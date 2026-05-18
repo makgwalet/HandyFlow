@@ -1,0 +1,26 @@
+# WHY: We run PostgreSQL locally in Docker so every developer has the
+# exact same database environment. No "works on my machine" problems.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: handyflow-db
+    environment:
+      POSTGRES_DB: handyflow
+      POSTGRES_USER: handyflow
+      POSTGRES_PASSWORD: handyflow123
+    ports:
+      # WHY 5433? Local PostgreSQL owns 5432.
+      # We move Docker to 5433 to avoid the conflict.
+      - "5433:5432"
+    volumes:
+      # WHY: Named volume = data survives container restarts
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U handyflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

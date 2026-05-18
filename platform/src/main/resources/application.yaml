@@ -1,0 +1,92 @@
+# WHY YAML over .properties?
+# YAML supports hierarchy — much cleaner for complex configs.
+# The indentation visually communicates the structure.
+
+spring:
+  application:
+    name: handyflow-platform
+
+  datasource:
+    url: jdbc:postgresql://localhost:5433/handyflow
+    username: handyflow
+    password: handyflow123
+    hikari:
+      # WHY: HikariCP is Spring Boot's default connection pool.
+      # These settings prevent connection exhaustion under load.
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      # WHY 'validate' not 'update'?
+      # 'update' auto-modifies your DB schema — DANGEROUS in production.
+      # 'validate' ensures your entities match the DB (Flyway manages changes).
+      ddl-auto: validate
+    show-sql: false  # true only during debugging — noisy in production
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        # WHY: This is crucial for multi-tenancy later.
+        # It prevents accidental cross-tenant data leakage.
+        default_schema: public
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+# ==================== APPLICATION SETTINGS ====================
+app:
+  security:
+    jwt:
+      # WHY: Secret must be long (256+ bits) and stored in environment
+      # variables in production — NEVER hardcode in production.
+      secret: "GdB35HWCrRPMEutmx3U1vkbITEkLRmpt7zvigkmtzEC"
+      expiration-ms: 86400000  # 24 hours
+      refresh-expiration-ms: 604800000  # 7 days
+
+  multitenancy:
+    # Strategy: SCHEMA (each tenant gets own schema) vs
+    # DISCRIMINATOR (shared tables with tenant_id column)
+    # We start with DISCRIMINATOR for simplicity, migrate later
+    strategy: DISCRIMINATOR
+
+# ==================== ACTUATOR ====================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,modulith
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# ==================== LOGGING ====================
+logging:
+  level:
+    com.handyflow: DEBUG
+    org.springframework.modulith: DEBUG
+    org.springframework.security: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{tenantId}] [%X{userId}] %logger{36} - %msg%n"
+    # WHY: We include tenantId and userId in every log line.
+    # This is called MDC (Mapped Diagnostic Context) — essential for debugging
+    # multi-tenant issues in production.
+
+# ==================== SWAGGER ====================
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    # WHY? Shows endpoints grouped by module/tag in the UI
+    tags-sorter: alpha
+    operations-sorter: alpha
+    # WHY? Remembers your auth token between page refreshes
+    persist-authorization: true
+  # WHY? Shows the actual request being sent — great for debugging
+  show-actuator: false
