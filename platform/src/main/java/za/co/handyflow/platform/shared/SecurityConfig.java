@@ -18,6 +18,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import za.co.handyflow.platform.admin.api.AdminJwtFilter;
 
 import java.util.List;
 
@@ -28,6 +29,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final AdminJwtFilter adminJwtFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -56,6 +58,15 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**",
                                 "/v3/api-docs",
+                                "/api/v1/creative/approve/**",   // public proof approval — no login required
+                                "/api/v1/desk/portal/**",
+                                "/api/v1/marketing/unsubscribe/**",
+                                "/api/v1/recruiter/careers/**",
+                                "/api/v1/recruiter/portal/**",
+                                "/api/v1/admin/auth/login",
+                                "/api/v1/admin/auth/verify-totp",
+                                "/api/v1/admin/auth/totp/setup",
+                                "/api/v1/admin/auth/totp/confirm",
                                 "/webjars/**",           // ← SpringDoc needs this
                                 "/swagger-resources/**"  // ← SpringDoc needs this
                         ).permitAll()
@@ -64,8 +75,8 @@ public class SecurityConfig {
                 )
 
                 // Insert our JWT filter BEFORE Spring's default auth filter
-                .addFilterBefore(jwtAuthFilter,
-                        UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(adminJwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
@@ -99,3 +110,5 @@ public class SecurityConfig {
 
 
 }
+
+

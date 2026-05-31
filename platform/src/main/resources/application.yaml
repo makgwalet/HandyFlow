@@ -39,6 +39,20 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
 
+  # ==================== Email — using Gmail SMTP (replace with real credentials) ====================
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: makgwale10111@gmail.com    # ← your actual Gmail
+    password: vvmqpuluhrxrecxh
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
 # ==================== APPLICATION SETTINGS ====================
 app:
   security:
@@ -54,6 +68,11 @@ app:
     # DISCRIMINATOR (shared tables with tenant_id column)
     # We start with DISCRIMINATOR for simplicity, migrate later
     strategy: DISCRIMINATOR
+
+  frontend:
+    url: ${FRONTEND_URL:http://localhost:5173}
+  notifications:
+    enabled: ${NOTIFICATIONS_ENABLED:true}
 
 # ==================== ACTUATOR ====================
 management:
@@ -90,3 +109,4 @@ springdoc:
     persist-authorization: true
   # WHY? Shows the actual request being sent — great for debugging
   show-actuator: false
+

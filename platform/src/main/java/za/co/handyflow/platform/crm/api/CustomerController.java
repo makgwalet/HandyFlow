@@ -15,6 +15,7 @@ import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.crm.application.internal.CustomerService;
 import za.co.handyflow.platform.crm.dto.CreateCustomerRequest;
 import za.co.handyflow.platform.crm.dto.CustomerResponse;
+import za.co.handyflow.platform.crm.dto.UpdateCustomerRequest;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
@@ -31,10 +32,10 @@ public class CustomerController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('CUSTOMER_READ')")
-    @Operation(summary = "List all customers")
+    @Operation(summary = "List all customers with pagination")
     public ResponseEntity<ApiResponse<Page<CustomerResponse>>> getCustomers(
             @RequestParam(required = false) String search,
-            @PageableDefault(size = 20) Pageable pageable
+            @PageableDefault(size = 10, sort = "name") Pageable pageable
     ) {
         featureGuard.requireModule("crm");
         var tenantId = TenantContext.getTenantIdAsObject();
@@ -65,6 +66,19 @@ public class CustomerController {
         var customer = customerService.createCustomer(tenantId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Customer created", customer));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('CUSTOMER_UPDATE')")
+    @Operation(summary = "Update an existing customer")
+    public ResponseEntity<ApiResponse<CustomerResponse>> updateCustomer(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateCustomerRequest request
+    ) {
+        featureGuard.requireModule("crm");
+        var tenantId = TenantContext.getTenantIdAsObject();
+        var customer = customerService.updateCustomer(tenantId, id, request);
+        return ResponseEntity.ok(ApiResponse.success("Customer updated", customer));
     }
 
     @DeleteMapping("/{id}")

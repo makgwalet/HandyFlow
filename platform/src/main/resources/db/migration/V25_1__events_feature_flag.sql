@@ -1,0 +1,1 @@
+UPDATE plans SET features = features || '{"events": true}'::jsonb WHERE name = 'ESSENTIAL';

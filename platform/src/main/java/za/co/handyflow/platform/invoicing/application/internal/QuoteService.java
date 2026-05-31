@@ -13,6 +13,10 @@ import za.co.handyflow.platform.invoicing.domain.repository.*;
 import za.co.handyflow.platform.invoicing.dto.*;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
+import org.springframework.beans.factory.annotation.Value;
+import za.co.handyflow.platform.identity.TenantFacade;
+import za.co.handyflow.platform.shared.EmailService;
+import za.co.handyflow.platform.shared.EmailTemplates;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -27,6 +31,11 @@ public class QuoteService {
     private final CrmFacade crmFacade;
     private final CatalogueFacade catalogueFacade;
     private final QuoteNumberGenerator quoteNumberGenerator;
+    private final TenantFacade tenantFacade;
+    private final EmailService emailService;
+
+    @Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
 
     @Transactional(readOnly = true)
     public Page<QuoteResponse> getQuotes(TenantId tenantId, Pageable pageable) {
@@ -43,8 +52,20 @@ public class QuoteService {
 
     @Transactional
     public QuoteResponse createQuote(TenantId tenantId, CreateQuoteRequest request) {
-        // Verify customer exists in CRM — cross-module call via facade
-        if (!crmFacade.customerExists(tenantId, request.customerId())) {
+
+        // Business rule: must have either a saved customer OR a walk-in name
+        boolean hasCustomer = request.customerId() != null;
+        boolean hasWalkin   = request.walkinClientName() != null
+                && !request.walkinClientName().isBlank();
+
+        if (!hasCustomer && !hasWalkin) {
+            throw new IllegalArgumentException(
+                    "Either a customer must be selected or a walk-in client name must be provided"
+            );
+        }
+
+        // Only validate CRM if a customerId was actually provided
+        if (hasCustomer && !crmFacade.customerExists(tenantId, request.customerId())) {
             throw new ResourceNotFoundException("Customer",
                     request.customerId().toString());
         }
@@ -52,11 +73,18 @@ public class QuoteService {
         String quoteNumber = quoteNumberGenerator.next(tenantId);
 
         Quote quote = Quote.create(
-                tenantId, request.customerId(),
-                quoteNumber, request.title()
+                tenantId,
+                request.customerId(),       // null for walk-ins — that's fine now
+                quoteNumber,
+                request.title(),
+                request.walkinClientName(),
+                request.walkinClientEmail(),
+                request.walkinClientPhone()
         );
+
         quoteRepository.save(quote);
-        log.info("Created quote={} tenant={}", quoteNumber, tenantId);
+        log.info("Created quote={} tenant={} walkin={}",
+                quoteNumber, tenantId, !hasCustomer);
         return toResponse(quote);
     }
 
@@ -123,10 +151,11 @@ public class QuoteService {
         Invoice invoice = Invoice.createFromQuote(
                 tenantId, quote.getCustomerId(),
                 quote.getId(), invoiceNumber,
-                quote.getSubtotal(), quote.getVatTotal(), quote.getTotal()
+                quote.getSubtotal(), quote.getVatTotal(), quote.getTotal(),
+                quote.getWalkinClientName(),    // ← add
+                quote.getWalkinClientEmail(),   // ← add
+                quote.getWalkinClientPhone()    // ← add
         );
-
-        // Copy line items from quote to invoice
         quote.getLineItems().forEach(qli -> {
             InvoiceLineItem ili = InvoiceLineItem.create(
                     invoice, tenantId,
@@ -138,10 +167,43 @@ public class QuoteService {
         });
 
         invoiceRepository.save(invoice);
+        invoice.markIssued();
         quote.markInvoiced();
         quoteRepository.save(quote);
 
         log.info("Converted quote={} to invoice={}", quoteId, invoice.getId());
+
+        // ── Email notification ─────────────────────────────────────────────
+        // WHY async? PDF/email must not block the HTTP response.
+        // If email fails, the invoice is already saved — we just log the error.
+        try {
+            tenantFacade.findTenantDetails(tenantId).ifPresent(tenant -> {
+
+                // Walk-in quotes have no CRM customer — use the walk-in name directly
+                String customerName = (quote.getCustomerId() != null)
+                        ? crmFacade.findCustomerById(tenantId, quote.getCustomerId())
+                        .map(c -> c.name())
+                        .orElse("Customer")
+                        : (quote.getWalkinClientName() != null
+                        ? quote.getWalkinClientName()
+                        : "Walk-in Client");
+
+                String amount = "R " + String.format(
+                        java.util.Locale.US, "%,.2f", invoice.getTotal());
+
+                emailService.send(
+                        tenant.email(),
+                        "Invoice " + invoiceNumber + " generated — " + customerName,
+                        EmailTemplates.invoiceGenerated(
+                                tenant.companyName(), invoiceNumber,
+                                customerName, amount, frontendUrl
+                        )
+                );
+            });
+        } catch (Exception e) {
+            log.warn("Invoice notification not sent: {}", e.getMessage());
+        }
+
         return invoice.getId();
     }
 
@@ -173,7 +235,10 @@ public class QuoteService {
                 q.getCustomerId(), q.getTitle(), q.getNotes(),
                 q.getSubtotal(), q.getVatTotal(), q.getTotal(),
                 q.getCurrency(), q.getSentAt(), q.getExpiresAt(),
-                q.getAcceptedAt(), lineItems, q.getCreatedAt()
+                q.getAcceptedAt(), lineItems, q.getCreatedAt(),
+                q.getWalkinClientName(),     // ← new
+                q.getWalkinClientEmail(),    // ← new
+                q.getWalkinClientPhone()     // ← new
         );
     }
 }

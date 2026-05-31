@@ -7,6 +7,7 @@ import za.co.handyflow.platform.identity.UserCreatedEvent;
 import za.co.handyflow.platform.shared.AggregateRoot;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -28,6 +29,19 @@ public class User extends AggregateRoot<User> {
     @Column(name = "last_name", nullable = false)
     private String lastName;
 
+    // Added by V29 migration
+    @Column(name = "phone")
+    private String phone;
+
+    @Column(name = "job_title")
+    private String jobTitle;
+
+    @Column(name = "department")
+    private String department;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt = Instant.now();
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private UserStatus status;
@@ -44,38 +58,63 @@ public class User extends AggregateRoot<User> {
         ACTIVE, INACTIVE, LOCKED
     }
 
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
     public static User create(TenantId tenantId, String email,
                               String passwordHash, String firstName,
                               String lastName) {
         User user = new User();
         user.setTenantIdOnCreation(tenantId);
-        user.email = email.toLowerCase().trim();
+        user.email        = email.toLowerCase().trim();
         user.passwordHash = passwordHash;
-        user.firstName = firstName;
-        user.lastName = lastName;
-        user.status = UserStatus.ACTIVE;
+        user.firstName    = firstName;
+        user.lastName     = lastName;
+        user.status       = UserStatus.ACTIVE;
 
-        user.registerEvent(UserCreatedEvent.of(
-                tenantId,
-                user.getId(),
-                email
-        ));
-
+        user.registerEvent(UserCreatedEvent.of(tenantId, user.getId(), email));
         return user;
     }
 
-    // Called by AggregateRoot subclasses that don't self-reference
     private void setTenantIdOnCreation(TenantId tenantId) {
         initTenantId(tenantId);
     }
+
+    // ── Profile updates ───────────────────────────────────────────────────────
+
+    public void setFirstName(String firstName)   { this.firstName  = firstName; }
+    public void setLastName(String lastName)      { this.lastName   = lastName; }
+    public void setPhone(String phone)            { this.phone      = phone; }
+    public void setJobTitle(String jobTitle)      { this.jobTitle   = jobTitle; }
+    public void setDepartment(String department)  { this.department = department; }
+
+    // ── Role management ───────────────────────────────────────────────────────
 
     public void assignRole(Role role) {
         this.roles.add(role);
     }
 
+    /** Replace all roles with a single role — used when admin changes a user's role. */
+    public void clearRoles() {
+        this.roles.clear();
+    }
+
+    // ── Status management ─────────────────────────────────────────────────────
+
     public boolean isActive() {
         return this.status == UserStatus.ACTIVE;
     }
+
+    public void activate() {
+        this.status = UserStatus.ACTIVE;
+    }
+
+    public void deactivate() {
+        this.status = UserStatus.INACTIVE;
+    }
+
+    // ── Permission resolution ─────────────────────────────────────────────────
 
     // WHY expose this method instead of direct field access?
     // Spring Security needs a flat list of authority strings.

@@ -102,6 +102,16 @@ public class CatalogueItem {
         this.updatedAt = Instant.now();
     }
 
+    public void update(String name, String description, CatalogueCategory category,
+                       String unit, BigDecimal defaultPrice, BigDecimal vatRate) {
+        this.name = name;
+        this.description = description;
+        this.category = category;
+        this.unit = unit;
+        this.defaultPrice = defaultPrice;
+        this.vatRate = vatRate;
+    }
+
     public boolean isDeleted() { return deletedAt != null; }
 
     @PreUpdate

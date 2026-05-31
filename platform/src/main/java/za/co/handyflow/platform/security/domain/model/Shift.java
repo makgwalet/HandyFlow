@@ -1,0 +1,111 @@
+// security/domain/model/Shift.java
+
+package za.co.handyflow.platform.security.domain.model;
+
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import za.co.handyflow.platform.shared.TenantId;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = "security_shifts")
+@Getter
+@NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
+public class Shift {
+
+    @Id
+    private UUID id = UUID.randomUUID();
+
+    @Embedded
+    @AttributeOverride(name = "value",
+            column = @Column(name = "tenant_id", nullable = false))
+    private TenantId tenantId;
+
+    @Column(name = "site_id", nullable = false)
+    private UUID siteId;
+
+    @Column(name = "guard_id", nullable = false)
+    private UUID guardId;
+
+    @Column(name = "start_at", nullable = false)
+    private Instant startAt;
+
+    @Column(name = "end_at", nullable = false)
+    private Instant endAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ShiftStatus status;
+
+    private String notes;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    @Column(name = "deleted_by")
+    private UUID deletedBy;
+
+    @Version
+    private Long version;
+
+    public static Shift create(TenantId tenantId, UUID siteId, UUID guardId,
+                               Instant startAt, Instant endAt, String notes) {
+        if (!endAt.isAfter(startAt)) {
+            throw new IllegalArgumentException("Shift end must be after start");
+        }
+        Shift s = new Shift();
+        s.tenantId  = tenantId;
+        s.siteId    = siteId;
+        s.guardId   = guardId;
+        s.startAt   = startAt;
+        s.endAt     = endAt;
+        s.status    = ShiftStatus.SCHEDULED;
+        s.notes     = notes;
+        s.createdAt = Instant.now();
+        s.updatedAt = Instant.now();
+        return s;
+    }
+
+    public void start() {
+        if (status != ShiftStatus.SCHEDULED) {
+            throw new IllegalStateException("Only SCHEDULED shifts can be started");
+        }
+        this.status    = ShiftStatus.ACTIVE;
+        this.updatedAt = Instant.now();
+    }
+
+    public void complete() {
+        if (status != ShiftStatus.ACTIVE) {
+            throw new IllegalStateException("Only ACTIVE shifts can be completed");
+        }
+        this.status    = ShiftStatus.COMPLETED;
+        this.updatedAt = Instant.now();
+    }
+
+    public void miss() {
+        if (status != ShiftStatus.SCHEDULED) return;
+        this.status    = ShiftStatus.MISSED;
+        this.updatedAt = Instant.now();
+    }
+
+    public void cancel(UUID cancelledBy) {
+        this.status    = ShiftStatus.CANCELLED;
+        this.deletedAt = Instant.now();
+        this.deletedBy = cancelledBy;
+        this.updatedAt = Instant.now();
+    }
+
+    public boolean isDeleted() { return deletedAt != null; }
+
+    @PreUpdate
+    void onUpdate() { this.updatedAt = Instant.now(); }
+}

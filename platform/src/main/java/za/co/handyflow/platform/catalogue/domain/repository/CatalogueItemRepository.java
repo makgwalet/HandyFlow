@@ -2,6 +2,7 @@ package za.co.handyflow.platform.catalogue.domain.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import za.co.handyflow.platform.catalogue.domain.model.CatalogueCategory;
 import za.co.handyflow.platform.catalogue.domain.model.CatalogueItem;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -11,7 +12,6 @@ import java.util.UUID;
 
 public interface CatalogueItemRepository extends JpaRepository<CatalogueItem, UUID> {
 
-    // WHY deleted_at IS NULL? Soft delete — we never return deleted items
     @Query("SELECT i FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.deletedAt IS NULL ORDER BY i.name")
     List<CatalogueItem> findAllActive(TenantId tenantId);
 
@@ -20,6 +20,9 @@ public interface CatalogueItemRepository extends JpaRepository<CatalogueItem, UU
 
     @Query("SELECT i FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.id = :id AND i.deletedAt IS NULL")
     Optional<CatalogueItem> findActiveById(TenantId tenantId, UUID id);
+
+    @Query("SELECT i FROM CatalogueItem i WHERE i.tenantId = :tenantId AND i.category = :category AND i.deletedAt IS NULL")
+    List<CatalogueItem> findAllByCategory(TenantId tenantId, CatalogueCategory category);
 
     boolean existsByTenantIdAndNameAndDeletedAtIsNull(TenantId tenantId, String name);
 }

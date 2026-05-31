@@ -26,7 +26,7 @@ public class Invoice {
             column = @Column(name = "tenant_id", nullable = false))
     private TenantId tenantId;
 
-    @Column(name = "customer_id", nullable = false)
+    @Column(name = "customer_id", nullable = true)
     private UUID customerId;
 
     @Column(name = "quote_id")
@@ -83,13 +83,25 @@ public class Invoice {
     @Column(name = "deleted_by")
     private UUID deletedBy;
 
+    @Column(name = "walkin_client_name")
+    private String walkinClientName;
+
+    @Column(name = "walkin_client_email")
+    private String walkinClientEmail;
+
+    @Column(name = "walkin_client_phone")
+    private String walkinClientPhone;
+
     @Version
     private Long version;
 
     public static Invoice createFromQuote(TenantId tenantId, UUID customerId,
                                           UUID quoteId, String invoiceNumber,
                                           BigDecimal subtotal, BigDecimal vatTotal,
-                                          BigDecimal total) {
+                                          BigDecimal total,
+                                          String walkinClientName,
+                                          String walkinClientEmail,
+                                          String walkinClientPhone) {
         Invoice inv = new Invoice();
         inv.tenantId = tenantId;
         inv.customerId = customerId;
@@ -100,6 +112,9 @@ public class Invoice {
         inv.vatTotal = vatTotal;
         inv.total = total;
         inv.amountPaid = BigDecimal.ZERO;
+        inv.walkinClientName = walkinClientName;
+        inv.walkinClientEmail = walkinClientEmail;
+        inv.walkinClientPhone = walkinClientPhone;
         inv.createdAt = Instant.now();
         inv.updatedAt = Instant.now();
         return inv;
@@ -114,6 +129,27 @@ public class Invoice {
         this.issuedAt = Instant.now();
         this.dueDate = dueDate;
         this.updatedAt = Instant.now();
+    }
+
+    public void recordPayment(BigDecimal amount, Instant paidDate) {
+        if (this.status == InvoiceStatus.CANCELLED)
+            throw new IllegalStateException("Cannot record payment on a cancelled invoice");
+        this.amountPaid = this.amountPaid.add(amount);
+        if (this.amountPaid.compareTo(this.total) >= 0) {
+            this.status  = InvoiceStatus.PAID;
+            this.paidAt  = paidDate != null ? paidDate : Instant.now();
+        } else {
+            this.status = InvoiceStatus.PARTIALLY_PAID;
+        }
+        this.updatedAt = Instant.now();
+    }
+
+    public void markIssued() {
+        if (this.status == InvoiceStatus.DRAFT) {
+            this.status = InvoiceStatus.ISSUED;
+            this.issuedAt = Instant.now();
+            this.updatedAt = Instant.now();
+        }
     }
 
     @PreUpdate

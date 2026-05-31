@@ -79,4 +79,37 @@ public class CatalogueController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Category created", category));
     }
+
+    @PutMapping("/items/{id}")
+    @PreAuthorize("hasAuthority('SETTINGS_MANAGE')")
+    @Operation(summary = "Update a catalogue item")
+    public ResponseEntity<ApiResponse<CatalogueItemSummary>> updateItem(
+            @PathVariable UUID id,
+            @Valid @RequestBody CreateItemRequest request
+    ) {
+        var tenantId = TenantContext.getTenantIdAsObject();
+        var item = catalogueService.updateItem(tenantId, id, request);
+        return ResponseEntity.ok(ApiResponse.success("Item updated", item));
+    }
+
+    @PutMapping("/categories/{id}")
+    @PreAuthorize("hasAuthority('SETTINGS_MANAGE')")
+    @Operation(summary = "Update a category")
+    public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
+            @PathVariable UUID id,
+            @Valid @RequestBody CreateCategoryRequest request
+    ) {
+        var tenantId = TenantContext.getTenantIdAsObject();
+        var category = catalogueService.updateCategory(tenantId, id, request);
+        return ResponseEntity.ok(ApiResponse.success("Category updated", category));
+    }
+
+    @DeleteMapping("/categories/{id}")
+    @PreAuthorize("hasAuthority('SETTINGS_MANAGE')")
+    @Operation(summary = "Delete a category and all its items")
+    public ResponseEntity<ApiResponse<Void>> deleteCategory(@PathVariable UUID id) {
+        var tenantId = TenantContext.getTenantIdAsObject();
+        catalogueService.deleteCategory(tenantId, id);
+        return ResponseEntity.ok(ApiResponse.success("Category deleted", null));
+    }
 }

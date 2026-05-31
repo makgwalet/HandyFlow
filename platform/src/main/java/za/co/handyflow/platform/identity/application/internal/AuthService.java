@@ -14,7 +14,6 @@ import za.co.handyflow.platform.identity.dto.request.LoginRequest;
 import za.co.handyflow.platform.identity.dto.request.RegisterRequest;
 import za.co.handyflow.platform.identity.dto.response.AuthResponse;
 import za.co.handyflow.platform.shared.JwtService;
-import za.co.handyflow.platform.shared.TenantContext;
 
 @Slf4j
 @Service
@@ -30,8 +29,7 @@ public class AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest request) {
 
-        // Guard: check uniqueness before creating anything
-        if(tenantRepository.existsBySlug(request.slug())) {
+        if (tenantRepository.existsBySlug(request.slug())) {
             throw new IllegalArgumentException(
                     "Slug '" + request.slug() + "' is already taken"
             );
@@ -43,20 +41,17 @@ public class AuthService {
             );
         }
 
-        // 1. Create the tenant
+        // moduleKeys passed via event — billing listens and activates modules
         Tenant tenant = Tenant.register(
                 request.companyName(),
                 request.slug(),
-                request.email()
+                request.email(),
+                request.moduleKeys()
         );
         tenantRepository.save(tenant);
-        // WHY save tenant first?
-        // User has a FK to tenant. Tenant must exist in DB before user is created.
 
-        // 2. Create default ADMIN role for this tenant
         Role adminRole = roleService.createDefaultAdminRole(tenant.getTenantId());
 
-        // 3. Create the owner user
         User owner = User.create(
                 tenant.getTenantId(),
                 request.email(),
@@ -69,38 +64,32 @@ public class AuthService {
 
         log.info("Registered new tenant={} owner={}", tenant.getSlug(), owner.getId());
 
-        // 4. Generate JWT and return
         return buildAuthResponse(owner, tenant);
     }
 
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
 
-        // 1. Find the tenant by slug
         Tenant tenant = tenantRepository.findBySlug(request.tenantSlug())
                 .orElseThrow(() -> new IllegalArgumentException(
                         "No company found with slug: " + request.tenantSlug()
                 ));
 
-        if (!tenant.isActive()){
+        if (!tenant.isActive()) {
             throw new IllegalStateException("This account is suspended or cancelled");
         }
 
-        // 2. Find the user within that tenant
         User user = userRepository
                 .findByEmailAndTenantId(request.email(), tenant.getTenantId())
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Invalid email or password"
-                        // WHY vague message? Never tell attackers which part was wrong.
-                        // "Email not found" tells them the email doesn't exist — useful to attackers.
                 ));
 
-        // 3. Verify password
-        if(!passwordEncoder.matches(request.password(), user.getPasswordHash())){
+        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new IllegalArgumentException("Invalid email or password");
         }
 
-        if(!user.isActive()){
+        if (!user.isActive()) {
             throw new IllegalStateException("Your account has been deactivated");
         }
 

@@ -6,7 +6,9 @@ import {
   ChevronDown, Search, ExternalLink, User, Lock,
   CreditCard, LogOut, X, UserPlus, FilePlus, Plus,
   TrendingUp, ChevronRight, Building2, CheckCircle,
-  AlertCircle,
+  AlertCircle, Shield, Fuel, HardHat, Car, Briefcase,
+  BookOpen, Calculator, Calendar, HeartPulse, PartyPopper, FilePen, Wallet,
+  Palette, Headphones, CheckSquare, Megaphone, UserCheck, ShoppingCart,
 } from 'lucide-react'
 import { apiClient } from '../../api/client'
 import { useAuthStore } from '../../store/auth.store'
@@ -30,11 +32,29 @@ interface Notification {
   read: boolean
 }
 
-const ACTIVE_APPS: AppTile[] = [
-  { key: 'crm', name: 'CRM', description: 'Customers & contacts', icon: Users, bg: '#DBEAFE', iconColor: '#1D4ED8', route: '/customers' },
-  { key: 'invoicing', name: 'Invoicing', description: 'Quotes & invoices', icon: FileText, bg: '#DCFCE7', iconColor: '#166534', route: '/quotes' },
-  { key: 'catalogue', name: 'Catalogue', description: 'Products & services', icon: Package, bg: '#F3E8FF', iconColor: '#7C3AED', route: '/catalogue' },
-]
+const MODULE_REGISTRY: Record<string, AppTile> = {
+  crm:         { key: 'crm',         name: 'CRM',          description: 'Customers & contacts',          icon: Users,       bg: '#DBEAFE', iconColor: '#1D4ED8', route: '/customers'   },
+  invoicing:   { key: 'invoicing',   name: 'Invoicing',    description: 'Quotes & invoices',             icon: FileText,    bg: '#DCFCE7', iconColor: '#166534', route: '/invoices'    },
+  catalogue:   { key: 'catalogue',   name: 'Catalogue',    description: 'Products & services',           icon: Package,     bg: '#F3E8FF', iconColor: '#7C3AED', route: '/catalogue'   },
+  security:    { key: 'security',    name: 'Security',     description: 'Guards, sites & QR patrols',   icon: Shield,      bg: '#F0FDF4', iconColor: '#0D9488', route: '/security'    },
+  fuel:        { key: 'fuel',        name: 'Fuel',         description: 'Tanks, dispatch & deliveries', icon: Fuel,        bg: '#FEF3C7', iconColor: '#D97706', route: '/fuel'        },
+  earthmoving: { key: 'earthmoving', name: 'Earthmoving',  description: 'Assets & operators',           icon: HardHat,     bg: '#FEF9C3', iconColor: '#854D0E', route: '/earthmoving' },
+  property:    { key: 'property',    name: 'Property',     description: 'Units, leases & rent',         icon: Building2,   bg: '#EDE9FE', iconColor: '#7C3AED', route: '/property'    },
+  fleet:       { key: 'fleet',       name: 'Fleet',        description: 'Vehicles & trips',             icon: Car,         bg: '#E0F2FE', iconColor: '#0369A1', route: '/fleet'       },
+  hr:          { key: 'hr',          name: 'HR & Payroll', description: 'Employees & pay runs',         icon: Briefcase,   bg: '#FCE7F3', iconColor: '#9D174D', route: '/hr'          },
+  accounting:  { key: 'accounting',  name: 'Accounting',   description: 'Accounts & reports',           icon: Calculator,  bg: '#ECFDF5', iconColor: '#059669', route: '/accounting'  },
+  bookings:    { key: 'bookings',    name: 'Bookings',     description: 'Appointments & scheduling',    icon: Calendar,    bg: '#FFF7ED', iconColor: '#EA580C', route: '/bookings'    },
+  clinic:      { key: 'clinic',      name: 'Clinic',       description: 'Patients & consultations',     icon: HeartPulse,  bg: '#FFF1F2', iconColor: '#BE123C', route: '/clinic'      },
+  events:      { key: 'events',      name: 'Events',       description: 'Ticketing & QR check-in',      icon: PartyPopper, bg: '#F0F9FF', iconColor: '#0284C7', route: '/events'      },
+  contracting: { key: 'contracting', name: 'Contracting',  description: 'Contracts & OTP signing',      icon: FilePen,     bg: '#F0F9FF', iconColor: '#0284C7', route: '/contracts'   },
+  expenses:    { key: 'expenses',    name: 'Expenses',     description: 'Staff expense claims',         icon: Wallet,      bg: '#FDF4FF', iconColor: '#9333EA', route: '/expenses'    },
+  creative:    { key: 'creative',    name: 'Creative',     description: 'Design jobs & proofs',         icon: Palette,      bg: '#FDF4FF', iconColor: '#9333EA', route: '/creative'    },
+  desk:        { key: 'desk',        name: 'Desk Support', description: 'Helpdesk & SLA tracking',      icon: Headphones,   bg: '#F0F9FF', iconColor: '#0369A1', route: '/desk'        },
+  tasks:       { key: 'tasks',       name: 'Tasks',        description: 'Kanban boards & time logs',    icon: CheckSquare,  bg: '#F0FDF4', iconColor: '#059669', route: '/tasks'       },
+  marketing:   { key: 'marketing',   name: 'Marketing',    description: 'Email campaigns & contacts',   icon: Megaphone,    bg: '#FFF7ED', iconColor: '#EA580C', route: '/marketing'   },
+  recruiter:   { key: 'recruiter',   name: 'Recruiter',    description: 'Jobs, pipeline & hiring',      icon: UserCheck,    bg: '#ECFDF5', iconColor: '#059669', route: '/recruiter'   },
+  pos:         { key: 'pos',         name: 'POS & Stock',  description: 'Point of sale & inventory',    icon: ShoppingCart, bg: '#EFF6FF', iconColor: '#2563EB', route: '/pos'         },
+}
 
 const MOCK_NOTIFICATIONS: Notification[] = [
   { id: '1', type: 'warning', text: 'Pilot ends in 57 days — upgrade to keep access to all your data', time: 'Today, 08:00', read: false },
@@ -118,6 +138,23 @@ export function DashboardPage() {
     queryKey: ['subscription'],
     queryFn: async () => (await apiClient.get('/api/v1/billing/subscription')).data,
   })
+
+  const { data: tenantModules = [] } = useQuery<{moduleKey: string; accessible: boolean}[]>({
+    queryKey: ['tenant-modules-dashboard'],
+    queryFn: async () => {
+      const r = await apiClient.get('/api/v1/billing/modules/mine')
+      return r.data || []
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // CRM and Catalogue are always active (core, not in modules/mine)
+  const CORE_ALWAYS = ['crm', 'catalogue']
+  const apiModuleKeys = new Set(tenantModules.filter(m => m.accessible).map(m => m.moduleKey))
+  const allActiveKeys = [...CORE_ALWAYS, ...Array.from(apiModuleKeys)]
+  const activeApps = allActiveKeys
+    .filter(key => MODULE_REGISTRY[key])
+    .map(key => MODULE_REGISTRY[key])
 
   const today = new Date().toLocaleDateString('en-ZA', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
@@ -508,7 +545,7 @@ export function DashboardPage() {
               Your apps
             </p>
             <p style={{ fontSize: 13, color: '#64748B', margin: 0 }}>
-              {ACTIVE_APPS.length} active {ACTIVE_APPS.length === 1 ? 'app' : 'apps'} on your plan
+              {activeApps.length} active {activeApps.length === 1 ? 'app' : 'apps'} on your plan
             </p>
           </div>
           <button
@@ -527,10 +564,10 @@ export function DashboardPage() {
 
         <div style={{
           display: 'grid',
-          gridTemplateColumns: `repeat(${ACTIVE_APPS.length}, minmax(0, 200px))`,
+          gridTemplateColumns: 'repeat(5, 1fr)',
           gap: 14, marginBottom: 36,
         }}>
-          {ACTIVE_APPS.map(app => (
+          {activeApps.map(app => (
             <AppTileCard key={app.key} app={app} onClick={() => navigate(app.route)} />
           ))}
         </div>

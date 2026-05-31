@@ -1,0 +1,30 @@
+package za.co.handyflow.platform.tasks.dto;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+public record TaskResponse(
+        UUID       id,
+        UUID       boardId,
+        UUID       columnId,
+        String     columnName,
+        String     title,
+        String     description,
+        String     priority,
+        String     status,
+        UUID       assigneeId,
+        String     assigneeName,
+        LocalDate  dueDate,
+        boolean    overdue,
+        BigDecimal estimatedHours,
+        BigDecimal loggedHours,
+        int        sortOrder,
+        String     linkedEntityType,
+        UUID       linkedEntityId,
+        int        commentCount,
+        List<TaskCommentResponse> comments,
+        Instant    createdAt,
+        Instant    updatedAt,
+        Instant    completedAt
+) {}

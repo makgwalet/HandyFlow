@@ -10,6 +10,7 @@ import za.co.handyflow.platform.crm.domain.model.Customer;
 import za.co.handyflow.platform.crm.domain.repository.CustomerRepository;
 import za.co.handyflow.platform.crm.dto.CreateCustomerRequest;
 import za.co.handyflow.platform.crm.dto.CustomerResponse;
+import za.co.handyflow.platform.crm.dto.UpdateCustomerRequest;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -66,6 +67,33 @@ public class CustomerService {
         customer.softDelete(null);
         customerRepository.save(customer);
         log.info("Soft deleted customer={} tenant={}", id, tenantId);
+    }
+
+    @Transactional
+    public CustomerResponse updateCustomer(TenantId tenantId, UUID id, UpdateCustomerRequest request) {
+        Customer customer = customerRepository.findActiveById(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", id.toString()));
+
+        // If email is changing, check it isn't already taken by another customer
+        if (request.email() != null
+                && !request.email().equals(customer.getEmail())
+                && customerRepository.existsByTenantIdAndEmailAndDeletedAtIsNull(tenantId, request.email())) {
+            throw new IllegalArgumentException(
+                    "A customer with email '" + request.email() + "' already exists"
+            );
+        }
+
+        customer.update(
+                request.name(),
+                request.email(),
+                request.phone(),
+                request.address(),
+                request.taxNumber(),
+                request.notes()
+        );
+        customerRepository.save(customer);
+        log.info("Updated customer={} tenant={}", id, tenantId);
+        return toResponse(customer);
     }
 
     private CustomerResponse toResponse(Customer c) {

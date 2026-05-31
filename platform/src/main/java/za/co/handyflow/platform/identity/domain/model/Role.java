@@ -42,13 +42,18 @@ public class Role {
 
     public static Role create(TenantId tenantId, String name, String description) {
         Role role = new Role();
-        role.tenantId = tenantId;
-        role.name = name.toUpperCase().trim();
+        role.tenantId    = tenantId;
+        role.name        = name.toUpperCase().trim();
         role.description = description;
         return role;
     }
 
     public void addPermission(Permission permission) {
         this.permissions.add(permission);
+    }
+
+    /** Replace all permissions — used when admin edits a role's permission set. */
+    public void clearPermissions() {
+        this.permissions.clear();
     }
 }

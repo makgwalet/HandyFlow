@@ -19,6 +19,7 @@ export interface RegisterRequest {
   lastName: string
   email: string
   password: string
+  moduleKeys?: string[]
 }
 
 export interface LoginRequest {

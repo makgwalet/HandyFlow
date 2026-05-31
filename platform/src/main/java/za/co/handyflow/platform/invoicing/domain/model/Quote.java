@@ -26,7 +26,7 @@ public class Quote {
             column = @Column(name = "tenant_id", nullable = false))
     private TenantId tenantId;
 
-    @Column(name = "customer_id", nullable = false)
+    @Column(name = "customer_id", nullable = true)
     private UUID customerId;
 
     @Column(name = "quote_number", nullable = false)
@@ -80,16 +80,30 @@ public class Quote {
     @Column(name = "deleted_by")
     private UUID deletedBy;
 
+    @Column(name = "walkin_client_name")
+    private String walkinClientName;
+
+    @Column(name = "walkin_client_email")
+    private String walkinClientEmail;
+
+    @Column(name = "walkin_client_phone")
+    private String walkinClientPhone;
+
     @Version
     private Long version;
 
     public static Quote create(TenantId tenantId, UUID customerId,
-                               String quoteNumber, String title) {
+                               String quoteNumber, String title,
+                               String walkinClientName, String walkinClientEmail,
+                               String walkinClientPhone) {
         Quote q = new Quote();
         q.tenantId = tenantId;
         q.customerId = customerId;
         q.quoteNumber = quoteNumber;
         q.title = title;
+        q.walkinClientName = walkinClientName;
+        q.walkinClientEmail = walkinClientEmail;
+        q.walkinClientPhone = walkinClientPhone;
         q.status = QuoteStatus.DRAFT;
         q.createdAt = Instant.now();
         q.updatedAt = Instant.now();

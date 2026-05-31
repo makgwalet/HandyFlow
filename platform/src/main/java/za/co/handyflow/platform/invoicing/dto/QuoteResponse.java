@@ -20,5 +20,10 @@ public record QuoteResponse(
         Instant expiresAt,
         Instant acceptedAt,
         List<LineItemResponse> lineItems,
-        Instant createdAt
+        Instant createdAt,
+
+        // Walk-in fields — null when customerId is set
+        String walkinClientName,
+        String walkinClientEmail,
+        String walkinClientPhone
 ) {}

@@ -1,0 +1,4 @@
+ALTER TABLE security_incidents
+    ADD COLUMN IF NOT EXISTS acknowledged_at  TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS resolved_at      TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW();

@@ -30,6 +30,15 @@ public interface QuoteRepository extends JpaRepository<Quote, UUID> {
         """)
     Optional<Quote> findActiveById(TenantId tenantId, UUID id);
 
+    @Query("""
+        SELECT DISTINCT q FROM Quote q
+        LEFT JOIN FETCH q.lineItems
+        WHERE q.tenantId = :tenantId
+        AND q.id = :id
+        AND q.deletedAt IS NULL
+        """)
+    Optional<Quote> findActiveByIdWithLineItems(TenantId tenantId, UUID id);
+
     // WHY this query? Used by the scheduler.
     // Only SENT quotes expire — partial DB index matches this exactly.
     @Query("""
@@ -46,3 +55,4 @@ public interface QuoteRepository extends JpaRepository<Quote, UUID> {
         """)
     long countAllByTenantId(TenantId tenantId);
 }
+

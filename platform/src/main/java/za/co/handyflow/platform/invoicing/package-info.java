@@ -1,5 +1,4 @@
-// invoicing/package-info.java
-@ApplicationModule(allowedDependencies = {"shared", "billing", "crm", "catalogue"})
+@ApplicationModule(allowedDependencies = {"shared", "billing", "crm", "catalogue", "identity"})
 package za.co.handyflow.platform.invoicing;
 
 import org.springframework.modulith.ApplicationModule;

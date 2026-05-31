@@ -1,0 +1,285 @@
+package za.co.handyflow.platform.hr.application.internal;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.hr.domain.model.*;
+import za.co.handyflow.platform.hr.domain.repository.*;
+import za.co.handyflow.platform.hr.dto.*;
+import za.co.handyflow.platform.shared.ResourceNotFoundException;
+import za.co.handyflow.platform.shared.TenantId;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class HrService {
+
+    private final HrEmployeeRepository     employeeRepo;
+    private final HrLeaveBalanceRepository  balanceRepo;
+    private final HrLeaveRequestRepository  leaveRepo;
+    private final HrDisciplinaryRepository  disciplinaryRepo;
+    private final EmployeeNumberGenerator   numberGen;
+
+    // ── Employees ─────────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public Page<EmployeeResponse> getEmployees(TenantId tenantId, String status,
+                                               String search, Pageable pageable) {
+        return employeeRepo.findAllActive(tenantId, status, search, pageable)
+                .map(this::toEmployeeResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public EmployeeResponse getEmployee(TenantId tenantId, UUID id) {
+        return employeeRepo.findActiveById(tenantId, id)
+                .map(this::toEmployeeResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee", id.toString()));
+    }
+
+    @Transactional
+    public EmployeeResponse createEmployee(TenantId tenantId, CreateEmployeeRequest req) {
+        String number = numberGen.next(tenantId);
+        HrEmployee emp = HrEmployee.create(tenantId, number, req.firstName(),
+                req.lastName(), req.startDate(), req.employmentType(),
+                req.grossSalary(), req.payFrequency());
+
+        // Apply optional fields via reflection-free setters
+        applyOptionalFields(emp, req);
+        employeeRepo.save(emp);
+
+        // Seed BCEA leave balances for the current year
+        seedLeaveBalances(tenantId, emp.getId(), LocalDate.now().getYear());
+
+        log.info("Created employee={} {} tenant={}", number, emp.getFullName(), tenantId);
+        return toEmployeeResponse(emp);
+    }
+
+    @Transactional
+    public EmployeeResponse terminateEmployee(TenantId tenantId, UUID id,
+                                              LocalDate endDate) {
+        HrEmployee emp = findActive(tenantId, id);
+        emp.terminate(endDate);
+        employeeRepo.save(emp);
+        log.info("Terminated employee={}", emp.getEmployeeNumber());
+        return toEmployeeResponse(emp);
+    }
+
+    // ── Leave balances ────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<LeaveBalanceResponse> getLeaveBalances(TenantId tenantId,
+                                                       UUID employeeId, int year) {
+        findActive(tenantId, employeeId); // verify employee belongs to tenant
+        return balanceRepo.findByEmployeeAndYear(employeeId, year)
+                .stream().map(this::toBalanceResponse).toList();
+    }
+
+    // ── Leave requests ────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public Page<LeaveRequestResponse> getLeaveRequests(TenantId tenantId,
+                                                       String status, Pageable pageable) {
+        return leaveRepo.findAllByTenant(tenantId, status, pageable)
+                .map(r -> toLeaveResponse(r, tenantId));
+    }
+
+    @Transactional
+    public LeaveRequestResponse submitLeaveRequest(TenantId tenantId,
+                                                   UUID employeeId,
+                                                   SubmitLeaveRequest req) {
+        HrEmployee emp = findActive(tenantId, employeeId);
+
+        long workingDays = req.startDate().datesUntil(req.endDate().plusDays(1))
+                .filter(d -> d.getDayOfWeek().getValue() <= 5)
+                .count();
+        BigDecimal days = BigDecimal.valueOf(workingDays);
+
+        // Check balance
+        int year = req.startDate().getYear();
+        balanceRepo.findByEmployeeYearAndType(employeeId, year, req.leaveType())
+                .ifPresent(bal -> {
+                    if (bal.getAvailableDays().compareTo(days) < 0)
+                        throw new IllegalArgumentException(
+                                "Insufficient " + req.leaveType() + " leave balance. " +
+                                        "Available: " + bal.getAvailableDays() + " days, requested: " + days);
+                    bal.addPending(days);
+                    balanceRepo.save(bal);
+                });
+
+        HrLeaveRequest request = HrLeaveRequest.create(tenantId, employeeId,
+                req.leaveType(), req.startDate(), req.endDate(), days, req.reason());
+        leaveRepo.save(request);
+        log.info("Leave request {} days {} for employee={}", days, req.leaveType(),
+                emp.getEmployeeNumber());
+        return toLeaveResponse(request, tenantId);
+    }
+
+    @Transactional
+    public LeaveRequestResponse approveLeaveRequest(TenantId tenantId,
+                                                    UUID requestId, UUID approverId) {
+        HrLeaveRequest req = leaveRepo.findByTenantAndId(tenantId, requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("LeaveRequest", requestId.toString()));
+        if (!"PENDING".equals(req.getStatus()))
+            throw new IllegalStateException("Only PENDING requests can be approved");
+
+        req.approve(approverId);
+        leaveRepo.save(req);
+
+        balanceRepo.findByEmployeeYearAndType(
+                        req.getEmployeeId(), req.getStartDate().getYear(), req.getLeaveType())
+                .ifPresent(bal -> {
+                    bal.approvePending(req.getDaysRequested());
+                    balanceRepo.save(bal);
+                });
+        return toLeaveResponse(req, tenantId);
+    }
+
+    @Transactional
+    public LeaveRequestResponse rejectLeaveRequest(TenantId tenantId, UUID requestId,
+                                                   UUID approverId, String reason) {
+        HrLeaveRequest req = leaveRepo.findByTenantAndId(tenantId, requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("LeaveRequest", requestId.toString()));
+        req.reject(approverId, reason);
+        leaveRepo.save(req);
+
+        balanceRepo.findByEmployeeYearAndType(
+                        req.getEmployeeId(), req.getStartDate().getYear(), req.getLeaveType())
+                .ifPresent(bal -> {
+                    bal.rejectPending(req.getDaysRequested());
+                    balanceRepo.save(bal);
+                });
+        return toLeaveResponse(req, tenantId);
+    }
+
+    // ── Disciplinary ──────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<DisciplinaryResponse> getDisciplinary(TenantId tenantId, UUID employeeId) {
+        findActive(tenantId, employeeId);
+        return disciplinaryRepo.findByEmployee(employeeId)
+                .stream().map(d -> toDisciplinaryResponse(d, tenantId)).toList();
+    }
+
+    @Transactional
+    public DisciplinaryResponse addDisciplinary(TenantId tenantId, UUID employeeId,
+                                                AddDisciplinaryRequest req,
+                                                UUID issuedBy) {
+        HrEmployee emp = findActive(tenantId, employeeId);
+        HrDisciplinary d = HrDisciplinary.create(tenantId, employeeId,
+                req.incidentDate(), req.incidentType(), req.description(), issuedBy);
+        if (req.hearingDate() != null) d.setOutcome(null, req.hearingDate());
+        disciplinaryRepo.save(d);
+        log.info("Disciplinary {} added for employee={}", req.incidentType(),
+                emp.getEmployeeNumber());
+        return toDisciplinaryResponse(d, tenantId);
+    }
+
+    // ── Leave balance seeder ──────────────────────────────────────────────────
+
+    private void seedLeaveBalances(TenantId tenantId, UUID employeeId, int year) {
+        // WHY? BCEA statutory minimums — every employee gets these automatically
+        record Seed(String type, BigDecimal days) {}
+        List.of(
+                new Seed("ANNUAL",               new BigDecimal("15")),  // BCEA min 15 days
+                new Seed("SICK",                 new BigDecimal("30")),  // 30 days per 3-year cycle
+                new Seed("FAMILY_RESPONSIBILITY",new BigDecimal("3")),   // 3 days BCEA
+                new Seed("STUDY",                new BigDecimal("5"))
+        ).forEach(s -> {
+            if (balanceRepo.findByEmployeeYearAndType(employeeId, year, s.type()).isEmpty()) {
+                balanceRepo.save(HrLeaveBalance.create(
+                        tenantId, employeeId, year, s.type(), s.days()));
+            }
+        });
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private HrEmployee findActive(TenantId tenantId, UUID id) {
+        return employeeRepo.findActiveById(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee", id.toString()));
+    }
+
+    private void applyOptionalFields(HrEmployee emp, CreateEmployeeRequest req) {
+        try {
+            java.lang.reflect.Field[] fields = emp.getClass().getDeclaredFields();
+            for (java.lang.reflect.Field f : fields) {
+                f.setAccessible(true);
+                switch (f.getName()) {
+                    case "idNumber"    -> f.set(emp, req.idNumber());
+                    case "taxNumber"   -> f.set(emp, req.taxNumber());
+                    case "dateOfBirth" -> f.set(emp, req.dateOfBirth());
+                    case "gender"      -> f.set(emp, req.gender());
+                    case "race"        -> f.set(emp, req.race());
+                    case "email"       -> f.set(emp, req.email());
+                    case "phone"       -> f.set(emp, req.phone());
+                    case "jobTitle"    -> f.set(emp, req.jobTitle());
+                    case "department"  -> f.set(emp, req.department());
+                    case "bankName"    -> f.set(emp, req.bankName());
+                    case "bankAccountNumber" -> f.set(emp, req.bankAccountNumber());
+                    case "bankBranchCode"    -> f.set(emp, req.bankBranchCode());
+                    case "medicalAidContribution" ->
+                            f.set(emp, req.medicalAidContribution() != null
+                                    ? req.medicalAidContribution() : BigDecimal.ZERO);
+                    case "pensionContribution" ->
+                            f.set(emp, req.pensionContribution() != null
+                                    ? req.pensionContribution() : BigDecimal.ZERO);
+                    case "travelAllowance" ->
+                            f.set(emp, req.travelAllowance() != null
+                                    ? req.travelAllowance() : BigDecimal.ZERO);
+                    case "emergencyContactName"     -> f.set(emp, req.emergencyContactName());
+                    case "emergencyContactPhone"    -> f.set(emp, req.emergencyContactPhone());
+                    case "notes"       -> f.set(emp, req.notes());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not apply optional fields: {}", e.getMessage());
+        }
+    }
+
+    // ── Mappers ───────────────────────────────────────────────────────────────
+
+    private EmployeeResponse toEmployeeResponse(HrEmployee e) {
+        return new EmployeeResponse(e.getId(), e.getEmployeeNumber(),
+                e.getFirstName(), e.getLastName(), e.getFullName(),
+                e.getIdNumber(), e.getTaxNumber(), e.getDateOfBirth(),
+                e.getGender(), e.getRace(), e.getEmail(), e.getPhone(),
+                e.getEmploymentType(), e.getJobTitle(), e.getDepartment(),
+                e.getStartDate(), e.getEndDate(), e.getStatus(),
+                e.getGrossSalary(), e.getPayFrequency(),
+                e.getMedicalAidContribution(), e.getPensionContribution(),
+                e.getTravelAllowance(), e.getEmergencyContactName(),
+                e.getEmergencyContactPhone(), e.getCreatedAt());
+    }
+
+    private LeaveBalanceResponse toBalanceResponse(HrLeaveBalance b) {
+        return new LeaveBalanceResponse(b.getId(), b.getLeaveType(), b.getLeaveYear(),
+                b.getEntitledDays(), b.getTakenDays(), b.getPendingDays(),
+                b.getAvailableDays());
+    }
+
+    private LeaveRequestResponse toLeaveResponse(HrLeaveRequest r, TenantId tenantId) {
+        String empName = employeeRepo.findActiveById(tenantId, r.getEmployeeId())
+                .map(HrEmployee::getFullName).orElse("Unknown");
+        return new LeaveRequestResponse(r.getId(), r.getEmployeeId(), empName,
+                r.getLeaveType(), r.getStartDate(), r.getEndDate(),
+                r.getDaysRequested(), r.getReason(), r.getStatus(),
+                r.getRejectionReason(), r.getCreatedAt());
+    }
+
+    private DisciplinaryResponse toDisciplinaryResponse(HrDisciplinary d,
+                                                        TenantId tenantId) {
+        String empName = employeeRepo.findActiveById(tenantId, d.getEmployeeId())
+                .map(HrEmployee::getFullName).orElse("Unknown");
+        return new DisciplinaryResponse(d.getId(), d.getEmployeeId(), empName,
+                d.getIncidentDate(), d.getIncidentType(), d.getDescription(),
+                d.getOutcome(), d.getHearingDate(), d.isAcknowledged(), d.getCreatedAt());
+    }
+}

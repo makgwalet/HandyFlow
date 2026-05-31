@@ -106,6 +106,52 @@ public class CatalogueService {
         );
     }
 
+    @Transactional
+    public CatalogueItemSummary updateItem(TenantId tenantId, UUID itemId, CreateItemRequest request) {
+        CatalogueItem item = itemRepository.findActiveById(tenantId, itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("CatalogueItem", itemId.toString()));
+
+        CatalogueCategory category = null;
+        if (request.categoryId() != null) {
+            category = categoryRepository.findActiveById(tenantId, request.categoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Category", request.categoryId().toString()));
+        }
+
+        BigDecimal vatRate = request.vatRate() != null ? request.vatRate() : new BigDecimal("15.00");
+
+        item.update(request.name(), request.description(), category,
+                request.unit(), request.defaultPrice(), vatRate);
+        itemRepository.save(item);
+        log.info("Updated catalogue item={} tenant={}", itemId, tenantId);
+        return toSummary(item);
+    }
+
+    @Transactional
+    public CategoryResponse updateCategory(TenantId tenantId, UUID categoryId, CreateCategoryRequest request) {
+        CatalogueCategory cat = categoryRepository.findActiveById(tenantId, categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", categoryId.toString()));
+        cat.update(request.name(), request.description());
+        categoryRepository.save(cat);
+        log.info("Updated category={} tenant={}", categoryId, tenantId);
+        return new CategoryResponse(cat.getId(), cat.getName(), cat.getDescription(), cat.getSortOrder());
+    }
+
+    @Transactional
+    public void deleteCategory(TenantId tenantId, UUID categoryId) {
+        CatalogueCategory cat = categoryRepository.findActiveById(tenantId, categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", categoryId.toString()));
+
+        // Soft delete all items in this category first
+        List<CatalogueItem> items = itemRepository.findAllByCategory(tenantId, cat);
+        items.forEach(item -> item.softDelete(null));
+        itemRepository.saveAll(items);
+
+        // Then soft delete the category itself
+        cat.softDelete(null);
+        categoryRepository.save(cat);
+        log.info("Deleted category={} with {} items tenant={}", categoryId, items.size(), tenantId);
+    }
+
     private CatalogueItemSummary toSummary(CatalogueItem item) {
         return new CatalogueItemSummary(
                 item.getId(), item.getName(), item.getDescription(),

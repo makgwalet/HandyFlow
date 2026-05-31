@@ -25,6 +25,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return request.getRequestURI().startsWith("/api/v1/admin/");
+    }
+
+    @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
@@ -43,6 +48,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     Set<String> permissions = jwtService.extractPermissions(jwt);
 
                     TenantContext.setTenantId(tenantId);
+                    TenantContext.setUserId(userId);
 
                     var authorities = permissions.stream()
                             .map(SimpleGrantedAuthority::new)
@@ -77,3 +83,5 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
     }
 }
+
+

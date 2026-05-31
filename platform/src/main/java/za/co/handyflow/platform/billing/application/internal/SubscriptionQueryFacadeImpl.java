@@ -26,8 +26,14 @@ class SubscriptionQueryFacadeImpl implements SubscriptionQueryFacade {
     public SubscriptionResponse getSubscription(TenantId tenantId) {
         Subscription sub = subscriptionRepository.findByTenantId(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Subscription", tenantId.toString()
-                ));
+                        "Subscription", tenantId.toString()));
+
+        boolean suspended = "SUSPENDED".equals(sub.getStatus().toString())
+                         || "CANCELLED".equals(sub.getStatus().toString());
+
+        Long graceDaysRemaining = "PAST_DUE".equals(sub.getStatus().toString())
+                ? sub.graceDaysRemaining()
+                : null;
 
         return new SubscriptionResponse(
                 sub.getId(),
@@ -37,7 +43,10 @@ class SubscriptionQueryFacadeImpl implements SubscriptionQueryFacade {
                 sub.getPilotEndsAt(),
                 sub.pilotDaysRemaining(),
                 sub.getCurrentPeriodEnd(),
-                sub.getPlan().priceInRands()
+                sub.getPlan().priceInRands(),
+                sub.getPastDueSince(),       // null unless PAST_DUE
+                graceDaysRemaining,          // null unless PAST_DUE
+                suspended                    // true if SUSPENDED or CANCELLED
         );
     }
 

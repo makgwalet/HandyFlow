@@ -15,6 +15,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.invoicing.application.internal.QuoteService;
+import za.co.handyflow.platform.invoicing.application.internal.QuotePdfService;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import za.co.handyflow.platform.invoicing.dto.AddLineItemRequest;
 import za.co.handyflow.platform.invoicing.dto.CreateQuoteRequest;
 import za.co.handyflow.platform.invoicing.dto.QuoteResponse;
@@ -30,6 +33,7 @@ import java.util.UUID;
 public class QuoteController {
 
     private final QuoteService quoteService;
+    private final QuotePdfService quotePdfService;
     private final FeatureGuard featureGuard;
 
     @GetMapping
@@ -84,7 +88,7 @@ public class QuoteController {
 
     @PostMapping("/{id}/send")
     @PreAuthorize("hasAuthority('INVOICE_SEND')")
-    @Operation(summary = "Send quote to customer — starts 30-day expiry countdown")
+    @Operation(summary = "Send quote to customer â€” starts 30-day expiry countdown")
     public ResponseEntity<ApiResponse<QuoteResponse>> sendQuote(@PathVariable UUID id) {
         featureGuard.requireModule("invoicing");
         var tenantId = TenantContext.getTenantIdAsObject();
@@ -113,6 +117,23 @@ public class QuoteController {
                 .body(ApiResponse.success("Invoice created", invoiceId));
     }
 
+    @GetMapping("/{id}/pdf")
+    @PreAuthorize("hasAuthority('INVOICE_READ')")
+    @Operation(summary = "Download quote as PDF — send to client for approval")
+    public ResponseEntity<byte[]> downloadPdf(@PathVariable UUID id) {
+        featureGuard.requireModule("invoicing");
+        var tenantId = TenantContext.getTenantIdAsObject();
+        byte[] pdf = quotePdfService.generateQuotePdf(id, tenantId);
+        var quote = quoteService.getQuote(tenantId, id);
+        String filename = quote.quoteNumber() + ".pdf";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .contentLength(pdf.length)
+                .body(pdf);
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('INVOICE_DELETE')")
     @Operation(summary = "Soft delete a draft quote")
@@ -123,3 +144,4 @@ public class QuoteController {
         return ResponseEntity.ok(ApiResponse.success("Quote deleted", null));
     }
 }
+
