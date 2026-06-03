@@ -67,7 +67,16 @@ public class PayrollService {
                 .orElseThrow(() -> new ResourceNotFoundException("PayRun", payRunId.toString()));
 
         if (!"DRAFT".equals(run.getStatus()))
-            throw new IllegalStateException("Only DRAFT pay runs can be processed");
+            throw new IllegalStateException("Only DRAFT pay runs can be processed. Current status: " + run.getStatus());
+
+        // FIX 1.4: Idempotency — delete any existing payslips before re-processing
+        // Prevents duplicate payslips if processing was retried after a partial failure
+        List<HrPayslip> existing = payslipRepo.findByPayRun(payRunId);
+        if (!existing.isEmpty()) {
+            log.warn("Deleting {} existing payslips before re-processing pay run={}",
+                    existing.size(), run.getPayRunNumber());
+            payslipRepo.deleteAll(existing);
+        }
 
         run.markProcessing();
         payRunRepo.save(run);
@@ -76,54 +85,36 @@ public class PayrollService {
         if (employees.isEmpty())
             throw new IllegalStateException("No active employees found for this tenant");
 
-        // Calculate annual payroll for SDL threshold check
         BigDecimal annualPayroll = employees.stream()
                 .map(HrEmployee::getGrossSalary)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .multiply(BigDecimal.valueOf(12));
 
-        BigDecimal runGross = BigDecimal.ZERO;
-        BigDecimal runPaye  = BigDecimal.ZERO;
-        BigDecimal runUif   = BigDecimal.ZERO;
-        BigDecimal runSdl   = BigDecimal.ZERO;
+        BigDecimal runGross = BigDecimal.ZERO, runPaye = BigDecimal.ZERO;
+        BigDecimal runUif   = BigDecimal.ZERO, runSdl  = BigDecimal.ZERO;
         BigDecimal runNet   = BigDecimal.ZERO;
 
         for (HrEmployee emp : employees) {
-            PayrollEngine.PayrollResult result =
-                    engine.calculate(emp, run.getTaxYear(), annualPayroll);
+            PayrollEngine.PayrollResult result = engine.calculate(emp, run.getTaxYear(), annualPayroll);
 
             HrPayslip slip = HrPayslip.create(tenantId, run.getId(), emp.getId(),
                     result.grossSalary(), result.travelAllowance(),
                     result.medicalAid(), result.pension());
+
+            // FIX 1.5: Calculate YTD BEFORE save — slip.getId() is not yet in DB
+            BigDecimal ytdGross = payslipRepo.sumYtdGross(emp.getId(), run.getTaxYear(), slip.getId());
+            BigDecimal ytdPaye  = payslipRepo.sumYtdPaye(emp.getId(), run.getTaxYear(), slip.getId());
+            BigDecimal ytdUif   = payslipRepo.sumYtdUif(emp.getId(), run.getTaxYear(), slip.getId());
 
             slip.applyCalculations(
                     result.payeAmount(), result.uifEmployee(), result.uifEmployer(),
                     result.sdlAmount(), result.taxableIncome(), result.taxBeforeRebate(),
                     result.primaryRebate(), run.getTaxYear());
 
-            // YTD calculations
-            // YTD calculations
-            BigDecimal ytdGross = payslipRepo.sumYtdGross(
-                    emp.getId(), run.getTaxYear(), slip.getId());
-            BigDecimal ytdPaye  = payslipRepo.sumYtdPaye(
-                    emp.getId(), run.getTaxYear(), slip.getId());
-            BigDecimal ytdUif   = payslipRepo.sumYtdUif(
-                    emp.getId(), run.getTaxYear(), slip.getId());
-
-            try {
-                java.lang.reflect.Field ytdGrossF =
-                        slip.getClass().getDeclaredField("ytdGross");
-                java.lang.reflect.Field ytdPayeF  =
-                        slip.getClass().getDeclaredField("ytdPaye");
-                java.lang.reflect.Field ytdUifF   =
-                        slip.getClass().getDeclaredField("ytdUif");
-                ytdGrossF.setAccessible(true);
-                ytdPayeF.setAccessible(true);
-                ytdUifF.setAccessible(true);
-                ytdGrossF.set(slip, ytdGross.add(result.totalEarnings()));
-                ytdPayeF.set(slip,  ytdPaye.add(result.payeAmount()));
-                ytdUifF.set(slip,   ytdUif.add(result.uifEmployee()));
-            } catch (Exception ignored) {}
+            // FIX 1.2: Replace reflection with direct setters on HrPayslip
+            slip.setYtdGross(ytdGross.add(result.totalEarnings()));
+            slip.setYtdPaye(ytdPaye.add(result.payeAmount()));
+            slip.setYtdUif(ytdUif.add(result.uifEmployee()));
 
             payslipRepo.save(slip);
 
@@ -137,14 +128,12 @@ public class PayrollService {
         run.complete(runGross, runPaye, runUif, runSdl, runNet, employees.size());
         payRunRepo.save(run);
 
-        // Auto-generate EMP201
         HrEmp201 emp201 = HrEmp201.create(tenantId, run.getId(),
-                run.getPeriodStart(), run.getPeriodEnd(),
-                runPaye, runUif, runSdl);
+                run.getPeriodStart(), run.getPeriodEnd(), runPaye, runUif, runSdl);
         emp201Repo.save(emp201);
 
-        log.info("Processed pay run={} employees={} gross={} paye={} net={}",
-                run.getPayRunNumber(), employees.size(), runGross, runPaye, runNet);
+        log.info("Processed pay run={} employees={} gross={} paye={} uif={} sdl={} net={}",
+                run.getPayRunNumber(), employees.size(), runGross, runPaye, runUif, runSdl, runNet);
         return toPayRunResponse(run);
     }
 

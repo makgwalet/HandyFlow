@@ -1,5 +1,3 @@
-// fleet/domain/model/VehicleService.java
-
 package za.co.handyflow.platform.fleet.domain.model;
 
 import jakarta.persistence.*;
@@ -35,20 +33,22 @@ public class VehicleService {
     @Column(nullable = false)
     private String description;
 
+    @Column(name = "service_date", nullable = false)
+    private LocalDate serviceDate;
+
     @Column(name = "odometer_at_service")
     private Integer odometerAtService;
 
+    // NEW: the next km at which service is due after this one
     @Column(name = "next_service_km")
     private Integer nextServiceKm;
-
-    @Column(name = "service_date", nullable = false)
-    private LocalDate serviceDate;
 
     @Column(precision = 15, scale = 2)
     private BigDecimal cost;
 
     private String supplier;
 
+    // NEW: invoice/job card reference for cost tracking
     @Column(name = "invoice_ref")
     private String invoiceRef;
 
@@ -64,11 +64,15 @@ public class VehicleService {
     @Version
     private Long version;
 
+    // ── Factory — matches FleetService.recordService call ─────────────────────
+
     public static VehicleService create(TenantId tenantId, UUID vehicleId,
                                         String type, String description,
                                         LocalDate serviceDate,
                                         Integer odometerAtService,
-                                        BigDecimal cost, String supplier,
+                                        Integer nextServiceKm,
+                                        BigDecimal cost,
+                                        String supplier,
                                         String invoiceRef) {
         VehicleService s = new VehicleService();
         s.tenantId          = tenantId;
@@ -77,6 +81,7 @@ public class VehicleService {
         s.description       = description;
         s.serviceDate       = serviceDate;
         s.odometerAtService = odometerAtService;
+        s.nextServiceKm     = nextServiceKm;
         s.cost              = cost;
         s.supplier          = supplier;
         s.invoiceRef        = invoiceRef;

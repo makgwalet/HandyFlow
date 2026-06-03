@@ -53,6 +53,12 @@ spring:
             enable: true
             required: true
 
+  task:
+    scheduling:
+      pool:
+        size: 4
+      thread-name-prefix: contract-sched-
+
 # ==================== APPLICATION SETTINGS ====================
 app:
   security:
@@ -109,4 +115,33 @@ springdoc:
     persist-authorization: true
   # WHY? Shows the actual request being sent — great for debugging
   show-actuator: false
+
+# ── Contracting module ────────────────────────────────────────────────────────
+contracting:
+  signing:
+    # CRITICAL: use a long random secret in production, stored in env var or secrets manager
+    # Generate: openssl rand -hex 32
+    secret: ${CONTRACTING_SIGNING_SECRET:handyflow-signing-secret-CHANGE-IN-PRODUCTION}
+    base-url: ${FRONTEND_URL:http://localhost:5173}
+    token-validity-hours: 72
+
+  owner:
+    # TODO: replace with dynamic lookup from tenant/user profile
+    name: ${CONTRACTING_OWNER_NAME:HandyFlow Admin}
+    email: ${CONTRACTING_OWNER_EMAIL:makgwale10111@gmail.com}
+
+
+# ── SMS provider ──────────────────────────────────────────────────────────────
+# FIX §14: Changed matchIfMissing to false — sms.enabled must be explicitly set.
+# - sms.enabled=false  → StubSmsService active (logs to console), OtpDevController enabled
+# - sms.enabled=true   → BulkSmsSaService active, OtpDevController disabled
+
+sms:
+  enabled: ${SMS_ENABLED:false}          # set to true in production
+  provider: bulksms                      # only bulksms implemented; add smsportal later
+  bulksms:
+    token-id: ${BULKSMS_TOKEN_ID:}
+    token-secret: ${BULKSMS_TOKEN_SECRET:}
+    sender-id: ${BULKSMS_SENDER_ID:HandyFlow}   # max 11 chars for alphanumeric sender ID
+
 

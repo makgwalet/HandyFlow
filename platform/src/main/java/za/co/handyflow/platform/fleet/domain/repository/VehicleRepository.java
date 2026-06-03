@@ -24,4 +24,11 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
     Page<Vehicle> findByStatus(TenantId tenantId, String status, Pageable pageable);
 
     boolean existsByTenantIdAndRegistrationAndDeletedAtIsNull(TenantId tenantId, String registration);
+
+    @Query("SELECT v FROM Vehicle v WHERE v.tenantId = :tenantId AND v.vehicleType = :vehicleType AND v.deletedAt IS NULL ORDER BY v.registration")
+    Page<Vehicle> findByType(TenantId tenantId, String vehicleType, Pageable pageable);
+
+    @Query("SELECT v FROM Vehicle v WHERE v.tenantId = :tenantId AND v.status = :status AND v.vehicleType = :vehicleType AND v.deletedAt IS NULL ORDER BY v.registration")
+    Page<Vehicle> findByStatusAndType(TenantId tenantId, String status, String vehicleType, Pageable pageable);
+
 }

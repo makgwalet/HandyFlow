@@ -1,5 +1,3 @@
-// fleet/domain/model/Vehicle.java
-
 package za.co.handyflow.platform.fleet.domain.model;
 
 import jakarta.persistence.*;
@@ -48,6 +46,9 @@ public class Vehicle {
     @Column(nullable = false)
     private String status = "AVAILABLE";
 
+    @Column(name = "fuel_type", nullable = false)
+    private String fuelType = "DIESEL";
+
     @Column(name = "licence_disc_expiry")
     private LocalDate licenceDiscExpiry;
 
@@ -64,24 +65,29 @@ public class Vehicle {
     private Integer lastServiceKm = 0;
 
     @Column(name = "service_interval_km", nullable = false)
-    private Integer serviceIntervalKm = 15000;
+    private Integer serviceIntervalKm = 10000;
 
-    @Column(name = "fuel_type", nullable = false)
-    private String fuelType = "DIESEL";
+    // NEW: time-based service interval — "every 180 days regardless of km"
+    @Column(name = "service_interval_days")
+    private Integer serviceIntervalDays;
 
     @Column(name = "tank_capacity_litres", precision = 8, scale = 2)
     private BigDecimal tankCapacityLitres;
+
+    @Column(name = "daily_rate", precision = 15, scale = 2)
+    private BigDecimal dailyRate;
+
+    // NEW: the person primarily responsible for this vehicle
+    @Column(name = "assigned_driver_name")
+    private String assignedDriverName;
+
+    private String notes;
 
     @Column(name = "purchase_date")
     private LocalDate purchaseDate;
 
     @Column(name = "purchase_price", precision = 15, scale = 2)
     private BigDecimal purchasePrice;
-
-    @Column(name = "daily_rate", precision = 15, scale = 2)
-    private BigDecimal dailyRate;
-
-    private String notes;
 
     @Column(name = "photo_url")
     private String photoUrl;
@@ -101,35 +107,60 @@ public class Vehicle {
     @Version
     private Long version;
 
-    public static Vehicle create(TenantId tenantId, String registration,
+    // ── Factory ───────────────────────────────────────────────────────────────
+
+    public static Vehicle create(TenantId tenantId,
+                                 String registration,
                                  String make, String model, Integer year,
+                                 String colour, String vin,
                                  String vehicleType, String fuelType,
-                                 LocalDate licenceDiscExpiry) {
+                                 LocalDate licenceDiscExpiry,
+                                 LocalDate roadworthyExpiry,
+                                 LocalDate insuranceExpiry,
+                                 BigDecimal dailyRate,
+                                 BigDecimal tankCapacityLitres,
+                                 Integer serviceIntervalKm,
+                                 Integer serviceIntervalDays,
+                                 String assignedDriverName,
+                                 String notes) {
         Vehicle v = new Vehicle();
-        v.tenantId          = tenantId;
-        v.registration      = registration.toUpperCase().trim();
-        v.make              = make;
-        v.model             = model;
-        v.year              = year;
-        v.vehicleType       = vehicleType;
-        v.fuelType          = fuelType != null ? fuelType : "DIESEL";
-        v.licenceDiscExpiry = licenceDiscExpiry;
-        v.status            = "AVAILABLE";
-        v.currentOdometer   = 0;
-        v.lastServiceKm     = 0;
-        v.serviceIntervalKm = 15000;
-        v.createdAt         = Instant.now();
-        v.updatedAt         = Instant.now();
+        v.tenantId            = tenantId;
+        v.registration        = registration.toUpperCase().trim();
+        v.make                = make;
+        v.model               = model;
+        v.year                = year;
+        v.colour              = colour;
+        v.vin                 = vin;
+        v.vehicleType         = vehicleType;
+        v.fuelType            = fuelType != null ? fuelType : "DIESEL";
+        v.licenceDiscExpiry   = licenceDiscExpiry;
+        v.roadworthyExpiry    = roadworthyExpiry;
+        v.insuranceExpiry     = insuranceExpiry;
+        v.dailyRate           = dailyRate;
+        v.tankCapacityLitres  = tankCapacityLitres;
+        v.serviceIntervalKm   = serviceIntervalKm != null ? serviceIntervalKm : 10000;
+        v.serviceIntervalDays = serviceIntervalDays;
+        v.assignedDriverName  = assignedDriverName;
+        v.notes               = notes;
+        v.status              = "AVAILABLE";
+        v.currentOdometer     = 0;
+        v.lastServiceKm       = 0;
+        v.createdAt           = Instant.now();
+        v.updatedAt           = Instant.now();
         return v;
     }
 
+    // ── Domain logic ──────────────────────────────────────────────────────────
+
     public boolean isDueForService() {
-        // WHY? Alert when km driven since last service exceeds interval
-        return (currentOdometer - lastServiceKm) >= serviceIntervalKm;
+        boolean kmDue = (currentOdometer - lastServiceKm) >= serviceIntervalKm;
+        if (!kmDue || serviceIntervalDays == null) return kmDue;
+        // Also check time-based interval if configured
+        // (lastServiceDate tracking requires a separate field — for now use km only)
+        return true;
     }
 
     public boolean isLicenceExpiringSoon() {
-        // WHY 30 days? Standard lead time to renew disc
         return licenceDiscExpiry != null &&
                 licenceDiscExpiry.isBefore(LocalDate.now().plusDays(30));
     }
@@ -139,12 +170,12 @@ public class Vehicle {
                 roadworthyExpiry.isBefore(LocalDate.now().plusDays(30));
     }
 
+    public boolean isInsuranceExpiringSoon() {
+        return insuranceExpiry != null &&
+                insuranceExpiry.isBefore(LocalDate.now().plusDays(30));
+    }
+
     public void updateOdometer(int newOdometer) {
-        if (newOdometer < this.currentOdometer) {
-            throw new IllegalArgumentException(
-                    "New odometer reading cannot be less than current"
-            );
-        }
         this.currentOdometer = newOdometer;
         this.updatedAt = Instant.now();
     }

@@ -48,22 +48,22 @@ public class HrPayslip {
                                    BigDecimal travelAllowance,
                                    BigDecimal medicalAid, BigDecimal pension) {
         HrPayslip p = new HrPayslip();
-        p.id             = UUID.randomUUID();
-        p.tenantId       = tenantId.getValue();
-        p.payRunId       = payRunId;
-        p.employeeId     = employeeId;
-        p.grossSalary    = grossSalary;
-        p.overtimeAmount = BigDecimal.ZERO;
-        p.bonusAmount    = BigDecimal.ZERO;
+        p.id              = UUID.randomUUID();
+        p.tenantId        = tenantId.getValue();
+        p.payRunId        = payRunId;
+        p.employeeId      = employeeId;
+        p.grossSalary     = grossSalary;
+        p.overtimeAmount  = BigDecimal.ZERO;
+        p.bonusAmount     = BigDecimal.ZERO;
         p.travelAllowance = travelAllowance != null ? travelAllowance : BigDecimal.ZERO;
-        p.otherEarnings  = BigDecimal.ZERO;
-        p.medicalAid     = medicalAid != null ? medicalAid : BigDecimal.ZERO;
-        p.pension        = pension    != null ? pension    : BigDecimal.ZERO;
+        p.otherEarnings   = BigDecimal.ZERO;
+        p.medicalAid      = medicalAid != null ? medicalAid : BigDecimal.ZERO;
+        p.pension         = pension    != null ? pension    : BigDecimal.ZERO;
         p.otherDeductions = BigDecimal.ZERO;
-        p.ytdGross       = BigDecimal.ZERO;
-        p.ytdPaye        = BigDecimal.ZERO;
-        p.ytdUif         = BigDecimal.ZERO;
-        p.createdAt      = Instant.now();
+        p.ytdGross        = BigDecimal.ZERO;
+        p.ytdPaye         = BigDecimal.ZERO;
+        p.ytdUif          = BigDecimal.ZERO;
+        p.createdAt       = Instant.now();
         return p;
     }
 
@@ -80,7 +80,7 @@ public class HrPayslip {
         this.primaryRebate   = primaryRebate;
         this.taxYear         = taxYear;
 
-        this.totalEarnings   = grossSalary
+        this.totalEarnings = grossSalary
                 .add(overtimeAmount).add(bonusAmount)
                 .add(travelAllowance).add(otherEarnings);
 
@@ -90,4 +90,12 @@ public class HrPayslip {
 
         this.netPay = totalEarnings.subtract(totalDeductions);
     }
+
+    // ── YTD setters — required by PayrollService.processPayRun() ─────────────
+    // These replace the reflection-based field setting that was silently failing.
+    // @Getter is class-level; setters must be explicit for the fields that need them.
+
+    public void setYtdGross(BigDecimal ytdGross) { this.ytdGross = ytdGross; }
+    public void setYtdPaye(BigDecimal ytdPaye)   { this.ytdPaye  = ytdPaye;  }
+    public void setYtdUif(BigDecimal ytdUif)     { this.ytdUif   = ytdUif;   }
 }

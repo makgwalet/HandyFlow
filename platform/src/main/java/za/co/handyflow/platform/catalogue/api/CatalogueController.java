@@ -28,7 +28,7 @@ public class CatalogueController {
     private final CatalogueService catalogueService;
 
     @GetMapping("/items")
-    @PreAuthorize("hasAuthority('INVOICE_CREATE')")
+    @PreAuthorize("hasAnyAuthority('INVOICE_CREATE','POS_READ','POS_MANAGE','POS_SELL')")
     @Operation(summary = "Search catalogue items", description = "Search by name. Leave query empty to get all items.")
     public ResponseEntity<ApiResponse<List<CatalogueItemSummary>>> searchItems(
             @RequestParam(required = false) String query

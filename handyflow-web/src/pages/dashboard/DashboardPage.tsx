@@ -139,6 +139,54 @@ export function DashboardPage() {
     queryFn: async () => (await apiClient.get('/api/v1/billing/subscription')).data,
   })
 
+  // Live stats queries
+const { data: customersData } = useQuery({
+  queryKey: ['dashboard-customers'],
+  queryFn: async () => {
+    const res = await apiClient.get('/api/v1/crm/customers?size=100')
+    return res.data.content as { id: string; createdAt: string }[]
+  },
+})
+
+const { data: quotesData } = useQuery({
+  queryKey: ['dashboard-quotes'],
+  queryFn: async () => {
+    const res = await apiClient.get('/api/v1/invoicing/quotes?size=100')
+    return res.data.content as { id: string; status: string; total: number }[]
+  },
+})
+
+const { data: invoicesData } = useQuery({
+  queryKey: ['dashboard-invoices'],
+  queryFn: async () => {
+    const res = await apiClient.get('/api/v1/invoicing/invoices?size=100')
+    return res.data.content as { id: string; status: string; total: number; createdAt: string }[]
+  },
+})
+
+// Computed stats
+const now          = new Date()
+const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+const customers    = customersData || []
+const quotes       = quotesData    || []
+const invoices     = invoicesData  || []
+
+const customerCount     = customers.length
+const customersThisMonth = customers.filter(c =>
+  new Date(c.createdAt) >= startOfMonth
+).length
+
+const activeQuotes   = quotes.filter(q => ['DRAFT','SENT'].includes(q.status)).length
+const invoicedQuotes = quotes.filter(q => q.status === 'INVOICED').length
+
+const revenueMTD = invoices
+  .filter(i => i.status === 'PAID' && new Date(i.createdAt) >= startOfMonth)
+  .reduce((s, i) => s + (i.total || 0), 0)
+
+const totalQuoted = quotes
+  .reduce((s, q) => s + (q.total || 0), 0)
+
   const { data: tenantModules = [] } = useQuery<{moduleKey: string; accessible: boolean}[]>({
     queryKey: ['tenant-modules-dashboard'],
     queryFn: async () => {
@@ -161,9 +209,29 @@ export function DashboardPage() {
   })
 
   const stats = [
-    { label: 'Customers', value: '1', sub: '↑ 1 this month', positive: true, icon: Users, bg: '#EFF6FF', iconColor: '#2563EB' },
-    { label: 'Active quotes', value: '0', sub: '1 invoiced', icon: FileText, bg: '#F0FDF4', iconColor: '#16A34A' },
-    { label: 'Revenue MTD', value: 'R 0', sub: 'R 106K quoted', icon: TrendingUp, bg: '#FEFCE8', iconColor: '#CA8A04' },
+    {
+      label: 'Customers',
+      value: customerCount,
+      sub: customersThisMonth > 0 ? `↑ ${customersThisMonth} this month` : 'No new this month',
+      positive: customersThisMonth > 0,
+      icon: Users, bg: '#EFF6FF', iconColor: '#2563EB',
+    },
+    {
+      label: 'Active quotes',
+      value: activeQuotes,
+      sub: invoicedQuotes > 0 ? `${invoicedQuotes} invoiced` : 'None invoiced yet',
+      icon: FileText, bg: '#F0FDF4', iconColor: '#16A34A',
+    },
+    {
+      label: 'Revenue MTD',
+      value: revenueMTD > 0
+        ? `R ${(revenueMTD / 1000).toFixed(0)}K`
+        : 'R 0',
+      sub: totalQuoted > 0
+        ? `R ${(totalQuoted / 1000).toFixed(0)}K quoted`
+        : 'No quotes yet',
+      icon: TrendingUp, bg: '#FEFCE8', iconColor: '#CA8A04',
+    },
     {
       label: 'Pilot days left',
       value: subscription?.pilotDaysRemaining ?? '—',

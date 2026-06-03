@@ -272,4 +272,17 @@ public class FuelService {
 
         return toDeliveryResponse(delivery);
     }
+
+    @Transactional
+    public SupplierResponse updateSupplier(TenantId tenantId, UUID supplierId,
+                                           CreateSupplierRequest req) {
+        FuelSupplier supplier = supplierRepository.findActiveById(tenantId, supplierId)
+                .orElseThrow(() -> new ResourceNotFoundException("Supplier", supplierId.toString()));
+
+        supplier.update(req.name(), req.contactName(), req.contactPhone(),
+                req.contactEmail(), req.accountNumber());
+        supplierRepository.save(supplier);
+        log.info("Updated supplier={} tenant={}", supplierId, tenantId);
+        return toSupplierResponse(supplier);
+    }
 }

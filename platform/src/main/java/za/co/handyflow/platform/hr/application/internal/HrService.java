@@ -47,18 +47,62 @@ public class HrService {
     @Transactional
     public EmployeeResponse createEmployee(TenantId tenantId, CreateEmployeeRequest req) {
         String number = numberGen.next(tenantId);
-        HrEmployee emp = HrEmployee.create(tenantId, number, req.firstName(),
-                req.lastName(), req.startDate(), req.employmentType(),
+        HrEmployee emp = HrEmployee.create(
+                tenantId, number,
+                req.firstName(), req.lastName(),
+                req.startDate(), req.employmentType(),
                 req.grossSalary(), req.payFrequency());
 
-        // Apply optional fields via reflection-free setters
-        applyOptionalFields(emp, req);
+        // Direct setter calls — no reflection, no silent failures
+        emp.setIdNumber(req.idNumber());
+        emp.setTaxNumber(req.taxNumber());
+        emp.setDateOfBirth(req.dateOfBirth());
+        emp.setGender(req.gender());
+        emp.setRace(req.race());
+        emp.setEmail(req.email());
+        emp.setPhone(req.phone());
+        emp.setJobTitle(req.jobTitle());
+        emp.setDepartment(req.department());
+        emp.setBankName(req.bankName());
+        emp.setBankAccountNumber(req.bankAccountNumber());
+        emp.setBankBranchCode(req.bankBranchCode());
+        emp.setMedicalAidContribution(req.medicalAidContribution() != null
+                ? req.medicalAidContribution() : java.math.BigDecimal.ZERO);
+        emp.setPensionContribution(req.pensionContribution() != null
+                ? req.pensionContribution() : java.math.BigDecimal.ZERO);
+        emp.setTravelAllowance(req.travelAllowance() != null
+                ? req.travelAllowance() : java.math.BigDecimal.ZERO);
+        emp.setEmergencyContactName(req.emergencyContactName());
+        emp.setEmergencyContactPhone(req.emergencyContactPhone());
+        emp.setNotes(req.notes());
+
         employeeRepo.save(emp);
-
-        // Seed BCEA leave balances for the current year
-        seedLeaveBalances(tenantId, emp.getId(), LocalDate.now().getYear());
-
+        seedLeaveBalances(tenantId, emp.getId(), java.time.LocalDate.now().getYear());
         log.info("Created employee={} {} tenant={}", number, emp.getFullName(), tenantId);
+        return toEmployeeResponse(emp);
+    }
+
+    @Transactional
+    public EmployeeResponse updateEmployee(TenantId tenantId, UUID id,
+                                           CreateEmployeeRequest req) {
+        HrEmployee emp = findActive(tenantId, id);
+        emp.setEmail(req.email());
+        emp.setPhone(req.phone());
+        emp.setJobTitle(req.jobTitle());
+        emp.setDepartment(req.department());
+        emp.setGrossSalary(req.grossSalary());
+        emp.setPayFrequency(req.payFrequency());
+        emp.setTravelAllowance(req.travelAllowance() != null ? req.travelAllowance() : java.math.BigDecimal.ZERO);
+        emp.setMedicalAidContribution(req.medicalAidContribution() != null ? req.medicalAidContribution() : java.math.BigDecimal.ZERO);
+        emp.setPensionContribution(req.pensionContribution() != null ? req.pensionContribution() : java.math.BigDecimal.ZERO);
+        emp.setBankName(req.bankName());
+        emp.setBankAccountNumber(req.bankAccountNumber());
+        emp.setBankBranchCode(req.bankBranchCode());
+        emp.setEmergencyContactName(req.emergencyContactName());
+        emp.setEmergencyContactPhone(req.emergencyContactPhone());
+        emp.setNotes(req.notes());
+        employeeRepo.save(emp);
+        log.info("Updated employee={}", emp.getEmployeeNumber());
         return toEmployeeResponse(emp);
     }
 

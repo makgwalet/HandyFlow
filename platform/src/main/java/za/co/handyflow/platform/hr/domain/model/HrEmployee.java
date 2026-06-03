@@ -123,4 +123,25 @@ public class HrEmployee {
     public String getFullName() {
         return firstName + " " + lastName;
     }
+
+    public void setIdNumber(String idNumber)                { this.idNumber = idNumber; }
+    public void setTaxNumber(String taxNumber)              { this.taxNumber = taxNumber; }
+    public void setDateOfBirth(java.time.LocalDate dob)     { this.dateOfBirth = dob; }
+    public void setGender(String gender)                    { this.gender = gender; }
+    public void setRace(String race)                        { this.race = race; }
+    public void setEmail(String email)                      { this.email = email; }
+    public void setPhone(String phone)                      { this.phone = phone; }
+    public void setJobTitle(String jobTitle)                { this.jobTitle = jobTitle; }
+    public void setDepartment(String department)            { this.department = department; }
+    public void setBankName(String bankName)                { this.bankName = bankName; }
+    public void setBankAccountNumber(String acc)            { this.bankAccountNumber = acc; }
+    public void setBankBranchCode(String code)              { this.bankBranchCode = code; }
+    public void setMedicalAidContribution(java.math.BigDecimal v) { this.medicalAidContribution = v; }
+    public void setPensionContribution(java.math.BigDecimal v)    { this.pensionContribution = v; }
+    public void setTravelAllowance(java.math.BigDecimal v)        { this.travelAllowance = v; }
+    public void setGrossSalary(java.math.BigDecimal v)            { this.grossSalary = v; }
+    public void setPayFrequency(String v)                         { this.payFrequency = v; }
+    public void setEmergencyContactName(String v)                 { this.emergencyContactName = v; }
+    public void setEmergencyContactPhone(String v)                { this.emergencyContactPhone = v; }
+    public void setNotes(String notes)                            { this.notes = notes; }
 }

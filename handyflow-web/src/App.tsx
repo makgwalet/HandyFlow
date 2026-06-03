@@ -22,7 +22,8 @@ import { BookingsPage } from './pages/bookings/BookingsPage'
 import { HrPage } from './pages/hr/HrPage'
 import { ClinicPage } from './pages/clinic/ClinicPage'
 import { EventsPage } from './pages/events/EventsPage'
-import { ContractingPage } from './pages/contracting/ContractingPage'
+import ContractingPage from './pages/contracting/ContractingPage'
+import SigningPage from './pages/contracting/SigningPage'
 import { ExpensesPage } from './pages/expenses/ExpensesPage'
 import { AcceptInvitePage } from './pages/auth/AcceptInvitePage'
 import { CreativePage } from './pages/creative/CreativePage'
@@ -81,6 +82,7 @@ export default function App() {
             <Route path="/marketing"   element={<MarketingPage />} />
             <Route path="/recruiter"   element={<RecruiterPage />} />
             <Route path="/pos"         element={<PosPage />} />
+            <Route path="/sign/:token" element={<SigningPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

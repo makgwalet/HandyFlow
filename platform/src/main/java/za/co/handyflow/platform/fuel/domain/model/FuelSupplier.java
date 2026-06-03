@@ -82,6 +82,16 @@ public class FuelSupplier {
         this.updatedAt = Instant.now();
     }
 
+    public void update(String name, String contactName, String contactPhone,
+                       String contactEmail, String accountNumber) {
+        this.name          = name;
+        this.contactName   = contactName;
+        this.contactPhone  = contactPhone;
+        this.contactEmail  = contactEmail;
+        this.accountNumber = accountNumber;
+        this.updatedAt     = java.time.Instant.now();
+    }
+
     public boolean isDeleted() { return deletedAt != null; }
 
     @PreUpdate

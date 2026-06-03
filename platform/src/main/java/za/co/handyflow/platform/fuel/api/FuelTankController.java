@@ -1,5 +1,3 @@
-// fuel/api/FuelTankController.java
-
 package za.co.handyflow.platform.fuel.api;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,15 +29,14 @@ import java.util.UUID;
 @Tag(name = "Fuel & Logistics", description = "Fuel inventory, dispatch, deliveries and reconciliation")
 public class FuelTankController {
 
-    private final FuelService  fuelService;
-    private final FeatureGuard featureGuard;
+    private final FuelService              fuelService;
+    private final FeatureGuard             featureGuard;
     private final DeliveryReceiptPdfService receiptPdfService;
 
     // ── Tanks ─────────────────────────────────────────────────────────────────
 
     @GetMapping("/tanks")
     @PreAuthorize("hasAuthority('USER_READ')")
-    @Operation(summary = "List all tanks with current levels and fill percentage")
     public ResponseEntity<ApiResponse<List<TankResponse>>> getTanks() {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(
@@ -56,10 +53,8 @@ public class FuelTankController {
 
     @PostMapping("/tanks")
     @PreAuthorize("hasAuthority('USER_CREATE')")
-    @Operation(summary = "Register a new fuel tank")
     public ResponseEntity<ApiResponse<TankResponse>> createTank(
-            @Valid @RequestBody CreateTankRequest request
-    ) {
+            @Valid @RequestBody CreateTankRequest request) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Tank created",
@@ -78,24 +73,33 @@ public class FuelTankController {
 
     @PostMapping("/suppliers")
     @PreAuthorize("hasAuthority('USER_CREATE')")
-    @Operation(summary = "Add a fuel supplier")
     public ResponseEntity<ApiResponse<SupplierResponse>> createSupplier(
-            @Valid @RequestBody CreateSupplierRequest request
-    ) {
+            @Valid @RequestBody CreateSupplierRequest request) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Supplier added",
                         fuelService.createSupplier(TenantContext.getTenantIdAsObject(), request)));
     }
 
+    // FIX: PUT instead of PATCH — avoids CORS preflight failures.
+    // Was completely missing — SuppliersTab calls PUT /suppliers/{id}.
+    @PutMapping("/suppliers/{id}")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @Operation(summary = "Update an existing fuel supplier's contact details")
+    public ResponseEntity<ApiResponse<SupplierResponse>> updateSupplier(
+            @PathVariable UUID id,
+            @Valid @RequestBody CreateSupplierRequest request) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Supplier updated",
+                fuelService.updateSupplier(TenantContext.getTenantIdAsObject(), id, request)));
+    }
+
     // ── Receipts ──────────────────────────────────────────────────────────────
 
     @GetMapping("/receipts")
     @PreAuthorize("hasAuthority('USER_READ')")
-    @Operation(summary = "List all fuel receipts across all tanks")
     public ResponseEntity<ApiResponse<Page<ReceiptResponse>>> getReceipts(
-            @PageableDefault(size = 20) Pageable pageable
-    ) {
+            @PageableDefault(size = 50) Pageable pageable) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(
                 fuelService.getReceipts(TenantContext.getTenantIdAsObject(), pageable)));
@@ -103,11 +107,9 @@ public class FuelTankController {
 
     @PostMapping("/tanks/{id}/receive")
     @PreAuthorize("hasAuthority('USER_CREATE')")
-    @Operation(summary = "Receive fuel into tank — validates capacity, updates stock level")
     public ResponseEntity<ApiResponse<ReceiptResponse>> receiveFuel(
             @PathVariable UUID id,
-            @Valid @RequestBody ReceiveFuelRequest request
-    ) {
+            @Valid @RequestBody ReceiveFuelRequest request) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Fuel received",
@@ -118,10 +120,8 @@ public class FuelTankController {
 
     @GetMapping("/dispatches")
     @PreAuthorize("hasAuthority('USER_READ')")
-    @Operation(summary = "List all fuel dispatches")
     public ResponseEntity<ApiResponse<Page<DispatchResponse>>> getDispatches(
-            @PageableDefault(size = 20) Pageable pageable
-    ) {
+            @PageableDefault(size = 50) Pageable pageable) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(
                 fuelService.getDispatches(TenantContext.getTenantIdAsObject(), pageable)));
@@ -129,11 +129,9 @@ public class FuelTankController {
 
     @PostMapping("/tanks/{id}/dispatch")
     @PreAuthorize("hasAuthority('USER_CREATE')")
-    @Operation(summary = "Dispatch fuel from tank — validates sufficient stock, deducts level")
     public ResponseEntity<ApiResponse<DispatchResponse>> dispatchFuel(
             @PathVariable UUID id,
-            @Valid @RequestBody DispatchFuelRequest request
-    ) {
+            @Valid @RequestBody DispatchFuelRequest request) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Fuel dispatched",
@@ -144,11 +142,9 @@ public class FuelTankController {
 
     @GetMapping("/tanks/{id}/dip-readings")
     @PreAuthorize("hasAuthority('USER_READ')")
-    @Operation(summary = "Get dip reading history for a tank")
     public ResponseEntity<ApiResponse<Page<DipReadingResponse>>> getDipReadings(
             @PathVariable UUID id,
-            @PageableDefault(size = 20) Pageable pageable
-    ) {
+            @PageableDefault(size = 50) Pageable pageable) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(
                 fuelService.getDipReadings(TenantContext.getTenantIdAsObject(), id, pageable)));
@@ -156,11 +152,9 @@ public class FuelTankController {
 
     @PostMapping("/tanks/{id}/dip-readings")
     @PreAuthorize("hasAuthority('USER_CREATE')")
-    @Operation(summary = "Record a dip reading — calculates variance vs system level")
     public ResponseEntity<ApiResponse<DipReadingResponse>> recordDipReading(
             @PathVariable UUID id,
-            @Valid @RequestBody DipReadingRequest request
-    ) {
+            @Valid @RequestBody DipReadingRequest request) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Dip reading recorded",
@@ -171,11 +165,9 @@ public class FuelTankController {
 
     @GetMapping("/deliveries")
     @PreAuthorize("hasAuthority('USER_READ')")
-    @Operation(summary = "List deliveries, optionally filter by status")
     public ResponseEntity<ApiResponse<Page<DeliveryResponse>>> getDeliveries(
             @RequestParam(required = false) String status,
-            @PageableDefault(size = 20) Pageable pageable
-    ) {
+            @PageableDefault(size = 50) Pageable pageable) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(
                 fuelService.getDeliveries(TenantContext.getTenantIdAsObject(), status, pageable)));
@@ -183,10 +175,8 @@ public class FuelTankController {
 
     @PostMapping("/deliveries")
     @PreAuthorize("hasAuthority('USER_CREATE')")
-    @Operation(summary = "Schedule a fuel delivery to a client site")
     public ResponseEntity<ApiResponse<DeliveryResponse>> scheduleDelivery(
-            @Valid @RequestBody CreateDeliveryRequest request
-    ) {
+            @Valid @RequestBody CreateDeliveryRequest request) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Delivery scheduled",
@@ -195,11 +185,9 @@ public class FuelTankController {
 
     @PostMapping("/deliveries/{id}/complete")
     @PreAuthorize("hasAuthority('USER_UPDATE')")
-    @Operation(summary = "Complete a delivery — records actual litres delivered, deducts from tank")
     public ResponseEntity<ApiResponse<DeliveryResponse>> completeDelivery(
             @PathVariable UUID id,
-            @Valid @RequestBody CompleteDeliveryRequest request
-    ) {
+            @Valid @RequestBody CompleteDeliveryRequest request) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Delivery completed",
                 fuelService.completeDelivery(TenantContext.getTenantIdAsObject(), id, request)));
@@ -207,12 +195,9 @@ public class FuelTankController {
 
     @GetMapping("/deliveries/{id}/receipt")
     @PreAuthorize("hasAuthority('USER_READ')")
-    @Operation(summary = "Download fuel delivery receipt PDF — proof of delivery for mine sites")
     public ResponseEntity<byte[]> downloadReceipt(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
-        var tenantId = TenantContext.getTenantIdAsObject();
-        byte[] pdf = receiptPdfService.generateReceipt(id, tenantId);
-
+        byte[] pdf = receiptPdfService.generateReceipt(id, TenantContext.getTenantIdAsObject());
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"FDR-" + id + ".pdf\"")

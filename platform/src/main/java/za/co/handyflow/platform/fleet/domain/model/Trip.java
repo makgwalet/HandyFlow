@@ -1,5 +1,3 @@
-// fleet/domain/model/Trip.java
-
 package za.co.handyflow.platform.fleet.domain.model;
 
 import jakarta.persistence.*;
@@ -36,6 +34,10 @@ public class Trip {
 
     private String purpose;
 
+    // NEW: BUSINESS | PRIVATE — for SARS logbook compliance
+    @Column(name = "trip_type", nullable = false)
+    private String tripType = "BUSINESS";
+
     @Column(name = "start_location")
     private String startLocation;
 
@@ -57,14 +59,21 @@ public class Trip {
     @Column(name = "fuel_used_litres", precision = 8, scale = 2)
     private BigDecimal fuelUsedLitres;
 
+    // NEW: ACTIVE | COMPLETED | CANCELLED — needed for filtering in logbook
+    @Column(name = "status", nullable = false)
+    private String status = "ACTIVE";
+
     private String notes;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    // ── Factory — 9 args matching FleetService.startTrip ─────────────────────
+
     public static Trip create(TenantId tenantId, UUID vehicleId,
                               UUID guardId, String driverName,
-                              String purpose, String startLocation,
+                              String purpose, String tripType,
+                              String startLocation,
                               Integer startOdometer, Instant startAt) {
         Trip t = new Trip();
         t.tenantId      = tenantId;
@@ -72,15 +81,19 @@ public class Trip {
         t.guardId       = guardId;
         t.driverName    = driverName;
         t.purpose       = purpose;
+        t.tripType      = tripType != null ? tripType : "BUSINESS";
         t.startLocation = startLocation;
         t.startOdometer = startOdometer;
         t.startAt       = startAt;
+        t.status        = "ACTIVE";
         t.createdAt     = Instant.now();
         return t;
     }
 
-    public int getDistanceKm() {
-        if (endOdometer == null) return 0;
+    // ── Domain logic ──────────────────────────────────────────────────────────
+
+    public Integer getDistanceKm() {
+        if (endOdometer == null) return null;
         return endOdometer - startOdometer;
     }
 
@@ -88,13 +101,17 @@ public class Trip {
                          Instant endAt, BigDecimal fuelUsedLitres, String notes) {
         if (endOdometer != null && endOdometer < this.startOdometer) {
             throw new IllegalArgumentException(
-                    "End odometer cannot be less than start odometer"
-            );
+                    "End odometer (" + endOdometer + ") cannot be less than start (" + startOdometer + ")");
         }
         this.endLocation    = endLocation;
         this.endOdometer    = endOdometer;
         this.endAt          = endAt;
         this.fuelUsedLitres = fuelUsedLitres;
         this.notes          = notes;
+        this.status         = "COMPLETED";
+    }
+
+    public void cancel() {
+        this.status = "CANCELLED";
     }
 }
