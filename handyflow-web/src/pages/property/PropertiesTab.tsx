@@ -1,173 +1,176 @@
+// src/pages/property/PropertiesTab.tsx
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, Building2, Home, ChevronDown, ChevronUp, X } from "lucide-react"
+import { Plus, X, ChevronDown, ChevronUp, Building2, MapPin, Layers } from "lucide-react"
 
-interface Unit {
-  id: string; propertyId: string; unitNumber: string; unitType: string
-  floorNumber: number | null; sizeSqm: number | null
-  baseRent: number; depositAmount: number
-  status: "VACANT" | "OCCUPIED" | "MAINTENANCE"; furnished: boolean
-}
-interface Property {
-  id: string; name: string; propertyType: string
-  address: Record<string, string> | null; description: string | null
-  totalUnits: number; vacantUnits: number; occupiedUnits: number; createdAt: string
-}
+const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
+const fmtR   = (n: any) => n != null && Number(n) > 0 ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
 
-const UNIT_STATUS: Record<string, { color: string; bg: string; label: string }> = {
-  VACANT:      { color: "#166534", bg: "#DCFCE7", label: "Vacant"      },
-  OCCUPIED:    { color: "#1D4ED8", bg: "#EFF6FF", label: "Occupied"    },
-  MAINTENANCE: { color: "#D97706", bg: "#FFFBEB", label: "Maintenance" },
-}
-const PROPERTY_TYPES = ["RESIDENTIAL","COMMERCIAL","INDUSTRIAL","MIXED_USE"]
+const PROPERTY_TYPES = ["RESIDENTIAL","COMMERCIAL","INDUSTRIAL","RETAIL","MIXED_USE","LAND","OTHER"]
 const UNIT_TYPES     = ["STUDIO","1BED","2BED","3BED","4BED","PENTHOUSE","COMMERCIAL","RETAIL","WAREHOUSE","PARKING","OTHER"]
+
+const TYPE_COLOR: Record<string, string> = {
+  RESIDENTIAL: "#1D4ED8", COMMERCIAL: "#0D9488", INDUSTRIAL: "#D97706",
+  RETAIL: "#7C3AED", MIXED_USE: "#166534", LAND: "#92400E", OTHER: "#64748B",
+}
+
+const STATUS_CFG: Record<string, { color: string; bg: string }> = {
+  VACANT:      { color: "#166534", bg: "#DCFCE7" },
+  OCCUPIED:    { color: "#1D4ED8", bg: "#EFF6FF" },
+  MAINTENANCE: { color: "#D97706", bg: "#FFFBEB" },
+  RESERVED:    { color: "#7C3AED", bg: "#F5F3FF" },
+}
+
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none", background: "#fff" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
 
 export default function PropertiesTab() {
   const qc = useQueryClient()
-  const [expanded, setExpanded]       = useState<string | null>(null)
-  const [showAddProp, setShowAddProp] = useState(false)
-  const [showAddUnit, setShowAddUnit] = useState<string | null>(null)
-  const [error, setError]             = useState("")
-  const [propForm, setPropForm] = useState({ name: "", propertyType: "RESIDENTIAL", description: "", street: "", suburb: "", city: "", province: "", postalCode: "" })
-  const [unitForm, setUnitForm] = useState({ unitNumber: "", unitType: "2BED", floorNumber: "", sizeSqm: "", baseRent: "", depositAmount: "", furnished: false })
+  const [expanded, setExpanded]     = useState<string | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [showAddUnit, setShowUnit]  = useState<string | null>(null)
+  const [error, setError]           = useState("")
 
-  const { data: properties = [], isLoading } = useQuery<Property[]>({
+  const [form, setForm] = useState({
+    name: "", propertyType: "RESIDENTIAL", description: "",
+    purchasePrice: "", marketValue: "",
+    street: "", suburb: "", city: "", province: "", postalCode: "",
+  })
+
+  const [unitForm, setUnitForm] = useState({
+    unitNumber: "", unitType: "1BED", floorNumber: "", sizeSqm: "",
+    baseRent: "", depositAmount: "", furnished: false,
+  })
+
+  const { data: properties = [], isLoading } = useQuery<any[]>({
     queryKey: ["properties"],
-    queryFn: async () => (await apiClient.get("/api/v1/property/properties?size=50")).data.content,
+    queryFn: async () => unwrap(await apiClient.get("/api/v1/property/properties?size=100")),
   })
 
-  // Fetch units from dedicated endpoint — list endpoint returns units:[] always
-  const { data: allUnits = [] } = useQuery<Unit[]>({
-    queryKey: ["property-units"],
-    queryFn: async () => (await apiClient.get("/api/v1/property/units?size=200")).data.content,
+  const { data: expanded_property } = useQuery<any>({
+    queryKey: ["property", expanded],
+    enabled: !!expanded,
+    queryFn: async () => {
+      const r = await apiClient.get(`/api/v1/property/properties/${expanded}`)
+      return r.data?.data ?? r.data
+    },
   })
-
-  const unitsByProperty = allUnits.reduce((acc, u) => {
-    if (!acc[u.propertyId]) acc[u.propertyId] = []
-    acc[u.propertyId].push(u)
-    return acc
-  }, {} as Record<string, Unit[]>)
-
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["properties"] })
-    qc.invalidateQueries({ queryKey: ["property-units"] })
-  }
 
   const createProperty = useMutation({
     mutationFn: (body: any) => apiClient.post("/api/v1/property/properties", body),
-    onSuccess: () => { invalidate(); setShowAddProp(false); setPropForm({ name: "", propertyType: "RESIDENTIAL", description: "", street: "", suburb: "", city: "", province: "", postalCode: "" }); setError("") },
-    onError: (e: any) => setError(e.response?.data?.message || "Failed to create property"),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["properties"] }); setShowCreate(false); setError("") },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to create property"),
   })
 
   const addUnit = useMutation({
-    mutationFn: ({ propertyId, body }: { propertyId: string; body: any }) =>
-      apiClient.post(`/api/v1/property/properties/${propertyId}/units`, body),
-    onSuccess: () => { invalidate(); setShowAddUnit(null); setUnitForm({ unitNumber: "", unitType: "2BED", floorNumber: "", sizeSqm: "", baseRent: "", depositAmount: "", furnished: false }); setError("") },
-    onError: (e: any) => setError(e.response?.data?.message || "Failed to add unit"),
+    mutationFn: ({ id, body }: { id: string; body: any }) =>
+      apiClient.post(`/api/v1/property/properties/${id}/units`, body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["property", showAddUnit] }); setShowUnit(null); setError("") },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to add unit"),
   })
 
-  const fmtR = (n: number) => `R ${n.toLocaleString("en-ZA")}`
-  const totalUnits    = allUnits.length
-  const vacantUnits   = allUnits.filter(u => u.status === "VACANT").length
-  const occupiedUnits = allUnits.filter(u => u.status === "OCCUPIED").length
+  const deleteProperty = useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/api/v1/property/properties/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["properties"] }); setExpanded(null) },
+    onError: (e: any) => alert(e.response?.data?.message ?? "Cannot delete property"),
+  })
+
+  const units = expanded_property?.units ?? []
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-        {[
-          { label: "Properties",  value: properties.length, color: "#1B3A6B" },
-          { label: "Total Units", value: totalUnits,         color: "#475569" },
-          { label: "Occupied",    value: occupiedUnits,      color: "#1D4ED8" },
-          { label: "Vacant",      value: vacantUnits,        color: "#166534" },
-        ].map(s => (
-          <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
-        <button onClick={() => setShowAddProp(true)} style={btnPrimary}><Plus size={15} /> Add Property</button>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
+        <button onClick={() => { setShowCreate(true); setError("") }}
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          <Plus size={15} /> Add Property
+        </button>
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading properties...</div>
-      ) : properties.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading...</div>
+      ) : (properties as any[]).length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
-          <Building2 size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
+          <Building2 size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
           <div style={{ fontWeight: 600, color: "#475569" }}>No properties yet</div>
-          <div style={{ fontSize: 14, marginTop: 4 }}>Add your first property to start managing units and leases.</div>
+          <div style={{ fontSize: 13, marginTop: 4 }}>Add your first property to start managing your portfolio.</div>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {properties.map(prop => {
-            const isOpen    = expanded === prop.id
-            const propUnits = unitsByProperty[prop.id] ?? []
-            const occ       = propUnits.filter(u => u.status === "OCCUPIED").length
-            const pct       = propUnits.length > 0 ? Math.round((occ / propUnits.length) * 100) : 0
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {(properties as any[]).map(p => {
+            const color = TYPE_COLOR[p.propertyType] ?? "#64748B"
+            const isOpen = expanded === p.id
+            const pct    = p.totalUnits > 0 ? Math.round((p.occupiedUnits / p.totalUnits) * 100) : 0
+
             return (
-              <div key={prop.id} style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
-                <div onClick={() => setExpanded(isOpen ? null : prop.id)}
-                  style={{ padding: "16px 20px", background: isOpen ? "#F0FDF4" : "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 42, height: 42, borderRadius: 10, background: isOpen ? "#0D9488" : "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <Building2 size={20} color={isOpen ? "#fff" : "#94A3B8"} />
+              <div key={p.id} style={{ border: "1px solid #E2E8F0", borderLeft: `3px solid ${color}`, borderRadius: 10, overflow: "hidden" }}>
+                <div onClick={() => setExpanded(isOpen ? null : p.id)}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", cursor: "pointer", background: isOpen ? "#F8FAFC" : "#fff" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{p.name}</span>
+                      <span style={{ background: `${color}18`, color, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{p.propertyType.replace("_"," ")}</span>
                     </div>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{prop.name}</div>
-                      <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 1 }}>
-                        {prop.propertyType.replace("_", " ")}
-                        {prop.address && ` · ${prop.address.suburb || ""}, ${prop.address.city || ""}`}
-                      </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 12, color: "#64748B" }}>
+                      {p.address && <span><MapPin size={11} style={{ verticalAlign: "middle", marginRight: 2 }} />{p.address.suburb}, {p.address.city}</span>}
+                      <span><Layers size={11} style={{ verticalAlign: "middle", marginRight: 2 }} />{p.totalUnits} units</span>
+                      <span style={{ fontWeight: 600, color: pct >= 80 ? "#166534" : pct >= 50 ? "#D97706" : "#DC2626" }}>{pct}% occupied</span>
+                      {p.marketValue > 0 && <span style={{ fontWeight: 600, color: "#1B3A6B" }}>{fmtR(p.marketValue)}</span>}
                     </div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 12, color: "#64748B", marginBottom: 4 }}>{occ}/{propUnits.length} units · {pct}% occupied</div>
-                      <div style={{ width: 120, height: 6, background: "#F1F5F9", borderRadius: 99, overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#0D9488" : "#1D4ED8", borderRadius: 99 }} />
-                      </div>
-                    </div>
-                    {isOpen ? <ChevronUp size={16} color="#94A3B8" /> : <ChevronDown size={16} color="#94A3B8" />}
-                  </div>
+                  {isOpen ? <ChevronUp size={16} color="#94A3B8" /> : <ChevronDown size={16} color="#94A3B8" />}
                 </div>
 
                 {isOpen && (
                   <div style={{ borderTop: "1px solid #E2E8F0", padding: "16px 20px", background: "#FAFAFA" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.06em" }}>UNITS ({propUnits.length})</div>
-                      <button onClick={e => { e.stopPropagation(); setShowAddUnit(prop.id); setError("") }} style={btnTeal}>
-                        <Plus size={13} /> Add Unit
+                    {/* Occupancy bar */}
+                    <div style={{ marginBottom: 18 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748B", marginBottom: 5 }}>
+                        <span>Occupancy</span>
+                        <span>{p.occupiedUnits} occupied · {p.vacantUnits} vacant</span>
+                      </div>
+                      <div style={{ height: 7, background: "#E2E8F0", borderRadius: 99, overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${pct}%`, background: pct >= 80 ? "#16A34A" : pct >= 50 ? "#D97706" : "#DC2626", borderRadius: 99 }} />
+                      </div>
+                    </div>
+
+                    {/* Units grid */}
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>Units</span>
+                        <button onClick={() => { setShowUnit(p.id); setError("") }}
+                          style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#374151" }}>
+                          <Plus size={11} /> Add Unit
+                        </button>
+                      </div>
+                      {units.length === 0 ? (
+                        <div style={{ fontSize: 13, color: "#94A3B8" }}>No units added yet.</div>
+                      ) : (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
+                          {units.map((u: any) => {
+                            const sc = STATUS_CFG[u.status] ?? { color: "#64748B", bg: "#F8FAFC" }
+                            return (
+                              <div key={u.id} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: "12px 14px" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                                  <span style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>Unit {u.unitNumber}</span>
+                                  <span style={{ background: sc.bg, color: sc.color, padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>{u.status}</span>
+                                </div>
+                                <div style={{ fontSize: 11, color: "#64748B" }}>{u.unitType.replace("_"," ")} {u.sizeSqm && `· ${u.sizeSqm}m²`}</div>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: "#1B3A6B", marginTop: 4 }}>{fmtR(u.baseRent)}/mo</div>
+                                {u.furnished && <div style={{ fontSize: 10, color: "#0D9488", marginTop: 2, fontWeight: 600 }}>Furnished</div>}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                      <button onClick={() => deleteProperty.mutate(p.id)}
+                        style={{ padding: "6px 14px", background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        Delete Property
                       </button>
                     </div>
-                    {propUnits.length === 0 ? (
-                      <div style={{ color: "#94A3B8", fontSize: 13, padding: "12px 0" }}>No units yet. Add the first unit to this property.</div>
-                    ) : (
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
-                        {propUnits.map(unit => {
-                          const us = UNIT_STATUS[unit.status] || UNIT_STATUS.VACANT
-                          return (
-                            <div key={unit.id} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10, padding: "14px 16px" }}>
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                                  <Home size={14} color="#0D9488" />
-                                  <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>Unit {unit.unitNumber}</span>
-                                </div>
-                                <span style={{ background: us.bg, color: us.color, padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{us.label}</span>
-                              </div>
-                              <div style={{ fontSize: 12, color: "#64748B", marginBottom: 6 }}>
-                                {unit.unitType}{unit.sizeSqm && ` · ${unit.sizeSqm}m²`}{unit.floorNumber && ` · Floor ${unit.floorNumber}`}
-                              </div>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{fmtR(unit.baseRent)}/month</div>
-                              <div style={{ fontSize: 11, color: "#94A3B8" }}>Deposit: {fmtR(unit.depositAmount)}</div>
-                              {unit.furnished && <div style={{ fontSize: 11, color: "#0D9488", marginTop: 3 }}>✓ Furnished</div>}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -176,100 +179,141 @@ export default function PropertiesTab() {
         </div>
       )}
 
-      {showAddProp && (
-        <Modal title="Add Property" onClose={() => { setShowAddProp(false); setError("") }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div style={{ gridColumn: "1 / -1" }}>
-                <Field label="Property Name *"><MInput value={propForm.name} onChange={v => setPropForm(f => ({ ...f, name: v }))} placeholder="Germiston Heights" /></Field>
+      {/* Create property modal */}
+      {showCreate && (
+        <Modal title="Add Property" onClose={() => setShowCreate(false)}>
+          <Sect title="Basic details">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div style={{ gridColumn: "1/-1" }}>
+                <label style={lbl}>Property name *</label>
+                <input autoFocus value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Sunrise Apartments" style={inp} />
               </div>
-              <Field label="Property Type">
-                <select value={propForm.propertyType} onChange={e => setPropForm(f => ({ ...f, propertyType: e.target.value }))} style={sel}>
-                  {PROPERTY_TYPES.map(t => <option key={t} value={t}>{t.replace("_", " ")}</option>)}
+              <div>
+                <label style={lbl}>Property type *</label>
+                <select value={form.propertyType} onChange={e => setForm(f => ({ ...f, propertyType: e.target.value }))} style={{ ...inp, background: "#fff" }}>
+                  {PROPERTY_TYPES.map(t => <option key={t} value={t}>{t.replace("_"," ")}</option>)}
                 </select>
-              </Field>
-              <Field label="Description"><MInput value={propForm.description} onChange={v => setPropForm(f => ({ ...f, description: v }))} placeholder="12-unit residential block" /></Field>
-            </div>
-            <div style={{ borderTop: "1px solid #F1F5F9", paddingTop: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.05em", marginBottom: 10 }}>ADDRESS</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <Field label="Street"><MInput value={propForm.street} onChange={v => setPropForm(f => ({ ...f, street: v }))} placeholder="45 Rietfontein Road" /></Field>
-                <Field label="Suburb"><MInput value={propForm.suburb} onChange={v => setPropForm(f => ({ ...f, suburb: v }))} placeholder="Germiston" /></Field>
-                <Field label="City"><MInput value={propForm.city} onChange={v => setPropForm(f => ({ ...f, city: v }))} placeholder="Ekurhuleni" /></Field>
-                <Field label="Province"><MInput value={propForm.province} onChange={v => setPropForm(f => ({ ...f, province: v }))} placeholder="Gauteng" /></Field>
-                <Field label="Postal Code"><MInput value={propForm.postalCode} onChange={v => setPropForm(f => ({ ...f, postalCode: v }))} placeholder="1401" /></Field>
+              </div>
+              <div>
+                <label style={lbl}>Market value (R)</label>
+                <input type="number" value={form.marketValue} onChange={e => setForm(f => ({ ...f, marketValue: e.target.value }))} placeholder="0.00" style={inp} />
+              </div>
+              <div style={{ gridColumn: "1/-1" }}>
+                <label style={lbl}>Description</label>
+                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} style={{ ...inp, resize: "vertical" as const }} />
               </div>
             </div>
-          </div>
-          {error && <ErrMsg msg={error} />}
-          <ModalFooter onCancel={() => { setShowAddProp(false); setError("") }}
-            onSubmit={() => createProperty.mutate({ name: propForm.name, propertyType: propForm.propertyType, description: propForm.description || null, address: { street: propForm.street, suburb: propForm.suburb, city: propForm.city, province: propForm.province, postalCode: propForm.postalCode } })}
-            loading={createProperty.isPending} disabled={!propForm.name} label="Create Property" />
+          </Sect>
+          <Sect title="Address">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div style={{ gridColumn: "1/-1" }}>
+                <label style={lbl}>Street address *</label>
+                <input value={form.street} onChange={e => setForm(f => ({ ...f, street: e.target.value }))} placeholder="12 Main Road" style={inp} />
+              </div>
+              <div><label style={lbl}>Suburb</label><input value={form.suburb} onChange={e => setForm(f => ({ ...f, suburb: e.target.value }))} placeholder="Sandton" style={inp} /></div>
+              <div><label style={lbl}>City *</label><input value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} placeholder="Johannesburg" style={inp} /></div>
+              <div><label style={lbl}>Province</label><input value={form.province} onChange={e => setForm(f => ({ ...f, province: e.target.value }))} placeholder="Gauteng" style={inp} /></div>
+              <div><label style={lbl}>Postal code</label><input value={form.postalCode} onChange={e => setForm(f => ({ ...f, postalCode: e.target.value }))} placeholder="2196" style={inp} /></div>
+            </div>
+          </Sect>
+          {error && <ErrBox msg={error} />}
+          <ModalFoot onCancel={() => setShowCreate(false)} loading={createProperty.isPending}
+            disabled={!form.name || !form.city} label="Add Property"
+            onSubmit={() => createProperty.mutate({
+              name: form.name, propertyType: form.propertyType, description: form.description || null,
+              purchasePrice: parseFloat(form.purchasePrice) || null,
+              marketValue: parseFloat(form.marketValue) || null,
+              address: { street: form.street, suburb: form.suburb, city: form.city, province: form.province, postalCode: form.postalCode },
+            })} />
         </Modal>
       )}
 
+      {/* Add unit modal */}
       {showAddUnit && (
-        <Modal title="Add Unit" onClose={() => { setShowAddUnit(null); setError("") }}>
+        <Modal title="Add Unit" onClose={() => setShowUnit(null)}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-            <Field label="Unit Number *"><MInput value={unitForm.unitNumber} onChange={v => setUnitForm(f => ({ ...f, unitNumber: v }))} placeholder="1A" /></Field>
-            <Field label="Unit Type">
-              <select value={unitForm.unitType} onChange={e => setUnitForm(f => ({ ...f, unitType: e.target.value }))} style={sel}>
-                {UNIT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            <div>
+              <label style={lbl}>Unit number *</label>
+              <input autoFocus value={unitForm.unitNumber} onChange={e => setUnitForm(f => ({ ...f, unitNumber: e.target.value }))} placeholder="1A" style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>Unit type *</label>
+              <select value={unitForm.unitType} onChange={e => setUnitForm(f => ({ ...f, unitType: e.target.value }))} style={{ ...inp, background: "#fff" }}>
+                {UNIT_TYPES.map(t => <option key={t} value={t}>{t.replace("_"," ")}</option>)}
               </select>
-            </Field>
-            <Field label="Floor Number"><MInput value={unitForm.floorNumber} onChange={v => setUnitForm(f => ({ ...f, floorNumber: v }))} placeholder="1" type="number" /></Field>
-            <Field label="Size (m²)"><MInput value={unitForm.sizeSqm} onChange={v => setUnitForm(f => ({ ...f, sizeSqm: v }))} placeholder="75.5" type="number" /></Field>
-            <Field label="Monthly Rent (R) *"><MInput value={unitForm.baseRent} onChange={v => setUnitForm(f => ({ ...f, baseRent: v }))} placeholder="8500" type="number" /></Field>
-            <Field label="Deposit (R) *"><MInput value={unitForm.depositAmount} onChange={v => setUnitForm(f => ({ ...f, depositAmount: v }))} placeholder="17000" type="number" /></Field>
-            <div style={{ gridColumn: "1 / -1" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                <input type="checkbox" checked={unitForm.furnished} onChange={e => setUnitForm(f => ({ ...f, furnished: e.target.checked }))} style={{ width: 16, height: 16 }} />
-                <span style={{ fontSize: 14, color: "#374151" }}>Furnished unit</span>
+            </div>
+            <div>
+              <label style={lbl}>Monthly rent (R) *</label>
+              <input type="number" value={unitForm.baseRent} onChange={e => setUnitForm(f => ({ ...f, baseRent: e.target.value }))} placeholder="8500.00" style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>Deposit (R)</label>
+              <input type="number" value={unitForm.depositAmount} onChange={e => setUnitForm(f => ({ ...f, depositAmount: e.target.value }))} placeholder="17000.00" style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>Size (m²)</label>
+              <input type="number" value={unitForm.sizeSqm} onChange={e => setUnitForm(f => ({ ...f, sizeSqm: e.target.value }))} placeholder="65" style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>Floor</label>
+              <input type="number" value={unitForm.floorNumber} onChange={e => setUnitForm(f => ({ ...f, floorNumber: e.target.value }))} placeholder="1" style={inp} />
+            </div>
+            <div style={{ gridColumn: "1/-1" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "#374151", cursor: "pointer" }}>
+                <input type="checkbox" checked={unitForm.furnished} onChange={e => setUnitForm(f => ({ ...f, furnished: e.target.checked }))} />
+                Furnished
               </label>
             </div>
           </div>
-          {error && <ErrMsg msg={error} />}
-          <ModalFooter onCancel={() => { setShowAddUnit(null); setError("") }}
-            onSubmit={() => addUnit.mutate({ propertyId: showAddUnit, body: { unitNumber: unitForm.unitNumber, unitType: unitForm.unitType, floorNumber: unitForm.floorNumber ? Number(unitForm.floorNumber) : null, sizeSqm: unitForm.sizeSqm ? Number(unitForm.sizeSqm) : null, baseRent: Number(unitForm.baseRent), depositAmount: Number(unitForm.depositAmount), furnished: unitForm.furnished } })}
-            loading={addUnit.isPending} disabled={!unitForm.unitNumber || !unitForm.baseRent || !unitForm.depositAmount} label="Add Unit" />
+          {error && <ErrBox msg={error} />}
+          <ModalFoot onCancel={() => setShowUnit(null)} loading={addUnit.isPending}
+            disabled={!unitForm.unitNumber || !unitForm.baseRent} label="Add Unit"
+            onSubmit={() => addUnit.mutate({ id: showAddUnit, body: {
+              unitNumber: unitForm.unitNumber, unitType: unitForm.unitType,
+              floorNumber: parseInt(unitForm.floorNumber) || null,
+              sizeSqm: parseFloat(unitForm.sizeSqm) || null,
+              baseRent: parseFloat(unitForm.baseRent),
+              depositAmount: parseFloat(unitForm.depositAmount) || null,
+              furnished: unitForm.furnished,
+            }})} />
         </Modal>
       )}
     </div>
   )
 }
 
+function Sect({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.07em", marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #F1F5F9" }}>{title}</div>
+      {children}
+    </div>
+  )
+}
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-      <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 560, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 580, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
           <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{title}</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={20} /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
         </div>
         {children}
       </div>
     </div>
   )
 }
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "#374151", marginBottom: 5 }}>{label}</label>{children}</div>
-}
-function MInput({ value, onChange, placeholder, type = "text" }: { value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
-  return <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{ width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
-}
-function ErrMsg({ msg }: { msg: string }) {
-  return <div style={{ marginTop: 10, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#DC2626", fontSize: 13 }}>{msg}</div>
-}
-function ModalFooter({ onCancel, onSubmit, loading, disabled, label }: { onCancel: () => void; onSubmit: () => void; loading: boolean; disabled: boolean; label: string }) {
+function ModalFoot({ onCancel, onSubmit, loading, disabled, label }: any) {
   return (
-    <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-      <button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 8, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
-      <button onClick={onSubmit} disabled={disabled || loading} style={{ padding: "9px 20px", background: disabled || loading ? "#94A3B8" : "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: disabled || loading ? "not-allowed" : "pointer" }}>
+    <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+      <button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
+      <button onClick={onSubmit} disabled={disabled || loading}
+        style={{ padding: "9px 22px", background: disabled ? "#94A3B8" : "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
         {loading ? "Saving..." : label}
       </button>
     </div>
   )
 }
-const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer" }
-const btnTeal: React.CSSProperties    = { display: "flex", alignItems: "center", gap: 5, background: "#0D9488", color: "#fff", border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 13, cursor: "pointer" }
-const sel: React.CSSProperties        = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, background: "#fff" }
+function ErrBox({ msg }: { msg: string }) {
+  return <div style={{ marginTop: 12, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{msg}</div>
+}

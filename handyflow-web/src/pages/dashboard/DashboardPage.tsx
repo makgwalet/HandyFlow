@@ -54,6 +54,7 @@ const MODULE_REGISTRY: Record<string, AppTile> = {
   marketing:   { key: 'marketing',   name: 'Marketing',    description: 'Email campaigns & contacts',   icon: Megaphone,    bg: '#FFF7ED', iconColor: '#EA580C', route: '/marketing'   },
   recruiter:   { key: 'recruiter',   name: 'Recruiter',    description: 'Jobs, pipeline & hiring',      icon: UserCheck,    bg: '#ECFDF5', iconColor: '#059669', route: '/recruiter'   },
   pos:         { key: 'pos',         name: 'POS & Stock',  description: 'Point of sale & inventory',    icon: ShoppingCart, bg: '#EFF6FF', iconColor: '#2563EB', route: '/pos'         },
+  accountant: { key: 'accountant',   name: 'Accountant',   description: 'Clients, SARS & billing',      icon: BookOpen,     bg: '#EFF6FF', iconColor: '#1B3A6B', route: '/accountant' },
 }
 
 const MOCK_NOTIFICATIONS: Notification[] = [

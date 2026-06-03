@@ -83,9 +83,16 @@ public class Property {
     @Version
     private Long version;
 
+    // ── Factory ───────────────────────────────────────────────────────────────
+
+    /**
+     * Extended create — accepts optional financials so the service does not
+     * need setters. purchasePrice and marketValue are nullable.
+     */
     public static Property create(TenantId tenantId, String name,
                                   String propertyType, Map<String, String> address,
-                                  String description, UUID customerId) {
+                                  String description, UUID customerId,
+                                  BigDecimal purchasePrice, BigDecimal marketValue) {
         Property p = new Property();
         p.tenantId     = tenantId;
         p.name         = name.trim();
@@ -93,11 +100,26 @@ public class Property {
         p.address      = address;
         p.description  = description;
         p.customerId   = customerId;
+        p.purchasePrice = purchasePrice;
+        p.marketValue   = marketValue;
         p.active       = true;
         p.createdAt    = Instant.now();
         p.updatedAt    = Instant.now();
         return p;
     }
+
+    /**
+     * Kept for backwards compatibility — callers that don't supply financials.
+     * Delegates to the full factory with nulls.
+     */
+    public static Property create(TenantId tenantId, String name,
+                                  String propertyType, Map<String, String> address,
+                                  String description, UUID customerId) {
+        return create(tenantId, name, propertyType, address, description,
+                customerId, null, null);
+    }
+
+    // ── Mutations ─────────────────────────────────────────────────────────────
 
     public void softDelete(UUID deletedByUserId) {
         this.deletedAt = Instant.now();
@@ -105,6 +127,21 @@ public class Property {
         this.active    = false;
         this.updatedAt = Instant.now();
     }
+
+    /** Update market value — e.g. after a revaluation. */
+    public void updateMarketValue(BigDecimal marketValue) {
+        this.marketValue = marketValue;
+        this.updatedAt   = Instant.now();
+    }
+
+    /** Update notes or description after creation. */
+    public void updateDetails(String notes, String description) {
+        this.notes       = notes;
+        this.description = description;
+        this.updatedAt   = Instant.now();
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     public boolean isDeleted() { return deletedAt != null; }
 

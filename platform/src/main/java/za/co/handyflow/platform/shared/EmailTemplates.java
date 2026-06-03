@@ -324,4 +324,170 @@ public class EmailTemplates {
             """.formatted(partyName, contractTitle, contractNumber,
                 signingUrl, signingUrl, signingUrl));
     }
+
+    // ── Property / Lease notifications ────────────────────────────────────────
+
+    public static String leaseCreated(String lesseeName, String propertyName,
+                                      String unitNumber, String startDate,
+                                      String endDate, String monthlyRent,
+                                      int paymentDay) {
+        return wrap("""
+            <p>Dear <strong>%s</strong>,</p>
+            <p>Your lease agreement has been created. Here are your details:</p>
+            <div class="highlight">
+              <p><strong>%s — Unit %s</strong><br/>
+              Start: %s &nbsp;&middot;&nbsp; End: %s<br/>
+              Monthly rent: <strong>R%s</strong> due on the <strong>%s</strong> of each month
+              </p>
+            </div>
+            <p>Please ensure your first payment is made on time. Contact your landlord if you have any queries.</p>
+            """.formatted(lesseeName, propertyName, unitNumber,
+                startDate, endDate, monthlyRent, ordinal(paymentDay)));
+    }
+
+    public static String leaseTerminated(String lesseeName, String reason) {
+        return wrap("""
+            <p>Dear <strong>%s</strong>,</p>
+            <p>This is to confirm that your lease has been terminated.</p>
+            <div class="highlight-red">
+              <p><strong>Reason:</strong> %s</p>
+            </div>
+            <p>Please ensure the unit is vacated and keys returned as per the agreed date.
+               Your deposit refund will be processed after the move-out inspection.</p>
+            """.formatted(lesseeName, reason != null ? reason : "As per lease agreement"));
+    }
+
+    public static String leaseRenewed(String lesseeName, String newEndDate, String newRent) {
+        return wrap("""
+            <p>Dear <strong>%s</strong>,</p>
+            <p>Your lease has been renewed. Your updated terms are:</p>
+            <div class="highlight-green">
+              <p>New end date: <strong>%s</strong><br/>
+                 New monthly rent: <strong>R%s</strong></p>
+            </div>
+            <p>Your payment day remains unchanged. Thank you for renewing.</p>
+            """.formatted(lesseeName, newEndDate, newRent));
+    }
+
+    public static String rentEscalation(String lesseeName, String oldRent,
+                                        String newRent, String effectiveDate) {
+        return wrap("""
+            <p>Dear <strong>%s</strong>,</p>
+            <p>Please be advised that your monthly rent has been adjusted as follows:</p>
+            <div class="highlight-amber">
+              <p>Previous rent: R%s &nbsp;&rarr;&nbsp; <strong>New rent: R%s</strong><br/>
+                 Effective from: <strong>%s</strong></p>
+            </div>
+            <p>Please update your payment instructions accordingly. Contact your landlord if you have any queries.</p>
+            """.formatted(lesseeName, oldRent, newRent, effectiveDate));
+    }
+
+    public static String rentReceipt(String lesseeName, String amount,
+                                     String period, String paidDate, String reference) {
+        String refLine = (reference != null && !reference.isBlank())
+                ? " &nbsp;&middot;&nbsp; Ref: " + org.springframework.web.util.HtmlUtils.htmlEscape(reference)
+                : "";
+        return wrap("""
+            <p>Dear <strong>%s</strong>,</p>
+            <p>We confirm receipt of your rental payment:</p>
+            <div class="highlight-green">
+              <p>Amount: <strong>R%s</strong><br/>
+                 Period: <strong>%s</strong><br/>
+                 Paid: %s%s</p>
+            </div>
+            <p>Thank you for your payment.</p>
+            """.formatted(lesseeName, amount, period, paidDate, refLine));
+    }
+
+    public static String rentOverdueReminder(String lesseeName, String amount,
+                                             String period, String daysOverdue) {
+        return wrap("""
+            <p>Dear <strong>%s</strong>,</p>
+            <p>This is a reminder that your rental payment is overdue:</p>
+            <div class="highlight-red">
+              <p>Amount outstanding: <strong>R%s</strong><br/>
+                 Period: <strong>%s</strong><br/>
+                 Days overdue: <strong>%s</strong></p>
+            </div>
+            <p>Please make payment as soon as possible to avoid penalties.
+               If you have already paid, please send your proof of payment to your landlord.</p>
+            """.formatted(lesseeName, amount, period, daysOverdue));
+    }
+
+    private static String ordinal(int n) {
+        if (n >= 11 && n <= 13) return n + "th";
+        return switch (n % 10) {
+            case 1  -> n + "st";
+            case 2  -> n + "nd";
+            case 3  -> n + "rd";
+            default -> n + "th";
+        };
+    }
+
+    // ── Accountant module notifications ───────────────────────────────────────
+
+    /**
+     * SARS deadline reminder — sent at D-30, D-7, D-1 before adjusted due date.
+     */
+    public static String taxDeadlineReminder(String clientName, String deadlineType,
+                                             String dueDate, int daysUntilDue,
+                                             int periodYear, Integer periodMonth) {
+        String urgency = daysUntilDue == 1 ? "highlight-red" : daysUntilDue <= 7 ? "highlight-amber" : "highlight";
+        String period  = periodMonth != null
+                ? java.time.Month.of(periodMonth).getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH) + " " + periodYear
+                : String.valueOf(periodYear);
+        return wrap("""
+            <p>This is a compliance reminder for your client:</p>
+            <div class="%s">
+              <p><strong>%s</strong> &mdash; %s<br/>
+                 Period: %s<br/>
+                 Due date: <strong>%s</strong><br/>
+                 Days remaining: <strong>%d</strong></p>
+            </div>
+            <p>Please ensure this filing is submitted timeously to avoid SARS penalties and interest.</p>
+            <a href="#" class="btn">Open HandyFlow</a>
+            <div class="legal">
+              <p>Late submission of VAT201 attracts a 10%% penalty + interest at repo + 6.5%%.
+                 EMP201 late submission attracts 10%% plus a further 200%% penalty on outstanding PAYE.</p>
+            </div>
+            """.formatted(urgency, deadlineType, clientName, period, dueDate, daysUntilDue));
+    }
+
+    /**
+     * Fee note / invoice email to client.
+     */
+    public static String feeNote(String clientName, String invoiceNumber,
+                                 String amount, String dueDate) {
+        return wrap("""
+            <p>Dear <strong>%s</strong>,</p>
+            <p>Please find your professional fee note from your accountant:</p>
+            <div class="highlight">
+              <p>Invoice: <strong>%s</strong><br/>
+                 Amount: <strong>R%s</strong><br/>
+                 Due: <strong>%s</strong></p>
+            </div>
+            <p>Please make payment by the due date. Bank details will be provided on the attached invoice.
+               Quote the invoice number as your payment reference.</p>
+            <a href="#" class="btn btn-teal">View Invoice</a>
+            """.formatted(clientName, invoiceNumber, amount, dueDate));
+    }
+
+    /**
+     * Client onboarding welcome — sent when a new client is registered.
+     */
+    public static String clientOnboardingWelcome(String clientName, String firmName,
+                                                 String contactEmail) {
+        return wrap("""
+            <p>Dear <strong>%s</strong>,</p>
+            <p>Welcome to <strong>%s</strong>. Your client file has been set up in our practice management system.</p>
+            <div class="highlight-green">
+              <p>Our team will be in touch to complete your onboarding, including:<br/>
+                 &bull; FICA verification (ID copy and proof of address)<br/>
+                 &bull; SARS agent appointment form<br/>
+                 &bull; Bank account details for EFT payments</p>
+            </div>
+            <p>For any queries, please contact us at <a href="mailto:%s">%s</a>.</p>
+            """.formatted(clientName, firmName, contactEmail, contactEmail));
+    }
+
 }
