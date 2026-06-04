@@ -13,19 +13,21 @@ import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class EventsService {
 
-    private final EventRepository          eventRepo;
+    private final EventRepository           eventRepo;
     private final EventTicketTierRepository tierRepo;
-    private final EventGuestRepository     guestRepo;
-    private final EventVendorRepository    vendorRepo;
-    private final EventCheckInRepository   checkInRepo;
-    private final EventNumberGenerator     numberGen;
+    private final EventGuestRepository      guestRepo;
+    private final EventVendorRepository     vendorRepo;
+    private final EventCheckInRepository    checkInRepo;
+    private final EventNumberGenerator      numberGen;
 
     // ── Events ────────────────────────────────────────────────────────────────
 
@@ -79,9 +81,7 @@ public class EventsService {
         Event event = findActive(tenantId, id);
         event.complete();
         eventRepo.save(event);
-        log.info("Completed event={} checkedIn={}",
-                event.getEventNumber(),
-                guestRepo.countCheckedIn(id));
+        log.info("Completed event={}", event.getEventNumber());
         return toEventResponse(event);
     }
 
@@ -120,18 +120,20 @@ public class EventsService {
                                          String status, UUID tierId,
                                          Pageable pageable) {
         findActive(tenantId, eventId);
+        // Pre-load all tiers for this event once — avoids N+1 inside toGuestResponse
+        Map<UUID, String> tierNames = tierRepo.findByEvent(eventId).stream()
+                .collect(Collectors.toMap(EventTicketTier::getId, EventTicketTier::getName));
         return guestRepo.findByEvent(eventId, status, tierId, pageable)
-                .map(g -> toGuestResponse(g, eventId));
+                .map(g -> toGuestResponseWithTierMap(g, tierNames));
     }
 
     @Transactional
     public GuestResponse registerGuest(TenantId tenantId, UUID eventId,
                                        RegisterGuestRequest req) {
         Event event = findActive(tenantId, eventId);
-        if (java.util.List.of("CANCELLED","COMPLETED").contains(event.getStatus()))
+        if (List.of("CANCELLED","COMPLETED").contains(event.getStatus()))
             throw new IllegalStateException("Cannot register guests for a " + event.getStatus() + " event");
 
-        // Check tier availability
         if (req.tierId() != null) {
             EventTicketTier tier = tierRepo.findByIdAndEvent(req.tierId(), eventId)
                     .orElseThrow(() -> new ResourceNotFoundException("Tier", req.tierId().toString()));
@@ -140,24 +142,25 @@ public class EventsService {
             tier.incrementSold();
             tierRepo.save(tier);
 
-            // Auto-mark event as sold out if no tiers remain
             if (tierRepo.countAvailableTiers(eventId) == 0 && "PUBLISHED".equals(event.getStatus())) {
                 event.markSoldOut();
                 eventRepo.save(event);
             }
         }
 
-        long guestSeq = guestRepo.countActive(eventId) + 1;
-        String ticketNumber = numberGen.nextTicket(event.getEventNumber(), guestSeq);
+        long guestSeq    = guestRepo.countActive(eventId) + 1;
+        String ticketNum = numberGen.nextTicket(event.getEventNumber(), guestSeq);
 
         EventGuest guest = EventGuest.create(tenantId, eventId, req.tierId(),
                 req.customerId(), req.fullName(), req.email(), req.phone(),
-                req.company(), req.dietaryRequirements(), ticketNumber,
+                req.company(), req.dietaryRequirements(), ticketNum,
                 req.amountPaid(), event.isFree());
         guestRepo.save(guest);
-        log.info("Registered guest={} event={} ticket={}",
-                req.fullName(), event.getEventNumber(), ticketNumber);
-        return toGuestResponse(guest, eventId);
+        log.info("Registered guest={} event={} ticket={}", req.fullName(), event.getEventNumber(), ticketNum);
+
+        Map<UUID, String> tierNames = tierRepo.findByEvent(eventId).stream()
+                .collect(Collectors.toMap(EventTicketTier::getId, EventTicketTier::getName));
+        return toGuestResponseWithTierMap(guest, tierNames);
     }
 
     @Transactional
@@ -167,7 +170,9 @@ public class EventsService {
                 .orElseThrow(() -> new ResourceNotFoundException("Guest", guestId.toString()));
         guest.cancel();
         guestRepo.save(guest);
-        return toGuestResponse(guest, eventId);
+        Map<UUID, String> tierNames = tierRepo.findByEvent(eventId).stream()
+                .collect(Collectors.toMap(EventTicketTier::getId, EventTicketTier::getName));
+        return toGuestResponseWithTierMap(guest, tierNames);
     }
 
     // ── Check-in ──────────────────────────────────────────────────────────────
@@ -176,14 +181,17 @@ public class EventsService {
     public CheckInResponse checkIn(TenantId tenantId, UUID eventId,
                                    CheckInRequest req, UUID scannedBy) {
         findActive(tenantId, eventId);
-
-        // Look up guest by QR code
-        EventGuest guest = guestRepo.findByQrCode(req.qrCode()).orElse(null);
+        // Try QR token first; fall back to ticket number (e.g. EVT-2026-00001-0001)
+        // so door staff can type ticket numbers when scanning isn't available.
+        String input = req.qrCode() != null ? req.qrCode().trim() : "";
+        EventGuest guest = guestRepo.findByQrCode(input)
+                .or(() -> guestRepo.findByTicketNumber(input))
+                .orElse(null);
 
         String result;
-        String guestName  = "Unknown";
-        String tierName   = "—";
-        String ticketNum  = "—";
+        String guestName = "Unknown";
+        String tierName  = "—";
+        String ticketNum = "—";
 
         if (guest == null || !guest.getEventId().equals(eventId)) {
             result = "NOT_FOUND";
@@ -195,37 +203,34 @@ public class EventsService {
             result    = "ALREADY_CHECKED_IN";
             guestName = guest.getFullName();
             ticketNum = guest.getTicketNumber();
+            // Look up tier name once
+            if (guest.getTierId() != null)
+                tierName = tierRepo.findById(guest.getTierId()).map(EventTicketTier::getName).orElse("—");
         } else {
             result    = "SUCCESS";
             guestName = guest.getFullName();
             ticketNum = guest.getTicketNumber();
-
             guest.checkIn(scannedBy);
             guestRepo.save(guest);
 
-            // Increment tier checked-in count
             if (guest.getTierId() != null) {
                 tierRepo.findById(guest.getTierId()).ifPresent(tier -> {
                     tier.incrementCheckedIn();
                     tierRepo.save(tier);
+                    // capture tierName inside closure
                 });
-            }
-
-            if (guest.getTierId() != null) {
                 tierName = tierRepo.findById(guest.getTierId())
                         .map(EventTicketTier::getName).orElse("—");
             }
         }
 
-        // Always record the scan attempt
         EventCheckIn checkIn = EventCheckIn.create(tenantId, eventId,
                 guest != null ? guest.getId() : null,
                 scannedBy, req.location(), result);
         checkInRepo.save(checkIn);
 
         long totalCheckedIn = guestRepo.countCheckedIn(eventId);
-        log.info("Check-in {} event={} guest={} result={}",
-                ticketNum, eventId, guestName, result);
+        log.info("Check-in {} event={} guest={} result={}", ticketNum, eventId, guestName, result);
 
         return new CheckInResponse(result, guestName, tierName,
                 ticketNum, guest != null ? guest.getCheckedInAt() : null, totalCheckedIn);
@@ -234,12 +239,14 @@ public class EventsService {
     @Transactional(readOnly = true)
     public EventStatsResponse getStats(TenantId tenantId, UUID eventId) {
         findActive(tenantId, eventId);
-        long registered  = guestRepo.countActive(eventId);
-        long checkedIn   = guestRepo.countCheckedIn(eventId);
-        long vendors     = vendorRepo.findByEvent(eventId).size();
-        long confirmed   = vendorRepo.findByEvent(eventId).stream()
-                .filter(EventVendor::isConfirmed).count();
-        return new EventStatsResponse(registered, checkedIn, 0, vendors, confirmed);
+        long registered = guestRepo.countActive(eventId);
+        long checkedIn  = guestRepo.countCheckedIn(eventId);
+
+        // FIX: was calling vendorRepo.findByEvent twice — now two separate count queries
+        long totalVendors    = vendorRepo.countByEvent(eventId);
+        long confirmedVendors = vendorRepo.countConfirmedByEvent(eventId);
+
+        return new EventStatsResponse(registered, checkedIn, 0, totalVendors, confirmedVendors);
     }
 
     // ── Vendors ───────────────────────────────────────────────────────────────
@@ -272,14 +279,12 @@ public class EventsService {
         return toVendorResponse(vendor);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Private helpers ───────────────────────────────────────────────────────
 
     private Event findActive(TenantId tenantId, UUID id) {
         return eventRepo.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Event", id.toString()));
     }
-
-    // ── Mappers ───────────────────────────────────────────────────────────────
 
     private EventResponse toEventResponse(Event e) {
         return new EventResponse(e.getId(), e.getEventNumber(), e.getTitle(),
@@ -296,10 +301,12 @@ public class EventsService {
                 t.getSaleStart(), t.getSaleEnd(), t.isActive());
     }
 
-    private GuestResponse toGuestResponse(EventGuest g, UUID eventId) {
-        String tierName = g.getTierId() != null
-                ? tierRepo.findById(g.getTierId()).map(EventTicketTier::getName).orElse("—")
-                : "—";
+    /**
+     * Tier name resolved from a pre-loaded map — no extra DB query per guest.
+     * Fixes the N+1 problem in the original toGuestResponse().
+     */
+    private GuestResponse toGuestResponseWithTierMap(EventGuest g, Map<UUID, String> tierNames) {
+        String tierName = g.getTierId() != null ? tierNames.getOrDefault(g.getTierId(), "—") : "—";
         return new GuestResponse(g.getId(), g.getTicketNumber(), g.getQrCode(),
                 g.getFullName(), g.getEmail(), g.getPhone(), g.getCompany(),
                 g.getDietaryRequirements(), g.getTierId(), tierName,

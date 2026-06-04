@@ -24,9 +24,19 @@ public interface FeeNoteRepository extends JpaRepository<FeeNote, UUID> {
     Page<FeeNote> findByClient(@Param("clientId") UUID clientId, Pageable pageable);
 
     /**
-     * All outstanding invoices for the firm — SENT, PARTIAL, or OVERDUE.
-     * Powers the debtors aging view.
-     * tenantId null = all tenants (used by scheduler for bulk processing).
+     * Debtors view — DRAFT, SENT, PARTIAL, OVERDUE (everything not PAID or WRITTEN_OFF).
+     * tenantId null = all tenants (scheduler bulk processing).
+     */
+    @Query("""
+        SELECT f FROM AccountantFeeNote f
+        WHERE (:tenantId IS NULL OR f.tenantId = :tenantId)
+          AND f.status NOT IN ('PAID','WRITTEN_OFF')
+        ORDER BY f.dueDate ASC
+    """)
+    List<FeeNote> findAllUnpaid(@Param("tenantId") UUID tenantId);
+
+    /**
+     * Outstanding only (excludes DRAFT) — used by dashboard KPI and aging.
      */
     @Query("""
         SELECT f FROM AccountantFeeNote f
@@ -37,8 +47,7 @@ public interface FeeNoteRepository extends JpaRepository<FeeNote, UUID> {
     List<FeeNote> findOutstanding(@Param("tenantId") UUID tenantId);
 
     /**
-     * SENT invoices whose due_date has passed — used by scheduler to mark OVERDUE.
-     * tenantId null = across all tenants.
+     * SENT/PARTIAL invoices past due — used by scheduler to mark OVERDUE.
      */
     @Query("""
         SELECT f FROM AccountantFeeNote f
@@ -56,7 +65,6 @@ public interface FeeNoteRepository extends JpaRepository<FeeNote, UUID> {
     Optional<FeeNote> findByInvoiceNumber(@Param("tenantId") UUID tenantId,
                                           @Param("number") String number);
 
-    /** Draft fee notes — not yet sent to client. */
     @Query("""
         SELECT f FROM AccountantFeeNote f
         WHERE f.tenantId = :tenantId

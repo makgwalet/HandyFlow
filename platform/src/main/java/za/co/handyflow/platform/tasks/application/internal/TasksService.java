@@ -17,7 +17,9 @@ import za.co.handyflow.platform.tasks.dto.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -35,14 +37,22 @@ public class TasksService {
 
     @Transactional(readOnly = true)
     public TasksSummaryResponse getSummary(TenantId tenantId, UUID userId) {
+        // Use isDoneColumn flag as the source of truth for completed count.
+        // The status field may lag when tasks are created directly into non-default columns.
+        Long doneByColumn = jdbc.queryForObject(
+                "SELECT COUNT(t.id) FROM tasks t " +
+                        "JOIN task_columns tc ON tc.id = t.column_id " +
+                        "WHERE t.tenant_id = ? AND t.deleted_at IS NULL AND tc.is_done_column = true",
+                Long.class, tenantId.getValue());
+        long doneCount  = doneByColumn != null ? doneByColumn : 0;
+
         long todo       = taskRepo.countByStatus(tenantId, "TODO");
         long inProgress = taskRepo.countByStatus(tenantId, "IN_PROGRESS");
         long inReview   = taskRepo.countByStatus(tenantId, "IN_REVIEW");
-        long done       = taskRepo.countByStatus(tenantId, "DONE");
-        long overdue    = taskRepo.findOverdue(tenantId, LocalDate.now()).size();
-        long mine       = taskRepo.findMyTasks(tenantId, userId).size();
-        long total      = todo + inProgress + inReview + done;
-        return new TasksSummaryResponse(total, todo, inProgress, inReview, done, overdue, mine);
+        long overdue    = taskRepo.countOverdue(tenantId, LocalDate.now());
+        long mine       = userId != null ? taskRepo.countMyTasks(tenantId, userId) : 0;
+        long total      = todo + inProgress + inReview + doneCount;
+        return new TasksSummaryResponse(total, todo, inProgress, inReview, doneCount, overdue, mine);
     }
 
     // ── Boards ────────────────────────────────────────────────────────────────
@@ -67,12 +77,11 @@ public class TasksService {
                 req.color(), false, createdBy);
         boardRepo.save(board);
 
-        // Seed industry-standard default columns
         List.of(
-                TaskColumn.create(board.getId(), tenantId.getValue(), "To Do",        "#94A3B8", 0, false),
-                TaskColumn.create(board.getId(), tenantId.getValue(), "In Progress",  "#3B82F6", 1, false),
-                TaskColumn.create(board.getId(), tenantId.getValue(), "In Review",    "#F59E0B", 2, false),
-                TaskColumn.create(board.getId(), tenantId.getValue(), "Done",         "#10B981", 3, true)
+                TaskColumn.create(board.getId(), tenantId.getValue(), "To Do",       "#94A3B8", 0, false),
+                TaskColumn.create(board.getId(), tenantId.getValue(), "In Progress", "#3B82F6", 1, false),
+                TaskColumn.create(board.getId(), tenantId.getValue(), "In Review",   "#F59E0B", 2, false),
+                TaskColumn.create(board.getId(), tenantId.getValue(), "Done",        "#10B981", 3, true)
         ).forEach(columnRepo::save);
 
         log.info("Created board={} tenant={}", board.getId(), tenantId);
@@ -90,30 +99,25 @@ public class TasksService {
     @Transactional
     public void archiveBoard(TenantId tenantId, UUID boardId) {
         TaskBoard board = findBoard(tenantId, boardId);
-        if (board.isDefault()) {
-            throw new HandyFlowException(
-                    "The default board cannot be archived", HttpStatus.BAD_REQUEST, "DEFAULT_BOARD");
-        }
+        if (board.isDefault()) throw new HandyFlowException(
+                "The default board cannot be archived", HttpStatus.BAD_REQUEST, "DEFAULT_BOARD");
         board.archive();
         boardRepo.save(board);
-        log.info("Archived board={} tenant={}", boardId, tenantId);
     }
 
     // ── Columns ───────────────────────────────────────────────────────────────
 
     @Transactional
     public ColumnResponse addColumn(TenantId tenantId, UUID boardId, CreateColumnRequest req) {
-        findBoard(tenantId, boardId); // verify ownership
+        findBoard(tenantId, boardId);
         TaskColumn col = TaskColumn.create(boardId, tenantId.getValue(),
                 req.name(), req.color(), req.sortOrder(), req.isDoneColumn());
         columnRepo.save(col);
-        log.info("Added column={} to board={}", col.getId(), boardId);
         return toColumnResponse(col, null);
     }
 
     @Transactional
-    public ColumnResponse updateColumn(TenantId tenantId, UUID boardId,
-                                       UUID columnId, CreateColumnRequest req) {
+    public ColumnResponse updateColumn(TenantId tenantId, UUID boardId, UUID columnId, CreateColumnRequest req) {
         findBoard(tenantId, boardId);
         TaskColumn col = columnRepo.findById(columnId)
                 .orElseThrow(() -> new ResourceNotFoundException("Column", columnId.toString()));
@@ -125,75 +129,55 @@ public class TasksService {
     @Transactional
     public void deleteColumn(TenantId tenantId, UUID boardId, UUID columnId) {
         findBoard(tenantId, boardId);
-
-        // Must not delete the only column
         List<TaskColumn> allCols = columnRepo.findByBoardIdOrderBySortOrderAsc(boardId);
-        if (allCols.size() <= 1) {
-            throw new HandyFlowException(
-                    "Cannot delete the only column on a board", HttpStatus.BAD_REQUEST, "LAST_COLUMN");
-        }
-
-        // Move tasks to the first column that isn't the one being deleted
-        TaskColumn target = allCols.stream()
-                .filter(c -> !c.getId().equals(columnId))
-                .findFirst()
-                .orElseThrow();
-
-        jdbc.update(
-                "UPDATE tasks SET column_id = ? WHERE column_id = ? AND deleted_at IS NULL",
+        if (allCols.size() <= 1) throw new HandyFlowException(
+                "Cannot delete the only column on a board", HttpStatus.BAD_REQUEST, "LAST_COLUMN");
+        TaskColumn target = allCols.stream().filter(c -> !c.getId().equals(columnId)).findFirst().orElseThrow();
+        jdbc.update("UPDATE tasks SET column_id = ? WHERE column_id = ? AND deleted_at IS NULL",
                 target.getId(), columnId);
-
         columnRepo.deleteById(columnId);
-        log.info("Deleted column={} from board={} tasks moved to column={}", columnId, boardId, target.getId());
     }
 
     // ── Tasks ─────────────────────────────────────────────────────────────────
 
-    /**
-     * Paginated tasks for a board — replaces the old list-all pattern.
-     * Supports standard Spring Pageable (page, size, sort).
-     */
     @Transactional(readOnly = true)
     public Page<TaskResponse> getBoardTasks(TenantId tenantId, UUID boardId, Pageable pageable) {
-        findBoard(tenantId, boardId); // verify ownership
-        // Fetch columns once so we can map columnId → name efficiently
-        List<TaskColumn> cols = columnRepo.findByBoardIdOrderBySortOrderAsc(boardId);
+        findBoard(tenantId, boardId);
+        List<Task> tasks = taskRepo.findByBoardIdAndDeletedAtIsNullOrderBySortOrderAscCreatedAtAsc(boardId);
 
-        // Build a flat list from all columns and apply pageable manually.
-        // Replace with a proper repo method if task volume grows significantly.
-        List<Task> all = cols.stream()
-                .flatMap(c -> taskRepo
-                        .findByColumnIdAndDeletedAtIsNullOrderBySortOrderAsc(c.getId())
-                        .stream())
+        // FIX: pre-load all columns and comment counts in batch — eliminates N+1
+        Map<UUID, String> columnNames = columnRepo.findByBoardIdOrderBySortOrderAsc(boardId)
+                .stream().collect(Collectors.toMap(TaskColumn::getId, TaskColumn::getName));
+        Map<UUID, Integer> commentCounts = commentRepo.countByTaskIds(
+                tasks.stream().map(Task::getId).toList());
+        Map<UUID, BigDecimal> loggedHours = timeLogRepo.sumHoursByTaskIds(
+                tasks.stream().map(Task::getId).toList());
+
+        List<TaskResponse> content = tasks.stream()
+                .map(t -> toTaskResponseBatched(t, columnNames, commentCounts, loggedHours))
                 .toList();
 
-        int start = (int) pageable.getOffset();
-        int end   = Math.min(start + pageable.getPageSize(), all.size());
-        List<Task> page = start >= all.size() ? List.of() : all.subList(start, end);
-
-        List<TaskResponse> content = page.stream()
-                .map(t -> toTaskResponse(t, false))
-                .toList();
-
-        return new PageImpl<>(content, pageable, all.size());
+        int start = (int) Math.min(pageable.getOffset(), content.size());
+        int end   = Math.min(start + pageable.getPageSize(), content.size());
+        return new PageImpl<>(content.subList(start, end), pageable, content.size());
     }
 
     @Transactional(readOnly = true)
     public List<TaskResponse> getMyTasks(TenantId tenantId, UUID userId) {
-        return taskRepo.findMyTasks(tenantId, userId)
-                .stream().map(t -> toTaskResponse(t, false)).toList();
+        return taskRepo.findMyTasks(tenantId, userId).stream()
+                .map(t -> toTaskResponse(t, false)).toList();
     }
 
     @Transactional(readOnly = true)
     public List<TaskResponse> getOverdueTasks(TenantId tenantId) {
-        return taskRepo.findOverdue(tenantId, LocalDate.now())
-                .stream().map(t -> toTaskResponse(t, false)).toList();
+        return taskRepo.findOverdue(tenantId, LocalDate.now()).stream()
+                .map(t -> toTaskResponse(t, false)).toList();
     }
 
     @Transactional(readOnly = true)
     public List<TaskResponse> getLinkedTasks(TenantId tenantId, String entityType, UUID entityId) {
-        return taskRepo.findByLinkedEntity(tenantId, entityType, entityId)
-                .stream().map(t -> toTaskResponse(t, false)).toList();
+        return taskRepo.findByLinkedEntity(tenantId, entityType, entityId).stream()
+                .map(t -> toTaskResponse(t, false)).toList();
     }
 
     @Transactional(readOnly = true)
@@ -202,15 +186,11 @@ public class TasksService {
     }
 
     @Transactional
-    public TaskResponse createTask(TenantId tenantId, UUID boardId,
-                                   UUID createdBy, CreateTaskRequest req) {
+    public TaskResponse createTask(TenantId tenantId, UUID boardId, UUID createdBy, CreateTaskRequest req) {
         findBoard(tenantId, boardId);
 
-        // Use the requested column, fall back to the first column on the board
         UUID columnId;
         if (req.columnId() != null) {
-            columnRepo.findById(req.columnId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Column", req.columnId().toString()));
             columnId = req.columnId();
         } else {
             columnId = columnRepo.findFirstByBoardIdOrderBySortOrderAsc(boardId)
@@ -219,15 +199,16 @@ public class TasksService {
                             "Board has no columns", HttpStatus.BAD_REQUEST, "NO_COLUMNS"));
         }
 
-        int sortOrder = taskRepo
-                .findByColumnIdAndDeletedAtIsNullOrderBySortOrderAsc(columnId).size();
-
+        int sortOrder = taskRepo.findByColumnIdAndDeletedAtIsNullOrderBySortOrderAsc(columnId).size();
         Task task = Task.create(tenantId, boardId, columnId,
                 req.title(), req.description(), req.priority(),
                 req.assigneeId(), req.dueDate(), req.estimatedHours(), sortOrder,
                 req.linkedEntityType(), req.linkedEntityId(), createdBy);
         taskRepo.save(task);
-
+        // Sync status field based on which column the task is created in
+        final UUID finalColumnId = columnId;
+        columnRepo.findById(finalColumnId).ifPresent(col ->
+                jdbc.update("UPDATE tasks SET status = ? WHERE id = ?", deriveStatus(col), task.getId()));
         log.info("Created task={} board={} column={}", task.getId(), boardId, columnId);
         return toTaskResponse(task, false);
     }
@@ -249,32 +230,35 @@ public class TasksService {
                 .orElseThrow(() -> new ResourceNotFoundException("Column", req.columnId().toString()));
         task.moveToColumn(req.columnId(), col.isDoneColumn());
         taskRepo.save(task);
-        log.info("Moved task={} to column={}", taskId, req.columnId());
+        // Sync status field with column name so summary counts stay accurate
+        jdbc.update("UPDATE tasks SET status = ? WHERE id = ?", deriveStatus(col), taskId);
         return toTaskResponse(task, false);
+    }
+
+    /** Derive a status string from the column name for backward compat with status-based queries. */
+    private String deriveStatus(TaskColumn col) {
+        if (col.isDoneColumn()) return "DONE";
+        String upper = col.getName().toUpperCase();
+        if (upper.contains("PROGRESS") || upper.contains("DOING"))    return "IN_PROGRESS";
+        if (upper.contains("REVIEW")   || upper.contains("TESTING"))  return "IN_REVIEW";
+        return "TODO";
     }
 
     @Transactional
     public TaskResponse completeTask(TenantId tenantId, UUID taskId) {
         Task task = findTask(tenantId, taskId);
-
-        // Move to the done column on the board if one exists
-        columnRepo.findByBoardIdOrderBySortOrderAsc(task.getBoardId())
-                .stream()
-                .filter(TaskColumn::isDoneColumn)
-                .findFirst()
+        columnRepo.findByBoardIdOrderBySortOrderAsc(task.getBoardId()).stream()
+                .filter(TaskColumn::isDoneColumn).findFirst()
                 .ifPresent(done -> task.moveToColumn(done.getId(), true));
-
         task.complete();
         taskRepo.save(task);
-        log.info("Completed task={}", taskId);
         return toTaskResponse(task, false);
     }
 
     @Transactional
     public void deleteTask(TenantId tenantId, UUID taskId) {
-        findTask(tenantId, taskId); // verify ownership
+        findTask(tenantId, taskId);
         jdbc.update("UPDATE tasks SET deleted_at = NOW() WHERE id = ?", taskId);
-        log.info("Soft-deleted task={}", taskId);
     }
 
     // ── Comments ──────────────────────────────────────────────────────────────
@@ -283,21 +267,15 @@ public class TasksService {
     public TaskResponse addComment(TenantId tenantId, UUID taskId,
                                    AddTaskCommentRequest req, UUID authorId, String authorName) {
         Task task = findTask(tenantId, taskId);
-        TaskComment comment = TaskComment.create(taskId, tenantId.getValue(),
-                authorId, authorName, req.body());
-        commentRepo.save(comment);
-        log.info("Added comment to task={} by user={}", taskId, authorId);
+        commentRepo.save(TaskComment.create(taskId, tenantId.getValue(), authorId, authorName, req.body()));
         return toTaskResponse(task, true);
     }
 
     @Transactional(readOnly = true)
     public List<TaskCommentResponse> getComments(TenantId tenantId, UUID taskId) {
-        findTask(tenantId, taskId); // verify ownership
-        return commentRepo.findByTaskIdOrderByCreatedAtAsc(taskId)
-                .stream()
-                .map(c -> new TaskCommentResponse(
-                        c.getId(), c.getAuthorId(), c.getAuthorName(),
-                        c.getBody(), c.getCreatedAt()))
+        findTask(tenantId, taskId);
+        return commentRepo.findByTaskIdOrderByCreatedAtAsc(taskId).stream()
+                .map(c -> new TaskCommentResponse(c.getId(), c.getAuthorId(), c.getAuthorName(), c.getBody(), c.getCreatedAt()))
                 .toList();
     }
 
@@ -311,7 +289,6 @@ public class TasksService {
         TaskTimeLog entry = TaskTimeLog.create(taskId, tenantId.getValue(),
                 userId, userName, req.hours(), req.description(), logDate);
         timeLogRepo.save(entry);
-        log.info("Logged {}h on task={} by user={}", req.hours(), taskId, userId);
         return toTimeLogResponse(entry);
     }
 
@@ -322,23 +299,15 @@ public class TasksService {
                 .stream().map(this::toTimeLogResponse).toList();
     }
 
-    // ── Public utility ────────────────────────────────────────────────────────
+    // ── User resolution ───────────────────────────────────────────────────────
 
-    /**
-     * Exposed so the controller can resolve display names without coupling
-     * itself to the JDBC layer. Replace the SQL lookup with a proper
-     * UserRepository call once available.
-     */
     public String resolveUserName(UUID userId) {
         if (userId == null) return "Team Member";
         try {
             String name = jdbc.queryForObject(
-                    "SELECT first_name || ' ' || last_name FROM users WHERE id = ?",
-                    String.class, userId);
+                    "SELECT first_name || ' ' || last_name FROM users WHERE id = ?", String.class, userId);
             return name != null ? name : "Team Member";
-        } catch (Exception e) {
-            return "Team Member";
-        }
+        } catch (Exception e) { return "Team Member"; }
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -354,8 +323,7 @@ public class TasksService {
     }
 
     private BoardResponse toBoardResponse(TaskBoard b, boolean includeTasks) {
-        List<ColumnResponse> columns = columnRepo.findByBoardIdOrderBySortOrderAsc(b.getId())
-                .stream()
+        List<ColumnResponse> columns = columnRepo.findByBoardIdOrderBySortOrderAsc(b.getId()).stream()
                 .map(col -> {
                     List<TaskResponse> tasks = includeTasks
                             ? taskRepo.findByColumnIdAndDeletedAtIsNullOrderBySortOrderAsc(col.getId())
@@ -368,43 +336,59 @@ public class TasksService {
     }
 
     private ColumnResponse toColumnResponse(TaskColumn c, List<TaskResponse> tasks) {
-        return new ColumnResponse(c.getId(), c.getName(), c.getColor(),
-                c.getSortOrder(), c.isDoneColumn(), tasks);
+        return new ColumnResponse(c.getId(), c.getName(), c.getColor(), c.getSortOrder(), c.isDoneColumn(), tasks);
     }
 
+    /**
+     * Batch-efficient mapper — resolves column names and counts from pre-loaded maps.
+     * Used in getBoardTasks() to avoid N+1 queries per card.
+     */
+    private TaskResponse toTaskResponseBatched(Task t,
+                                               Map<UUID, String> columnNames,
+                                               Map<UUID, Integer> commentCounts,
+                                               Map<UUID, BigDecimal> loggedHoursMap) {
+        String     columnName   = columnNames.getOrDefault(t.getColumnId(), null);
+        String     assigneeName = resolveUserName(t.getAssigneeId());
+        BigDecimal logged       = loggedHoursMap.getOrDefault(t.getId(), BigDecimal.ZERO);
+        int        commentCount = commentCounts.getOrDefault(t.getId(), 0);
+        return new TaskResponse(
+                t.getId(), t.getBoardId(), t.getColumnId(), columnName,
+                t.getTitle(), t.getDescription(), t.getPriority(), t.getStatus(),
+                t.getAssigneeId(), assigneeName, t.getDueDate(), t.isOverdue(),
+                t.getEstimatedHours(), logged, t.getSortOrder(),
+                t.getLinkedEntityType(), t.getLinkedEntityId(),
+                commentCount, List.of(), t.getCreatedAt(), t.getUpdatedAt(), t.getCompletedAt());
+    }
+
+    /**
+     * Single-task mapper with optional comments inclusion.
+     * Used for task detail, create, update, move — not for board list loads.
+     */
     private TaskResponse toTaskResponse(Task t, boolean includeComments) {
         String     columnName   = fetchColumnName(t.getColumnId());
         String     assigneeName = resolveUserName(t.getAssigneeId());
         BigDecimal logged       = timeLogRepo.sumHoursByTask(t.getId());
-        int        commentCount = commentRepo.findByTaskIdOrderByCreatedAtAsc(t.getId()).size();
+        int        commentCount = commentRepo.countByTask(t.getId());
 
         List<TaskCommentResponse> comments = includeComments
-                ? commentRepo.findByTaskIdOrderByCreatedAtAsc(t.getId())
-                .stream()
-                .map(c -> new TaskCommentResponse(
-                        c.getId(), c.getAuthorId(), c.getAuthorName(),
-                        c.getBody(), c.getCreatedAt()))
+                ? commentRepo.findByTaskIdOrderByCreatedAtAsc(t.getId()).stream()
+                .map(c -> new TaskCommentResponse(c.getId(), c.getAuthorId(), c.getAuthorName(), c.getBody(), c.getCreatedAt()))
                 .toList()
                 : List.of();
 
         return new TaskResponse(
                 t.getId(), t.getBoardId(), t.getColumnId(), columnName,
                 t.getTitle(), t.getDescription(), t.getPriority(), t.getStatus(),
-                t.getAssigneeId(), assigneeName,
-                t.getDueDate(), t.isOverdue(),
-                t.getEstimatedHours(), logged,
-                t.getSortOrder(),
+                t.getAssigneeId(), assigneeName, t.getDueDate(), t.isOverdue(),
+                t.getEstimatedHours(), logged, t.getSortOrder(),
                 t.getLinkedEntityType(), t.getLinkedEntityId(),
-                commentCount, comments,
-                t.getCreatedAt(), t.getUpdatedAt(), t.getCompletedAt());
+                commentCount, comments, t.getCreatedAt(), t.getUpdatedAt(), t.getCompletedAt());
     }
 
     private String fetchColumnName(UUID columnId) {
         if (columnId == null) return null;
-        try {
-            return jdbc.queryForObject(
-                    "SELECT name FROM task_columns WHERE id = ?", String.class, columnId);
-        } catch (Exception e) { return null; }
+        try { return jdbc.queryForObject("SELECT name FROM task_columns WHERE id = ?", String.class, columnId); }
+        catch (Exception e) { return null; }
     }
 
     private TimeLogResponse toTimeLogResponse(TaskTimeLog l) {

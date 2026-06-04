@@ -15,4 +15,12 @@ public interface EventVendorRepository extends JpaRepository<EventVendor, UUID> 
 
     @Query("SELECT v FROM EventVendor v WHERE v.id = :id AND v.eventId = :eventId")
     Optional<EventVendor> findByIdAndEvent(UUID id, UUID eventId);
+
+    /** FIX: replaces calling findByEvent().size() in getStats() */
+    @Query("SELECT COUNT(v) FROM EventVendor v WHERE v.eventId = :eventId")
+    long countByEvent(UUID eventId);
+
+    /** FIX: replaces calling findByEvent().stream().filter(confirmed).count() in getStats() */
+    @Query("SELECT COUNT(v) FROM EventVendor v WHERE v.eventId = :eventId AND v.confirmed = true")
+    long countConfirmedByEvent(UUID eventId);
 }

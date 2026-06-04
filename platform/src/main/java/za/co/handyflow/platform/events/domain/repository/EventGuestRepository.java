@@ -21,8 +21,16 @@ public interface EventGuestRepository extends JpaRepository<EventGuest, UUID> {
     Page<EventGuest> findByEvent(UUID eventId, String status,
                                  UUID tierId, Pageable pageable);
 
+    /** Look up by the UUID QR token stored in qr_code column */
     @Query("SELECT g FROM EventGuest g WHERE g.qrCode = :qrCode")
     Optional<EventGuest> findByQrCode(String qrCode);
+
+    /**
+     * Look up by the human-readable ticket number (EVT-2026-00001-0001).
+     * Used as fallback when a ticket number is typed instead of a QR scan.
+     */
+    @Query("SELECT g FROM EventGuest g WHERE g.ticketNumber = :ticketNumber")
+    Optional<EventGuest> findByTicketNumber(String ticketNumber);
 
     @Query("SELECT g FROM EventGuest g WHERE g.id = :id AND g.eventId = :eventId")
     Optional<EventGuest> findByIdAndEvent(UUID id, UUID eventId);

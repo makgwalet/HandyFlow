@@ -34,6 +34,7 @@ public class AccountantService {
     private final FeeNoteRepository        feeNoteRepo;
     private final DeadlineEngine           deadlineEngine;
     private final FeeNoteNumberGenerator   feeNoteNumberGen;
+    private final AccountantProfileRepository profileRepo;
     private final EmailService             emailService;
 
     // ── L2: Client portfolio ──────────────────────────────────────────────────
@@ -296,7 +297,7 @@ public class AccountantService {
 
     @Transactional(readOnly = true)
     public List<FeeNoteResponse> getOutstandingInvoices(TenantId tenantId) {
-        return feeNoteRepo.findOutstanding(tenantId.getValue()).stream()
+        return feeNoteRepo.findAllUnpaid(tenantId.getValue()).stream()
                 .map(this::toFeeNoteResponse).toList();
     }
 
@@ -415,5 +416,38 @@ public class AccountantService {
 
     private FeeNoteLine buildFeeNoteLine(UUID feeNoteId, TimeEntry e, boolean includeVat, int order) {
         return FeeNoteLine.forTimeEntry(feeNoteId, e, includeVat, order);
+    }
+
+    // ── Practice profile ──────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public ProfileResponse getProfile(TenantId tenantId) {
+        return profileRepo.findByTenantId(tenantId)
+                .map(this::toProfileResponse)
+                .orElse(null);   // null = no profile yet; frontend shows setup prompt
+    }
+
+    @Transactional
+    public ProfileResponse upsertProfile(TenantId tenantId, CreateProfileRequest req) {
+        AccountantProfile profile = profileRepo.findByTenantId(tenantId)
+                .orElse(null);
+        if (profile == null) {
+            profile = AccountantProfile.create(tenantId, req.firmName(), req.practiceNumber(),
+                    req.vatNumber(), req.contactEmail(), req.contactPhone(),
+                    req.defaultHourlyRate(), req.yearEndMonth());
+        } else {
+            profile.update(req.firmName(), req.practiceNumber(), req.vatNumber(),
+                    req.contactEmail(), req.contactPhone(),
+                    req.defaultHourlyRate(), req.yearEndMonth());
+        }
+        profileRepo.save(profile);
+        return toProfileResponse(profile);
+    }
+
+    private ProfileResponse toProfileResponse(AccountantProfile p) {
+        return new ProfileResponse(p.getId(), p.getFirmName(), p.getPracticeNumber(),
+                p.getRegistrationNumber(), p.getVatNumber(), p.getContactEmail(),
+                p.getContactPhone(), p.getDefaultHourlyRate(), p.getYearEndMonth(),
+                p.getCreatedAt());
     }
 }

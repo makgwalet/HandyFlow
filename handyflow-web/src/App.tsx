@@ -33,6 +33,7 @@ import { MarketingPage } from './pages/marketing/MarketingPage'
 import { RecruiterPage } from './pages/recruiter/RecruiterPage'
 import { PosPage } from './pages/pos/PosPage'
 import { AccountantPage } from "./pages/accountant/AccountantPage"
+import { CreativeApprovePage } from "./pages/creative/CreativeApprovePage"
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -83,9 +84,10 @@ export default function App() {
             <Route path="/marketing"   element={<MarketingPage />} />
             <Route path="/recruiter"   element={<RecruiterPage />} />
             <Route path="/pos"         element={<PosPage />} />
-            <Route path="/sign/:token" element={<SigningPage />} />
             <Route path="/accountant" element={<AccountantPage />} />
           </Route>
+          <Route path="/sign/:token" element={<SigningPage />} />
+          <Route path="/creative/approve/:token" element={<CreativeApprovePage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>

@@ -216,4 +216,23 @@ public class AccountantController {
         return ResponseEntity.ok(ApiResponse.success("Outstanding invoices",
                 accountantService.getOutstandingInvoices(TenantContext.getTenantIdAsObject())));
     }
+
+    // ── Practice profile ──────────────────────────────────────────────────────
+
+    @GetMapping("/profile")
+    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @Operation(summary = "Get the accountant firm's practice profile")
+    public ResponseEntity<ApiResponse<ProfileResponse>> getProfile() {
+        return ResponseEntity.ok(ApiResponse.success("Profile",
+                accountantService.getProfile(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/profile")
+    @PreAuthorize("hasAnyAuthority('USER_CREATE','ACCOUNTANT_WRITE')")
+    @Operation(summary = "Create or update the accountant firm's practice profile")
+    public ResponseEntity<ApiResponse<ProfileResponse>> upsertProfile(
+            @Valid @RequestBody CreateProfileRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Profile saved",
+                accountantService.upsertProfile(TenantContext.getTenantIdAsObject(), req)));
+    }
 }
