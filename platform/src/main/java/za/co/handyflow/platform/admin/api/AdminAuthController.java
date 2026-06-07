@@ -8,9 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.admin.application.internal.AdminAuthService;
+import za.co.handyflow.platform.admin.application.internal.AdminService;
 import za.co.handyflow.platform.admin.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
-import za.co.handyflow.platform.shared.TenantContext;
 
 import java.util.UUID;
 
@@ -21,6 +21,15 @@ import java.util.UUID;
 public class AdminAuthController {
 
     private final AdminAuthService adminAuthService;
+    private final AdminService        adminService;
+
+    /*
+     * Phase 8 NOTE: TENANT_SIGNED_UP notifications are emitted from the
+     * tenant-facing RegistrationService / AuthService, not from here.
+     * AdminAuthController only handles admin logins and impersonation.
+     * See RegistrationService.registerTenant() — inject AdminNotificationService
+     * there and call notifyTenantSignedUp() after the tenant row is committed.
+     */
 
     @PostMapping("/login")
     @Operation(summary = "Step 1 — Password login. Returns partialToken if TOTP enabled, or TOTP_SETUP_REQUIRED if first login")
@@ -63,10 +72,9 @@ public class AdminAuthController {
     public ResponseEntity<ApiResponse<String>> impersonate(
             @Valid @RequestBody ImpersonateRequest req,
             HttpServletRequest http) {
-        // Resolve tenant ID from slug
-        UUID tenantId = resolveTenantId(req.tenantSlug());
-        UUID adminId  = TenantContext.getCurrentUserId();
-        String adminEmail = extractAdminEmailFromContext();
+        UUID tenantId  = adminService.resolveTenantBySlug(req.tenantSlug());
+        UUID adminId   = getAdminId();
+        String adminEmail = getAdminEmail();
 
         String token = adminAuthService.impersonateTenant(
                 adminId, adminEmail, tenantId,
@@ -76,17 +84,33 @@ public class AdminAuthController {
                 "Impersonation token generated — expires in 15 minutes. Read-only.", token));
     }
 
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /** Phase 1a: AdminJwtFilter stores adminId (UUID string) as principal. */
+    private UUID getAdminId() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication();
+        if (auth == null || auth.getPrincipal() == null)
+            throw new za.co.handyflow.platform.shared.HandyFlowException(
+                    "No admin context", org.springframework.http.HttpStatus.UNAUTHORIZED, "NO_CONTEXT");
+        return UUID.fromString(auth.getPrincipal().toString());
+    }
+
+    /** Phase 1b/1d: AdminJwtFilter stores email in authentication.getDetails() Map. */
+    @SuppressWarnings("unchecked")
+    private String getAdminEmail() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication();
+        if (auth != null && auth.getDetails() instanceof java.util.Map) {
+            var details = (java.util.Map<String, String>) auth.getDetails();
+            String email = details.get("email");
+            if (email != null && !email.isBlank()) return email;
+        }
+        return "unknown-admin";
+    }
+
     private String getIp(HttpServletRequest req) {
         String forwarded = req.getHeader("X-Forwarded-For");
         return forwarded != null ? forwarded.split(",")[0].trim() : req.getRemoteAddr();
-    }
-
-    private UUID resolveTenantId(String slug) {
-        // Resolved via AdminService — placeholder, wired through context
-        return UUID.randomUUID(); // TODO: wire properly in AdminService
-    }
-
-    private String extractAdminEmailFromContext() {
-        return "admin@handyflow.co.za"; // TODO: extract from JWT claims
     }
 }

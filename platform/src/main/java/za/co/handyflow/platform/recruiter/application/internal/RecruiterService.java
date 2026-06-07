@@ -357,6 +357,53 @@ public class RecruiterService {
         return employeeId;
     }
 
+    @Transactional(readOnly = true)
+    public List<JobResponse> getPublicJobsBySlug(String slug) {
+        return getPublicJobs(resolveTenantBySlug(slug));
+    }
+
+    @Transactional(readOnly = true)
+    public JobResponse getPublicJobBySlugAndTenant(String tenantSlug, String jobSlug) {
+        return getPublicJobBySlug(resolveTenantBySlug(tenantSlug), jobSlug);
+    }
+
+    @Transactional
+    public PublicApplicationResponse submitApplicationBySlug(String tenantSlug,
+                                                             UUID jobId,
+                                                             SubmitApplicationRequest req) {
+        return submitApplication(resolveTenantBySlug(tenantSlug), jobId, req);
+    }
+
+    // FIX: moveStage now accepts UUID instead of hardcoded string.
+    // Overloaded — the UUID version resolves the real user name.
+    @Transactional
+    public ApplicationResponse moveStage(TenantId tenantId, UUID id,
+                                         MoveStageRequest req, UUID movedById) {
+        String name = fetchUserName(movedById);
+        if (name == null || name.isBlank()) name = "Recruiter";
+        return moveStage(tenantId, id, req, name);
+    }
+
+    private TenantId resolveTenantBySlug(String slug) {
+        try {
+            String id = jdbc.queryForObject(
+                    "SELECT id::text FROM tenants WHERE slug = ?", String.class, slug);
+            return TenantId.of(id);
+        } catch (Exception e) {
+            throw new HandyFlowException("Company not found: " + slug,
+                    org.springframework.http.HttpStatus.NOT_FOUND, "NOT_FOUND");
+        }
+    }
+
+    private String fetchUserName(UUID userId) {
+        if (userId == null) return null;
+        try {
+            return jdbc.queryForObject(
+                    "SELECT first_name || ' ' || last_name FROM users WHERE id = ?",
+                    String.class, userId);
+        } catch (Exception e) { return null; }
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private RecJob findJob(TenantId tenantId, UUID id) {

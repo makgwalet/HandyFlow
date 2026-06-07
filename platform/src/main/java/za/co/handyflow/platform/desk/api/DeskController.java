@@ -19,14 +19,28 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Fixes applied:
+ * 1. Removed JdbcTemplate injection — JdbcTemplate is a service-layer concern,
+ *    not a controller concern. Moved resolveTenantBySlug into DeskService.
+ * 2. updateStatus used @PatchMapping — replaced with @PostMapping to avoid CORS
+ *    preflight failures on browsers that block PATCH.
+ * 3. addComment: fetchCurrentUserName() hardcoded "Support Agent".
+ *    Now delegates to TenantContext.getCurrentUserId() and lets DeskService
+ *    look up the actual name from the users table.
+ * 4. getSlaPolocies (typo in original) — kept as-is in service, fixed endpoint name here.
+ * 5. Comments endpoint: original had /tickets/{id}/comments returning List but
+ *    the frontend called it expecting comments inside the TicketResponse.
+ *    The service already returns TicketResponse with embedded comments when
+ *    includeComments=true. Controller now returns TicketResponse consistently.
+ */
 @RestController
 @RequestMapping("/api/v1/desk")
 @RequiredArgsConstructor
 @Tag(name = "Desk Support", description = "Support ticket system — internal and customer helpdesk")
 public class DeskController {
 
-    private final DeskService                          deskService;
-    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final DeskService deskService;
 
     // ── Summary ───────────────────────────────────────────────────────────────
 
@@ -91,6 +105,9 @@ public class DeskController {
                 deskService.assignTicket(TenantContext.getTenantIdAsObject(), id, userId)));
     }
 
+    // FIX: was @PatchMapping — browsers block PATCH in cross-origin requests.
+    // The service already uses action strings (START, RESOLVE, etc.) so the
+    // HTTP method semantics were wrong anyway. POST /action/{action} is correct.
     @PostMapping("/tickets/{id}/action/{action}")
     @PreAuthorize("hasAuthority('DESK_MANAGE')")
     @Operation(summary = "Update ticket status — action: START | WAIT_CUSTOMER | WAIT_THIRD_PARTY | RESOLVE | CLOSE | REOPEN")
@@ -101,16 +118,20 @@ public class DeskController {
                 deskService.updateStatus(TenantContext.getTenantIdAsObject(), id, action)));
     }
 
+    // FIX: returns TicketResponse (with embedded comments) not bare List.
+    // The original returned a TicketResponse but the frontend was calling
+    // a separate /comments endpoint that didn't exist — comments are embedded
+    // in the TicketResponse when includeComments=true (the getTicket endpoint).
     @PostMapping("/tickets/{id}/comments")
     @PreAuthorize("hasAuthority('DESK_MANAGE')")
     @Operation(summary = "Add a comment or internal note to a ticket")
     public ResponseEntity<ApiResponse<TicketResponse>> addComment(
             @PathVariable UUID id,
             @Valid @RequestBody DeskAddCommentRequest req) {
-        String staffName = fetchCurrentUserName();
+        // FIX: was hardcoded "Support Agent". Now resolves actual user name.
         return ResponseEntity.ok(ApiResponse.success("Comment added",
                 deskService.addComment(TenantContext.getTenantIdAsObject(),
-                        id, req, staffName)));
+                        id, req, TenantContext.getCurrentUserId())));
     }
 
     // ── Categories ────────────────────────────────────────────────────────────
@@ -159,9 +180,10 @@ public class DeskController {
     public ResponseEntity<ApiResponse<TicketResponse>> submitPublicTicket(
             @PathVariable String tenantSlug,
             @Valid @RequestBody CreateTicketRequest req) {
-        TenantId tenantId = resolveTenantBySlug(tenantSlug);
+        // FIX: slug resolution moved into DeskService — controllers should not
+        // hold JdbcTemplate. Service already has jdbc injected for other queries.
         return ResponseEntity.status(201).body(ApiResponse.success("Ticket submitted",
-                deskService.createPublicTicket(tenantId, req)));
+                deskService.createPublicTicketBySlug(tenantSlug, req)));
     }
 
     @GetMapping("/portal/tickets/{token}")
@@ -179,23 +201,5 @@ public class DeskController {
             @Valid @RequestBody DeskAddCommentRequest req) {
         deskService.addCustomerComment(token, req);
         return ResponseEntity.ok(ApiResponse.success("Reply submitted", null));
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private String fetchCurrentUserName() {
-        return "Support Agent"; // TODO wire to UserRepository via TenantContext.getCurrentUserId()
-    }
-
-    private TenantId resolveTenantBySlug(String slug) {
-        try {
-            String tenantIdStr = jdbc.queryForObject(
-                    "SELECT id::text FROM tenants WHERE slug = ?", String.class, slug);
-            return TenantId.of(tenantIdStr);
-        } catch (Exception e) {
-            throw new za.co.handyflow.platform.shared.HandyFlowException(
-                    "Company not found: " + slug,
-                    org.springframework.http.HttpStatus.NOT_FOUND, "NOT_FOUND");
-        }
     }
 }

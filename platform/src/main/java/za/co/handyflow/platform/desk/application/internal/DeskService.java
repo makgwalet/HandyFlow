@@ -269,6 +269,27 @@ public class DeskService {
         }
     }
 
+    @Transactional
+    public TicketResponse addComment(TenantId tenantId, UUID ticketId,
+                                     DeskAddCommentRequest req, UUID createdBy) {
+        String staffName = fetchUserName(createdBy);
+        if (staffName == null || staffName.isBlank()) staffName = "Support Agent";
+        return addComment(tenantId, ticketId, req, staffName);
+    }
+
+    // FIX: slug resolution moved from controller to service.
+    @Transactional
+    public TicketResponse createPublicTicketBySlug(String slug, CreateTicketRequest req) {
+        try {
+            String tenantIdStr = jdbc.queryForObject(
+                    "SELECT id::text FROM tenants WHERE slug = ?", String.class, slug);
+            return createPublicTicket(TenantId.of(tenantIdStr), req);
+        } catch (Exception e) {
+            throw new HandyFlowException("Company not found: " + slug,
+                    org.springframework.http.HttpStatus.NOT_FOUND, "NOT_FOUND");
+        }
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private DeskTicket findTicket(TenantId tenantId, UUID id) {

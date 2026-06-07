@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +17,15 @@ import za.co.handyflow.platform.shared.TenantContext;
 
 import java.util.UUID;
 
+/**
+ * Security fix: all endpoints used BILLING_READ/BILLING_MANAGE.
+ * AP is a distinct module — the correct permissions are AP_READ and AP_MANAGE
+ * (seeded in V34__ap_permissions.sql). Using BILLING_* permissions means anyone
+ * with billing access can also manage AP, which are separate concerns.
+ *
+ * hasAnyAuthority() is used to remain backward-compatible with tenants that
+ * already have BILLING_* grants configured while the AP_* grants propagate.
+ */
 @RestController
 @RequestMapping("/api/v1/ap")
 @RequiredArgsConstructor
@@ -29,7 +37,7 @@ public class ApController {
     // ── Summary ───────────────────────────────────────────────────────────────
 
     @GetMapping("/summary")
-    @PreAuthorize("hasAuthority('BILLING_READ')")
+    @PreAuthorize("hasAnyAuthority('AP_READ','BILLING_READ')")
     @Operation(summary = "AP dashboard summary — outstanding, overdue, due this week/month")
     public ResponseEntity<ApiResponse<ApSummaryResponse>> getSummary() {
         return ResponseEntity.ok(ApiResponse.success(
@@ -39,7 +47,7 @@ public class ApController {
     // ── Bills ─────────────────────────────────────────────────────────────────
 
     @GetMapping("/bills")
-    @PreAuthorize("hasAuthority('BILLING_READ')")
+    @PreAuthorize("hasAnyAuthority('AP_READ','BILLING_READ')")
     @Operation(summary = "List bills — filter by status: DRAFT | APPROVED | PAID | OVERDUE | CANCELLED")
     public ResponseEntity<ApiResponse<Page<BillResponse>>> getBills(
             @RequestParam(required = false) String status,
@@ -49,7 +57,7 @@ public class ApController {
     }
 
     @GetMapping("/bills/{id}")
-    @PreAuthorize("hasAuthority('BILLING_READ')")
+    @PreAuthorize("hasAnyAuthority('AP_READ','BILLING_READ')")
     @Operation(summary = "Get bill detail")
     public ResponseEntity<ApiResponse<BillResponse>> getBill(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -57,7 +65,7 @@ public class ApController {
     }
 
     @PostMapping("/bills")
-    @PreAuthorize("hasAuthority('BILLING_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
     @Operation(summary = "Create a new supplier bill")
     public ResponseEntity<ApiResponse<BillResponse>> createBill(
             @Valid @RequestBody CreateBillRequest req) {
@@ -67,7 +75,7 @@ public class ApController {
     }
 
     @PutMapping("/bills/{id}")
-    @PreAuthorize("hasAuthority('BILLING_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
     @Operation(summary = "Update a DRAFT bill")
     public ResponseEntity<ApiResponse<BillResponse>> updateBill(
             @PathVariable UUID id,
@@ -77,7 +85,7 @@ public class ApController {
     }
 
     @PostMapping("/bills/{id}/approve")
-    @PreAuthorize("hasAuthority('BILLING_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
     @Operation(summary = "Approve a bill — posts accounting journal entry (debit expense, credit AP)")
     public ResponseEntity<ApiResponse<BillResponse>> approveBill(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Bill approved",
@@ -85,7 +93,7 @@ public class ApController {
     }
 
     @PostMapping("/bills/{id}/pay")
-    @PreAuthorize("hasAuthority('BILLING_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
     @Operation(summary = "Mark bill as paid directly — posts payment journal entry")
     public ResponseEntity<ApiResponse<BillResponse>> payBill(
             @PathVariable UUID id,
@@ -96,7 +104,7 @@ public class ApController {
     }
 
     @PostMapping("/bills/{id}/cancel")
-    @PreAuthorize("hasAuthority('BILLING_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
     @Operation(summary = "Cancel a bill")
     public ResponseEntity<ApiResponse<BillResponse>> cancelBill(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Bill cancelled",
@@ -106,7 +114,7 @@ public class ApController {
     // ── Evidence uploads ──────────────────────────────────────────────────────
 
     @PostMapping("/bills/{id}/attachment")
-    @PreAuthorize("hasAuthority('BILLING_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
     @Operation(summary = "Upload supplier invoice document (PDF/image as base64)")
     public ResponseEntity<ApiResponse<BillResponse>> uploadAttachment(
             @PathVariable UUID id,
@@ -116,8 +124,8 @@ public class ApController {
     }
 
     @PostMapping("/bills/{id}/pop")
-    @PreAuthorize("hasAuthority('BILLING_MANAGE')")
-    @Operation(summary = "Upload proof of payment for a bill (POP — bank confirmation, receipt)")
+    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
+    @Operation(summary = "Upload proof of payment for a bill")
     public ResponseEntity<ApiResponse<BillResponse>> uploadBillPop(
             @PathVariable UUID id,
             @Valid @RequestBody UploadEvidenceRequest req) {
@@ -129,7 +137,7 @@ public class ApController {
     // ── EFT Batches ───────────────────────────────────────────────────────────
 
     @GetMapping("/batches")
-    @PreAuthorize("hasAuthority('BILLING_READ')")
+    @PreAuthorize("hasAnyAuthority('AP_READ','BILLING_READ')")
     @Operation(summary = "List EFT batches")
     public ResponseEntity<ApiResponse<Page<BatchResponse>>> getBatches(Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -137,7 +145,7 @@ public class ApController {
     }
 
     @GetMapping("/batches/{id}")
-    @PreAuthorize("hasAuthority('BILLING_READ')")
+    @PreAuthorize("hasAnyAuthority('AP_READ','BILLING_READ')")
     @Operation(summary = "Get EFT batch detail with all included bills")
     public ResponseEntity<ApiResponse<BatchResponse>> getBatch(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -145,7 +153,7 @@ public class ApController {
     }
 
     @PostMapping("/batches")
-    @PreAuthorize("hasAuthority('BILLING_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
     @Operation(summary = "Create EFT batch — group approved bills for bulk bank payment")
     public ResponseEntity<ApiResponse<BatchResponse>> createBatch(
             @Valid @RequestBody CreateBatchRequest req) {
@@ -155,7 +163,7 @@ public class ApController {
     }
 
     @PostMapping("/batches/{id}/submit")
-    @PreAuthorize("hasAuthority('BILLING_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
     @Operation(summary = "Mark batch as submitted to bank")
     public ResponseEntity<ApiResponse<BatchResponse>> submitBatch(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Batch submitted",
@@ -163,7 +171,7 @@ public class ApController {
     }
 
     @PostMapping("/batches/{id}/confirm-paid")
-    @PreAuthorize("hasAuthority('BILLING_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
     @Operation(summary = "Confirm batch payment received — marks all bills paid, posts journal entries")
     public ResponseEntity<ApiResponse<BatchResponse>> confirmBatchPaid(
             @PathVariable UUID id,
@@ -174,7 +182,7 @@ public class ApController {
     }
 
     @PostMapping("/batches/{id}/pop")
-    @PreAuthorize("hasAuthority('BILLING_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
     @Operation(summary = "Upload proof of payment / remittance advice for the batch")
     public ResponseEntity<ApiResponse<BatchResponse>> uploadBatchPop(
             @PathVariable UUID id,
@@ -185,7 +193,7 @@ public class ApController {
     }
 
     @GetMapping("/batches/{id}/export")
-    @PreAuthorize("hasAuthority('BILLING_READ')")
+    @PreAuthorize("hasAnyAuthority('AP_READ','BILLING_READ')")
     @Operation(summary = "Export batch as CSV for bank EFT upload (Nedbank/Standard Bank format)")
     public ResponseEntity<byte[]> exportBatch(@PathVariable UUID id) {
         String csv = apService.exportBatchCsv(TenantContext.getTenantIdAsObject(), id);
@@ -197,7 +205,7 @@ public class ApController {
     }
 
     @PostMapping("/batches/{id}/cancel")
-    @PreAuthorize("hasAuthority('BILLING_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('AP_MANAGE','BILLING_MANAGE')")
     @Operation(summary = "Cancel a DRAFT or SUBMITTED batch — releases bills back to approved state")
     public ResponseEntity<ApiResponse<BatchResponse>> cancelBatch(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Batch cancelled",

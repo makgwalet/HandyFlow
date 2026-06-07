@@ -103,6 +103,7 @@ public class AuthService {
                 user.getId(),
                 tenant.getId(),
                 user.getEmail(),
+                user.getFirstName(), user.getLastName(),
                 user.getPermissionNames()
         );
 

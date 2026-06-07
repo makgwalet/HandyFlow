@@ -16,6 +16,7 @@ import za.co.handyflow.platform.shared.JwtService;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Component
@@ -30,15 +31,15 @@ public class AdminJwtFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
         return !path.startsWith("/api/v1/admin/") ||
-               path.equals("/api/v1/admin/auth/login") ||
-               path.equals("/api/v1/admin/auth/verify-totp") ||
-               path.startsWith("/api/v1/admin/auth/totp");
+                path.equals("/api/v1/admin/auth/login") ||
+                path.equals("/api/v1/admin/auth/verify-totp") ||
+                path.startsWith("/api/v1/admin/auth/totp");
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
-                                     HttpServletResponse response,
-                                     FilterChain chain) throws ServletException, IOException {
+                                    HttpServletResponse response,
+                                    FilterChain chain) throws ServletException, IOException {
         String header = request.getHeader("Authorization");
         if (header == null || !header.startsWith("Bearer ")) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Admin token required");
@@ -63,10 +64,21 @@ public class AdminJwtFilter extends OncePerRequestFilter {
                 return;
             }
 
+            // Phase 1 fix: principal = adminId (UUID string) so getAdminId()
+            // works via authentication.getPrincipal(). Email stored as Details
+            // so extractAdminEmailFromContext() can retrieve it without re-parsing JWT.
+            String adminId    = claims.getSubject();
             String adminEmail = (String) claims.get("email");
+            String fullName   = (String) claims.get("fullName");
+
             var auth = new UsernamePasswordAuthenticationToken(
-                    adminEmail, null,
+                    adminId, null,
                     List.of(new SimpleGrantedAuthority("ROLE_SUPERADMIN")));
+            // Store email + fullName as WebAuthenticationDetails-compatible map
+            auth.setDetails(java.util.Map.of(
+                    "email",    adminEmail != null ? adminEmail : "",
+                    "fullName", fullName   != null ? fullName   : ""
+            ));
             SecurityContextHolder.getContext().setAuthentication(auth);
 
         } catch (Exception e) {

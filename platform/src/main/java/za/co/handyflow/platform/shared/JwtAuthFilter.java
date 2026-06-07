@@ -49,6 +49,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
                     TenantContext.setTenantId(tenantId);
                     TenantContext.setUserId(userId);
+                    // BUG-004 fix: populate USER_NAME so getCurrentUserName()
+                    // returns a real display name, not the UUID fallback.
+                    String displayName = jwtService.extractName(jwt);
+                    TenantContext.setUserName(displayName);
 
                     var authorities = permissions.stream()
                             .map(SimpleGrantedAuthority::new)

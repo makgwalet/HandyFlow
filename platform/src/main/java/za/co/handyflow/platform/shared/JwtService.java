@@ -34,12 +34,15 @@ public class JwtService {
     }
 
     public String generateToken(UUID userId, UUID tenantId,
-                                String email, Set<String> permissions) {
+                                String email, String firstName,
+                                String lastName, Set<String> permissions) {
         return Jwts.builder()
                 .subject(userId.toString())
                 .claims(Map.of(
                         "tenantId", tenantId.toString(),
                         "email", email,
+                        "firstName", firstName != null ? firstName : "",
+                        "lastName",  lastName  != null ? lastName  : "",
                         "permissions", permissions
                 ))
                 .issuedAt(new Date())
@@ -59,6 +62,16 @@ public class JwtService {
 
     public String extractEmail(String token) {
         return extractClaim(token, claims -> claims.get("email", String.class));
+    }
+
+    /** Returns "FirstName LastName" from the JWT, or empty string if absent. */
+    public String extractName(String token) {
+        String fn = extractClaim(token, claims -> claims.get("firstName", String.class));
+        String ln = extractClaim(token, claims -> claims.get("lastName",  String.class));
+        fn = fn != null ? fn : "";
+        ln = ln != null ? ln : "";
+        String full = (fn + " " + ln).trim();
+        return full.isEmpty() ? "" : full;
     }
 
     @SuppressWarnings("unchecked")

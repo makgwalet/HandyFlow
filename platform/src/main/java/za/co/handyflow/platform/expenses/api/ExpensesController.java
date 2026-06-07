@@ -41,67 +41,44 @@ public class ExpensesController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('USER_READ')")
     @Operation(summary = "Get expense claim detail")
-    public ResponseEntity<ApiResponse<ExpenseClaimResponse>> getClaim(
-            @PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<ExpenseClaimResponse>> getClaim(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Success",
                 expensesService.getClaim(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('USER_CREATE')")   // FIXED: was USER_READ
     @Operation(summary = "Submit a new expense claim")
     public ResponseEntity<ApiResponse<ExpenseClaimResponse>> submitClaim(
             @Valid @RequestBody CreateExpenseClaimRequest req) {
-        // Get submitting user ID from JWT subject
-        UUID submittedBy = null;
-        try {
-            var auth = org.springframework.security.core.context.SecurityContextHolder
-                    .getContext().getAuthentication();
-            if (auth != null) submittedBy = UUID.fromString(auth.getName());
-        } catch (Exception ignored) {}
-
         return ResponseEntity.status(201).body(ApiResponse.success("Claim submitted",
                 expensesService.submitClaim(TenantContext.getTenantIdAsObject(),
-                        submittedBy, req)));
+                        TenantContext.getCurrentUserId(), req)));
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")   // FIXED: was USER_READ
     @Operation(summary = "Approve an expense claim — auto-posts journal entry to Accounting")
     public ResponseEntity<ApiResponse<ExpenseClaimResponse>> approveClaim(
             @PathVariable UUID id) {
-        UUID approvedBy = null;
-        try {
-            var auth = org.springframework.security.core.context.SecurityContextHolder
-                    .getContext().getAuthentication();
-            if (auth != null) approvedBy = UUID.fromString(auth.getName());
-        } catch (Exception ignored) {}
-
         return ResponseEntity.ok(ApiResponse.success("Claim approved",
                 expensesService.approveClaim(TenantContext.getTenantIdAsObject(),
-                        id, approvedBy)));
+                        id, TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")   // FIXED: was USER_READ
     @Operation(summary = "Reject an expense claim with a reason")
     public ResponseEntity<ApiResponse<ExpenseClaimResponse>> rejectClaim(
             @PathVariable UUID id,
             @RequestBody RejectExpenseRequest req) {
-        UUID approvedBy = null;
-        try {
-            var auth = org.springframework.security.core.context.SecurityContextHolder
-                    .getContext().getAuthentication();
-            if (auth != null) approvedBy = UUID.fromString(auth.getName());
-        } catch (Exception ignored) {}
-
         return ResponseEntity.ok(ApiResponse.success("Claim rejected",
                 expensesService.rejectClaim(TenantContext.getTenantIdAsObject(),
-                        id, approvedBy, req.reason())));
+                        id, TenantContext.getCurrentUserId(), req.reason())));
     }
 
     @PostMapping("/{id}/reimburse")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")   // FIXED: was USER_READ
     @Operation(summary = "Mark an approved claim as reimbursed")
     public ResponseEntity<ApiResponse<ExpenseClaimResponse>> markReimbursed(
             @PathVariable UUID id) {

@@ -202,6 +202,7 @@ public class UserManagementService {
                 user.getId(),
                 inv.getTenantId().getValue(),   // UUID from TenantId
                 user.getEmail(),
+                user.getFirstName(), user.getLastName(),
                 user.getPermissionNames()
         );
         return new AuthResponse(

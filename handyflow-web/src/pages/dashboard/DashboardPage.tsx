@@ -481,10 +481,10 @@ const totalQuoted = quotes
 
                 <div style={{ padding: '6px 0' }}>
                   {[
-                    { icon: User, label: 'Update profile', action: undefined },
-                    { icon: Lock, label: 'Change password', action: undefined },
+                    { icon: User, label: 'Update profile', action: () => navigate('/profile') },
+                    { icon: Lock, label: 'Change password', action: () => navigate('/profile') },
                     { icon: CreditCard, label: 'Billing & plan', action: () => navigate('/billing') },
-                    { icon: Settings, label: 'Settings', action: undefined },
+                    { icon: Settings, label: 'Settings', action: () => navigate('/settings') },
                   ].map(item => (
                     <button key={item.label}
                       onClick={() => { item.action?.(); setProfileOpen(false) }}

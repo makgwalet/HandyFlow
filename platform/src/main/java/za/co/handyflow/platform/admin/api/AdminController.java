@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.admin.application.internal.AdminNotificationService;
 import za.co.handyflow.platform.admin.application.internal.AdminService;
 import za.co.handyflow.platform.admin.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -24,6 +25,7 @@ import java.util.UUID;
 public class AdminController {
 
     private final AdminService adminService;
+    private final AdminNotificationService notificationService;
 
     // ── Dashboard ─────────────────────────────────────────────────────────────
 
@@ -154,6 +156,54 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success(adminService.getIncidents(status)));
     }
 
+
+    @GetMapping("/incidents/{id}")
+    @Operation(summary = "Get INTERNAL ticket detail with full comment thread")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getIncidentDetail(
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getIncidentDetail(id)));
+    }
+
+    @PostMapping("/incidents/{id}/reply")
+    @Operation(summary = "Admin replies to an INTERNAL desk ticket — author shown as HandyFlow Support")
+    public ResponseEntity<ApiResponse<Void>> replyToIncident(
+            @PathVariable UUID id,
+            @RequestBody Map<String, String> req,
+            HttpServletRequest http) {
+        String body = req.get("body");
+        if (body == null || body.isBlank()) throw new za.co.handyflow.platform.shared.HandyFlowException(
+                "Reply body is required", org.springframework.http.HttpStatus.BAD_REQUEST, "MISSING_BODY");
+        adminService.replyToIncident(id, getAdminId(), getAdminEmail(),
+                getAdminFullName(), body);
+        return ResponseEntity.ok(ApiResponse.success("Reply sent", null));
+    }
+
+    @PostMapping("/incidents/{id}/resolve")
+    @Operation(summary = "Resolve an INTERNAL desk ticket")
+    public ResponseEntity<ApiResponse<Void>> resolveIncident(
+            @PathVariable UUID id,
+            HttpServletRequest http) {
+        adminService.resolveIncident(id, getAdminId(), getAdminEmail());
+        return ResponseEntity.ok(ApiResponse.success("Ticket resolved", null));
+    }
+
+    @PostMapping("/incidents/{id}/assign/{adminUserId}")
+    @Operation(summary = "Assign an INTERNAL ticket to a HandyFlow admin staff member")
+    public ResponseEntity<ApiResponse<Void>> assignIncident(
+            @PathVariable UUID id,
+            @PathVariable UUID adminUserId,
+            HttpServletRequest http) {
+        adminService.assignIncident(id, adminUserId, getAdminId(), getAdminEmail());
+        return ResponseEntity.ok(ApiResponse.success("Ticket assigned", null));
+    }
+
+    @GetMapping("/staff")
+    @Operation(summary = "List HandyFlow admin staff — used for incident assignment picker")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAdminStaff() {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getAdminStaff()));
+    }
+
+
     // ── Reports ───────────────────────────────────────────────────────────────
 
     @GetMapping("/reports/module-adoption")
@@ -176,13 +226,45 @@ public class AdminController {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /**
+     * Phase 1a fix: AdminJwtFilter now stores adminId (UUID string) as the
+     * authentication principal. Read it directly from SecurityContext.
+     */
     private UUID getAdminId() {
-        // Extract from JWT — in production wire through AdminJwtFilter
-        return UUID.fromString("00000000-0000-0000-0000-000000000001");
+        var auth = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication();
+        if (auth == null || auth.getPrincipal() == null)
+            throw new za.co.handyflow.platform.shared.HandyFlowException(
+                    "No admin context", org.springframework.http.HttpStatus.UNAUTHORIZED, "NO_CONTEXT");
+        return UUID.fromString(auth.getPrincipal().toString());
     }
 
+    /**
+     * Phase 1b/1d fix: AdminJwtFilter stores email in authentication.getDetails()
+     * as a Map. Read it from there — no JWT re-parsing needed.
+     */
+    @SuppressWarnings("unchecked")
     private String getAdminEmail() {
-        return "superadmin@handyflow.co.za";
+        var auth = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication();
+        if (auth != null && auth.getDetails() instanceof java.util.Map) {
+            var details = (java.util.Map<String, String>) auth.getDetails();
+            String email = details.get("email");
+            if (email != null && !email.isBlank()) return email;
+        }
+        return "unknown-admin";
+    }
+
+    @SuppressWarnings("unchecked")
+    private String getAdminFullName() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication();
+        if (auth != null && auth.getDetails() instanceof java.util.Map) {
+            var details = (java.util.Map<String, String>) auth.getDetails();
+            String name = details.get("fullName");
+            if (name != null && !name.isBlank()) return name;
+        }
+        return "HandyFlow Support";
     }
 
     private String getIp(HttpServletRequest req) {

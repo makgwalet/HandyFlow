@@ -16,6 +16,9 @@ public class ClaimNumberGenerator {
     // Format: EXP-2026-00001
     public String next(TenantId tenantId) {
         int year = LocalDate.now().getYear();
+
+        jdbc.execute("SELECT pg_advisory_xact_lock(hashtext('exp:" + tenantId.getValue() + "'))");
+
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM expense_claims WHERE tenant_id = ? AND EXTRACT(YEAR FROM created_at) = ?",
                 Integer.class, tenantId.getValue(), year);

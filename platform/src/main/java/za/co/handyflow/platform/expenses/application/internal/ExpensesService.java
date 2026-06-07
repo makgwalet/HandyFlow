@@ -101,7 +101,7 @@ public class ExpensesService {
         try {
             // Find or use default expense account (6000-series)
             var expenseAccountRow = jdbc.queryForMap(
-                    "SELECT id FROM acc_accounts WHERE tenant_id = ? AND account_code LIKE '6%' AND active = true LIMIT 1",
+                    "SELECT id FROM acc_accounts WHERE tenant_id = ? AND account_code LIKE '5%' AND account_subtype = 'STAFF_EXPENSES' AND active = true LIMIT 1",
                     tenantId.getValue());
             var payableAccountRow = jdbc.queryForMap(
                     "SELECT id FROM acc_accounts WHERE tenant_id = ? AND account_code LIKE '2%' AND active = true LIMIT 1",

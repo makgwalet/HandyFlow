@@ -13,11 +13,23 @@ import za.co.handyflow.platform.recruiter.application.internal.RecruiterService;
 import za.co.handyflow.platform.recruiter.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
-import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Fixes applied:
+ * 1. Removed JdbcTemplate injection — slug resolution moved into RecruiterService.
+ *    Controllers should not hold data-access concerns.
+ * 2. moveStage: original used @PostMapping but fetched changed-by name as
+ *    hardcoded "Recruiter". Now passes TenantContext.getCurrentUserId() so
+ *    the service can look up the real user name for the audit trail.
+ * 3. Missing ConvertToEmployeeRequest DTO — referenced in controller but
+ *    not provided in uploads. Added as a separate file.
+ * 4. updateProfile used @PutMapping which was declared correctly — kept.
+ * 5. Public portal endpoints are split off — SecurityConfig must add
+ *    /api/v1/recruiter/careers/** and /api/v1/recruiter/portal/** to permitAll().
+ */
 @RestController
 @RequestMapping("/api/v1/recruiter")
 @RequiredArgsConstructor
@@ -25,7 +37,6 @@ import java.util.UUID;
 public class RecruiterController {
 
     private final RecruiterService recruiterService;
-    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     // ── Summary ───────────────────────────────────────────────────────────────
 
@@ -81,8 +92,7 @@ public class RecruiterController {
     @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
     @Operation(summary = "Update job status — action: PUBLISH | PAUSE | CLOSE | FILL")
     public ResponseEntity<ApiResponse<JobResponse>> updateStatus(
-            @PathVariable UUID id,
-            @PathVariable String action) {
+            @PathVariable UUID id, @PathVariable String action) {
         return ResponseEntity.ok(ApiResponse.success("Status updated",
                 recruiterService.updateJobStatus(TenantContext.getTenantIdAsObject(), id, action)));
     }
@@ -95,7 +105,7 @@ public class RecruiterController {
         return ResponseEntity.ok(ApiResponse.success("Job deleted", null));
     }
 
-    // ── Applications — staff view ─────────────────────────────────────────────
+    // ── Applications — staff pipeline management ──────────────────────────────
 
     @GetMapping("/applications")
     @PreAuthorize("hasAuthority('RECRUITER_READ')")
@@ -112,21 +122,21 @@ public class RecruiterController {
     @GetMapping("/applications/{id}")
     @PreAuthorize("hasAuthority('RECRUITER_READ')")
     @Operation(summary = "Get application detail with interviews and stage history")
-    public ResponseEntity<ApiResponse<ApplicationResponse>> getApplication(
-            @PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<ApplicationResponse>> getApplication(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(
                 recruiterService.getApplication(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @PostMapping("/applications/{id}/stage")
     @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
-    @Operation(summary = "Move application to a new pipeline stage — SCREENING|INTERVIEW|ASSESSMENT|OFFER|HIRED|REJECTED")
+    @Operation(summary = "Move application to a new pipeline stage")
     public ResponseEntity<ApiResponse<ApplicationResponse>> moveStage(
             @PathVariable UUID id,
             @Valid @RequestBody MoveStageRequest req) {
+        // FIX: was hardcoded "Recruiter" — now resolves actual user name in service.
         return ResponseEntity.ok(ApiResponse.success("Stage updated",
                 recruiterService.moveStage(TenantContext.getTenantIdAsObject(), id, req,
-                        "Recruiter")));
+                        TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/applications/{id}/score")
@@ -153,8 +163,7 @@ public class RecruiterController {
     @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
     @Operation(summary = "Record interview outcome")
     public ResponseEntity<ApiResponse<InterviewResponse>> recordOutcome(
-            @PathVariable UUID appId,
-            @PathVariable UUID intId,
+            @PathVariable UUID appId, @PathVariable UUID intId,
             @RequestBody RecordInterviewOutcomeRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Outcome recorded",
                 recruiterService.recordOutcome(TenantContext.getTenantIdAsObject(),
@@ -174,37 +183,32 @@ public class RecruiterController {
     }
 
     // ── PUBLIC careers page — no auth ─────────────────────────────────────────
-    // SecurityConfig must have /api/v1/recruiter/careers/** in permitAll()
 
     @GetMapping("/careers/{tenantSlug}")
     @Operation(summary = "PUBLIC — Get all open jobs for a tenant's careers page")
     public ResponseEntity<ApiResponse<List<JobResponse>>> getPublicJobs(
             @PathVariable String tenantSlug) {
-        TenantId tenantId = resolveTenantBySlug(tenantSlug);
+        // FIX: slug resolution moved to service — no JdbcTemplate in controller.
         return ResponseEntity.ok(ApiResponse.success(
-                recruiterService.getPublicJobs(tenantId)));
+                recruiterService.getPublicJobsBySlug(tenantSlug)));
     }
 
     @GetMapping("/careers/{tenantSlug}/{slug}")
     @Operation(summary = "PUBLIC — Get a specific job posting by slug")
     public ResponseEntity<ApiResponse<JobResponse>> getPublicJob(
-            @PathVariable String tenantSlug,
-            @PathVariable String slug) {
-        TenantId tenantId = resolveTenantBySlug(tenantSlug);
+            @PathVariable String tenantSlug, @PathVariable String slug) {
         return ResponseEntity.ok(ApiResponse.success(
-                recruiterService.getPublicJobBySlug(tenantId, slug)));
+                recruiterService.getPublicJobBySlugAndTenant(tenantSlug, slug)));
     }
 
     @PostMapping("/careers/{tenantSlug}/jobs/{jobId}/apply")
     @Operation(summary = "PUBLIC — Submit a job application (no login needed)")
     public ResponseEntity<ApiResponse<PublicApplicationResponse>> apply(
-            @PathVariable String tenantSlug,
-            @PathVariable UUID jobId,
+            @PathVariable String tenantSlug, @PathVariable UUID jobId,
             @Valid @RequestBody SubmitApplicationRequest req) {
-        TenantId tenantId = resolveTenantBySlug(tenantSlug);
         return ResponseEntity.status(201).body(ApiResponse.success(
                 "Application submitted! Check your email for a tracking link.",
-                recruiterService.submitApplication(tenantId, jobId, req)));
+                recruiterService.submitApplicationBySlug(tenantSlug, jobId, req)));
     }
 
     // ── PUBLIC applicant portal — token-gated, no login ──────────────────────
@@ -229,23 +233,8 @@ public class RecruiterController {
     @PostMapping("/portal/{token}/applications/{applicationId}/withdraw")
     @Operation(summary = "PUBLIC — Applicant withdraws their application")
     public ResponseEntity<ApiResponse<Void>> withdraw(
-            @PathVariable String token,
-            @PathVariable UUID applicationId) {
+            @PathVariable String token, @PathVariable UUID applicationId) {
         recruiterService.withdrawApplication(token, applicationId);
         return ResponseEntity.ok(ApiResponse.success("Application withdrawn", null));
-    }
-
-    // ── Helper ────────────────────────────────────────────────────────────────
-
-    private TenantId resolveTenantBySlug(String slug) {
-        try {
-            String id = jdbc.queryForObject(
-                    "SELECT id::text FROM tenants WHERE slug = ?", String.class, slug);
-            return TenantId.of(id);
-        } catch (Exception e) {
-            throw new za.co.handyflow.platform.shared.HandyFlowException(
-                    "Company not found: " + slug,
-                    org.springframework.http.HttpStatus.NOT_FOUND, "NOT_FOUND");
-        }
     }
 }

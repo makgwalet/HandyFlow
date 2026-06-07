@@ -20,8 +20,9 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AdminService {
 
-    private final AdminAuditLogRepository auditRepo;
-    private final JdbcTemplate jdbc;
+    private final AdminAuditLogRepository    auditRepo;
+    private final JdbcTemplate               jdbc;
+    private final AdminNotificationService   notificationService;
 
     // ── Dashboard ─────────────────────────────────────────────────────────────
 
@@ -47,11 +48,13 @@ public class AdminService {
             WHERE created_at >= NOW() - INTERVAL '7 days'
             """);
 
-        // Churn this month — cancelled this month
+        // Churn this month — tenants whose subscription moved to CANCELLED this month.
+        // WHY updated_at? subscriptions has no cancelled_at column; status change timestamp
+        // is tracked via updated_at which Hibernate always sets on save.
         long churnThisMonth = count("""
             SELECT COUNT(*) FROM subscriptions
             WHERE status = 'CANCELLED'
-            AND cancelled_at >= date_trunc('month', NOW())
+            AND updated_at >= date_trunc('month', NOW())
             """);
 
         // Trial conversions this month — PILOT → ACTIVE this month
@@ -119,7 +122,7 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getTenants(String search, String status,
-                                                  String sortBy, int page, int size) {
+                                                String sortBy, int page, int size) {
         StringBuilder sql = new StringBuilder("""
             SELECT t.id, t.name, t.slug, t.created_at,
                    s.status AS subscription_status,
@@ -223,7 +226,7 @@ public class AdminService {
 
     @Transactional
     public void extendPilot(UUID adminId, String adminEmail, String tenantSlug,
-                             int days, String ipAddress) {
+                            int days, String ipAddress) {
         int updated = jdbc.update("""
             UPDATE tenant_modules
             SET trial_ends_at = COALESCE(trial_ends_at, NOW()) + (? || ' days')::INTERVAL,
@@ -243,33 +246,56 @@ public class AdminService {
 
     @Transactional
     public void suspendTenant(UUID adminId, String adminEmail, String tenantSlug,
-                               String reason, String ipAddress) {
+                              String reason, String ipAddress) {
+        // FIX: must update BOTH subscriptions AND tenants.status.
+        // FeatureGuard checks tenants.status — updating only subscriptions
+        // had no effect on actual access control.
         jdbc.update("""
             UPDATE subscriptions SET status = 'SUSPENDED', updated_at = NOW()
             WHERE tenant_id = (SELECT id FROM tenants WHERE slug = ?)
             """, tenantSlug);
+        jdbc.update("""
+            UPDATE tenants SET status = 'SUSPENDED', updated_at = NOW()
+            WHERE slug = ?
+            """, tenantSlug);
 
         audit(adminId, adminEmail, "SUSPEND_TENANT", "TENANT", tenantSlug, tenantSlug,
                 "{\"reason\":\"" + reason + "\"}", ipAddress);
+
+        // Resolve tenant name for the notification (best-effort — slug is fallback)
+        String tenantName = resolveTenantName(tenantSlug);
+        UUID   tenantId   = resolveTenantId(tenantSlug);
+        notificationService.notifyTenantSuspended(tenantId, tenantName, tenantSlug);
+
         log.info("Admin {} suspended tenant: {}", adminEmail, tenantSlug);
     }
 
     @Transactional
     public void reactivateTenant(UUID adminId, String adminEmail, String tenantSlug,
-                                  String ipAddress) {
+                                 String ipAddress) {
+        // FIX: mirror of suspendTenant — restore both subscriptions AND tenants.status.
         jdbc.update("""
             UPDATE subscriptions SET status = 'ACTIVE', updated_at = NOW()
             WHERE tenant_id = (SELECT id FROM tenants WHERE slug = ?)
             """, tenantSlug);
+        jdbc.update("""
+            UPDATE tenants SET status = 'ACTIVE', updated_at = NOW()
+            WHERE slug = ?
+            """, tenantSlug);
 
         audit(adminId, adminEmail, "REACTIVATE_TENANT", "TENANT", tenantSlug, tenantSlug,
                 null, ipAddress);
+
+        String tenantName = resolveTenantName(tenantSlug);
+        UUID   tenantId   = resolveTenantId(tenantSlug);
+        notificationService.notifyTenantReactivated(tenantId, tenantName, tenantSlug);
+
         log.info("Admin {} reactivated tenant: {}", adminEmail, tenantSlug);
     }
 
     @Transactional
     public void forceActivateModule(UUID adminId, String adminEmail, String tenantSlug,
-                                     String moduleKey, String ipAddress) {
+                                    String moduleKey, String ipAddress) {
         int updated = jdbc.update("""
             UPDATE tenant_modules
             SET status = 'ACTIVE', updated_at = NOW()
@@ -289,11 +315,12 @@ public class AdminService {
         audit(adminId, adminEmail, "FORCE_ACTIVATE_MODULE", "MODULE",
                 moduleKey, tenantSlug + "/" + moduleKey,
                 "{\"module\":\"" + moduleKey + "\"}", ipAddress);
+        log.info("Admin {} force-activated module {} for tenant {}", adminEmail, moduleKey, tenantSlug);
     }
 
     @Transactional
     public void forceDeactivateModule(UUID adminId, String adminEmail, String tenantSlug,
-                                       String moduleKey, String ipAddress) {
+                                      String moduleKey, String ipAddress) {
         jdbc.update("""
             UPDATE tenant_modules
             SET status = 'CANCELLED', cancelled_at = NOW(), updated_at = NOW()
@@ -304,6 +331,7 @@ public class AdminService {
         audit(adminId, adminEmail, "FORCE_DEACTIVATE_MODULE", "MODULE",
                 moduleKey, tenantSlug + "/" + moduleKey,
                 "{\"module\":\"" + moduleKey + "\"}", ipAddress);
+        log.info("Admin {} force-deactivated module {} for tenant {}", adminEmail, moduleKey, tenantSlug);
     }
 
     // ── Incident inbox (uses Desk module INTERNAL channel) ────────────────────
@@ -324,7 +352,10 @@ public class AdminService {
             sql.append(" AND dt.status = ?");
             params.add(status);
         }
-        sql.append(" ORDER BY dt.priority DESC, dt.created_at ASC");
+        // FIX: TEXT alphabetical DESC gives wrong ordering for mixed priority values.
+        // URGENT > NORMAL > LOW > HIGH alphabetically — HIGH lands last, wrong.
+        // Correct via explicit CASE-based integer ordering.
+        sql.append(" ORDER BY CASE dt.priority WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL' THEN 3 ELSE 4 END ASC, dt.created_at ASC");
         return jdbc.queryForList(sql.toString(), params.toArray());
     }
 
@@ -385,7 +416,7 @@ public class AdminService {
 
     @Transactional
     public void updateModulePrice(UUID adminId, String adminEmail, String moduleKey,
-                                   BigDecimal newPrice, String ipAddress) {
+                                  BigDecimal newPrice, String ipAddress) {
         BigDecimal oldPrice = queryDecimal(
                 "SELECT monthly_price FROM module_catalogue WHERE key = ?", moduleKey);
         jdbc.update("UPDATE module_catalogue SET monthly_price = ? WHERE key = ?",
@@ -394,6 +425,7 @@ public class AdminService {
                 moduleKey, moduleKey,
                 "{\"oldPrice\":" + oldPrice + ",\"newPrice\":" + newPrice + "}",
                 ipAddress);
+        log.info("Admin {} updated price for {} from R{} to R{}", adminEmail, moduleKey, oldPrice, newPrice);
     }
 
     // ── Audit log ─────────────────────────────────────────────────────────────
@@ -433,11 +465,196 @@ public class AdminService {
             """);
     }
 
+    // ── Incident management (Phase 5) ────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getIncidentDetail(UUID ticketId) {
+        Map<String, Object> ticket;
+        try {
+            ticket = jdbc.queryForMap("""
+                SELECT dt.id, dt.ticket_number, dt.subject, dt.description,
+                       dt.priority, dt.status, dt.sla_breached,
+                       dt.requester_name, dt.requester_email,
+                       dt.created_at, dt.updated_at, dt.due_at,
+                       dt.first_response_at, dt.resolved_at,
+                       t.name AS tenant_name, t.slug AS tenant_slug
+                FROM desk_tickets dt
+                JOIN tenants t ON t.id = dt.tenant_id
+                WHERE dt.id = ?
+                  AND dt.channel = 'INTERNAL'
+                  AND dt.deleted_at IS NULL
+                """, ticketId);
+        } catch (Exception e) {
+            throw new HandyFlowException("Incident not found: " + ticketId,
+                    HttpStatus.NOT_FOUND, "NOT_FOUND");
+        }
+        List<Map<String, Object>> comments = jdbc.queryForList("""
+            SELECT id, author_name, author_type, is_internal, body, created_at
+            FROM desk_comments
+            WHERE ticket_id = ?
+            ORDER BY created_at ASC
+            """, ticketId);
+        ticket.put("comments", comments);
+        return ticket;
+    }
+
+    @Transactional
+    public void replyToIncident(UUID ticketId, UUID adminId, String adminEmail,
+                                String adminFullName, String body) {
+        Map<String, Object> ticket;
+        try {
+            ticket = jdbc.queryForMap("""
+                SELECT id, tenant_id, ticket_number, status, first_response_at
+                FROM desk_tickets
+                WHERE id = ? AND channel = 'INTERNAL' AND deleted_at IS NULL
+                """, ticketId);
+        } catch (Exception e) {
+            throw new HandyFlowException("Incident not found",
+                    HttpStatus.NOT_FOUND, "NOT_FOUND");
+        }
+        String status = (String) ticket.get("status");
+        if ("CLOSED".equals(status) || "RESOLVED".equals(status))
+            throw new HandyFlowException("Cannot reply to a " + status + " ticket",
+                    HttpStatus.BAD_REQUEST, "TICKET_CLOSED");
+
+        String displayName = (adminFullName != null && !adminFullName.isBlank())
+                ? adminFullName : "HandyFlow Support";
+
+        UUID commentId = UUID.randomUUID();
+        UUID tenantId  = (UUID) ticket.get("tenant_id");
+        jdbc.update("""
+            INSERT INTO desk_comments
+            (id, ticket_id, tenant_id, author_name, author_type, is_internal, body, created_at)
+            VALUES (?, ?, ?, ?, 'TEAM', false, ?, NOW())
+            """, commentId, ticketId, tenantId, displayName, body);
+
+        // Record first response if not yet set; always update updated_at
+        if (ticket.get("first_response_at") == null) {
+            jdbc.update("""
+                UPDATE desk_tickets SET first_response_at = NOW(), updated_at = NOW()
+                WHERE id = ?
+                """, ticketId);
+        } else {
+            jdbc.update("UPDATE desk_tickets SET updated_at = NOW() WHERE id = ?", ticketId);
+        }
+
+        audit(adminId, adminEmail, "INCIDENT_REPLY", "TICKET",
+                ticketId.toString(), (String) ticket.get("ticket_number"),
+                "{\"commentId\":\"" + commentId + "\"}", null);
+        log.info("Admin {} replied to incident {}", adminEmail, ticket.get("ticket_number"));
+    }
+
+    @Transactional
+    public void resolveIncident(UUID ticketId, UUID adminId, String adminEmail) {
+        Map<String, Object> ticket;
+        try {
+            ticket = jdbc.queryForMap("""
+                SELECT ticket_number, status FROM desk_tickets
+                WHERE id = ? AND channel = 'INTERNAL' AND deleted_at IS NULL
+                """, ticketId);
+        } catch (Exception e) {
+            throw new HandyFlowException("Incident not found",
+                    HttpStatus.NOT_FOUND, "NOT_FOUND");
+        }
+        String currentStatus = (String) ticket.get("status");
+        if ("RESOLVED".equals(currentStatus) || "CLOSED".equals(currentStatus))
+            throw new HandyFlowException("Ticket is already " + currentStatus,
+                    HttpStatus.BAD_REQUEST, "ALREADY_RESOLVED");
+
+        jdbc.update("""
+            UPDATE desk_tickets
+            SET status = 'RESOLVED', resolved_at = NOW(), updated_at = NOW()
+            WHERE id = ?
+            """, ticketId);
+
+        // System comment visible in tenant's ticket thread
+        jdbc.update("""
+            INSERT INTO desk_comments
+            (id, ticket_id, tenant_id, author_name, author_type, is_internal, body, created_at)
+            SELECT gen_random_uuid(), ?, tenant_id, 'HandyFlow Admin', 'SYSTEM',
+                   false, 'Ticket resolved by HandyFlow support team.', NOW()
+            FROM desk_tickets WHERE id = ?
+            """, ticketId, ticketId);
+
+        audit(adminId, adminEmail, "INCIDENT_RESOLVE", "TICKET",
+                ticketId.toString(), (String) ticket.get("ticket_number"), null, null);
+        log.info("Admin {} resolved incident {}", adminEmail, ticket.get("ticket_number"));
+    }
+
+    @Transactional
+    public void assignIncident(UUID ticketId, UUID assignToAdminId,
+                               UUID adminId, String adminEmail) {
+        // WHY comment not FK? desk_tickets.assigned_to references tenant users,
+        // not admin_users. A schema change would couple two bounded contexts.
+        // Recording assignment as a system comment is clean and auditable.
+        String assigneeName;
+        try {
+            assigneeName = jdbc.queryForObject(
+                    "SELECT full_name FROM admin_users WHERE id = ? AND active = true",
+                    String.class, assignToAdminId);
+        } catch (Exception e) {
+            throw new HandyFlowException("Admin user not found or inactive",
+                    HttpStatus.NOT_FOUND, "NOT_FOUND");
+        }
+
+        jdbc.update("""
+            INSERT INTO desk_comments
+            (id, ticket_id, tenant_id, author_name, author_type, is_internal, body, created_at)
+            SELECT gen_random_uuid(), ?, tenant_id, 'System', 'SYSTEM',
+                   true, ?, NOW()
+            FROM desk_tickets WHERE id = ?
+            """, ticketId, "Assigned to HandyFlow staff: " + assigneeName, ticketId);
+
+        jdbc.update("UPDATE desk_tickets SET updated_at = NOW() WHERE id = ?", ticketId);
+
+        audit(adminId, adminEmail, "INCIDENT_ASSIGN", "TICKET",
+                ticketId.toString(), assignToAdminId.toString(),
+                "{\"assignedTo\":\"" + assigneeName + "\"}", null);
+        log.info("Admin {} assigned incident {} to {}", adminEmail, ticketId, assigneeName);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getAdminStaff() {
+        return jdbc.queryForList("""
+            SELECT id, email, full_name, role
+            FROM admin_users
+            WHERE active = true
+            ORDER BY full_name
+            """);
+    }
+
+    // ── Slug resolution ───────────────────────────────────────────────────────────
+
+    public UUID resolveTenantBySlug(String slug) {
+        try {
+            String id = jdbc.queryForObject(
+                    "SELECT id::text FROM tenants WHERE slug = ?", String.class, slug);
+            if (id == null) throw new RuntimeException("Not found");
+            return UUID.fromString(id);
+        } catch (Exception e) {
+            throw new HandyFlowException(
+                    "Tenant not found: " + slug, HttpStatus.NOT_FOUND, "NOT_FOUND");
+        }
+    }
+
+    // Alias for notification calls — same as resolveTenantBySlug
+    private UUID resolveTenantId(String slug) {
+        return resolveTenantBySlug(slug);
+    }
+
+    private String resolveTenantName(String slug) {
+        try {
+            String name = jdbc.queryForObject(
+                    "SELECT name FROM tenants WHERE slug = ?", String.class, slug);
+            return name != null ? name : slug;
+        } catch (Exception e) { return slug; }
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private void audit(UUID adminId, String adminEmail, String action,
-                        String targetType, String targetId, String targetName,
-                        String details, String ip) {
+                       String targetType, String targetId, String targetName,
+                       String details, String ip) {
         auditRepo.save(AdminAuditLog.create(adminId, adminEmail, action,
                 targetType, targetId, targetName, details, ip));
     }

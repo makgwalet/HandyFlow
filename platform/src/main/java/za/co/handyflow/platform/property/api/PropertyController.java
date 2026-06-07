@@ -230,6 +230,7 @@ public class PropertyController {
 
 
     @PutMapping("/leases/{id}")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
     @Operation(summary = "Update lease terms — rent, end date, payment day, escalation rate")
     public ResponseEntity<ApiResponse<LeaseResponse>> updateLease(
             @PathVariable UUID id,
@@ -240,6 +241,7 @@ public class PropertyController {
     }
 
     @PostMapping("/leases/{id}/renew")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
     @Operation(summary = "Renew a lease — extend end date, auto-apply escalation if no new rent given")
     public ResponseEntity<ApiResponse<LeaseResponse>> renewLease(
             @PathVariable UUID id,
@@ -250,6 +252,7 @@ public class PropertyController {
     }
 
     @PostMapping("/leases/{id}/escalate")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
     @Operation(summary = "Apply rent escalation — percentage increase or fixed new amount")
     public ResponseEntity<ApiResponse<LeaseResponse>> escalateLease(
             @PathVariable UUID id,
