@@ -33,6 +33,7 @@ public class QuoteService {
     private final QuoteNumberGenerator quoteNumberGenerator;
     private final TenantFacade tenantFacade;
     private final EmailService emailService;
+    private final InvoicePdfService invoicePdfService;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -179,30 +180,35 @@ public class QuoteService {
         try {
             tenantFacade.findTenantDetails(tenantId).ifPresent(tenant -> {
 
-                // Walk-in quotes have no CRM customer — use the walk-in name directly
                 String customerName = (quote.getCustomerId() != null)
                         ? crmFacade.findCustomerById(tenantId, quote.getCustomerId())
-                        .map(c -> c.name())
-                        .orElse("Customer")
+                        .map(c -> c.name()).orElse("Customer")
                         : (quote.getWalkinClientName() != null
-                        ? quote.getWalkinClientName()
-                        : "Walk-in Client");
+                        ? quote.getWalkinClientName() : "Walk-in Client");
 
                 String amount = "R " + String.format(
                         java.util.Locale.US, "%,.2f", invoice.getTotal());
 
-                emailService.send(
+                // Generate PDF to attach
+                byte[] pdfBytes = invoicePdfService.generateInvoicePdf(
+                        invoice.getId(), tenantId);
+
+                // Send with PDF attachment — client can open directly, no login needed
+                emailService.sendWithAttachment(
                         tenant.email(),
-                        "Invoice " + invoiceNumber + " generated — " + customerName,
-                        EmailTemplates.invoiceGenerated(
+                        "Invoice " + invoiceNumber + " — " + customerName,
+                        EmailTemplates.invoiceGeneratedWithPdf(
                                 tenant.companyName(), invoiceNumber,
-                                customerName, amount, frontendUrl
-                        )
+                                customerName, amount
+                        ),
+                        invoiceNumber + ".pdf",
+                        pdfBytes
                 );
             });
         } catch (Exception e) {
-            log.warn("Invoice notification not sent: {}", e.getMessage());
+            log.warn("Invoice notification/PDF not sent: {}", e.getMessage());
         }
+
 
         return invoice.getId();
     }

@@ -10,11 +10,13 @@ import { AdminTenantDetail }  from './pages/tenants/AdminTenantDetail'
 import { AdminBillingPage }   from './pages/billing/AdminBillingPage'
 import { AdminIncidentsPage } from './pages/incidents/AdminIncidentsPage'
 import { AdminInvoicesPage }  from './pages/invoices/AdminInvoicesPage'
-import { AdminModulesPage, AdminNewModulePage }   from './pages/modules/AdminModulesPage'
+import { AdminModulesPage }   from './pages/modules/AdminModulesPage'
 import { AdminReportsPage }   from './pages/reports/AdminReportsPage'
 import { AdminAuditPage }     from './pages/audit/AdminAuditPage'
 import { authStore }          from './store/auth'
 import { AdminLookupsPage } from './pages/lookups/AdminLookupsPage'
+import { AdminNewModulePage } from './pages/modules/AdminNewModulePage'
+import { AdminOnboardingPage } from './pages/onboarding/AdminOnboardingPage'
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } })
 
@@ -54,6 +56,7 @@ export default function App() {
             <Route path="/audit"         element={<AdminAuditPage />} />
             <Route path="/lookups"       element={<AdminLookupsPage />} />
             <Route path="/modules/new"   element={<AdminNewModulePage />} />
+            <Route path="/onboarding" element={<AdminOnboardingPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

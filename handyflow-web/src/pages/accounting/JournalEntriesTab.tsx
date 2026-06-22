@@ -1,361 +1,422 @@
+// src/pages/accounting/JournalEntriesTab.tsx
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { Plus, ChevronDown, ChevronUp, CheckCircle, RotateCcw, AlertCircle, X, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { Plus, X, ChevronDown, ChevronUp, AlertCircle } from "lucide-react"
 
-interface JournalLine {
-  id: string
-  accountId: string
-  accountCode: string
-  accountName: string
-  description: string
-  debitAmount: number
-  creditAmount: number
+interface Account { id: string; accountCode: string; accountName: string; accountType: string }
+interface JournalLine { id: string; accountId: string; accountCode: string; accountName: string
+  description: string; debitAmount: number; creditAmount: number }
+interface Journal { id: string; entryNumber: string; entryDate: string; description: string
+  reference: string; entryType: string; status: string; totalDebit: number; totalCredit: number
+  balanced: boolean; lines: JournalLine[]; createdAt: string }
+
+const STATUS: Record<string, { label: string; bg: string; color: string }> = {
+  DRAFT:    { label: "Draft",    bg: "#F1F5F9", color: "#475569" },
+  POSTED:   { label: "Posted",  bg: "#F0FDF4", color: "#166534" },
+  REVERSED: { label: "Reversed",bg: "#FEF3C7", color: "#92400E" },
 }
 
-interface JournalEntry {
-  id: string
-  entryNumber: string
-  entryDate: string
-  description: string
-  reference: string
-  entryType: string
-  status: string
-  totalDebit: number
-  totalCredit: number
-  balanced: boolean
-  lines: JournalLine[]
-  createdAt: string
+const fmtR = (n: number) => n == null ? "—" : `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
+const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
+const inp: React.CSSProperties = {
+  width: "100%", padding: "8px 12px", border: "1.5px solid #E2E8F0",
+  borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box",
 }
 
-interface Account {
-  id: string
-  accountCode: string
-  accountName: string
-  accountType: string
-}
-
-const STATUS_STYLE: Record<string, { color: string; bg: string }> = {
-  DRAFT:  { color: "#D97706", bg: "#FFFBEB" },
-  POSTED: { color: "#166534", bg: "#DCFCE7" },
-}
+interface DraftLine { tempId: string; accountId: string; description: string; debit: string; credit: string }
 
 export default function JournalEntriesTab() {
   const qc = useQueryClient()
+  const [expanded, setExpanded] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
-  const [expanded, setExpanded]     = useState<string | null>(null)
-  const [statusFilter, setStatus]   = useState("")
-  const [error, setError]           = useState("")
+  const [statusFilter, setStatusFilter] = useState("ALL")
+  const [reverseTarget, setReverseTarget] = useState<Journal | null>(null)
+  const [reversalDate, setReversalDate] = useState(new Date().toISOString().split("T")[0])
+  const [error, setError] = useState("")
 
+  // Form state
   const [form, setForm] = useState({
     entryDate: new Date().toISOString().split("T")[0],
-    description: "",
-    reference: "",
-    entryType: "MANUAL",
-    lines: [
-      { accountId: "", description: "", debitAmount: "", creditAmount: "" },
-      { accountId: "", description: "", debitAmount: "", creditAmount: "" },
-    ],
+    description: "", reference: "", entryType: "MANUAL",
   })
-
-  const { data: entriesPage, isLoading } = useQuery({
-    queryKey: ["journal-entries", statusFilter],
-    queryFn: async () => {
-      const params = statusFilter ? `?status=${statusFilter}&size=50` : "?size=50"
-      const res = await apiClient.get(`/api/v1/accounting/journal-entries${params}`)
-      return res.data
-    },
-  })
+  const [lines, setLines] = useState<DraftLine[]>([
+    { tempId: "1", accountId: "", description: "", debit: "", credit: "" },
+    { tempId: "2", accountId: "", description: "", debit: "", credit: "" },
+  ])
 
   const { data: accounts = [] } = useQuery<Account[]>({
-    queryKey: ["acc-accounts"],
+    queryKey: ["coa"],
     queryFn: async () => {
       const res = await apiClient.get("/api/v1/accounting/accounts")
-      return res.data
+      return (res.data?.data ?? res.data) as Account[]
     },
   })
 
-  const entries: JournalEntry[] = entriesPage?.content || []
-
-  const createEntry = useMutation({
-    mutationFn: (body: any) => apiClient.post("/api/v1/accounting/journal-entries", body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["journal-entries"] })
-      setShowCreate(false)
-      resetForm()
+  const { data, isLoading } = useQuery({
+    queryKey: ["journals", statusFilter],
+    queryFn: async () => {
+      const qs = statusFilter !== "ALL" ? `&status=${statusFilter}` : ""
+      const res = await apiClient.get(`/api/v1/accounting/journal-entries?size=50&sort=entryDate,desc${qs}`)
+      const payload = res.data?.data ?? res.data
+      return payload as { content: Journal[]; totalElements: number }
     },
-    onError: (e: any) => setError(e.response?.data?.message || "Failed to create journal entry"),
   })
 
-  const postEntry = useMutation({
-    mutationFn: (id: string) => apiClient.post(`/api/v1/accounting/journal-entries/${id}/post`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["journal-entries"] }),
-  })
+  const journals = data?.content ?? []
 
-  const resetForm = () => {
-    setForm({
-      entryDate: new Date().toISOString().split("T")[0],
-      description: "", reference: "", entryType: "MANUAL",
-      lines: [
-        { accountId: "", description: "", debitAmount: "", creditAmount: "" },
-        { accountId: "", description: "", debitAmount: "", creditAmount: "" },
-      ],
-    })
-    setError("")
-  }
-
-  const addLine = () => setForm(f => ({ ...f, lines: [...f.lines, { accountId: "", description: "", debitAmount: "", creditAmount: "" }] }))
-  const removeLine = (i: number) => setForm(f => ({ ...f, lines: f.lines.filter((_, idx) => idx !== i) }))
-  const updateLine = (i: number, field: string, value: string) => {
-    setForm(f => ({ ...f, lines: f.lines.map((l, idx) => idx === i ? { ...l, [field]: value } : l) }))
-  }
-
-  const totalDebit  = form.lines.reduce((s, l) => s + (parseFloat(l.debitAmount)  || 0), 0)
-  const totalCredit = form.lines.reduce((s, l) => s + (parseFloat(l.creditAmount) || 0), 0)
+  const totalDebit  = lines.reduce((s, l) => s + (parseFloat(l.debit)  || 0), 0)
+  const totalCredit = lines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0)
   const balanced    = Math.abs(totalDebit - totalCredit) < 0.01 && totalDebit > 0
 
-  const handleSubmit = () => {
-    if (!form.description) { setError("Description is required"); return }
-    if (!balanced) { setError("Journal entry must balance: debits must equal credits"); return }
-    createEntry.mutate({
-      entryDate: form.entryDate,
-      description: form.description,
-      reference: form.reference || null,
-      entryType: form.entryType,
-      lines: form.lines
-        .filter(l => l.accountId)
-        .map(l => ({
-          accountId: l.accountId,
-          description: l.description || null,
-          debitAmount:  parseFloat(l.debitAmount)  || null,
-          creditAmount: parseFloat(l.creditAmount) || null,
-        })),
-    })
-  }
+  const create = useMutation({
+    mutationFn: () => apiClient.post("/api/v1/accounting/journal-entries", {
+      entryDate: form.entryDate, description: form.description,
+      reference: form.reference || undefined, entryType: form.entryType,
+      lines: lines.filter(l => l.accountId).map(l => ({
+        accountId: l.accountId, description: l.description || undefined,
+        debitAmount:  parseFloat(l.debit)  || 0,
+        creditAmount: parseFloat(l.credit) || 0,
+      })),
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["journals"] })
+      setShowCreate(false)
+      setError("")
+      setForm({ entryDate: new Date().toISOString().split("T")[0], description: "", reference: "", entryType: "MANUAL" })
+      setLines([
+        { tempId: "1", accountId: "", description: "", debit: "", credit: "" },
+        { tempId: "2", accountId: "", description: "", debit: "", credit: "" },
+      ])
+    },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to create journal entry"),
+  })
 
-  const fmtR = (n: number) => n ? `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
+  const post = useMutation({
+    mutationFn: (id: string) => apiClient.post(`/api/v1/accounting/journal-entries/${id}/post`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["journals"] }),
+  })
+
+  const reverse = useMutation({
+    mutationFn: ({ id, date }: { id: string; date: string }) =>
+      apiClient.post(`/api/v1/accounting/journal-entries/${id}/reverse`, { reversalDate: date }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["journals"] })
+      setReverseTarget(null)
+    },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to reverse entry"),
+  })
+
+  const addLine = () =>
+    setLines(l => [...l, { tempId: Date.now().toString(), accountId: "", description: "", debit: "", credit: "" }])
+  const removeLine = (id: string) => setLines(l => l.filter(x => x.tempId !== id))
+  const updateLine = (id: string, field: keyof DraftLine, val: string) =>
+    setLines(l => l.map(x => x.tempId === id ? { ...x, [field]: val } : x))
 
   return (
     <div>
-      {/* Toolbar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <div style={{ display: "flex", gap: 8 }}>
-          {["", "DRAFT", "POSTED"].map(s => (
-            <button
-              key={s}
-              onClick={() => setStatus(s)}
-              style={{
-                padding: "6px 14px", borderRadius: 6, fontSize: 13, cursor: "pointer",
-                border: statusFilter === s ? "1px solid #0D9488" : "1px solid #E2E8F0",
-                background: statusFilter === s ? "#F0FDF4" : "#fff",
-                color: statusFilter === s ? "#0D9488" : "#64748B",
-                fontWeight: statusFilter === s ? 600 : 400,
-              }}
-            >
-              {s || "All"}
-            </button>
-          ))}
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#0F172A", margin: 0 }}>Journal Entries</h2>
+          <p style={{ fontSize: 12, color: "#94A3B8", margin: "3px 0 0" }}>
+            Double-entry bookkeeping — every debit must equal every credit
+          </p>
         </div>
-        <button onClick={() => setShowCreate(true)} style={btnPrimary}>
-          <Plus size={15} /> New Entry
+        <button onClick={() => { setShowCreate(true); setError("") }}
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "#1B3A6B", color: "white",
+            border: "none", borderRadius: 9, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          <Plus size={14} /> New Journal Entry
         </button>
       </div>
 
-      {/* Entries list */}
-      {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading entries...</div>
-      ) : entries.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
-          <div style={{ fontWeight: 600, color: "#475569", marginBottom: 4 }}>No journal entries yet</div>
-          <div style={{ fontSize: 14 }}>Create your first double-entry journal entry.</div>
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {entries.map(entry => {
-            const style = STATUS_STYLE[entry.status] || { color: "#475569", bg: "#F8FAFC" }
-            const isOpen = expanded === entry.id
-            return (
-              <div key={entry.id} style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden" }}>
-                <div
-                  onClick={() => setExpanded(isOpen ? null : entry.id)}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", background: isOpen ? "#F8FAFC" : "#fff" }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{entry.entryNumber}</span>
-                        <span style={{ background: style.bg, color: style.color, padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{entry.status}</span>
-                        {!entry.balanced && (
-                          <span style={{ background: "#FEF2F2", color: "#DC2626", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>UNBALANCED</span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
-                        {entry.entryDate} · {entry.description}
-                        {entry.reference && ` · Ref: ${entry.reference}`}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{fmtR(entry.totalDebit)}</div>
-                      <div style={{ fontSize: 11, color: "#94A3B8" }}>debit / credit</div>
-                    </div>
-                    {entry.status === "DRAFT" && (
-                      <button
-                        onClick={e => { e.stopPropagation(); postEntry.mutate(entry.id) }}
-                        style={{ padding: "5px 12px", background: "#0D9488", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer" }}
-                      >
-                        Post
-                      </button>
+      {/* Status filter */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+        {["ALL", "DRAFT", "POSTED", "REVERSED"].map(s => (
+          <button key={s} onClick={() => setStatusFilter(s)}
+            style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+              cursor: "pointer", border: "none",
+              background: statusFilter === s ? "#1B3A6B" : "#F1F5F9",
+              color:      statusFilter === s ? "white"   : "#64748B" }}>
+            {s === "ALL" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
+          </button>
+        ))}
+      </div>
+
+      {/* Table */}
+      <div style={{ background: "white", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        {isLoading ? (
+          <div style={{ padding: 60, textAlign: "center", color: "#94A3B8" }}>Loading journal entries...</div>
+        ) : journals.length === 0 ? (
+          <div style={{ padding: 60, textAlign: "center", color: "#94A3B8" }}>
+            No journal entries yet — create your first entry above.
+          </div>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #F1F5F9" }}>
+                {["Journal #", "Date", "Description", "Debit", "Credit", "Status", "Actions"].map(h => (
+                  <th key={h} style={{ textAlign: "left", padding: "10px 14px", fontSize: 11,
+                    fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {journals.map(j => {
+                const ss = STATUS[j.status] ?? STATUS.DRAFT
+                const isExp = expanded === j.id
+                return (
+                  <>
+                    <tr key={j.id}
+                      onClick={() => setExpanded(isExp ? null : j.id)}
+                      style={{ borderBottom: "1px solid #F8FAFC", cursor: "pointer",
+                        background: isExp ? "#FAFBFF" : "white" }}
+                      onMouseEnter={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = "#F8FAFC" }}
+                      onMouseLeave={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = "white" }}>
+                      <td style={{ padding: "12px 14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 700, color: "#1B3A6B" }}>{j.entryNumber}</span>
+                          {isExp ? <ChevronUp size={12} color="#94A3B8" /> : <ChevronDown size={12} color="#94A3B8" />}
+                        </div>
+                        <span style={{ fontSize: 10, color: "#94A3B8" }}>{j.entryType}</span>
+                      </td>
+                      <td style={{ padding: "12px 14px", fontSize: 13, color: "#64748B" }}>{fmtDate(j.entryDate)}</td>
+                      <td style={{ padding: "12px 14px" }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{j.description}</div>
+                        {j.reference && <div style={{ fontSize: 11, color: "#94A3B8" }}>{j.reference}</div>}
+                      </td>
+                      <td style={{ padding: "12px 14px", fontSize: 13, fontWeight: 600, color: "#1B3A6B" }}>{fmtR(j.totalDebit)}</td>
+                      <td style={{ padding: "12px 14px", fontSize: 13, fontWeight: 600, color: "#0D9488" }}>{fmtR(j.totalCredit)}</td>
+                      <td style={{ padding: "12px 14px" }}>
+                        <span style={{ background: ss.bg, color: ss.color, fontSize: 11,
+                          fontWeight: 700, padding: "3px 8px", borderRadius: 10 }}>{ss.label}</span>
+                        {!j.balanced && <span style={{ fontSize: 10, color: "#DC2626", marginLeft: 6 }}>UNBALANCED</span>}
+                      </td>
+                      <td style={{ padding: "12px 14px" }}>
+                        <div style={{ display: "flex", gap: 5 }} onClick={e => e.stopPropagation()}>
+                          {j.status === "DRAFT" && (
+                            <button onClick={() => post.mutate(j.id)} disabled={post.isPending}
+                              style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px",
+                                background: "#F0FDF4", color: "#166534", border: "1px solid #BBF7D0",
+                                borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                              <CheckCircle size={11} /> Post
+                            </button>
+                          )}
+                          {j.status === "POSTED" && (
+                            <button onClick={() => { setReverseTarget(j); setError("") }}
+                              style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px",
+                                background: "#FEF3C7", color: "#92400E", border: "1px solid #FCD34D",
+                                borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                              <RotateCcw size={11} /> Reverse
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {isExp && (
+                      <tr key={`${j.id}-exp`}>
+                        <td colSpan={7} style={{ padding: 0 }}>
+                          <div style={{ background: "#F8FAFC", padding: "14px 24px", borderBottom: "1px solid #F1F5F9" }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", marginBottom: 10, letterSpacing: "0.06em" }}>JOURNAL LINES</div>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                              <thead>
+                                <tr style={{ borderBottom: "1px solid #E2E8F0" }}>
+                                  {["Account", "Description", "Debit", "Credit"].map(h => (
+                                    <th key={h} style={{ textAlign: "left", padding: "6px 10px", fontSize: 11,
+                                      fontWeight: 600, color: "#64748B", textTransform: "uppercase" }}>{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {j.lines.map((l, i) => (
+                                  <tr key={l.id} style={{ borderBottom: i < j.lines.length - 1 ? "1px solid #F1F5F9" : "none" }}>
+                                    <td style={{ padding: "7px 10px" }}>
+                                      <span style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 600, color: "#1B3A6B" }}>{l.accountCode}</span>
+                                      <span style={{ fontSize: 12, color: "#374151", marginLeft: 8 }}>{l.accountName}</span>
+                                    </td>
+                                    <td style={{ padding: "7px 10px", fontSize: 12, color: "#64748B" }}>{l.description || "—"}</td>
+                                    <td style={{ padding: "7px 10px", fontSize: 13, fontWeight: l.debitAmount > 0 ? 600 : 400,
+                                      color: l.debitAmount > 0 ? "#1B3A6B" : "#94A3B8" }}>
+                                      {l.debitAmount > 0 ? fmtR(l.debitAmount) : "—"}
+                                    </td>
+                                    <td style={{ padding: "7px 10px", fontSize: 13, fontWeight: l.creditAmount > 0 ? 600 : 400,
+                                      color: l.creditAmount > 0 ? "#0D9488" : "#94A3B8" }}>
+                                      {l.creditAmount > 0 ? fmtR(l.creditAmount) : "—"}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot>
+                                <tr style={{ borderTop: "2px solid #E2E8F0" }}>
+                                  <td colSpan={2} style={{ padding: "8px 10px", fontSize: 12, fontWeight: 700, color: "#0F172A" }}>Totals</td>
+                                  <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, color: "#1B3A6B" }}>{fmtR(j.totalDebit)}</td>
+                                  <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, color: "#0D9488" }}>{fmtR(j.totalCredit)}</td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                    {isOpen ? <ChevronUp size={16} color="#94A3B8" /> : <ChevronDown size={16} color="#94A3B8" />}
-                  </div>
-                </div>
+                  </>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
 
-                {isOpen && entry.lines?.length > 0 && (
-                  <div style={{ borderTop: "1px solid #E2E8F0", padding: "12px 18px", background: "#FAFAFA" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                      <thead>
-                        <tr>
-                          <th style={th}>Account</th>
-                          <th style={th}>Description</th>
-                          <th style={{ ...th, textAlign: "right" }}>Debit</th>
-                          <th style={{ ...th, textAlign: "right" }}>Credit</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {entry.lines.map(line => (
-                          <tr key={line.id}>
-                            <td style={td}>
-                              <span style={{ fontFamily: "monospace", fontSize: 12, color: "#64748B" }}>{line.accountCode}</span>
-                              <span style={{ marginLeft: 8, fontSize: 13, color: "#0F172A" }}>{line.accountName}</span>
-                            </td>
-                            <td style={{ ...td, color: "#64748B" }}>{line.description || "—"}</td>
-                            <td style={{ ...td, textAlign: "right", color: "#1D4ED8", fontWeight: line.debitAmount ? 600 : 400 }}>
-                              {line.debitAmount ? fmtR(line.debitAmount) : "—"}
-                            </td>
-                            <td style={{ ...td, textAlign: "right", color: "#166534", fontWeight: line.creditAmount ? 600 : 400 }}>
-                              {line.creditAmount ? fmtR(line.creditAmount) : "—"}
-                            </td>
-                          </tr>
-                        ))}
-                        <tr style={{ borderTop: "2px solid #E2E8F0" }}>
-                          <td colSpan={2} style={{ ...td, fontWeight: 700, color: "#0F172A" }}>TOTAL</td>
-                          <td style={{ ...td, textAlign: "right", fontWeight: 700, color: "#1D4ED8" }}>{fmtR(entry.totalDebit)}</td>
-                          <td style={{ ...td, textAlign: "right", fontWeight: 700, color: "#166534" }}>{fmtR(entry.totalCredit)}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Create modal */}
+      {/* Create Journal Modal */}
       {showCreate && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 720, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>New Journal Entry</h3>
-              <button onClick={() => { setShowCreate(false); resetForm() }} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={20} /></button>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex",
+          alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
+          <div style={{ background: "white", borderRadius: 16, padding: 28, width: 700, maxHeight: "90vh",
+            overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>New Journal Entry</h3>
+              <button onClick={() => setShowCreate(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
+                <X size={20} />
+              </button>
             </div>
 
+            {/* Header fields */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 20 }}>
-              <Field label="Date *">
-                <input type="date" value={form.entryDate} onChange={e => setForm(f => ({ ...f, entryDate: e.target.value }))} style={inputStyle} />
-              </Field>
-              <Field label="Entry Type">
-                <select value={form.entryType} onChange={e => setForm(f => ({ ...f, entryType: e.target.value }))} style={inputStyle}>
-                  {["MANUAL", "ADJUSTMENT", "OPENING", "CLOSING", "ACCRUAL"].map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </Field>
-              <Field label="Reference">
-                <input value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} placeholder="INV-001" style={inputStyle} />
-              </Field>
-              <div style={{ gridColumn: "1 / -1" }}>
-                <Field label="Description *">
-                  <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Monthly salary expense" style={inputStyle} />
-                </Field>
-              </div>
+              {[
+                { label: "Date *", key: "entryDate", type: "date" },
+                { label: "Reference", key: "reference", type: "text" },
+                { label: "Type", key: "entryType", type: "select" },
+              ].map(f => (
+                <div key={f.key}>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 5 }}>{f.label}</label>
+                  {f.type === "select" ? (
+                    <select value={(form as any)[f.key]}
+                      onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                      style={{ ...inp }}>
+                      {["MANUAL","INVOICE","PAYMENT","BANK","DEPRECIATION","ADJUSTMENT","VAT"].map(t =>
+                        <option key={t}>{t}</option>)}
+                    </select>
+                  ) : (
+                    <input type={f.type} value={(form as any)[f.key]}
+                      onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                      style={inp} />
+                  )}
+                </div>
+              ))}
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 5 }}>Description *</label>
+              <input value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                placeholder="e.g. Cash sale — Black Flamingo" style={inp} />
             </div>
 
             {/* Lines */}
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 10, letterSpacing: "0.04em" }}>JOURNAL LINES</div>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ background: "#F8FAFC" }}>
-                    <th style={th}>Account</th>
-                    <th style={th}>Description</th>
-                    <th style={{ ...th, textAlign: "right" }}>Debit (R)</th>
-                    <th style={{ ...th, textAlign: "right" }}>Credit (R)</th>
-                    <th style={th}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {form.lines.map((line, i) => (
-                    <tr key={i}>
-                      <td style={{ padding: "6px 8px" }}>
-                        <select
-                          value={line.accountId}
-                          onChange={e => updateLine(i, "accountId", e.target.value)}
-                          style={{ ...inputStyle, minWidth: 200 }}
-                        >
-                          <option value="">Select account...</option>
-                          {accounts.map(a => (
-                            <option key={a.id} value={a.id}>{a.accountCode} — {a.accountName}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td style={{ padding: "6px 8px" }}>
-                        <input value={line.description} onChange={e => updateLine(i, "description", e.target.value)} placeholder="Optional" style={{ ...inputStyle, minWidth: 120 }} />
-                      </td>
-                      <td style={{ padding: "6px 8px" }}>
-                        <input type="number" value={line.debitAmount} onChange={e => updateLine(i, "debitAmount", e.target.value)} placeholder="0.00" style={{ ...inputStyle, textAlign: "right", minWidth: 100 }} />
-                      </td>
-                      <td style={{ padding: "6px 8px" }}>
-                        <input type="number" value={line.creditAmount} onChange={e => updateLine(i, "creditAmount", e.target.value)} placeholder="0.00" style={{ ...inputStyle, textAlign: "right", minWidth: 100 }} />
-                      </td>
-                      <td style={{ padding: "6px 8px" }}>
-                        {form.lines.length > 2 && (
-                          <button onClick={() => removeLine(i)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={14} /></button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <button onClick={addLine} style={{ ...btnOutline, marginTop: 8 }}><Plus size={13} /> Add Line</button>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr 1fr 1fr 32px", gap: 8, marginBottom: 6 }}>
+                {["Account", "Description", "Debit (R)", "Credit (R)", ""].map(h => (
+                  <div key={h} style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</div>
+                ))}
+              </div>
+              {lines.map(l => (
+                <div key={l.tempId} style={{ display: "grid", gridTemplateColumns: "3fr 2fr 1fr 1fr 32px", gap: 8, marginBottom: 8, alignItems: "center" }}>
+                  <select value={l.accountId} onChange={e => updateLine(l.tempId, "accountId", e.target.value)}
+                    style={{ ...inp, fontSize: 12 }}>
+                    <option value="">Select account...</option>
+                    {accounts.map(a => (
+                      <option key={a.id} value={a.id}>{a.accountCode} — {a.accountName}</option>
+                    ))}
+                  </select>
+                  <input value={l.description} onChange={e => updateLine(l.tempId, "description", e.target.value)}
+                    placeholder="Optional note" style={{ ...inp, fontSize: 12 }} />
+                  <input type="number" value={l.debit} onChange={e => updateLine(l.tempId, "debit", e.target.value)}
+                    placeholder="0.00" style={{ ...inp, fontSize: 12 }} />
+                  <input type="number" value={l.credit} onChange={e => updateLine(l.tempId, "credit", e.target.value)}
+                    placeholder="0.00" style={{ ...inp, fontSize: 12 }} />
+                  <button onClick={() => removeLine(l.tempId)} disabled={lines.length <= 2}
+                    style={{ background: "none", border: "none", cursor: lines.length <= 2 ? "not-allowed" : "pointer",
+                      color: lines.length <= 2 ? "#CBD5E1" : "#FDA4AF", padding: 4, borderRadius: 6, display: "flex" }}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+              <button onClick={addLine}
+                style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#1B3A6B",
+                  background: "none", border: "1px dashed #BFDBFE", borderRadius: 7, padding: "6px 12px", cursor: "pointer" }}>
+                <Plus size={12} /> Add line
+              </button>
             </div>
 
-            {/* Balance indicator */}
-            <div style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "10px 14px", borderRadius: 8,
-              background: balanced ? "#DCFCE7" : "#FEF2F2",
-              border: `1px solid ${balanced ? "#86EFAC" : "#FECACA"}`,
-              marginBottom: 16,
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                {!balanced && <AlertCircle size={14} color="#DC2626" />}
-                <span style={{ fontSize: 13, fontWeight: 600, color: balanced ? "#166534" : "#DC2626" }}>
-                  {balanced ? "✓ Balanced" : "Entry is not balanced"}
-                </span>
-              </div>
-              <div style={{ fontSize: 13, color: "#475569" }}>
-                Debits: <strong>R {totalDebit.toFixed(2)}</strong> · Credits: <strong>R {totalCredit.toFixed(2)}</strong>
-              </div>
+            {/* Totals summary */}
+            <div style={{ background: balanced ? "#F0FDF4" : "#FEF2F2", borderRadius: 8,
+              padding: "10px 14px", marginBottom: 14, fontSize: 13 }}>
+              <span style={{ color: "#64748B" }}>Total Debit: </span>
+              <strong style={{ color: "#1B3A6B", marginRight: 20 }}>{fmtR(totalDebit)}</strong>
+              <span style={{ color: "#64748B" }}>Total Credit: </span>
+              <strong style={{ color: "#0D9488", marginRight: 20 }}>{fmtR(totalCredit)}</strong>
+              <strong style={{ color: balanced ? "#166534" : "#DC2626" }}>
+                {balanced ? "✓ Balanced" : `✗ Off by R${Math.abs(totalDebit - totalCredit).toFixed(2)}`}
+              </strong>
             </div>
 
-            {error && <div style={{ marginBottom: 12, color: "#DC2626", fontSize: 13 }}>{error}</div>}
+            {error && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px",
+                background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8,
+                fontSize: 13, color: "#DC2626", marginBottom: 14 }}>
+                <AlertCircle size={14} />{error}
+              </div>
+            )}
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-              <button onClick={() => { setShowCreate(false); resetForm() }} style={btnCancel}>Cancel</button>
-              <button onClick={handleSubmit} disabled={createEntry.isPending} style={btnPrimary}>
-                {createEntry.isPending ? "Saving..." : "Create Entry"}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={() => setShowCreate(false)}
+                style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9,
+                  background: "white", fontSize: 13, cursor: "pointer", color: "#374151" }}>
+                Cancel
+              </button>
+              <button disabled={create.isPending || !balanced || !form.description}
+                onClick={() => create.mutate()}
+                style={{ padding: "9px 20px", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700,
+                  background: balanced && form.description ? "#1B3A6B" : "#E2E8F0",
+                  color: balanced && form.description ? "white" : "#94A3B8",
+                  cursor: balanced && form.description ? "pointer" : "not-allowed" }}>
+                {create.isPending ? "Creating..." : "Create Journal Entry"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reverse Modal */}
+      {reverseTarget && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex",
+          alignItems: "center", justifyContent: "center", zIndex: 1001, backdropFilter: "blur(2px)" }}>
+          <div style={{ background: "white", borderRadius: 16, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700 }}>Reverse Journal Entry</h3>
+            <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 20px" }}>
+              Creates an equal-and-opposite posted journal entry. The original will be marked REVERSED.
+            </p>
+            <div style={{ background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 8,
+              padding: "10px 14px", marginBottom: 20, fontSize: 13, color: "#92400E" }}>
+              Reversing: <strong>{reverseTarget.entryNumber}</strong> — {reverseTarget.description}
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 5 }}>Reversal Date</label>
+              <input type="date" value={reversalDate} onChange={e => setReversalDate(e.target.value)} style={inp} />
+            </div>
+            {error && (
+              <div style={{ padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA",
+                borderRadius: 8, fontSize: 12, color: "#DC2626", marginBottom: 12 }}>{error}</div>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={() => { setReverseTarget(null); setError("") }}
+                style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "white", fontSize: 13, cursor: "pointer", color: "#374151" }}>
+                Cancel
+              </button>
+              <button disabled={reverse.isPending}
+                onClick={() => reverse.mutate({ id: reverseTarget.id, date: reversalDate })}
+                style={{ padding: "9px 20px", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700,
+                  background: "#D97706", color: "white", cursor: "pointer" }}>
+                {reverse.isPending ? "Reversing..." : "Confirm Reversal"}
               </button>
             </div>
           </div>
@@ -364,14 +425,3 @@ export default function JournalEntriesTab() {
     </div>
   )
 }
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "#374151", marginBottom: 5 }}>{label}</label>{children}</div>
-}
-
-const inputStyle: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 13, boxSizing: "border-box" as const, background: "#fff" }
-const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer" }
-const btnOutline: React.CSSProperties = { display: "flex", alignItems: "center", gap: 5, background: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 6, padding: "6px 12px", fontSize: 13, cursor: "pointer" }
-const btnCancel: React.CSSProperties = { padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 8, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }
-const th: React.CSSProperties = { padding: "8px 10px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#64748B", letterSpacing: "0.05em", borderBottom: "1px solid #E2E8F0" }
-const td: React.CSSProperties = { padding: "10px 10px", fontSize: 13, borderBottom: "1px solid #F1F5F9" }

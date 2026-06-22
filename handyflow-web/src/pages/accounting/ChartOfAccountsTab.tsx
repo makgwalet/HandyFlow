@@ -1,172 +1,128 @@
-import { useState } from "react"
+// src/pages/accounting/ChartOfAccountsTab.tsx
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Search, ChevronDown, ChevronRight } from "lucide-react"
+import { BookOpen, AlertCircle } from "lucide-react"
 
 interface Account {
-  id: string
-  accountCode: string
-  accountName: string
-  accountType: string
-  accountSubtype: string
-  isSystem: boolean
-  openingBalance: number
-  description: string
+  id: string; accountCode: string; accountName: string
+  accountType: string; accountSubtype: string; isSystem: boolean
+  openingBalance: number; description: string | null
 }
 
-const TYPE_COLORS: Record<string, { color: string; bg: string }> = {
-  ASSET:     { color: "#1D4ED8", bg: "#EFF6FF" },
-  LIABILITY: { color: "#B45309", bg: "#FFFBEB" },
-  EQUITY:    { color: "#7C3AED", bg: "#F5F3FF" },
-  INCOME:    { color: "#166534", bg: "#DCFCE7" },
-  EXPENSE:   { color: "#DC2626", bg: "#FEF2F2" },
+const TYPE_COLOR: Record<string, { bg: string; color: string }> = {
+  ASSET:     { bg: "#EFF6FF", color: "#1D4ED8" },
+  LIABILITY: { bg: "#FEF2F2", color: "#DC2626" },
+  EQUITY:    { bg: "#F3E8FF", color: "#7C3AED" },
+  INCOME:    { bg: "#F0FDF4", color: "#166534" },
+  EXPENSE:   { bg: "#FEF3C7", color: "#92400E" },
 }
 
-const TYPE_ORDER = ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"]
+const fmtR = (n: number) =>
+  n == null ? "—" : `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
 
 export default function ChartOfAccountsTab() {
-  const [search, setSearch]       = useState("")
-  const [expanded, setExpanded]   = useState<Set<string>>(new Set(TYPE_ORDER))
-
-  const { data: accounts = [], isLoading } = useQuery<Account[]>({
-    queryKey: ["acc-accounts"],
+  const { data: accounts = [], isLoading, isError } = useQuery<Account[]>({
+    queryKey: ["coa"],
     queryFn: async () => {
       const res = await apiClient.get("/api/v1/accounting/accounts")
-      return res.data
+      return (res.data?.data ?? res.data) as Account[]
     },
   })
 
-  const filtered = accounts.filter(a =>
-    !search ||
-    a.accountCode.toLowerCase().includes(search.toLowerCase()) ||
-    a.accountName.toLowerCase().includes(search.toLowerCase())
-  )
-
-  const grouped = TYPE_ORDER.reduce((acc, type) => {
-    acc[type] = filtered.filter(a => a.accountType === type)
+  const grouped = accounts.reduce((acc, a) => {
+    if (!acc[a.accountType]) acc[a.accountType] = []
+    acc[a.accountType].push(a)
     return acc
   }, {} as Record<string, Account[]>)
 
-  const toggle = (type: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      next.has(type) ? next.delete(type) : next.add(type)
-      return next
-    })
-  }
+  const types = ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"]
 
-  const fmtR = (n: number) => n ? `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
-
-  if (isLoading) return (
-    <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading accounts...</div>
-  )
+  if (isLoading) return <div style={{ padding: 60, textAlign: "center", color: "#94A3B8" }}>Loading chart of accounts...</div>
+  if (isError)   return <div style={{ padding: 60, textAlign: "center", color: "#DC2626" }}>Failed to load accounts</div>
 
   return (
     <div>
-      {/* Summary stats */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-        {TYPE_ORDER.map(type => {
-          const style = TYPE_COLORS[type] || { color: "#475569", bg: "#F8FAFC" }
-          const count = grouped[type]?.length || 0
-          return (
-            <div key={type} style={{ flex: 1, background: style.bg, borderRadius: 10, padding: "12px 16px", border: `1px solid ${style.bg}` }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: style.color }}>{count}</div>
-              <div style={{ fontSize: 12, color: style.color, marginTop: 2, opacity: 0.8 }}>{type}</div>
-            </div>
-          )
-        })}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#0F172A", margin: 0 }}>Chart of Accounts</h2>
+          <p style={{ fontSize: 12, color: "#94A3B8", margin: "3px 0 0" }}>
+            Standard South African chart of accounts — {accounts.length} accounts across {types.length} types
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {types.map(t => {
+            const c = TYPE_COLOR[t]
+            return (
+              <span key={t} style={{ fontSize: 11, fontWeight: 600, background: c.bg, color: c.color,
+                padding: "4px 10px", borderRadius: 20 }}>
+                {t} ({grouped[t]?.length ?? 0})
+              </span>
+            )
+          })}
+        </div>
       </div>
 
-      {/* Search */}
-      <div style={{ position: "relative", marginBottom: 20, maxWidth: 340 }}>
-        <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94A3B8" }} />
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search accounts..."
-          style={{ width: "100%", padding: "9px 12px 9px 36px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }}
-        />
-      </div>
-
-      {/* Grouped accounts */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {TYPE_ORDER.map(type => {
-          const accs = grouped[type] || []
-          const style = TYPE_COLORS[type] || { color: "#475569", bg: "#F8FAFC" }
-          const isOpen = expanded.has(type)
-
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {types.map(type => {
+          const accs = grouped[type] ?? []
+          if (accs.length === 0) return null
+          const c = TYPE_COLOR[type]
           return (
-            <div key={type} style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden" }}>
-              {/* Group header */}
-              <div
-                onClick={() => toggle(type)}
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: style.bg, cursor: "pointer" }}
-              >
+            <div key={type} style={{ background: "white", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ background: c.bg, padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {isOpen ? <ChevronDown size={16} color={style.color} /> : <ChevronRight size={16} color={style.color} />}
-                  <span style={{ fontWeight: 700, fontSize: 13, color: style.color, letterSpacing: "0.05em" }}>{type}</span>
-                  <span style={{ background: style.color, color: "#fff", borderRadius: 20, padding: "1px 8px", fontSize: 11 }}>{accs.length}</span>
+                  <BookOpen size={14} color={c.color} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: c.color }}>{type}</span>
+                  <span style={{ fontSize: 12, color: c.color, opacity: 0.7 }}>({accs.length} accounts)</span>
                 </div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: c.color }}>
+                  {fmtR(accs.reduce((s, a) => s + (a.openingBalance ?? 0), 0))} opening
+                </span>
               </div>
-
-              {/* Account rows */}
-              {isOpen && accs.length > 0 && (
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ background: "#F8FAFC" }}>
-                      <th style={th}>Code</th>
-                      <th style={th}>Account Name</th>
-                      <th style={th}>Subtype</th>
-                      <th style={{ ...th, textAlign: "right" }}>Opening Balance</th>
-                      <th style={th}>Type</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {accs.map((acc, i) => (
-                      <tr key={acc.id} style={{ background: i % 2 === 0 ? "#fff" : "#FAFAFA" }}>
-                        <td style={td}>
-                          <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569" }}>{acc.accountCode}</span>
-                        </td>
-                        <td style={td}>
-                          <span style={{ fontWeight: 500, color: "#0F172A" }}>{acc.accountName}</span>
-                          {acc.isSystem && (
-                            <span style={{ marginLeft: 6, fontSize: 10, color: "#94A3B8", background: "#F1F5F9", padding: "1px 6px", borderRadius: 4 }}>SYSTEM</span>
-                          )}
-                        </td>
-                        <td style={td}>
-                          <span style={{ fontSize: 12, color: "#64748B" }}>{acc.accountSubtype || "—"}</span>
-                        </td>
-                        <td style={{ ...td, textAlign: "right" }}>
-                          <span style={{ fontSize: 13, color: "#0F172A" }}>{fmtR(acc.openingBalance)}</span>
-                        </td>
-                        <td style={td}>
-                          <span style={{ background: style.bg, color: style.color, padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
-                            {type}
-                          </span>
-                        </td>
-                      </tr>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #F1F5F9" }}>
+                    {["Code", "Account Name", "Subtype", "Opening Balance"].map(h => (
+                      <th key={h} style={{ textAlign: "left", padding: "8px 16px", fontSize: 11,
+                        fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
                     ))}
-                  </tbody>
-                </table>
-              )}
-
-              {isOpen && accs.length === 0 && (
-                <div style={{ padding: "16px 20px", color: "#94A3B8", fontSize: 13 }}>No accounts in this category.</div>
-              )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {accs.map((acc, i) => (
+                    <tr key={acc.id}
+                      style={{ borderBottom: i < accs.length - 1 ? "1px solid #F8FAFC" : "none" }}
+                      onMouseEnter={e => (e.currentTarget.style.background = "#F8FAFC")}
+                      onMouseLeave={e => (e.currentTarget.style.background = "white")}>
+                      <td style={{ padding: "10px 16px" }}>
+                        <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 600, color: c.color }}>
+                          {acc.accountCode}
+                        </span>
+                      </td>
+                      <td style={{ padding: "10px 16px" }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{acc.accountName}</span>
+                        {acc.description && (
+                          <p style={{ fontSize: 11, color: "#94A3B8", margin: "1px 0 0" }}>{acc.description}</p>
+                        )}
+                      </td>
+                      <td style={{ padding: "10px 16px" }}>
+                        <span style={{ fontSize: 11, background: "#F1F5F9", color: "#475569",
+                          padding: "2px 8px", borderRadius: 10, fontWeight: 500 }}>
+                          {acc.accountSubtype}
+                        </span>
+                      </td>
+                      <td style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600,
+                        color: acc.openingBalance > 0 ? "#166534" : "#0F172A" }}>
+                        {fmtR(acc.openingBalance)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )
         })}
       </div>
     </div>
   )
-}
-
-const th: React.CSSProperties = {
-  padding: "8px 16px", textAlign: "left", fontSize: 11,
-  fontWeight: 600, color: "#64748B", letterSpacing: "0.05em",
-  borderBottom: "1px solid #E2E8F0",
-}
-const td: React.CSSProperties = {
-  padding: "10px 16px", fontSize: 13,
-  borderBottom: "1px solid #F1F5F9",
 }

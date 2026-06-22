@@ -490,4 +490,107 @@ public class EmailTemplates {
             """.formatted(clientName, firmName, contactEmail, contactEmail));
     }
 
+    public static String invoiceGeneratedWithPdf(
+            String companyName, String invoiceNumber,
+            String customerName, String amount) {
+
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="margin:0;padding:0;background:#F1F5F9;font-family:'Helvetica Neue',Arial,sans-serif;">
+              <table width="100%%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;padding:40px 20px;">
+                <tr><td align="center">
+                  <table width="600" cellpadding="0" cellspacing="0"
+                         style="background:#ffffff;border-radius:12px;overflow:hidden;
+                                box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+
+                    <!-- Header bar -->
+                    <tr>
+                      <td style="background:#1B3A6B;padding:28px 40px;">
+                        <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">%s</h1>
+                        <p style="margin:4px 0 0;color:#93C5FD;font-size:13px;">Tax Invoice Ready</p>
+                      </td>
+                    </tr>
+
+                    <!-- Body -->
+                    <tr>
+                      <td style="padding:36px 40px;">
+                        <p style="margin:0 0 16px;color:#374151;font-size:15px;">
+                          Hi %s,
+                        </p>
+                        <p style="margin:0 0 24px;color:#374151;font-size:15px;line-height:1.6;">
+                          A tax invoice has been generated. Please find it attached to this email
+                          as a PDF — no login required.
+                        </p>
+
+                        <!-- Invoice summary card -->
+                        <table width="100%%" cellpadding="0" cellspacing="0"
+                               style="background:#F0FDFA;border-left:4px solid #0D9488;
+                                      border-radius:0 8px 8px 0;margin-bottom:28px;">
+                          <tr>
+                            <td style="padding:16px 20px;">
+                              <p style="margin:0 0 6px;color:#64748B;font-size:12px;
+                                        text-transform:uppercase;letter-spacing:0.05em;">Invoice details</p>
+                              <p style="margin:0 0 4px;color:#0F172A;font-size:15px;font-weight:600;">
+                                %s
+                              </p>
+                              <p style="margin:0 0 4px;color:#374151;font-size:14px;">
+                                Customer: <strong>%s</strong>
+                              </p>
+                              <p style="margin:0;color:#374151;font-size:14px;">
+                                Amount: <strong style="color:#1B3A6B;">%s</strong>
+                              </p>
+                            </td>
+                          </tr>
+                        </table>
+
+                        <!-- Attachment reminder -->
+                        <table width="100%%" cellpadding="0" cellspacing="0"
+                               style="background:#FEF9C3;border:1px solid #FDE68A;
+                                      border-radius:8px;margin-bottom:28px;">
+                          <tr>
+                            <td style="padding:14px 20px;">
+                              <p style="margin:0;color:#92400E;font-size:13px;">
+                                📎 <strong>%s.pdf</strong> is attached to this email.
+                                Forward it directly to your client or accounts team.
+                              </p>
+                            </td>
+                          </tr>
+                        </table>
+
+                        <p style="margin:0;color:#94A3B8;font-size:13px;line-height:1.6;">
+                          If you have any questions, please contact us at the details on the invoice.
+                        </p>
+                      </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                      <td style="background:#F8FAFC;padding:20px 40px;border-top:1px solid #E2E8F0;">
+                        <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">
+                          HandyFlow · Powering African SMEs ·
+                          <a href="https://handyflow.co.za" style="color:#0D9488;">handyflow.co.za</a>
+                        </p>
+                      </td>
+                    </tr>
+
+                  </table>
+                </td></tr>
+              </table>
+            </body>
+            </html>
+            """.formatted(
+                companyName,          // header company name
+                customerName,         // "Hi {customer}"
+                invoiceNumber,        // invoice number in card
+                customerName,         // customer name in card
+                amount,               // amount in card
+                invoiceNumber         // attachment filename reminder
+        );
+    }
+
 }

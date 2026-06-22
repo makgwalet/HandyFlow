@@ -2,9 +2,11 @@ package za.co.handyflow.platform.accounting.domain.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import za.co.handyflow.platform.accounting.domain.model.AccVatPeriod;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,4 +21,20 @@ public interface AccVatPeriodRepository extends JpaRepository<AccVatPeriod, UUID
 
     @Query("SELECT v FROM AccVatPeriod v WHERE v.tenantId = :#{#tenantId.value} AND v.id = :id")
     Optional<AccVatPeriod> findByTenantAndId(TenantId tenantId, UUID id);
+
+    /**
+     * Find all OPEN VAT periods across all tenants ending within the given date range.
+     * Used by AccountingNotificationScheduler to find periods closing soon.
+     */
+    @Query("""
+        SELECT v FROM AccVatPeriod v
+        WHERE v.status = 'OPEN'
+        AND v.periodEnd >= :from
+        AND v.periodEnd <= :to
+        """)
+    List<AccVatPeriod> findOpenPeriodsEndingBetween(
+            @Param("from") LocalDate from,
+            @Param("to")   LocalDate to);
+
+
 }

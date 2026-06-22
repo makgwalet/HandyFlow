@@ -5,12 +5,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, FileText, Download, ChevronDown, ChevronUp,
   CheckCircle, Send, X, Receipt, FileCheck, Clock,
-  AlertCircle, XCircle, Eye,
+  AlertCircle, XCircle, Eye, RefreshCw, Pause, Play,
+  Trash2, Gauge, AlertTriangle, Timer,
 } from 'lucide-react'
 import { apiClient } from '../../api/client'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type QuoteStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED' | 'INVOICED'
+type RecurringStatus = 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'COMPLETED'
 
 interface Quote {
   id: string; quoteNumber: string; title: string; status: QuoteStatus
@@ -19,8 +21,22 @@ interface Quote {
 
 interface Invoice {
   id: string; invoiceNumber: string; customerId: string | null; status: string
-  issuedAt: string | null; dueDate: string | null; subtotal: number; vatTotal: number
-  total: number; amountPaid: number; lineItems: any[]; createdAt: string
+  issuedAt: string | null; dueDate: string | null
+  subtotal: number; vatTotal: number; total: number; amountPaid: number
+  lineItems: any[]; createdAt: string
+  invoiceType: 'STANDARD' | 'RECURRING_INSTANCE' | 'RETAINER'
+  recurringScheduleId: string | null
+  committedHours: number | null; ratePerHour: number | null; hoursConsumed: number
+  walkinClientName: string | null
+}
+
+interface RecurringSchedule {
+  id: string; title: string; status: RecurringStatus
+  frequency: string; customIntervalDays: number | null
+  nextRunAt: string; lastRunAt: string | null
+  total: number; subtotal: number; vatTotal: number
+  customerId: string | null; lineItems: any[]
+  walkinClientName: string | null; createdAt: string
 }
 
 // ── Status configs ────────────────────────────────────────────────────────────
@@ -42,6 +58,17 @@ const INVOICE_STATUS: Record<string, { label: string; bg: string; color: string 
   CANCELLED:      { bg: '#F8FAFC', color: '#94A3B8', label: 'Cancelled' },
 }
 
+const RECURRING_STATUS: Record<RecurringStatus, { label: string; bg: string; color: string; icon: React.ElementType }> = {
+  ACTIVE:    { label: 'Active',    bg: '#F0FDF4', color: '#166534', icon: Play },
+  PAUSED:    { label: 'Paused',    bg: '#FEF3C7', color: '#92400E', icon: Pause },
+  CANCELLED: { label: 'Cancelled', bg: '#FEF2F2', color: '#DC2626', icon: XCircle },
+  COMPLETED: { label: 'Completed', bg: '#F3E8FF', color: '#7C3AED', icon: CheckCircle },
+}
+
+const FREQ_LABEL: Record<string, string> = {
+  DAILY: 'Daily', WEEKLY: 'Weekly', MONTHLY: 'Monthly', CUSTOM: 'Custom',
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmtR = (n: number | null | undefined) =>
   n == null ? '—' : `R ${n.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`
@@ -54,34 +81,50 @@ const inp: React.CSSProperties = {
   borderRadius: 9, fontSize: 14, boxSizing: 'border-box', background: 'white', outline: 'none',
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
+// ── Root Page ─────────────────────────────────────────────────────────────────
 export function InvoicingPage() {
   const location = useLocation()
   const navigate = useNavigate()
-  const activeTab = location.pathname.startsWith('/invoices') ? 'invoices' : 'quotes'
+
+  const activeTab = location.pathname.startsWith('/invoices')  ? 'invoices'
+                  : location.pathname.startsWith('/recurring') ? 'recurring'
+                  : 'quotes'
 
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-
-      {/* Page header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', margin: '0 0 4px' }}>Invoicing</h1>
-          <p style={{ fontSize: 13, color: '#94A3B8', margin: 0 }}>Quotes, invoices and payment tracking</p>
+          <p style={{ fontSize: 13, color: '#94A3B8', margin: 0 }}>Quotes, invoices, recurring billing and retainers</p>
         </div>
-        {activeTab === 'quotes' && (
-          <button onClick={() => navigate('/quotes/new')}
-            style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#1B3A6B', color: 'white', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-            <Plus size={15} /> New Quote
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {activeTab === 'quotes' && (
+            <button onClick={() => navigate('/quotes/new')}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#1B3A6B', color: 'white', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              <Plus size={15} /> New Quote
+            </button>
+          )}
+          {activeTab === 'recurring' && (
+            <button onClick={() => navigate('/recurring/new')}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#0D9488', color: 'white', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              <Plus size={15} /> New Schedule
+            </button>
+          )}
+          {activeTab === 'invoices' && (
+            <button onClick={() => navigate('/invoices/retainer/new')}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#7C3AED', color: 'white', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              <Plus size={15} /> Retainer Invoice
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 24, background: '#F1F5F9', borderRadius: 12, padding: 4, width: 'fit-content' }}>
         {[
-          { key: 'quotes',   label: 'Quotes',   icon: FileText, path: '/quotes' },
-          { key: 'invoices', label: 'Invoices', icon: Receipt,  path: '/invoices' },
+          { key: 'quotes',    label: 'Quotes',    icon: FileText,   path: '/quotes' },
+          { key: 'invoices',  label: 'Invoices',  icon: Receipt,    path: '/invoices' },
+          { key: 'recurring', label: 'Recurring', icon: RefreshCw,  path: '/recurring' },
         ].map(tab => (
           <button key={tab.key} onClick={() => navigate(tab.path)}
             style={{
@@ -89,8 +132,8 @@ export function InvoicingPage() {
               padding: '8px 20px', borderRadius: 9, border: 'none',
               fontSize: 14, fontWeight: 600, cursor: 'pointer',
               background: activeTab === tab.key ? 'white' : 'transparent',
-              color: activeTab === tab.key ? '#1B3A6B' : '#64748B',
-              boxShadow: activeTab === tab.key ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+              color:      activeTab === tab.key ? '#1B3A6B' : '#64748B',
+              boxShadow:  activeTab === tab.key ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
               transition: 'all 0.15s',
             }}>
             <tab.icon size={15} /> {tab.label}
@@ -98,7 +141,9 @@ export function InvoicingPage() {
         ))}
       </div>
 
-      {activeTab === 'quotes' ? <QuotesTab /> : <InvoicesTab />}
+      {activeTab === 'quotes'    && <QuotesTab />}
+      {activeTab === 'invoices'  && <InvoicesTab />}
+      {activeTab === 'recurring' && <RecurringTab />}
     </div>
   )
 }
@@ -106,21 +151,17 @@ export function InvoicingPage() {
 // ── Quotes Tab ────────────────────────────────────────────────────────────────
 function QuotesTab() {
   const navigate = useNavigate()
-
   const { data, isLoading, isError } = useQuery({
     queryKey: ['quotes'],
     queryFn: async () => {
       const res = await apiClient.get('/api/v1/invoicing/quotes?size=100&sort=createdAt,desc')
-      const payload = res.data?.data ?? res.data
-      return payload as { content: Quote[]; totalElements: number }
+      return (res.data?.data ?? res.data) as { content: Quote[]; totalElements: number }
     },
   })
-
   const quotes = data?.content ?? []
 
   return (
     <div>
-      {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
         {[
           { label: 'Total',    value: quotes.length,                                      color: '#1B3A6B' },
@@ -136,21 +177,9 @@ function QuotesTab() {
       </div>
 
       <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 14, overflow: 'hidden' }}>
-        {isLoading ? (
-          <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8' }}>Loading quotes...</div>
-        ) : isError ? (
-          <div style={{ padding: 60, textAlign: 'center' }}>
-            <AlertCircle size={32} color="#DC2626" style={{ marginBottom: 10 }} />
-            <div style={{ fontWeight: 600, color: '#DC2626' }}>Failed to load quotes</div>
-            <div style={{ fontSize: 13, color: '#94A3B8', marginTop: 4 }}>Please refresh and try again.</div>
-          </div>
-        ) : quotes.length === 0 ? (
-          <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8' }}>
-            <FileText size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
-            <div style={{ fontWeight: 600, color: '#475569', marginBottom: 4 }}>No quotes yet</div>
-            <div style={{ fontSize: 13 }}>Create your first quote to get started.</div>
-          </div>
-        ) : (
+        {isLoading ? <LoadingRow text="Loading quotes..." /> :
+         isError   ? <ErrorRow /> :
+         quotes.length === 0 ? <EmptyRow icon={FileText} text="No quotes yet" sub="Create your first quote to get started." /> : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
@@ -182,9 +211,7 @@ function QuotesTab() {
                     <td style={{ padding: '14px 16px', fontSize: 13, color: '#64748B' }}>
                       {q.expiresAt ? new Date(q.expiresAt).toLocaleDateString('en-ZA') : '—'}
                     </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <Eye size={15} color="#94A3B8" />
-                    </td>
+                    <td style={{ padding: '14px 16px' }}><Eye size={15} color="#94A3B8" /></td>
                   </tr>
                 )
               })}
@@ -202,9 +229,13 @@ function InvoicesTab() {
   const [expanded, setExpanded]         = useState<string | null>(null)
   const [downloading, setDownloading]   = useState<string | null>(null)
   const [payModal, setPayModal]         = useState<Invoice | null>(null)
+  const [hoursModal, setHoursModal]     = useState<Invoice | null>(null)
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const [typeFilter, setTypeFilter]     = useState('ALL')
   const [payForm, setPayForm] = useState({ amount: '', paymentMethod: 'EFT', reference: '', note: '' })
-  const [payError, setPayError] = useState('')
+  const [hoursForm, setHoursForm] = useState({ hours: '', note: '' })
+  const [payError, setPayError]   = useState('')
+  const [hoursError, setHoursError] = useState('')
 
   const { data: invoices = [], isLoading, isError } = useQuery<Invoice[]>({
     queryKey: ['invoices'],
@@ -239,15 +270,25 @@ function InvoicesTab() {
       setPayForm({ amount: '', paymentMethod: 'EFT', reference: '', note: '' })
     },
     onError: (e: any) => {
-        const data = e.response?.data
-        // Pull the first field-level error if available
-        if (data?.data && typeof data.data === 'object') {
-            const firstError = Object.values(data.data)[0]
-            setPayError(`${Object.keys(data.data)[0]}: ${firstError}`)
-        } else {
-            setPayError(data?.message ?? 'Failed to record payment. Please try again.')
-        }
-        },
+      const d = e.response?.data
+      if (d?.data && typeof d.data === 'object') {
+        const [k, v] = Object.entries(d.data)[0] as [string, string]
+        setPayError(`${k}: ${v}`)
+      } else {
+        setPayError(d?.message ?? 'Failed to record payment.')
+      }
+    },
+  })
+
+  const logHours = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: any }) =>
+      apiClient.post(`/api/v1/invoicing/invoices/${id}/hours`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['invoices'] })
+      setHoursModal(null); setHoursError('')
+      setHoursForm({ hours: '', note: '' })
+    },
+    onError: (e: any) => setHoursError(e.response?.data?.message ?? 'Failed to log hours.'),
   })
 
   const downloadPdf = async (inv: Invoice) => {
@@ -255,86 +296,98 @@ function InvoicesTab() {
     try {
       const res = await apiClient.get(`/api/v1/invoicing/invoices/${inv.id}/pdf`, { responseType: 'blob' } as any)
       const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-      const a = document.createElement('a')
-      a.href = url; a.download = `${inv.invoiceNumber}.pdf`; a.click()
+      const a = document.createElement('a'); a.href = url; a.download = `${inv.invoiceNumber}.pdf`; a.click()
       URL.revokeObjectURL(url)
-    } catch {
-      alert('Failed to download PDF. Please try again.')
-    } finally {
-      setDownloading(null)
-    }
+    } catch { alert('Failed to download PDF.') }
+    finally { setDownloading(null) }
   }
 
-  const filtered = statusFilter === 'ALL' ? invoices : invoices.filter(i => i.status === statusFilter)
+  let filtered = statusFilter === 'ALL' ? invoices : invoices.filter(i => i.status === statusFilter)
+  if (typeFilter !== 'ALL') filtered = filtered.filter(i => i.invoiceType === typeFilter)
 
   const totalRevenue     = invoices.filter(i => i.status === 'PAID').reduce((s, i) => s + i.total, 0)
-  const totalOutstanding = invoices.filter(i => ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE'].includes(i.status)).reduce((s, i) => s + i.total, 0)
+  const totalOutstanding = invoices.filter(i => ['ISSUED','PARTIALLY_PAID','OVERDUE'].includes(i.status)).reduce((s, i) => s + i.total, 0)
   const overdueCount     = invoices.filter(i => i.status === 'OVERDUE').length
+  const retainerCount    = invoices.filter(i => i.invoiceType === 'RETAINER').length
 
-  const customerName = (id: string | null) => {
-    if (!id) return <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>Walk-in client</span>
-    return customerMap[id] ?? <span style={{ color: '#94A3B8', fontSize: 12 }}>{id.slice(0, 8)}…</span>
+  const displayName = (inv: Invoice) => {
+    if (!inv.customerId) return inv.walkinClientName
+      ? <span style={{ fontSize: 13 }}>{inv.walkinClientName} <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>(walk-in)</span></span>
+      : <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>Walk-in client</span>
+    return customerMap[inv.customerId] ?? <span style={{ color: '#94A3B8', fontSize: 12 }}>{inv.customerId.slice(0, 8)}…</span>
   }
 
   return (
     <div>
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'Total invoices', value: invoices.length,    fmt: false, color: '#1B3A6B' },
+          { label: 'Total invoices', value: invoices.length,                  fmt: false, color: '#1B3A6B' },
           { label: 'Paid',           value: invoices.filter(i => i.status === 'PAID').length, fmt: false, color: '#166534' },
-          { label: 'Total revenue',  value: fmtR(totalRevenue),     fmt: true, color: '#0D9488' },
-          { label: 'Outstanding',    value: fmtR(totalOutstanding),  fmt: true, color: overdueCount > 0 ? '#DC2626' : '#D97706' },
+          { label: 'Retainers',      value: retainerCount,                    fmt: false, color: '#7C3AED' },
+          { label: 'Revenue',        value: fmtR(totalRevenue),               fmt: true,  color: '#0D9488' },
+          { label: 'Outstanding',    value: fmtR(totalOutstanding),           fmt: true,  color: overdueCount > 0 ? '#DC2626' : '#D97706' },
         ].map(s => (
-          <div key={s.label} style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 12, padding: '16px 20px' }}>
-            <div style={{ fontSize: s.fmt ? 18 : 26, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 12, color: '#64748B', marginTop: 3 }}>{s.label}</div>
+          <div key={s.label} style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 12, padding: '14px 18px' }}>
+            <div style={{ fontSize: s.fmt ? 16 : 24, fontWeight: 700, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
-      {/* Status filter */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-        {['ALL', 'DRAFT', 'ISSUED', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'CANCELLED'].map(s => (
-          <button key={s} onClick={() => setStatusFilter(s)}
-            style={{ padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
-              background: statusFilter === s ? '#1B3A6B' : '#F1F5F9',
-              color:      statusFilter === s ? 'white'   : '#64748B',
-            }}>
-            {s === 'ALL' ? 'All' : (INVOICE_STATUS[s]?.label ?? s)}
-            {s !== 'ALL' && ` (${invoices.filter(i => i.status === s).length})`}
-          </button>
-        ))}
+      {/* Filters row */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {['ALL', 'DRAFT', 'ISSUED', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'CANCELLED'].map(s => (
+            <button key={s} onClick={() => setStatusFilter(s)}
+              style={{ padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
+                background: statusFilter === s ? '#1B3A6B' : '#F1F5F9',
+                color:      statusFilter === s ? 'white'   : '#64748B' }}>
+              {s === 'ALL' ? 'All status' : (INVOICE_STATUS[s]?.label ?? s)}
+              {s !== 'ALL' && ` (${invoices.filter(i => i.status === s).length})`}
+            </button>
+          ))}
+        </div>
+        <div style={{ height: 20, width: 1, background: '#E2E8F0' }} />
+        <div style={{ display: 'flex', gap: 6 }}>
+          {['ALL', 'STANDARD', 'RECURRING_INSTANCE', 'RETAINER'].map(t => (
+            <button key={t} onClick={() => setTypeFilter(t)}
+              style={{ padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
+                background: typeFilter === t ? '#7C3AED' : '#F1F5F9',
+                color:      typeFilter === t ? 'white'   : '#64748B' }}>
+              {t === 'ALL' ? 'All types' : t === 'RECURRING_INSTANCE' ? 'Recurring' : t === 'RETAINER' ? 'Retainer' : 'Standard'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Table */}
       <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 14, overflow: 'hidden' }}>
-        {isLoading ? (
-          <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8' }}>Loading invoices...</div>
-        ) : isError ? (
-          <div style={{ padding: 60, textAlign: 'center' }}>
-            <AlertCircle size={32} color="#DC2626" style={{ marginBottom: 10 }} />
-            <div style={{ fontWeight: 600, color: '#DC2626' }}>Failed to load invoices</div>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8' }}>
-            <FileText size={36} color="#CBD5E1" style={{ marginBottom: 12, opacity: 0.5 }} />
-            <div style={{ fontWeight: 600, color: '#475569', marginBottom: 4 }}>No invoices</div>
-            <div style={{ fontSize: 13 }}>Convert an accepted quote to generate an invoice.</div>
-          </div>
-        ) : (
+        {isLoading ? <LoadingRow text="Loading invoices..." /> :
+         isError   ? <ErrorRow /> :
+         filtered.length === 0 ? <EmptyRow icon={FileText} text="No invoices" sub="Convert an accepted quote, create a retainer, or let a recurring schedule fire." /> : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
-                {['Invoice #', 'Customer', 'Issued', 'Due', 'Total', 'Status', 'Actions'].map(h => (
+                {['Invoice #', 'Customer', 'Issued', 'Due', 'Amount', 'Status', 'Actions'].map(h => (
                   <th key={h} style={{ textAlign: 'left', padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtered.map(inv => {
-                const ss = INVOICE_STATUS[inv.status] ?? INVOICE_STATUS.DRAFT
+                const ss    = INVOICE_STATUS[inv.status] ?? INVOICE_STATUS.DRAFT
                 const isExp = expanded === inv.id
+                const isRetainer = inv.invoiceType === 'RETAINER'
+                const isRecurring = inv.invoiceType === 'RECURRING_INSTANCE'
+
+                // Hours state for retainers
+                const pctConsumed = isRetainer && inv.committedHours
+                  ? Math.min(100, ((inv.hoursConsumed ?? 0) / inv.committedHours) * 100)
+                  : 0
+                const isOverage = isRetainer && inv.committedHours != null
+                  && (inv.hoursConsumed ?? 0) > inv.committedHours
+
                 return (
                   <>
                     <tr key={inv.id}
@@ -342,63 +395,106 @@ function InvoicesTab() {
                       style={{ borderBottom: '1px solid #F8FAFC', cursor: 'pointer', background: isExp ? '#FAFBFF' : 'white' }}
                       onMouseEnter={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = '#F8FAFC' }}
                       onMouseLeave={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = 'white' }}>
+
                       <td style={{ padding: '14px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <FileText size={14} color="#0D9488" />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <FileText size={14} color={isRetainer ? '#7C3AED' : isRecurring ? '#0D9488' : '#64748B'} />
                           <span style={{ fontWeight: 700, fontSize: 14, color: '#0F172A' }}>{inv.invoiceNumber}</span>
                           {isExp ? <ChevronUp size={13} color="#94A3B8" /> : <ChevronDown size={13} color="#94A3B8" />}
                         </div>
+                        {/* Type badges */}
+                        <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                          {isRetainer && (
+                            <span style={{ fontSize: 10, fontWeight: 700, background: '#F3E8FF', color: '#7C3AED', padding: '2px 6px', borderRadius: 6 }}>RETAINER</span>
+                          )}
+                          {isRecurring && (
+                            <span style={{ fontSize: 10, fontWeight: 700, background: '#CCFBF1', color: '#0F766E', padding: '2px 6px', borderRadius: 6 }}>RECURRING</span>
+                          )}
+                          {isOverage && (
+                            <span style={{ fontSize: 10, fontWeight: 700, background: '#FEF2F2', color: '#DC2626', padding: '2px 6px', borderRadius: 6 }}>OVERAGE</span>
+                          )}
+                        </div>
                       </td>
-                      <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 600, color: '#374151' }}>
-                        {customerName(inv.customerId)}
-                      </td>
+
+                      <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 600, color: '#374151' }}>{displayName(inv)}</td>
                       <td style={{ padding: '14px 16px', fontSize: 13, color: '#64748B' }}>{fmtDate(inv.issuedAt)}</td>
                       <td style={{ padding: '14px 16px', fontSize: 13, color: inv.status === 'OVERDUE' ? '#DC2626' : '#64748B' }}>
                         {fmtDate(inv.dueDate)}
                       </td>
+
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>{fmtR(inv.total)}</div>
                         {inv.status === 'PARTIALLY_PAID' && inv.amountPaid > 0 && (
                           <div style={{ fontSize: 11, color: '#92400E', marginTop: 1 }}>Paid: {fmtR(inv.amountPaid)}</div>
                         )}
+                        {/* Hours progress bar for retainers */}
+                        {isRetainer && inv.committedHours != null && (
+                          <div style={{ marginTop: 6 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: isOverage ? '#DC2626' : '#64748B', marginBottom: 2 }}>
+                              <span>{inv.hoursConsumed ?? 0}h used</span>
+                              <span>{inv.committedHours}h committed</span>
+                            </div>
+                            <div style={{ height: 4, borderRadius: 2, background: '#F1F5F9', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${pctConsumed}%`, background: isOverage ? '#DC2626' : pctConsumed > 80 ? '#D97706' : '#0D9488', borderRadius: 2, transition: 'width 0.3s' }} />
+                            </div>
+                          </div>
+                        )}
                       </td>
+
                       <td style={{ padding: '14px 16px' }}>
-                        <span style={{ background: ss.bg, color: ss.color, padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
-                          {ss.label}
-                        </span>
+                        <span style={{ background: ss.bg, color: ss.color, padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>{ss.label}</span>
                       </td>
+
                       <td style={{ padding: '14px 16px' }}>
-                        <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
                           {inv.status === 'DRAFT' && (
-                            <button disabled={issueInvoice.isPending}
-                              onClick={() => issueInvoice.mutate(inv.id)}
-                              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                              <Send size={12} /> Issue
-                            </button>
+                            <ActionBtn icon={Send} label="Issue" color="#1D4ED8" bg="#EFF6FF" border="#BFDBFE"
+                              onClick={() => issueInvoice.mutate(inv.id)} disabled={issueInvoice.isPending} />
                           )}
-                          {['ISSUED', 'PARTIALLY_PAID', 'OVERDUE'].includes(inv.status) && (
-                            <button
-                              onClick={() => {
-                                setPayModal(inv); setPayError('')
-                                setPayForm(f => ({ ...f, amount: String(inv.total - (inv.amountPaid ?? 0)) }))
-                              }}
-                              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                              <CheckCircle size={12} /> Mark paid
-                            </button>
+                          {['ISSUED','PARTIALLY_PAID','OVERDUE'].includes(inv.status) && (
+                            <ActionBtn icon={CheckCircle} label="Mark paid" color="#166534" bg="#F0FDF4" border="#BBF7D0"
+                              onClick={() => { setPayModal(inv); setPayError(''); setPayForm(f => ({ ...f, amount: String(inv.total - (inv.amountPaid ?? 0)) })) }} />
                           )}
-                          <button disabled={downloading === inv.id} onClick={() => downloadPdf(inv)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
-                            <Download size={12} />{downloading === inv.id ? '…' : 'PDF'}
-                          </button>
+                          {isRetainer && ['ISSUED','PARTIALLY_PAID','PAID'].includes(inv.status) && (
+                            <ActionBtn icon={Timer} label="Log hrs" color="#7C3AED" bg="#F3E8FF" border="#DDD6FE"
+                              onClick={() => { setHoursModal(inv); setHoursError(''); setHoursForm({ hours: '', note: '' }) }} />
+                          )}
+                          <ActionBtn icon={Download} label={downloading === inv.id ? '…' : 'PDF'} color="#64748B" bg="#F8FAFC" border="#E2E8F0"
+                            onClick={() => downloadPdf(inv)} disabled={downloading === inv.id} />
                         </div>
                       </td>
                     </tr>
 
-                    {/* Expanded line items */}
                     {isExp && (
-                      <tr key={`${inv.id}-lines`}>
+                      <tr key={`${inv.id}-exp`}>
                         <td colSpan={7} style={{ padding: 0 }}>
                           <div style={{ background: '#F8FAFC', borderBottom: '1px solid #F1F5F9', padding: '16px 24px' }}>
+                            {/* Retainer detail panel */}
+                            {isRetainer && inv.committedHours != null && (
+                              <div style={{ background: 'white', border: '1px solid #DDD6FE', borderRadius: 10, padding: '14px 18px', marginBottom: 16 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: '#7C3AED', letterSpacing: '0.06em', marginBottom: 10 }}>RETAINER HOURS</div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                                  {[
+                                    { label: 'Committed', value: `${inv.committedHours}h`,        color: '#1B3A6B' },
+                                    { label: 'Consumed',  value: `${inv.hoursConsumed ?? 0}h`,    color: isOverage ? '#DC2626' : '#0F172A' },
+                                    { label: 'Remaining', value: isOverage ? 'Overage!' : `${Math.max(0, inv.committedHours - (inv.hoursConsumed ?? 0))}h`, color: isOverage ? '#DC2626' : '#166534' },
+                                    { label: 'Rate',      value: fmtR(inv.ratePerHour) + '/hr',   color: '#64748B' },
+                                  ].map(m => (
+                                    <div key={m.label}>
+                                      <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 3 }}>{m.label}</div>
+                                      <div style={{ fontSize: 16, fontWeight: 700, color: m.color }}>{m.value}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                                {isOverage && (
+                                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 7, background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#DC2626' }}>
+                                    <AlertTriangle size={13} /> Consumed {((inv.hoursConsumed ?? 0) - inv.committedHours!).toFixed(2)}h over commitment — consider issuing a reconciliation invoice.
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Line items */}
                             <div style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.06em', marginBottom: 10 }}>LINE ITEMS</div>
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                               <thead>
@@ -446,76 +542,380 @@ function InvoicesTab() {
 
       {/* Mark as Paid modal */}
       {payModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(2px)' }}>
-          <div style={{ background: 'white', borderRadius: 16, padding: 28, width: 460, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>Record Payment</h3>
-                <p style={{ margin: '3px 0 0', fontSize: 13, color: '#94A3B8' }}>
-                  {payModal.invoiceNumber} · Total {fmtR(payModal.total)}
-                  {payModal.amountPaid > 0 && ` · Already paid ${fmtR(payModal.amountPaid)}`}
-                </p>
+        <Modal title="Record Payment"
+          subtitle={`${payModal.invoiceNumber} · ${fmtR(payModal.total)}${payModal.amountPaid > 0 ? ` · Paid ${fmtR(payModal.amountPaid)}` : ''}`}
+          onClose={() => { setPayModal(null); setPayError('') }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {[
+              { label: 'Amount Received (R) *', key: 'amount',    type: 'number', placeholder: '' },
+              { label: 'Payment Reference',     key: 'reference', type: 'text',   placeholder: 'e.g. EFT-20260530-001' },
+              { label: 'Note (optional)',        key: 'note',      type: 'text',   placeholder: 'e.g. Paid in full' },
+            ].map(f => (
+              <div key={f.key}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>{f.label}</label>
+                <input type={f.type} value={(payForm as any)[f.key]}
+                  onChange={e => setPayForm(p => ({ ...p, [f.key]: e.target.value }))}
+                  placeholder={f.placeholder} style={inp} />
               </div>
-              <button onClick={() => setPayModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={20} /></button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {[
-                { label: 'Amount Received (R) *', key: 'amount',    type: 'number', placeholder: '' },
-                { label: 'Payment Reference',     key: 'reference', type: 'text',   placeholder: 'e.g. EFT-20260530-001' },
-                { label: 'Note (optional)',        key: 'note',      type: 'text',   placeholder: 'e.g. Paid in full' },
-              ].map(f => (
-                <div key={f.key}>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>{f.label}</label>
-                  <input type={f.type} value={(payForm as any)[f.key]}
-                    onChange={e => setPayForm(p => ({ ...p, [f.key]: e.target.value }))}
-                    placeholder={f.placeholder} style={inp} />
-                </div>
-              ))}
-              <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Payment Method</label>
-                <select value={payForm.paymentMethod}
-                  onChange={e => setPayForm(p => ({ ...p, paymentMethod: e.target.value }))}
-                  style={{ ...inp, appearance: 'none' as const }}>
-                  {['EFT', 'CASH', 'CARD', 'CHEQUE', 'OTHER'].map(m => <option key={m}>{m}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {payError && (
-              <div style={{ marginTop: 14, padding: '10px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <AlertCircle size={15} color="#DC2626" style={{ flexShrink: 0 }} />{payError}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
-              <button onClick={() => { setPayModal(null); setPayError('') }}
-                style={{ padding: '10px 18px', border: '1px solid #E2E8F0', borderRadius: 9, background: 'white', fontSize: 14, cursor: 'pointer', color: '#374151' }}>
-                Cancel
-              </button>
-              <button
-                disabled={!payForm.amount || markPaid.isPending}
-                onClick={() => markPaid.mutate({
-                  id: payModal.id,
-                  body: {
-                    amountPaid: Number(payForm.amount),
-                    paymentMethod: payForm.paymentMethod,
-                    reference: payForm.reference || undefined,
-                    note: payForm.note || undefined,
-                  },
-                })}
-                style={{
-                  padding: '10px 22px', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700,
-                  background: !payForm.amount ? '#E2E8F0' : '#16A34A',
-                  color: !payForm.amount ? '#94A3B8' : 'white',
-                  cursor: !payForm.amount ? 'not-allowed' : 'pointer',
-                }}>
-                {markPaid.isPending ? 'Saving...' : 'Confirm payment'}
-              </button>
+            ))}
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Payment Method</label>
+              <select value={payForm.paymentMethod} onChange={e => setPayForm(p => ({ ...p, paymentMethod: e.target.value }))}
+                style={{ ...inp, appearance: 'none' as const }}>
+                {['EFT', 'CASH', 'CARD', 'CHEQUE', 'OTHER'].map(m => <option key={m}>{m}</option>)}
+              </select>
             </div>
           </div>
-        </div>
+          {payError && <ErrorBanner msg={payError} />}
+          <ModalFooter
+            onCancel={() => { setPayModal(null); setPayError('') }}
+            onConfirm={() => markPaid.mutate({ id: payModal.id, body: { amountPaid: Number(payForm.amount), paymentMethod: payForm.paymentMethod, reference: payForm.reference || undefined, paidDate: undefined } })}
+            confirmLabel={markPaid.isPending ? 'Saving...' : 'Confirm payment'}
+            disabled={!payForm.amount || markPaid.isPending}
+            confirmColor="#16A34A" />
+        </Modal>
       )}
+
+      {/* Log Hours modal */}
+      {hoursModal && (
+        <Modal title="Log Hours"
+          subtitle={`${hoursModal.invoiceNumber} · ${hoursModal.hoursConsumed ?? 0}h used of ${hoursModal.committedHours}h committed`}
+          onClose={() => { setHoursModal(null); setHoursError('') }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Hours to log *</label>
+              <input type="number" min="0.01" step="0.25" value={hoursForm.hours}
+                onChange={e => setHoursForm(f => ({ ...f, hours: e.target.value }))}
+                placeholder="e.g. 4.5" style={inp} autoFocus />
+              <p style={{ fontSize: 11, color: '#94A3B8', margin: '4px 0 0' }}>
+                Remaining commitment: {Math.max(0, (hoursModal.committedHours ?? 0) - (hoursModal.hoursConsumed ?? 0)).toFixed(2)}h
+              </p>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Note (optional)</label>
+              <input type="text" value={hoursForm.note}
+                onChange={e => setHoursForm(f => ({ ...f, note: e.target.value }))}
+                placeholder="e.g. Dozer on site 07:00–13:00, load count 48" style={inp} />
+            </div>
+            {Number(hoursForm.hours) > 0 && (Number(hoursForm.hours) + (hoursModal.hoursConsumed ?? 0)) > (hoursModal.committedHours ?? Infinity) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#92400E' }}>
+                <AlertTriangle size={14} color="#F59E0B" />
+                This will exceed the committed hours — invoice will enter <strong>overage</strong>.
+              </div>
+            )}
+          </div>
+          {hoursError && <ErrorBanner msg={hoursError} />}
+          <ModalFooter
+            onCancel={() => { setHoursModal(null); setHoursError('') }}
+            onConfirm={() => logHours.mutate({ id: hoursModal.id, body: { hours: Number(hoursForm.hours), note: hoursForm.note || undefined } })}
+            confirmLabel={logHours.isPending ? 'Saving...' : 'Log hours'}
+            disabled={!hoursForm.hours || logHours.isPending}
+            confirmColor="#7C3AED" />
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+// ── Recurring Tab ─────────────────────────────────────────────────────────────
+function RecurringTab() {
+  const qc = useQueryClient()
+  const navigate = useNavigate()
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['recurring-schedules'],
+    queryFn: async () => {
+      const res = await apiClient.get('/api/v1/invoicing/recurring-schedules?size=100&sort=createdAt,desc')
+      const payload = res.data?.data ?? res.data
+      return payload as { content: RecurringSchedule[]; totalElements: number }
+    },
+  })
+
+  const schedules = data?.content ?? []
+
+  const { data: customers = [] } = useQuery({
+    queryKey: ['customers-map'],
+    queryFn: async () => {
+      const res = await apiClient.get('/api/v1/crm/customers?size=500')
+      const payload = res.data?.data ?? res.data
+      return (payload.content ?? payload) as { id: string; name: string }[]
+    },
+  })
+  const customerMap = Object.fromEntries(customers.map(c => [c.id, c.name]))
+
+  const pause = useMutation({
+    mutationFn: (id: string) => apiClient.post(`/api/v1/invoicing/recurring-schedules/${id}/pause`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['recurring-schedules'] }),
+  })
+  const resume = useMutation({
+    mutationFn: (id: string) => apiClient.post(`/api/v1/invoicing/recurring-schedules/${id}/resume`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['recurring-schedules'] }),
+  })
+  const cancel = useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/api/v1/invoicing/recurring-schedules/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['recurring-schedules'] }),
+  })
+
+  const active    = schedules.filter(s => s.status === 'ACTIVE').length
+  const paused    = schedules.filter(s => s.status === 'PAUSED').length
+  const monthlyMRR = schedules
+    .filter(s => s.status === 'ACTIVE' && s.frequency === 'MONTHLY')
+    .reduce((sum, s) => sum + s.total, 0)
+
+  const displayName = (s: RecurringSchedule) => {
+    if (!s.customerId) return s.walkinClientName ?? <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>Walk-in</span>
+    return customerMap[s.customerId] ?? s.customerId.slice(0, 8) + '…'
+  }
+
+  const freqLabel = (s: RecurringSchedule) => {
+    if (s.frequency === 'CUSTOM' && s.customIntervalDays) return `Every ${s.customIntervalDays}d`
+    return FREQ_LABEL[s.frequency] ?? s.frequency
+  }
+
+  return (
+    <div>
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+        {[
+          { label: 'Total schedules', value: schedules.length, fmt: false, color: '#1B3A6B' },
+          { label: 'Active',          value: active,           fmt: false, color: '#166534' },
+          { label: 'Paused',          value: paused,           fmt: false, color: '#92400E' },
+          { label: 'Monthly MRR',     value: fmtR(monthlyMRR), fmt: true,  color: '#0D9488' },
+        ].map(s => (
+          <div key={s.label} style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 12, padding: '14px 18px' }}>
+            <div style={{ fontSize: s.fmt ? 18 : 24, fontWeight: 700, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Info callout */}
+      <div style={{ marginBottom: 16, padding: '12px 16px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 10, fontSize: 13, color: '#166534', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <RefreshCw size={15} style={{ marginTop: 1, flexShrink: 0 }} />
+        <div>
+          Schedules fire automatically at <strong>02:45 every morning</strong>. Each run creates a new issued invoice linked back to this schedule.
+          Monthly schedules are great for site security fees, equipment lease charges, and management retainers.
+        </div>
+      </div>
+
+      <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 14, overflow: 'hidden' }}>
+        {isLoading ? <LoadingRow text="Loading schedules..." /> :
+         isError   ? <ErrorRow /> :
+         schedules.length === 0 ? (
+          <div style={{ padding: '60px 24px', textAlign: 'center' }}>
+            <RefreshCw size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
+            <div style={{ fontWeight: 600, color: '#475569', marginBottom: 4 }}>No recurring schedules yet</div>
+            <div style={{ fontSize: 13, color: '#94A3B8', marginBottom: 20 }}>
+              Set up automatic monthly invoicing for mining site security, equipment rentals, or any regular service.
+            </div>
+            <button onClick={() => navigate('/recurring/new')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#0D9488', color: 'white', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              <Plus size={15} /> Create first schedule
+            </button>
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
+                {['Schedule', 'Customer', 'Frequency', 'Amount', 'Next run', 'Status', 'Actions'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {schedules.map(s => {
+                const sc    = RECURRING_STATUS[s.status] ?? RECURRING_STATUS.ACTIVE
+                const Icon  = sc.icon
+                const isExp = expanded === s.id
+
+                return (
+                  <>
+                    <tr key={s.id}
+                      onClick={() => setExpanded(isExp ? null : s.id)}
+                      style={{ borderBottom: '1px solid #F8FAFC', cursor: 'pointer', background: isExp ? '#F0FDFA' : 'white' }}
+                      onMouseEnter={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = '#F8FAFC' }}
+                      onMouseLeave={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = 'white' }}>
+
+                      <td style={{ padding: '14px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <RefreshCw size={14} color="#0D9488" />
+                          <span style={{ fontWeight: 700, fontSize: 14, color: '#0F172A' }}>{s.title}</span>
+                          {isExp ? <ChevronUp size={13} color="#94A3B8" /> : <ChevronDown size={13} color="#94A3B8" />}
+                        </div>
+                      </td>
+                      <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 600, color: '#374151' }}>{displayName(s)}</td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <span style={{ fontSize: 13, background: '#F1F5F9', color: '#475569', padding: '3px 9px', borderRadius: 12, fontWeight: 600 }}>{freqLabel(s)}</span>
+                      </td>
+                      <td style={{ padding: '14px 16px', fontSize: 14, fontWeight: 700, color: '#0F172A' }}>{fmtR(s.total)}</td>
+                      <td style={{ padding: '14px 16px', fontSize: 13, color: '#64748B' }}>{fmtDate(s.nextRunAt)}</td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: sc.bg, color: sc.color, fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 20 }}>
+                          <Icon size={11} />{sc.label}
+                        </span>
+                      </td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
+                          {s.status === 'ACTIVE' && (
+                            <ActionBtn icon={Pause} label="Pause" color="#92400E" bg="#FEF3C7" border="#FCD34D"
+                              onClick={() => pause.mutate(s.id)} disabled={pause.isPending} />
+                          )}
+                          {s.status === 'PAUSED' && (
+                            <ActionBtn icon={Play} label="Resume" color="#166534" bg="#F0FDF4" border="#BBF7D0"
+                              onClick={() => resume.mutate(s.id)} disabled={resume.isPending} />
+                          )}
+                          {['ACTIVE','PAUSED'].includes(s.status) && (
+                            <ActionBtn icon={Trash2} label="Cancel" color="#DC2626" bg="#FEF2F2" border="#FECACA"
+                              onClick={() => { if (confirm(`Cancel recurring schedule "${s.title}"?`)) cancel.mutate(s.id) }}
+                              disabled={cancel.isPending} />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {isExp && (
+                      <tr key={`${s.id}-exp`}>
+                        <td colSpan={7} style={{ padding: 0 }}>
+                          <div style={{ background: '#F0FDFA', borderBottom: '1px solid #CCFBF1', padding: '16px 24px' }}>
+                            {s.lastRunAt && (
+                              <p style={{ fontSize: 12, color: '#0F766E', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <CheckCircle size={13} /> Last invoice generated: {fmtDate(s.lastRunAt)}
+                              </p>
+                            )}
+                            <div style={{ fontSize: 11, fontWeight: 700, color: '#0F766E', letterSpacing: '0.06em', marginBottom: 10 }}>TEMPLATE LINE ITEMS</div>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                              <thead>
+                                <tr style={{ borderBottom: '1px solid #CCFBF1' }}>
+                                  {['Description', 'Qty', 'Unit Price', 'VAT %', 'Line Total'].map(h => (
+                                    <th key={h} style={{ textAlign: 'left', padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#0F766E', textTransform: 'uppercase' as const }}>{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {s.lineItems.map((li: any, i: number) => (
+                                  <tr key={i} style={{ borderBottom: i < s.lineItems.length - 1 ? '1px solid #F0FDFA' : 'none' }}>
+                                    <td style={{ padding: '8px 12px', color: '#374151' }}>{li.description}</td>
+                                    <td style={{ padding: '8px 12px', color: '#64748B' }}>{li.quantity}</td>
+                                    <td style={{ padding: '8px 12px', color: '#64748B' }}>{fmtR(li.unitPrice)}</td>
+                                    <td style={{ padding: '8px 12px', color: '#64748B' }}>{li.vatRate ?? 15}%</td>
+                                    <td style={{ padding: '8px 12px', fontWeight: 600, color: '#0F172A' }}>{fmtR(li.lineTotal)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                              <div style={{ minWidth: 240 }}>
+                                {[['Subtotal', fmtR(s.subtotal)], ['VAT', fmtR(s.vatTotal)]].map(([l, v]) => (
+                                  <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, color: '#64748B' }}>
+                                    <span>{l}</span><span>{v}</span>
+                                  </div>
+                                ))}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 0', fontSize: 15, fontWeight: 700, color: '#0F172A', borderTop: '1px solid #D1FAE5', marginTop: 4 }}>
+                                  <span>Per invoice</span><span>{fmtR(s.total)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Shared UI primitives ──────────────────────────────────────────────────────
+function ActionBtn({ icon: Icon, label, color, bg, border, onClick, disabled }: {
+  icon: React.ElementType; label: string; color: string; bg: string; border: string
+  onClick: () => void; disabled?: boolean
+}) {
+  return (
+    <button disabled={disabled} onClick={onClick}
+      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px',
+        background: disabled ? '#F8FAFC' : bg, color: disabled ? '#CBD5E1' : color,
+        border: `1px solid ${disabled ? '#E2E8F0' : border}`,
+        borderRadius: 7, fontSize: 12, fontWeight: 600,
+        cursor: disabled ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' as const }}>
+      <Icon size={12} />{label}
+    </button>
+  )
+}
+
+function Modal({ title, subtitle, children, onClose }: {
+  title: string; subtitle?: string; children: React.ReactNode; onClose: () => void
+}) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(2px)' }}>
+      <div style={{ background: 'white', borderRadius: 16, padding: 28, width: 460, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>{title}</h3>
+            {subtitle && <p style={{ margin: '3px 0 0', fontSize: 13, color: '#94A3B8' }}>{subtitle}</p>}
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex', padding: 2 }}><X size={20} /></button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function ModalFooter({ onCancel, onConfirm, confirmLabel, disabled, confirmColor }: {
+  onCancel: () => void; onConfirm: () => void; confirmLabel: string
+  disabled?: boolean; confirmColor: string
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
+      <button onClick={onCancel}
+        style={{ padding: '10px 18px', border: '1px solid #E2E8F0', borderRadius: 9, background: 'white', fontSize: 14, cursor: 'pointer', color: '#374151' }}>
+        Cancel
+      </button>
+      <button disabled={disabled} onClick={onConfirm}
+        style={{ padding: '10px 22px', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700,
+          background: disabled ? '#E2E8F0' : confirmColor,
+          color: disabled ? '#94A3B8' : 'white',
+          cursor: disabled ? 'not-allowed' : 'pointer' }}>
+        {confirmLabel}
+      </button>
+    </div>
+  )
+}
+
+function ErrorBanner({ msg }: { msg: string }) {
+  return (
+    <div style={{ marginTop: 14, padding: '10px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <AlertCircle size={15} style={{ flexShrink: 0 }} />{msg}
+    </div>
+  )
+}
+
+function LoadingRow({ text }: { text: string }) {
+  return <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8' }}>{text}</div>
+}
+
+function ErrorRow() {
+  return (
+    <div style={{ padding: 60, textAlign: 'center' }}>
+      <AlertCircle size={32} color="#DC2626" style={{ marginBottom: 10 }} />
+      <div style={{ fontWeight: 600, color: '#DC2626' }}>Failed to load data</div>
+      <div style={{ fontSize: 13, color: '#94A3B8', marginTop: 4 }}>Please refresh and try again.</div>
+    </div>
+  )
+}
+
+function EmptyRow({ icon: Icon, text, sub }: { icon: React.ElementType; text: string; sub: string }) {
+  return (
+    <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8' }}>
+      <Icon size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
+      <div style={{ fontWeight: 600, color: '#475569', marginBottom: 4 }}>{text}</div>
+      <div style={{ fontSize: 13 }}>{sub}</div>
     </div>
   )
 }

@@ -1,0 +1,39 @@
+package za.co.handyflow.platform.invoicing.dto;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+public record RecurringScheduleResponse(
+        UUID id,
+        String title,
+        String notes,
+        String status,
+        String frequency,
+        Integer frequencyDay,
+        Integer customIntervalDays,
+        UUID customerId,
+        Instant startDate,
+        Instant endDate,
+        Instant nextRunAt,
+        Instant lastRunAt,
+        BigDecimal subtotal,
+        BigDecimal vatTotal,
+        BigDecimal total,
+        String currency,
+        List<LineItemResponse> lineItems,
+        Instant createdAt,
+        String walkinClientName,
+        String walkinClientEmail,
+        String walkinClientPhone,
+        boolean variableHours,
+        BigDecimal ratePerHour,
+        BigDecimal minimumHoursPerCycle,
+        BigDecimal hoursVatRate,
+        Instant contractStartDate,
+        Instant contractEndDate,
+        BigDecimal contractedTotalHours,
+        BigDecimal totalHoursBilled,
+        int remainingCycles
+) {}

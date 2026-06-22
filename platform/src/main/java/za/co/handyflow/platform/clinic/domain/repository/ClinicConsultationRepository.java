@@ -21,4 +21,8 @@ public interface ClinicConsultationRepository extends JpaRepository<ClinicConsul
 
     @Query("SELECT c FROM ClinicConsultation c WHERE c.tenantId = :#{#tenantId.value} AND c.deletedAt IS NULL ORDER BY c.consultedAt DESC")
     Page<ClinicConsultation> findAllActive(TenantId tenantId, Pageable pageable);
+
+    // FIX #8 — for the /billing/consultations?unbilled=true endpoint
+    @Query("SELECT c FROM ClinicConsultation c WHERE c.tenantId = :#{#tenantId.value} AND c.deletedAt IS NULL AND c.billed = false ORDER BY c.consultedAt DESC")
+    Page<ClinicConsultation> findAllUnbilled(TenantId tenantId, Pageable pageable);
 }

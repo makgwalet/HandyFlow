@@ -1,12 +1,12 @@
 // src/pages/modules/AdminModulesPage.tsx
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { adminApi } from '../../api/client'
 import {
   Package, Edit3, TrendingUp, X, CheckCircle,
-  AlertTriangle, RefreshCw, DollarSign,
+  AlertTriangle, RefreshCw, DollarSign, Plus,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 
 const fmtR = (n: any) => n != null ? `R ${Number(n).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}` : '—'
 
@@ -18,13 +18,15 @@ const CATEGORY_COLOR: Record<string, { color: string; bg: string }> = {
   ENTERPRISE: { color: '#FC8181', bg: '#DC262620' },
 }
 
+// ── Shared styles — separate objects, not merged ───────────────────────────
 const inp: React.CSSProperties = {
   width: '100%', padding: '9px 12px', border: '1.5px solid #2D3748',
   borderRadius: 8, fontSize: 13, background: '#1A202C', color: '#F7FAFC',
   outline: 'none', boxSizing: 'border-box' as const, fontFamily: 'inherit',
 }
+const lbl: React.CSSProperties = {
   display: 'block', fontSize: 11, fontWeight: 700, color: '#718096',
-  marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em',
+  marginBottom: 5, textTransform: 'uppercase' as const, letterSpacing: '0.06em',
 }
 const btnP: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -39,9 +41,10 @@ const btnS: React.CSSProperties = {
   cursor: 'pointer', color: '#A0AEC0', fontWeight: 500,
 }
 
-const navigate = useNavigate()
-
-function PriceModal({ module: mod, onClose, onSaved }: { module: any; onClose: () => void; onSaved: () => void }) {
+// ── PriceModal — self-contained component, hooks called inside it ──────────
+function PriceModal({ module: mod, onClose, onSaved }: {
+  module: any; onClose: () => void; onSaved: () => void
+}) {
   const [price, setPrice] = useState(String(mod.monthly_price ?? mod.monthlyPrice ?? ''))
   const [error, setError] = useState('')
 
@@ -80,10 +83,15 @@ function PriceModal({ module: mod, onClose, onSaved }: { module: any; onClose: (
             </div>
           )}
           <div style={{ marginTop: 10, padding: '10px 12px', background: '#1A202C', border: '1px solid #2D3748', borderRadius: 8, fontSize: 12, color: '#718096', lineHeight: 1.6 }}>
-            Price change applies to <strong style={{ color: '#F7FAFC' }}>new activations only</strong>. Existing subscribers retain their current price until you explicitly migrate them.
+            Price change applies to <strong style={{ color: '#F7FAFC' }}>new activations only</strong>.
+            Existing subscribers retain their current price until you explicitly migrate them.
           </div>
         </div>
-        {error && <div style={{ marginBottom: 12, padding: '10px 12px', background: '#3B1515', border: '1px solid #FC818150', borderRadius: 8, fontSize: 13, color: '#FC8181' }}>{error}</div>}
+        {error && (
+          <div style={{ marginBottom: 12, padding: '10px 12px', background: '#3B1515', border: '1px solid #FC818150', borderRadius: 8, fontSize: 13, color: '#FC8181' }}>
+            {error}
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button onClick={onClose} style={btnS}>Cancel</button>
           <button onClick={() => update.mutate()}
@@ -97,10 +105,12 @@ function PriceModal({ module: mod, onClose, onSaved }: { module: any; onClose: (
   )
 }
 
+// ── Main page — useNavigate called inside function component body ──────────
 export function AdminModulesPage() {
-  const qc = useQueryClient()
+  const qc       = useQueryClient()
+  const navigate = useNavigate()   // ← correct: inside function component, not module scope
   const [editingModule, setEditingModule] = useState<any>(null)
-  const [toast, setToast]                 = useState<{ msg: string; ok: boolean } | null>(null)
+  const [toast,         setToast]         = useState<{ msg: string; ok: boolean } | null>(null)
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok }); setTimeout(() => setToast(null), 4000)
@@ -122,13 +132,11 @@ export function AdminModulesPage() {
     },
   })
 
-  // Merge mrr + adoption data by key
-  const modules = mrr.map((m: any) => {
+  const modules = (mrr as any[]).map((m: any) => {
     const a = (adoption as any[]).find(x => x.key === m.key) ?? {}
     return { ...m, ...a }
   })
 
-  // Group by category
   const grouped = modules.reduce((acc: any, m: any) => {
     const cat = m.category ?? 'OTHER'
     if (!acc[cat]) acc[cat] = []
@@ -136,9 +144,9 @@ export function AdminModulesPage() {
     return acc
   }, {} as Record<string, any[]>)
 
-  const totalMrr = modules.reduce((s: number, m: any) => s + (Number(m.module_mrr) || 0), 0)
-  const totalActive = modules.reduce((s: number, m: any) => s + (Number(m.active_count || m.active) || 0), 0)
-  const totalTrial  = modules.reduce((s: number, m: any) => s + (Number(m.trial_count || m.trial) || 0), 0)
+  const totalMrr    = modules.reduce((s, m) => s + (Number(m.module_mrr) || 0), 0)
+  const totalActive = modules.reduce((s, m) => s + (Number(m.active_count || m.active) || 0), 0)
+  const totalTrial  = modules.reduce((s, m) => s + (Number(m.trial_count  || m.trial)  || 0), 0)
 
   return (
     <div style={{ color: '#F7FAFC' }}>
@@ -155,18 +163,20 @@ export function AdminModulesPage() {
             Pricing · Adoption · Active vs trial counts per module
           </p>
         </div>
-        <button onClick={() => refetch()} style={btnS}><RefreshCw size={13} /></button>
-        <button onClick={() => navigate('/modules/new')} style={btnP}>
-          <Plus size={14} /> New module
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => refetch()} style={btnS}><RefreshCw size={13} /></button>
+          <button onClick={() => navigate('/modules/new')} style={btnP}>
+            <Plus size={14} /> New module
+          </button>
+        </div>
       </div>
 
       {/* Summary strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
         {[
-          { label: 'Total module MRR', value: fmtR(totalMrr), color: '#0D9488', bg: '#0D948820', border: '#0D948840', icon: <DollarSign size={16} /> },
-          { label: 'Active subscriptions', value: totalActive, color: '#68D391', bg: '#16653420', border: '#16653440', icon: <CheckCircle size={16} /> },
-          { label: 'Trial subscriptions', value: totalTrial, color: '#F6AD55', bg: '#D9770620', border: '#D9770640', icon: <TrendingUp size={16} /> },
+          { label: 'Total module MRR',     value: fmtR(totalMrr),  color: '#0D9488', bg: '#0D948820', border: '#0D948840', icon: <DollarSign size={16} /> },
+          { label: 'Active subscriptions', value: totalActive,      color: '#68D391', bg: '#16653420', border: '#16653440', icon: <CheckCircle size={16} /> },
+          { label: 'Trial subscriptions',  value: totalTrial,       color: '#F6AD55', bg: '#D9770620', border: '#D9770640', icon: <TrendingUp  size={16} /> },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, border: `1px solid ${k.border}`, borderRadius: 12, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ color: k.color }}>{k.icon}</div>
@@ -204,11 +214,11 @@ export function AdminModulesPage() {
                   </thead>
                   <tbody>
                     {(mods as any[]).map((m: any) => {
-                      const active      = Number(m.active_count || m.active) || 0
-                      const trial       = Number(m.trial_count  || m.trial)  || 0
-                      const cancelled   = Number(m.cancelled)   || 0
-                      const convRate    = m.conversion_rate_pct != null ? `${m.conversion_rate_pct}%` : '—'
-                      const modMrr      = Number(m.module_mrr)  || 0
+                      const active       = Number(m.active_count || m.active) || 0
+                      const trial        = Number(m.trial_count  || m.trial)  || 0
+                      const cancelled    = Number(m.cancelled)   || 0
+                      const convRate     = m.conversion_rate_pct != null ? `${m.conversion_rate_pct}%` : '—'
+                      const modMrr       = Number(m.module_mrr)  || 0
                       const monthlyPrice = Number(m.monthly_price || m.monthlyPrice) || 0
                       return (
                         <tr key={m.key} style={{ borderBottom: '1px solid #1E2532' }}
@@ -251,7 +261,10 @@ export function AdminModulesPage() {
 
       {editingModule && (
         <PriceModal module={editingModule} onClose={() => setEditingModule(null)}
-          onSaved={() => { qc.invalidateQueries({ queryKey: ['admin-module-catalogue'] }); showToast(`Price updated for ${editingModule.name}`) }} />
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ['admin-module-catalogue'] })
+            showToast(`Price updated for ${editingModule.name}`)
+          }} />
       )}
 
       {toast && (

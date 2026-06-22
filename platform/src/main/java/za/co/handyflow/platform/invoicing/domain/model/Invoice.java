@@ -92,31 +92,74 @@ public class Invoice {
     @Column(name = "walkin_client_phone")
     private String walkinClientPhone;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "invoice_type", nullable = false)
+    private InvoiceType invoiceType = InvoiceType.STANDARD;
+
+    /**
+     * For RECURRING_INSTANCE invoices — links back to the schedule that created
+     * this invoice.  Null for STANDARD and RETAINER invoices.
+     */
+    @Column(name = "recurring_schedule_id")
+    private UUID recurringScheduleId;
+
+    /**
+     * The minimum hours the client must pay for upfront before machine release.
+     * Only populated for RETAINER invoices.
+     */
+    @Column(name = "committed_hours", precision = 10, scale = 2)
+    private BigDecimal committedHours;
+
+    /** Rate charged per hour.  committedHours × ratePerHour = initial retainer amount. */
+    @Column(name = "rate_per_hour", precision = 12, scale = 2)
+    private BigDecimal ratePerHour;
+
+    /**
+     * Actual hours consumed so far (logged via POST /invoices/{id}/hours).
+     * Starts at 0; when hoursConsumed > committedHours the invoice becomes
+     * RETAINER_OVERAGE and a reconciliation invoice should be raised.
+     */
+    @Column(name = "hours_consumed", precision = 10, scale = 2)
+    private BigDecimal hoursConsumed = BigDecimal.ZERO;
+
+    @Column(name = "credit_amount", nullable = false)
+    private BigDecimal creditAmount = BigDecimal.ZERO;
+
     @Version
     private Long version;
 
-    public static Invoice createFromQuote(TenantId tenantId, UUID customerId,
-                                          UUID quoteId, String invoiceNumber,
-                                          BigDecimal subtotal, BigDecimal vatTotal,
-                                          BigDecimal total,
-                                          String walkinClientName,
-                                          String walkinClientEmail,
-                                          String walkinClientPhone) {
-        Invoice inv = new Invoice();
-        inv.tenantId = tenantId;
-        inv.customerId = customerId;
-        inv.quoteId = quoteId;
-        inv.invoiceNumber = invoiceNumber;
-        inv.status = InvoiceStatus.DRAFT;
-        inv.subtotal = subtotal;
-        inv.vatTotal = vatTotal;
-        inv.total = total;
-        inv.amountPaid = BigDecimal.ZERO;
-        inv.walkinClientName = walkinClientName;
+    public static Invoice createFromQuote(
+            TenantId tenantId,
+            UUID customerId,
+            UUID quoteId,
+            String invoiceNumber,
+            java.math.BigDecimal subtotal,
+            java.math.BigDecimal vatTotal,
+            java.math.BigDecimal total,
+            String walkinClientName,
+            String walkinClientEmail,
+            String walkinClientPhone
+    ) {
+        var inv = new Invoice();
+        inv.id               = java.util.UUID.randomUUID();
+        inv.tenantId         = tenantId;
+        inv.customerId       = customerId;
+        inv.quoteId          = quoteId;
+        inv.invoiceNumber    = invoiceNumber;
+        inv.invoiceType      = InvoiceType.STANDARD;
+        inv.subtotal         = subtotal;
+        inv.vatTotal         = vatTotal;
+        inv.total            = total;
+        inv.amountPaid       = java.math.BigDecimal.ZERO;
+        inv.creditAmount     = java.math.BigDecimal.ZERO;
+        inv.hoursConsumed    = java.math.BigDecimal.ZERO;
+        inv.status           = InvoiceStatus.DRAFT;
+        inv.currency         = "ZAR";
+        inv.walkinClientName  = walkinClientName;
         inv.walkinClientEmail = walkinClientEmail;
         inv.walkinClientPhone = walkinClientPhone;
-        inv.createdAt = Instant.now();
-        inv.updatedAt = Instant.now();
+        inv.createdAt        = java.time.Instant.now();
+        inv.updatedAt        = java.time.Instant.now();
         return inv;
     }
 
@@ -131,17 +174,27 @@ public class Invoice {
         this.updatedAt = Instant.now();
     }
 
-    public void recordPayment(BigDecimal amount, Instant paidDate) {
-        if (this.status == InvoiceStatus.CANCELLED)
+    public void recordPayment(BigDecimal amount, Instant paidAt) {
+        if (status == InvoiceStatus.CANCELLED) {
             throw new IllegalStateException("Cannot record payment on a cancelled invoice");
-        this.amountPaid = this.amountPaid.add(amount);
-        if (this.amountPaid.compareTo(this.total) >= 0) {
-            this.status  = InvoiceStatus.PAID;
-            this.paidAt  = paidDate != null ? paidDate : Instant.now();
-        } else {
-            this.status = InvoiceStatus.PARTIALLY_PAID;
         }
-        this.updatedAt = Instant.now();
+        // Always accumulate — supports multiple partial payments
+        this.amountPaid = (this.amountPaid == null ? BigDecimal.ZERO : this.amountPaid).add(amount);
+        this.paidAt     = paidAt;
+
+        int cmp = this.amountPaid.compareTo(this.total);
+
+        if (cmp < 0) {
+            this.status      = InvoiceStatus.PARTIALLY_PAID;
+            this.creditAmount = BigDecimal.ZERO;
+        } else if (cmp == 0) {
+            this.status      = InvoiceStatus.PAID;
+            this.creditAmount = BigDecimal.ZERO;
+        } else {
+            // amountPaid > total
+            this.status       = InvoiceStatus.OVERPAID;
+            this.creditAmount = this.amountPaid.subtract(this.total);
+        }
     }
 
     public void markIssued() {
@@ -150,6 +203,137 @@ public class Invoice {
             this.issuedAt = Instant.now();
             this.updatedAt = Instant.now();
         }
+    }
+
+    /**
+     * Creates an upfront / retainer invoice.
+     *
+     * The initial total is committedHours × ratePerHour (+ VAT).
+     * Line items are added separately (one line for the committed hours block
+     * is conventional, but callers can add more).
+     */
+    public static Invoice createRetainer(
+            TenantId tenantId,
+            UUID customerId,
+            String invoiceNumber,
+            String title,
+            java.math.BigDecimal committedHours,
+            java.math.BigDecimal ratePerHour,
+            String walkinClientName,
+            String walkinClientEmail,
+            String walkinClientPhone
+    ) {
+        var inv = new Invoice();
+        inv.id               = java.util.UUID.randomUUID();
+        inv.tenantId         = tenantId;
+        inv.customerId       = customerId;
+        inv.invoiceNumber    = invoiceNumber;
+        inv.title            = title;
+        inv.invoiceType      = InvoiceType.RETAINER;
+        inv.committedHours   = committedHours;
+        inv.ratePerHour      = ratePerHour;
+        inv.hoursConsumed    = java.math.BigDecimal.ZERO;
+        inv.creditAmount     = java.math.BigDecimal.ZERO;
+        inv.amountPaid       = java.math.BigDecimal.ZERO;
+        inv.subtotal         = java.math.BigDecimal.ZERO;
+        inv.vatTotal         = java.math.BigDecimal.ZERO;
+        inv.total            = java.math.BigDecimal.ZERO;
+        inv.status           = InvoiceStatus.DRAFT;
+        inv.currency         = "ZAR";
+        inv.walkinClientName  = walkinClientName;
+        inv.walkinClientEmail = walkinClientEmail;
+        inv.walkinClientPhone = walkinClientPhone;
+        inv.createdAt        = java.time.Instant.now();
+        inv.updatedAt        = java.time.Instant.now();
+        return inv;
+    }
+
+    /** Factory for invoices spawned by a recurring schedule. */
+    public static Invoice createFromSchedule(
+            TenantId tenantId,
+            UUID customerId,
+            UUID scheduleId,
+            String invoiceNumber,
+            String title,
+            java.math.BigDecimal subtotal,
+            java.math.BigDecimal vatTotal,
+            java.math.BigDecimal total,
+            String walkinClientName,
+            String walkinClientEmail,
+            String walkinClientPhone
+    ) {
+        var inv = new Invoice();
+        inv.id                  = java.util.UUID.randomUUID();
+        inv.tenantId            = tenantId;
+        inv.customerId          = customerId;
+        inv.recurringScheduleId = scheduleId;
+        inv.invoiceNumber       = invoiceNumber;
+        inv.title               = title;
+        inv.invoiceType         = InvoiceType.RECURRING_INSTANCE;
+        inv.subtotal            = subtotal;
+        inv.vatTotal            = vatTotal;
+        inv.total               = total;
+        inv.amountPaid          = java.math.BigDecimal.ZERO;
+        inv.creditAmount        = java.math.BigDecimal.ZERO;
+        inv.hoursConsumed       = java.math.BigDecimal.ZERO;
+        inv.status              = InvoiceStatus.DRAFT;
+        inv.currency            = "ZAR";
+        inv.walkinClientName    = walkinClientName;
+        inv.walkinClientEmail   = walkinClientEmail;
+        inv.walkinClientPhone   = walkinClientPhone;
+        inv.createdAt           = java.time.Instant.now();
+        inv.updatedAt           = java.time.Instant.now();
+        return inv;
+    }
+
+// ── Hours logging behaviour ───────────────────────────────────────────────────
+
+    /**
+     * Log consumed hours against a retainer invoice.
+     * Returns true if this tips the invoice into overage (consumed > committed).
+     */
+    public boolean logHours(BigDecimal hours) {
+        if (invoiceType != InvoiceType.RETAINER) {
+            throw new IllegalStateException("Cannot log hours on a non-retainer invoice");
+        }
+        this.hoursConsumed = this.hoursConsumed.add(hours);
+        return committedHours != null && hoursConsumed.compareTo(committedHours) > 0;
+    }
+
+    public BigDecimal getRemainingHours() {
+        if (committedHours == null) return BigDecimal.ZERO;
+        return committedHours.subtract(hoursConsumed).max(BigDecimal.ZERO);
+    }
+
+    public boolean isOverage() {
+        return committedHours != null && hoursConsumed.compareTo(committedHours) > 0;
+    }
+
+    // ── Totals recalculation ──────────────────────────────────────────────────
+
+    /**
+     * Recomputes subtotal, vatTotal, and total from the current line items.
+     *
+     * WHY a manual recalculate rather than @Formula or @Transient computed fields?
+     * Line items are added one at a time and the invoice is saved once after all
+     * items are attached.  Computed DB formulas would require a flush/reload cycle
+     * after every addLineItem() call.  Explicit recalculation keeps the entity
+     * self-contained and testable without a DB round-trip.
+     */
+    public void recalculateTotals() {
+        this.subtotal = lineItems.stream()
+                .map(InvoiceLineItem::getLineTotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        this.vatTotal = lineItems.stream()
+                .map(InvoiceLineItem::getVatAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        this.total = this.subtotal.add(this.vatTotal);
+    }
+
+    public BigDecimal getCreditAmount() {
+        return creditAmount != null ? creditAmount : BigDecimal.ZERO;
     }
 
     @PreUpdate

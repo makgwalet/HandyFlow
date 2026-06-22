@@ -1,199 +1,211 @@
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { BarChart2, TrendingUp, TrendingDown, Scale } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { BarChart2, TrendingUp, TrendingDown, Minus } from "lucide-react"
 
-interface ReportLine {
-  accountCode: string
-  accountName: string
-  amount: number
+type ReportType = "profit-and-loss" | "balance-sheet" | "trial-balance"
+
+interface ReportLine { accountCode: string; accountName: string; amount: number; grossDebit?: number; grossCredit?: number }
+interface ReportSection { title: string; lines: ReportLine[]; total: number }
+interface Report { reportType: string; fromDate: string; toDate: string; sections: ReportSection[]; netResult: number }
+
+const fmtR = (n: number) => n == null ? "—" : `R ${(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
+const inp: React.CSSProperties = {
+  padding: "8px 12px", border: "1.5px solid #E2E8F0",
+  borderRadius: 8, fontSize: 13, outline: "none",
 }
 
-interface ReportSection {
-  title: string
-  lines: ReportLine[]
-  total: number
+const REPORT_CONFIG = {
+  "profit-and-loss": { label: "Profit & Loss",  icon: TrendingUp,  color: "#0D9488", path: "profit-and-loss" },
+  "balance-sheet":   { label: "Balance Sheet",  icon: Scale,       color: "#1B3A6B", path: "balance-sheet"  },
+  "trial-balance":   { label: "Trial Balance",  icon: BarChart2,   color: "#7C3AED", path: "trial-balance"  },
 }
 
-interface Report {
-  reportType: string
-  fromDate: string
-  toDate: string
-  sections: ReportSection[]
-  netResult: number
-}
-
-type ReportType = "profit-and-loss" | "trial-balance"
-
-const getDefaultDates = () => {
-  const now = new Date()
-  const from = new Date(now.getFullYear(), 0, 1).toISOString().split("T")[0]  // Jan 1 this year
-  const to   = now.toISOString().split("T")[0]
-  return { from, to }
-}
+const now = new Date()
+const DEFAULT_FROM = `${now.getFullYear()}-01-01`
+const DEFAULT_TO   = now.toISOString().split("T")[0]
 
 export default function ReportsTab() {
-  const defaults = getDefaultDates()
   const [reportType, setReportType] = useState<ReportType>("profit-and-loss")
-  const [from, setFrom] = useState(defaults.from)
-  const [to, setTo]     = useState(defaults.to)
-  const [run, setRun]   = useState(false)
+  const [from, setFrom] = useState(DEFAULT_FROM)
+  const [to,   setTo]   = useState(DEFAULT_TO)
+  const [run,  setRun]  = useState(false)
 
-  const { data: report, isLoading, refetch } = useQuery<Report>({
-    queryKey: ["report", reportType, from, to],
-    queryFn: async () => {
-      const res = await apiClient.get(`/api/v1/accounting/reports/${reportType}?from=${from}&to=${to}`)
-      return res.data
-    },
-    enabled: run,
-  })
+  const [report, setReport] = useState<Report | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isError, setIsError] = useState(false)
 
-  const handleRun = () => {
+  const handleRun = async () => {
+    setIsLoading(true)
+    setIsError(false)
     setRun(true)
-    refetch()
+    try {
+      const res = await apiClient.get(`/api/v1/accounting/reports/${reportType}?from=${from}&to=${to}`)
+      setReport((res.data?.data ?? res.data) as Report)
+    } catch {
+      setIsError(true)
+      setReport(null)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const fmtR = (n: number) => {
-    if (n == null) return "R 0.00"
-    const abs = Math.abs(n)
-    const formatted = `R ${abs.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
-    return n < 0 ? `(${formatted})` : formatted
-  }
-
-  const netColor = (report?.netResult ?? 0) >= 0 ? "#166534" : "#DC2626"
-  const NetIcon  = (report?.netResult ?? 0) >= 0 ? TrendingUp : TrendingDown
+  const config = REPORT_CONFIG[reportType]
+  const Icon   = config.icon
 
   return (
     <div>
       {/* Controls */}
-      <div style={{ display: "flex", gap: 12, alignItems: "flex-end", marginBottom: 24, flexWrap: "wrap" }}>
+      <div style={{ background: "white", border: "1px solid #E2E8F0", borderRadius: 12,
+        padding: 20, marginBottom: 20, display: "flex", gap: 16, alignItems: "flex-end", flexWrap: "wrap" }}>
+        {/* Report type picker */}
         <div>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 6 }}>REPORT TYPE</label>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Report</label>
           <div style={{ display: "flex", gap: 6 }}>
-            {(["profit-and-loss", "trial-balance", "balance-sheet"] as ReportType[]).map(type => (
-              <button
-                key={type}
-                onClick={() => { setReportType(type); setRun(false) }}
-                style={{
-                  padding: "8px 16px", borderRadius: 7, fontSize: 13, cursor: "pointer",
-                  border: reportType === type ? "1px solid #1B3A6B" : "1px solid #E2E8F0",
-                  background: reportType === type ? "#1B3A6B" : "#fff",
-                  color: reportType === type ? "#fff" : "#64748B",
-                  fontWeight: reportType === type ? 600 : 400,
-                }}
-              >
-                {type === "profit-and-loss" ? "Profit & Loss"
-                  : type === "trial-balance" ? "Trial Balance"
-                  : "Balance Sheet"}
-              </button>
-            ))}
+            {(Object.keys(REPORT_CONFIG) as ReportType[]).map(k => {
+              const c = REPORT_CONFIG[k]
+              const I = c.icon
+              return (
+                <button key={k} onClick={() => { setReportType(k); setRun(false) }}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
+                    borderRadius: 9, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                    background: reportType === k ? c.color : "#F1F5F9",
+                    color:      reportType === k ? "white"  : "#64748B" }}>
+                  <I size={13} />{c.label}
+                </button>
+              )
+            })}
           </div>
         </div>
         <div>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 6 }}>FROM</label>
-          <input type="date" value={from} onChange={e => { setFrom(e.target.value); setRun(false) }} style={dateInput} />
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>From</label>
+          <input type="date" value={from} onChange={e => { setFrom(e.target.value); setRun(false) }} style={inp} />
         </div>
         <div>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 6 }}>TO</label>
-          <input type="date" value={to} onChange={e => { setTo(e.target.value); setRun(false) }} style={dateInput} />
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>To</label>
+          <input type="date" value={to} onChange={e => { setTo(e.target.value); setRun(false) }} style={inp} />
         </div>
-        <button onClick={handleRun} style={{ padding: "9px 20px", background: "#0D9488", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+        <button onClick={handleRun}
+          style={{ padding: "8px 20px", background: config.color, color: "white", border: "none",
+            borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
           Run Report
         </button>
       </div>
 
-      {/* Empty state */}
-      {!run && !isLoading && (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
-          <BarChart2 size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>Select a report type and date range</div>
-          <div style={{ fontSize: 14, marginTop: 4 }}>Click Run Report to generate financial statements.</div>
-        </div>
-      )}
-
-      {isLoading && (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Generating report...</div>
-      )}
+      {isLoading && <div style={{ padding: 60, textAlign: "center", color: "#94A3B8" }}>Generating report...</div>}
+      {isError   && <div style={{ padding: 60, textAlign: "center", color: "#DC2626" }}>Failed to load report — check your date range.</div>}
 
       {report && !isLoading && (
-        <div>
+        <div style={{ background: "white", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
           {/* Report header */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, padding: "16px 20px", background: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
+          <div style={{ background: config.color, padding: "20px 28px", display: "flex",
+            justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>
-                {report.reportType === "PROFIT_AND_LOSS" ? "Profit & Loss Statement" : "Trial Balance"}
-              </h3>
-              <div style={{ fontSize: 13, color: "#64748B" }}>
-                Period: {report.fromDate} to {report.toDate}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Icon size={18} color="white" />
+                <span style={{ fontSize: 18, fontWeight: 800, color: "white" }}>{config.label}</span>
+              </div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", marginTop: 3 }}>
+                {new Date(report.fromDate).toLocaleDateString("en-ZA")} to {new Date(report.toDate).toLocaleDateString("en-ZA")}
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 2 }}>
-                {report.reportType === "PROFIT_AND_LOSS" ? "NET PROFIT / LOSS" : "NET BALANCE"}
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginBottom: 2 }}>
+                {reportType === "profit-and-loss" ? "Net Profit" : reportType === "trial-balance" ? "Net Difference" : "Liabilities + Equity"}
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
-                <NetIcon size={18} color={netColor} />
-                <span style={{ fontSize: 22, fontWeight: 700, color: netColor }}>{fmtR(report.netResult)}</span>
+              <div style={{ fontSize: 24, fontWeight: 800, color: report.netResult >= 0 ? "#4ADE80" : "#F87171" }}>
+                {fmtR(report.netResult)}
               </div>
             </div>
           </div>
 
           {/* Sections */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {report.sections?.map((section, si) => (
-              <div key={si} style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden" }}>
-                <div style={{ padding: "12px 18px", background: "#1B3A6B", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontWeight: 700, fontSize: 13, color: "#fff", letterSpacing: "0.04em" }}>{section.title}</span>
-                  <span style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>{fmtR(section.total)}</span>
-                </div>
+          {report.sections.map(section => (
+            <div key={section.title}>
+              <div style={{ padding: "14px 28px 8px", background: "#F8FAFC",
+                borderBottom: "1px solid #F1F5F9", borderTop: "1px solid #F1F5F9" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  {section.title}
+                </span>
+              </div>
 
-                {section.lines?.length > 0 ? (
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <tbody>
-                      {section.lines.map((line, li) => (
-                        <tr key={li} style={{ background: li % 2 === 0 ? "#fff" : "#FAFAFA" }}>
-                          <td style={{ padding: "9px 18px", fontSize: 12, color: "#64748B", fontFamily: "monospace", width: 80 }}>{line.accountCode}</td>
-                          <td style={{ padding: "9px 18px", fontSize: 13, color: "#0F172A" }}>{line.accountName}</td>
-                          <td style={{ padding: "9px 18px", fontSize: 13, fontWeight: 500, textAlign: "right", color: line.amount < 0 ? "#DC2626" : "#0F172A" }}>
-                            {fmtR(line.amount)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr style={{ borderTop: "2px solid #E2E8F0", background: "#F8FAFC" }}>
-                        <td colSpan={2} style={{ padding: "10px 18px", fontWeight: 700, color: "#0F172A", fontSize: 13 }}>
-                          Total {section.title}
+              {/* Trial balance: show gross debit/credit columns */}
+              {reportType === "trial-balance" ? (
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ background: "#F8FAFC" }}>
+                      <th style={{ textAlign: "left", padding: "8px 28px", fontSize: 11, fontWeight: 700, color: "#94A3B8" }}>Code</th>
+                      <th style={{ textAlign: "left", padding: "8px 0", fontSize: 11, fontWeight: 700, color: "#94A3B8" }}>Account</th>
+                      <th style={{ textAlign: "right", padding: "8px 28px 8px 0", fontSize: 11, fontWeight: 700, color: "#1B3A6B" }}>Debit</th>
+                      <th style={{ textAlign: "right", padding: "8px 28px 8px 0", fontSize: 11, fontWeight: 700, color: "#0D9488" }}>Credit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {section.lines.map((line, i) => (
+                      <tr key={i} style={{ borderBottom: "1px solid #F8FAFC" }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "#F8FAFC")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "white")}>
+                        <td style={{ padding: "10px 28px", fontFamily: "monospace", fontSize: 12, color: "#64748B" }}>{line.accountCode}</td>
+                        <td style={{ padding: "10px 0", fontSize: 13, color: "#374151" }}>{line.accountName}</td>
+                        <td style={{ padding: "10px 28px 10px 0", textAlign: "right", fontSize: 13, fontWeight: 600,
+                          color: (line.grossDebit ?? 0) > 0 ? "#1B3A6B" : "#94A3B8" }}>
+                          {(line.grossDebit ?? 0) > 0 ? fmtR(line.grossDebit ?? 0) : "—"}
                         </td>
-                        <td style={{ padding: "10px 18px", fontWeight: 700, color: "#0F172A", fontSize: 14, textAlign: "right" }}>
-                          {fmtR(section.total)}
+                        <td style={{ padding: "10px 28px 10px 0", textAlign: "right", fontSize: 13, fontWeight: 600,
+                          color: (line.grossCredit ?? 0) > 0 ? "#0D9488" : "#94A3B8" }}>
+                          {(line.grossCredit ?? 0) > 0 ? fmtR(line.grossCredit ?? 0) : "—"}
                         </td>
                       </tr>
-                    </tfoot>
-                  </table>
-                ) : (
-                  <div style={{ padding: "14px 18px", color: "#94A3B8", fontSize: 13 }}>No transactions in this period.</div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Net result footer */}
-          <div style={{ marginTop: 16, padding: "16px 20px", background: netColor === "#166534" ? "#DCFCE7" : "#FEF2F2", borderRadius: 10, border: `1px solid ${netColor === "#166534" ? "#86EFAC" : "#FECACA"}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <NetIcon size={20} color={netColor} />
-              <span style={{ fontWeight: 700, fontSize: 15, color: netColor }}>
-                {report.reportType === "PROFIT_AND_LOSS"
-                  ? ((report.netResult ?? 0) >= 0 ? "Net Profit" : "Net Loss")
-                  : "Net Balance"}
-              </span>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ borderTop: "2px solid #E2E8F0", background: "#F8FAFC" }}>
+                      <td colSpan={2} style={{ padding: "10px 28px", fontWeight: 700, color: "#0F172A" }}>Total</td>
+                      <td style={{ padding: "10px 28px 10px 0", textAlign: "right", fontWeight: 700, color: "#1B3A6B" }}>
+                        {fmtR(section.lines.reduce((s, l) => s + (l.grossDebit ?? 0), 0))}
+                      </td>
+                      <td style={{ padding: "10px 28px 10px 0", textAlign: "right", fontWeight: 700, color: "#0D9488" }}>
+                        {fmtR(section.lines.reduce((s, l) => s + (l.grossCredit ?? 0), 0))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              ) : (
+                <>
+                  {section.lines.map((line, i) => (
+                    <div key={i}
+                      style={{ display: "flex", justifyContent: "space-between", padding: "10px 28px",
+                        borderBottom: "1px solid #F8FAFC" }}
+                      onMouseEnter={e => (e.currentTarget.style.background = "#F8FAFC")}
+                      onMouseLeave={e => (e.currentTarget.style.background = "white")}>
+                      <div style={{ display: "flex", gap: 14 }}>
+                        <span style={{ fontFamily: "monospace", fontSize: 12, color: "#94A3B8", minWidth: 50 }}>{line.accountCode}</span>
+                        <span style={{ fontSize: 13, color: "#374151" }}>{line.accountName}</span>
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: line.amount >= 0 ? "#0F172A" : "#DC2626" }}>
+                        {fmtR(line.amount)}
+                      </span>
+                    </div>
+                  ))}
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 28px",
+                    borderTop: "2px solid #E2E8F0", background: "#F8FAFC" }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>Total {section.title}</span>
+                    <span style={{ fontSize: 15, fontWeight: 800, color: config.color }}>{fmtR(section.total)}</span>
+                  </div>
+                </>
+              )}
             </div>
-            <span style={{ fontWeight: 700, fontSize: 20, color: netColor }}>{fmtR(report.netResult)}</span>
-          </div>
+          ))}
+        </div>
+      )}
+
+      {!run && !isLoading && (
+        <div style={{ padding: 60, textAlign: "center", color: "#94A3B8", background: "white",
+          border: "1px solid #E2E8F0", borderRadius: 12 }}>
+          <BarChart2 size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
+          <div style={{ fontWeight: 600, color: "#475569", marginBottom: 4 }}>Select a report and date range</div>
+          <div style={{ fontSize: 13 }}>Click Run Report to generate your financial statement.</div>
         </div>
       )}
     </div>
   )
 }
-
-const dateInput: React.CSSProperties = { padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 13, background: "#fff" }

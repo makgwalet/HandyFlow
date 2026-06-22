@@ -15,9 +15,11 @@ import java.util.UUID;
 public class ClinicPractitioner {
 
     @Id UUID id;
-    @Column(name = "tenant_id") UUID tenantId;
-    @Column(name = "first_name") String firstName;
-    @Column(name = "last_name")  String lastName;
+    @Column(name = "tenant_id")       UUID   tenantId;
+    @Column(name = "first_name")      String firstName;
+    @Column(name = "last_name")       String lastName;
+    @Column(name = "full_name", insertable = false, updatable = false)
+    String fullName;
     String specialty;
     @Column(name = "hpcsa_number")    String hpcsaNumber;
     @Column(name = "practice_number") String practiceNumber;
@@ -27,12 +29,13 @@ public class ClinicPractitioner {
     @Column(name = "created_at") Instant createdAt;
     @Column(name = "updated_at") Instant updatedAt;
     @Column(name = "deleted_at") Instant deletedAt;
-    @Column(name = "deleted_by") UUID deletedBy;
+    @Column(name = "deleted_by") UUID    deletedBy;
     @Version long version;
 
-    public static ClinicPractitioner create(TenantId tenantId, String firstName,
-                                            String lastName, String specialty,
-                                            String hpcsaNumber, String practiceNumber,
+    public static ClinicPractitioner create(TenantId tenantId,
+                                            String firstName, String lastName,
+                                            String specialty, String hpcsaNumber,
+                                            String practiceNumber,
                                             String phone, String email) {
         ClinicPractitioner p = new ClinicPractitioner();
         p.id             = UUID.randomUUID();

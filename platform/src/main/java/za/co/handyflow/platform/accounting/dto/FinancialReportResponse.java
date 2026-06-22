@@ -20,6 +20,13 @@ public record FinancialReportResponse(
     public record ReportLine(
             String accountCode,
             String accountName,
-            BigDecimal amount
-    ) {}
+            BigDecimal amount,         // net amount (debit - credit)
+            BigDecimal grossDebit,     // trial balance gross debit column (null for P&L / BS)
+            BigDecimal grossCredit     // trial balance gross credit column (null for P&L / BS)
+    ) {
+        // Convenience constructor for P&L and Balance Sheet (no gross columns needed)
+        public ReportLine(String accountCode, String accountName, BigDecimal amount) {
+            this(accountCode, accountName, amount, null, null);
+        }
+    }
 }

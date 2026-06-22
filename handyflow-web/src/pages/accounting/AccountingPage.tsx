@@ -2,7 +2,7 @@
 import { useState } from "react"
 import {
   BookOpen, GitBranch, Landmark, BarChart2,
-  FileText, TrendingUp, Users, LayoutDashboard,
+  FileText, Users, LayoutDashboard,
 } from "lucide-react"
 import ChartOfAccountsTab from "./ChartOfAccountsTab"
 import JournalEntriesTab from "./JournalEntriesTab"
@@ -10,18 +10,20 @@ import BankAccountsTab from "./BankAccountsTab"
 import ReportsTab from "./ReportsTab"
 import VatReturnsTab from "./VatReturnsTab"
 import AgingTab from "./AgingTab"
-import AccountingDashboard from "./AccountingDashboard"
+import AccountantDashboard from "../accountant/AccountantDashboard"
+import DashboardTab from "./AccountingDashboard"
+
 
 type Tab = "dashboard" | "accounts" | "journal" | "bank" | "reports" | "vat" | "aging"
 
 const tabs = [
-  { id: "dashboard" as Tab, label: "Dashboard",          icon: LayoutDashboard },
-  { id: "accounts"  as Tab, label: "Chart of Accounts",  icon: BookOpen },
-  { id: "journal"   as Tab, label: "Journal Entries",    icon: GitBranch },
-  { id: "bank"      as Tab, label: "Bank Accounts",      icon: Landmark },
-  { id: "reports"   as Tab, label: "Reports",            icon: BarChart2 },
-  { id: "vat"       as Tab, label: "VAT Returns",        icon: FileText },
-  { id: "aging"     as Tab, label: "AR / AP Aging",      icon: Users },
+  { id: "dashboard" as Tab, label: "Dashboard",         icon: LayoutDashboard },
+  { id: "accounts"  as Tab, label: "Chart of Accounts", icon: BookOpen },
+  { id: "journal"   as Tab, label: "Journal Entries",   icon: GitBranch },
+  { id: "bank"      as Tab, label: "Bank Accounts",     icon: Landmark },
+  { id: "reports"   as Tab, label: "Reports",           icon: BarChart2 },
+  { id: "vat"       as Tab, label: "VAT Returns",       icon: FileText },
+  { id: "aging"     as Tab, label: "AR / AP Aging",     icon: Users },
 ]
 
 export function AccountingPage() {
@@ -43,8 +45,7 @@ export function AccountingPage() {
         <div style={{
           display: "flex", gap: 2, flexWrap: "wrap",
           borderBottom: "1px solid #E2E8F0",
-          marginBottom: 28, paddingBottom: 0,
-          overflowX: "auto",
+          marginBottom: 28, overflowX: "auto",
         }}>
           {tabs.map(tab => {
             const Icon = tab.icon
@@ -69,7 +70,7 @@ export function AccountingPage() {
           })}
         </div>
 
-        {activeTab === "dashboard" && <AccountingDashboard onNavigate={setActiveTab} />}
+        {activeTab === "dashboard" && <DashboardTab />}
         {activeTab === "accounts"  && <ChartOfAccountsTab />}
         {activeTab === "journal"   && <JournalEntriesTab />}
         {activeTab === "bank"      && <BankAccountsTab />}

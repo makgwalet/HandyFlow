@@ -8,6 +8,7 @@ import za.co.handyflow.platform.identity.TenantFacade;
 import za.co.handyflow.platform.identity.domain.repository.TenantRepository;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -34,5 +35,27 @@ class TenantFacadeImpl implements TenantFacade {
                         t.getBankBranch(),
                         t.getPaymentTerms()
                 ));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TenantDetails> findAllActive() {
+        return tenantRepository.findAll().stream()
+                .map(t -> new TenantDetails(
+                        t.getId(),
+                        t.getName(),
+                        t.getSlug(),
+                        t.getVatNumber(),
+                        t.getPhone(),
+                        t.getEmail(),
+                        t.getAddress(),
+                        t.getLogoUrl(),
+                        t.getBankName(),
+                        t.getBankAccount(),
+                        t.getBankBranch(),
+                        t.getPaymentTerms()
+                ))
+                .filter(td -> td.email() != null && !td.email().isBlank())
+                .toList();
     }
 }

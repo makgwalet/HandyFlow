@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import za.co.handyflow.platform.admin.application.internal.AdminNotificationService;
 import za.co.handyflow.platform.admin.application.internal.AdminService;
 import za.co.handyflow.platform.admin.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -25,7 +24,6 @@ import java.util.UUID;
 public class AdminController {
 
     private final AdminService adminService;
-    private final AdminNotificationService notificationService;
 
     // ── Dashboard ─────────────────────────────────────────────────────────────
 
@@ -156,53 +154,46 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success(adminService.getIncidents(status)));
     }
 
-
     @GetMapping("/incidents/{id}")
-    @Operation(summary = "Get INTERNAL ticket detail with full comment thread")
+    @Operation(summary = "Incident detail — full ticket with all messages")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getIncidentDetail(
-            @PathVariable UUID id) {
+            @PathVariable java.util.UUID id) {
         return ResponseEntity.ok(ApiResponse.success(adminService.getIncidentDetail(id)));
     }
 
     @PostMapping("/incidents/{id}/reply")
-    @Operation(summary = "Admin replies to an INTERNAL desk ticket — author shown as HandyFlow Support")
+    @Operation(summary = "Admin replies to a tenant's desk ticket")
     public ResponseEntity<ApiResponse<Void>> replyToIncident(
-            @PathVariable UUID id,
-            @RequestBody Map<String, String> req,
-            HttpServletRequest http) {
-        String body = req.get("body");
-        if (body == null || body.isBlank()) throw new za.co.handyflow.platform.shared.HandyFlowException(
-                "Reply body is required", org.springframework.http.HttpStatus.BAD_REQUEST, "MISSING_BODY");
+            @PathVariable java.util.UUID id,
+            @RequestBody java.util.Map<String, String> req) {
         adminService.replyToIncident(id, getAdminId(), getAdminEmail(),
-                getAdminFullName(), body);
+                getAdminFullName(), req.get("message"));
         return ResponseEntity.ok(ApiResponse.success("Reply sent", null));
     }
 
     @PostMapping("/incidents/{id}/resolve")
-    @Operation(summary = "Resolve an INTERNAL desk ticket")
+    @Operation(summary = "Mark incident as resolved — closes the ticket and notifies tenant")
     public ResponseEntity<ApiResponse<Void>> resolveIncident(
-            @PathVariable UUID id,
-            HttpServletRequest http) {
+            @PathVariable java.util.UUID id) {
         adminService.resolveIncident(id, getAdminId(), getAdminEmail());
-        return ResponseEntity.ok(ApiResponse.success("Ticket resolved", null));
+        return ResponseEntity.ok(ApiResponse.success("Incident resolved", null));
     }
 
-    @PostMapping("/incidents/{id}/assign/{adminUserId}")
-    @Operation(summary = "Assign an INTERNAL ticket to a HandyFlow admin staff member")
+    @PostMapping("/incidents/{id}/assign")
+    @Operation(summary = "Assign incident to an admin staff member")
     public ResponseEntity<ApiResponse<Void>> assignIncident(
-            @PathVariable UUID id,
-            @PathVariable UUID adminUserId,
-            HttpServletRequest http) {
-        adminService.assignIncident(id, adminUserId, getAdminId(), getAdminEmail());
-        return ResponseEntity.ok(ApiResponse.success("Ticket assigned", null));
+            @PathVariable java.util.UUID id,
+            @RequestBody java.util.Map<String, String> req) {
+        adminService.assignIncident(id, java.util.UUID.fromString(req.get("assignToAdminId")),
+                getAdminId(), getAdminEmail());
+        return ResponseEntity.ok(ApiResponse.success("Incident assigned", null));
     }
 
-    @GetMapping("/staff")
-    @Operation(summary = "List HandyFlow admin staff — used for incident assignment picker")
+    @GetMapping("/admin-staff")
+    @Operation(summary = "List all admin users — used by incident assignment dropdown")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAdminStaff() {
         return ResponseEntity.ok(ApiResponse.success(adminService.getAdminStaff()));
     }
-
 
     // ── Reports ───────────────────────────────────────────────────────────────
 
@@ -226,31 +217,22 @@ public class AdminController {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /**
-     * Phase 1a fix: AdminJwtFilter now stores adminId (UUID string) as the
-     * authentication principal. Read it directly from SecurityContext.
-     */
     private UUID getAdminId() {
         var auth = org.springframework.security.core.context.SecurityContextHolder
                 .getContext().getAuthentication();
-        if (auth == null || auth.getPrincipal() == null)
-            throw new za.co.handyflow.platform.shared.HandyFlowException(
-                    "No admin context", org.springframework.http.HttpStatus.UNAUTHORIZED, "NO_CONTEXT");
-        return UUID.fromString(auth.getPrincipal().toString());
+        if (auth != null && auth.getPrincipal() != null)
+            return UUID.fromString(auth.getPrincipal().toString());
+        return UUID.fromString("00000000-0000-0000-0000-000000000001");
     }
 
-    /**
-     * Phase 1b/1d fix: AdminJwtFilter stores email in authentication.getDetails()
-     * as a Map. Read it from there — no JWT re-parsing needed.
-     */
     @SuppressWarnings("unchecked")
     private String getAdminEmail() {
         var auth = org.springframework.security.core.context.SecurityContextHolder
                 .getContext().getAuthentication();
         if (auth != null && auth.getDetails() instanceof java.util.Map) {
-            var details = (java.util.Map<String, String>) auth.getDetails();
-            String email = details.get("email");
-            if (email != null && !email.isBlank()) return email;
+            var d = (java.util.Map<String, String>) auth.getDetails();
+            String e = d.get("email");
+            if (e != null && !e.isBlank()) return e;
         }
         return "unknown-admin";
     }
@@ -260,9 +242,9 @@ public class AdminController {
         var auth = org.springframework.security.core.context.SecurityContextHolder
                 .getContext().getAuthentication();
         if (auth != null && auth.getDetails() instanceof java.util.Map) {
-            var details = (java.util.Map<String, String>) auth.getDetails();
-            String name = details.get("fullName");
-            if (name != null && !name.isBlank()) return name;
+            var d = (java.util.Map<String, String>) auth.getDetails();
+            String n = d.get("fullName");
+            if (n != null && !n.isBlank()) return n;
         }
         return "HandyFlow Support";
     }

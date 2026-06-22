@@ -1,140 +1,217 @@
-// src/pages/accounting/VatReturnsTab.tsx
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { FileText, Plus, X, CheckCircle, AlertCircle } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { FileText, AlertCircle, CheckCircle } from "lucide-react"
 
-const fmtR = (n: number) => `R ${(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
+interface VatPeriod { id: string; periodStart: string; periodEnd: string; status: string
+  outputVat: number; inputVat: number; vatPayable: number }
+interface Vat201 { from: string; to: string; invoiceCount: number; totalSales: number
+  outputVat: number; inputVat: number; netVatPayable: number }
+
+const fmtR  = (n: number) => `R ${(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
+const fmtDt = (d: string) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
+const inp: React.CSSProperties = {
+  width: "100%", padding: "8px 12px", border: "1.5px solid #E2E8F0",
+  borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box",
+}
+
+const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
+  OPEN:      { bg: "#F0FDF4", color: "#166534" },
+  CLOSED:    { bg: "#F1F5F9", color: "#475569" },
+  SUBMITTED: { bg: "#EFF6FF", color: "#1D4ED8" },
+}
 
 export default function VatReturnsTab() {
-  const now = new Date()
-  const [from, setFrom] = useState(`${now.getFullYear()}-01-01`)
-  const [to, setTo]     = useState(now.toISOString().split("T")[0])
-  const [run, setRun]   = useState(false)
+  const qc = useQueryClient()
+  const [showCreate, setShowCreate] = useState(false)
+  const [selectedPeriod, setSelectedPeriod] = useState<VatPeriod | null>(null)
+  const [form, setForm] = useState({ periodStart: "", periodEnd: "" })
+  const [vatFrom, setVatFrom] = useState("")
+  const [vatTo,   setVatTo]   = useState("")
+  const [error, setError] = useState("")
 
-  // Fetch paid invoices for output VAT
-  const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ["invoices-vat", from, to],
+  const { data: periods = [], isLoading } = useQuery<VatPeriod[]>({
+    queryKey: ["vat-periods"],
     queryFn: async () => {
-      const res = await apiClient.get("/api/v1/invoicing/invoices?size=500")
-      const payload = res.data?.data ?? res.data
-      return (payload.content ?? payload) as any[]
+      const res = await apiClient.get("/api/v1/accounting/vat-periods")
+      return (res.data?.data ?? res.data) as VatPeriod[]
     },
-    enabled: run,
   })
 
-  // Calculate VAT201 fields
-  const periodInvoices = invoices.filter(inv => {
-    const issued = inv.issuedAt ?? inv.createdAt
-    return issued >= from && issued <= to
+  const { data: vat201, isLoading: vatLoading, refetch: runVat201 } = useQuery<Vat201>({
+    queryKey: ["vat201", vatFrom, vatTo],
+    enabled: false,
+    queryFn: async () => {
+      const res = await apiClient.get(`/api/v1/accounting/reports/vat201?from=${vatFrom}&to=${vatTo}`)
+      return (res.data?.data ?? res.data) as Vat201
+    },
   })
 
-  const outputVat  = periodInvoices.filter(i => ["ISSUED", "PARTIALLY_PAID", "PAID", "OVERDUE"].includes(i.status))
-                                   .reduce((s: number, i: any) => s + (i.vatTotal ?? 0), 0)
-  const salesTotal = periodInvoices.reduce((s: number, i: any) => s + (i.subtotal ?? 0), 0)
-  const vatPayable = outputVat // In future: subtract input VAT from journal entries
+  const create = useMutation({
+    mutationFn: () => apiClient.post("/api/v1/accounting/vat-periods", form),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["vat-periods"] }); setShowCreate(false); setError("") },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to create VAT period"),
+  })
 
-  const fields = [
-    { code: "Field 1",  label: "Total Sales (excl. VAT)",    value: fmtR(salesTotal),  note: "All taxable supplies" },
-    { code: "Field 4",  label: "Output VAT (15% on sales)",  value: fmtR(outputVat),   note: "VAT charged on invoices" },
-    { code: "Field 14", label: "Input VAT (claimable)",      value: "R 0.00",           note: "Add via journal entries — coming soon" },
-    { code: "Field 20", label: "Net VAT Payable to SARS",    value: fmtR(vatPayable),  note: "Fields 4 minus Field 14", highlight: true },
-  ]
+  const close = useMutation({
+    mutationFn: (id: string) => apiClient.post(`/api/v1/accounting/vat-periods/${id}/close`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["vat-periods"] }); setSelectedPeriod(null) },
+  })
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 12, alignItems: "flex-end", marginBottom: 24, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 6 }}>PERIOD FROM</label>
-          <input type="date" value={from} onChange={e => { setFrom(e.target.value); setRun(false) }}
-            style={{ padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 13 }} />
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#0F172A", margin: 0 }}>VAT Returns</h2>
+          <p style={{ fontSize: 12, color: "#94A3B8", margin: "3px 0 0" }}>
+            SARS VAT201 — manage periods, capture output/input VAT from invoices and journals
+          </p>
         </div>
-        <div>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 6 }}>PERIOD TO</label>
-          <input type="date" value={to} onChange={e => { setTo(e.target.value); setRun(false) }}
-            style={{ padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 13 }} />
-        </div>
-        <button onClick={() => setRun(true)}
-          style={{ padding: "9px 20px", background: "#7C3AED", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-          Calculate VAT201
+        <button onClick={() => { setShowCreate(true); setError("") }}
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "#7C3AED", color: "white",
+            border: "none", borderRadius: 9, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          <Plus size={14} /> New VAT Period
         </button>
       </div>
 
-      {!run ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
-          <FileText size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>Select a VAT period</div>
-          <div style={{ fontSize: 14, marginTop: 4 }}>Typically bi-monthly for most SA businesses.</div>
+      {/* VAT201 Calculator */}
+      <div style={{ background: "white", border: "1px solid #DDD6FE", borderRadius: 12,
+        padding: 20, marginBottom: 20 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#7C3AED", marginBottom: 12 }}>
+          VAT201 Calculator
         </div>
-      ) : isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Calculating VAT...</div>
-      ) : (
-        <div>
-          {/* VAT201 form layout */}
-          <div style={{ background: "#F5F3FF", border: "1px solid #DDD6FE", borderRadius: 12, padding: 20, marginBottom: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-              <FileText size={16} color="#7C3AED" />
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#6D28D9" }}>VAT201 Summary — {from} to {to}</span>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {fields.map(f => (
-                <div key={f.code} style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                  padding: "12px 16px", borderRadius: 8,
-                  background: f.highlight ? "#7C3AED" : "#fff",
-                  border: `1px solid ${f.highlight ? "#7C3AED" : "#E2E8F0"}`,
-                }}>
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: f.highlight ? "rgba(255,255,255,0.7)" : "#94A3B8", letterSpacing: "0.05em" }}>{f.code}</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: f.highlight ? "#fff" : "#0F172A" }}>{f.label}</div>
-                    <div style={{ fontSize: 11, color: f.highlight ? "rgba(255,255,255,0.6)" : "#94A3B8", marginTop: 2 }}>{f.note}</div>
-                  </div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: f.highlight ? "#fff" : "#0F172A" }}>{f.value}</div>
-                </div>
-              ))}
-            </div>
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 5 }}>From</label>
+            <input type="date" value={vatFrom} onChange={e => setVatFrom(e.target.value)} style={{ ...inp, width: "auto" }} />
           </div>
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 5 }}>To</label>
+            <input type="date" value={vatTo} onChange={e => setVatTo(e.target.value)} style={{ ...inp, width: "auto" }} />
+          </div>
+          <button disabled={!vatFrom || !vatTo || vatLoading}
+            onClick={() => runVat201()}
+            style={{ padding: "8px 18px", background: "#7C3AED", color: "white",
+              border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            {vatLoading ? "Calculating..." : "Calculate VAT201"}
+          </button>
+        </div>
 
-          {/* Invoice breakdown */}
-          <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden" }}>
-            <div style={{ padding: "12px 18px", background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>
-                Invoices in period ({periodInvoices.length})
-              </span>
-            </div>
-            {periodInvoices.length === 0 ? (
-              <div style={{ padding: "24px", textAlign: "center", color: "#94A3B8", fontSize: 13 }}>No invoices in this period.</div>
-            ) : (
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ background: "#F8FAFC" }}>
-                    {["Invoice #", "Status", "Subtotal", "VAT", "Total"].map(h => (
-                      <th key={h} style={{ padding: "9px 16px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#64748B", textTransform: "uppercase" as const }}>{h}</th>
-                    ))}
+        {vat201 && (
+          <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+            {[
+              { label: "Total Sales (excl VAT)", value: fmtR(vat201.totalSales), sub: `${vat201.invoiceCount} invoices`, color: "#1B3A6B" },
+              { label: "Output VAT (Box 4)", value: fmtR(vat201.outputVat), sub: "VAT charged on sales", color: "#0D9488" },
+              { label: "Input VAT (Box 15)", value: fmtR(vat201.inputVat), sub: "VAT claimable on purchases", color: "#7C3AED" },
+              { label: "Net VAT Payable (Box 17)", value: fmtR(vat201.netVatPayable), sub: vat201.netVatPayable >= 0 ? "Payable to SARS" : "Refund from SARS",
+                color: vat201.netVatPayable >= 0 ? "#DC2626" : "#166534" },
+            ].map(k => (
+              <div key={k.label} style={{ background: "#F5F3FF", borderRadius: 8, padding: "12px 14px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#7C3AED", textTransform: "uppercase",
+                  letterSpacing: "0.05em", marginBottom: 4 }}>{k.label}</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: k.color }}>{k.value}</div>
+                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>{k.sub}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* VAT Periods */}
+      <div style={{ background: "white", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ padding: "12px 20px", background: "#F8FAFC", borderBottom: "1px solid #F1F5F9" }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>VAT Periods</span>
+        </div>
+        {isLoading ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#94A3B8" }}>Loading...</div>
+        ) : periods.length === 0 ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#94A3B8" }}>No VAT periods — create one to start.</div>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #F1F5F9" }}>
+                {["Period", "Output VAT", "Input VAT", "Net Payable", "Status", "Actions"].map(h => (
+                  <th key={h} style={{ textAlign: "left", padding: "9px 16px", fontSize: 11,
+                    fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {periods.map(p => {
+                const ss = STATUS_STYLE[p.status] ?? STATUS_STYLE.OPEN
+                return (
+                  <tr key={p.id} style={{ borderBottom: "1px solid #F8FAFC" }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "#F8FAFC")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "white")}>
+                    <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
+                      {fmtDt(p.periodStart)} – {fmtDt(p.periodEnd)}
+                    </td>
+                    <td style={{ padding: "12px 16px", fontSize: 13, color: "#0D9488", fontWeight: 600 }}>{fmtR(p.outputVat)}</td>
+                    <td style={{ padding: "12px 16px", fontSize: 13, color: "#7C3AED", fontWeight: 600 }}>{fmtR(p.inputVat)}</td>
+                    <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700,
+                      color: p.vatPayable >= 0 ? "#DC2626" : "#166534" }}>{fmtR(p.vatPayable)}</td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <span style={{ background: ss.bg, color: ss.color, fontSize: 11,
+                        fontWeight: 700, padding: "3px 10px", borderRadius: 10 }}>{p.status}</span>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      {p.status === "OPEN" && (
+                        <button onClick={() => close.mutate(p.id)}
+                          style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px",
+                            background: "#F0FDF4", color: "#166534", border: "1px solid #BBF7D0",
+                            borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                          <CheckCircle size={11} /> Close Period
+                        </button>
+                      )}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {periodInvoices.map((inv: any, i: number) => (
-                    <tr key={inv.id} style={{ borderBottom: "1px solid #F1F5F9", background: i % 2 === 0 ? "#fff" : "#FAFAFA" }}>
-                      <td style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{inv.invoiceNumber}</td>
-                      <td style={{ padding: "10px 16px" }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: inv.status === "PAID" ? "#DCFCE7" : "#FEF3C7", color: inv.status === "PAID" ? "#166534" : "#92400E" }}>
-                          {inv.status}
-                        </span>
-                      </td>
-                      <td style={{ padding: "10px 16px", fontSize: 13, color: "#374151" }}>{fmtR(inv.subtotal)}</td>
-                      <td style={{ padding: "10px 16px", fontSize: 13, color: "#7C3AED" }}>{fmtR(inv.vatTotal)}</td>
-                      <td style={{ padding: "10px 16px", fontSize: 14, fontWeight: 700, color: "#0F172A" }}>{fmtR(inv.total)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
 
-          <div style={{ marginTop: 16, padding: "12px 16px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 8, display: "flex", gap: 8, fontSize: 13, color: "#92400E" }}>
-            <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-            <span>Input VAT from purchase invoices and expenses is not yet automatically calculated. Add input VAT amounts via Journal Entries to account code <strong>1300 — VAT Input</strong> to reduce your VAT payable.</span>
+      {/* Create VAT Period Modal */}
+      {showCreate && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex",
+          alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
+          <div style={{ background: "white", borderRadius: 16, padding: 28, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>New VAT Period</h3>
+              <button onClick={() => setShowCreate(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={18} /></button>
+            </div>
+            <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 5 }}>Period Start *</label>
+                <input type="date" value={form.periodStart}
+                  onChange={e => setForm(p => ({ ...p, periodStart: e.target.value }))} style={inp} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 5 }}>Period End *</label>
+                <input type="date" value={form.periodEnd}
+                  onChange={e => setForm(p => ({ ...p, periodEnd: e.target.value }))} style={inp} />
+              </div>
+            </div>
+            <div style={{ padding: "10px 14px", background: "#F5F3FF", borderRadius: 8, fontSize: 12,
+              color: "#7C3AED", marginBottom: 16 }}>
+              Only one OPEN period is allowed at a time. Close the current period before opening a new one.
+            </div>
+            {error && (
+              <div style={{ padding: "8px 12px", background: "#FEF2F2", borderRadius: 8,
+                fontSize: 12, color: "#DC2626", marginBottom: 12 }}>{error}</div>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={() => setShowCreate(false)}
+                style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "white", fontSize: 13, cursor: "pointer", color: "#374151" }}>Cancel</button>
+              <button disabled={create.isPending || !form.periodStart || !form.periodEnd}
+                onClick={() => create.mutate()}
+                style={{ padding: "9px 20px", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700,
+                  background: "#7C3AED", color: "white", cursor: "pointer" }}>
+                {create.isPending ? "Creating..." : "Create Period"}
+              </button>
+            </div>
           </div>
         </div>
       )}

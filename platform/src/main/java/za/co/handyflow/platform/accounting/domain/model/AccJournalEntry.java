@@ -74,6 +74,15 @@ public class AccJournalEntry {
         this.updatedAt = Instant.now();
     }
 
+    public void markReversed(String reversalEntryNumber) {
+        if (!"POSTED".equals(this.status))
+            throw new IllegalStateException("Only POSTED entries can be marked reversed");
+        this.status = "REVERSED";
+        this.reference = (this.reference != null ? this.reference + " | " : "")
+                + "Reversed by: " + reversalEntryNumber;
+        this.updatedAt = java.time.Instant.now();
+    }
+
     public boolean isBalanced() {
         return totalDebit.compareTo(totalCredit) == 0;
     }

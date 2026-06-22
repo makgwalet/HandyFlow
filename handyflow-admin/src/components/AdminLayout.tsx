@@ -7,6 +7,7 @@ import {
   FileText, BarChart2, LogOut, Shield, ChevronDown,
   Bell, Package, ScrollText, Menu, X,
   Database,
+  UserPlus,
 } from 'lucide-react'
 import { AdminNotificationBell } from './AdminNotificationBell'
 
@@ -20,6 +21,7 @@ const NAV = [
   { path: '/reports',    label: 'Reports',       icon: BarChart2       },
   { path: '/audit',      label: 'Audit Log',     icon: ScrollText      },
   { path: '/lookups', label: 'Lookups',           icon: Database },
+  { path: '/onboarding', label: 'Onboarding', icon: UserPlus },
 ]
 
 export function AdminLayout() {

@@ -7,9 +7,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.accounting.application.internal.AccountingReportPdfService;
 import za.co.handyflow.platform.accounting.application.internal.AccountingService;
 import za.co.handyflow.platform.accounting.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -22,10 +25,11 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/accounting")
 @RequiredArgsConstructor
-@Tag(name = "Accounting", description = "Chart of accounts, journal entries, bank accounts and financial reports")
+@Tag(name = "Accounting", description = "Chart of accounts, journals, bank accounts, VAT, reports")
 public class AccountingController {
 
     private final AccountingService accountingService;
+    private final AccountingReportPdfService reportPdfService;
 
     // ── Chart of Accounts ─────────────────────────────────────────────────────
 
@@ -50,7 +54,7 @@ public class AccountingController {
 
     @GetMapping("/journal-entries")
     @PreAuthorize("hasAuthority('USER_READ')")
-    @Operation(summary = "List journal entries, optionally filter by status (DRAFT | POSTED)")
+    @Operation(summary = "List journal entries (optionally filter by status: DRAFT | POSTED | REVERSED)")
     public ResponseEntity<ApiResponse<Page<JournalEntryResponse>>> getJournalEntries(
             @RequestParam(required = false) String status, Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -59,7 +63,7 @@ public class AccountingController {
 
     @PostMapping("/journal-entries")
     @PreAuthorize("hasAuthority('USER_READ')")
-    @Operation(summary = "Create a double-entry journal entry (must balance: debits = credits)")
+    @Operation(summary = "Create a double-entry journal entry (must balance: total debits = total credits)")
     public ResponseEntity<ApiResponse<JournalEntryResponse>> createJournalEntry(
             @Valid @RequestBody CreateJournalEntryRequest req) {
         return ResponseEntity.status(201).body(ApiResponse.success("Journal entry created",
@@ -75,6 +79,17 @@ public class AccountingController {
                 accountingService.postJournalEntry(TenantContext.getTenantIdAsObject(), id)));
     }
 
+    @PostMapping("/journal-entries/{id}/reverse")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Reverse a POSTED journal entry — creates equal-and-opposite entry dated today (or supplied date)")
+    public ResponseEntity<ApiResponse<JournalEntryResponse>> reverseJournalEntry(
+            @PathVariable UUID id,
+            @RequestBody(required = false) ReverseJournalRequest req) {
+        LocalDate reversalDate = req != null ? req.reversalDate() : null;
+        return ResponseEntity.ok(ApiResponse.success("Journal entry reversed",
+                accountingService.reverseJournalEntry(TenantContext.getTenantIdAsObject(), id, reversalDate)));
+    }
+
     // ── Bank Accounts ─────────────────────────────────────────────────────────
 
     @GetMapping("/bank-accounts")
@@ -87,11 +102,20 @@ public class AccountingController {
 
     @PostMapping("/bank-accounts")
     @PreAuthorize("hasAuthority('USER_READ')")
-    @Operation(summary = "Register a bank account")
+    @Operation(summary = "Register a new bank account")
     public ResponseEntity<ApiResponse<BankAccountResponse>> createBankAccount(
             @Valid @RequestBody CreateBankAccountRequest req) {
         return ResponseEntity.status(201).body(ApiResponse.success("Bank account added",
                 accountingService.createBankAccount(TenantContext.getTenantIdAsObject(), req)));
+    }
+
+    @GetMapping("/bank-accounts/{id}/transactions")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "List transactions for a bank account (paginated, newest first)")
+    public ResponseEntity<ApiResponse<Page<BankTransactionResponse>>> getBankTransactions(
+            @PathVariable UUID id, Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                accountingService.getBankTransactions(TenantContext.getTenantIdAsObject(), id, pageable)));
     }
 
     @PostMapping("/bank-accounts/{id}/transactions")
@@ -102,6 +126,44 @@ public class AccountingController {
             @Valid @RequestBody AddBankTransactionRequest req) {
         return ResponseEntity.status(201).body(ApiResponse.success("Transaction recorded",
                 accountingService.addTransaction(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    // ── VAT ───────────────────────────────────────────────────────────────────
+
+    @GetMapping("/vat-periods")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "List VAT periods")
+    public ResponseEntity<ApiResponse<List<VatPeriodResponse>>> getVatPeriods() {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                accountingService.getVatPeriods(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/vat-periods")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Open a new VAT period (only one OPEN period allowed at a time)")
+    public ResponseEntity<ApiResponse<VatPeriodResponse>> createVatPeriod(
+            @Valid @RequestBody CreateVatPeriodRequest req) {
+        return ResponseEntity.status(201).body(ApiResponse.success("VAT period created",
+                accountingService.createVatPeriod(TenantContext.getTenantIdAsObject(),
+                        req.periodStart(), req.periodEnd())));
+    }
+
+    @PostMapping("/vat-periods/{id}/close")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Close an open VAT period")
+    public ResponseEntity<ApiResponse<VatPeriodResponse>> closeVatPeriod(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("VAT period closed",
+                accountingService.closeVatPeriod(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/reports/vat201")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "VAT201 summary — output VAT, input VAT, net payable for a date range")
+    public ResponseEntity<ApiResponse<Vat201Response>> getVat201(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                accountingService.getVat201(TenantContext.getTenantIdAsObject(), from, to)));
     }
 
     // ── Financial Reports ─────────────────────────────────────────────────────
@@ -118,7 +180,7 @@ public class AccountingController {
 
     @GetMapping("/reports/trial-balance")
     @PreAuthorize("hasAuthority('USER_READ')")
-    @Operation(summary = "Trial balance for a date range")
+    @Operation(summary = "Trial balance with gross debit and credit columns for a date range")
     public ResponseEntity<ApiResponse<FinancialReportResponse>> getTrialBalance(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
@@ -128,11 +190,84 @@ public class AccountingController {
 
     @GetMapping("/reports/balance-sheet")
     @PreAuthorize("hasAuthority('USER_READ')")
-    @Operation(summary = "Balance sheet as at a date")
+    @Operation(summary = "Balance sheet as at a date (includes opening balances)")
     public ResponseEntity<ApiResponse<FinancialReportResponse>> getBalanceSheet(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return ResponseEntity.ok(ApiResponse.success("Success",
                 accountingService.getBalanceSheet(TenantContext.getTenantIdAsObject(), from, to)));
+    }
+
+    @GetMapping("/reports/ar-aging")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Aged debtors report — outstanding invoices bucketed by days overdue")
+    public ResponseEntity<ApiResponse<AgingReportResponse>> getArAging() {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                accountingService.getArAging(TenantContext.getTenantIdAsObject())));
+    }
+
+    @GetMapping("/reports/profit-and-loss/pdf")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Download Profit & Loss as PDF")
+    public ResponseEntity<byte[]> getProfitAndLossPdf(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        byte[] pdf = reportPdfService.generateProfitAndLoss(
+                TenantContext.getTenantIdAsObject(), from, to);
+        return pdfResponse(pdf, "profit-and-loss-" + from + "-to-" + to + ".pdf");
+    }
+
+    @GetMapping("/reports/balance-sheet/pdf")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Download Balance Sheet as PDF")
+    public ResponseEntity<byte[]> getBalanceSheetPdf(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        byte[] pdf = reportPdfService.generateBalanceSheet(
+                TenantContext.getTenantIdAsObject(), from, to);
+        return pdfResponse(pdf, "balance-sheet-" + from + "-to-" + to + ".pdf");
+    }
+
+    @GetMapping("/reports/trial-balance/pdf")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Download Trial Balance as PDF")
+    public ResponseEntity<byte[]> getTrialBalancePdf(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        byte[] pdf = reportPdfService.generateTrialBalance(
+                TenantContext.getTenantIdAsObject(), from, to);
+        return pdfResponse(pdf, "trial-balance-" + from + "-to-" + to + ".pdf");
+    }
+
+    @GetMapping("/reports/vat201/pdf")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Download VAT201 summary as PDF")
+    public ResponseEntity<byte[]> getVat201Pdf(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        byte[] pdf = reportPdfService.generateVat201(
+                TenantContext.getTenantIdAsObject(), from, to);
+        return pdfResponse(pdf, "vat201-" + from + "-to-" + to + ".pdf");
+    }
+
+    // ── Chart data endpoints ──────────────────────────────────────────────────
+
+    @GetMapping("/reports/monthly-summary")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Monthly revenue vs expenses for the last N months — used for dashboard charts")
+    public ResponseEntity<ApiResponse<List<MonthlySummaryResponse>>> getMonthlySummary(
+            @RequestParam(defaultValue = "6") int months) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                accountingService.getMonthlySummary(TenantContext.getTenantIdAsObject(), months)));
+    }
+
+    // ── Helper ────────────────────────────────────────────────────────────────
+
+    private ResponseEntity<byte[]> pdfResponse(byte[] pdf, String filename) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .contentLength(pdf.length)
+                .body(pdf);
     }
 }

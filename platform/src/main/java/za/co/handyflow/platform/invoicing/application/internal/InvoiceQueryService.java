@@ -1,3 +1,4 @@
+// invoicing/application/internal/InvoiceQueryService.java
 package za.co.handyflow.platform.invoicing.application.internal;
 
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,7 @@ import za.co.handyflow.platform.invoicing.dto.LineItemResponse;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -46,13 +48,39 @@ public class InvoiceQueryService {
                 )).toList();
 
         return new InvoiceResponse(
-                inv.getId(), inv.getInvoiceNumber(),
-                inv.getStatus().name(), inv.getCustomerId(),
-                inv.getQuoteId(), inv.getTitle(),
-                inv.getSubtotal(), inv.getVatTotal(),
-                inv.getTotal(), inv.getAmountPaid(),
-                inv.getCurrency(), inv.getDueDate(),
-                inv.getIssuedAt(), lineItems, inv.getCreatedAt()
+                // ── core ──────────────────────────────────────────────────
+                inv.getId(),
+                inv.getInvoiceNumber(),
+                inv.getStatus().name(),
+                inv.getCustomerId(),
+                inv.getQuoteId(),
+                inv.getTitle(),
+                inv.getSubtotal(),
+                inv.getVatTotal(),
+                inv.getTotal(),
+                inv.getAmountPaid(),
+                inv.getCurrency(),
+                inv.getDueDate(),
+                inv.getIssuedAt(),
+                lineItems,
+                inv.getCreatedAt(),
+                // ── type / recurring ──────────────────────────────────────
+                // WHY null-safe: existing invoices written before the migration
+                // will have invoiceType = null until Flyway sets DEFAULT 'STANDARD'.
+                // getInvoiceType() returns the enum; name() gives the String.
+                inv.getInvoiceType() != null ? inv.getInvoiceType().name() : "STANDARD",
+                inv.getRecurringScheduleId(),
+                // ── retainer / upfront-hours ──────────────────────────────
+                inv.getCommittedHours(),
+                inv.getRatePerHour(),
+                // hoursConsumed has a DB default of 0 so it is never null,
+                // but guard anyway for in-memory objects created before save.
+                inv.getHoursConsumed() != null ? inv.getHoursConsumed() : BigDecimal.ZERO,
+                inv.getCreditAmount(),
+                // ── walk-in ───────────────────────────────────────────────
+                inv.getWalkinClientName(),
+                inv.getWalkinClientEmail(),
+                inv.getWalkinClientPhone()
         );
     }
 }
