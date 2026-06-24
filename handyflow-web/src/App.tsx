@@ -38,6 +38,7 @@ import { AccountsPayablePage } from "./pages/ap/AccountsPayablePage"
 import { ProfilePage } from "./pages/settings/ProfilePage"
 import { CreateRecurringSchedulePage } from "./pages/invoicing/CreateRecurringSchedulePage"
 import { CreateRetainerPage } from "./pages/invoicing/CreateRetainerPage"
+import { SupplyChainPage } from "./pages/supply-chain/SupplyChainPage"
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -90,10 +91,11 @@ export default function App() {
             <Route path="/pos"         element={<PosPage />} />
             <Route path="/accountant" element={<AccountantPage />} />
             <Route path="/ap"         element={<AccountsPayablePage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/invoices/retainer/new" element={<CreateRetainerPage />} />
-            <Route path="/recurring/new"         element={<CreateRecurringSchedulePage />} />
-            <Route path="/recurring"             element={<InvoicingPage />} />
+            <Route path="/profile"                element={<ProfilePage />} />
+            <Route path="/invoices/retainer/new"  element={<CreateRetainerPage />} />
+            <Route path="/recurring/new"          element={<CreateRecurringSchedulePage />} />
+            <Route path="/recurring"              element={<InvoicingPage />} />
+            <Route path="/supply-chain"           element={<SupplyChainPage />} />
           </Route>
           <Route path="/sign/:token" element={<SigningPage />} />
           <Route path="/creative/approve/:token" element={<CreativeApprovePage />} />

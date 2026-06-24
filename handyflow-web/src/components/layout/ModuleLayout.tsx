@@ -7,32 +7,36 @@ import {
   HeartPulse, PartyPopper, FilePen, Wallet, Briefcase,
   Bell, User, Lock, LogOut, ChevronDown, X,
   Palette, Headphones, CheckSquare, Megaphone, UserCheck, ShoppingCart,
+  Truck, Receipt, UserCog,
 } from 'lucide-react'
 import { apiClient } from '../../api/client'
 import { useAuthStore } from '../../store/auth.store'
 
 const MODULE_REGISTRY: Record<string, { icon: React.ElementType; label: string; route: string }> = {
-  crm:         { icon: Users,         label: 'Customers',    route: '/customers'   },
-  invoicing:   { icon: FileText,      label: 'Invoices',     route: '/invoices'    },
-  catalogue:   { icon: Package,       label: 'Catalogue',    route: '/catalogue'   },
-  security:    { icon: Shield,        label: 'Security',     route: '/security'    },
-  fuel:        { icon: Fuel,          label: 'Fuel',         route: '/fuel'        },
-  earthmoving: { icon: HardHat,       label: 'Earthmoving',  route: '/earthmoving' },
-  property:    { icon: Building2,     label: 'Property',     route: '/property'    },
-  fleet:       { icon: Car,           label: 'Fleet',        route: '/fleet'       },
-  hr:          { icon: Briefcase,     label: 'HR & Payroll', route: '/hr'          },
-  accounting:  { icon: Calculator,    label: 'Accounting',   route: '/accounting'  },
-  bookings:    { icon: CalendarCheck, label: 'Bookings',     route: '/bookings'    },
-  clinic:      { icon: HeartPulse,    label: 'Clinic',       route: '/clinic'      },
-  events:      { icon: PartyPopper,   label: 'Events',       route: '/events'      },
-  contracting: { icon: FilePen,       label: 'Contracts',    route: '/contracts'   },
-  expenses:    { icon: Wallet,        label: 'Expenses',     route: '/expenses'    },
-  creative:    { icon: Palette,       label: 'Creative',     route: '/creative'    },
-  desk:        { icon: Headphones,    label: 'Desk',         route: '/desk'        },
-  tasks:       { icon: CheckSquare,   label: 'Tasks',        route: '/tasks'       },
-  marketing:   { icon: Megaphone,     label: 'Marketing',    route: '/marketing'   },
-  recruiter:   { icon: UserCheck,     label: 'Recruiter',    route: '/recruiter'   },
-  pos:         { icon: ShoppingCart,  label: 'POS & Stock',  route: '/pos'         },
+  crm:          { icon: Users,         label: 'Customers',    route: '/customers'    },
+  invoicing:    { icon: FileText,      label: 'Invoices',     route: '/invoices'     },
+  catalogue:    { icon: Package,       label: 'Catalogue',    route: '/catalogue'    },
+  security:     { icon: Shield,        label: 'Security',     route: '/security'     },
+  fuel:         { icon: Fuel,          label: 'Fuel',         route: '/fuel'         },
+  earthmoving:  { icon: HardHat,       label: 'Earthmoving',  route: '/earthmoving'  },
+  property:     { icon: Building2,     label: 'Property',     route: '/property'     },
+  fleet:        { icon: Car,           label: 'Fleet',        route: '/fleet'        },
+  hr:           { icon: Briefcase,     label: 'HR & Payroll', route: '/hr'           },
+  accounting:   { icon: Calculator,    label: 'Accounting',   route: '/accounting'   },
+  bookings:     { icon: CalendarCheck, label: 'Bookings',     route: '/bookings'     },
+  clinic:       { icon: HeartPulse,    label: 'Clinic',       route: '/clinic'       },
+  events:       { icon: PartyPopper,   label: 'Events',       route: '/events'       },
+  contracting:  { icon: FilePen,       label: 'Contracts',    route: '/contracts'    },
+  expenses:     { icon: Wallet,        label: 'Expenses',     route: '/expenses'     },
+  creative:     { icon: Palette,       label: 'Creative',     route: '/creative'     },
+  desk:         { icon: Headphones,    label: 'Desk',         route: '/desk'         },
+  tasks:        { icon: CheckSquare,   label: 'Tasks',        route: '/tasks'        },
+  marketing:    { icon: Megaphone,     label: 'Marketing',    route: '/marketing'    },
+  recruiter:    { icon: UserCheck,     label: 'Recruiter',    route: '/recruiter'    },
+  pos:          { icon: ShoppingCart,  label: 'POS & Stock',  route: '/pos'          },
+  supply_chain: { icon: Truck,         label: 'Supply Chain', route: '/supply-chain' },
+  ap:           { icon: Receipt,       label: 'Payables',     route: '/ap'           },
+  accountant:   { icon: UserCog,       label: 'Accountant',   route: '/accountant'   },
 }
 
 const STATIC_NAV = [
@@ -97,12 +101,14 @@ export function ModuleLayout() {
           style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '5px 10px', color: 'rgba(255,255,255,0.8)', fontSize: 12, cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}>
           <ChevronLeft size={13} /> Portal
         </button>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
           <div style={{ width: 26, height: 26, background: '#0D9488', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Building2 size={14} color="white" strokeWidth={2.5} />
           </div>
           <span style={{ color: 'white', fontWeight: 700, fontSize: 14 }}>HandyFlow</span>
         </div>
+
         <nav style={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, overflowX: 'auto', msOverflowStyle: 'none' as any }}>
           <style>{`nav::-webkit-scrollbar{display:none}`}</style>
           {allNav.map(({ icon: Icon, label, route, key }) => (
@@ -120,7 +126,9 @@ export function ModuleLayout() {
             </NavLink>
           ))}
         </nav>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          {/* Notifications */}
           <div ref={notifRef} style={{ position: 'relative' }}>
             <button onClick={() => { setNotifOpen(o => !o); setProfileOpen(false) }}
               style={{ position: 'relative', background: notifOpen ? 'rgba(255,255,255,0.12)' : 'none', border: 'none', cursor: 'pointer', padding: '7px', borderRadius: 8, display: 'flex', alignItems: 'center', color: 'rgba(255,255,255,0.7)' }}>
@@ -137,7 +145,10 @@ export function ModuleLayout() {
               </div>
             )}
           </div>
+
           <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.15)' }} />
+
+          {/* Profile */}
           <div ref={profileRef} style={{ position: 'relative' }}>
             <button onClick={() => { setProfileOpen(o => !o); setNotifOpen(false) }}
               style={{ display: 'flex', alignItems: 'center', gap: 7, background: profileOpen ? 'rgba(255,255,255,0.12)' : 'none', border: 'none', cursor: 'pointer', padding: '4px 8px 4px 4px', borderRadius: 8 }}>
@@ -147,6 +158,7 @@ export function ModuleLayout() {
               <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: 500 }}>{user?.firstName}</span>
               <ChevronDown size={12} color="rgba(255,255,255,0.4)" />
             </button>
+
             {profileOpen && (
               <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 230, background: 'white', border: '1px solid #E2E8F0', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.12)', zIndex: 200, overflow: 'hidden' }}>
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid #F1F5F9' }}>
@@ -155,9 +167,9 @@ export function ModuleLayout() {
                 </div>
                 <div style={{ padding: '4px 0' }}>
                   {[
-                    { icon: User,       label: 'Update profile',  fn: () => {} },
-                    { icon: Lock,       label: 'Change password', fn: () => {} },
-                    { icon: CreditCard, label: 'Billing & plan',  fn: () => { navigate('/billing'); setProfileOpen(false) } },
+                    { icon: User,       label: 'Update profile',  fn: () => { navigate('/profile');  setProfileOpen(false) } },
+                    { icon: Lock,       label: 'Change password', fn: () => { navigate('/profile');  setProfileOpen(false) } },
+                    { icon: CreditCard, label: 'Billing & plan',  fn: () => { navigate('/billing');  setProfileOpen(false) } },
                     { icon: Settings,   label: 'Settings',        fn: () => { navigate('/settings'); setProfileOpen(false) } },
                   ].map(item => (
                     <button key={item.label} onClick={item.fn}
@@ -181,6 +193,7 @@ export function ModuleLayout() {
           </div>
         </div>
       </header>
+
       <div style={{ padding: '28px 32px', maxWidth: 1200, margin: '0 auto' }}>
         <Outlet />
       </div>
