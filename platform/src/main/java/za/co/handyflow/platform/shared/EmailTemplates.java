@@ -593,4 +593,139 @@ public class EmailTemplates {
         );
     }
 
+    // ── Bookings module notifications ─────────────────────────────────────────
+
+    /**
+     * Sent to the client immediately after a booking is created (status = PENDING).
+     *
+     * WHY send on PENDING and not just CONFIRMED?
+     * The client should know their request was received even before a staff member
+     * confirms it.  This sets expectations and reduces "did it work?" calls to the
+     * business.  The confirmed email (below) follows once a staff member confirms.
+     *
+     * @param clientName   Client's display name
+     * @param bookingNumber e.g. BK-2026-00023
+     * @param serviceName  e.g. "Haircut & Style"
+     * @param date         e.g. "2026-07-15"
+     * @param startTime    e.g. "09:00"
+     * @param endTime      e.g. "10:00"
+     * @param price        e.g. "R 350.00"
+     */
+    public static String bookingCreated(String clientName, String bookingNumber,
+                                        String serviceName, String date,
+                                        String startTime, String endTime,
+                                        String price) {
+        String priceRow = (price != null && !price.isBlank())
+                ? "<br/>Price: <strong>" + org.springframework.web.util.HtmlUtils.htmlEscape(price) + "</strong>"
+                : "";
+        return wrap("""
+            <p>Hi <strong>%s</strong>,</p>
+            <p>We have received your booking request. Here are the details:</p>
+            <div class="highlight">
+              <p><strong>%s</strong> &nbsp;&middot;&nbsp; %s<br/>
+                 Date: <strong>%s</strong><br/>
+                 Time: <strong>%s &ndash; %s</strong>%s</p>
+            </div>
+            <p>Your booking is currently <strong>pending confirmation</strong>.
+               You will receive another email once it is confirmed.</p>
+            <p style="color:#94A3B8;font-size:13px;">
+              If you need to cancel or change your booking, please contact us directly.
+            </p>
+            """.formatted(
+                org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(bookingNumber),
+                org.springframework.web.util.HtmlUtils.htmlEscape(serviceName),
+                date, startTime, endTime, priceRow));
+    }
+
+    /**
+     * Sent to the client when a staff member confirms the booking.
+     * This is the "you're in the calendar" email — the most important one.
+     */
+    public static String bookingConfirmed(String clientName, String bookingNumber,
+                                          String serviceName, String date,
+                                          String startTime, String endTime) {
+        return wrap("""
+            <p>Hi <strong>%s</strong>,</p>
+            <p>Great news — your booking has been <strong>confirmed</strong>!</p>
+            <div class="highlight-green">
+              <p>&#10003; &nbsp;<strong>%s</strong> &nbsp;&middot;&nbsp; %s<br/>
+                 Date: <strong>%s</strong><br/>
+                 Time: <strong>%s &ndash; %s</strong></p>
+            </div>
+            <p>Please arrive a few minutes early. If you need to reschedule or cancel,
+               contact us as soon as possible so we can offer the slot to another client.</p>
+            <p style="color:#94A3B8;font-size:13px;">
+              See you then!
+            </p>
+            """.formatted(
+                org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(bookingNumber),
+                org.springframework.web.util.HtmlUtils.htmlEscape(serviceName),
+                date, startTime, endTime));
+    }
+
+    /**
+     * Sent to the client when their booking is cancelled (by either party).
+     *
+     * WHY include the reason?
+     * Transparent communication reduces client frustration.  A "cancelled with
+     * no explanation" email damages trust.  Even a simple reason like "staff
+     * unavailability" is better than silence.
+     *
+     * @param reason  May be null — we render a generic message in that case.
+     */
+    public static String bookingCancelled(String clientName, String bookingNumber,
+                                          String serviceName, String date,
+                                          String reason) {
+        String reasonBlock = (reason != null && !reason.isBlank())
+                ? "<div class=\"highlight-red\"><p><strong>Reason:</strong> "
+                + org.springframework.web.util.HtmlUtils.htmlEscape(reason) + "</p></div>"
+                : "<p style=\"color:#94A3B8;font-size:13px;\">No specific reason was provided.</p>";
+        return wrap("""
+            <p>Hi <strong>%s</strong>,</p>
+            <p>We are sorry to inform you that the following booking has been <strong>cancelled</strong>:</p>
+            <div class="highlight-amber">
+              <p>%s &nbsp;&middot;&nbsp; %s<br/>
+                 Date: <strong>%s</strong></p>
+            </div>
+            %s
+            <p>We apologise for any inconvenience. Please contact us to reschedule
+               at a time that works for you.</p>
+            """.formatted(
+                org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(bookingNumber),
+                org.springframework.web.util.HtmlUtils.htmlEscape(serviceName),
+                date, reasonBlock));
+    }
+
+    /**
+     * Appointment reminder — sent the day before (or morning of) a confirmed booking.
+     * Called by a @Scheduled nightly job that checks bookings for tomorrow.
+     *
+     * WHY a separate reminder template?
+     * The confirmation email is sent at booking time — often days or weeks before
+     * the appointment.  The reminder is sent 24h before so the client doesn't forget.
+     * Two different emails for two different purposes.
+     */
+    public static String bookingReminder(String clientName, String serviceName,
+                                         String date, String startTime, String endTime) {
+        return wrap("""
+            <p>Hi <strong>%s</strong>,</p>
+            <p>This is a friendly reminder about your appointment <strong>tomorrow</strong>:</p>
+            <div class="highlight">
+              <p>&#128197; &nbsp;<strong>%s</strong><br/>
+                 Date: <strong>%s</strong><br/>
+                 Time: <strong>%s &ndash; %s</strong></p>
+            </div>
+            <p>Please arrive a few minutes before your scheduled time.
+               If you can no longer make it, please let us know as soon as possible.</p>
+            <p style="color:#94A3B8;font-size:13px;">
+              We look forward to seeing you!
+            </p>
+            """.formatted(
+                org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(serviceName),
+                date, startTime, endTime));
+    }
 }

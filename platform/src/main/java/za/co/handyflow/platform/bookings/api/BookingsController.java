@@ -10,6 +10,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.bookings.application.internal.BookingConfirmationPdfService;
 import za.co.handyflow.platform.bookings.application.internal.BookingsService;
 import za.co.handyflow.platform.bookings.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -25,7 +26,8 @@ import java.util.UUID;
 @Tag(name = "Bookings", description = "Appointment scheduling, availability and booking management")
 public class BookingsController {
 
-    private final BookingsService bookingsService;
+    private final BookingsService               bookingsService;
+    private final BookingConfirmationPdfService confirmationPdfService;
 
     // ── Services ──────────────────────────────────────────────────────────────
 
@@ -112,16 +114,22 @@ public class BookingsController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('USER_READ')")
-    @Operation(summary = "List bookings with optional status, date and staff filters")
+    @Operation(summary = "List bookings with optional status, date, date range, staff and search filters",
+            description = "Use `date` for single-day filtering (BookingsTab). Use `dateFrom`+`dateTo` for week-range filtering (CalendarTab). `date` takes precedence over `dateFrom`/`dateTo` if both are supplied.")
     public ResponseEntity<ApiResponse<Page<BookingResponse>>> getBookings(
             @RequestParam(required = false) String status,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
             @RequestParam(required = false) UUID staffId,
+            @RequestParam(required = false) String search,
             Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Success",
                 bookingsService.getBookings(TenantContext.getTenantIdAsObject(),
-                        status, date, staffId, pageable)));
+                        status, date, dateFrom, dateTo, staffId, search, pageable)));
     }
 
     @GetMapping("/{id}")
@@ -134,7 +142,7 @@ public class BookingsController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('USER_READ')")
-    @Operation(summary = "Create a new booking — checks slot availability automatically")
+    @Operation(summary = "Create a new booking — checks slot availability and lead time automatically")
     public ResponseEntity<ApiResponse<BookingResponse>> createBooking(
             @Valid @RequestBody CreateBookingRequest req) {
         return ResponseEntity.status(201).body(ApiResponse.success("Booking created",
@@ -182,5 +190,86 @@ public class BookingsController {
     public ResponseEntity<ApiResponse<BookingResponse>> noShow(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Marked as no-show",
                 bookingsService.markNoShow(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    /**
+     * Reschedule an existing booking to a new date and time.
+     *
+     * WHY POST and not PUT?
+     * PUT implies replacing the entire resource.  Reschedule is an action
+     * (verb) applied to the booking — it changes the slot but preserves
+     * the booking number, client, service, and audit history.
+     * POST /{id}/reschedule reads as "perform the reschedule action on booking {id}".
+     */
+    @PostMapping("/{id}/reschedule")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Reschedule a booking to a new date/time — preserves booking number and history")
+    public ResponseEntity<ApiResponse<BookingResponse>> reschedule(
+            @PathVariable UUID id,
+            @Valid @RequestBody RescheduleBookingRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Booking rescheduled",
+                bookingsService.rescheduleBooking(
+                        TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @GetMapping(value = "/{id}/confirmation.pdf", produces = "application/pdf")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Download booking confirmation as PDF",
+            description = "Re-downloadable confirmation PDF. Same content as the email attachment.")
+    public void downloadConfirmationPdf(
+            @PathVariable UUID id,
+            jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        var tenantId = TenantContext.getTenantIdAsObject();
+        var booking  = bookingsService.getBookingEntity(tenantId, id);
+        var pdf      = confirmationPdfService.generate(tenantId, booking);
+        var filename = "booking-confirmation-" + booking.getBookingNumber() + ".pdf";
+        response.setContentType("application/pdf");
+        response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+        response.setHeader("Cache-Control", "no-cache");
+        response.getOutputStream().write(pdf);
+    }
+
+    @PutMapping("/staff/{id}")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Update a staff member's name, email or phone")
+    public ResponseEntity<ApiResponse<StaffResponse>> updateStaff(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateStaffRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Staff updated",
+                bookingsService.updateStaff(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @DeleteMapping("/staff/{id}")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Deactivate a staff member")
+    public ResponseEntity<ApiResponse<Void>> deactivateStaff(@PathVariable UUID id) {
+        bookingsService.deactivateStaff(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok(ApiResponse.success("Staff deactivated", null));
+    }
+
+    @DeleteMapping("/services/{id}")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Soft-delete a booking service")
+    public ResponseEntity<ApiResponse<Void>> deleteService(@PathVariable UUID id) {
+        bookingsService.deleteService(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok(ApiResponse.success("Service deleted", null));
+    }
+
+    @GetMapping("/services/{id}/staff")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Get staff members assigned to a service")
+    public ResponseEntity<ApiResponse<List<UUID>>> getServiceStaff(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                bookingsService.getServiceStaff(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PutMapping("/services/{id}/staff")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Set which staff members can perform this service")
+    public ResponseEntity<ApiResponse<Void>> setServiceStaff(
+            @PathVariable UUID id,
+            @RequestBody List<UUID> staffIds) {
+        bookingsService.setServiceStaff(TenantContext.getTenantIdAsObject(), id, staffIds);
+        return ResponseEntity.ok(ApiResponse.success("Staff assignments updated", null));
     }
 }

@@ -24,7 +24,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/security/shifts")
 @RequiredArgsConstructor
-@Tag(name = "Security - Shifts", description = "Shift scheduling and management")
+@Tag(name = "Security - Shifts", description = "Shift scheduling and lifecycle management")
 public class ShiftController {
 
     private final ShiftService shiftService;
@@ -32,45 +32,71 @@ public class ShiftController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "List shifts — paginated, sorted by startAt DESC")
     public ResponseEntity<ApiResponse<Page<ShiftResponse>>> getShifts(
-            @PageableDefault(size = 20) Pageable pageable
-    ) {
+            @PageableDefault(size = 20) Pageable pageable) {
         featureGuard.requireModule("security");
-        var tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
-                shiftService.getShifts(tenantId, pageable)));
+                shiftService.getShifts(TenantContext.getTenantIdAsObject(), pageable)));
     }
 
     @PostMapping
     @PreAuthorize("hasAuthority('USER_CREATE')")
-    @Operation(summary = "Schedule a new shift — validates no overlapping shifts for guard")
+    @Operation(
+            summary = "Schedule a shift",
+            description = "Validates: guard is ACTIVE and schedulable, site belongs to this tenant, " +
+                    "no overlapping shifts for this guard."
+    )
     public ResponseEntity<ApiResponse<ShiftResponse>> createShift(
-            @Valid @RequestBody CreateShiftRequest request
-    ) {
+            @Valid @RequestBody CreateShiftRequest request) {
         featureGuard.requireModule("security");
-        var tenantId = TenantContext.getTenantIdAsObject();
-        var shift = shiftService.createShift(tenantId, request);
+        var shift = shiftService.createShift(TenantContext.getTenantIdAsObject(), request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Shift scheduled", shift));
     }
 
+    /**
+     * Fixes bug #4: PUT /shifts/{id} was missing.
+     * ShiftsTab.tsx called this endpoint on every "Edit Shift" save — it silently
+     * 404'd in production, meaning the edit modal appeared to work but made no change.
+     *
+     * Only mutable fields are accepted: notes and endAt (to extend overtime).
+     * Guard, site, and startAt cannot be changed — cancel and recreate instead.
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @Operation(
+            summary = "Update a shift (notes and/or extend end time)",
+            description = "Only notes and endAt can be updated. " +
+                    "Extending endAt is checked against other shifts for this guard."
+    )
+    public ResponseEntity<ApiResponse<ShiftResponse>> updateShift(
+            @PathVariable UUID id,
+            @RequestBody UpdateShiftRequest request) {
+        featureGuard.requireModule("security");
+        return ResponseEntity.ok(ApiResponse.success("Shift updated",
+                shiftService.updateShift(TenantContext.getTenantIdAsObject(), id, request)));
+    }
+
     @PostMapping("/{id}/start")
     @PreAuthorize("hasAuthority('USER_UPDATE')")
-    @Operation(summary = "Guard starts shift — status: SCHEDULED → ACTIVE")
+    @Operation(summary = "Guard starts shift — SCHEDULED → ACTIVE")
     public ResponseEntity<ApiResponse<ShiftResponse>> startShift(@PathVariable UUID id) {
         featureGuard.requireModule("security");
-        var tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success("Shift started",
-                shiftService.startShift(tenantId, id)));
+                shiftService.startShift(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @PostMapping("/{id}/complete")
     @PreAuthorize("hasAuthority('USER_UPDATE')")
-    @Operation(summary = "Guard completes shift — status: ACTIVE → COMPLETED")
+    @Operation(
+            summary = "Guard completes shift — ACTIVE → COMPLETED",
+            description = "Enforces minimum checkpoint scan count if configured on this shift " +
+                    "(minScanCount > 0). Fails with 409 if required scans haven't been recorded."
+    )
     public ResponseEntity<ApiResponse<ShiftResponse>> completeShift(@PathVariable UUID id) {
         featureGuard.requireModule("security");
-        var tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success("Shift completed",
-                shiftService.completeShift(tenantId, id)));
+                shiftService.completeShift(TenantContext.getTenantIdAsObject(), id)));
     }
 }

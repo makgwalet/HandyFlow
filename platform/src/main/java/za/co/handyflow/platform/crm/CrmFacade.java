@@ -1,8 +1,3 @@
-// ─── PATTERN 1: DIRECT CALL via Facade ───
-// When: Module A needs data from Module B synchronously
-// Example: InvoicingModule needs to verify a customer exists in CrmModule
-
-// In crm/application/CrmFacade.java (PUBLIC interface)
 package za.co.handyflow.platform.crm;
 
 import za.co.handyflow.platform.shared.TenantId;
@@ -11,19 +6,39 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * WHY AN INTERFACE FACADE?
+ * CrmFacade — public API of the CRM module.
  *
- * The Facade is the ONLY public entry point to a module's services.
- * Other modules depend on the INTERFACE (not the implementation).
+ * This interface lives in the MODULE ROOT package (not in application.internal).
+ * WHY? Because this is what other modules import.  The internal package
+ * contains implementation details that only CRM itself should see.
  *
- * This means:
- * 1. You can swap implementations without breaking callers
- * 2. The interface is the "contract" — it tells you exactly what
- *    this module offers to the outside world
- * 3. Easy to mock in tests
+ * RULE: Every method on this interface must return either:
+ * - A primitive/String/UUID (no domain objects crossing module boundaries)
+ * - A shared DTO (CustomerSummary is in the shared CRM public package)
+ * - void
+ *
+ * WHY? If BookingService received a Customer entity, it would depend on
+ * CRM's domain model.  Changes to Customer would then require changes in
+ * Bookings — that's tight coupling, the thing we're trying to avoid.
  */
 public interface CrmFacade {
-    Optional<CustomerSummary> findCustomerById(TenantId tenantId, UUID customerId);
-    boolean customerExists(TenantId tenantId, UUID customerId);
-}
 
+    /** Look up a customer visible to queries. Returns empty if not found or deleted. */
+    Optional<CustomerSummary> findCustomerById(TenantId tenantId, UUID customerId);
+
+    /** Quick existence check without loading the full entity. */
+    boolean customerExists(TenantId tenantId, UUID customerId);
+
+    /**
+     * Notify CRM that a booking was created for this customer.
+     * CRM records this on the customer's activity timeline.
+     * Called by BookingService after successfully persisting a booking.
+     */
+    void notifyBookingLinked(TenantId tenantId, UUID customerId, UUID bookingId, UUID triggeredBy);
+
+    /**
+     * Notify CRM that an invoice was raised for this customer.
+     * CRM records this on the customer's activity timeline.
+     */
+    void notifyInvoiceLinked(TenantId tenantId, UUID customerId, UUID invoiceId, UUID triggeredBy);
+}

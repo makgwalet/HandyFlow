@@ -42,6 +42,15 @@ public class Shift {
 
     private String notes;
 
+    /**
+     * Minimum checkpoint scans required before this shift can be marked COMPLETED.
+     * 0 = no enforcement (default, backward-compatible).
+     * Set > 0 at shift creation to enforce proof-of-patrol (fixes bug #17).
+     * Phase 1: derive from site.patrol_required_scans automatically.
+     */
+    @Column(name = "min_scan_count", nullable = false)
+    private int minScanCount = 0;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

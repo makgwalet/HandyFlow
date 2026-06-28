@@ -25,6 +25,8 @@ public class SiteService {
 
     private final SiteRepository siteRepository;
 
+    // ── Queries ───────────────────────────────────────────────────────────────
+
     @Transactional(readOnly = true)
     public Page<SiteResponse> getSites(TenantId tenantId, Pageable pageable) {
         return siteRepository.findAllActive(tenantId, pageable).map(this::toResponse);
@@ -37,13 +39,15 @@ public class SiteService {
                 .orElseThrow(() -> new ResourceNotFoundException("Site", id.toString()));
     }
 
+    // ── Commands ──────────────────────────────────────────────────────────────
+
     @Transactional
     public SiteResponse createSite(TenantId tenantId, CreateSiteRequest req) {
         Site site = Site.create(tenantId, req.customerId(), req.name(),
                 req.address(), req.latitude(), req.longitude(),
                 req.contactName(), req.contactPhone(), req.instructions());
         siteRepository.save(site);
-        log.info("Created site={} tenant={}", site.getName(), tenantId);
+        log.info("[Security] Created site='{}' tenant={}", site.getName(), tenantId);
         return toResponse(site);
     }
 
@@ -61,23 +65,48 @@ public class SiteService {
     }
 
     @Transactional
-    public void deleteSite(TenantId tenantId, UUID id) {
+    public void deleteSite(TenantId tenantId, UUID id, UUID deletedBy) {
         Site site = siteRepository.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Site", id.toString()));
-        site.softDelete(null);
+        // Fix bug #19 pattern: pass actor ID, not null
+        site.softDelete(deletedBy);
         siteRepository.save(site);
+        log.info("[Security] Soft-deleted site={} by={} tenant={}", id, deletedBy, tenantId);
     }
 
+    @Transactional
+    public SiteResponse terminateSite(TenantId tenantId, UUID id, String reason, UUID terminatedBy) {
+        Site site = siteRepository.findActiveById(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Site", id.toString()));
+        site.terminateContract(reason != null ? reason : "Contract ended");
+        siteRepository.save(site);
+        log.info("[Security] Contract terminated site={} by={} reason='{}' tenant={}",
+                id, terminatedBy, reason, tenantId);
+        return toResponse(site);
+    }
+
+    // ── Mappers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Maps a Site to SiteResponse.
+     *
+     * Fixes bug #9: terminatedAt was captured in Site.java (V48 migration added
+     * the column; Site.java has the field) but was never included in SiteResponse
+     * or the mapper.  Every API consumer was blind to WHEN a contract was terminated
+     * — only the reason was visible.  For audit and legal purposes, the timestamp
+     * is equally important.
+     */
     private SiteResponse toResponse(Site s) {
         return new SiteResponse(
                 s.getId(), s.getName(), s.getCustomerId(),
                 s.getAddress(), s.getLatitude(), s.getLongitude(),
                 s.getContactName(), s.getContactPhone(), s.isActive(),
-                List.of(),
+                List.of(),  // no checkpoints in list view — saves N+1 lazy loads
                 s.getContractStatus() != null ? s.getContractStatus() : "ACTIVE",
                 s.getContractStart(),
                 s.getContractEnd(),
                 s.getTerminationReason(),
+                s.getTerminatedAt(),     // ← bug #9 fix: was missing from all previous toResponse calls
                 s.getCreatedAt()
         );
     }
@@ -89,6 +118,7 @@ public class SiteService {
                         c.getId(), c.getName(), c.getDescription(),
                         c.getQrCode(), c.getSortOrder()
                 )).toList();
+
         return new SiteResponse(
                 s.getId(), s.getName(), s.getCustomerId(),
                 s.getAddress(), s.getLatitude(), s.getLongitude(),
@@ -98,18 +128,8 @@ public class SiteService {
                 s.getContractStart(),
                 s.getContractEnd(),
                 s.getTerminationReason(),
+                s.getTerminatedAt(),     // ← bug #9 fix
                 s.getCreatedAt()
         );
     }
-
-    @Transactional
-    public SiteResponse terminateSite(TenantId tenantId, UUID id, String reason) {
-        Site site = siteRepository.findActiveById(tenantId, id)
-                .orElseThrow(() -> new ResourceNotFoundException("Site", id.toString()));
-        site.terminateContract(reason != null ? reason : "Contract ended");
-        siteRepository.save(site);
-        log.info("Site contract terminated site={} tenant={}", id, tenantId);
-        return toResponse(site);
-    }
-
 }

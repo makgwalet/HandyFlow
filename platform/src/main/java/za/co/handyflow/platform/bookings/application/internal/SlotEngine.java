@@ -31,7 +31,10 @@ public class SlotEngine {
             DateTimeFormatter.ofPattern("HH:mm");
 
     public List<AvailableSlot> getAvailableSlots(TenantId tenantId, UUID staffId,
-                                                 LocalDate date, int durationMinutes) {
+                                                 LocalDate date, int durationMinutes,
+                                                 int bufferBeforeMinutes,
+                                                 int bufferAfterMinutes,
+                                                 int minLeadTimeMinutes) {
         // WHY get day of week as int matching our schema?
         // Java DayOfWeek: MONDAY=1 … SUNDAY=7
         // Our schema: 0=Sun, 1=Mon … 6=Sat
@@ -76,17 +79,29 @@ public class SlotEngine {
             boolean blocked = blocks.stream()
                     .anyMatch(b -> b.overlaps(slotStart, slotEnd));
 
-            // Check booking conflict
+            // Check booking conflict — extend slotEnd by bufferAfterMinutes so
+            // the cleanup window is also protected from new bookings
+            LocalTime effectiveEnd = slotEnd.plusMinutes(bufferAfterMinutes);
             List<Booking> conflicts = staffId != null
-                    ? bookingRepo.findConflicts(staffId, date, slotStart, slotEnd)
+                    ? bookingRepo.findConflicts(staffId, date, slotStart, effectiveEnd)
                     : List.of();
 
-            if (!blocked && conflicts.isEmpty()) {
+            // Lead time check — suppress slots that start too soon
+            boolean tooSoon = false;
+            if (minLeadTimeMinutes > 0 && date.equals(LocalDate.now())) {
+                LocalTime cutoff = LocalTime.now().plusMinutes(minLeadTimeMinutes);
+                tooSoon = slotStart.isBefore(cutoff);
+            }
+
+            if (!blocked && conflicts.isEmpty() && !tooSoon) {
                 String label = slotStart.format(TIME_FMT) + " – " + slotEnd.format(TIME_FMT);
                 slots.add(new AvailableSlot(slotStart, slotEnd, label));
             }
 
-            cursor = cursor.plusMinutes(SLOT_INTERVAL_MINUTES);
+            // Step by max(SLOT_INTERVAL, bufferBefore) so back-to-back slots
+            // respect prep time between appointments
+            int step = Math.max(SLOT_INTERVAL_MINUTES, bufferBeforeMinutes > 0 ? bufferBeforeMinutes : SLOT_INTERVAL_MINUTES);
+            cursor = cursor.plusMinutes(step);
         }
 
         log.debug("Found {} slots for staffId={} date={}", slots.size(), staffId, date);

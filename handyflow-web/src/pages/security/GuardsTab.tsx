@@ -1,19 +1,30 @@
 // src/pages/security/GuardsTab.tsx
-import { useState, useRef } from "react"
+// Changes from original:
+//   - Guard interface: add psiraExpiryDate, statusChangedAt, statusNote
+//   - Photo: show avatar fallback when photoUrl is null OR "PENDING_UPLOAD"
+//   - PSiRA expiry: compliance badge (red if expired, amber if <30 days)
+//   - Guard detail view: show statusChangedAt + statusNote
+//   - Status filter: already correct
+//   - PATCH /guards/{id}/status: already wired correctly
+
+import { useState, useRef, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import {
   Plus, Search, Shield, Phone, BadgeCheck, Trash2, X,
   Edit2, Eye, AlertCircle, Fingerprint, Upload,
-  CheckCircle, AlertTriangle, Clock, Ban, HelpCircle,
+  CheckCircle, AlertTriangle, Clock, Ban, HelpCircle, Calendar,
 } from "lucide-react"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface Guard {
   id: string; firstName: string; lastName: string; fullName: string
-  psiraNumber: string; idNumber: string; phone: string; grade: string
-  active: boolean; status?: string; notes: string; photoUrl: string | null; createdAt: string
+  psiraNumber: string | null; idNumber: string | null; phone: string | null
+  grade: string; active: boolean
+  status: string; statusNote: string | null; statusChangedAt: string | null
+  psiraExpiryDate: string | null
+  notes: string | null; photoUrl: string | null; createdAt: string
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -33,7 +44,7 @@ const GUARD_STATUSES = [
 const STATUS_MAP = Object.fromEntries(GUARD_STATUSES.map(s => [s.value, s]))
 const EMPTY_FORM = { firstName: "", lastName: "", psiraNumber: "", idNumber: "", phone: "", grade: "C", notes: "" }
 
-// ── SA ID Validator (Luhn + DOB + gender decode) ───────────────────────────────
+// ── SA ID Validator ────────────────────────────────────────────────────────────
 
 function validateSaId(id: string): { valid: boolean; dob?: string; gender?: string; error?: string } {
   const clean = id.replace(/\s/g, "")
@@ -53,6 +64,42 @@ function validateSaId(id: string): { valid: boolean; dob?: string; gender?: stri
   if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return { valid: false, error: "SA ID contains invalid date of birth" }
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
   return { valid: true, dob: `${String(dd).padStart(2,"0")} ${months[mm-1]} ${year}`, gender: parseInt(clean[6]) >= 5 ? "Male" : "Female" }
+}
+
+// ── PSiRA expiry helper ────────────────────────────────────────────────────────
+
+function psiraExpiryStatus(dateStr: string | null): { label: string; color: string; bg: string } | null {
+  if (!dateStr) return null
+  const expiry = new Date(dateStr)
+  const now    = new Date()
+  const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / 86400000)
+  if (daysLeft < 0)  return { label: "PSiRA Expired",              color: "#DC2626", bg: "#FEF2F2" }
+  if (daysLeft <= 30) return { label: `PSiRA expires in ${daysLeft}d`, color: "#D97706", bg: "#FEF3C7" }
+  return null // valid — no badge needed, clutter-free when compliant
+}
+
+// ── Photo component ────────────────────────────────────────────────────────────
+
+function GuardAvatar({ guard, size = 36 }: { guard: Guard; size?: number }) {
+  // WHY check for "PENDING_UPLOAD"?
+  // Dev-mode photo capture stores a placeholder instead of base64.
+  // The frontend must treat it the same as null and show the initials avatar.
+  const hasPhoto = guard.photoUrl && guard.photoUrl !== "PENDING_UPLOAD"
+  const unavail  = (guard.status ?? "ACTIVE") !== "ACTIVE"
+  return hasPhoto ? (
+    <img src={guard.photoUrl!} alt={guard.fullName}
+      style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover",
+               border: "2px solid #BFDBFE", flexShrink: 0, opacity: unavail ? 0.6 : 1 }} />
+  ) : (
+    <div style={{ width: size, height: size, borderRadius: "50%",
+                  background: unavail ? "#F1F5F9" : "#EFF6FF",
+                  border: `2px solid ${unavail ? "#E2E8F0" : "#BFDBFE"}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontWeight: 700, fontSize: size * 0.33,
+                  color: unavail ? "#94A3B8" : "#1D4ED8", flexShrink: 0 }}>
+      {guard.firstName?.[0]}{guard.lastName?.[0]}
+    </div>
+  )
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -95,7 +142,7 @@ export default function GuardsTab() {
   const createGuard = useMutation({
     mutationFn: (body: any) => apiClient.post("/api/v1/security/guards", body),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["guards"] }); closeAdd() },
-    onError: (e: any) => {
+    onError:   (e: any) => {
       const d = e.response?.data
       if (d?.errors && typeof d.errors === "object") setFieldErrors(d.errors)
       else setApiError(d?.message ?? "Failed to create guard")
@@ -105,20 +152,23 @@ export default function GuardsTab() {
   const updateGuard = useMutation({
     mutationFn: ({ id, body }: { id: string; body: any }) => apiClient.put(`/api/v1/security/guards/${id}`, body),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["guards"] }); closeEdit() },
-    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to update guard"),
+    onError:   (e: any) => setApiError(e.response?.data?.message ?? "Failed to update guard"),
   })
 
   const updateStatus = useMutation({
     mutationFn: ({ id, status, note }: { id: string; status: string; note: string }) =>
       apiClient.patch(`/api/v1/security/guards/${id}/status`, { status, note }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["guards"] }); setChangingStatus(null); setNewStatus(""); setStatusNote("") },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["guards"] })
+      setChangingStatus(null); setNewStatus(""); setStatusNote("")
+    },
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to update status"),
   })
 
   const deleteGuard = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/api/v1/security/guards/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["guards"] }); setDeleting(null) },
-    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to remove guard"),
+    onError:   (e: any) => setApiError(e.response?.data?.message ?? "Failed to remove guard"),
   })
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -128,8 +178,11 @@ export default function GuardsTab() {
 
   const openEdit = (g: Guard) => {
     setEditing(g)
-    setForm({ firstName: g.firstName, lastName: g.lastName, psiraNumber: g.psiraNumber ?? "", idNumber: g.idNumber ?? "", phone: g.phone ?? "", grade: g.grade, notes: g.notes ?? "" })
-    setCapturedPhoto(g.photoUrl ?? null)
+    setForm({ firstName: g.firstName, lastName: g.lastName,
+              psiraNumber: g.psiraNumber ?? "", idNumber: g.idNumber ?? "",
+              phone: g.phone ?? "", grade: g.grade, notes: g.notes ?? "" })
+    // Don't pre-fill PENDING_UPLOAD — show the avatar
+    setCapturedPhoto(g.photoUrl && g.photoUrl !== "PENDING_UPLOAD" ? g.photoUrl : null)
     setFieldErrors({}); setApiError("")
   }
 
@@ -173,6 +226,8 @@ export default function GuardsTab() {
 
   const filtered = statusFilter === "ALL" ? guards : guards.filter(g => (g.status ?? "ACTIVE") === statusFilter)
 
+  const fmtDate = (iso: string | null) => iso ? new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : null
+
   const inpSt = (key: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", border: `1.5px solid ${fieldErrors[key] ? "#DC2626" : "#E2E8F0"}`,
     borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const,
@@ -192,6 +247,8 @@ export default function GuardsTab() {
   }
 
   const idFeedback = validateSaId(form.idNumber)
+
+  // ── Guard Form (shared for add + edit) ────────────────────────────────────
 
   const GuardForm = () => (
     <>
@@ -249,8 +306,10 @@ export default function GuardsTab() {
 
       {/* Photo */}
       <div style={{ marginTop: 16, padding: 16, background: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 12 }}>Guard Photo</div>
-        {capturedPhoto ? (
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 12 }}>Guard Photo
+          <span style={{ fontSize: 11, fontWeight: 400, color: "#94A3B8", marginLeft: 8 }}>(dev mode — stored as PENDING_UPLOAD until S3 is configured)</span>
+        </div>
+        {capturedPhoto && capturedPhoto !== "PENDING_UPLOAD" ? (
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <img src={capturedPhoto} alt="Guard" style={{ width: 80, height: 80, borderRadius: 10, objectFit: "cover", border: "2px solid #0D9488" }} />
             <div>
@@ -280,7 +339,7 @@ export default function GuardsTab() {
         )}
       </div>
 
-      {/* Fingerprint */}
+      {/* Fingerprint stub */}
       <div style={{ marginTop: 12, padding: 16, background: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
@@ -305,7 +364,7 @@ export default function GuardsTab() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div style={{ position: "relative" }}>
           <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94A3B8" }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search guards..."
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or PSiRA..."
             style={{ paddingLeft: 36, paddingRight: 14, paddingTop: 9, paddingBottom: 9, border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, width: 260, outline: "none" }} />
         </div>
         <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError(""); setCapturedPhoto(null); setFpStatus("idle") }}
@@ -317,10 +376,10 @@ export default function GuardsTab() {
       {/* Stats */}
       <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
         {[
-          { label: "Total",     value: guards.length,                                               color: "#1B3A6B" },
-          { label: "Active",    value: guards.filter(g => (g.status ?? "ACTIVE") === "ACTIVE").length, color: "#166534" },
-          { label: "On Leave",  value: guards.filter(g => g.status === "ON_LEAVE").length,          color: "#1D4ED8" },
-          { label: "Suspended", value: guards.filter(g => g.status === "SUSPENDED").length,         color: "#DC2626" },
+          { label: "Total",     value: guards.length,                                                     color: "#1B3A6B" },
+          { label: "Active",    value: guards.filter(g => (g.status ?? "ACTIVE") === "ACTIVE").length,    color: "#166534" },
+          { label: "On Leave",  value: guards.filter(g => g.status === "ON_LEAVE").length,                color: "#1D4ED8" },
+          { label: "Suspended", value: guards.filter(g => g.status === "SUSPENDED").length,               color: "#DC2626" },
         ].map(s => (
           <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 20px" }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
@@ -328,6 +387,34 @@ export default function GuardsTab() {
           </div>
         ))}
       </div>
+
+      {/* PSiRA expiry alerts — only show if any are expired or expiring soon */}
+      {(() => {
+        const expiring = guards.filter(g => {
+          const s = psiraExpiryStatus(g.psiraExpiryDate)
+          return s !== null
+        })
+        if (expiring.length === 0) return null
+        return (
+          <div style={{ marginBottom: 16, padding: "12px 16px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <AlertTriangle size={16} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", marginBottom: 4 }}>PSiRA Compliance Alert</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                {expiring.map(g => {
+                  const s = psiraExpiryStatus(g.psiraExpiryDate)!
+                  return (
+                    <div key={g.id} style={{ fontSize: 12, color: "#78350F" }}>
+                      {g.fullName} — <span style={{ color: s.color, fontWeight: 600 }}>{s.label}</span>
+                      {g.psiraExpiryDate && ` (${fmtDate(g.psiraExpiryDate)})`}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Status filter pills */}
       <div style={{ display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" }}>
@@ -364,19 +451,14 @@ export default function GuardsTab() {
             </thead>
             <tbody>
               {filtered.map((g, i) => {
-                const gStatus = g.status ?? "ACTIVE"
-                const unavail = gStatus !== "ACTIVE"
+                const gStatus   = g.status ?? "ACTIVE"
+                const unavail   = gStatus !== "ACTIVE"
+                const expiryBadge = psiraExpiryStatus(g.psiraExpiryDate)
                 return (
                   <tr key={g.id} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #F1F5F9" : "none", background: unavail ? "#FAFAFA" : "#fff" }}>
                     <td style={{ padding: "13px 16px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        {g.photoUrl ? (
-                          <img src={g.photoUrl} alt={g.fullName} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", border: "2px solid #BFDBFE", flexShrink: 0, opacity: unavail ? 0.6 : 1 }} />
-                        ) : (
-                          <div style={{ width: 36, height: 36, borderRadius: "50%", background: unavail ? "#F1F5F9" : "#EFF6FF", border: `2px solid ${unavail ? "#E2E8F0" : "#BFDBFE"}`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12, color: unavail ? "#94A3B8" : "#1D4ED8", flexShrink: 0 }}>
-                            {g.firstName?.[0]}{g.lastName?.[0]}
-                          </div>
-                        )}
+                        <GuardAvatar guard={g} size={36} />
                         <div>
                           <div style={{ fontWeight: 600, color: unavail ? "#94A3B8" : "#0F172A" }}>{g.fullName}</div>
                           <div style={{ fontSize: 12, color: "#94A3B8" }}>ID: {g.idNumber || "—"}</div>
@@ -384,7 +466,14 @@ export default function GuardsTab() {
                       </div>
                     </td>
                     <td style={{ padding: "13px 16px", color: "#475569" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}><BadgeCheck size={13} color="#0D9488" />{g.psiraNumber || "—"}</div>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}><BadgeCheck size={13} color="#0D9488" />{g.psiraNumber || "—"}</div>
+                        {expiryBadge && (
+                          <span style={{ fontSize: 10, fontWeight: 600, background: expiryBadge.bg, color: expiryBadge.color, padding: "1px 6px", borderRadius: 10, marginTop: 3, display: "inline-block" }}>
+                            {expiryBadge.label}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: "13px 16px", color: "#475569" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 5 }}><Phone size={13} color="#94A3B8" />{g.phone || "—"}</div>
@@ -409,7 +498,7 @@ export default function GuardsTab() {
         </div>
       )}
 
-      {/* ── Add Guard Modal ───────────────────────────────────────────────── */}
+      {/* ── Add / Edit modals ─────────────────────────────────────────────── */}
       {showAdd && (
         <Modal title="Add New Guard" onClose={closeAdd} width={580}>
           <GuardForm />
@@ -417,8 +506,6 @@ export default function GuardsTab() {
           <Footer onCancel={closeAdd} onSubmit={() => handleSubmit(false)} loading={createGuard.isPending} label="Add Guard" />
         </Modal>
       )}
-
-      {/* ── Edit Guard Modal ──────────────────────────────────────────────── */}
       {editing && (
         <Modal title={`Edit — ${editing.fullName}`} onClose={closeEdit} width={580}>
           <GuardForm />
@@ -431,19 +518,12 @@ export default function GuardsTab() {
       {viewing && (
         <Modal title="Guard Profile" onClose={() => setViewing(null)} width={480}>
           <div style={{ textAlign: "center", marginBottom: 22 }}>
-            {viewing.photoUrl ? (
-              <div style={{ position: "relative", display: "inline-block" }}>
-                <img src={viewing.photoUrl} alt={viewing.fullName}
-                  style={{ width: 110, height: 110, borderRadius: "50%", objectFit: "cover", border: "3px solid #1B3A6B", display: "block" }} />
-                <div style={{ position: "absolute", bottom: 4, right: 4, width: 28, height: 28, borderRadius: "50%", background: STATUS_MAP[viewing.status ?? "ACTIVE"]?.color ?? "#166534", border: "2px solid #fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {(() => { const S = GUARD_STATUSES.find(s => s.value === (viewing.status ?? "ACTIVE")); const Icon = S?.icon ?? CheckCircle; return <Icon size={12} color="#fff" /> })()}
-                </div>
+            <div style={{ position: "relative", display: "inline-block" }}>
+              <GuardAvatar guard={viewing} size={110} />
+              <div style={{ position: "absolute", bottom: 4, right: 4, width: 28, height: 28, borderRadius: "50%", background: STATUS_MAP[viewing.status ?? "ACTIVE"]?.color ?? "#166534", border: "2px solid #fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {(() => { const S = GUARD_STATUSES.find(s => s.value === (viewing.status ?? "ACTIVE")); const Icon = S?.icon ?? CheckCircle; return <Icon size={12} color="#fff" /> })()}
               </div>
-            ) : (
-              <div style={{ width: 110, height: 110, borderRadius: "50%", background: "#EFF6FF", border: "3px solid #1B3A6B", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, fontWeight: 800, color: "#1D4ED8", margin: "0 auto" }}>
-                {viewing.firstName?.[0]}{viewing.lastName?.[0]}
-              </div>
-            )}
+            </div>
             <h3 style={{ margin: "12px 0 6px", fontSize: 20, fontWeight: 700, color: "#0F172A" }}>{viewing.fullName}</h3>
             <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
               <span style={{ background: `${GRADE_COLORS[viewing.grade]}18`, color: GRADE_COLORS[viewing.grade], padding: "3px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>Grade {viewing.grade}</span>
@@ -465,16 +545,37 @@ export default function GuardsTab() {
             ))}
           </div>
 
-          {/* SA ID decoded info */}
-          {viewing.idNumber && (() => { const r = validateSaId(viewing.idNumber); return r.valid && r.dob ? (
+          {/* PSiRA expiry compliance */}
+          {(() => {
+            const badge = psiraExpiryStatus(viewing.psiraExpiryDate)
+            if (!badge) return null
+            return (
+              <div style={{ marginTop: 10, padding: "10px 14px", background: badge.bg, border: `1px solid ${badge.color}40`, borderRadius: 8, fontSize: 13, color: badge.color, fontWeight: 600, display: "flex", gap: 8, alignItems: "center" }}>
+                <Calendar size={14} />{badge.label} {viewing.psiraExpiryDate && `(${fmtDate(viewing.psiraExpiryDate)})`}
+              </div>
+            )
+          })()}
+
+          {/* SA ID decoded */}
+          {viewing.idNumber && (() => { const r = validateSaId(viewing.idNumber!); return r.valid && r.dob ? (
             <div style={{ marginTop: 10, padding: "10px 14px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 8, fontSize: 13, color: "#166534", display: "flex", gap: 16 }}>
               <span>DOB: {r.dob}</span><span>{r.gender}</span>
             </div>
           ) : null })()}
 
+          {/* Status history */}
+          {viewing.statusNote && (
+            <div style={{ marginTop: 10, padding: "10px 14px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, fontSize: 13 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 4 }}>
+                Status note {viewing.statusChangedAt && `· ${fmtDate(viewing.statusChangedAt)}`}
+              </div>
+              <div style={{ color: "#78350F" }}>{viewing.statusNote}</div>
+            </div>
+          )}
+
           {viewing.notes && (
-            <div style={{ marginTop: 10, padding: "10px 14px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, fontSize: 13, color: "#78350F" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 3, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>Notes</div>
+            <div style={{ marginTop: 10, padding: "10px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, color: "#374151" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>Notes</div>
               {viewing.notes}
             </div>
           )}
@@ -491,13 +592,7 @@ export default function GuardsTab() {
       {changingStatus && (
         <Modal title="Update Guard Status" onClose={() => { setChangingStatus(null); setApiError("") }} width={460}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, padding: "12px 14px", background: "#F8FAFC", borderRadius: 10 }}>
-            {changingStatus.photoUrl ? (
-              <img src={changingStatus.photoUrl} alt="" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", border: "2px solid #E2E8F0", flexShrink: 0 }} />
-            ) : (
-              <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 16, color: "#1D4ED8", flexShrink: 0 }}>
-                {changingStatus.firstName?.[0]}{changingStatus.lastName?.[0]}
-              </div>
-            )}
+            <GuardAvatar guard={changingStatus} size={44} />
             <div>
               <div style={{ fontWeight: 700, color: "#0F172A", marginBottom: 3 }}>{changingStatus.fullName}</div>
               <StatusBadge status={changingStatus.status} />
@@ -507,8 +602,7 @@ export default function GuardsTab() {
           <label style={lbl}>Select New Status</label>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
             {GUARD_STATUSES.map(s => {
-              const Icon = s.icon
-              const sel  = newStatus === s.value
+              const Icon = s.icon; const sel = newStatus === s.value
               return (
                 <button key={s.value} onClick={() => setNewStatus(s.value)}
                   style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", border: `2px solid ${sel ? s.color : "#E2E8F0"}`, borderRadius: 9, cursor: "pointer", background: sel ? s.bg : "#fff", textAlign: "left" as const, width: "100%" }}>
@@ -528,14 +622,14 @@ export default function GuardsTab() {
           {newStatus && newStatus !== "ACTIVE" && (
             <div style={{ marginBottom: 16 }}>
               <label style={lbl}>
-                Reason / Note{newStatus === "SUSPENDED" || newStatus === "TERMINATED" ? " *" : " (optional)"}
+                Reason / Note{(newStatus === "SUSPENDED" || newStatus === "TERMINATED") ? " *" : " (optional)"}
               </label>
               <textarea value={statusNote} onChange={e => setStatusNote(e.target.value)} rows={3}
                 placeholder={
                   newStatus === "ON_LEAVE" ? "e.g. Annual leave 1–14 June 2026" :
                   newStatus === "SUSPENDED" ? "e.g. Pending disciplinary hearing re: incident on 28 May" :
                   newStatus === "UNDER_INVESTIGATION" ? "e.g. Incident report #IR-2026-042 filed" :
-                  newStatus === "TERMINATED" ? "e.g. Resignation accepted effective 31 May 2026" : ""
+                  "e.g. Resignation accepted effective 31 May 2026"
                 }
                 style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, resize: "vertical" as const, outline: "none" }} />
             </div>
@@ -564,24 +658,25 @@ export default function GuardsTab() {
         </Modal>
       )}
 
-      {/* ── Delete Confirmation Modal ─────────────────────────────────────── */}
+      {/* ── Delete Confirmation ───────────────────────────────────────────── */}
       {deleting && (
         <Modal title="" onClose={() => { setDeleting(null); setApiError("") }} width={400}>
           <div style={{ textAlign: "center" }}>
             <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#FEF2F2", border: "2px solid #FECACA", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
               <Trash2 size={22} color="#DC2626" />
             </div>
-            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Remove Guard?</h3>
+            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700 }}>Remove Guard?</h3>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 40, padding: "6px 14px", marginBottom: 14 }}>
-              <Shield size={13} color="#DC2626" /><span style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{deleting.fullName}</span>
+              <Shield size={13} color="#DC2626" /><span style={{ fontSize: 13, fontWeight: 600 }}>{deleting.fullName}</span>
             </div>
             <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 20px", lineHeight: 1.6 }}>
-              This deactivates the guard record. Shift history and incident records are preserved.
+              Deactivates the guard record. Shift history and incident records are preserved.
             </p>
             {apiError && <ErrBanner msg={apiError} />}
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => { setDeleting(null); setApiError("") }} style={{ flex: 1, padding: "10px", border: "1.5px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#374151" }}>Keep Guard</button>
-              <button onClick={() => deleteGuard.mutate(deleting.id)} disabled={deleteGuard.isPending} style={{ flex: 1, padding: "10px", border: "none", borderRadius: 9, background: "#DC2626", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+              <button onClick={() => deleteGuard.mutate(deleting.id)} disabled={deleteGuard.isPending}
+                style={{ flex: 1, padding: "10px", border: "none", borderRadius: 9, background: "#DC2626", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {deleteGuard.isPending ? "Removing..." : "Yes, Remove"}
               </button>
             </div>

@@ -285,4 +285,21 @@ public class ScmController {
                 scmService.addPurchaseOrderLine(TenantContext.getTenantIdAsObject(), id, req)));
     }
 
+    /**
+     * GET /purchase-orders/{id}/lines
+     * Returns the line items for a purchase order.
+     * ScPurchaseOrder is a flat entity — lines live in sc_po_lines.
+     */
+    @GetMapping("/purchase-orders/{id}/lines")
+    @PreAuthorize("hasAuthority('SCM_READ')")
+    @Operation(summary = "Get line items for a purchase order")
+    public ResponseEntity<ApiResponse<List<ScPoLine>>> getPurchaseOrderLines(
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                scmService.getPurchaseOrderLines(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+
+
+
 }

@@ -40,6 +40,13 @@ public class BookingStaff {
         return s;
     }
 
+    public void update(String name, String email, String phone) {
+        this.name      = name;
+        this.email     = email;
+        this.phone     = phone;
+        this.updatedAt = Instant.now();
+    }
+
     public void deactivate() {
         this.active    = false;
         this.updatedAt = Instant.now();
