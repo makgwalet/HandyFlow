@@ -70,6 +70,7 @@ export default function App() {
 
           {/* Client portal — public, intentionally outside ModuleLayout (no nav bar) */}
           <Route path="/projects/portal/:token" element={<ClientPortalPage />} />
+          <Route path="/portal/:token" element={<ClientPortalPage />} />
 
           {/* Token-secured routes — also outside ModuleLayout */}
           <Route path="/sign/:token"                   element={<SigningPage />} />

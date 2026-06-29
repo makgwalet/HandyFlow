@@ -42,7 +42,7 @@ const GUARD_STATUSES = [
 ]
 
 const STATUS_MAP = Object.fromEntries(GUARD_STATUSES.map(s => [s.value, s]))
-const EMPTY_FORM = { firstName: "", lastName: "", psiraNumber: "", idNumber: "", phone: "", grade: "C", notes: "" }
+const EMPTY_FORM = { firstName: "", lastName: "", psiraNumber: "", idNumber: "", phone: "", grade: "C", notes: "", psiraExpiryDate: "" }
 
 // ── SA ID Validator ────────────────────────────────────────────────────────────
 
@@ -180,7 +180,8 @@ export default function GuardsTab() {
     setEditing(g)
     setForm({ firstName: g.firstName, lastName: g.lastName,
               psiraNumber: g.psiraNumber ?? "", idNumber: g.idNumber ?? "",
-              phone: g.phone ?? "", grade: g.grade, notes: g.notes ?? "" })
+              phone: g.phone ?? "", grade: g.grade, notes: g.notes ?? "",
+              psiraExpiryDate: g.psiraExpiryDate ?? "" })
     // Don't pre-fill PENDING_UPLOAD — show the avatar
     setCapturedPhoto(g.photoUrl && g.photoUrl !== "PENDING_UPLOAD" ? g.photoUrl : null)
     setFieldErrors({}); setApiError("")
@@ -194,7 +195,7 @@ export default function GuardsTab() {
     if (form.idNumber) { const r = validateSaId(form.idNumber); if (!r.valid) errs.idNumber = r.error! }
     setFieldErrors(errs)
     if (Object.keys(errs).length > 0) return
-    const body = { ...form, photoUrl: capturedPhoto ?? undefined }
+    const body = { ...form, photoUrl: capturedPhoto ?? undefined, psiraExpiryDate: form.psiraExpiryDate || null }
     if (isEdit && editing) updateGuard.mutate({ id: editing.id, body })
     else createGuard.mutate(body)
   }
@@ -297,6 +298,15 @@ export default function GuardsTab() {
           <select value={form.grade} onChange={e => setForm(f => ({ ...f, grade: e.target.value }))} style={{ ...inpSt("grade"), background: "#fff" }}>
             {["A","B","C","D","E"].map(g => <option key={g} value={g}>Grade {g}</option>)}
           </select>
+        </div>
+        <div>
+          <label style={lbl}>PSiRA Expiry Date <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+          <input type="date" value={form.psiraExpiryDate}
+            onChange={e => setForm(f => ({ ...f, psiraExpiryDate: e.target.value }))}
+            style={inpSt("psiraExpiryDate")} />
+          {form.psiraExpiryDate && (() => { const s = psiraExpiryStatus(form.psiraExpiryDate); return s ? (
+            <div style={{ marginTop: 6, fontSize: 12, color: s.color, fontWeight: 600 }}>{s.label}</div>
+          ) : <div style={{ marginTop: 6, fontSize: 12, color: "#166534" }}>✓ Valid</div> })()}
         </div>
         <div style={{ gridColumn: "1 / -1" }}>
           <label style={lbl}>Notes</label>

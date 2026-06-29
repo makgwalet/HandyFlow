@@ -9,99 +9,80 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.security.domain.model.Checkpoint;
 import za.co.handyflow.platform.security.domain.model.CheckpointLog;
+import za.co.handyflow.platform.security.domain.model.Site;
 import za.co.handyflow.platform.security.domain.repository.CheckpointLogRepository;
 import za.co.handyflow.platform.security.domain.repository.CheckpointRepository;
 import za.co.handyflow.platform.security.domain.repository.ShiftRepository;
+import za.co.handyflow.platform.security.domain.repository.SiteRepository;
 import za.co.handyflow.platform.security.dto.ScanRequest;
 import za.co.handyflow.platform.security.dto.ScanResponse;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Base64;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
- * CheckpointScanService — rewritten to fix bugs #6, #7(partial), #11, #18.
+ * CheckpointScanService — fixes bugs #6, #7, #11, #13, #18.
  *
- * Original issues:
- *
- *   Bug #6: NFC/BLE scans threw "Invalid QR code" because findByQrCode was
- *   called unconditionally even when qrCode was null.  Fixed by branching on
- *   scanType before the lookup.
- *
- *   Bug #11: findByQrCode had no tenant filter — any tenant's QR could
- *   (in theory) resolve a checkpoint from a different tenant.  Fixed by passing
- *   tenantId to all checkpoint lookup queries.
- *
- *   Bug #18: The same checkpoint could be scanned twice in the same second,
- *   allowing a guard to "scan everything in 10 seconds" and fake a patrol.
- *   Fixed by a configurable per-checkpoint cooldown within a shift.
- *
- *   Bug #7 (partial): QR codes are still plain UUIDs, not HMAC-signed.
- *   Full HMAC signing (using security_sites.qr_secret which already exists
- *   in the DB but is unused) is Phase 1 work.  Phase 0 adds the tenant filter
- *   and NFC/BLE routing so at least the scan service is correct.
- *
- * ─ Scan type routing ──────────────────────────────────────────────────────────
- * The ScanRequest carries a scanType field ("QR", "NFC", "BLE", "GPS_PING",
- * "MANUAL") and the corresponding identifier (qrCode, nfcTagId, bleBeaconId).
- * This service routes to the correct checkpoint lookup based on scanType.
- * GPS_PING and MANUAL don't look up a checkpoint — they log a guard position
- * or a supervisor-entered event instead.
+ * Bug #13: guardId resolved from authenticated session, NOT the request body.
+ * Bug #7:  HMAC-SHA256 QR verification using site.qrSecret (ENFORCE_QR_HMAC flag
+ *          is false until guard app ships signed QRs).
+ * Bug #6:  scanType routing — NFC/BLE have dedicated lookup methods.
+ * Bug #11: All checkpoint lookups include tenantId scoping.
+ * Bug #18: 60s cooldown per checkpoint per shift.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class CheckpointScanService {
 
-    /**
-     * Minimum seconds between two scans of the SAME checkpoint in the SAME shift.
-     *
-     * WHY 60 seconds? A guard physically walking a checkpoint should take at
-     * least 30–60 seconds to travel away and return.  10 seconds is a
-     * speed-run fraud pattern; 60 seconds is a reasonable floor for any real
-     * patrol dwell time.  Sites with longer patrol intervals can raise this;
-     * the default errs on the side of catching the obvious fraud case.
-     *
-     * Phase 1: move this to a per-site configuration column.
-     */
-    private static final int SCAN_COOLDOWN_SECONDS = 60;
+    static final int     SCAN_COOLDOWN_SECONDS = 60;
+    // Set to true once the guard app ships HMAC-signed QR payloads (Phase 1).
+    static final boolean ENFORCE_QR_HMAC       = false;
 
     private final CheckpointRepository    checkpointRepository;
     private final CheckpointLogRepository logRepository;
     private final ShiftRepository         shiftRepository;
+    private final SiteRepository          siteRepository;
 
+    /**
+     * @param authenticatedGuardId Resolved from HTTP session by the controller.
+     *                             The request body's guardId is ignored (bug #13 fix).
+     */
     @Transactional
-    public ScanResponse scan(TenantId tenantId, ScanRequest req) {
-
+    public ScanResponse scan(TenantId tenantId, ScanRequest req, UUID authenticatedGuardId) {
         String scanType = req.scanType() != null ? req.scanType().toUpperCase() : "QR";
 
-        // ── 1. Resolve the checkpoint based on scan method ─────────────────────
         Checkpoint checkpoint = resolveCheckpoint(tenantId, req, scanType);
 
-        // ── 2. Validate shift (if provided) ────────────────────────────────────
-        if (req.shiftId() != null) {
-            validateShiftForScan(tenantId, req.shiftId(), checkpoint);
+        if ("QR".equals(scanType) && ENFORCE_QR_HMAC) {
+            verifyQrHmac(checkpoint, req.qrCode());
         }
 
-        // ── 3. Cooldown check (fixes bug #18) ──────────────────────────────────
         if (req.shiftId() != null) {
+            validateShiftForScan(tenantId, req.shiftId(), checkpoint, authenticatedGuardId);
             enforceCheckpointCooldown(checkpoint.getId(), req.shiftId());
         }
 
-        // ── 4. Create the log entry ─────────────────────────────────────────────
         CheckpointLog entry = CheckpointLog.create(
                 tenantId,
                 checkpoint.getId(),
-                req.guardId(),
+                authenticatedGuardId,   // session identity, NOT req.guardId()
                 req.shiftId(),
                 req.latitude(),
-                req.longitude()
+                req.longitude(),
+                scanType                // persisted for audit trail
         );
         logRepository.save(entry);
 
         log.info("[Security] Checkpoint scanned type={} checkpoint='{}' guard={} shift={}",
-                scanType, checkpoint.getName(), req.guardId(), req.shiftId());
+                scanType, checkpoint.getName(), authenticatedGuardId, req.shiftId());
 
         return new ScanResponse(
                 entry.getId(),
@@ -111,131 +92,156 @@ public class CheckpointScanService {
         );
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
+    // ── HMAC QR verification (bug #7) ─────────────────────────────────────────
 
     /**
-     * Routes the scan to the correct checkpoint lookup based on scanType.
-     *
-     * WHY switch on scanType instead of just trying each identifier in order?
-     * The guard's device knows exactly which hardware triggered the scan.
-     * A QR scan will always have qrCode set; an NFC scan will always have
-     * nfcTagId set.  Trying identifiers in order would mask bugs in the
-     * client (e.g. an NFC scan accidentally sending a stale qrCode would
-     * succeed for the wrong reason).
-     *
-     * Fixing bug #6: the original code called findByQrCode(req.qrCode())
-     * unconditionally.  An NFC scan has qrCode=null → throws NPE or
-     * "Invalid QR code" before even reaching the repository.
+     * Wire format: "{checkpointId}:{siteId}:{Base64url(HMAC-SHA256(secret, payload))}"
+     * The guard app generates QR images from this string; scanning returns this string.
+     * Phase 1: add timestamp segment for expiry window.
      */
+    private void verifyQrHmac(Checkpoint checkpoint, String qrCode) {
+        String[] parts = qrCode != null ? qrCode.split(":") : new String[0];
+        if (parts.length < 3) {
+            throw new HandyFlowException(
+                    "QR code format is invalid — please regenerate the QR for this checkpoint",
+                    HttpStatus.BAD_REQUEST, "INVALID_QR_FORMAT");
+        }
+        String payload   = parts[0] + ":" + parts[1];
+        String signature = parts[2];
+
+        String secret = siteRepository.findById(checkpoint.getSite().getId())
+                .map(Site::getQrSecret)
+                .orElseThrow(() -> new HandyFlowException(
+                        "Site configuration error", HttpStatus.INTERNAL_SERVER_ERROR, "SITE_NOT_FOUND"));
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(), "HmacSHA256"));
+            String expected = Base64.getUrlEncoder().withoutPadding()
+                    .encodeToString(mac.doFinal(payload.getBytes()));
+            if (!expected.equals(signature)) {
+                log.warn("[Security] QR HMAC mismatch checkpoint={}", checkpoint.getId());
+                throw new HandyFlowException(
+                        "QR code signature is invalid — scan the original printed QR",
+                        HttpStatus.UNAUTHORIZED, "INVALID_QR_SIGNATURE");
+            }
+        } catch (HandyFlowException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new HandyFlowException("QR verification failed",
+                    HttpStatus.INTERNAL_SERVER_ERROR, "HMAC_ERROR");
+        }
+    }
+
+    /** Generates a signed QR payload for a checkpoint. Called by Phase 1 QR generation endpoint. */
+    public String generateQrPayload(Checkpoint checkpoint, String siteSecret) {
+        try {
+            String payload = checkpoint.getId() + ":" + checkpoint.getSite().getId();
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(siteSecret.getBytes(), "HmacSHA256"));
+            String sig = Base64.getUrlEncoder().withoutPadding()
+                    .encodeToString(mac.doFinal(payload.getBytes()));
+            return payload + ":" + sig;
+        } catch (Exception e) {
+            throw new RuntimeException("QR generation failed", e);
+        }
+    }
+
+    // ── Checkpoint resolution ──────────────────────────────────────────────────
+
     private Checkpoint resolveCheckpoint(TenantId tenantId, ScanRequest req, String scanType) {
         return switch (scanType) {
             case "QR" -> {
-                if (req.qrCode() == null || req.qrCode().isBlank()) {
-                    throw new HandyFlowException(
-                            "QR code is required for QR scan type",
-                            HttpStatus.BAD_REQUEST, "MISSING_QR_CODE");
-                }
-                yield checkpointRepository.findByQrCode(tenantId, req.qrCode())
+                if (req.qrCode() == null || req.qrCode().isBlank()) throw new HandyFlowException(
+                        "QR code is required for QR scan type", HttpStatus.BAD_REQUEST, "MISSING_QR_CODE");
+                // HMAC format: "{checkpointId}:{siteId}:{sig}" — try ID lookup first
+                String lookupCode = req.qrCode().contains(":")
+                        ? req.qrCode().split(":")[0] : req.qrCode();
+                yield tryUuidLookup(tenantId, lookupCode)
+                        .or(() -> checkpointRepository.findByQrCode(tenantId, req.qrCode()))
                         .orElseThrow(() -> new HandyFlowException(
-                                "Invalid or expired QR code",
-                                HttpStatus.BAD_REQUEST, "INVALID_QR_CODE"));
+                                "Invalid or expired QR code", HttpStatus.BAD_REQUEST, "INVALID_QR_CODE"));
             }
             case "NFC" -> {
-                if (req.nfcTagId() == null || req.nfcTagId().isBlank()) {
-                    throw new HandyFlowException(
-                            "NFC tag ID is required for NFC scan type",
-                            HttpStatus.BAD_REQUEST, "MISSING_NFC_ID");
-                }
+                if (req.nfcTagId() == null || req.nfcTagId().isBlank()) throw new HandyFlowException(
+                        "NFC tag ID is required", HttpStatus.BAD_REQUEST, "MISSING_NFC_ID");
                 yield checkpointRepository.findByNfcTagUid(tenantId, req.nfcTagId())
                         .orElseThrow(() -> new HandyFlowException(
-                                "NFC tag not registered to any checkpoint at this site",
-                                HttpStatus.BAD_REQUEST, "INVALID_NFC_TAG"));
+                                "NFC tag not registered", HttpStatus.BAD_REQUEST, "INVALID_NFC_TAG"));
             }
             case "BLE" -> {
-                if (req.bleBeaconId() == null || req.bleBeaconId().isBlank()) {
-                    throw new HandyFlowException(
-                            "BLE beacon ID is required for BLE scan type",
-                            HttpStatus.BAD_REQUEST, "MISSING_BLE_ID");
-                }
+                if (req.bleBeaconId() == null || req.bleBeaconId().isBlank()) throw new HandyFlowException(
+                        "BLE beacon ID is required", HttpStatus.BAD_REQUEST, "MISSING_BLE_ID");
                 yield checkpointRepository.findByBleBeaconId(tenantId, req.bleBeaconId())
                         .orElseThrow(() -> new HandyFlowException(
-                                "BLE beacon not registered to any checkpoint at this site",
-                                HttpStatus.BAD_REQUEST, "INVALID_BLE_BEACON"));
+                                "BLE beacon not registered", HttpStatus.BAD_REQUEST, "INVALID_BLE_BEACON"));
             }
-            case "GPS_PING", "MANUAL" ->
-                // GPS_PING and MANUAL events log guard position, not a specific checkpoint.
-                // These do not resolve a checkpoint — return a meaningful error
-                // because the caller should use a different endpoint for these.
-                // Phase 1: add POST /shifts/{id}/location-ping for GPS_PING events.
-                    throw new HandyFlowException(
-                            "Scan type " + scanType + " does not target a checkpoint. " +
-                                    "Use the shift location endpoint instead.",
-                            HttpStatus.BAD_REQUEST, "UNSUPPORTED_SCAN_TYPE_FOR_CHECKPOINT");
+            case "GPS_PING", "MANUAL" -> throw new HandyFlowException(
+                    "Use the shift location endpoint for " + scanType + " (Phase 1)",
+                    HttpStatus.BAD_REQUEST, "UNSUPPORTED_SCAN_TYPE_FOR_CHECKPOINT");
             default -> throw new HandyFlowException(
-                    "Unknown scan type: " + scanType,
-                    HttpStatus.BAD_REQUEST, "UNKNOWN_SCAN_TYPE");
+                    "Unknown scan type: " + scanType, HttpStatus.BAD_REQUEST, "UNKNOWN_SCAN_TYPE");
         };
     }
 
-    /**
-     * Validates that the provided shiftId belongs to this tenant and is ACTIVE.
-     *
-     * WHY check that the shift is ACTIVE?
-     * A guard could scan a checkpoint referencing a shift that hasn't started
-     * yet (SCHEDULED) or has already ended (COMPLETED).  Both are potential
-     * fraud patterns:
-     * - Pre-scan: scanning checkpoints before the shift starts to build up
-     *   a log, then not showing up.
-     * - Post-scan: claiming to have patrolled during a shift that ended.
-     * Only ACTIVE shifts allow new checkpoint scans.
-     */
-    private void validateShiftForScan(TenantId tenantId, UUID shiftId, Checkpoint checkpoint) {
-        var shift = shiftRepository.findActiveById(tenantId, shiftId)
-                .orElseThrow(() -> new HandyFlowException(
-                        "Shift not found or does not belong to your account",
-                        HttpStatus.BAD_REQUEST, "INVALID_SHIFT"));
-
-        if (shift.getStatus().name().equals("SCHEDULED")) {
-            throw new HandyFlowException(
-                    "Cannot scan checkpoints before your shift has started",
-                    HttpStatus.BAD_REQUEST, "SHIFT_NOT_STARTED");
+    private Optional<Checkpoint> tryUuidLookup(TenantId tenantId, String maybeUuid) {
+        try {
+            UUID id = UUID.fromString(maybeUuid);
+            return checkpointRepository.findById(id)
+                    .filter(c -> c.getSite().getTenantId().equals(tenantId) && c.isActive());
+        } catch (IllegalArgumentException e) {
+            return Optional.empty();
         }
-        if (!shift.getStatus().name().equals("ACTIVE")) {
-            throw new HandyFlowException(
-                    "This shift is " + shift.getStatus() + " — checkpoint scans are not allowed",
-                    HttpStatus.BAD_REQUEST, "SHIFT_NOT_ACTIVE");
-        }
-        // Optionally validate that the checkpoint's site matches the shift's site —
-        // Phase 1 enhancement: prevents scanning a checkpoint from Site B while
-        // on a shift for Site A.
     }
 
-    /**
-     * Enforces the per-checkpoint cooldown within a shift (fixes bug #18).
-     *
-     * WHY within a shift, not globally?
-     * A 12-hour shift might legitimately require hourly parking lot checks
-     * (same checkpoint scanned 5–6 times).  A global cooldown would block the
-     * second hourly check.  The cooldown is per-shift so it catches speed-run
-     * fraud within a single patrol round, while allowing legitimate re-scans
-     * between rounds.
-     *
-     * The cooldown window is SCAN_COOLDOWN_SECONDS (default 60s).
-     * If the last scan of this checkpoint in this shift is within the window,
-     * we reject with a clear error message telling the guard how long to wait.
-     */
+    // ── Shift validation ───────────────────────────────────────────────────────
+
+    private void validateShiftForScan(TenantId tenantId, UUID shiftId,
+                                      Checkpoint checkpoint, UUID guardId) {
+        var shift = shiftRepository.findActiveById(tenantId, shiftId)
+                .orElseThrow(() -> new HandyFlowException(
+                        "Shift not found", HttpStatus.BAD_REQUEST, "INVALID_SHIFT"));
+
+        // Guard must own the shift — catches the ghost-guard fraud pattern
+        if (!shift.getGuardId().equals(guardId)) {
+            log.warn("[Security] Guard {} tried to scan on shift owned by guard {} — rejected",
+                    guardId, shift.getGuardId());
+            throw new HandyFlowException(
+                    "This shift is not assigned to you", HttpStatus.FORBIDDEN, "SHIFT_NOT_ASSIGNED");
+        }
+        if (shift.getStatus().name().equals("SCHEDULED")) throw new HandyFlowException(
+                "Cannot scan before your shift has started", HttpStatus.BAD_REQUEST, "SHIFT_NOT_STARTED");
+        if (!shift.getStatus().name().equals("ACTIVE")) throw new HandyFlowException(
+                "Shift is " + shift.getStatus(), HttpStatus.BAD_REQUEST, "SHIFT_NOT_ACTIVE");
+    }
+
+    // ── Cooldown ───────────────────────────────────────────────────────────────
+
     private void enforceCheckpointCooldown(UUID checkpointId, UUID shiftId) {
-        logRepository.findLastScanInShift(checkpointId, shiftId).ifPresent(lastScan -> {
-            Instant cooldownExpiry = lastScan.getScannedAt()
-                    .plusSeconds(SCAN_COOLDOWN_SECONDS);
-            if (Instant.now().isBefore(cooldownExpiry)) {
-                long secondsRemaining = cooldownExpiry.getEpochSecond()
-                        - Instant.now().getEpochSecond();
+        logRepository.findLastScanInShift(checkpointId, shiftId).ifPresent(last -> {
+            Instant expiry = last.getScannedAt().plusSeconds(SCAN_COOLDOWN_SECONDS);
+            if (Instant.now().isBefore(expiry)) {
+                long s = expiry.getEpochSecond() - Instant.now().getEpochSecond();
                 throw new HandyFlowException(
-                        "This checkpoint was scanned too recently. " +
-                                "Please wait " + secondsRemaining + " more second(s) before scanning again.",
+                        "Checkpoint scanned too recently. Wait " + s + "s.",
                         HttpStatus.TOO_MANY_REQUESTS, "SCAN_COOLDOWN");
             }
         });
+    }
+
+    // ── Haversine (used by IncidentService for bug #21) ────────────────────────
+
+    /**
+     * Calculates the distance in metres between two GPS coordinates (Haversine formula).
+     * Accurate to ~0.5% for distances under 20km — sufficient for site proximity checks.
+     */
+    public static double haversineMetres(BigDecimal lat1, BigDecimal lon1,
+                                         BigDecimal lat2, BigDecimal lon2) {
+        final double R = 6_371_000;
+        double φ1 = Math.toRadians(lat1.doubleValue());
+        double φ2 = Math.toRadians(lat2.doubleValue());
+        double Δφ = Math.toRadians(lat2.subtract(lat1).doubleValue());
+        double Δλ = Math.toRadians(lon2.subtract(lon1).doubleValue());
+        double a = Math.sin(Δφ/2)*Math.sin(Δφ/2) + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)*Math.sin(Δλ/2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 }

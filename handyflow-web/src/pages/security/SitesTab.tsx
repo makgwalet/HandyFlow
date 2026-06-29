@@ -52,6 +52,9 @@ export default function SitesTab() {
   const [siteForm,        setSiteForm]         = useState(EMPTY_SITE_FORM)
   const [cpForm,          setCpForm]           = useState(EMPTY_CP_FORM)
   const [terminateReason, setTerminateReason]  = useState("")
+  const [showPortal,      setShowPortal]        = useState<Site | null>(null)
+  const [portalLabel,     setPortalLabel]        = useState("")
+  const [portalToken,     setPortalToken]        = useState<string | null>(null)
   const [siteErrors,      setSiteErrors]       = useState<Record<string, string>>({})
   const [apiError,        setApiError]         = useState("")
 
@@ -109,6 +112,23 @@ export default function SitesTab() {
     mutationFn: (id: string) => apiClient.delete(`/api/v1/security/sites/${id}`),
     onSuccess: () => { invalidate(); setShowDelete(null); if (expanded === showDelete?.id) setExpanded(null); setApiError("") },
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to delete site"),
+  })
+
+  const generatePortalToken = useMutation({
+    mutationFn: ({ id, label }: { id: string; label: string }) =>
+      apiClient.post(`/api/v1/security/sites/${id}/portal/generate`, { label }),
+    onSuccess: (res) => {
+      const token = res.data?.data?.token ?? res.data?.token
+      setPortalToken(token)
+      invalidate()
+    },
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to generate portal link"),
+  })
+
+  const disablePortal = useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/api/v1/security/sites/${id}/portal`),
+    onSuccess: () => { invalidate(); setShowPortal(null); setPortalToken(null) },
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to disable portal"),
   })
 
   // ── Validation ─────────────────────────────────────────────────────────────
@@ -213,6 +233,11 @@ export default function SitesTab() {
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                     {site.contractStatus !== "TERMINATED" && site.active && (
                       <>
+                        <button onClick={e => { e.stopPropagation(); setShowPortal(site); setPortalLabel(site.name); setPortalToken(null); setApiError("") }}
+                          title="Client portal"
+                          style={{ background: "#F0FDF4", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "#166534", fontSize: 12, fontWeight: 600 }}>
+                          Portal
+                        </button>
                         <button onClick={e => { e.stopPropagation(); setShowTerminate(site); setTerminateReason(""); setApiError("") }}
                           title="Terminate contract"
                           style={{ background: "#FEF3C7", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "#D97706", fontSize: 12, fontWeight: 600 }}>
@@ -393,6 +418,60 @@ export default function SitesTab() {
               {terminateSite.isPending ? "Terminating..." : "Terminate Contract"}
             </button>
           </div>
+        </Modal>
+      )}
+
+      {/* ── Client Portal Modal ──────────────────────────────────────────────── */}
+      {showPortal && (
+        <Modal title="Client Portal" onClose={() => { setShowPortal(null); setPortalToken(null); setApiError("") }} width={480}>
+          <div style={{ padding: "12px 14px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 9, marginBottom: 18 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#1D4ED8", marginBottom: 4 }}>Share read-only access with your client</div>
+            <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.6 }}>
+              The portal gives your client a real-time view of guards on-site, shifts, and open incidents — no HandyFlow login required. The URL is the only credential.
+            </div>
+          </div>
+
+          {!portalToken ? (
+            <>
+              <div style={{ marginBottom: 14 }}>
+                <label style={lbl}>Portal label <span style={{ fontWeight: 400, color: "#94A3B8" }}>(shown in portal header)</span></label>
+                <input value={portalLabel} onChange={e => setPortalLabel(e.target.value)}
+                  placeholder={showPortal.name}
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }} />
+              </div>
+              {apiError && <ErrBanner msg={apiError} />}
+              <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                <button onClick={() => { setShowPortal(null); setApiError("") }} style={cancelBtn}>Cancel</button>
+                <button onClick={() => generatePortalToken.mutate({ id: showPortal.id, label: portalLabel || showPortal.name })}
+                  disabled={generatePortalToken.isPending}
+                  style={{ flex: 1, padding: "10px", background: "#166534", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                  {generatePortalToken.isPending ? "Generating..." : "Generate Portal Link"}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ marginBottom: 14 }}>
+                <label style={lbl}>Portal URL — share this with your client</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input readOnly value={`${window.location.origin}/portal/${portalToken}`}
+                    style={{ flex: 1, padding: "9px 12px", border: "1.5px solid #86EFAC", borderRadius: 8, fontSize: 13, background: "#F0FDF4", color: "#166534", fontFamily: "monospace", outline: "none" }} />
+                  <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/portal/${portalToken}`)}
+                    style={{ padding: "9px 14px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 8, cursor: "pointer", fontSize: 12, color: "#166534", fontWeight: 600 }}>
+                    Copy
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 5 }}>Anyone with this link can view the portal. To revoke access, click "Disable Portal".</div>
+              </div>
+              <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                <button onClick={() => { setShowPortal(null); setPortalToken(null) }} style={{ flex: 1, padding: "10px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Done</button>
+                <button onClick={() => disablePortal.mutate(showPortal.id)} disabled={disablePortal.isPending}
+                  style={{ padding: "10px 16px", background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 9, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
+                  Disable Portal
+                </button>
+              </div>
+            </>
+          )}
         </Modal>
       )}
 

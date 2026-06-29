@@ -79,6 +79,21 @@ public class ShiftService {
                     HttpStatus.CONFLICT, "GUARD_NOT_SCHEDULABLE");
         }
 
+        // PSiRA expiry compliance check.
+        // WHY block scheduling, not just warn?
+        // Deploying a guard with an expired PSiRA registration is a regulatory
+        // violation under the Private Security Industry Regulation Act.  The
+        // company is liable for criminal penalties.  A hard block here prevents
+        // the scheduling mistake before it happens — far better than discovering
+        // the guard was deployed without a valid registration during an audit.
+        if (guard.getPsiraExpiryDate() != null &&
+                guard.getPsiraExpiryDate().isBefore(java.time.LocalDate.now())) {
+            throw new HandyFlowException(
+                    "Guard " + guard.getFullName() + "'s PSiRA registration expired on "
+                            + guard.getPsiraExpiryDate() + ". Renew their registration before scheduling.",
+                    HttpStatus.CONFLICT, "PSIRA_EXPIRED");
+        }
+
         // Fix bug #14: validate site belongs to this tenant.
         siteRepository.findActiveById(tenantId, req.siteId())
                 .orElseThrow(() -> new ResourceNotFoundException("Site", req.siteId().toString()));

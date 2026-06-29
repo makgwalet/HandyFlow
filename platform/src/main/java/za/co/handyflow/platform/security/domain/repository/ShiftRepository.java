@@ -89,4 +89,64 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
         WHERE s.id = :id
         """)
     void updateShift(UUID id, String notes, Instant endAt);
+
+    // ── Phase 1.5 additions ────────────────────────────────────────────────────
+
+    /**
+     * Tenant-scoped findById — avoids fetching shifts across tenant boundaries.
+     */
+    @Query("""
+        SELECT s FROM Shift s
+        WHERE s.tenantId = :tenantId
+        AND s.id = :id
+        AND s.deletedAt IS NULL
+        """)
+    Optional<Shift> findByTenantAndId(TenantId tenantId, UUID id);
+
+    /**
+     * Overlap check returning a boolean — used by swap approval and rotation
+     * schedule generation.  Excludes an optional shift ID (null = no exclusion)
+     * so an existing shift can check against itself without false positives.
+     */
+    @Query("""
+        SELECT COUNT(s) > 0 FROM Shift s
+        WHERE s.tenantId  = :tenantId
+        AND s.guardId     = :guardId
+        AND s.deletedAt   IS NULL
+        AND s.status NOT IN ('CANCELLED', 'MISSED')
+        AND s.startAt     < :endAt
+        AND s.endAt       > :startAt
+        AND (:excludeId IS NULL OR s.id <> :excludeId)
+        """)
+    boolean hasOverlap(TenantId tenantId, UUID guardId,
+                       Instant startAt, Instant endAt,
+                       UUID excludeId);
+
+    /**
+     * SCHEDULED shifts whose startAt + grace period has passed — used by
+     * NoShowAlertScheduler to detect late/no-show guards.
+     */
+    @Query("""
+        SELECT s FROM Shift s
+        WHERE s.tenantId = :tenantId
+        AND s.status = 'SCHEDULED'
+        AND s.startAt < :threshold
+        AND s.deletedAt IS NULL
+        ORDER BY s.startAt
+        """)
+    List<Shift> findScheduledStartingBefore(TenantId tenantId, Instant threshold);
+
+    /**
+     * ACTIVE shifts whose endAt + overtime grace has passed — used by
+     * NoShowAlertScheduler to detect forgotten clock-outs.
+     */
+    @Query("""
+        SELECT s FROM Shift s
+        WHERE s.tenantId = :tenantId
+        AND s.status = 'ACTIVE'
+        AND s.endAt < :threshold
+        AND s.deletedAt IS NULL
+        ORDER BY s.endAt
+        """)
+    List<Shift> findActiveEndingBefore(TenantId tenantId, Instant threshold);
 }

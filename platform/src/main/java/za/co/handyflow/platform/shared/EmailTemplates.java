@@ -593,30 +593,21 @@ public class EmailTemplates {
         );
     }
 
+
+
     // ── Bookings module notifications ─────────────────────────────────────────
 
     /**
-     * Sent to the client immediately after a booking is created (status = PENDING).
-     *
-     * WHY send on PENDING and not just CONFIRMED?
-     * The client should know their request was received even before a staff member
-     * confirms it.  This sets expectations and reduces "did it work?" calls to the
-     * business.  The confirmed email (below) follows once a staff member confirms.
-     *
-     * @param clientName   Client's display name
-     * @param bookingNumber e.g. BK-2026-00023
-     * @param serviceName  e.g. "Haircut & Style"
-     * @param date         e.g. "2026-07-15"
-     * @param startTime    e.g. "09:00"
-     * @param endTime      e.g. "10:00"
-     * @param price        e.g. "R 350.00"
+     * Sent immediately after a booking is created (status = PENDING).
+     * Lets the client know their request was received before staff confirm it.
      */
     public static String bookingCreated(String clientName, String bookingNumber,
                                         String serviceName, String date,
                                         String startTime, String endTime,
                                         String price) {
         String priceRow = (price != null && !price.isBlank())
-                ? "<br/>Price: <strong>" + org.springframework.web.util.HtmlUtils.htmlEscape(price) + "</strong>"
+                ? "<br/>Price: <strong>"
+                + org.springframework.web.util.HtmlUtils.htmlEscape(price) + "</strong>"
                 : "";
         return wrap("""
             <p>Hi <strong>%s</strong>,</p>
@@ -639,15 +630,14 @@ public class EmailTemplates {
     }
 
     /**
-     * Sent to the client when a staff member confirms the booking.
-     * This is the "you're in the calendar" email — the most important one.
+     * Sent when a staff member confirms the booking — the "you're in the calendar" email.
      */
     public static String bookingConfirmed(String clientName, String bookingNumber,
                                           String serviceName, String date,
                                           String startTime, String endTime) {
         return wrap("""
             <p>Hi <strong>%s</strong>,</p>
-            <p>Great news — your booking has been <strong>confirmed</strong>!</p>
+            <p>Great news &mdash; your booking has been <strong>confirmed</strong>!</p>
             <div class="highlight-green">
               <p>&#10003; &nbsp;<strong>%s</strong> &nbsp;&middot;&nbsp; %s<br/>
                  Date: <strong>%s</strong><br/>
@@ -655,9 +645,7 @@ public class EmailTemplates {
             </div>
             <p>Please arrive a few minutes early. If you need to reschedule or cancel,
                contact us as soon as possible so we can offer the slot to another client.</p>
-            <p style="color:#94A3B8;font-size:13px;">
-              See you then!
-            </p>
+            <p style="color:#94A3B8;font-size:13px;">See you then!</p>
             """.formatted(
                 org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
                 org.springframework.web.util.HtmlUtils.htmlEscape(bookingNumber),
@@ -666,14 +654,8 @@ public class EmailTemplates {
     }
 
     /**
-     * Sent to the client when their booking is cancelled (by either party).
-     *
-     * WHY include the reason?
-     * Transparent communication reduces client frustration.  A "cancelled with
-     * no explanation" email damages trust.  Even a simple reason like "staff
-     * unavailability" is better than silence.
-     *
-     * @param reason  May be null — we render a generic message in that case.
+     * Sent when a booking is cancelled by either party.
+     * WHY include reason? Transparent communication reduces client frustration.
      */
     public static String bookingCancelled(String clientName, String bookingNumber,
                                           String serviceName, String date,
@@ -684,7 +666,8 @@ public class EmailTemplates {
                 : "<p style=\"color:#94A3B8;font-size:13px;\">No specific reason was provided.</p>";
         return wrap("""
             <p>Hi <strong>%s</strong>,</p>
-            <p>We are sorry to inform you that the following booking has been <strong>cancelled</strong>:</p>
+            <p>We are sorry to inform you that the following booking has been
+               <strong>cancelled</strong>:</p>
             <div class="highlight-amber">
               <p>%s &nbsp;&middot;&nbsp; %s<br/>
                  Date: <strong>%s</strong></p>
@@ -700,13 +683,12 @@ public class EmailTemplates {
     }
 
     /**
-     * Appointment reminder — sent the day before (or morning of) a confirmed booking.
-     * Called by a @Scheduled nightly job that checks bookings for tomorrow.
+     * Appointment reminder — sent the evening before a confirmed booking
+     * by BookingReminderScheduler (@Scheduled nightly at 20:00).
      *
-     * WHY a separate reminder template?
-     * The confirmation email is sent at booking time — often days or weeks before
-     * the appointment.  The reminder is sent 24h before so the client doesn't forget.
-     * Two different emails for two different purposes.
+     * WHY separate from bookingConfirmed?
+     * Confirmation is sent at booking time (days or weeks before).
+     * This reminder is sent 24h before so the client doesn't forget.
      */
     public static String bookingReminder(String clientName, String serviceName,
                                          String date, String startTime, String endTime) {
@@ -720,12 +702,110 @@ public class EmailTemplates {
             </div>
             <p>Please arrive a few minutes before your scheduled time.
                If you can no longer make it, please let us know as soon as possible.</p>
-            <p style="color:#94A3B8;font-size:13px;">
-              We look forward to seeing you!
-            </p>
+            <p style="color:#94A3B8;font-size:13px;">We look forward to seeing you!</p>
             """.formatted(
                 org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
                 org.springframework.web.util.HtmlUtils.htmlEscape(serviceName),
                 date, startTime, endTime));
     }
+
+    // ── PSiRA compliance alert ─────────────────────────────────────────────────
+
+    /**
+     * Data carrier for PSiRA expiry information per guard.
+     * Used by psiraComplianceAlert() and PsiraComplianceScheduler.
+     *
+     * WHY a nested record and not a top-level class?
+     * This type exists solely to pass data between PsiraComplianceScheduler and
+     * this template method.  Nesting it here keeps the two tightly coupled things
+     * in one place and avoids a separate DTO file for what is essentially a
+     * display-only value object.
+     */
+    public record GuardExpiryInfo(
+            String              fullName,
+            String              psiraNumber,
+            java.time.LocalDate expiryDate,
+            boolean             isExpired
+    ) {}
+
+    /**
+     * PSiRA compliance alert — sent nightly at 07:00 by PsiraComplianceScheduler
+     * when guards have expired or expiring-within-30-days registrations.
+     *
+     * @param expired      Guards whose PSiRA has already lapsed
+     * @param expiringSoon Guards whose PSiRA lapses within the next 30 days
+     * @param today        The date the report was generated (shown in the body)
+     */
+    public static String psiraComplianceAlert(
+            java.util.List<GuardExpiryInfo> expired,
+            java.util.List<GuardExpiryInfo> expiringSoon,
+            java.time.LocalDate today) {
+
+        StringBuilder rows = new StringBuilder();
+
+        if (!expired.isEmpty()) {
+            rows.append("""
+                <div class="highlight-red">
+                  <p><strong>&#9888; Expired PSiRA registrations (%d guard%s)</strong><br>
+                  These guards cannot legally be deployed until their PSiRA is renewed.</p>
+                </div>
+            """.formatted(expired.size(), expired.size() == 1 ? "" : "s"));
+
+            for (GuardExpiryInfo g : expired) {
+                rows.append("""
+                    <div class="party-row">
+                      <div class="name">%s</div>
+                      <div class="role">PSiRA: %s &nbsp;&middot;&nbsp; Expired: %s</div>
+                    </div>
+                """.formatted(
+                        org.springframework.web.util.HtmlUtils.htmlEscape(g.fullName()),
+                        g.psiraNumber() != null
+                                ? org.springframework.web.util.HtmlUtils.htmlEscape(g.psiraNumber())
+                                : "&mdash;",
+                        g.expiryDate()
+                ));
+            }
+        }
+
+        if (!expiringSoon.isEmpty()) {
+            rows.append("""
+                <div class="highlight-amber" style="margin-top:16px">
+                  <p><strong>&#9200; PSiRA registrations expiring within 30 days (%d guard%s)</strong><br>
+                  Submit renewal applications now to avoid deployment disruptions.</p>
+                </div>
+            """.formatted(expiringSoon.size(), expiringSoon.size() == 1 ? "" : "s"));
+
+            for (GuardExpiryInfo g : expiringSoon) {
+                long daysLeft = today.until(g.expiryDate(), java.time.temporal.ChronoUnit.DAYS);
+                rows.append("""
+                    <div class="party-row">
+                      <div class="name">%s</div>
+                      <div class="role">PSiRA: %s &nbsp;&middot;&nbsp; Expires: %s (%d day%s)</div>
+                    </div>
+                """.formatted(
+                        org.springframework.web.util.HtmlUtils.htmlEscape(g.fullName()),
+                        g.psiraNumber() != null
+                                ? org.springframework.web.util.HtmlUtils.htmlEscape(g.psiraNumber())
+                                : "&mdash;",
+                        g.expiryDate(),
+                        daysLeft,
+                        daysLeft == 1 ? "" : "s"
+                ));
+            }
+        }
+
+        return wrap("""
+            <p>This is your daily PSiRA compliance report for <strong>%s</strong>.</p>
+            %s
+            <p>Please log in to HandyFlow to update guard PSiRA details and take
+               action before shifts are affected.</p>
+            <div class="legal">
+              <p>PSiRA registration is required under the Private Security Industry
+              Regulation Act (Act 56 of 2001). Deploying an unregistered guard exposes
+              your company to regulatory fines and criminal liability. This report is
+              generated automatically each morning at 07:00.</p>
+            </div>
+        """.formatted(today.toString(), rows.toString()));
+    }
+
 }

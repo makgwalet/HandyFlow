@@ -132,4 +132,43 @@ public class GuardController {
                 guardService.updatePhoto(TenantContext.getTenantIdAsObject(), id,
                         body.get("photoBase64"))));
     }
+
+    /**
+     * Reset a guard's PIN — supervisor-only operation.
+     *
+     * WHY supervisor-only and not self-service?
+     * A guard must not be able to reset their own PIN without supervision —
+     * that's exactly the social-engineering vector for "someone else logging
+     * in as me."  The supervisor sets the temp PIN in person, logs the reason,
+     * and the guard is forced to change it on first use.
+     *
+     * The temporary PIN is returned once in the response body (plaintext) and
+     * NOT stored — only the bcrypt hash is persisted.  The supervisor reads
+     * it to the guard verbally or sends it to the guard's registered phone.
+     *
+     * Phase 2: integrate with SMS (same EmailService pattern) to deliver the
+     * temp PIN to the guard's registered phone automatically.
+     */
+    @PostMapping("/{id}/reset-pin")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @Operation(
+            summary = "Reset a guard's PIN (supervisor only)",
+            description = """
+            Generates a random 6-digit temporary PIN, stores its bcrypt hash,
+            marks pin_must_change = true so the guard must set a new PIN on
+            first login, and logs the reset to the audit trail.
+            The temporary PIN is returned once in the response — it is not
+            stored and cannot be retrieved again.
+            """
+    )
+    public ResponseEntity<ApiResponse<ResetPinResponse>> resetPin(
+            @PathVariable UUID id,
+            @Valid @RequestBody ResetPinRequest req) {
+        featureGuard.requireModule("security");
+        var tenantId    = TenantContext.getTenantIdAsObject();
+        var supervisorId = TenantContext.getCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.success(
+                guardService.resetPin(tenantId, id, supervisorId, req)));
+    }
 }
+

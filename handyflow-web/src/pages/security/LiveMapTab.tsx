@@ -1,37 +1,79 @@
 // src/pages/security/LiveMapTab.tsx
+// Changes from original:
+//   - Fetch last checkpoint scan per active shift via GET /shifts/{id}/scans
+//   - "Last checkpoint: —" replaced with real checkpoint name + time
+//   - 30s refetch for both shifts and scan data
+
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Radio, MapPin, QrCode, Bluetooth, Navigation, Clock, Shield } from "lucide-react"
 
 const SCAN_TYPE_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  QR:       { label: "QR Code",   color: "#1D4ED8", icon: QrCode },
-  NFC:      { label: "NFC Tag",   color: "#7C3AED", icon: Radio },
-  BLE:      { label: "BLE Beacon",color: "#0D9488", icon: Bluetooth },
-  GPS_PING: { label: "GPS Ping",  color: "#166534", icon: Navigation },
-  MANUAL:   { label: "Manual",    color: "#D97706", icon: Clock },
+  QR:       { label: "QR Code",    color: "#1D4ED8", icon: QrCode },
+  NFC:      { label: "NFC Tag",    color: "#7C3AED", icon: Radio },
+  BLE:      { label: "BLE Beacon", color: "#0D9488", icon: Bluetooth },
+  GPS_PING: { label: "GPS Ping",   color: "#166534", icon: Navigation },
+  MANUAL:   { label: "Manual",     color: "#D97706", icon: Clock },
+}
+
+interface ScanLog {
+  id: string; checkpointId: string; checkpointName: string
+  guardId: string; shiftId: string; scannedAt: string
+  latitude: number | null; longitude: number | null; scanType: string
 }
 
 export default function LiveMapTab() {
   const [selectedGuard, setSelectedGuard] = useState<string | null>(null)
 
-  const { data: guards = [] } = useQuery({
+  const { data: guards = [] } = useQuery<any[]>({
     queryKey: ["guards"],
-    queryFn: async () => { const r = await apiClient.get("/api/v1/security/guards?size=100"); return (r.data?.data ?? r.data).content ?? [] },
-    refetchInterval: 30000,
-  })
-
-  const { data: shifts = [] } = useQuery({
-    queryKey: ["active-shifts"],
     queryFn: async () => {
-      const r = await apiClient.get("/api/v1/security/shifts?size=100")
-      const all = (r.data?.data ?? r.data).content ?? []
-      return (all as any[]).filter((s: any) => s.status === "ACTIVE")
+      const r = await apiClient.get("/api/v1/security/guards?size=100")
+      const p = r.data?.data ?? r.data
+      return p?.content ?? []
     },
     refetchInterval: 30000,
   })
 
-  const activeCount = (shifts as any[]).length
+  const { data: shifts = [] } = useQuery<any[]>({
+    queryKey: ["active-shifts"],
+    queryFn: async () => {
+      const r = await apiClient.get("/api/v1/security/shifts?size=100")
+      const p = r.data?.data ?? r.data
+      const all = p?.content ?? []
+      return all.filter((s: any) => s.status === "ACTIVE")
+    },
+    refetchInterval: 30000,
+  })
+
+  // Fetch last checkpoint scan for each active shift
+  const { data: shiftScans = {} } = useQuery<Record<string, ScanLog | null>>({
+    queryKey: ["shift-scans", shifts.map((s: any) => s.id).join(",")],
+    queryFn: async () => {
+      if (shifts.length === 0) return {}
+      const results = await Promise.all(
+        shifts.map(async (shift: any) => {
+          try {
+            const r = await apiClient.get(`/api/v1/security/shifts/${shift.id}/scans`)
+            const p = r.data?.data ?? r.data
+            const scans: ScanLog[] = Array.isArray(p) ? p : []
+            return [shift.id, scans.length > 0 ? scans[scans.length - 1] : null]
+          } catch {
+            return [shift.id, null]
+          }
+        })
+      )
+      return Object.fromEntries(results)
+    },
+    enabled: shifts.length > 0,
+    refetchInterval: 30000,
+  })
+
+  const activeCount = shifts.length
+
+  const fmtTime = (iso: string) =>
+    new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })
 
   return (
     <div>
@@ -41,7 +83,7 @@ export default function LiveMapTab() {
           <p style={{ margin: 0, fontSize: 13, color: "#94A3B8" }}>Real-time guard positions and checkpoint scans</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 14px", background: "#DCFCE7", border: "1px solid #86EFAC", borderRadius: 20 }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22C55E", animation: "pulse 2s infinite" }} />
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22C55E" }} />
           <span style={{ fontSize: 13, fontWeight: 600, color: "#166534" }}>{activeCount} guards on duty</span>
         </div>
       </div>
@@ -60,25 +102,21 @@ export default function LiveMapTab() {
           ))}
         </div>
         <div style={{ marginTop: 8, fontSize: 12, color: "#64748B" }}>
-          Future: CAT phone app will send GPS pings every 5 minutes during active shifts. NFC tags and BLE beacons supported for indoor checkpoints without GPS.
+          Future: CAT phone app will send GPS pings every 5 minutes during active shifts. NFC tags and BLE beacons supported for indoor checkpoints.
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16 }}>
         {/* Map placeholder */}
         <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden", minHeight: 500, position: "relative", background: "#F8FAFC" }}>
-          {/* Simulated map background */}
           <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, #EFF6FF 0%, #F0FDF4 50%, #FFFBEB 100%)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
 
-            {/* Mock guard pins */}
-            {(shifts as any[]).slice(0, 4).map((shift: any, i: number) => {
+            {shifts.map((shift: any, i: number) => {
               const positions = [
-                { top: "20%", left: "25%" },
-                { top: "45%", left: "60%" },
-                { top: "65%", left: "30%" },
-                { top: "30%", left: "70%" },
+                { top: "20%", left: "25%" }, { top: "45%", left: "60%" },
+                { top: "65%", left: "30%" }, { top: "30%", left: "70%" },
               ]
-              const pos = positions[i] ?? positions[0]
+              const pos = positions[i % positions.length]
               return (
                 <div key={shift.id} style={{ position: "absolute", ...pos, transform: "translate(-50%, -50%)", cursor: "pointer", zIndex: 2 }}
                   onClick={() => setSelectedGuard(shift.guardId)}>
@@ -88,8 +126,7 @@ export default function LiveMapTab() {
                   <div style={{ position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)", marginTop: 4, background: "#1B3A6B", color: "#fff", borderRadius: 6, padding: "2px 8px", fontSize: 10, fontWeight: 600, whiteSpace: "nowrap" }}>
                     Guard {i + 1}
                   </div>
-                  {/* Pulse ring */}
-                  <div style={{ position: "absolute", inset: -6, borderRadius: "50%", border: "2px solid #1B3A6B", opacity: 0.3, animation: "ping 2s infinite" }} />
+                  <div style={{ position: "absolute", inset: -6, borderRadius: "50%", border: "2px solid #1B3A6B", opacity: 0.3 }} />
                 </div>
               )
             })}
@@ -125,13 +162,15 @@ export default function LiveMapTab() {
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 4 }}>Active Guards</div>
 
-          {(shifts as any[]).length === 0 ? (
+          {shifts.length === 0 ? (
             <div style={{ textAlign: "center", padding: "30px 16px", border: "1px dashed #E2E8F0", borderRadius: 10, color: "#94A3B8", fontSize: 13 }}>
               No guards currently on shift
             </div>
           ) : (
-            (shifts as any[]).map((shift: any, i: number) => {
-              const guard = (guards as any[]).find(g => g.id === shift.guardId)
+            shifts.map((shift: any, i: number) => {
+              const guard   = guards.find((g: any) => g.id === shift.guardId)
+              const lastScan: ScanLog | null = shiftScans[shift.id] ?? null
+
               return (
                 <div key={shift.id}
                   onClick={() => setSelectedGuard(selectedGuard === shift.guardId ? null : shift.guardId)}
@@ -148,23 +187,37 @@ export default function LiveMapTab() {
                       <div style={{ fontSize: 11, color: "#94A3B8" }}>Grade {guard?.grade ?? "—"}</div>
                     </div>
                   </div>
+
                   <div style={{ fontSize: 11, color: "#64748B" }}>
-                    Shift: {new Date(shift.startAt).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })} – {new Date(shift.endAt).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}
+                    Shift: {fmtTime(shift.startAt)} – {fmtTime(shift.endAt)}
                   </div>
-                  {/* Last scan info */}
+
+                  {/* Last checkpoint — now real data */}
                   <div style={{ marginTop: 8, padding: "6px 10px", background: "#F8FAFC", borderRadius: 6, fontSize: 11, color: "#64748B" }}>
-                    Last checkpoint: —
+                    {lastScan ? (
+                      <span>
+                        Last: <strong style={{ color: "#0F172A" }}>{lastScan.checkpointName}</strong>
+                        {" · "}{fmtTime(lastScan.scannedAt)}
+                        {lastScan.scanType && lastScan.scanType !== "QR" && (
+                          <span style={{ marginLeft: 6, background: `${SCAN_TYPE_CONFIG[lastScan.scanType]?.color ?? "#64748B"}18`, color: SCAN_TYPE_CONFIG[lastScan.scanType]?.color ?? "#64748B", padding: "1px 5px", borderRadius: 10, fontSize: 10, fontWeight: 600 }}>
+                            {SCAN_TYPE_CONFIG[lastScan.scanType]?.label ?? lastScan.scanType}
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <span>No checkpoints scanned yet</span>
+                    )}
                   </div>
                 </div>
               )
             })
           )}
 
-          {/* Device legend */}
+          {/* Coming soon notice */}
           <div style={{ marginTop: 8, padding: "14px 16px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#92400E", marginBottom: 8 }}>Coming soon</div>
             <div style={{ fontSize: 11, color: "#78350F", lineHeight: 1.6 }}>
-              CAT phone GPS tracking — guards on active shifts will show real-time positions updated every 5 minutes. NFC wristbands and BLE ankle tags also supported.
+              CAT phone GPS tracking — guards on active shifts will show real-time positions updated every 5 minutes.
             </div>
           </div>
         </div>

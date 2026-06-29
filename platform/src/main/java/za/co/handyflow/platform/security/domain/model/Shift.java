@@ -115,6 +115,25 @@ public class Shift {
 
     public boolean isDeleted() { return deletedAt != null; }
 
+    /**
+     * Re-assigns this shift to a different guard after a swap is approved.
+     *
+     * WHY a dedicated domain method rather than a setter?
+     * The reassignment must be traceable — it happens only through an approved
+     * ShiftSwapRequest, and the shift's updatedAt reflects the change.
+     * A generic setGuardId() setter would allow silent reassignment anywhere,
+     * making the audit trail impossible to reconstruct.
+     * This method is only called from ShiftSwapService.approveSwap().
+     */
+    public void reassignGuard(UUID newGuardId) {
+        if (this.status != ShiftStatus.SCHEDULED) {
+            throw new IllegalStateException(
+                    "Only SCHEDULED shifts can be reassigned via swap (status: " + this.status + ")");
+        }
+        this.guardId   = newGuardId;
+        this.updatedAt = java.time.Instant.now();
+    }
+
     @PreUpdate
     void onUpdate() { this.updatedAt = Instant.now(); }
 }

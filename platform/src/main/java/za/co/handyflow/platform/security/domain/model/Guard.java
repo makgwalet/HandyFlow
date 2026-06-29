@@ -122,7 +122,7 @@ public class Guard {
 
     public static Guard create(TenantId tenantId, String firstName, String lastName,
                                String psiraNumber, String idNumber, String phone,
-                               String grade) {
+                               String grade, java.time.LocalDate psiraExpiryDate) {
         Guard g = new Guard();
         g.tenantId    = tenantId;
         g.firstName   = firstName.trim();
@@ -132,8 +132,9 @@ public class Guard {
         g.phone       = phone;
         g.grade       = grade;
         g.status      = "ACTIVE";
-        g.active      = true;
-        g.createdAt   = Instant.now();
+        g.active          = true;
+        g.psiraExpiryDate = psiraExpiryDate;
+        g.createdAt       = Instant.now();
         g.updatedAt   = Instant.now();
         return g;
     }
@@ -145,15 +146,17 @@ public class Guard {
     }
 
     public void update(String firstName, String lastName, String psiraNumber,
-                       String idNumber, String phone, String grade, String notes) {
-        this.firstName   = firstName.trim();
-        this.lastName    = lastName.trim();
-        this.psiraNumber = psiraNumber;
-        this.idNumber    = idNumber;
-        this.phone       = phone;
-        this.grade       = grade;
-        this.notes       = notes;
-        this.updatedAt   = Instant.now();
+                       String idNumber, String phone, String grade, String notes,
+                       java.time.LocalDate psiraExpiryDate) {
+        this.firstName        = firstName.trim();
+        this.lastName         = lastName.trim();
+        this.psiraNumber      = psiraNumber;
+        this.idNumber         = idNumber;
+        this.phone            = phone;
+        this.grade            = grade;
+        this.notes            = notes;
+        this.psiraExpiryDate  = psiraExpiryDate;
+        this.updatedAt        = Instant.now();
     }
 
     /**
@@ -232,6 +235,129 @@ public class Guard {
     }
 
     public boolean isDeleted() { return deletedAt != null; }
+
+    // ── Phase 1.5: PIN lifecycle ───────────────────────────────────────────────
+
+    @Column(name = "pin_hash", length = 72)
+    private String pinHash;
+
+    @Column(name = "pin_set_at")
+    private java.time.Instant pinSetAt;
+
+    @Column(name = "pin_expires_at")
+    private java.time.Instant pinExpiresAt;
+
+    @Column(name = "pin_must_change", nullable = false)
+    private boolean pinMustChange = false;
+
+    @Column(name = "pin_failure_count", nullable = false)
+    private int pinFailureCount = 0;
+
+    @Column(name = "pin_locked_until")
+    private java.time.Instant pinLockedUntil;
+
+    @Column(name = "pin_history")
+    private String pinHistory;  // JSON array of last 5 bcrypt hashes
+
+    /**
+     * Sets a new PIN hash (e.g. after a supervisor reset or a self-change).
+     * pinMustChange=true forces the guard to set a new PIN on first login
+     * when called from a supervisor reset flow.
+     */
+    public void setPinHash(String pinHash, java.time.Instant expiresAt) {
+        this.pinHash       = pinHash;
+        this.pinSetAt      = java.time.Instant.now();
+        this.pinExpiresAt  = expiresAt;
+        this.pinMustChange = true;  // supervisor reset always forces a change
+        this.pinFailureCount = 0;
+        this.pinLockedUntil  = null;
+        this.updatedAt = java.time.Instant.now();
+    }
+
+    /** Called on successful PIN verification — resets failure count. */
+    public void recordPinSuccess() {
+        this.pinFailureCount = 0;
+        this.pinLockedUntil  = null;
+        this.updatedAt = java.time.Instant.now();
+    }
+
+    /**
+     * Called on PIN failure.  After 5 consecutive failures, locks the PIN
+     * for 30 minutes.  Returns true if the account is now locked.
+     */
+    public boolean recordPinFailure() {
+        this.pinFailureCount++;
+        if (this.pinFailureCount >= 5) {
+            this.pinLockedUntil = java.time.Instant.now()
+                    .plus(30, java.time.temporal.ChronoUnit.MINUTES);
+        }
+        this.updatedAt = java.time.Instant.now();
+        return this.pinLockedUntil != null;
+    }
+
+    public boolean isPinLocked() {
+        return pinLockedUntil != null && pinLockedUntil.isAfter(java.time.Instant.now());
+    }
+
+    public boolean isPinExpired() {
+        return pinExpiresAt != null && pinExpiresAt.isBefore(java.time.Instant.now());
+    }
+
+    // ── Phase 2 fields (stored now, used in Phase 2) ───────────────────────────
+
+    @Column(name = "registered_device_id", length = 200)
+    private String registeredDeviceId;
+
+    @Column(name = "face_embedding", columnDefinition = "TEXT")
+    private String faceEmbedding;  // Base64-encoded float vector; images are never stored
+
+    public void setRegisteredDeviceId(String deviceId) {
+        this.registeredDeviceId = deviceId;
+        this.updatedAt = java.time.Instant.now();
+    }
+
+    public void setFaceEmbedding(String base64Embedding) {
+        this.faceEmbedding = base64Embedding;
+        this.updatedAt = java.time.Instant.now();
+    }
+
+    /**
+     * Called on supervisor enrollment — clears the must-change flag since the
+     * supervisor set the PIN in person (not a remotely-delivered temp PIN).
+     */
+    public void clearPinMustChange() {
+        this.pinMustChange   = false;
+        this.pinFailureCount = 0;
+        this.pinLockedUntil  = null;
+        this.updatedAt = java.time.Instant.now();
+    }
+
+    /**
+     * Updates PIN hash and rotates the history (keeps last 5 hashes).
+     * Called on guard self-service PIN change.
+     */
+    public void updatePinWithHistory(String newHash) {
+        // Rotate history — keep last 5 (including the one being replaced)
+        java.util.List<String> history = new java.util.ArrayList<>();
+        if (this.pinHistory != null && !this.pinHistory.isBlank()) {
+            // Simple JSON array stored as text: ["hash1","hash2",...]
+            String stripped = this.pinHistory.replaceAll("[\\[\\]\"]", "");
+            if (!stripped.isBlank()) {
+                for (String h : stripped.split(",")) {
+                    if (!h.isBlank()) history.add(h.trim());
+                }
+            }
+        }
+        if (this.pinHash != null) history.add(0, this.pinHash); // push current to history
+        if (history.size() > 5) history = history.subList(0, 5);
+        this.pinHistory    = "[\"" + String.join("\",\"", history) + "\"]";
+        this.pinHash       = newHash;
+        this.pinSetAt      = java.time.Instant.now();
+        this.pinMustChange = false;
+        this.pinFailureCount = 0;
+        this.pinLockedUntil  = null;
+        this.updatedAt = java.time.Instant.now();
+    }
 
     @PreUpdate
     void onUpdate() { this.updatedAt = Instant.now(); }

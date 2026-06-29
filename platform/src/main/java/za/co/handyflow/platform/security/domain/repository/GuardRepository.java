@@ -87,4 +87,39 @@ public interface GuardRepository extends JpaRepository<Guard, UUID> {
         ORDER BY g.lastName, g.firstName
         """)
     Page<Guard> findSchedulable(TenantId tenantId, Pageable pageable);
+
+    // ── Guard authentication (Phase 1.5) ──────────────────────────────────────
+
+    /**
+     * Look up a guard by phone number across all tenants — used by the
+     * guard login endpoint where the guard identifies by phone, not email.
+     *
+     * WHY no tenant filter here?
+     * The guard provides their phone number (unique per real person) and a PIN.
+     * We look them up by phone first, then verify PIN, then scope all subsequent
+     * operations to their tenant.  If we filtered by tenant first we'd need the
+     * tenant to be known before login — a chicken-and-egg problem.
+     *
+     * SECURITY: phone numbers are not secret, so this query alone proves nothing.
+     * The PIN check in GuardAuthService is the actual authentication step.
+     */
+    @Query("""
+        SELECT g FROM Guard g
+        WHERE g.phone = :phone
+        AND g.deletedAt IS NULL
+        AND g.active = true
+        """)
+    Optional<Guard> findActiveByPhone(String phone);
+
+    /**
+     * Find guard by ID for authentication purposes — includes all statuses
+     * so GuardAuthService can return appropriate error messages
+     * (e.g. "your account is suspended" rather than "guard not found").
+     */
+    @Query("""
+        SELECT g FROM Guard g
+        WHERE g.id = :id
+        AND g.deletedAt IS NULL
+        """)
+    Optional<Guard> findByIdForAuth(UUID id);
 }

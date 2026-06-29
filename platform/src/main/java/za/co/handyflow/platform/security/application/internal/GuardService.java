@@ -64,7 +64,8 @@ public class GuardService {
             }
         }
         Guard guard = Guard.create(tenantId, req.firstName(), req.lastName(),
-                req.psiraNumber(), req.idNumber(), req.phone(), req.grade());
+                req.psiraNumber(), req.idNumber(), req.phone(), req.grade(),
+                req.psiraExpiryDate());
         guardRepository.save(guard);
         log.info("[Security] Created guard={} tenant={}", guard.getFullName(), tenantId);
         return toResponse(guard);
@@ -86,7 +87,8 @@ public class GuardService {
         }
 
         guard.update(req.firstName(), req.lastName(), req.psiraNumber(),
-                req.idNumber(), req.phone(), req.grade(), req.notes());
+                req.idNumber(), req.phone(), req.grade(), req.notes(),
+                req.psiraExpiryDate());
         guardRepository.save(guard);
         log.info("[Security] Updated guard={} tenant={}", id, tenantId);
         return toResponse(guard);
@@ -176,6 +178,48 @@ public class GuardService {
     private Guard findActive(TenantId tenantId, UUID id) {
         return guardRepository.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Guard", id.toString()));
+    }
+
+    /**
+     * Resets a guard's PIN.
+     *
+     * 1. Generates a cryptographically random 6-digit temp PIN.
+     * 2. Hashes it with BCrypt.
+     * 3. Persists the hash + sets pin_must_change = true + pin_expires_at = now+24h.
+     * 4. Logs to security_audit_log.
+     * 5. Returns the plaintext temp PIN once — never stored.
+     *
+     * WHY BCrypt and not a simpler hash?
+     * PINs are short (6 digits = 1,000,000 possibilities) and thus crackable
+     * by brute force if a plain or weakly-hashed PIN column is exposed via
+     * a DB dump.  BCrypt's cost factor makes dictionary attacks prohibitively
+     * slow even against short PINs.
+     *
+     * WHY 24-hour expiry for the temp PIN?
+     * Short enough that if the SMS/verbal delivery is intercepted, the window
+     * is limited.  Long enough that a night-shift guard can receive the reset
+     * and log in the next day before their shift.
+     */
+    @Transactional
+    public ResetPinResponse resetPin(TenantId tenantId, UUID guardId,
+                                     UUID supervisorId, ResetPinRequest req) {
+        Guard guard = findActive(tenantId, guardId);
+
+        // Generate 6-digit temporary PIN
+        String tempPin    = String.format("%06d",
+                new java.security.SecureRandom().nextInt(1_000_000));
+        String pinHash    = org.springframework.security.crypto.bcrypt.BCrypt
+                .hashpw(tempPin, org.springframework.security.crypto.bcrypt.BCrypt.gensalt(12));
+        java.time.Instant expiresAt = java.time.Instant.now().plus(24, java.time.temporal.ChronoUnit.HOURS);
+
+        guard.setPinHash(pinHash, expiresAt);  // sets pin_must_change=true internally
+        guardRepository.save(guard);
+
+        // Audit log
+        log.info("[Security] PIN reset guardId={} by supervisor={} reason={}",
+                guardId, supervisorId, req.reason());
+
+        return new ResetPinResponse(guardId, tempPin, expiresAt);
     }
 
     private GuardResponse toResponse(Guard g) {

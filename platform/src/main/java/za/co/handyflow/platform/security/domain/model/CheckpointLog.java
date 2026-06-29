@@ -41,9 +41,17 @@ public class CheckpointLog {
     private BigDecimal longitude;
     private String notes;
 
+    /**
+     * How the checkpoint was verified: QR | NFC | BLE | GPS_PING | MANUAL
+     * Stored per-log so patrol audit reports can show method used at each checkpoint.
+     */
+    @Column(name = "scan_type")
+    private String scanType;
+
     public static CheckpointLog create(TenantId tenantId, UUID checkpointId,
                                        UUID guardId, UUID shiftId,
-                                       BigDecimal latitude, BigDecimal longitude) {
+                                       BigDecimal latitude, BigDecimal longitude,
+                                       String scanType) {
         CheckpointLog log = new CheckpointLog();
         log.tenantId      = tenantId;
         log.checkpointId  = checkpointId;
@@ -52,6 +60,7 @@ public class CheckpointLog {
         log.scannedAt     = Instant.now();
         log.latitude      = latitude;
         log.longitude     = longitude;
+        log.scanType      = scanType;
         return log;
     }
 }

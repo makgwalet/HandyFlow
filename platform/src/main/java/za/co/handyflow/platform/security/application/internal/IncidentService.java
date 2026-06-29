@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.security.domain.model.Incident;
+import za.co.handyflow.platform.security.application.internal.CheckpointScanService;
 import za.co.handyflow.platform.security.domain.repository.IncidentRepository;
 import za.co.handyflow.platform.security.domain.repository.GuardRepository;
 import za.co.handyflow.platform.security.domain.repository.SiteRepository;
@@ -158,6 +159,22 @@ public class IncidentService {
                 req.latitude(),
                 req.longitude()
         );
+
+        // Fix bug #21: cross-check incident GPS against site location.
+        // Warn (don't reject) — mobile GPS can be inaccurate in buildings.
+        if (req.latitude() != null && req.longitude() != null) {
+            siteRepo.findActiveById(tenantId, req.siteId()).ifPresent(site -> {
+                if (site.getLatitude() != null && site.getLongitude() != null) {
+                    double dist = CheckpointScanService.haversineMetres(
+                            req.latitude(), req.longitude(),
+                            site.getLatitude(), site.getLongitude());
+                    if (dist > 2000) {
+                        log.warn("[Security] Incident GPS {}m from site '{}' — guard may not be on-site",
+                                Math.round(dist), site.getName());
+                    }
+                }
+            });
+        }
 
         // Fix bug #16: type column was never set.
         // CreateIncidentRequest now includes an optional type; default to GENERAL.

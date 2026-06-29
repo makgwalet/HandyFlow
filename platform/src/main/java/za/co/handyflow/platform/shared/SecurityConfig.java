@@ -19,6 +19,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import za.co.handyflow.platform.admin.api.AdminJwtFilter;
+import za.co.handyflow.platform.security.infrastructure.GuardJwtFilter;
 
 import java.util.List;
 
@@ -30,6 +31,7 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
     private final AdminJwtFilter adminJwtFilter;
+    private final GuardJwtFilter guardJwtFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -67,6 +69,8 @@ public class SecurityConfig {
                                 "/api/v1/admin/auth/verify-totp",
                                 "/api/v1/admin/auth/totp/setup",
                                 "/api/v1/admin/auth/totp/confirm",
+                                "/api/v1/portal/**",
+                                "/api/v1/auth/guard/**",   // guard login — no tenant JWT required
                                 "/webjars/**",           // ← SpringDoc needs this
                                 "/swagger-resources/**"  // ← SpringDoc needs this
                         ).permitAll()
@@ -76,6 +80,7 @@ public class SecurityConfig {
 
                 // Insert our JWT filter BEFORE Spring's default auth filter
                 .addFilterBefore(adminJwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(guardJwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
@@ -111,5 +116,3 @@ public class SecurityConfig {
 
 
 }
-
-

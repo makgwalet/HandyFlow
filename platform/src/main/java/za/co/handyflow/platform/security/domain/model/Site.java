@@ -89,6 +89,15 @@ public class Site {
     @Column(name = "terminated_at")
     private Instant terminatedAt;
 
+    @Column(name = "portal_token")
+    private String portalToken;
+
+    @Column(name = "portal_enabled", nullable = false)
+    private boolean portalEnabled = false;
+
+    @Column(name = "portal_label")
+    private String portalLabel;
+
     @Version
     private Long version;
 
@@ -125,6 +134,20 @@ public class Site {
         this.terminationReason = reason;
         this.terminatedAt    = Instant.now();
         this.active          = false;
+    }
+
+    public String generatePortalToken(String customLabel) {
+        this.portalToken   = java.util.UUID.randomUUID().toString();
+        this.portalEnabled = true;
+        this.portalLabel   = customLabel != null ? customLabel : this.name;
+        this.updatedAt     = java.time.Instant.now();
+        return this.portalToken;
+    }
+
+    public void disablePortal() {
+        this.portalToken   = null;
+        this.portalEnabled = false;
+        this.updatedAt     = java.time.Instant.now();
     }
 
     public boolean isDeleted() { return deletedAt != null; }
