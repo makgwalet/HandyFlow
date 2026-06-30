@@ -71,6 +71,7 @@ public class SecurityConfig {
                                 "/api/v1/admin/auth/totp/confirm",
                                 "/api/v1/portal/**",
                                 "/api/v1/auth/guard/**",   // guard login — no tenant JWT required
+                                "/api/v1/security/cameras/motion-webhook",   // camera webhook — auth via webhookSecret, not JWT
                                 "/webjars/**",           // ← SpringDoc needs this
                                 "/swagger-resources/**"  // ← SpringDoc needs this
                         ).permitAll()
@@ -116,3 +117,5 @@ public class SecurityConfig {
 
 
 }
+
+

@@ -303,6 +303,36 @@ public class Guard {
         return pinExpiresAt != null && pinExpiresAt.isBefore(java.time.Instant.now());
     }
 
+    // ── Phase 2: Guard screening rollup ────────────────────────────────────────
+
+    @Column(name = "screening_status", nullable = false, length = 20)
+    private String screeningStatus = "NOT_REQUIRED";
+
+    /** Recomputed by GuardScreeningService.updateScreeningStatus() after every record change. */
+    public void setScreeningStatus(String status) {
+        this.screeningStatus = status;
+        this.updatedAt = java.time.Instant.now();
+    }
+
+    // ── Phase 3: Firearm competency (gates armoury issue) ──────────────────────
+
+    @Column(name = "firearm_competency_number", length = 100)
+    private String firearmCompetencyNumber;
+
+    @Column(name = "firearm_competency_expiry")
+    private java.time.LocalDate firearmCompetencyExpiry;
+
+    public void setFirearmCompetency(String number, java.time.LocalDate expiry) {
+        this.firearmCompetencyNumber = number;
+        this.firearmCompetencyExpiry = expiry;
+        this.updatedAt = java.time.Instant.now();
+    }
+
+    public boolean hasFirearmCompetency() {
+        return firearmCompetencyExpiry != null
+                && !firearmCompetencyExpiry.isBefore(java.time.LocalDate.now());
+    }
+
     // ── Phase 2 fields (stored now, used in Phase 2) ───────────────────────────
 
     @Column(name = "registered_device_id", length = 200)
