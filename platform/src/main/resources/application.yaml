@@ -68,6 +68,15 @@ app:
       secret: "GdB35HWCrRPMEutmx3U1vkbITEkLRmpt7zvigkmtzEC"
       expiration-ms: 86400000  # 24 hours
       refresh-expiration-ms: 604800000  # 7 days
+    encryption: # ADD THIS
+      key: "9D0FVy7gkMA1+Y6RikJn9I1QB5diY6LwETHMMWTQ1pw="  # OR RUN: openssl rand -base64 32
+  # IMPORTANT:
+  # - Replace the key above with your own: openssl rand -base64 32
+  # - In production, use an environment variable: ${ENCRYPTION_KEY}
+  # - DO NOT commit the real key to git — treat it like a DB password
+  # - Changing this key WITHOUT a migration script will make all existing
+  #   encrypted principal data (medicalNotes, knownThreats) unreadable
+
 
   multitenancy:
     # Strategy: SCHEMA (each tenant gets own schema) vs

@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.security.application.internal.CloseProtectionService;
+import za.co.handyflow.platform.security.domain.model.AuditEvent;
 import za.co.handyflow.platform.security.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -43,7 +44,7 @@ import java.util.UUID;
  * itself. Until a role is granted VIP_DETAIL_ACCESS, nobody (including
  * tenant admins) can reach any endpoint here.
  */
-@Tag(name = "Security - Close Protection (Phase 3)")
+@Tag(name = "Security - Close Protection")
 @RestController
 @RequestMapping("/api/v1/security/cp")
 @RequiredArgsConstructor
@@ -59,15 +60,18 @@ public class CloseProtectionController {
     public ResponseEntity<ApiResponse<Page<PrincipalResponse>>> getAllPrincipals(
             Pageable pageable) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
+        UUID     actorId  = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success(
-                cpService.getAllPrincipals(tenantId, pageable)));
+                cpService.getAllPrincipals(tenantId, pageable, actorId)));
     }
 
     @GetMapping("/principals/{id}")
     @Operation(summary = "Get a principal's full record (real name, medical notes, threats)")
     public ResponseEntity<ApiResponse<PrincipalResponse>> getPrincipal(@PathVariable UUID id) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
-        return ResponseEntity.ok(ApiResponse.success(cpService.getPrincipal(tenantId, id)));
+        UUID     actorId  = TenantContext.getCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.success(
+                cpService.getPrincipal(tenantId, id, actorId)));
     }
 
     @PostMapping("/principals")
@@ -97,6 +101,33 @@ public class CloseProtectionController {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         cpService.deactivatePrincipal(tenantId, id);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // ── Audit trail (Part 9.3) ─────────────────────────────────────────────────
+
+    @GetMapping("/principals/{id}/audit")
+    @Operation(
+            summary = "Full audit trail for a principal",
+            description = "Every CREATED, UPDATED, VIEWED action on this principal record, " +
+                    "newest first. Part 9.3 compliance requirement — 'who accessed " +
+                    "this record and when.'")
+    public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<AuditEvent>>> getPrincipalAudit(
+            @PathVariable UUID id, Pageable pageable) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(
+                cpService.getPrincipalAudit(tenantId, id, pageable)));
+    }
+
+    @GetMapping("/principals/{id}/audit/views")
+    @Operation(
+            summary = "Who has viewed this principal's full record",
+            description = "VIEWED events only — the access log that answers 'who has looked " +
+                    "at this person's medical notes and threat intel.'")
+    public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<AuditEvent>>> getPrincipalViewHistory(
+            @PathVariable UUID id, Pageable pageable) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(
+                cpService.getPrincipalViewHistory(tenantId, id, pageable)));
     }
 
     // ── Protection Details ─────────────────────────────────────────────────────

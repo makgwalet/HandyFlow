@@ -85,4 +85,26 @@ public interface CheckpointLogRepository extends JpaRepository<CheckpointLog, UU
         LIMIT 1
         """)
     Optional<CheckpointLog> findLastScanSince(UUID checkpointId, Instant since);
+
+    // ── Reporting additions ────────────────────────────────────────────────────
+
+    @Query("""
+        SELECT COUNT(l) FROM CheckpointLog l
+        WHERE l.tenantId = :tenantId
+        AND l.checkpointId IN (
+            SELECT c.id FROM Checkpoint c WHERE c.site.id = :siteId
+        )
+        AND l.scannedAt >= :from
+        AND l.scannedAt < :to
+        """)
+    long countBySiteInRange(TenantId tenantId, UUID siteId, Instant from, Instant to);
+
+    @Query("""
+        SELECT COUNT(l) FROM CheckpointLog l
+        WHERE l.tenantId = :tenantId
+        AND l.guardId = :guardId
+        AND l.scannedAt >= :from
+        AND l.scannedAt < :to
+        """)
+    long countByGuardInRange(TenantId tenantId, UUID guardId, Instant from, Instant to);
 }

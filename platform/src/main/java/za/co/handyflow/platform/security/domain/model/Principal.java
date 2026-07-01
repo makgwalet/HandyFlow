@@ -23,11 +23,15 @@ import java.util.UUID;
  * phone screen doesn't expose who is being protected. Real identity is only
  * resolvable through this entity by someone with VIP_DETAIL_ACCESS.
  *
- * medicalNotes/knownThreats are NOT YET ENCRYPTED at the application layer
- * (see V115 migration header) — flagged here so a future encryption pass
- * knows exactly which two fields need it. They're still gated at the API
- * layer via VIP_DETAIL_ACCESS in the meantime, but a raw DB query bypasses
- * that gate today.
+ * medicalNotes/knownThreats are stored ENCRYPTED (AES-256-GCM) at rest as
+ * of Part 9.3 — but encryption/decryption happens at the CloseProtectionService
+ * boundary, not in this entity. This entity's fields always hold ciphertext
+ * when read from/written to the database; the service decrypts before
+ * building a PrincipalResponse and encrypts before persisting. Keeping the
+ * entity itself encryption-agnostic matches the rest of this codebase's
+ * pattern of thin entities with business logic in the service layer, and
+ * means a future switch to per-tenant keys or a different cipher only
+ * touches CloseProtectionService + FieldEncryptionService, not this class.
  */
 @Entity
 @Table(name = "security_principals")

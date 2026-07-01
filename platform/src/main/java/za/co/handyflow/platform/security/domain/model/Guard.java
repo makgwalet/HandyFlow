@@ -1,5 +1,4 @@
 // security/domain/model/Guard.java
-
 package za.co.handyflow.platform.security.domain.model;
 
 import jakarta.persistence.*;
@@ -9,37 +8,13 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Set;
 import java.util.UUID;
 
-/**
- * Guard — a PSiRA-registered security officer employed by a tenant.
- *
- * Status workflow (distinct from the active tombstone):
- *
- *   ACTIVE              → ON_LEAVE / SUSPENDED / UNDER_INVESTIGATION / TERMINATED
- *   ON_LEAVE            → ACTIVE
- *   SUSPENDED           → ACTIVE / TERMINATED
- *   UNDER_INVESTIGATION → ACTIVE / SUSPENDED / TERMINATED
- *   TERMINATED          → (terminal — no way back, soft-delete separately)
- *
- * WHY separate status from active?
- * `active = false` means the record is logically deleted.
- * `status = SUSPENDED` means the guard exists and has a history but must not
- * be scheduled for shifts until reinstated.  Collapsing suspension and deletion
- * into the same boolean loses that distinction — you can't reinstate a deleted
- * record cleanly, and you can't tell from a deleted record whether it was
- * a disciplinary suspension or a normal resignation.
- */
 @Entity
 @Table(name = "security_guards")
 @Getter
 @NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
 public class Guard {
-
-    private static final Set<String> SCHEDULABLE_STATUSES = Set.of("ACTIVE");
-    private static final Set<String> VALID_STATUSES =
-            Set.of("ACTIVE", "ON_LEAVE", "SUSPENDED", "UNDER_INVESTIGATION", "TERMINATED");
 
     @Id
     private UUID id = UUID.randomUUID();
@@ -73,36 +48,6 @@ public class Guard {
 
     private String notes;
 
-    // ── Status workflow (added in V50) ────────────────────────────────────────
-
-    /**
-     * Operational status — independent of the soft-delete tombstone (deletedAt).
-     * A guard can be ACTIVE in the DB but SUSPENDED for scheduling purposes.
-     *
-     * WHY DEFAULT 'ACTIVE'? All guards created before V50 were schedulable.
-     * The DB default keeps them schedulable after the migration.
-     */
-    @Column(nullable = false)
-    private String status = "ACTIVE";
-
-    @Column(name = "status_changed_at")
-    private Instant statusChangedAt;
-
-    @Column(name = "status_note")
-    private String statusNote;
-
-    /**
-     * PSiRA registration expiry.
-     * WHY track this?
-     * The Sectoral Determination and PSiRA regulations require a valid
-     * registration for a guard to be deployed.  Scheduling an expired guard
-     * exposes the company to regulatory fines and criminal liability.
-     * A future compliance check on createShift will block scheduling if this
-     * date is in the past.
-     */
-    @Column(name = "psira_expiry_date")
-    private LocalDate psiraExpiryDate;
-
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -118,107 +63,185 @@ public class Guard {
     @Version
     private Long version;
 
-    // ── Factory ───────────────────────────────────────────────────────────────
+    // ── Operational status (Phase 1.5) ─────────────────────────────────────────
+    // ACTIVE | ON_LEAVE | SUSPENDED | UNDER_INVESTIGATION | TERMINATED
+
+    @Column(name = "status", length = 30)
+    private String status = "ACTIVE";
+
+    @Column(name = "status_note")
+    private String statusNote;
+
+    @Column(name = "status_changed_at")
+    private Instant statusChangedAt;
+
+    @Column(name = "status_changed_by")
+    private UUID statusChangedBy;
+
+    // ── PSiRA compliance ───────────────────────────────────────────────────────
+
+    @Column(name = "psira_expiry_date")
+    private LocalDate psiraExpiryDate;
+
+    // ── Phase 1.5: PIN lifecycle ───────────────────────────────────────────────
+
+    @Column(name = "pin_hash")
+    private String pinHash;
+
+    @Column(name = "pin_changed_at")
+    private Instant pinChangedAt;
+
+    @Column(name = "pin_expires_at")
+    private Instant pinExpiresAt;
+
+    @Column(name = "pin_must_change")
+    private boolean pinMustChange = false;
+
+    @Column(name = "pin_failed_attempts")
+    private int pinFailedAttempts = 0;
+
+    @Column(name = "pin_locked_until")
+    private Instant pinLockedUntil;
+
+    @Column(name = "pin_history", columnDefinition = "TEXT")
+    private String pinHistory;   // JSON array of last N hashed PINs
+
+    @Column(name = "registered_device_id")
+    private String registeredDeviceId;
+
+    @Column(name = "face_embedding", columnDefinition = "TEXT")
+    private String faceEmbedding;
+
+    // ── Screening ──────────────────────────────────────────────────────────────
+
+    @Column(name = "screening_status", length = 20)
+    private String screeningStatus = "UNSCREENED";
+
+    // ── Firearms ───────────────────────────────────────────────────────────────
+
+    @Column(name = "firearm_competency_number", length = 50)
+    private String firearmCompetencyNumber;
+
+    @Column(name = "firearm_competency_expiry")
+    private LocalDate firearmCompetencyExpiry;
+
+    // ── Phase 3 Part 9.5: CP vetting tier ─────────────────────────────────────
+
+    @Column(name = "cp_vetting_tier", length = 20)
+    private String cpVettingTier;
+
+    @Column(name = "cp_vetting_cleared_at")
+    private LocalDate cpVettingClearedAt;
+
+    @Column(name = "cp_vetting_expires_at")
+    private LocalDate cpVettingExpiresAt;
+
+    // ── Phase 4: Payroll rate ──────────────────────────────────────────────────
+
+    @Column(name = "hourly_rate_cents")
+    private Integer hourlyRateCents;
+
+    @Column(name = "rate_effective_from")
+    private LocalDate rateEffectiveFrom;
+
+    // ── Phase 4: Branch scoping ────────────────────────────────────────────────
+
+    @Column(name = "primary_branch_id")
+    private UUID primaryBranchId;
+
+    // ── Factory ────────────────────────────────────────────────────────────────
 
     public static Guard create(TenantId tenantId, String firstName, String lastName,
                                String psiraNumber, String idNumber, String phone,
-                               String grade, java.time.LocalDate psiraExpiryDate) {
+                               String grade, LocalDate psiraExpiryDate) {
         Guard g = new Guard();
-        g.tenantId    = tenantId;
-        g.firstName   = firstName.trim();
-        g.lastName    = lastName.trim();
-        g.psiraNumber = psiraNumber;
-        g.idNumber    = idNumber;
-        g.phone       = phone;
-        g.grade       = grade;
-        g.status      = "ACTIVE";
-        g.active          = true;
+        g.tenantId        = tenantId;
+        g.firstName       = firstName.trim();
+        g.lastName        = lastName.trim();
+        g.psiraNumber     = psiraNumber;
+        g.idNumber        = idNumber;
+        g.phone           = phone;
+        g.grade           = grade;
         g.psiraExpiryDate = psiraExpiryDate;
+        g.active          = true;
+        g.status          = "ACTIVE";
         g.createdAt       = Instant.now();
-        g.updatedAt   = Instant.now();
+        g.updatedAt       = Instant.now();
         return g;
     }
 
-    // ── Domain methods ────────────────────────────────────────────────────────
+    // ── Queries ────────────────────────────────────────────────────────────────
 
-    public String getFullName() {
-        return firstName + " " + lastName;
+    public String getFullName() { return firstName + " " + lastName; }
+
+    public boolean isDeleted()  { return deletedAt != null; }
+
+    public boolean isSchedulable() {
+        return active && deletedAt == null
+                && "ACTIVE".equals(status)
+                && !"FLAGGED".equals(screeningStatus);
     }
+
+    public boolean isPinLocked() {
+        return pinLockedUntil != null && Instant.now().isBefore(pinLockedUntil);
+    }
+
+    public boolean isPinExpired() {
+        return pinExpiresAt != null && Instant.now().isAfter(pinExpiresAt);
+    }
+
+    public boolean isPinMustChange() { return pinMustChange; }
+
+    public boolean hasFirearmCompetency() {
+        return firearmCompetencyExpiry != null
+                && !firearmCompetencyExpiry.isBefore(LocalDate.now());
+    }
+
+    public boolean meetsVettingTierFor(String principalThreatLevel) {
+        if (principalThreatLevel == null) return true;
+        if (cpVettingExpiresAt != null && cpVettingExpiresAt.isBefore(LocalDate.now())) return false;
+        return tierRank(cpVettingTier) >= tierRank(principalThreatLevel);
+    }
+
+    private static int tierRank(String tier) {
+        if (tier == null) return 0;
+        return switch (tier) {
+            case "LOW", "STANDARD"    -> 1;
+            case "MEDIUM", "ENHANCED" -> 2;
+            case "HIGH"               -> 3;
+            case "CRITICAL"           -> 4;
+            default                   -> 0;
+        };
+    }
+
+    // ── Mutations ──────────────────────────────────────────────────────────────
 
     public void update(String firstName, String lastName, String psiraNumber,
                        String idNumber, String phone, String grade, String notes,
-                       java.time.LocalDate psiraExpiryDate) {
-        this.firstName        = firstName.trim();
-        this.lastName         = lastName.trim();
-        this.psiraNumber      = psiraNumber;
-        this.idNumber         = idNumber;
-        this.phone            = phone;
-        this.grade            = grade;
-        this.notes            = notes;
-        this.psiraExpiryDate  = psiraExpiryDate;
-        this.updatedAt        = Instant.now();
+                       LocalDate psiraExpiryDate) {
+        this.firstName       = firstName.trim();
+        this.lastName        = lastName.trim();
+        this.psiraNumber     = psiraNumber;
+        this.idNumber        = idNumber;
+        this.phone           = phone;
+        this.grade           = grade;
+        this.notes           = notes;
+        this.psiraExpiryDate = psiraExpiryDate;
+        this.updatedAt       = Instant.now();
     }
 
-    /**
-     * Updates guard status with an audit trail.
-     *
-     * WHY require a note for SUSPENDED and TERMINATED?
-     * These are serious HR/legal actions.  A status change with no explanation
-     * is worthless in a disciplinary hearing or a labour dispute.  The service
-     * layer enforces the note requirement; the domain just records it.
-     *
-     * WHY set active=false for TERMINATED?
-     * TERMINATED is a permanent end-state.  The guard should not be listed in
-     * active roster queries.  They remain in the DB for audit/history purposes
-     * (shifts, incidents, checkpoint logs retain the foreign key).
-     */
-    public void updateStatus(String newStatus, String note, UUID changedBy) {
-        if (!VALID_STATUSES.contains(newStatus)) {
-            throw new IllegalArgumentException("Invalid guard status: " + newStatus);
-        }
-        this.status          = newStatus;
-        this.statusNote      = note;
-        this.statusChangedAt = Instant.now();
-        if ("TERMINATED".equals(newStatus)) {
-            this.active = false;
-        }
+    public void updatePhoto(String photoUrl) {
+        this.photoUrl  = photoUrl;
         this.updatedAt = Instant.now();
     }
 
-    /**
-     * Whether this guard can be assigned to a new shift.
-     * Called by ShiftService.createShift before saving.
-     */
-    public boolean isSchedulable() {
-        return SCHEDULABLE_STATUSES.contains(this.status) && this.active && this.deletedAt == null;
-    }
-
-    /**
-     * Photo update for dev mode.
-     *
-     * WHY accept base64 here in dev but warn?
-     * We don't have S3 yet.  In production, the service layer should upload
-     * to object storage and pass only the CDN URL here.  The domain method
-     * accepts any string so the interface is correct for prod; the service
-     * layer is responsible for rejecting raw base64 when S3 is available.
-     *
-     * For now: if the value is a data URI (starts with "data:"), we store a
-     * placeholder token ("PENDING_UPLOAD:<first 20 chars of hash>") and log a
-     * warning so we can see the pattern but don't bloat the DB row.
-     * The frontend still shows the last-uploaded photo from the GuardResponse
-     * (which will be null for new captures until S3 is wired up).
-     */
-    public void updatePhoto(String photoUrlOrBase64) {
-        if (photoUrlOrBase64 != null && photoUrlOrBase64.startsWith("data:")) {
-            // Dev-mode guard: store a flag, not the full base64 blob.
-            // WHY? A base64-encoded 1MB photo becomes ~1.33MB of text.
-            // Storing it in a VARCHAR column bloats every SELECT on this
-            // row, kills the GuardResponse payload, and can't be CDN-cached.
-            // In prod: upload to S3 → store the CDN URL only.
-            this.photoUrl  = "PENDING_UPLOAD";
-        } else {
-            this.photoUrl = photoUrlOrBase64;
-        }
+    public void updateStatus(String status, String note, UUID changedBy) {
+        this.status          = status;
+        this.statusNote      = note;
+        this.statusChangedAt = Instant.now();
+        this.statusChangedBy = changedBy;
+        if (!"ACTIVE".equals(status)) this.active = false;
+        if ("ACTIVE".equals(status))  this.active = true;
         this.updatedAt = Instant.now();
     }
 
@@ -234,159 +257,102 @@ public class Guard {
         this.updatedAt = Instant.now();
     }
 
-    public boolean isDeleted() { return deletedAt != null; }
-
-    // ── Phase 1.5: PIN lifecycle ───────────────────────────────────────────────
-
-    @Column(name = "pin_hash", length = 72)
-    private String pinHash;
-
-    @Column(name = "pin_set_at")
-    private java.time.Instant pinSetAt;
-
-    @Column(name = "pin_expires_at")
-    private java.time.Instant pinExpiresAt;
-
-    @Column(name = "pin_must_change", nullable = false)
-    private boolean pinMustChange = false;
-
-    @Column(name = "pin_failure_count", nullable = false)
-    private int pinFailureCount = 0;
-
-    @Column(name = "pin_locked_until")
-    private java.time.Instant pinLockedUntil;
-
-    @Column(name = "pin_history")
-    private String pinHistory;  // JSON array of last 5 bcrypt hashes
+    // ── PIN lifecycle ──────────────────────────────────────────────────────────
 
     /**
-     * Sets a new PIN hash (e.g. after a supervisor reset or a self-change).
-     * pinMustChange=true forces the guard to set a new PIN on first login
-     * when called from a supervisor reset flow.
+     * Sets a new PIN hash and expiry. Also sets pin_must_change = true so the
+     * guard is forced to change their PIN on next login (used for supervisor resets).
      */
-    public void setPinHash(String pinHash, java.time.Instant expiresAt) {
-        this.pinHash       = pinHash;
-        this.pinSetAt      = java.time.Instant.now();
-        this.pinExpiresAt  = expiresAt;
-        this.pinMustChange = true;  // supervisor reset always forces a change
-        this.pinFailureCount = 0;
+    public void setPinHash(String pinHash, Instant expiresAt) {
+        this.pinHash         = pinHash;
+        this.pinExpiresAt    = expiresAt;
+        this.pinChangedAt    = Instant.now();
+        this.pinMustChange   = true;
+        this.pinFailedAttempts = 0;
         this.pinLockedUntil  = null;
-        this.updatedAt = java.time.Instant.now();
+        this.updatedAt       = Instant.now();
     }
 
-    /** Called on successful PIN verification — resets failure count. */
-    public void recordPinSuccess() {
-        this.pinFailureCount = 0;
+    /** Updates PIN and history without forcing must-change (guard-initiated change). */
+    public void updatePinWithHistory(String newPinHash) {
+        this.pinHash         = newPinHash;
+        this.pinChangedAt    = Instant.now();
+        this.pinMustChange   = false;
+        this.pinFailedAttempts = 0;
         this.pinLockedUntil  = null;
-        this.updatedAt = java.time.Instant.now();
+        this.updatedAt       = Instant.now();
+    }
+
+    public void clearPinMustChange() {
+        this.pinMustChange = false;
+        this.updatedAt     = Instant.now();
     }
 
     /**
-     * Called on PIN failure.  After 5 consecutive failures, locks the PIN
-     * for 30 minutes.  Returns true if the account is now locked.
+     * Records a failed PIN attempt. Locks the account for 15 minutes after
+     * 5 consecutive failures.
+     * @return true if the account is now locked
      */
     public boolean recordPinFailure() {
-        this.pinFailureCount++;
-        if (this.pinFailureCount >= 5) {
-            this.pinLockedUntil = java.time.Instant.now()
-                    .plus(30, java.time.temporal.ChronoUnit.MINUTES);
+        this.pinFailedAttempts++;
+        if (this.pinFailedAttempts >= 5) {
+            this.pinLockedUntil = Instant.now().plusSeconds(15 * 60);
         }
-        this.updatedAt = java.time.Instant.now();
-        return this.pinLockedUntil != null;
+        this.updatedAt = Instant.now();
+        return isPinLocked();
     }
 
-    public boolean isPinLocked() {
-        return pinLockedUntil != null && pinLockedUntil.isAfter(java.time.Instant.now());
+    public void recordPinSuccess() {
+        this.pinFailedAttempts = 0;
+        this.pinLockedUntil    = null;
+        this.updatedAt         = Instant.now();
     }
 
-    public boolean isPinExpired() {
-        return pinExpiresAt != null && pinExpiresAt.isBefore(java.time.Instant.now());
+    public void setFaceEmbedding(String embedding) {
+        this.faceEmbedding = embedding;
+        this.updatedAt     = Instant.now();
     }
-
-    // ── Phase 2: Guard screening rollup ────────────────────────────────────────
-
-    @Column(name = "screening_status", nullable = false, length = 20)
-    private String screeningStatus = "NOT_REQUIRED";
-
-    /** Recomputed by GuardScreeningService.updateScreeningStatus() after every record change. */
-    public void setScreeningStatus(String status) {
-        this.screeningStatus = status;
-        this.updatedAt = java.time.Instant.now();
-    }
-
-    // ── Phase 3: Firearm competency (gates armoury issue) ──────────────────────
-
-    @Column(name = "firearm_competency_number", length = 100)
-    private String firearmCompetencyNumber;
-
-    @Column(name = "firearm_competency_expiry")
-    private java.time.LocalDate firearmCompetencyExpiry;
-
-    public void setFirearmCompetency(String number, java.time.LocalDate expiry) {
-        this.firearmCompetencyNumber = number;
-        this.firearmCompetencyExpiry = expiry;
-        this.updatedAt = java.time.Instant.now();
-    }
-
-    public boolean hasFirearmCompetency() {
-        return firearmCompetencyExpiry != null
-                && !firearmCompetencyExpiry.isBefore(java.time.LocalDate.now());
-    }
-
-    // ── Phase 2 fields (stored now, used in Phase 2) ───────────────────────────
-
-    @Column(name = "registered_device_id", length = 200)
-    private String registeredDeviceId;
-
-    @Column(name = "face_embedding", columnDefinition = "TEXT")
-    private String faceEmbedding;  // Base64-encoded float vector; images are never stored
 
     public void setRegisteredDeviceId(String deviceId) {
         this.registeredDeviceId = deviceId;
-        this.updatedAt = java.time.Instant.now();
+        this.updatedAt          = Instant.now();
     }
 
-    public void setFaceEmbedding(String base64Embedding) {
-        this.faceEmbedding = base64Embedding;
-        this.updatedAt = java.time.Instant.now();
+    // ── Screening ──────────────────────────────────────────────────────────────
+
+    public void setScreeningStatus(String status) {
+        this.screeningStatus = status;
+        this.updatedAt       = Instant.now();
     }
 
-    /**
-     * Called on supervisor enrollment — clears the must-change flag since the
-     * supervisor set the PIN in person (not a remotely-delivered temp PIN).
-     */
-    public void clearPinMustChange() {
-        this.pinMustChange   = false;
-        this.pinFailureCount = 0;
-        this.pinLockedUntil  = null;
-        this.updatedAt = java.time.Instant.now();
+    // ── Firearms ───────────────────────────────────────────────────────────────
+
+    public void setFirearmCompetency(String competencyNumber, LocalDate expiry) {
+        this.firearmCompetencyNumber = competencyNumber;
+        this.firearmCompetencyExpiry = expiry;
+        this.updatedAt               = Instant.now();
     }
 
-    /**
-     * Updates PIN hash and rotates the history (keeps last 5 hashes).
-     * Called on guard self-service PIN change.
-     */
-    public void updatePinWithHistory(String newHash) {
-        // Rotate history — keep last 5 (including the one being replaced)
-        java.util.List<String> history = new java.util.ArrayList<>();
-        if (this.pinHistory != null && !this.pinHistory.isBlank()) {
-            // Simple JSON array stored as text: ["hash1","hash2",...]
-            String stripped = this.pinHistory.replaceAll("[\\[\\]\"]", "");
-            if (!stripped.isBlank()) {
-                for (String h : stripped.split(",")) {
-                    if (!h.isBlank()) history.add(h.trim());
-                }
-            }
-        }
-        if (this.pinHash != null) history.add(0, this.pinHash); // push current to history
-        if (history.size() > 5) history = history.subList(0, 5);
-        this.pinHistory    = "[\"" + String.join("\",\"", history) + "\"]";
-        this.pinHash       = newHash;
-        this.pinSetAt      = java.time.Instant.now();
-        this.pinMustChange = false;
-        this.pinFailureCount = 0;
-        this.pinLockedUntil  = null;
-        this.updatedAt = java.time.Instant.now();
+    // ── CP vetting ─────────────────────────────────────────────────────────────
+
+    public void setCpVettingTier(String tier, LocalDate clearedAt, LocalDate expiresAt) {
+        this.cpVettingTier      = tier;
+        this.cpVettingClearedAt = clearedAt;
+        this.cpVettingExpiresAt = expiresAt;
+        this.updatedAt          = Instant.now();
+    }
+
+    // ── Phase 4: Payroll & Branch ──────────────────────────────────────────────
+
+    public void setHourlyRate(int hourlyRateCents, LocalDate effectiveFrom) {
+        this.hourlyRateCents   = hourlyRateCents;
+        this.rateEffectiveFrom = effectiveFrom;
+        this.updatedAt         = Instant.now();
+    }
+
+    public void setPrimaryBranch(UUID branchId) {
+        this.primaryBranchId = branchId;
+        this.updatedAt       = Instant.now();
     }
 
     @PreUpdate

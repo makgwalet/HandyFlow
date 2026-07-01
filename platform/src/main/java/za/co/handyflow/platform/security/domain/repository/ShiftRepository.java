@@ -33,22 +33,6 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
         """)
     Optional<Shift> findActiveById(TenantId tenantId, UUID id);
 
-    /**
-     * Overlap detection — finds conflicting shifts for the same guard.
-     *
-     * WHY add tenantId? (fixes bug #15)
-     * The original query filtered only on guardId.  Guard UUIDs are globally
-     * unique so cross-tenant collision is essentially impossible, but the
-     * tenantId filter is defence-in-depth: if a UUID ever aliased across
-     * tenants (e.g. via a DB restore or a data migration), overlap detection
-     * would block/allow shifts based on another tenant's schedule.
-     * One extra index lookup costs nothing and is always correct.
-     *
-     * WHY exclude CANCELLED and MISSED?
-     * A CANCELLED shift no longer occupies the time slot.
-     * A MISSED shift was never started, so it logically frees the slot.
-     * Only SCHEDULED, ACTIVE, and COMPLETED shifts block rescheduling.
-     */
     @Query("""
         SELECT s FROM Shift s
         WHERE s.tenantId  = :tenantId
@@ -69,17 +53,6 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
         """)
     Page<Shift> findBySite(TenantId tenantId, UUID siteId, Pageable pageable);
 
-    /**
-     * Updates mutable shift fields — notes and endAt.
-     * Used by ShiftService.updateShift() (fixes bug #4).
-     *
-     * WHY @Modifying + native JPQL instead of adding an update() method to Shift?
-     * Shift is an aggregate root whose state transitions are controlled by domain
-     * methods (start(), complete(), cancel()).  Notes and endAt are operational
-     * metadata, not state transitions.  A JPQL update is cleaner than adding a
-     * generic setter to the domain model just to serve this one use case.
-     * Phase 1: revisit if more fields need update semantics.
-     */
     @Modifying
     @Query("""
         UPDATE Shift s
@@ -90,11 +63,6 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
         """)
     void updateShift(UUID id, String notes, Instant endAt);
 
-    // ── Phase 1.5 additions ────────────────────────────────────────────────────
-
-    /**
-     * Tenant-scoped findById — avoids fetching shifts across tenant boundaries.
-     */
     @Query("""
         SELECT s FROM Shift s
         WHERE s.tenantId = :tenantId
@@ -103,11 +71,6 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
         """)
     Optional<Shift> findByTenantAndId(TenantId tenantId, UUID id);
 
-    /**
-     * Overlap check returning a boolean — used by swap approval and rotation
-     * schedule generation.  Excludes an optional shift ID (null = no exclusion)
-     * so an existing shift can check against itself without false positives.
-     */
     @Query("""
         SELECT COUNT(s) > 0 FROM Shift s
         WHERE s.tenantId  = :tenantId
@@ -122,10 +85,6 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
                        Instant startAt, Instant endAt,
                        UUID excludeId);
 
-    /**
-     * SCHEDULED shifts whose startAt + grace period has passed — used by
-     * NoShowAlertScheduler to detect late/no-show guards.
-     */
     @Query("""
         SELECT s FROM Shift s
         WHERE s.tenantId = :tenantId
@@ -136,10 +95,6 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
         """)
     List<Shift> findScheduledStartingBefore(TenantId tenantId, Instant threshold);
 
-    /**
-     * ACTIVE shifts whose endAt + overtime grace has passed — used by
-     * NoShowAlertScheduler to detect forgotten clock-outs.
-     */
     @Query("""
         SELECT s FROM Shift s
         WHERE s.tenantId = :tenantId
@@ -149,4 +104,38 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
         ORDER BY s.endAt
         """)
     List<Shift> findActiveEndingBefore(TenantId tenantId, Instant threshold);
+
+    // ── Reporting additions ────────────────────────────────────────────────────
+
+    @Query("""
+        SELECT s FROM Shift s
+        WHERE s.tenantId = :tenantId
+        AND s.siteId = :siteId
+        AND s.startAt >= :from
+        AND s.startAt < :to
+        AND s.deletedAt IS NULL
+        ORDER BY s.startAt
+        """)
+    List<Shift> findBySiteInRange(TenantId tenantId, UUID siteId, Instant from, Instant to);
+
+    @Query("""
+        SELECT s FROM Shift s
+        WHERE s.tenantId = :tenantId
+        AND s.guardId = :guardId
+        AND s.startAt >= :from
+        AND s.startAt < :to
+        AND s.deletedAt IS NULL
+        ORDER BY s.startAt
+        """)
+    List<Shift> findByGuardInRange(TenantId tenantId, UUID guardId, Instant from, Instant to);
+
+    @Query("""
+        SELECT s FROM Shift s
+        WHERE s.tenantId = :tenantId
+        AND s.startAt >= :from
+        AND s.startAt < :to
+        AND s.deletedAt IS NULL
+        ORDER BY s.startAt
+        """)
+    List<Shift> findByTenantInRange(TenantId tenantId, Instant from, Instant to);
 }

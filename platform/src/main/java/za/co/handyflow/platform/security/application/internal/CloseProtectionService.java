@@ -55,6 +55,8 @@ public class CloseProtectionService {
     private final GuardRepository             guardRepository;
     private final AdvanceSurveyRepository     surveyRepository;
     private final ProtectionVehicleRepository vehicleRepository;
+    private final AuditEventRepository        auditRepository;
+    private final za.co.handyflow.platform.shared.FieldEncryptionService encryptionService;
 
     // ── Principal CRUD (VIP_DETAIL_ACCESS required — full detail) ─────────────
 
@@ -68,25 +70,40 @@ public class CloseProtectionService {
 
         Principal.ThreatLevel threatLevel = parseThreatLevel(req.threatLevel());
 
+        // Encrypt at the service boundary — Principal's fields hold ciphertext only.
         Principal principal = Principal.create(
                 tenantId, req.fullName(), req.aliasCodename(), threatLevel,
-                req.medicalNotes(), req.knownThreats(), req.emergencyContactsJson());
+                encryptionService.encrypt(req.medicalNotes()),
+                encryptionService.encrypt(req.knownThreats()),
+                req.emergencyContactsJson());
         principalRepository.save(principal);
 
         log.info("[Security] Principal created codename={} tenant={}",
                 req.aliasCodename(), tenantId.getValue());
+
+        // No "VIEWED" audit on create — the creating supervisor obviously
+        // already knows the data they just entered. Audit is for READS of
+        // existing records, not the act of authoring them.
         return toFullResponse(principal);
     }
 
-    @Transactional(readOnly = true)
-    public PrincipalResponse getPrincipal(TenantId tenantId, UUID id) {
-        return toFullResponse(findPrincipal(tenantId, id));
+    @Transactional
+    public PrincipalResponse getPrincipal(TenantId tenantId, UUID id, UUID actorId) {
+        Principal principal = findPrincipal(tenantId, id);
+        auditRepository.save(AuditEvent.recordView(
+                tenantId, actorId, "PRINCIPAL", id,
+                "{\"codename\":\"" + principal.getAliasCodename() + "\"}"));
+        return toFullResponse(principal);
     }
 
-    @Transactional(readOnly = true)
-    public Page<PrincipalResponse> getAllPrincipals(TenantId tenantId, Pageable pageable) {
-        return principalRepository.findAllActive(tenantId, pageable)
-                .map(this::toFullResponse);
+    @Transactional
+    public Page<PrincipalResponse> getAllPrincipals(TenantId tenantId, Pageable pageable,
+                                                    UUID actorId) {
+        Page<Principal> page = principalRepository.findAllActive(tenantId, pageable);
+        page.forEach(p -> auditRepository.save(AuditEvent.recordView(
+                tenantId, actorId, "PRINCIPAL", p.getId(),
+                "{\"codename\":\"" + p.getAliasCodename() + "\",\"context\":\"list_view\"}")));
+        return page.map(this::toFullResponse);
     }
 
     @Transactional
@@ -102,7 +119,9 @@ public class CloseProtectionService {
         }
 
         principal.update(req.fullName(), req.aliasCodename(), parseThreatLevel(req.threatLevel()),
-                req.medicalNotes(), req.knownThreats(), req.emergencyContactsJson());
+                encryptionService.encrypt(req.medicalNotes()),
+                encryptionService.encrypt(req.knownThreats()),
+                req.emergencyContactsJson());
         principalRepository.save(principal);
         return toFullResponse(principal);
     }
@@ -204,6 +223,20 @@ public class CloseProtectionService {
                     HttpStatus.FORBIDDEN, "GUARD_NOT_SCHEDULABLE");
         }
 
+        // Part 9.5 vetting gate — the guard's CP clearance tier must meet
+        // the minimum for this principal's threat level (hard block, same
+        // as the firearm competency gate in ArmouryService).
+        Principal principal = findPrincipal(tenantId,
+                findDetail(tenantId, detailId).getPrincipalId());
+        if (!guard.meetsVettingTierFor(principal.getThreatLevel().name())) {
+            throw new HandyFlowException(
+                    "Guard " + guard.getFullName() + " does not have sufficient CP vetting "
+                            + "clearance for a " + principal.getThreatLevel() + " threat-level principal. "
+                            + "Current tier: " + (guard.getCpVettingTier() != null
+                            ? guard.getCpVettingTier() : "NONE"),
+                    HttpStatus.FORBIDDEN, "INSUFFICIENT_CP_VETTING");
+        }
+
         if (assignmentRepository.hasOpenAssignment(detailId, req.guardId())) {
             throw new HandyFlowException(
                     "Guard " + guard.getFullName() + " already has an active role on this detail",
@@ -298,6 +331,72 @@ public class CloseProtectionService {
         stop.recordDeparture();
         itineraryRepository.save(stop);
         return toStopResponse(stop);
+    }
+
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<AuditEvent> getPrincipalAudit(
+            TenantId tenantId, UUID principalId,
+            org.springframework.data.domain.Pageable pageable) {
+        findPrincipal(tenantId, principalId); // validate tenant scoping
+        return auditRepository.findByEntity(tenantId, "PRINCIPAL", principalId, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<AuditEvent> getPrincipalViewHistory(
+            TenantId tenantId, UUID principalId,
+            org.springframework.data.domain.Pageable pageable) {
+        findPrincipal(tenantId, principalId);
+        return auditRepository.findViewHistory(tenantId, "PRINCIPAL", principalId, pageable);
+    }
+
+    // ── Part 9.4: Guard-facing CP profile (Shield app) ────────────────────────
+
+    /**
+     * Lightweight CP status for the Shield app's home screen.
+     * Uses codename only — never real name. Returns an empty/inactive
+     * profile if the guard has no current CP assignment.
+     *
+     * Not gated behind VIP_DETAIL_ACCESS — the guard themselves needs this
+     * on startup to know if they're on a CP detail today. Codename-only
+     * means no Part 9.3 confidentiality leak even without the authority gate.
+     */
+    @Transactional(readOnly = true)
+    public GuardCpProfileResponse getGuardCpProfile(TenantId tenantId, UUID guardId) {
+        List<DetailAssignment> active = assignmentRepository.findActiveByGuard(tenantId, guardId);
+
+        if (active.isEmpty()) {
+            return new GuardCpProfileResponse(false, null, null, null, null, null, null, List.of());
+        }
+
+        // Take the first active assignment — a guard shouldn't have more than
+        // one open-ended role (enforced by the DB constraint), but if somehow
+        // they do, take the most recently started one.
+        DetailAssignment assignment = active.stream()
+                .max(java.util.Comparator.comparing(DetailAssignment::getAssignmentStart))
+                .get();
+
+        ProtectionDetail detail = detailRepository.findById(assignment.getDetailId())
+                .orElse(null);
+        if (detail == null) {
+            return new GuardCpProfileResponse(false, null, null, null, null, null, null, List.of());
+        }
+
+        Principal principal = principalRepository.findById(detail.getPrincipalId()).orElse(null);
+        String codename     = principal != null ? principal.getAliasCodename() : "UNKNOWN";
+        String threatLevel  = principal != null ? principal.getThreatLevel().name() : "LOW";
+
+        // Only the next 3 upcoming stops for the initial response
+        List<ItineraryStopResponse> upcomingStops = itineraryRepository
+                .findByDetail(detail.getId()).stream()
+                .filter(s -> s.getActualDeparture() == null)
+                .limit(3)
+                .map(this::toStopResponse)
+                .toList();
+
+        return new GuardCpProfileResponse(
+                true, detail.getId(), codename, threatLevel,
+                assignment.getRole().name(), detail.getStartAt(), detail.getEndAt(),
+                upcomingStops);
     }
 
     // ── Advance Surveys ────────────────────────────────────────────────────────
@@ -467,7 +566,9 @@ public class CloseProtectionService {
     private PrincipalResponse toFullResponse(Principal p) {
         return new PrincipalResponse(
                 p.getId(), p.getFullName(), p.getAliasCodename(), p.getThreatLevel().name(),
-                p.getMedicalNotes(), p.getKnownThreats(), p.getEmergencyContacts(),
+                encryptionService.decrypt(p.getMedicalNotes()),
+                encryptionService.decrypt(p.getKnownThreats()),
+                p.getEmergencyContacts(),
                 p.getPhotoUrl(), p.isActive(), p.getCreatedAt());
     }
 
