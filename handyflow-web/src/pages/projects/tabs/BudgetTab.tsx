@@ -32,9 +32,11 @@ export function BudgetTab({projectId,project}:{projectId:string;project:Project}
     queryFn:async()=>{const r=await apiClient.get(`/api/v1/projects/${projectId}/budget`);return unwrap<BudgetLine>(r)},
     staleTime:30_000,
   })
+
+  // planPct omitted — server auto-computes from project dates (H-8 fix)
   const {data:evm}=useQuery<EVM>({
     queryKey:['pm-evm',projectId,taskPct],
-    queryFn:async()=>{const r=await apiClient.get(`/api/v1/projects/${projectId}/budget/evm?earnedPct=${taskPct}&planPct=50`);return r.data?.data??r.data},
+    queryFn:async()=>{const r=await apiClient.get(`/api/v1/projects/${projectId}/budget/evm?earnedPct=${taskPct}`);return r.data?.data??r.data},
     staleTime:60_000,
   })
 

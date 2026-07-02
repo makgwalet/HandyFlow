@@ -20,6 +20,7 @@ spring:
       max-lifetime: 1800000
 
   jpa:
+    open-in-view: false
     hibernate:
       # WHY 'validate' not 'update'?
       # 'update' auto-modifies your DB schema — DANGEROUS in production.

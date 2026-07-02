@@ -20,7 +20,9 @@ export function OverviewTab({ project }: { project: Project }) {
   const { data:milestones=[] } = useQuery<Task[]>({ queryKey:["pm-milestones",project.id], queryFn:async()=>{ const r=await apiClient.get(`/api/v1/projects/${project.id}/milestones`); return unwrap<Task>(r) }, staleTime:30_000 })
   const { data:risks=[] }      = useQuery<Risk[]>({ queryKey:["pm-risks",project.id], queryFn:async()=>{ const r=await apiClient.get(`/api/v1/projects/${project.id}/risks`); return unwrap<Risk>(r) }, staleTime:30_000 })
   const taskPct = project.taskCount>0 ? Math.round((project.completedTaskCount/project.taskCount)*100) : 0
-  const { data:evm } = useQuery<EVM>({ queryKey:["pm-evm",project.id,taskPct], queryFn:async()=>{ const r=await apiClient.get(`/api/v1/projects/${project.id}/budget/evm?earnedPct=${taskPct}&planPct=50`); return r.data?.data??r.data }, staleTime:60_000 })
+
+  // planPct omitted — server auto-computes from project baseline dates (H-8 fix)
+  const { data:evm } = useQuery<EVM>({ queryKey:["pm-evm",project.id,taskPct], queryFn:async()=>{ const r=await apiClient.get(`/api/v1/projects/${project.id}/budget/evm?earnedPct=${taskPct}`); return r.data?.data??r.data }, staleTime:60_000 })
 
   const spentPct = project.budgetTotal>0 ? (project.budgetSpent/project.budgetTotal)*100 : 0
   const openRisks = risks.filter(r=>r.status==="OPEN")

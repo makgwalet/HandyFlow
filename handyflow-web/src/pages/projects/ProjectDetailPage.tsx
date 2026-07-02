@@ -1,13 +1,17 @@
 // src/pages/projects/ProjectDetailPage.tsx
+// Route-based detail page (e.g. /projects/:id).
+// Project interface lives in ProjectDetailTab.tsx — import from there to avoid duplication.
 import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  HardHat, ChevronLeft, Play, Pause, CheckCircle, X,
+  HardHat, ChevronLeft, Play, Pause, CheckCircle,
   LayoutDashboard, GanttChart, ListTodo, Users, DollarSign,
   AlertTriangle, FileText, Hammer, ExternalLink,
 } from 'lucide-react'
 import { apiClient } from '../../api/client'
+// Single source of truth for the Project type — re-exported from ProjectDetailTab
+import type { Project } from './ProjectDetailTab'
 import { OverviewTab }   from './tabs/OverviewTab'
 import { GanttTab }      from './tabs/GanttTab'
 import { TasksTab }      from './tabs/TasksTab'
@@ -18,20 +22,6 @@ import { DocumentsTab }  from './tabs/DocumentsTab'
 import { FieldTab }      from './tabs/FieldTab'
 
 type TabKey = 'overview'|'gantt'|'tasks'|'resources'|'budget'|'risks'|'documents'|'field'
-
-export interface Project {
-  id: string; projectNumber: string; name: string; description: string | null
-  projectType: string; status: string; health: string
-  clientName: string | null; siteAddress: string | null
-  startDate: string | null; endDate: string | null
-  baselineStart: string | null; baselineEnd: string | null
-  budgetTotal: number; budgetSpent: number; budgetCommitted: number; budgetVariance: number
-  contractValue: number | null; contractRef: string | null; retentionPct: number
-  cidbGrade: string | null; nhbrcNumber: string | null
-  projectManagerName: string | null; clientPortalToken: string | null; notes: string | null
-  taskCount: number; completedTaskCount: number; openRiskCount: number
-  createdAt: string; updatedAt: string
-}
 
 const HEALTH_DOT: Record<string, string> = { GREEN:'#16A34A', AMBER:'#D97706', RED:'#DC2626' }
 const STATUS_LABEL: Record<string, { bg:string; color:string }> = {
@@ -128,6 +118,9 @@ export function ProjectDetailPage() {
           <button key={t.key} onClick={() => setTab(t.key)}
             style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '9px 14px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, fontWeight: tab === t.key ? 700 : 500, color: tab === t.key ? '#1B3A6B' : '#64748B', borderBottom: tab === t.key ? '2px solid #1B3A6B' : '2px solid transparent', marginBottom: -1 }}>
             <t.icon size={14} />{t.label}
+            {t.key === 'risks' && project.openRiskCount > 0 && (
+              <span style={{ marginLeft: 4, background: '#FEF2F2', color: '#DC2626', fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 10 }}>{project.openRiskCount}</span>
+            )}
           </button>
         ))}
       </div>

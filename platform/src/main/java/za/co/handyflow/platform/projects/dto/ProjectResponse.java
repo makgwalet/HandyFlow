@@ -48,7 +48,7 @@ public record ProjectResponse(
                 .subtract(p.getBudgetCommitted());
         return new ProjectResponse(
                 p.getId(), p.getProjectNumber(), p.getName(), p.getDescription(),
-                p.getProjectType(), p.getStatus(), p.getHealth(),
+                p.getProjectType(), p.getStatus().name(), p.getHealth().name(),
                 p.getClientName(), p.getClientId(), p.getSiteAddress(),
                 p.getStartDate(), p.getEndDate(), p.getBaselineStart(), p.getBaselineEnd(),
                 p.getBudgetTotal(), p.getBudgetSpent(), p.getBudgetCommitted(),

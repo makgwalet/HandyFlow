@@ -1,7 +1,7 @@
 // src/pages/projects/tabs/ResourcesTab.tsx
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Users, Truck, Wrench, Building2 } from 'lucide-react'
+import { Plus, Users, Truck, Wrench, Building2, AlertTriangle, X } from 'lucide-react'
 import { apiClient } from '../../../api/client'
 
 interface Resource { id:string; resourceType:string; resourceName:string; role:string|null; allocationPct:number; startDate:string|null; endDate:string|null; plannedHours:number|null; actualHours:number; hourlyRate:number|null; dailyRate:number|null }
@@ -21,6 +21,8 @@ export function ResourcesTab({projectId}:{projectId:string}) {
   const qc=useQueryClient()
   const [showAdd,setShowAdd]=useState(false)
   const [err,setErr]=useState('')
+  // Scheduling conflict warnings returned by AssignResourceResult
+  const [warnings,setWarnings]=useState<string[]>([])
   const initF=()=>({resourceType:'HUMAN',resourceName:'',role:'',allocationPct:'100',startDate:'',endDate:'',hourlyRate:'',dailyRate:'',plannedHours:''})
   const [form,setForm]=useState(initF())
   const sf=(k:string,v:string)=>setForm(p=>({...p,[k]:v}))
@@ -33,7 +35,15 @@ export function ResourcesTab({projectId}:{projectId:string}) {
 
   const addMut=useMutation({
     mutationFn:(body:any)=>apiClient.post(`/api/v1/projects/${projectId}/resources`,body),
-    onSuccess:()=>{qc.invalidateQueries({queryKey:['pm-resources',projectId]});setShowAdd(false);setForm(initF());setErr('')},
+    onSuccess:(r)=>{
+      qc.invalidateQueries({queryKey:['pm-resources',projectId]})
+      setShowAdd(false)
+      setForm(initF())
+      setErr('')
+      // Surface scheduling conflict warnings from AssignResourceResult
+      const w:string[] = r.data?.data?.warnings ?? r.data?.warnings ?? []
+      if (w.length > 0) setWarnings(w)
+    },
     onError:(e:any)=>setErr(e.response?.data?.message||'Failed to assign resource'),
   })
   const removeMut=useMutation({
@@ -47,6 +57,22 @@ export function ResourcesTab({projectId}:{projectId:string}) {
 
   return (
     <div>
+      {/* Conflict warnings banner — shown after a successful assignment with warnings */}
+      {warnings.length > 0 && (
+        <div style={{marginBottom:14,padding:'12px 16px',background:'#FFFBEB',border:'1px solid #FCD34D',borderRadius:10,display:'flex',alignItems:'flex-start',gap:10}}>
+          <AlertTriangle size={16} color="#D97706" style={{flexShrink:0,marginTop:1}}/>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,fontWeight:700,color:'#92400E',marginBottom:4}}>Scheduling conflicts detected</div>
+            {warnings.map((w,i)=>(
+              <div key={i} style={{fontSize:12,color:'#92400E'}}>{w}</div>
+            ))}
+          </div>
+          <button onClick={()=>setWarnings([])} style={{background:'none',border:'none',cursor:'pointer',color:'#D97706',padding:0,flexShrink:0}}>
+            <X size={14}/>
+          </button>
+        </div>
+      )}
+
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
         <div style={{fontSize:13,color:'#64748B'}}>
           {resources.length} resource{resources.length!==1?'s':''} · {totalActual.toFixed(1)} hrs logged / {totalPlanned.toFixed(0)} planned
