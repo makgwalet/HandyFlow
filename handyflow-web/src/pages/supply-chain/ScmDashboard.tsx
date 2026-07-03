@@ -1,126 +1,200 @@
 // src/pages/supply-chain/ScmDashboard.tsx
 import { useQuery } from "@tanstack/react-query"
-import { Truck, Users, ShoppingCart, Package, FileText, AlertTriangle, Clock, ArrowRight } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { unwrap, fmtR, Banner, Spinner, type Summary, type SupplierInvoice, type InventoryItem, type ScmTab } from "./scm.shared"
+import {
+  Users, ShoppingCart, FileText, Package, AlertTriangle,
+  Clock, TrendingUp, ArrowRight, CheckCircle
+} from "lucide-react"
 
-export function ScmDashboard({ onNav }: { onNav: (t: ScmTab) => void }) {
-  const { data: summary, isLoading } = useQuery<Summary>({
+interface Summary {
+  totalSuppliers: number; openPurchaseOrders: number; pendingInvoices: number
+  invoicesForApproval: number; lowStockItems: number; overdueInvoices: number
+}
+interface PO {
+  id: string; orderNumber: string; supplierName: string; status: string
+  totalAmount: number; orderDate: string; requiredByDate: string | null
+}
+interface LowStockItem {
+  id: string; catalogueItemId: string; qtyOnHand: number; reorderPoint: number; avgCost: number
+}
+
+const fmtR  = (n: number) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+const fmtD  = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
+const ACCENT = "#D97706"
+
+const PO_STATUS: Record<string, { bg: string; color: string; label: string }> = {
+  DRAFT:              { bg: "#F1F5F9", color: "#475569",  label: "Draft" },
+  PENDING_APPROVAL:   { bg: "#FEF3C7", color: "#92400E",  label: "Pending" },
+  APPROVED:           { bg: "#DBEAFE", color: "#1D4ED8",  label: "Approved" },
+  SENT:               { bg: "#EDE9FE", color: "#7C3AED",  label: "Sent" },
+  ACKNOWLEDGED:       { bg: "#D1FAE5", color: "#065F46",  label: "Acknowledged" },
+  PARTIALLY_RECEIVED: { bg: "#FEF9C3", color: "#713F12",  label: "Partial" },
+  FULLY_RECEIVED:     { bg: "#DCFCE7", color: "#166534",  label: "Received" },
+  INVOICED:           { bg: "#DBEAFE", color: "#1E40AF",  label: "Invoiced" },
+  CANCELLED:          { bg: "#FEE2E2", color: "#DC2626",  label: "Cancelled" },
+}
+
+function KpiCard({ label, value, icon: Icon, color, bg, onClick, urgent }:
+  { label: string; value: number; icon: React.ElementType; color: string; bg: string; onClick?: () => void; urgent?: boolean }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: "#fff", border: `1px solid ${urgent && value > 0 ? color : "#E2E8F0"}`,
+        borderRadius: 12, padding: "18px 20px", cursor: onClick ? "pointer" : "default",
+        transition: "box-shadow 0.15s",
+        boxShadow: urgent && value > 0 ? `0 0 0 3px ${bg}` : "none",
+      }}
+      onMouseEnter={e => { if (onClick) (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)" }}
+      onMouseLeave={e => { if (onClick) (e.currentTarget as HTMLElement).style.boxShadow = urgent && value > 0 ? `0 0 0 3px ${bg}` : "none" }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          {label}
+        </div>
+        <div style={{ width: 34, height: 34, borderRadius: 9, background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Icon size={16} color={color} />
+        </div>
+      </div>
+      <div style={{ fontSize: 32, fontWeight: 800, color: urgent && value > 0 ? color : "#0F172A" }}>
+        {value}
+      </div>
+      {onClick && (
+        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 8, fontSize: 12, color: ACCENT, fontWeight: 600 }}>
+          View all <ArrowRight size={12} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+type ScmTab = "dashboard" | "suppliers" | "purchase-orders" | "inventory" | "invoices"
+
+export function ScmDashboard({ onNav }: { onNav: (tab: ScmTab) => void }) {
+  const { data: summary } = useQuery<Summary>({
     queryKey: ["scm-summary"],
-    queryFn: async () => { const r = await apiClient.get("/api/v1/supply-chain/summary"); return r.data?.data ?? r.data ?? {} },
-    staleTime: 30_000,
-  })
-  const { data: overdue = [] } = useQuery<SupplierInvoice[]>({
-    queryKey: ["scm-invoices-overdue"],
-    queryFn: async () => { const r = await apiClient.get("/api/v1/supply-chain/supplier-invoices?status=APPROVED&size=5"); return unwrap<SupplierInvoice>(r).filter(i => i.overdue) },
+    queryFn: async () => { const r = await apiClient.get("/api/v1/supply-chain/summary"); return r.data?.data ?? r.data },
     staleTime: 60_000,
   })
-  const { data: lowStock = [] } = useQuery<InventoryItem[]>({
+
+  const { data: recentPOs } = useQuery<{ content: PO[] }>({
+    queryKey: ["scm-recent-pos"],
+    queryFn: async () => {
+      const r = await apiClient.get("/api/v1/supply-chain/purchase-orders?size=6")
+      const d = r.data?.data ?? r.data
+      return Array.isArray(d) ? { content: d } : d
+    },
+    staleTime: 60_000,
+  })
+
+  const { data: lowStock } = useQuery<LowStockItem[]>({
     queryKey: ["scm-low-stock"],
-    queryFn: async () => { const r = await apiClient.get("/api/v1/supply-chain/inventory/low-stock"); return unwrap<InventoryItem>(r) },
+    queryFn: async () => {
+      const r = await apiClient.get("/api/v1/supply-chain/inventory/low-stock")
+      const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : []
+    },
     staleTime: 60_000,
   })
 
-  if (isLoading) return <Spinner />
-
-  const KPIs = [
-    { label: "Active Suppliers",    value: summary?.totalSuppliers ?? 0,       color: "#1D4ED8", bg: "#EFF6FF", tab: "suppliers" as ScmTab,       Icon: Users        },
-    { label: "Open Purchase Orders", value: summary?.openPurchaseOrders ?? 0,  color: "#D97706", bg: "#FEF3C7", tab: "purchase-orders" as ScmTab,  Icon: ShoppingCart  },
-    { label: "Pending Invoices",    value: summary?.pendingInvoices ?? 0,       color: "#7C3AED", bg: "#F5F3FF", tab: "invoices" as ScmTab,          Icon: FileText     },
-    { label: "Low Stock Items",     value: summary?.lowStockItems ?? 0,         color: "#DC2626", bg: "#FEF2F2", tab: "inventory" as ScmTab,         Icon: Package      },
-  ]
+  const pos = recentPOs?.content ?? []
+  const s = summary
 
   return (
     <div>
-      {/* KPI cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 28 }}>
-        {KPIs.map(k => (
-          <div key={k.label} onClick={() => onNav(k.tab)}
-            style={{ background: k.bg, borderRadius: 12, padding: "18px 20px", cursor: "pointer", border: "1px solid transparent", transition: "box-shadow 0.15s" }}
-            onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"}
-            onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{k.label}</span>
-              <k.Icon size={16} color={k.color} />
-            </div>
-            <div style={{ fontSize: 30, fontWeight: 800, color: k.color }}>{k.value}</div>
-          </div>
-        ))}
+      {/* KPI grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 28 }}>
+        <KpiCard label="Active Suppliers"   value={s?.totalSuppliers ?? 0}      icon={Users}         color="#059669" bg="#DCFCE7" onClick={() => onNav("suppliers")} />
+        <KpiCard label="Open Orders"        value={s?.openPurchaseOrders ?? 0}  icon={ShoppingCart}  color="#1D4ED8" bg="#DBEAFE" onClick={() => onNav("purchase-orders")} />
+        <KpiCard label="Pending Invoices"   value={s?.pendingInvoices ?? 0}     icon={FileText}      color="#7C3AED" bg="#EDE9FE" onClick={() => onNav("invoices")} />
+        <KpiCard label="Low Stock Items"    value={s?.lowStockItems ?? 0}       icon={Package}       color="#D97706" bg="#FEF3C7" onClick={() => onNav("inventory")} urgent />
+        <KpiCard label="Overdue Invoices"   value={s?.overdueInvoices ?? 0}     icon={AlertTriangle} color="#DC2626" bg="#FEE2E2" onClick={() => onNav("invoices")} urgent />
+        <KpiCard label="Ready for Payment"  value={s?.invoicesForApproval ?? 0} icon={CheckCircle}   color="#059669" bg="#DCFCE7" onClick={() => onNav("invoices")} />
       </div>
 
-      {/* Alerts */}
-      {!!summary?.overdueInvoices && (
-        <Banner variant="error">{summary.overdueInvoices} overdue supplier invoice{summary.overdueInvoices !== 1 ? "s" : ""} — payment required</Banner>
-      )}
-      {!!summary?.invoicesForApproval && (
-        <Banner variant="warning">{summary.invoicesForApproval} invoice{summary.invoicesForApproval !== 1 ? "s" : ""} awaiting approval</Banner>
-      )}
-      {!!summary?.lowStockItems && (
-        <Banner variant="info">{summary.lowStockItems} item{summary.lowStockItems !== 1 ? "s" : ""} below reorder point</Banner>
-      )}
-
-      {/* Two-column: overdue invoices + low stock */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 8 }}>
-
-        {/* Overdue invoices */}
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
-          <div style={{ padding: "14px 18px", borderBottom: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>Overdue Invoices</span>
-            <button onClick={() => onNav("invoices")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#D97706", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>All invoices <ArrowRight size={12} /></button>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 18 }}>
+        {/* Recent Purchase Orders */}
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Recent Purchase Orders</div>
+            <button onClick={() => onNav("purchase-orders")}
+              style={{ fontSize: 12, color: ACCENT, fontWeight: 600, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+              View all <ArrowRight size={12} />
+            </button>
           </div>
-          {overdue.length === 0 ? (
-            <div style={{ padding: "24px 18px", fontSize: 13, color: "#94A3B8", textAlign: "center" }}>No overdue invoices</div>
-          ) : overdue.map(inv => (
-            <div key={inv.id} style={{ padding: "12px 18px", borderBottom: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{inv.invoiceNumber ?? `SINV-${inv.id.slice(0, 6)}`}</div>
-                <div style={{ fontSize: 11, color: "#94A3B8" }}>Due {new Date(inv.dueDate).toLocaleDateString("en-ZA")}</div>
+          {pos.length === 0
+            ? <div style={{ textAlign: "center", padding: "40px 0", color: "#94A3B8" }}>
+                <ShoppingCart size={32} style={{ opacity: .3, marginBottom: 8 }} />
+                <div style={{ fontSize: 13 }}>No purchase orders yet</div>
               </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#DC2626" }}>{fmtR(inv.totalAmount)}</div>
-            </div>
-          ))}
+            : <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ background: "#F8FAFC" }}>
+                      {["Order #", "Supplier", "Amount", "Required By", "Status"].map(h => (
+                        <th key={h} style={{ padding: "9px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pos.map((po, i) => {
+                      const st = PO_STATUS[po.status] ?? PO_STATUS.DRAFT
+                      return (
+                        <tr key={po.id} style={{ borderTop: "1px solid #F1F5F9", background: i % 2 === 0 ? "#fff" : "#FAFAFA" }}>
+                          <td style={{ padding: "10px 14px", fontSize: 12, fontWeight: 700, color: ACCENT }}>{po.orderNumber}</td>
+                          <td style={{ padding: "10px 14px", fontSize: 13, color: "#0F172A" }}>{po.supplierName}</td>
+                          <td style={{ padding: "10px 14px", fontSize: 13, fontWeight: 600 }}>{fmtR(po.totalAmount)}</td>
+                          <td style={{ padding: "10px 14px", fontSize: 12, color: "#64748B" }}>{fmtD(po.requiredByDate)}</td>
+                          <td style={{ padding: "10px 14px" }}>
+                            <span style={{ background: st.bg, color: st.color, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20 }}>
+                              {st.label}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+          }
         </div>
 
-        {/* Low stock */}
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
-          <div style={{ padding: "14px 18px", borderBottom: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>Low Stock Items</span>
-            <button onClick={() => onNav("inventory")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#D97706", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>View inventory <ArrowRight size={12} /></button>
+        {/* Low Stock Panel */}
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Low Stock Alerts</div>
+            <button onClick={() => onNav("inventory")}
+              style={{ fontSize: 12, color: ACCENT, fontWeight: 600, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+              View all <ArrowRight size={12} />
+            </button>
           </div>
-          {lowStock.length === 0 ? (
-            <div style={{ padding: "24px 18px", fontSize: 13, color: "#94A3B8", textAlign: "center" }}>All items are adequately stocked</div>
-          ) : lowStock.slice(0, 5).map(item => (
-            <div key={item.id} style={{ padding: "12px 18px", borderBottom: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: 12, color: "#475569", fontFamily: "monospace" }}>{item.catalogueItemId.slice(0, 12)}…</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#DC2626" }}>{item.qtyOnHand}</span>
-                <span style={{ fontSize: 11, color: "#94A3B8" }}>/ {item.reorderPoint} min</span>
+          {!lowStock || lowStock.length === 0
+            ? <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, padding: "32px 20px", textAlign: "center", color: "#94A3B8" }}>
+                <TrendingUp size={28} style={{ opacity: .3, marginBottom: 8 }} />
+                <div style={{ fontSize: 13 }}>All stock levels healthy</div>
               </div>
-            </div>
-          ))}
+            : <div style={{ border: "1px solid #FCD34D", borderRadius: 10, overflow: "hidden" }}>
+                {lowStock.slice(0, 8).map((item, i) => {
+                  const pct = item.reorderPoint > 0 ? Math.round((item.qtyOnHand / item.reorderPoint) * 100) : 0
+                  const critical = pct === 0
+                  return (
+                    <div key={item.id} style={{ padding: "10px 14px", borderTop: i > 0 ? "1px solid #FEF3C7" : "none", background: critical ? "#FEF2F2" : "#FFFBEB" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: critical ? "#DC2626" : "#92400E" }}>
+                          {critical && "⚠ "}Item {item.catalogueItemId.slice(0, 8)}…
+                        </div>
+                        <div style={{ fontSize: 11, color: "#64748B" }}>
+                          {item.qtyOnHand.toFixed(1)} / {item.reorderPoint.toFixed(1)}
+                        </div>
+                      </div>
+                      <div style={{ height: 4, background: "#E2E8F0", borderRadius: 2 }}>
+                        <div style={{ height: "100%", width: `${Math.min(pct, 100)}%`, background: critical ? "#EF4444" : "#F59E0B", borderRadius: 2 }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+          }
         </div>
-
-      </div>
-
-      {/* Quick links */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginTop: 16 }}>
-        {[
-          { label: "Add Supplier",      sub: "Register a new supplier",             tab: "suppliers"       as ScmTab, Icon: Users        },
-          { label: "New Purchase Order", sub: "Create a procurement order",         tab: "purchase-orders" as ScmTab, Icon: ShoppingCart  },
-          { label: "Record Invoice",    sub: "Log a supplier invoice for payment",  tab: "invoices"        as ScmTab, Icon: FileText      },
-        ].map(a => (
-          <button key={a.label} onClick={() => onNav(a.tab)}
-            style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "16px 18px", cursor: "pointer", display: "flex", alignItems: "center", gap: 14, textAlign: "left" }}>
-            <div style={{ width: 38, height: 38, borderRadius: 9, background: "#FEF3C7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <a.Icon size={17} color="#D97706" />
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{a.label}</div>
-              <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>{a.sub}</div>
-            </div>
-            <ArrowRight size={14} color="#CBD5E1" style={{ marginLeft: "auto", flexShrink: 0 }} />
-          </button>
-        ))}
       </div>
     </div>
   )

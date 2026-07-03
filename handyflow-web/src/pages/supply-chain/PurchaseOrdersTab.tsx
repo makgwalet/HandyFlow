@@ -1,278 +1,328 @@
 // src/pages/supply-chain/PurchaseOrdersTab.tsx
-import { useState } from "react"
+import React, { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Plus, ChevronDown, ChevronRight, Search } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { unwrap, fmtR, fmtDate, inp, TH, TD, Badge, Modal, ModalFooter, Field, ErrBox, Spinner, EmptyState, ActionChip, filterPill, type PurchaseOrder, type PoLine, type Supplier, type StockLocation, type CatalogueItem } from "./scm.shared"
+import { Plus, ChevronLeft, Send, CheckCircle, XCircle, Package, AlertTriangle } from "lucide-react"
+
+interface Supplier { id: string; name: string; paymentTermsDays: number }
+interface Location { id: string; name: string; locationType: string }
+interface PoLine { id: string; itemName: string; supplierSku: string | null; qtyOrdered: number; qtyReceived: number; unitCost: number; vatRate: number; lineTotal: number; lineTotalIncl: number; isFullyReceived: boolean }
+interface PO {
+  id: string; orderNumber: string; supplierName: string; supplierId: string; status: string
+  totalAmount: number; subtotal: number; vatAmount: number; orderDate: string
+  requiredByDate: string | null; projectRef: string | null; notes: string | null
+  createdByName: string | null; approvedByName: string | null; rejectionReason: string | null
+}
+
+const ACCENT = "#D97706"
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 9, fontSize: 14, boxSizing: "border-box", outline: "none", background: "#fff" }
+const fmtR = (n: number) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const fmtD = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
+
+const STATUS_CFG: Record<string, { bg: string; color: string; label: string }> = {
+  DRAFT:              { bg: "#F1F5F9", color: "#475569",  label: "Draft" },
+  PENDING_APPROVAL:   { bg: "#FEF3C7", color: "#92400E",  label: "Pending Approval" },
+  APPROVED:           { bg: "#DBEAFE", color: "#1D4ED8",  label: "Approved" },
+  SENT:               { bg: "#EDE9FE", color: "#7C3AED",  label: "Sent to Supplier" },
+  ACKNOWLEDGED:       { bg: "#D1FAE5", color: "#065F46",  label: "Acknowledged" },
+  PARTIALLY_RECEIVED: { bg: "#FEF9C3", color: "#713F12",  label: "Partially Received" },
+  FULLY_RECEIVED:     { bg: "#DCFCE7", color: "#166534",  label: "Fully Received" },
+  INVOICED:           { bg: "#DBEAFE", color: "#1E40AF",  label: "Invoiced" },
+  CANCELLED:          { bg: "#FEE2E2", color: "#DC2626",  label: "Cancelled" },
+}
+
+const STATUS_FILTERS = ["", "DRAFT", "PENDING_APPROVAL", "APPROVED", "SENT", "PARTIALLY_RECEIVED", "FULLY_RECEIVED"]
 
 export function PurchaseOrdersTab() {
   const qc = useQueryClient()
   const [statusFilter, setStatusFilter] = useState("")
-  const [showCreate, setShowCreate]     = useState(false)
-  const [expandedId, setExpandedId]     = useState<string | null>(null)
-  const [addLinesFor, setAddLinesFor]   = useState<string | null>(null)
-  const [grFor, setGrFor]               = useState<PurchaseOrder | null>(null)
-  const [err, setErr] = useState("")
+  const [detail, setDetail]   = useState<PO | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [showAddLine, setShowAddLine] = useState(false)
+  const [showReject, setShowReject]  = useState(false)
+  const [rejectReason, setRejectReason] = useState("")
+  const [err, setErr]         = useState("")
 
-  const blank = () => ({ supplierId: "", deliverToLocation: "", requiredByDate: "", currency: "ZAR", projectRef: "", notes: "" })
-  const [form, setForm] = useState(blank())
-  const sf = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
+  const initPO = () => ({ supplierId: "", deliverToLocation: "", requiredByDate: "", projectRef: "", notes: "", internalNotes: "" })
+  const initLine = () => ({ itemName: "", supplierSku: "", qtyOrdered: "", unitCost: "", vatRate: "15" })
+  const [poForm, setPoForm]   = useState(initPO())
+  const [lineForm, setLineForm] = useState(initLine())
+  const spf = (k: string, v: string) => setPoForm(p => ({ ...p, [k]: v }))
+  const slf = (k: string, v: string) => setLineForm(p => ({ ...p, [k]: v }))
 
-  const { data: suppliers = [] } = useQuery<Supplier[]>({ queryKey: ["scm-suppliers-active"], queryFn: async () => { const r = await apiClient.get("/api/v1/supply-chain/suppliers?status=ACTIVE&size=200"); return unwrap<Supplier>(r) }, staleTime: 60_000 })
-  const { data: locations = [] } = useQuery<StockLocation[]>({ queryKey: ["scm-locations"],       queryFn: async () => { const r = await apiClient.get("/api/v1/supply-chain/locations"); return unwrap<StockLocation>(r) },           staleTime: 60_000 })
-  const { data: orders = [], isLoading } = useQuery<PurchaseOrder[]>({
+  const { data: pos = [], isLoading } = useQuery<PO[]>({
     queryKey: ["scm-pos", statusFilter],
-    queryFn: async () => { const url = statusFilter ? `/api/v1/supply-chain/purchase-orders?status=${statusFilter}&size=50` : "/api/v1/supply-chain/purchase-orders?size=50"; const r = await apiClient.get(url); return unwrap<PurchaseOrder>(r) },
+    queryFn: async () => {
+      const url = statusFilter ? `/api/v1/supply-chain/purchase-orders?status=${statusFilter}&size=50` : "/api/v1/supply-chain/purchase-orders?size=50"
+      const r = await apiClient.get(url); const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : d?.content ?? []
+    }, staleTime: 30_000,
+  })
+
+  const { data: lines = [] } = useQuery<PoLine[]>({
+    queryKey: ["scm-po-lines", detail?.id],
+    queryFn: async () => { const r = await apiClient.get(`/api/v1/supply-chain/purchase-orders/${detail!.id}/lines`); const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : [] },
+    enabled: !!detail,
     staleTime: 30_000,
   })
-  const { data: lines = [] } = useQuery<PoLine[]>({
-    queryKey: ["scm-po-lines", expandedId],
-    queryFn: async () => { const r = await apiClient.get(`/api/v1/supply-chain/purchase-orders/${expandedId}/lines`); return unwrap<PoLine>(r) },
-    enabled: !!expandedId,
-    staleTime: 15_000,
+
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
+    queryKey: ["scm-suppliers-list"],
+    queryFn: async () => { const r = await apiClient.get("/api/v1/supply-chain/suppliers?size=200"); const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : d?.content ?? [] },
+    staleTime: 120_000,
   })
 
-  const createMut = useMutation({
-    mutationFn: (body: any) => apiClient.post("/api/v1/supply-chain/purchase-orders", body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["scm-pos"] }); qc.invalidateQueries({ queryKey: ["scm-summary"] }); setShowCreate(false); setForm(blank()); setErr("") },
-    onError: (e: any) => setErr(e.response?.data?.message || "Failed to create PO"),
-  })
-  const actionMut = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: string }) => apiClient.post(`/api/v1/supply-chain/purchase-orders/${id}/${action}`),
-    onSuccess: (_, { id }) => { qc.invalidateQueries({ queryKey: ["scm-pos"] }); qc.invalidateQueries({ queryKey: ["scm-po-lines", id] }); qc.invalidateQueries({ queryKey: ["scm-summary"] }) },
+  const { data: locations = [] } = useQuery<Location[]>({
+    queryKey: ["scm-locations"],
+    queryFn: async () => { const r = await apiClient.get("/api/v1/supply-chain/locations"); const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : [] },
+    staleTime: 120_000,
   })
 
-  const STATUSES = ["", "DRAFT", "PENDING_APPROVAL", "APPROVED", "SENT", "PARTIALLY_RECEIVED", "FULLY_RECEIVED"]
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ["scm-pos"] }); qc.invalidateQueries({ queryKey: ["scm-summary"] }) }
+  const invalidateLines = () => qc.invalidateQueries({ queryKey: ["scm-po-lines", detail?.id] })
+
+  const createMut  = useMutation({ mutationFn: (b: any) => apiClient.post("/api/v1/supply-chain/purchase-orders", b), onSuccess: (r) => { invalidate(); setShowCreate(false); setPoForm(initPO()); setErr(""); const po = r.data?.data ?? r.data; if (po) setDetail(po) }, onError: (e: any) => setErr(e.response?.data?.message || "Failed to create PO") })
+  const addLineMut = useMutation({ mutationFn: (b: any) => apiClient.post(`/api/v1/supply-chain/purchase-orders/${detail!.id}/lines`, b), onSuccess: (r) => { invalidateLines(); invalidate(); setShowAddLine(false); setLineForm(initLine()); setErr(""); const po = r.data?.data ?? r.data; if (po) setDetail(po) }, onError: (e: any) => setErr(e.response?.data?.message || "Failed to add line") })
+  const actionMut  = useMutation({ mutationFn: ({ action, body }: { action: string; body?: any }) => apiClient.post(`/api/v1/supply-chain/purchase-orders/${detail!.id}/${action}`, body), onSuccess: (r) => { invalidate(); const po = r.data?.data ?? r.data; if (po?.id) setDetail(po); setShowReject(false); setRejectReason("") }, onError: (e: any) => setErr(e.response?.data?.message || "Action failed") })
+
+  if (detail) {
+    const st = STATUS_CFG[detail.status] ?? STATUS_CFG.DRAFT
+    return (
+      <div>
+        <button onClick={() => setDetail(null)} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: "#64748B", fontSize: 13, marginBottom: 16, padding: 0 }}>
+          <ChevronLeft size={15} /> All Purchase Orders
+        </button>
+
+        {/* PO Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT }}>{detail.orderNumber}</span>
+              <span style={{ background: st.bg, color: st.color, fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 20 }}>{st.label}</span>
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A", marginBottom: 4 }}>{detail.supplierName}</div>
+            <div style={{ fontSize: 13, color: "#64748B" }}>
+              Order date: {fmtD(detail.orderDate)}
+              {detail.requiredByDate && ` · Required by: ${fmtD(detail.requiredByDate)}`}
+              {detail.projectRef && ` · Ref: ${detail.projectRef}`}
+            </div>
+            {detail.rejectionReason && (
+              <div style={{ marginTop: 8, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 12, color: "#DC2626" }}>
+                ✕ Returned: {detail.rejectionReason}
+              </div>
+            )}
+          </div>
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {detail.status === "DRAFT" && (
+              <>
+                <ActionBtn onClick={() => { setShowAddLine(true); setErr("") }} color={ACCENT} bg="#FEF3C7" border="#FCD34D" icon={Plus}>Add Line</ActionBtn>
+                <ActionBtn onClick={() => actionMut.mutate({ action: "submit" })} color="#1D4ED8" bg="#DBEAFE" border="#93C5FD" icon={Send}>Submit for Approval</ActionBtn>
+              </>
+            )}
+            {detail.status === "PENDING_APPROVAL" && (
+              <>
+                <ActionBtn onClick={() => actionMut.mutate({ action: "approve" })} color="#166534" bg="#DCFCE7" border="#86EFAC" icon={CheckCircle}>Approve</ActionBtn>
+                <ActionBtn onClick={() => { setShowReject(true); setErr("") }} color="#DC2626" bg="#FEE2E2" border="#FECACA" icon={XCircle}>Reject</ActionBtn>
+              </>
+            )}
+            {detail.status === "APPROVED" && (
+              <ActionBtn onClick={() => actionMut.mutate({ action: "send" })} color="#7C3AED" bg="#EDE9FE" border="#C4B5FD" icon={Send}>Mark as Sent</ActionBtn>
+            )}
+          </div>
+        </div>
+
+        {/* Lines table */}
+        <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
+          <div style={{ background: "#F8FAFC", padding: "10px 16px", fontSize: 12, fontWeight: 700, color: "#475569" }}>Line Items</div>
+          {lines.length === 0
+            ? <div style={{ padding: "24px 16px", textAlign: "center", color: "#94A3B8", fontSize: 13 }}>
+                No lines yet — {detail.status === "DRAFT" ? "add items using the button above" : "lines will appear once added"}
+              </div>
+            : <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr style={{ background: "#F8FAFC", borderTop: "1px solid #E2E8F0" }}>
+                  {["Item", "SKU", "Qty Ordered", "Qty Received", "Unit Cost", "Subtotal", "VAT", "Total Incl.", ""].map(h => (
+                    <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {lines.map((l, i) => (
+                    <tr key={l.id} style={{ borderTop: "1px solid #F1F5F9", background: i % 2 === 0 ? "#fff" : "#FAFAFA" }}>
+                      <td style={{ padding: "10px 12px", fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{l.itemName}</td>
+                      <td style={{ padding: "10px 12px", fontSize: 12, color: "#64748B" }}>{l.supplierSku ?? "—"}</td>
+                      <td style={{ padding: "10px 12px", fontSize: 13 }}>{l.qtyOrdered.toFixed(2)}</td>
+                      <td style={{ padding: "10px 12px", fontSize: 13, color: l.isFullyReceived ? "#059669" : l.qtyReceived > 0 ? ACCENT : "#94A3B8" }}>{l.qtyReceived.toFixed(2)}{l.isFullyReceived && " ✓"}</td>
+                      <td style={{ padding: "10px 12px", fontSize: 13 }}>{fmtR(l.unitCost)}</td>
+                      <td style={{ padding: "10px 12px", fontSize: 13 }}>{fmtR(l.lineTotal)}</td>
+                      <td style={{ padding: "10px 12px", fontSize: 12, color: "#64748B" }}>{l.vatRate}%</td>
+                      <td style={{ padding: "10px 12px", fontSize: 13, fontWeight: 600 }}>{fmtR(l.lineTotalIncl)}</td>
+                      <td />
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+          }
+        </div>
+
+        {/* Totals */}
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "16px 20px", minWidth: 260 }}>
+            {[["Subtotal (excl. VAT)", fmtR(detail.subtotal)], ["VAT", fmtR(detail.vatAmount)]].map(([k, v]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#64748B", marginBottom: 8 }}>
+                <span>{k}</span><span>{v}</span>
+              </div>
+            ))}
+            <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 800, color: "#0F172A" }}>
+              <span>Total (incl. VAT)</span><span style={{ color: ACCENT }}>{fmtR(detail.totalAmount)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Reject modal */}
+        {showReject && (
+          <Modal title="Return PO for Revision" onClose={() => setShowReject(false)}>
+            <p style={{ fontSize: 13, color: "#64748B", marginTop: 0 }}>Provide a reason so the buyer knows what to fix.</p>
+            <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)}
+              placeholder="e.g. Unit costs don't match the agreed quotation." autoFocus
+              style={{ ...inp, minHeight: 80, resize: "vertical" }} />
+            <ModalFooter onCancel={() => setShowReject(false)} onConfirm={() => actionMut.mutate({ action: "reject", body: { reason: rejectReason } })} label="Return PO" accent="#DC2626" />
+          </Modal>
+        )}
+
+        {/* Add line modal */}
+        {showAddLine && (
+          <Modal title="Add Line Item" onClose={() => { setShowAddLine(false); setErr("") }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <Fld label="Item Name *" span={2}><input value={lineForm.itemName} onChange={e => slf("itemName", e.target.value)} placeholder="Concrete blocks 190mm" style={inp} autoFocus /></Fld>
+              <Fld label="Supplier SKU"><input value={lineForm.supplierSku} onChange={e => slf("supplierSku", e.target.value)} placeholder="CB-190" style={inp} /></Fld>
+              <Fld label="VAT Rate (%)"><input type="number" value={lineForm.vatRate} onChange={e => slf("vatRate", e.target.value)} style={inp} /></Fld>
+              <Fld label="Qty Ordered *"><input type="number" value={lineForm.qtyOrdered} onChange={e => slf("qtyOrdered", e.target.value)} style={inp} /></Fld>
+              <Fld label="Unit Cost (R) *"><input type="number" value={lineForm.unitCost} onChange={e => slf("unitCost", e.target.value)} style={inp} /></Fld>
+            </div>
+            {err && <ErrBox msg={err} />}
+            <ModalFooter onCancel={() => { setShowAddLine(false); setErr("") }} onConfirm={() => {
+              if (!lineForm.itemName.trim() || !lineForm.qtyOrdered || !lineForm.unitCost) { setErr("Item name, quantity and unit cost are required"); return }
+              addLineMut.mutate({ itemName: lineForm.itemName.trim(), supplierSku: lineForm.supplierSku || null, qtyOrdered: parseFloat(lineForm.qtyOrdered), unitCost: parseFloat(lineForm.unitCost), vatRate: parseFloat(lineForm.vatRate) || 15 })
+            }} label={addLineMut.isPending ? "Adding…" : "Add Line"} loading={addLineMut.isPending} accent={ACCENT} />
+          </Modal>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div>
+      {/* Toolbar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 10, flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {STATUSES.map(s => <button key={s} onClick={() => setStatusFilter(s)} style={filterPill(statusFilter === s)}>{s ? s.replace(/_/g, " ") : "All"}</button>)}
+          {STATUS_FILTERS.map(s => (
+            <button key={s} onClick={() => setStatusFilter(s)}
+              style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: statusFilter === s ? 700 : 400, border: statusFilter === s ? `1.5px solid ${ACCENT}` : "1px solid #E2E8F0", background: statusFilter === s ? "#FEF3C7" : "#fff", color: statusFilter === s ? ACCENT : "#64748B" }}>
+              {s ? STATUS_CFG[s]?.label : "All"}
+            </button>
+          ))}
         </div>
-        <button onClick={() => { setShowCreate(true); setErr("") }} style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-          <Plus size={14} /> New PO
+        <button onClick={() => { setShowCreate(true); setErr("") }}
+          style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: ACCENT, color: "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          <Plus size={14} /> New Order
         </button>
       </div>
 
-      {isLoading ? <Spinner /> : orders.length === 0 ? (
-        <EmptyState icon={Plus} title="No purchase orders" sub="Create a purchase order to begin procurement" />
-      ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr style={{ background: "#F8FAFC" }}>
-              {["", "PO Number", "Supplier", "Project", "Status", "Total (excl)", "Required By", "Actions"].map(h => <th key={h} style={TH}>{h}</th>)}
-            </tr></thead>
-            <tbody>
-              {orders.map((po, i) => (
-                <>
-                  <tr key={po.id} style={{ background: i % 2 === 0 ? "#fff" : "#FAFAFA", borderTop: "1px solid #F1F5F9" }}>
-                    <td style={{ ...TD, width: 36, padding: "11px 6px 11px 14px" }}>
-                      <button onClick={() => setExpandedId(expandedId === po.id ? null : po.id)}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "#64748B", display: "flex" }}>
-                        {expandedId === po.id ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                      </button>
-                    </td>
-                    <td style={TD}><span style={{ fontWeight: 700, color: "#1B3A6B" }}>{po.orderNumber}</span></td>
-                    <td style={TD}>{po.supplierName}</td>
-                    <td style={{ ...TD, color: "#94A3B8" }}>{po.projectRef || "—"}</td>
-                    <td style={TD}><Badge status={po.status} /></td>
-                    <td style={TD}><strong>{fmtR(po.totalAmount)}</strong></td>
-                    <td style={{ ...TD, color: "#64748B" }}>{fmtDate(po.requiredByDate)}</td>
-                    <td style={TD}>
-                      <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                        {po.status === "DRAFT"            && <ActionChip label="Submit"    color="#92400E" bg="#FEF3C7" border="#FCD34D" onClick={() => actionMut.mutate({ id: po.id, action: "submit" })} />}
-                        {po.status === "PENDING_APPROVAL" && <ActionChip label="Approve"   color="#166534" bg="#DCFCE7" border="#86EFAC" onClick={() => actionMut.mutate({ id: po.id, action: "approve" })} />}
-                        {po.status === "APPROVED"         && <ActionChip label="Mark Sent" color="#1D4ED8" bg="#DBEAFE" border="#BFDBFE" onClick={() => actionMut.mutate({ id: po.id, action: "send" })} />}
-                        {po.status === "SENT"             && <ActionChip label="Receive"   color="#7C3AED" bg="#EDE9FE" border="#DDD6FE" onClick={() => setGrFor(po)} />}
-                        {po.status === "DRAFT"            && <ActionChip label="Add Lines" color="#0D9488" bg="#F0FDFA" border="#99F6E4" onClick={() => setAddLinesFor(po.id)} />}
-                      </div>
-                    </td>
-                  </tr>
-                  {expandedId === po.id && (
-                    <tr key={`${po.id}-lines`} style={{ background: "#F8FAFC", borderTop: "1px solid #F1F5F9" }}>
-                      <td colSpan={8} style={{ padding: "12px 16px 16px 50px" }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Line Items</div>
-                        {lines.length === 0 ? (
-                          <div style={{ fontSize: 13, color: "#94A3B8" }}>
-                            No lines yet.{po.status === "DRAFT" && <button onClick={() => setAddLinesFor(po.id)} style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: "#D97706", fontWeight: 600, fontSize: 13 }}>Add line items →</button>}
-                          </div>
-                        ) : (
-                          <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #E2E8F0", borderRadius: 8, overflow: "hidden" }}>
-                            <thead><tr style={{ background: "#F1F5F9" }}>
-                              {["Item", "SKU", "Qty", "Unit Cost", "VAT", "Line Total"].map(h => <th key={h} style={{ ...TH, fontSize: 10 }}>{h}</th>)}
-                            </tr></thead>
-                            <tbody>
-                              {lines.map(l => (
-                                <tr key={l.id} style={{ borderTop: "1px solid #F1F5F9" }}>
-                                  <td style={{ ...TD, fontSize: 12, fontWeight: 600 }}>{l.itemName}</td>
-                                  <td style={{ ...TD, fontSize: 12, color: "#94A3B8" }}>{l.supplierSku || "—"}</td>
-                                  <td style={{ ...TD, fontSize: 12 }}>{l.qtyOrdered}</td>
-                                  <td style={{ ...TD, fontSize: 12 }}>{fmtR(l.unitCost)}</td>
-                                  <td style={{ ...TD, fontSize: 12, color: "#64748B" }}>{l.vatRate}%</td>
-                                  <td style={{ ...TD, fontSize: 12, fontWeight: 700 }}>{fmtR(l.lineTotal)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                </>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* PO table */}
+      {isLoading
+        ? <div style={{ padding: 40, textAlign: "center", color: "#94A3B8" }}>Loading…</div>
+        : pos.length === 0
+          ? <div style={{ textAlign: "center", padding: "50px 0", color: "#94A3B8" }}><Package size={36} style={{ opacity: .3, marginBottom: 10 }} /><div style={{ fontWeight: 600, color: "#475569" }}>No purchase orders</div></div>
+          : <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr style={{ background: "#F8FAFC" }}>
+                  {["PO #", "Supplier", "Amount", "Order Date", "Required By", "Status", ""].map(h => (
+                    <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {pos.map((po, i) => {
+                    const st = STATUS_CFG[po.status] ?? STATUS_CFG.DRAFT
+                    return (
+                      <tr key={po.id} onClick={() => setDetail(po)} style={{ borderTop: "1px solid #F1F5F9", background: i % 2 === 0 ? "#fff" : "#FAFAFA", cursor: "pointer" }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#F0F7FF"}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? "#fff" : "#FAFAFA"}>
+                        <td style={{ padding: "11px 14px", fontSize: 12, fontWeight: 700, color: ACCENT }}>{po.orderNumber}</td>
+                        <td style={{ padding: "11px 14px", fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{po.supplierName}</td>
+                        <td style={{ padding: "11px 14px", fontSize: 13, fontWeight: 600 }}>{fmtR(po.totalAmount)}</td>
+                        <td style={{ padding: "11px 14px", fontSize: 12, color: "#64748B" }}>{fmtD(po.orderDate)}</td>
+                        <td style={{ padding: "11px 14px", fontSize: 12, color: "#64748B" }}>{fmtD(po.requiredByDate)}</td>
+                        <td style={{ padding: "11px 14px" }}><span style={{ background: st.bg, color: st.color, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20 }}>{st.label}</span></td>
+                        <td style={{ padding: "11px 14px", fontSize: 12, color: "#1D4ED8", fontWeight: 600 }}>Open →</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+      }
 
-      {/* Create PO */}
+      {/* Create PO Modal */}
       {showCreate && (
-        <Modal title="New Purchase Order" onClose={() => setShowCreate(false)}>
+        <Modal title="New Purchase Order" onClose={() => { setShowCreate(false); setErr("") }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Supplier *" span={2}>
-              <select value={form.supplierId} onChange={e => sf("supplierId", e.target.value)} style={inp}>
+            <Fld label="Supplier *" span={2}>
+              <select value={poForm.supplierId} onChange={e => spf("supplierId", e.target.value)} style={inp}>
                 <option value="">Select supplier…</option>
                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
-            </Field>
-            <Field label="Deliver To">
-              <select value={form.deliverToLocation} onChange={e => sf("deliverToLocation", e.target.value)} style={inp}>
+            </Fld>
+            <Fld label="Deliver To">
+              <select value={poForm.deliverToLocation} onChange={e => spf("deliverToLocation", e.target.value)} style={inp}>
                 <option value="">Select location…</option>
-                {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                {locations.map(l => <option key={l.id} value={l.id}>{l.name} ({l.locationType})</option>)}
               </select>
-            </Field>
-            <Field label="Required By"><input type="date" value={form.requiredByDate} onChange={e => sf("requiredByDate", e.target.value)} style={inp} /></Field>
-            <Field label="Currency">
-              <select value={form.currency} onChange={e => sf("currency", e.target.value)} style={inp}>
-                {["ZAR", "USD", "EUR", "GBP"].map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </Field>
-            <Field label="Project Ref"><input value={form.projectRef} onChange={e => sf("projectRef", e.target.value)} placeholder="e.g. SITE-A-2026" style={inp} /></Field>
-            <Field label="Notes" span={2}><textarea value={form.notes} onChange={e => sf("notes", e.target.value)} style={{ ...inp, minHeight: 56, resize: "vertical" }} placeholder="Instructions for supplier…" /></Field>
+            </Fld>
+            <Fld label="Required By Date"><input type="date" value={poForm.requiredByDate} onChange={e => spf("requiredByDate", e.target.value)} style={inp} /></Fld>
+            <Fld label="Project Reference"><input value={poForm.projectRef} onChange={e => spf("projectRef", e.target.value)} placeholder="PRJ-001" style={inp} /></Fld>
+            <Fld label="Notes"><input value={poForm.notes} onChange={e => spf("notes", e.target.value)} style={inp} /></Fld>
+            <Fld label="Internal Notes" span={2}><textarea value={poForm.internalNotes} onChange={e => spf("internalNotes", e.target.value)} style={{ ...inp, minHeight: 48, resize: "vertical" }} /></Fld>
+          </div>
+          <div style={{ marginTop: 12, padding: "10px 12px", background: "#FFFBEB", borderRadius: 8, fontSize: 12, color: "#92400E" }}>
+            ℹ After creating the PO you can add line items before submitting for approval.
           </div>
           {err && <ErrBox msg={err} />}
-          <ModalFooter onCancel={() => setShowCreate(false)} loading={createMut.isPending}
-            label={createMut.isPending ? "Creating…" : "Create PO"}
-            onConfirm={() => { if (!form.supplierId) { setErr("Select a supplier"); return } createMut.mutate({ ...form, deliverToLocation: form.deliverToLocation || null, requiredByDate: form.requiredByDate || null, projectRef: form.projectRef || null, notes: form.notes || null }) }} />
+          <ModalFooter onCancel={() => { setShowCreate(false); setErr("") }} onConfirm={() => {
+            if (!poForm.supplierId) { setErr("Please select a supplier"); return }
+            createMut.mutate({ supplierId: poForm.supplierId, deliverToLocation: poForm.deliverToLocation || null, requiredByDate: poForm.requiredByDate || null, projectRef: poForm.projectRef || null, notes: poForm.notes || null, internalNotes: poForm.internalNotes || null })
+          }} label={createMut.isPending ? "Creating…" : "Create PO"} loading={createMut.isPending} accent={ACCENT} />
         </Modal>
       )}
-
-      {addLinesFor && <AddLinesModal poId={addLinesFor} onClose={() => { setAddLinesFor(null); qc.invalidateQueries({ queryKey: ["scm-po-lines", addLinesFor] }); qc.invalidateQueries({ queryKey: ["scm-pos"] }) }} />}
-      {grFor && <GoodsReceiptModal po={grFor} locations={locations} onClose={() => { setGrFor(null); qc.invalidateQueries({ queryKey: ["scm-pos"] }); qc.invalidateQueries({ queryKey: ["scm-summary"] }) }} />}
     </div>
   )
 }
 
-// ── Add Line Items ─────────────────────────────────────────────────────────────
-function AddLinesModal({ poId, onClose }: { poId: string; onClose: () => void }) {
-  const [rows, setRows] = useState([{ description: "", qty: "1", unitPrice: "", catId: "", catName: "" }])
-  const [err, setErr] = useState("")
-  const [searches, setSearches] = useState<string[]>([""])
-  const [results, setResults] = useState<CatalogueItem[][]>([[]])
-
-  const addRow = () => { setRows(r => [...r, { description: "", qty: "1", unitPrice: "", catId: "", catName: "" }]); setSearches(s => [...s, ""]); setResults(r => [...r, []]) }
-  const upd = (i: number, k: string, v: string) => setRows(r => r.map((x, j) => j === i ? { ...x, [k]: v } : x))
-
-  const searchCat = async (i: number, q: string) => {
-    setSearches(s => s.map((x, j) => j === i ? q : x))
-    if (q.length < 2) { setResults(r => r.map((x, j) => j === i ? [] : x)); return }
-    try { const r = await apiClient.get(`/api/v1/catalogue/items?search=${encodeURIComponent(q)}&size=8`); setResults(res => res.map((x, j) => j === i ? unwrap<CatalogueItem>(r) : x)) } catch {}
-  }
-
-  const pickCat = (i: number, item: CatalogueItem) => {
-    upd(i, "description", item.name); upd(i, "catId", item.id); upd(i, "catName", item.name)
-    if (item.unitPrice) upd(i, "unitPrice", String(item.unitPrice))
-    setSearches(s => s.map((x, j) => j === i ? item.name : x))
-    setResults(r => r.map((x, j) => j === i ? [] : x))
-  }
-
-  const saveMut = useMutation({
-    mutationFn: async () => {
-      for (const r of rows.filter(r => r.description.trim())) {
-        await apiClient.post(`/api/v1/supply-chain/purchase-orders/${poId}/lines`, { itemName: r.description, qtyOrdered: parseFloat(r.qty) || 1, unitCost: parseFloat(r.unitPrice) || 0, vatRate: null, catalogueItemId: r.catId || null, supplierSku: null })
-      }
-    },
-    onSuccess: onClose,
-    onError: (e: any) => setErr(e.response?.data?.message || "Failed to save lines"),
-  })
-
+function ActionBtn({ onClick, color, bg, border, icon: Icon, children }: any) {
+  return <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: bg, color, border: `1px solid ${border}`, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}><Icon size={13} />{children}</button>
+}
+function Fld({ label, children, span }: { label: string; children: React.ReactNode; span?: number }) {
+  return <div style={{ gridColumn: span ? `span ${span}` : undefined }}><label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>{label}</label>{children}</div>
+}
+function ErrBox({ msg }: { msg: string }) {
+  return <div style={{ marginTop: 10, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#DC2626", fontSize: 13 }}>{msg}</div>
+}
+function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
-    <Modal title="Add Line Items" onClose={onClose} wide>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {rows.map((row, i) => (
-          <div key={i} style={{ padding: "12px 14px", background: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10, marginBottom: 6 }}>
-              <div style={{ position: "relative" }}>
-                <Search size={12} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "#94A3B8" }} />
-                <input value={searches[i]} onChange={e => searchCat(i, e.target.value)} placeholder="Search catalogue or type description…" style={{ ...inp, paddingLeft: 28, fontSize: 13, padding: "7px 10px 7px 28px" }} />
-                {results[i]?.length > 0 && (
-                  <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.1)", maxHeight: 180, overflowY: "auto" }}>
-                    {results[i].map(c => (
-                      <div key={c.id} onClick={() => pickCat(i, c)} style={{ padding: "8px 12px", cursor: "pointer", fontSize: 13, borderBottom: "1px solid #F1F5F9" }}
-                        onMouseEnter={e => (e.currentTarget.style.background = "#F8FAFC")} onMouseLeave={e => (e.currentTarget.style.background = "#fff")}>
-                        <strong>{c.name}</strong> {c.code && <span style={{ color: "#94A3B8", fontSize: 11 }}>({c.code})</span>}
-                        {c.unitPrice && <span style={{ float: "right", color: "#D97706", fontSize: 12, fontWeight: 700 }}>{fmtR(c.unitPrice)}</span>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <input type="number" value={row.qty} onChange={e => upd(i, "qty", e.target.value)} placeholder="Qty" style={{ ...inp, fontSize: 13, padding: "7px 10px" }} />
-              <input type="number" step="0.01" value={row.unitPrice} onChange={e => upd(i, "unitPrice", e.target.value)} placeholder="Unit price" style={{ ...inp, fontSize: 13, padding: "7px 10px" }} />
-            </div>
-            <div style={{ fontSize: 12, color: "#94A3B8", display: "flex", justifyContent: "space-between" }}>
-              <span>Line total: <strong style={{ color: "#0F172A" }}>{fmtR((parseFloat(row.qty) || 0) * (parseFloat(row.unitPrice) || 0))}</strong></span>
-              {rows.length > 1 && <button onClick={() => { setRows(r => r.filter((_, j) => j !== i)); setSearches(s => s.filter((_, j) => j !== i)); setResults(r => r.filter((_, j) => j !== i)) }} style={{ background: "none", border: "none", cursor: "pointer", color: "#DC2626", fontSize: 12 }}>Remove</button>}
-            </div>
-          </div>
-        ))}
-        <button onClick={addRow} style={{ padding: "8px 14px", border: "1px dashed #E2E8F0", borderRadius: 9, background: "#F8FAFC", color: "#64748B", fontSize: 13, cursor: "pointer" }}>+ Add another line</button>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+      <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 580, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{title}</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 20, lineHeight: 1 }}>×</button>
+        </div>
+        {children}
       </div>
-      {err && <ErrBox msg={err} />}
-      <ModalFooter onCancel={onClose} onConfirm={() => saveMut.mutate()} label={saveMut.isPending ? "Saving…" : "Save Lines"} loading={saveMut.isPending} />
-    </Modal>
+    </div>
   )
 }
-
-// ── Goods Receipt ──────────────────────────────────────────────────────────────
-function GoodsReceiptModal({ po, locations, onClose }: { po: PurchaseOrder; locations: StockLocation[]; onClose: () => void }) {
-  const qc = useQueryClient()
-  const [locationId, setLocationId] = useState(locations.find(l => l.isDefault)?.id || "")
-  const [deliveryRef, setDeliveryRef] = useState("")
-  const [err, setErr] = useState("")
-
-  const createGR = useMutation({
-    mutationFn: () => apiClient.post("/api/v1/supply-chain/goods-receipts", { purchaseOrderId: po.id, receivedToLocation: locationId, deliveryNoteRef: deliveryRef || null }),
-    onSuccess: r => { const grId = r.data?.data?.id ?? r.data?.id; if (grId) postGR.mutate(grId); else onClose() },
-    onError: (e: any) => setErr(e.response?.data?.message || "Failed to create GR"),
-  })
-  const postGR = useMutation({
-    mutationFn: (grId: string) => apiClient.post(`/api/v1/supply-chain/goods-receipts/${grId}/post`, []),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["scm-inventory"] }); onClose() },
-    onError: (e: any) => setErr(e.response?.data?.message || "Failed to post GR"),
-  })
-  const loading = createGR.isPending || postGR.isPending
-
+function ModalFooter({ onCancel, onConfirm, label, loading, accent }: { onCancel: () => void; onConfirm: () => void; label: string; loading?: boolean; accent?: string }) {
   return (
-    <Modal title="Receive Goods" onClose={onClose}>
-      <div style={{ padding: "10px 14px", background: "#EFF6FF", borderRadius: 10, marginBottom: 16, fontSize: 13, color: "#1D4ED8" }}>
-        Receiving against <strong>{po.orderNumber}</strong> — {po.supplierName}
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <Field label="Deliver To Location *">
-          <select value={locationId} onChange={e => setLocationId(e.target.value)} style={inp}>
-            <option value="">Select location…</option>
-            {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </select>
-        </Field>
-        <Field label="Delivery Note / Waybill Ref">
-          <input value={deliveryRef} onChange={e => setDeliveryRef(e.target.value)} placeholder="DN-2026-4521" style={inp} />
-        </Field>
-      </div>
-      <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 10 }}>All PO line items will be fully received and stock will be updated at the selected location.</p>
-      {err && <ErrBox msg={err} />}
-      <ModalFooter onCancel={onClose} onConfirm={() => { if (!locationId) { setErr("Select a delivery location"); return } createGR.mutate() }} label={loading ? "Posting…" : "Confirm Receipt"} loading={loading} />
-    </Modal>
+    <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+      <button onClick={onCancel} style={{ padding: "9px 16px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 13, cursor: "pointer", color: "#64748B" }}>Cancel</button>
+      <button onClick={onConfirm} disabled={loading} style={{ padding: "9px 18px", background: accent ?? "#D97706", color: "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: loading ? .6 : 1 }}>{label}</button>
+    </div>
   )
 }

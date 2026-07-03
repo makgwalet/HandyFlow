@@ -1,175 +1,261 @@
 // src/pages/supply-chain/InventoryTab.tsx
-import { useState, useEffect } from "react"
+import React, { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Plus, Search, AlertTriangle, CheckCircle, Clock, RotateCcw } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { unwrap, fmtR, fmtDate, inp, TH, TD, Badge, Modal, ModalFooter, Field, ErrBox, Spinner, EmptyState, Banner, filterPill, type InventoryItem, type StockMovement, type StockLocation, type CatalogueItem } from "./scm.shared"
+import { Plus, Package, AlertTriangle, TrendingUp, ChevronDown, ChevronUp } from "lucide-react"
+
+interface Location { id: string; name: string; locationType: string; isDefault: boolean }
+interface InventoryItem {
+  id: string; catalogueItemId: string; locationId: string; qtyOnHand: number; qtyReserved: number
+  qtyInTransit: number; reorderPoint: number; reorderQty: number; avgCost: number; lastCost: number
+  binLocation: string | null; updatedAt: string
+}
+interface Movement {
+  id: string; movementType: string; qtyChange: number; qtyBefore: number; qtyAfter: number
+  unitCost: number | null; referenceType: string | null; referenceNumber: string | null
+  createdByName: string | null; createdAt: string; notes: string | null
+}
+
+const ACCENT = "#D97706"
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 9, fontSize: 14, boxSizing: "border-box", outline: "none", background: "#fff" }
+const fmtR = (n: number) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const fmtD = (d: string) => new Date(d).toLocaleDateString("en-ZA")
+
+const MOVE_TYPE_COLOR: Record<string, { bg: string; color: string }> = {
+  OPENING:         { bg: "#F1F5F9", color: "#475569" },
+  PURCHASE:        { bg: "#DCFCE7", color: "#166534" },
+  SALE:            { bg: "#FEE2E2", color: "#DC2626" },
+  TRANSFER_IN:     { bg: "#DBEAFE", color: "#1D4ED8" },
+  TRANSFER_OUT:    { bg: "#EDE9FE", color: "#7C3AED" },
+  ADJUSTMENT_UP:   { bg: "#D1FAE5", color: "#065F46" },
+  ADJUSTMENT_DOWN: { bg: "#FEF3C7", color: "#92400E" },
+  WASTE:           { bg: "#FEE2E2", color: "#DC2626" },
+  RETURN_IN:       { bg: "#DCFCE7", color: "#166534" },
+  RETURN_OUT:      { bg: "#FEF3C7", color: "#92400E" },
+}
 
 export function InventoryTab() {
   const qc = useQueryClient()
-  const [locationId, setLocationId] = useState("")
+  const [selectedLocation, setSelectedLocation] = useState<string>("")
+  const [expandedItem, setExpandedItem] = useState<string | null>(null)
   const [showOpening, setShowOpening] = useState(false)
-  const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null)
   const [err, setErr] = useState("")
-  const [catSearch, setCatSearch] = useState("")
-  const [catResults, setCatResults] = useState<CatalogueItem[]>([])
-  const blank = () => ({ locationId: "", catalogueItemId: "", qty: "", unitCost: "", reorderPoint: "", reorderQty: "", binLocation: "" })
-  const [form, setForm] = useState(blank())
+
+  const initF = () => ({ catalogueItemId: "", locationId: "", qty: "", unitCost: "", reorderPoint: "", reorderQty: "", binLocation: "" })
+  const [form, setForm] = useState(initF())
   const sf = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
-  const [selectedCat, setSelectedCat] = useState<CatalogueItem | null>(null)
 
-  const { data: locations = [] } = useQuery<StockLocation[]>({ queryKey: ["scm-locations"], queryFn: async () => { const r = await apiClient.get("/api/v1/supply-chain/locations"); return unwrap<StockLocation>(r) }, staleTime: 60_000 })
-  const { data: inventory = [], isLoading } = useQuery<InventoryItem[]>({ queryKey: ["scm-inventory", locationId], queryFn: async () => { const r = await apiClient.get(locationId ? `/api/v1/supply-chain/inventory?locationId=${locationId}` : "/api/v1/supply-chain/inventory"); return unwrap<InventoryItem>(r) }, staleTime: 30_000 })
-  const { data: lowStock = [] } = useQuery<InventoryItem[]>({ queryKey: ["scm-low-stock"], queryFn: async () => { const r = await apiClient.get("/api/v1/supply-chain/inventory/low-stock"); return unwrap<InventoryItem>(r) }, staleTime: 30_000 })
-
-  useEffect(() => {
-    if (catSearch.length < 2) { setCatResults([]); return }
-    const t = setTimeout(async () => {
-      try { const r = await apiClient.get(`/api/v1/catalogue/items?search=${encodeURIComponent(catSearch)}&size=8`); setCatResults(unwrap<CatalogueItem>(r)) } catch { setCatResults([]) }
-    }, 300)
-    return () => clearTimeout(t)
-  }, [catSearch])
-
-  const openMut = useMutation({
-    mutationFn: (body: any) => apiClient.post("/api/v1/supply-chain/inventory/opening", body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["scm-inventory"] }); qc.invalidateQueries({ queryKey: ["scm-low-stock"] }); qc.invalidateQueries({ queryKey: ["scm-summary"] }); setShowOpening(false); setForm(blank()); setCatSearch(""); setSelectedCat(null); setErr("") },
-    onError: (e: any) => setErr(e.response?.data?.message || "Failed to set stock"),
+  const { data: locations = [] } = useQuery<Location[]>({
+    queryKey: ["scm-locations"],
+    queryFn: async () => { const r = await apiClient.get("/api/v1/supply-chain/locations"); const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : [] },
+    staleTime: 120_000,
   })
+
+  const { data: inventory = [], isLoading } = useQuery<InventoryItem[]>({
+    queryKey: ["scm-inventory", selectedLocation],
+    queryFn: async () => {
+      const url = selectedLocation ? `/api/v1/supply-chain/inventory?locationId=${selectedLocation}` : "/api/v1/supply-chain/inventory"
+      const r = await apiClient.get(url); const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : []
+    },
+    staleTime: 30_000,
+  })
+
+  const { data: movements = [] } = useQuery<Movement[]>({
+    queryKey: ["scm-movements", expandedItem],
+    queryFn: async () => { const r = await apiClient.get(`/api/v1/supply-chain/inventory/${expandedItem}/movements?size=20`); const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : [] },
+    enabled: !!expandedItem,
+    staleTime: 30_000,
+  })
+
+  const openingMut = useMutation({
+    mutationFn: (b: any) => apiClient.post("/api/v1/supply-chain/inventory/opening", b),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["scm-inventory"] }); setShowOpening(false); setForm(initF()); setErr("") },
+    onError: (e: any) => setErr(e.response?.data?.message || "Failed to set opening stock"),
+  })
+
+  const lowCount = inventory.filter(i => i.reorderPoint > 0 && i.qtyOnHand <= i.reorderPoint).length
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 10, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <select value={locationId} onChange={e => setLocationId(e.target.value)} style={{ ...inp, width: "auto", minWidth: 180 }}>
-            <option value="">All locations</option>
-            {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </select>
-          {lowStock.length > 0 && <span style={{ background: "#FEF2F2", color: "#DC2626", fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20 }}>{lowStock.length} low stock</span>}
+      {/* Location tabs + actions */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <button onClick={() => setSelectedLocation("")}
+            style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: !selectedLocation ? 700 : 400, border: !selectedLocation ? `1.5px solid ${ACCENT}` : "1px solid #E2E8F0", background: !selectedLocation ? "#FEF3C7" : "#fff", color: !selectedLocation ? ACCENT : "#64748B" }}>
+            All Locations
+          </button>
+          {locations.map(l => (
+            <button key={l.id} onClick={() => setSelectedLocation(l.id)}
+              style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: selectedLocation === l.id ? 700 : 400, border: selectedLocation === l.id ? `1.5px solid ${ACCENT}` : "1px solid #E2E8F0", background: selectedLocation === l.id ? "#FEF3C7" : "#fff", color: selectedLocation === l.id ? ACCENT : "#64748B" }}>
+              {l.name}
+            </button>
+          ))}
         </div>
-        <button onClick={() => { setShowOpening(true); setErr("") }} style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-          <Plus size={14} /> Set Opening Stock
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          {lowCount > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#FEF3C7", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "#92400E" }}>
+              <AlertTriangle size={13} /> {lowCount} low stock
+            </div>
+          )}
+          <button onClick={() => { setShowOpening(true); setErr("") }}
+            style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: ACCENT, color: "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            <Plus size={14} /> Set Opening Stock
+          </button>
+        </div>
       </div>
 
-      {lowStock.length > 0 && <Banner variant="error">{lowStock.length} item{lowStock.length !== 1 ? "s" : ""} at or below reorder point — consider raising purchase orders</Banner>}
+      {/* Inventory table */}
+      {isLoading
+        ? <div style={{ padding: 40, textAlign: "center", color: "#94A3B8" }}>Loading…</div>
+        : inventory.length === 0
+          ? <div style={{ textAlign: "center", padding: "50px 0", color: "#94A3B8" }}>
+              <Package size={36} style={{ opacity: .3, marginBottom: 10 }} />
+              <div style={{ fontWeight: 600, color: "#475569" }}>No inventory</div>
+              <div style={{ fontSize: 13 }}>Set opening stock to start tracking quantities</div>
+            </div>
+          : <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+              {inventory.map((item, i) => {
+                const isLow = item.reorderPoint > 0 && item.qtyOnHand <= item.reorderPoint
+                const isCritical = isLow && item.qtyOnHand <= 0
+                const isOpen = expandedItem === item.id
+                const stockPct = item.reorderPoint > 0 ? Math.min((item.qtyOnHand / item.reorderPoint) * 100, 200) : 100
+                return (
+                  <div key={item.id} style={{ borderTop: i > 0 ? "1px solid #F1F5F9" : "none" }}>
+                    <div
+                      onClick={() => setExpandedItem(isOpen ? null : item.id)}
+                      style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", background: isCritical ? "#FEF2F2" : isLow ? "#FFFBEB" : i % 2 === 0 ? "#fff" : "#FAFAFA" }}
+                    >
+                      {/* Status indicator */}
+                      <div style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, background: isCritical ? "#EF4444" : isLow ? "#F59E0B" : "#22C55E" }} />
 
-      {isLoading ? <Spinner /> : inventory.length === 0 ? (
-        <EmptyState icon={Plus} title="No inventory" sub="Set opening stock or receive a goods receipt to populate inventory" />
-      ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr style={{ background: "#F8FAFC" }}>
-              {["Catalogue Item", "Bin", "Qty On Hand", "Reorder Point", "Reorder Qty", "Avg Cost", "Status", ""].map(h => <th key={h} style={TH}>{h}</th>)}
-            </tr></thead>
-            <tbody>
-              {inventory.map((item, i) => (
-                <tr key={item.id} style={{ background: i % 2 === 0 ? "#fff" : "#FAFAFA", borderTop: "1px solid #F1F5F9" }}>
-                  <td style={TD}><span style={{ fontFamily: "monospace", fontSize: 12, color: "#475569" }}>{item.catalogueItemId.slice(0, 12)}…</span></td>
-                  <td style={{ ...TD, color: "#64748B" }}>{item.binLocation || "—"}</td>
-                  <td style={TD}><strong style={{ color: item.lowStock ? "#DC2626" : "#0F172A", fontSize: 15 }}>{item.qtyOnHand}</strong></td>
-                  <td style={{ ...TD, color: "#64748B" }}>{item.reorderPoint}</td>
-                  <td style={{ ...TD, color: "#64748B" }}>{item.reorderQty}</td>
-                  <td style={TD}>{fmtR(item.avgCost)}</td>
-                  <td style={TD}>
-                    {item.lowStock
-                      ? <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#DC2626", fontSize: 12, fontWeight: 600 }}><AlertTriangle size={13} />Low Stock</span>
-                      : <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#059669", fontSize: 12, fontWeight: 600 }}><CheckCircle size={13} />OK</span>
-                    }
-                  </td>
-                  <td style={TD}>
-                    <button onClick={() => setHistoryItem(item)} style={{ background: "none", border: "none", cursor: "pointer", color: "#D97706", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
-                      <RotateCcw size={12} /> History
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      {/* Item identity */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", marginBottom: 2 }}>
+                          Item {item.catalogueItemId.slice(0, 12)}…
+                          {item.binLocation && <span style={{ fontSize: 11, color: "#94A3B8", marginLeft: 8 }}>Bin: {item.binLocation}</span>}
+                          {isLow && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, background: isCritical ? "#FEE2E2" : "#FEF3C7", color: isCritical ? "#DC2626" : "#92400E", padding: "1px 6px", borderRadius: 20 }}>{isCritical ? "OUT OF STOCK" : "LOW STOCK"}</span>}
+                        </div>
+                        {/* Stock bar */}
+                        <div style={{ height: 4, background: "#F1F5F9", borderRadius: 2, marginTop: 4 }}>
+                          <div style={{ height: "100%", width: `${Math.min(stockPct, 100)}%`, background: isCritical ? "#EF4444" : isLow ? "#F59E0B" : "#22C55E", borderRadius: 2 }} />
+                        </div>
+                      </div>
+
+                      {/* Metrics */}
+                      <div style={{ display: "flex", gap: 24, flexShrink: 0 }}>
+                        <Metric label="On Hand"    value={item.qtyOnHand.toFixed(2)}    color={isCritical ? "#DC2626" : isLow ? ACCENT : "#0F172A"} />
+                        <Metric label="Reserved"   value={item.qtyReserved.toFixed(2)} />
+                        <Metric label="Reorder At" value={item.reorderPoint > 0 ? item.reorderPoint.toFixed(2) : "—"} />
+                        <Metric label="Avg Cost"   value={fmtR(item.avgCost)} />
+                        <Metric label="Stock Value" value={fmtR(item.qtyOnHand * item.avgCost)} />
+                      </div>
+                      {isOpen ? <ChevronUp size={15} color="#94A3B8" /> : <ChevronDown size={15} color="#94A3B8" />}
+                    </div>
+
+                    {/* Movement history */}
+                    {isOpen && (
+                      <div style={{ padding: "12px 20px", background: "#F8FAFC", borderTop: "1px solid #E2E8F0" }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                          <TrendingUp size={13} /> Movement History (last 20)
+                        </div>
+                        {movements.length === 0
+                          ? <div style={{ fontSize: 12, color: "#94A3B8" }}>No movements recorded</div>
+                          : <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                              <thead><tr>
+                                {["Date", "Type", "Change", "Before", "After", "Unit Cost", "Reference", "By"].map(h => (
+                                  <th key={h} style={{ textAlign: "left", padding: "5px 10px", color: "#94A3B8", fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</th>
+                                ))}
+                              </tr></thead>
+                              <tbody>
+                                {movements.map(m => {
+                                  const mc = MOVE_TYPE_COLOR[m.movementType] ?? { bg: "#F1F5F9", color: "#475569" }
+                                  return (
+                                    <tr key={m.id} style={{ borderTop: "1px solid #F1F5F9" }}>
+                                      <td style={{ padding: "6px 10px" }}>{fmtD(m.createdAt)}</td>
+                                      <td style={{ padding: "6px 10px" }}><span style={{ background: mc.bg, color: mc.color, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 12 }}>{m.movementType.replace(/_/g," ")}</span></td>
+                                      <td style={{ padding: "6px 10px", fontWeight: 700, color: m.qtyChange > 0 ? "#059669" : "#DC2626" }}>{m.qtyChange > 0 ? "+" : ""}{m.qtyChange.toFixed(2)}</td>
+                                      <td style={{ padding: "6px 10px", color: "#64748B" }}>{m.qtyBefore.toFixed(2)}</td>
+                                      <td style={{ padding: "6px 10px", fontWeight: 600 }}>{m.qtyAfter.toFixed(2)}</td>
+                                      <td style={{ padding: "6px 10px", color: "#64748B" }}>{m.unitCost != null ? fmtR(m.unitCost) : "—"}</td>
+                                      <td style={{ padding: "6px 10px", color: "#64748B" }}>{m.referenceNumber ?? "—"}</td>
+                                      <td style={{ padding: "6px 10px", color: "#94A3B8" }}>{m.createdByName ?? "—"}</td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                        }
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+      }
+
+      {/* Opening Stock Modal */}
+      {showOpening && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Set Opening Stock</h3>
+              <button onClick={() => setShowOpening(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 20, lineHeight: 1 }}>×</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ gridColumn: "span 2" }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Location *</label>
+                <select value={form.locationId} onChange={e => sf("locationId", e.target.value)} style={inp}>
+                  <option value="">Select location…</option>
+                  {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+              </div>
+              <div style={{ gridColumn: "span 2" }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Catalogue Item ID *</label>
+                <input value={form.catalogueItemId} onChange={e => sf("catalogueItemId", e.target.value)} placeholder="UUID from catalogue" style={inp} />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Opening Qty *</label>
+                <input type="number" value={form.qty} onChange={e => sf("qty", e.target.value)} placeholder="0.00" style={inp} />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Unit Cost (R)</label>
+                <input type="number" value={form.unitCost} onChange={e => sf("unitCost", e.target.value)} placeholder="0.00" style={inp} />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Reorder Point</label>
+                <input type="number" value={form.reorderPoint} onChange={e => sf("reorderPoint", e.target.value)} placeholder="10" style={inp} />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Reorder Qty</label>
+                <input type="number" value={form.reorderQty} onChange={e => sf("reorderQty", e.target.value)} placeholder="50" style={inp} />
+              </div>
+              <div style={{ gridColumn: "span 2" }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Bin Location</label>
+                <input value={form.binLocation} onChange={e => sf("binLocation", e.target.value)} placeholder="A-12-3" style={inp} />
+              </div>
+            </div>
+            {err && <div style={{ marginTop: 10, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#DC2626", fontSize: 13 }}>{err}</div>}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+              <button onClick={() => setShowOpening(false)} style={{ padding: "9px 16px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 13, cursor: "pointer", color: "#64748B" }}>Cancel</button>
+              <button onClick={() => {
+                if (!form.locationId || !form.catalogueItemId || !form.qty) { setErr("Location, catalogue item and quantity are required"); return }
+                openingMut.mutate({ locationId: form.locationId, catalogueItemId: form.catalogueItemId, qty: parseFloat(form.qty), unitCost: form.unitCost ? parseFloat(form.unitCost) : null, reorderPoint: form.reorderPoint ? parseFloat(form.reorderPoint) : null, reorderQty: form.reorderQty ? parseFloat(form.reorderQty) : null, binLocation: form.binLocation || null })
+              }} disabled={openingMut.isPending} style={{ padding: "9px 18px", background: ACCENT, color: "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: openingMut.isPending ? .6 : 1 }}>
+                {openingMut.isPending ? "Saving…" : "Set Stock"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
-
-      {/* Set Opening Stock Modal */}
-      {showOpening && (
-        <Modal title="Set Opening Stock" onClose={() => setShowOpening(false)}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Location *" span={2}>
-              <select value={form.locationId} onChange={e => sf("locationId", e.target.value)} style={inp}>
-                <option value="">Select location…</option>
-                {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Catalogue Item *" span={2}>
-              <div style={{ position: "relative" }}>
-                <Search size={13} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "#94A3B8" }} />
-                <input value={catSearch} onChange={e => { setCatSearch(e.target.value); setSelectedCat(null); sf("catalogueItemId", "") }} placeholder="Search by item name or code…" style={{ ...inp, paddingLeft: 28 }} />
-                {catResults.length > 0 && (
-                  <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.1)", maxHeight: 200, overflowY: "auto" }}>
-                    {catResults.map(c => (
-                      <div key={c.id} onClick={() => { setCatSearch(c.name); sf("catalogueItemId", c.id); if (c.unitPrice) sf("unitCost", String(c.unitPrice)); setSelectedCat(c); setCatResults([]) }}
-                        style={{ padding: "8px 12px", cursor: "pointer", fontSize: 13, borderBottom: "1px solid #F1F5F9" }}
-                        onMouseEnter={e => (e.currentTarget.style.background = "#F8FAFC")} onMouseLeave={e => (e.currentTarget.style.background = "#fff")}>
-                        <strong>{c.name}</strong> {c.code && <span style={{ color: "#94A3B8", fontSize: 11 }}>({c.code})</span>}
-                        {c.unitPrice && <span style={{ float: "right", color: "#D97706", fontSize: 12, fontWeight: 700 }}>{fmtR(c.unitPrice)}</span>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {selectedCat && <div style={{ fontSize: 11, color: "#059669", marginTop: 4 }}>Selected: {selectedCat.name}</div>}
-            </Field>
-            <Field label="Opening Qty *"><input type="number" value={form.qty} onChange={e => sf("qty", e.target.value)} placeholder="0" style={inp} /></Field>
-            <Field label="Unit Cost (R)"><input type="number" step="0.01" value={form.unitCost} onChange={e => sf("unitCost", e.target.value)} placeholder="0.00" style={inp} /></Field>
-            <Field label="Reorder Point"><input type="number" value={form.reorderPoint} onChange={e => sf("reorderPoint", e.target.value)} placeholder="0" style={inp} /></Field>
-            <Field label="Reorder Qty"><input type="number" value={form.reorderQty} onChange={e => sf("reorderQty", e.target.value)} placeholder="0" style={inp} /></Field>
-            <Field label="Bin Location" span={2}><input value={form.binLocation} onChange={e => sf("binLocation", e.target.value)} placeholder="e.g. A3-S2" style={inp} /></Field>
-          </div>
-          {err && <ErrBox msg={err} />}
-          <ModalFooter onCancel={() => setShowOpening(false)} loading={openMut.isPending} label={openMut.isPending ? "Saving…" : "Set Stock"}
-            onConfirm={() => { if (!form.locationId || !form.catalogueItemId || !form.qty) { setErr("Location, item and quantity are required"); return } openMut.mutate({ locationId: form.locationId, catalogueItemId: form.catalogueItemId, qty: parseFloat(form.qty), unitCost: parseFloat(form.unitCost) || 0, reorderPoint: parseFloat(form.reorderPoint) || 0, reorderQty: parseFloat(form.reorderQty) || 0, binLocation: form.binLocation || null }) }} />
-        </Modal>
-      )}
-
-      {historyItem && <StockHistoryModal item={historyItem} onClose={() => setHistoryItem(null)} />}
     </div>
   )
 }
 
-function StockHistoryModal({ item, onClose }: { item: InventoryItem; onClose: () => void }) {
-  const { data: movements = [], isLoading } = useQuery<StockMovement[]>({
-    queryKey: ["scm-movements", item.id],
-    queryFn: async () => { const r = await apiClient.get(`/api/v1/supply-chain/inventory/${item.id}/movements?size=50`); return unwrap<StockMovement>(r) },
-  })
+function Metric({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <Modal title="Stock Movement History" onClose={onClose}>
-      <div style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>
-        Current stock: <strong style={{ color: "#0F172A" }}>{item.qtyOnHand}</strong> · Avg cost: <strong>{fmtR(item.avgCost)}</strong>
-      </div>
-      {isLoading ? <Spinner /> : movements.length === 0 ? (
-        <EmptyState icon={RotateCcw} title="No movements" sub="Stock movements appear when goods are received or adjustments are made" />
-      ) : (
-        <div style={{ maxHeight: 380, overflowY: "auto", border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr style={{ background: "#F8FAFC" }}>
-              {["Date", "Type", "Qty", "Cost / Unit", "Reference", "By"].map(h => <th key={h} style={{ ...TH, fontSize: 10 }}>{h}</th>)}
-            </tr></thead>
-            <tbody>
-              {movements.map((m, i) => (
-                <tr key={m.id} style={{ borderTop: "1px solid #F1F5F9", background: i % 2 === 0 ? "#fff" : "#FAFAFA" }}>
-                  <td style={{ ...TD, fontSize: 12 }}>{fmtDate(m.movedAt)}</td>
-                  <td style={{ ...TD, fontSize: 12 }}><Badge status={m.movementType} /></td>
-                  <td style={{ ...TD, fontSize: 13, fontWeight: 700, color: m.qty > 0 ? "#059669" : "#DC2626" }}>{m.qty > 0 ? "+" : ""}{m.qty}</td>
-                  <td style={{ ...TD, fontSize: 12 }}>{fmtR(m.costPerUnit)}</td>
-                  <td style={{ ...TD, fontSize: 12, color: "#64748B" }}>{m.reference || "—"}</td>
-                  <td style={{ ...TD, fontSize: 12, color: "#64748B" }}>{m.movedByName || "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
-        <button onClick={onClose} style={{ padding: "8px 16px", border: "1px solid #E2E8F0", borderRadius: 8, background: "#fff", fontSize: 13, cursor: "pointer" }}>Close</button>
-      </div>
-    </Modal>
+    <div style={{ textAlign: "right" }}>
+      <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: color ?? "#0F172A" }}>{value}</div>
+    </div>
   )
 }

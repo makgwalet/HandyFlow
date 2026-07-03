@@ -9,6 +9,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -19,9 +20,27 @@ import za.co.handyflow.platform.supplychain.dto.*;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Supply Chain REST controller.
+ *
+ * WHY @Validated at the class level?
+ * ────────────────────────────────────
+ * @Valid on a @RequestBody triggers Bean Validation on the DTO fields.
+ * @Validated on the class enables validation on @RequestParam and @PathVariable too
+ * (e.g. @NotNull @PathVariable UUID id). Without @Validated, constraint annotations
+ * on method parameters are silently ignored.
+ *
+ * WHY getCurrentUserName() instead of userId.toString()?
+ * ──────────────────────────────────────────────────────
+ * `createdByName`, `receivedByName` etc. are displayed to users in movement history
+ * and audit logs. A UUID like `3a41cfaf-333a-4b6f-ad76-b282bcb0e701` is meaningless
+ * to a warehouse clerk. `TenantContext.getCurrentUserName()` returns "Thabo Molefe"
+ * from the firstName/lastName JWT claims — the same value shown in other modules.
+ */
 @RestController
 @RequestMapping("/api/v1/supply-chain")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Supply Chain", description = "Suppliers, purchase orders, inventory and AP invoices")
 public class ScmController {
 
@@ -31,7 +50,7 @@ public class ScmController {
 
     @GetMapping("/summary")
     @PreAuthorize("hasAuthority('SCM_READ')")
-    @Operation(summary = "SCM dashboard — supplier count, open POs, pending invoices, low stock alerts")
+    @Operation(summary = "SCM dashboard — supplier count, open POs, pending invoices, low-stock alerts")
     public ResponseEntity<ApiResponse<ScmSummaryResponse>> getSummary() {
         return ResponseEntity.ok(ApiResponse.success("Success",
                 scmService.getSummary(TenantContext.getTenantIdAsObject())));
@@ -62,17 +81,46 @@ public class ScmController {
     @Operation(summary = "Register a new supplier with BBBEE level, banking and payment terms")
     public ResponseEntity<ApiResponse<ScSupplier>> createSupplier(
             @Valid @RequestBody CreateSupplierRequest req) {
-        UUID userId = TenantContext.getCurrentUserId();
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Supplier created",
-                scmService.createSupplier(TenantContext.getTenantIdAsObject(), userId, req)));
+                scmService.createSupplier(TenantContext.getTenantIdAsObject(),
+                        TenantContext.getCurrentUserId(), req)));
     }
 
     @PutMapping("/suppliers/{id}")
     @PreAuthorize("hasAuthority('SCM_ADMIN')")
     public ResponseEntity<ApiResponse<ScSupplier>> updateSupplier(
-            @PathVariable UUID id, @RequestBody UpdateSupplierRequest req) {
+            @PathVariable UUID id, @Valid @RequestBody UpdateSupplierRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Supplier updated",
                 scmService.updateSupplier(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    // ── Supplier items (pricing catalogue) ────────────────────────────────────
+
+    @GetMapping("/suppliers/{id}/items")
+    @PreAuthorize("hasAuthority('SCM_READ')")
+    @Operation(summary = "List items this supplier sells and their prices")
+    public ResponseEntity<ApiResponse<List<ScSupplierItem>>> getSupplierItems(
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                scmService.getSupplierItems(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/suppliers/{id}/items")
+    @PreAuthorize("hasAuthority('SCM_ADMIN')")
+    @Operation(summary = "Add an item to a supplier's pricing catalogue")
+    public ResponseEntity<ApiResponse<ScSupplierItem>> addSupplierItem(
+            @PathVariable UUID id, @Valid @RequestBody AddSupplierItemRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Supplier item added",
+                scmService.addSupplierItem(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @GetMapping("/catalogue-items/{catalogueItemId}/best-price")
+    @PreAuthorize("hasAuthority('SCM_READ')")
+    @Operation(summary = "Best price across all suppliers for a catalogue item — ordered cheapest first")
+    public ResponseEntity<ApiResponse<List<ScSupplierItem>>> getBestPrice(
+            @PathVariable UUID catalogueItemId) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                scmService.getBestPriceForItem(TenantContext.getTenantIdAsObject(), catalogueItemId)));
     }
 
     // ── Stock Locations ───────────────────────────────────────────────────────
@@ -88,7 +136,7 @@ public class ScmController {
     @PostMapping("/locations")
     @PreAuthorize("hasAuthority('SCM_INVENTORY')")
     public ResponseEntity<ApiResponse<ScStockLocation>> createLocation(
-            @RequestBody CreateLocationRequest req) {
+            @Valid @RequestBody CreateLocationRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Location created",
                 scmService.createLocation(TenantContext.getTenantIdAsObject(), req)));
     }
@@ -116,11 +164,13 @@ public class ScmController {
     @PreAuthorize("hasAuthority('SCM_INVENTORY')")
     @Operation(summary = "Set opening stock for a catalogue item at a location")
     public ResponseEntity<ApiResponse<ScInventory>> openingStock(
-            @RequestBody OpeningStockRequest req) {
-        UUID userId = TenantContext.getCurrentUserId();
-        String userName = userId != null ? userId.toString() : "system";
+            @Valid @RequestBody OpeningStockRequest req) {
+        // FIX H-1: getCurrentUserName() — was userId.toString()
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Opening stock set",
-                scmService.openingStock(TenantContext.getTenantIdAsObject(), userId, userName, req)));
+                scmService.openingStock(TenantContext.getTenantIdAsObject(),
+                        TenantContext.getCurrentUserId(),
+                        TenantContext.getCurrentUserName(),
+                        req)));
     }
 
     @GetMapping("/inventory/{inventoryId}/movements")
@@ -156,11 +206,13 @@ public class ScmController {
     @PreAuthorize("hasAuthority('SCM_ORDER')")
     @Operation(summary = "Create a purchase order — auto-assigns PO number")
     public ResponseEntity<ApiResponse<ScPurchaseOrder>> createPurchaseOrder(
-            @RequestBody CreatePurchaseOrderRequest req) {
-        UUID userId = TenantContext.getCurrentUserId();
-        String userName = userId != null ? userId.toString() : "system";
+            @Valid @RequestBody CreatePurchaseOrderRequest req) {
+        // FIX H-1: getCurrentUserName() — was userId.toString()
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Purchase order created",
-                scmService.createPurchaseOrder(TenantContext.getTenantIdAsObject(), userId, userName, req)));
+                scmService.createPurchaseOrder(TenantContext.getTenantIdAsObject(),
+                        TenantContext.getCurrentUserId(),
+                        TenantContext.getCurrentUserName(),
+                        req)));
     }
 
     @PostMapping("/purchase-orders/{id}/submit")
@@ -175,17 +227,20 @@ public class ScmController {
     @PreAuthorize("hasAuthority('SCM_ADMIN')")
     @Operation(summary = "Approve a purchase order (PENDING_APPROVAL → APPROVED)")
     public ResponseEntity<ApiResponse<ScPurchaseOrder>> approvePurchaseOrder(@PathVariable UUID id) {
-        UUID userId = TenantContext.getCurrentUserId();
-        String name = userId != null ? userId.toString() : "approver";
+        // FIX H-1: getCurrentUserName() — was userId.toString()
+        // Parameter order matches ScmService: (tenantId, poId, approverId, approverName)
         return ResponseEntity.ok(ApiResponse.success("Purchase order approved",
-                scmService.approvePurchaseOrder(TenantContext.getTenantIdAsObject(), id, userId, name)));
+                scmService.approvePurchaseOrder(TenantContext.getTenantIdAsObject(),
+                        id,
+                        TenantContext.getCurrentUserId(),
+                        TenantContext.getCurrentUserName())));
     }
 
     @PostMapping("/purchase-orders/{id}/reject")
     @PreAuthorize("hasAuthority('SCM_ADMIN')")
     @Operation(summary = "Reject a PO — returns to DRAFT with reason")
     public ResponseEntity<ApiResponse<ScPurchaseOrder>> rejectPurchaseOrder(
-            @PathVariable UUID id, @RequestBody RejectPoRequest req) {
+            @PathVariable UUID id, @Valid @RequestBody RejectPoRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Purchase order rejected",
                 scmService.rejectPurchaseOrder(TenantContext.getTenantIdAsObject(), id, req.reason())));
     }
@@ -196,6 +251,23 @@ public class ScmController {
     public ResponseEntity<ApiResponse<ScPurchaseOrder>> markSent(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Marked as sent",
                 scmService.markSent(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/purchase-orders/{id}/lines")
+    @PreAuthorize("hasAuthority('SCM_READ')")
+    @Operation(summary = "Get line items for a purchase order")
+    public ResponseEntity<ApiResponse<List<ScPoLine>>> getPurchaseOrderLines(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                scmService.getPurchaseOrderLines(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/purchase-orders/{id}/lines")
+    @PreAuthorize("hasAuthority('SCM_ORDER')")
+    @Operation(summary = "Add a line item to a draft purchase order")
+    public ResponseEntity<ApiResponse<ScPurchaseOrder>> addPurchaseOrderLine(
+            @PathVariable UUID id, @Valid @RequestBody AddPoLineRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Line added",
+                scmService.addPurchaseOrderLine(TenantContext.getTenantIdAsObject(), id, req)));
     }
 
     // ── Goods Receipts ────────────────────────────────────────────────────────
@@ -212,22 +284,27 @@ public class ScmController {
     @PreAuthorize("hasAuthority('SCM_RECEIVE')")
     @Operation(summary = "Create a goods receipt against an approved PO")
     public ResponseEntity<ApiResponse<ScGoodsReceipt>> createGoodsReceipt(
-            @RequestBody CreateGoodsReceiptRequest req) {
-        UUID userId = TenantContext.getCurrentUserId();
-        String userName = userId != null ? userId.toString() : "system";
+            @Valid @RequestBody CreateGoodsReceiptRequest req) {
+        // FIX H-1: getCurrentUserName() — was userId.toString()
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Goods receipt created",
-                scmService.createGoodsReceipt(TenantContext.getTenantIdAsObject(), userId, userName, req)));
+                scmService.createGoodsReceipt(TenantContext.getTenantIdAsObject(),
+                        TenantContext.getCurrentUserId(),
+                        TenantContext.getCurrentUserName(),
+                        req)));
     }
 
     @PostMapping("/goods-receipts/{id}/post")
     @PreAuthorize("hasAuthority('SCM_RECEIVE')")
-    @Operation(summary = "Post goods receipt — creates stock movements and updates inventory")
+    @Operation(summary = "Post goods receipt — creates stock movements, updates inventory, transitions PO status")
     public ResponseEntity<ApiResponse<ScGoodsReceipt>> postGoodsReceipt(
-            @PathVariable UUID id, @RequestBody List<PostGrLineRequest> lines) {
-        UUID userId = TenantContext.getCurrentUserId();
-        String userName = userId != null ? userId.toString() : "system";
+            @PathVariable UUID id, @Valid @RequestBody List<PostGrLineRequest> lines) {
+        // FIX H-1: getCurrentUserName() — was userId.toString()
         return ResponseEntity.ok(ApiResponse.success("Goods receipt posted — stock updated",
-                scmService.postGoodsReceipt(TenantContext.getTenantIdAsObject(), id, userId, userName, lines)));
+                scmService.postGoodsReceipt(TenantContext.getTenantIdAsObject(),
+                        id,
+                        TenantContext.getCurrentUserId(),
+                        TenantContext.getCurrentUserName(),
+                        lines)));
     }
 
     // ── Supplier Invoices ─────────────────────────────────────────────────────
@@ -244,9 +321,9 @@ public class ScmController {
 
     @PostMapping("/supplier-invoices")
     @PreAuthorize("hasAuthority('SCM_INVOICE')")
-    @Operation(summary = "Record a supplier invoice — auto 3-way match if PO and GR provided")
+    @Operation(summary = "Record a supplier invoice — performs real 3-way match if PO and GR provided")
     public ResponseEntity<ApiResponse<ScSupplierInvoice>> createSupplierInvoice(
-            @RequestBody CreateSupplierInvoiceRequest req) {
+            @Valid @RequestBody CreateSupplierInvoiceRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Supplier invoice created",
                 scmService.createSupplierInvoice(TenantContext.getTenantIdAsObject(), req)));
     }
@@ -255,51 +332,20 @@ public class ScmController {
     @PreAuthorize("hasAuthority('SCM_INVOICE')")
     @Operation(summary = "Approve a supplier invoice (RECEIVED → APPROVED)")
     public ResponseEntity<ApiResponse<ScSupplierInvoice>> approveSupplierInvoice(@PathVariable UUID id) {
-        UUID userId = TenantContext.getCurrentUserId();
-        String name = userId != null ? userId.toString() : "approver";
+        // FIX H-1: getCurrentUserName()
         return ResponseEntity.ok(ApiResponse.success("Invoice approved",
-                scmService.approveSupplierInvoice(TenantContext.getTenantIdAsObject(), id, userId, name)));
+                scmService.approveSupplierInvoice(TenantContext.getTenantIdAsObject(),
+                        id,
+                        TenantContext.getCurrentUserId(),
+                        TenantContext.getCurrentUserName())));
     }
 
     @PostMapping("/supplier-invoices/{id}/pay")
     @PreAuthorize("hasAuthority('SCM_INVOICE')")
     @Operation(summary = "Mark supplier invoice as paid (APPROVED → PAID)")
     public ResponseEntity<ApiResponse<ScSupplierInvoice>> markPaid(
-            @PathVariable UUID id, @RequestBody MarkPaidRequest req) {
+            @PathVariable UUID id, @Valid @RequestBody MarkPaidRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Invoice marked as paid",
                 scmService.markPaid(TenantContext.getTenantIdAsObject(), id, req.paymentReference())));
     }
-
-
-    /**
-     * Add a line item to a DRAFT purchase order.
-     * The PO total is recalculated after each line is added.
-     */
-    @PostMapping("/purchase-orders/{id}/lines")
-    @PreAuthorize("hasAuthority('SCM_ORDER')")
-    @Operation(summary = "Add a line item to a draft purchase order")
-    public ResponseEntity<ApiResponse<ScPurchaseOrder>> addPurchaseOrderLine(
-            @PathVariable UUID id,
-            @RequestBody AddPoLineRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Line added",
-                scmService.addPurchaseOrderLine(TenantContext.getTenantIdAsObject(), id, req)));
-    }
-
-    /**
-     * GET /purchase-orders/{id}/lines
-     * Returns the line items for a purchase order.
-     * ScPurchaseOrder is a flat entity — lines live in sc_po_lines.
-     */
-    @GetMapping("/purchase-orders/{id}/lines")
-    @PreAuthorize("hasAuthority('SCM_READ')")
-    @Operation(summary = "Get line items for a purchase order")
-    public ResponseEntity<ApiResponse<List<ScPoLine>>> getPurchaseOrderLines(
-            @PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.success("Success",
-                scmService.getPurchaseOrderLines(TenantContext.getTenantIdAsObject(), id)));
-    }
-
-
-
-
 }
