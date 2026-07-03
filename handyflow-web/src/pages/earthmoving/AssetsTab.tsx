@@ -1,81 +1,14 @@
-
+// src/pages/earthmoving/AssetsTab.tsx
 import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { apiClient } from "../../api/client"
 import {
   Plus, Truck, AlertTriangle, ChevronDown, ChevronUp, X,
   Edit2, Eye, Clock, MapPin, Wrench, CheckCircle, AlertCircle,
 } from "lucide-react"
-
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-interface Asset {
-  id: string
-  name: string
-  fleetNumber: string | null
-  assetType: string
-  make: string | null
-  model: string | null
-  year: number | null
-  serialNumber: string | null
-  registration: string | null
-  ownershipType: string     // OWN | HIRED_IN | HIRED_OUT
-  hireSupplier: string | null
-  hireStartDate: string | null
-  hireEndDate: string | null
-  status: string
-  currentSite: string | null
-  currentClient: string | null
-  dailyRate: number | null
-  hourlyRate: number | null
-  currentHours: number
-  lastServiceHours: number
-  serviceIntervalHours: number
-  dueForService: boolean
-  notes: string | null
-  createdAt: string
-}
-
-// ── Constants ──────────────────────────────────────────────────────────────────
-
-const STATUS_CFG: Record<string, { color: string; bg: string; border: string; label: string; icon: React.ElementType }> = {
-  AVAILABLE:   { color: "#166534", bg: "#DCFCE7", border: "#86EFAC",  label: "Available",    icon: CheckCircle  },
-  DEPLOYED:    { color: "#1D4ED8", bg: "#EFF6FF", border: "#BFDBFE",  label: "Deployed",     icon: MapPin       },
-  MAINTENANCE: { color: "#D97706", bg: "#FFFBEB", border: "#FDE68A",  label: "Maintenance",  icon: Wrench       },
-  BREAKDOWN:   { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA",  label: "Breakdown",    icon: AlertTriangle },
-  HIRED_OUT:   { color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE",  label: "Hired Out",    icon: Truck        },
-  RETIRED:     { color: "#94A3B8", bg: "#F8FAFC", border: "#E2E8F0",  label: "Retired",      icon: Clock        },
-}
-
-const OWN_TYPE_CFG: Record<string, { color: string; bg: string; label: string }> = {
-  OWN:       { color: "#1B3A6B", bg: "#EFF6FF", label: "Owned"     },
-  HIRED_IN:  { color: "#7C3AED", bg: "#F5F3FF", label: "Hired In"  },
-  HIRED_OUT: { color: "#D97706", bg: "#FFFBEB", label: "Hired Out" },
-}
-
-const ASSET_TYPES = [
-  "DOZER","EXCAVATOR","GRADER","LOADER","DUMPER","CRANE",
-  "ROLLER","SCRAPER","COMPACTOR","DRILL","OTHER",
-]
-
-const STATUSES = ["AVAILABLE","DEPLOYED","MAINTENANCE","BREAKDOWN","HIRED_OUT","RETIRED"]
-
-const EMOJI: Record<string, string> = {
-  DOZER:"🚜", EXCAVATOR:"⛏️", GRADER:"🛣️", LOADER:"🏗️",
-  DUMPER:"🚛", CRANE:"🏗️", ROLLER:"🛞", SCRAPER:"🚜",
-  COMPACTOR:"🛞", DRILL:"⛏️", OTHER:"🚧",
-}
-
-const STATUS_DESCRIPTIONS: Record<string, string> = {
-  AVAILABLE:   "Machine is in the yard, ready to deploy",
-  DEPLOYED:    "Machine is active on a site",
-  MAINTENANCE: "Machine is undergoing scheduled maintenance",
-  BREAKDOWN:   "Machine is unserviceable due to breakdown or accident",
-  HIRED_OUT:   "Machine is hired out to a third party",
-  RETIRED:     "Machine has been permanently decommissioned",
-}
-
-const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
+import type { Asset } from "./shared/types"
+import { STATUS_CFG, STATUS_DESCRIPTIONS, OWN_TYPE_CFG, ASSET_TYPES, STATUSES, EMOJI } from "./shared/constants"
+import { fmtCurrency } from "./shared/format"
+import { Overlay, ModalHead, ModalFoot, Sect, ErrBanner, lbl, inputStyle } from "./shared/Modal"
+import { useAssets, useCreateAsset, useUpdateAssetStatus, useUpdateAssetHours } from "./shared/hooks"
 
 const EMPTY_FORM = {
   name: "", fleetNumber: "", assetType: "DOZER", make: "", model: "",
@@ -84,69 +17,37 @@ const EMPTY_FORM = {
   dailyRate: "", hourlyRate: "", notes: "",
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
+const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
 
 export default function AssetsTab() {
-  const qc = useQueryClient()
-
-  const [showAdd, setShowAdd]         = useState(false)
-  const [showStatus, setShowStatus]   = useState<Asset | null>(null)
-  const [showHours, setShowHours]     = useState<Asset | null>(null)
-  const [viewing, setViewing]         = useState<Asset | null>(null)
-  const [expanded, setExpanded]       = useState<string | null>(null)
+  const [showAdd, setShowAdd]           = useState(false)
+  const [showStatus, setShowStatus]     = useState<Asset | null>(null)
+  const [showHours, setShowHours]       = useState<Asset | null>(null)
+  const [viewing, setViewing]           = useState<Asset | null>(null)
+  const [expanded, setExpanded]         = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState("ALL")
-  const [filterType, setFilterType]   = useState("ALL")
-  const [form, setForm]               = useState(EMPTY_FORM)
-  const [newStatus, setNewStatus]     = useState("")
-  const [statusNote, setStatusNote]   = useState("")
-  const [newHours, setNewHours]       = useState("")
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const [apiError, setApiError]       = useState("")
+  const [filterType, setFilterType]     = useState("ALL")
+  const [form, setForm]                 = useState(EMPTY_FORM)
+  const [newStatus, setNewStatus]       = useState("")
+  const [statusNote, setStatusNote]     = useState("")
+  const [newHours, setNewHours]         = useState("")
+  const [fieldErrors, setFieldErrors]   = useState<Record<string, string>>({})
+  const [apiError, setApiError]         = useState("")
 
-  // ── Queries & mutations ────────────────────────────────────────────────────
+  const { data: assets = [], isLoading } = useAssets()
 
-  const { data: assets = [], isLoading } = useQuery<Asset[]>({
-    queryKey: ["em-assets"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/earthmoving/assets?size=200")),
+  const createAsset = useCreateAsset(() => {
+    setShowAdd(false); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("")
   })
 
-  const createAsset = useMutation({
-    mutationFn: (body: any) => apiClient.post("/api/v1/earthmoving/assets", body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["em-assets"] })
-      setShowAdd(false); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("")
-    },
-    onError: (e: any) => {
-      const d = e.response?.data
-      if (d?.errors) setFieldErrors(d.errors)
-      else setApiError(d?.message ?? "Failed to register asset")
-    },
+  const updateStatus = useUpdateAssetStatus((updated) => {
+    setShowStatus(null); setNewStatus(""); setStatusNote(""); setApiError("")
+    if (updated?.id) setViewing(updated)
   })
 
-  const updateStatus = useMutation({
-    // PUT not PATCH — avoids CORS preflight failures
-    mutationFn: ({ id, status, note }: { id: string; status: string; note: string }) =>
-      apiClient.put(`/api/v1/earthmoving/assets/${id}/status`, { status, note }),
-    onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: ["em-assets"] })
-      setShowStatus(null); setNewStatus(""); setStatusNote(""); setApiError("")
-      const updated = res.data?.data ?? res.data
-      if (updated?.id) setViewing(updated)
-    },
-    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to update status"),
+  const updateHours = useUpdateAssetHours(() => {
+    setShowHours(null); setNewHours(""); setApiError("")
   })
-
-  const updateHours = useMutation({
-    mutationFn: ({ id, hours }: { id: string; hours: number }) =>
-      apiClient.put(`/api/v1/earthmoving/assets/${id}/hours`, { currentHours: hours }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["em-assets"] })
-      setShowHours(null); setNewHours(""); setApiError("")
-    },
-    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to update hours"),
-  })
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
 
   const validate = () => {
     const errs: Record<string, string> = {}
@@ -158,28 +59,19 @@ export default function AssetsTab() {
     return Object.keys(errs).length === 0
   }
 
-  const filtered = (assets as Asset[]).filter(a => {
+  const filtered = assets.filter(a => {
     if (filterStatus !== "ALL" && a.status !== filterStatus) return false
-    if (filterType   !== "ALL" && a.assetType !== filterType) return false
+    if (filterType !== "ALL" && a.assetType !== filterType) return false
     return true
   })
 
-  const fmtR = (n: number | null | undefined) => n != null ? `R ${Number(n).toLocaleString("en-ZA")}` : "—"
-
   const stats = [
-    { label: "Total fleet",   value: assets.length,                                                 color: "#1B3A6B" },
-    { label: "Available",     value: assets.filter(a => a.status === "AVAILABLE").length,            color: "#166534" },
-    { label: "Deployed",      value: assets.filter(a => a.status === "DEPLOYED").length,             color: "#1D4ED8" },
-    { label: "Service due",   value: assets.filter(a => a.dueForService).length,                     color: "#D97706" },
-    { label: "Breakdowns",    value: assets.filter(a => a.status === "BREAKDOWN").length,            color: "#DC2626" },
+    { label: "Total fleet", value: assets.length, color: "#1B3A6B" },
+    { label: "Available",   value: assets.filter(a => a.status === "AVAILABLE").length, color: "#166534" },
+    { label: "Deployed",    value: assets.filter(a => a.status === "DEPLOYED").length, color: "#1D4ED8" },
+    { label: "Service due", value: assets.filter(a => a.dueForService).length, color: "#D97706" },
+    { label: "Breakdowns",  value: assets.filter(a => a.status === "BREAKDOWN").length, color: "#DC2626" },
   ]
-
-  const inp = (k: string): React.CSSProperties => ({
-    width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
-    border: `1.5px solid ${fieldErrors[k] ? "#DC2626" : "#E2E8F0"}`,
-    borderRadius: 8, fontSize: 14,
-    background: fieldErrors[k] ? "#FFF5F5" : "#fff", outline: "none",
-  })
 
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
     <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#DC2626", marginTop: 4 }}>
@@ -197,11 +89,8 @@ export default function AssetsTab() {
     )
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
   return (
     <div>
-
       {/* Stats row */}
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {stats.map(s => (
@@ -212,7 +101,6 @@ export default function AssetsTab() {
         ))}
       </div>
 
-      {/* Breakdown alert banner */}
       {assets.filter(a => a.status === "BREAKDOWN").length > 0 && (
         <div style={{ marginBottom: 16, padding: "12px 16px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
           <AlertTriangle size={17} color="#DC2626" style={{ flexShrink: 0 }} />
@@ -225,7 +113,6 @@ export default function AssetsTab() {
         </div>
       )}
 
-      {/* Service due banner */}
       {assets.filter(a => a.dueForService).length > 0 && (
         <div style={{ marginBottom: 16, padding: "12px 16px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
           <AlertTriangle size={17} color="#D97706" style={{ flexShrink: 0 }} />
@@ -238,7 +125,6 @@ export default function AssetsTab() {
         </div>
       )}
 
-      {/* Toolbar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {["ALL", ...STATUSES].map(s => (
@@ -256,7 +142,6 @@ export default function AssetsTab() {
         </button>
       </div>
 
-      {/* Type filter chips */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
         {["ALL", ...ASSET_TYPES].map(t => (
           <button key={t} onClick={() => setFilterType(t)}
@@ -269,7 +154,6 @@ export default function AssetsTab() {
         ))}
       </div>
 
-      {/* Asset list */}
       {isLoading ? (
         <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading fleet...</div>
       ) : filtered.length === 0 ? (
@@ -280,15 +164,12 @@ export default function AssetsTab() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {filtered.map(asset => {
-            const cfg = STATUS_CFG[asset.status] ?? STATUS_CFG.AVAILABLE
             const isOpen = expanded === asset.id
             const hoursUsed = (asset.currentHours ?? 0) - (asset.lastServiceHours ?? 0)
             const svcPct = Math.min(100, (hoursUsed / (asset.serviceIntervalHours || 250)) * 100)
 
             return (
               <div key={asset.id} style={{ border: `1px solid ${asset.status === "BREAKDOWN" ? "#FECACA" : "#E2E8F0"}`, borderRadius: 12, overflow: "hidden" }}>
-
-                {/* Main row */}
                 <div style={{ padding: "16px 20px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                     <div style={{ width: 48, height: 48, borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>
@@ -324,30 +205,30 @@ export default function AssetsTab() {
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{Number(asset.currentHours ?? 0).toLocaleString()} hrs</div>
-                      <div style={{ fontSize: 11, color: "#94A3B8" }}>{fmtR(asset.dailyRate)}/day</div>
+                      <div style={{ fontSize: 11, color: "#94A3B8" }}>{fmtCurrency(asset.dailyRate)}/day</div>
                     </div>
                     <StatusBadge status={asset.status} />
                     <div style={{ display: "flex", gap: 5 }}>
-                      <button onClick={() => setViewing(asset)} title="View profile"
+                      <button onClick={() => setViewing(asset)} title="View profile" aria-label="View profile"
                         style={{ background: "#EFF6FF", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#1D4ED8" }}>
                         <Eye size={13} />
                       </button>
-                      <button onClick={() => { setShowHours(asset); setNewHours(String(asset.currentHours ?? 0)) }} title="Update hour meter"
+                      <button onClick={() => { setShowHours(asset); setNewHours(String(asset.currentHours ?? 0)) }} title="Update hour meter" aria-label="Update hour meter"
                         style={{ background: "#F0FDF4", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#166534" }}>
                         <Clock size={13} />
                       </button>
-                      <button onClick={() => { setShowStatus(asset); setNewStatus(asset.status); setStatusNote(""); setApiError("") }} title="Change status"
+                      <button onClick={() => { setShowStatus(asset); setNewStatus(asset.status); setStatusNote(""); setApiError("") }} title="Change status" aria-label="Change status"
                         style={{ background: "#FEF3C7", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#D97706" }}>
                         <Edit2 size={13} />
                       </button>
                     </div>
-                    <button onClick={() => setExpanded(isOpen ? null : asset.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
+                    <button onClick={() => setExpanded(isOpen ? null : asset.id)} aria-label={isOpen ? "Collapse details" : "Expand details"}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
                       {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </button>
                   </div>
                 </div>
 
-                {/* Service progress bar */}
                 <div style={{ padding: "0 20px 12px", background: "#fff" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#94A3B8", marginBottom: 3 }}>
                     <span>Service interval</span>
@@ -359,19 +240,18 @@ export default function AssetsTab() {
                   </div>
                 </div>
 
-                {/* Expanded detail */}
                 {isOpen && (
                   <div style={{ borderTop: "1px solid #F1F5F9", padding: "16px 20px", background: "#F8FAFC" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14 }}>
                       {[
-                        { l: "Fleet No.",    v: asset.fleetNumber || "—" },
-                        { l: "Equipment",    v: asset.assetType },
-                        { l: "Serial No.",   v: asset.serialNumber || "—" },
-                        { l: "Ownership",    v: OWN_TYPE_CFG[asset.ownershipType]?.label ?? asset.ownershipType },
+                        { l: "Fleet No.", v: asset.fleetNumber || "—" },
+                        { l: "Equipment", v: asset.assetType },
+                        { l: "Serial No.", v: asset.serialNumber || "—" },
+                        { l: "Ownership", v: OWN_TYPE_CFG[asset.ownershipType]?.label ?? asset.ownershipType },
                         { l: "Current Site", v: asset.currentSite || "—" },
-                        { l: "Client",       v: asset.currentClient || "—" },
-                        { l: "Daily Rate",   v: fmtR(asset.dailyRate) },
-                        { l: "Hourly Rate",  v: fmtR(asset.hourlyRate) },
+                        { l: "Client", v: asset.currentClient || "—" },
+                        { l: "Daily Rate", v: fmtCurrency(asset.dailyRate) },
+                        { l: "Hourly Rate", v: fmtCurrency(asset.hourlyRate) },
                       ].map(item => (
                         <div key={item.l}>
                           <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
@@ -398,7 +278,7 @@ export default function AssetsTab() {
         </div>
       )}
 
-      {/* ── Register Asset Modal ──────────────────────────────────────────────── */}
+      {/* ── Register Asset Modal ────────────────────────────────────────── */}
       {showAdd && (
         <Overlay onClose={() => setShowAdd(false)}>
           <ModalHead title="Register Heavy Equipment" onClose={() => setShowAdd(false)} />
@@ -409,26 +289,26 @@ export default function AssetsTab() {
                 <label style={lbl}>Asset Name *</label>
                 <input autoFocus value={form.name}
                   onChange={e => { setForm(f => ({ ...f, name: e.target.value })); setFieldErrors(f => omit(f, "name")) }}
-                  placeholder="CAT D9T Dozer" style={inp("name")} />
+                  placeholder="CAT D9T Dozer" style={inputStyle(!!fieldErrors.name)} />
                 <FErr k="name" />
               </div>
               <div>
                 <label style={lbl}>Fleet / Unit Number</label>
                 <input value={form.fleetNumber} onChange={e => setForm(f => ({ ...f, fleetNumber: e.target.value }))}
-                  placeholder="D9-001" style={inp("fleetNumber")} />
+                  placeholder="D9-001" style={inputStyle()} />
                 <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 3 }}>
                   Identifies this machine in a fleet of similar units (e.g. D9-001, D9-002)
                 </div>
               </div>
               <div>
                 <label style={lbl}>Equipment Type *</label>
-                <select value={form.assetType} onChange={e => setForm(f => ({ ...f, assetType: e.target.value }))} style={{ ...inp("assetType"), background: "#fff" }}>
+                <select value={form.assetType} onChange={e => setForm(f => ({ ...f, assetType: e.target.value }))} style={{ ...inputStyle(), background: "#fff" }}>
                   {ASSET_TYPES.map(t => <option key={t} value={t}>{EMOJI[t] ?? "🚧"} {t}</option>)}
                 </select>
               </div>
               <div>
                 <label style={lbl}>Ownership</label>
-                <select value={form.ownershipType} onChange={e => setForm(f => ({ ...f, ownershipType: e.target.value }))} style={{ ...inp("ownershipType"), background: "#fff" }}>
+                <select value={form.ownershipType} onChange={e => setForm(f => ({ ...f, ownershipType: e.target.value }))} style={{ ...inputStyle(), background: "#fff" }}>
                   <option value="OWN">Own asset</option>
                   <option value="HIRED_IN">Hired in (from external supplier)</option>
                 </select>
@@ -442,15 +322,15 @@ export default function AssetsTab() {
                 <div style={{ gridColumn: "1 / -1" }}>
                   <label style={lbl}>Supplier / Owner Name</label>
                   <input value={form.hireSupplier} onChange={e => setForm(f => ({ ...f, hireSupplier: e.target.value }))}
-                    placeholder="Barloworld Equipment" style={inp("hireSupplier")} />
+                    placeholder="Barloworld Equipment" style={inputStyle()} />
                 </div>
                 <div>
                   <label style={lbl}>Hire Start Date</label>
-                  <input type="date" value={form.hireStartDate} onChange={e => setForm(f => ({ ...f, hireStartDate: e.target.value }))} style={inp("hireStartDate")} />
+                  <input type="date" value={form.hireStartDate} onChange={e => setForm(f => ({ ...f, hireStartDate: e.target.value }))} style={inputStyle()} />
                 </div>
                 <div>
                   <label style={lbl}>Hire End Date</label>
-                  <input type="date" value={form.hireEndDate} onChange={e => setForm(f => ({ ...f, hireEndDate: e.target.value }))} style={inp("hireEndDate")} />
+                  <input type="date" value={form.hireEndDate} onChange={e => setForm(f => ({ ...f, hireEndDate: e.target.value }))} style={inputStyle()} />
                 </div>
               </div>
             </Sect>
@@ -460,26 +340,26 @@ export default function AssetsTab() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
                 <label style={lbl}>Make</label>
-                <input value={form.make} onChange={e => setForm(f => ({ ...f, make: e.target.value }))} placeholder="Caterpillar" style={inp("make")} />
+                <input value={form.make} onChange={e => setForm(f => ({ ...f, make: e.target.value }))} placeholder="Caterpillar" style={inputStyle()} />
               </div>
               <div>
                 <label style={lbl}>Model</label>
-                <input value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} placeholder="D9T" style={inp("model")} />
+                <input value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} placeholder="D9T" style={inputStyle()} />
               </div>
               <div>
                 <label style={lbl}>Year</label>
                 <input type="number" value={form.year}
-                  onChange={e => { setForm(f => ({ ...f, year: e.target.value })); setFieldErrors(f => omit(f,"year")) }}
-                  placeholder="2021" style={inp("year")} />
+                  onChange={e => { setForm(f => ({ ...f, year: e.target.value })); setFieldErrors(f => omit(f, "year")) }}
+                  placeholder="2021" style={inputStyle(!!fieldErrors.year)} />
                 <FErr k="year" />
               </div>
               <div>
                 <label style={lbl}>Registration</label>
-                <input value={form.registration} onChange={e => setForm(f => ({ ...f, registration: e.target.value }))} placeholder="GP-CAT-001" style={inp("registration")} />
+                <input value={form.registration} onChange={e => setForm(f => ({ ...f, registration: e.target.value }))} placeholder="GP-CAT-001" style={inputStyle()} />
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
                 <label style={lbl}>Serial / VIN Number</label>
-                <input value={form.serialNumber} onChange={e => setForm(f => ({ ...f, serialNumber: e.target.value }))} placeholder="CAT-D9T-2021-00123" style={inp("serialNumber")} />
+                <input value={form.serialNumber} onChange={e => setForm(f => ({ ...f, serialNumber: e.target.value }))} placeholder="CAT-D9T-2021-00123" style={inputStyle()} />
               </div>
             </div>
           </Sect>
@@ -489,20 +369,20 @@ export default function AssetsTab() {
               <div>
                 <label style={lbl}>Daily Rate (R)</label>
                 <input type="number" value={form.dailyRate}
-                  onChange={e => { setForm(f => ({ ...f, dailyRate: e.target.value })); setFieldErrors(f => omit(f,"dailyRate")) }}
-                  placeholder="18500" style={inp("dailyRate")} />
+                  onChange={e => { setForm(f => ({ ...f, dailyRate: e.target.value })); setFieldErrors(f => omit(f, "dailyRate")) }}
+                  placeholder="18500" style={inputStyle(!!fieldErrors.dailyRate)} />
                 <FErr k="dailyRate" />
               </div>
               <div>
                 <label style={lbl}>Hourly Rate (R)</label>
-                <input type="number" value={form.hourlyRate} onChange={e => setForm(f => ({ ...f, hourlyRate: e.target.value }))} placeholder="2200" style={inp("hourlyRate")} />
+                <input type="number" value={form.hourlyRate} onChange={e => setForm(f => ({ ...f, hourlyRate: e.target.value }))} placeholder="2200" style={inputStyle()} />
               </div>
             </div>
           </Sect>
 
           <div>
             <label style={lbl}>Notes</label>
-            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} style={{ ...inp("notes"), resize: "vertical" as const }} placeholder="Condition notes, attachments, history..." />
+            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} style={{ ...inputStyle(), resize: "vertical" as const }} placeholder="Condition notes, attachments, history..." />
           </div>
 
           {apiError && <ErrBanner msg={apiError} />}
@@ -510,7 +390,8 @@ export default function AssetsTab() {
           <ModalFoot
             onCancel={() => setShowAdd(false)}
             onSubmit={() => {
-              if (validate()) createAsset.mutate({
+              if (!validate()) return
+              createAsset.mutate({
                 name: form.name, fleetNumber: form.fleetNumber || null, assetType: form.assetType,
                 make: form.make || null, model: form.model || null,
                 year: form.year ? Number(form.year) : null,
@@ -521,6 +402,12 @@ export default function AssetsTab() {
                 dailyRate: form.dailyRate ? Number(form.dailyRate) : null,
                 hourlyRate: form.hourlyRate ? Number(form.hourlyRate) : null,
                 notes: form.notes || null,
+              }, {
+                onError: (e: any) => {
+                  const d = e.response?.data
+                  if (d?.errors) setFieldErrors(d.errors)
+                  else setApiError(d?.message ?? "Failed to register asset")
+                },
               })
             }}
             loading={createAsset.isPending}
@@ -529,7 +416,7 @@ export default function AssetsTab() {
         </Overlay>
       )}
 
-      {/* ── Update Status Modal ───────────────────────────────────────────────── */}
+      {/* ── Update Status Modal ─────────────────────────────────────────── */}
       {showStatus && (
         <Overlay onClose={() => { setShowStatus(null); setApiError("") }}>
           <ModalHead title={`Update Status — ${showStatus.fleetNumber ?? showStatus.name}`} onClose={() => { setShowStatus(null); setApiError("") }} />
@@ -557,12 +444,15 @@ export default function AssetsTab() {
             <label style={lbl}>Note <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
             <input value={statusNote} onChange={e => setStatusNote(e.target.value)}
               placeholder={newStatus === "BREAKDOWN" ? "Describe the breakdown..." : newStatus === "DEPLOYED" ? "Site name and client..." : ""}
-              style={{ ...inp("_"), width: "100%" }} />
+              style={{ ...inputStyle(), width: "100%" }} />
           </div>
           {apiError && <ErrBanner msg={apiError} />}
           <ModalFoot
             onCancel={() => { setShowStatus(null); setApiError("") }}
-            onSubmit={() => updateStatus.mutate({ id: showStatus.id, status: newStatus, note: statusNote })}
+            onSubmit={() => updateStatus.mutate(
+              { id: showStatus.id, status: newStatus, note: statusNote },
+              { onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to update status — that transition may not be allowed from the asset's current status.") }
+            )}
             loading={updateStatus.isPending}
             label="Update Status"
             disabled={!newStatus || newStatus === showStatus.status}
@@ -570,7 +460,7 @@ export default function AssetsTab() {
         </Overlay>
       )}
 
-      {/* ── Hour Meter Modal ──────────────────────────────────────────────────── */}
+      {/* ── Hour Meter Modal ────────────────────────────────────────────── */}
       {showHours && (
         <Overlay onClose={() => { setShowHours(null); setApiError("") }}>
           <ModalHead title={`Hour Meter — ${showHours.fleetNumber ?? showHours.name}`} onClose={() => { setShowHours(null); setApiError("") }} />
@@ -582,10 +472,12 @@ export default function AssetsTab() {
             <label style={lbl}>New Hour Meter Reading *</label>
             <input type="number" value={newHours} onChange={e => setNewHours(e.target.value)} autoFocus
               placeholder="Enter current meter reading"
-              style={{ ...inp("_"), width: "100%", fontSize: 20, fontWeight: 700 }} />
+              style={{ ...inputStyle(), width: "100%", fontSize: 20, fontWeight: 700 }} />
             {Number(newHours) < Number(showHours.currentHours ?? 0) && newHours !== "" && (
               <div style={{ marginTop: 8, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, fontSize: 12, color: "#DC2626", display: "flex", alignItems: "center", gap: 6 }}>
-                <AlertCircle size={12} /> New reading is lower than current — check this is correct.
+                {/* NOTE: the backend now rejects this outright (hour meters only count up) —
+                    this banner is a pre-submit hint, the real enforcement lives server-side. */}
+                <AlertCircle size={12} /> New reading is lower than current — the server will reject this.
               </div>
             )}
           </div>
@@ -595,14 +487,20 @@ export default function AssetsTab() {
           {apiError && <ErrBanner msg={apiError} />}
           <ModalFoot
             onCancel={() => { setShowHours(null); setApiError("") }}
-            onSubmit={() => { if (newHours) updateHours.mutate({ id: showHours.id, hours: Number(newHours) }) }}
+            onSubmit={() => {
+              if (!newHours) return
+              updateHours.mutate(
+                { id: showHours.id, hours: Number(newHours) },
+                { onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to update hours") }
+              )
+            }}
             loading={updateHours.isPending}
             label="Update Hours"
           />
         </Overlay>
       )}
 
-      {/* ── View Asset Modal ──────────────────────────────────────────────────── */}
+      {/* ── View Asset Modal ────────────────────────────────────────────── */}
       {viewing && (
         <Overlay onClose={() => setViewing(null)}>
           <div style={{ background: "linear-gradient(135deg, #1B3A6B 0%, #0F2A52 100%)", margin: "-28px -28px 24px", padding: "24px 28px", borderRadius: "16px 16px 0 0" }}>
@@ -624,7 +522,7 @@ export default function AssetsTab() {
                   </div>
                 </div>
               </div>
-              <button onClick={() => setViewing(null)} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, cursor: "pointer", color: "#fff", padding: 6, display: "flex" }}><X size={18} /></button>
+              <button onClick={() => setViewing(null)} aria-label="Close dialog" style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, cursor: "pointer", color: "#fff", padding: 6, display: "flex" }}><X size={18} /></button>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
               <StatusBadge status={viewing.status} />
@@ -641,11 +539,11 @@ export default function AssetsTab() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
             {[
-              { l: "Current Hours",  v: `${Number(viewing.currentHours ?? 0).toLocaleString()} hrs` },
-              { l: "Last Service",   v: `${Number(viewing.lastServiceHours ?? 0).toLocaleString()} hrs` },
-              { l: "Serial Number",  v: viewing.serialNumber || "—" },
-              { l: "Daily Rate",     v: fmtR(viewing.dailyRate) },
-              { l: "Current Site",   v: viewing.currentSite || "—" },
+              { l: "Current Hours", v: `${Number(viewing.currentHours ?? 0).toLocaleString()} hrs` },
+              { l: "Last Service", v: `${Number(viewing.lastServiceHours ?? 0).toLocaleString()} hrs` },
+              { l: "Serial Number", v: viewing.serialNumber || "—" },
+              { l: "Daily Rate", v: fmtCurrency(viewing.dailyRate) },
+              { l: "Current Site", v: viewing.currentSite || "—" },
               { l: "Current Client", v: viewing.currentClient || "—" },
             ].map(item => (
               <div key={item.l} style={{ padding: "10px 14px", background: "#F8FAFC", borderRadius: 8 }}>
@@ -655,7 +553,6 @@ export default function AssetsTab() {
             ))}
           </div>
 
-          {/* Service bar */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748B", marginBottom: 6 }}>
               <span>Service interval progress</span>
@@ -699,61 +596,3 @@ export default function AssetsTab() {
     </div>
   )
 }
-
-// ── Sub-components ─────────────────────────────────────────────────────────────
-
-function Overlay({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 620, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function ModalHead({ title, onClose }: { title: string; onClose: () => void }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-      <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{title}</h3>
-      <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
-    </div>
-  )
-}
-
-function ModalFoot({ onCancel, onSubmit, loading, label, disabled = false }: { onCancel: () => void; onSubmit: () => void; loading: boolean; label: string; disabled?: boolean }) {
-  return (
-    <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-      <button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
-      <button onClick={onSubmit} disabled={loading || disabled}
-        style={{ padding: "9px 22px", background: loading || disabled ? "#94A3B8" : "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || disabled ? "not-allowed" : "pointer" }}>
-        {loading ? "Saving..." : label}
-      </button>
-    </div>
-  )
-}
-
-function Sect({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div style={{ marginBottom: 20 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.07em", textTransform: "uppercase" as const, marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #F1F5F9" }}>{title}</div>
-      {children}
-    </div>
-  )
-}
-
-function ErrBanner({ msg }: { msg: string }) {
-  return (
-    <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}>
-      <AlertCircle size={14} />{msg}
-    </div>
-  )
-}
-
-const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
-const inp = (k: string): React.CSSProperties => ({
-  width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
-  border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14,
-  background: "#fff", outline: "none",
-})

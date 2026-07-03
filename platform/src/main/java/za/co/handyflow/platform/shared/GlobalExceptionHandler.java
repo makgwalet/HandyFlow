@@ -7,6 +7,7 @@ package za.co.handyflow.platform.shared;
  * The result: clean controllers, consistent error responses.
  */
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -77,5 +78,22 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalState(IllegalStateException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(IllegalArgumentException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Void>> handleOptimisticLock(OptimisticLockingFailureException e) {
+        log.warn("Optimistic locking conflict: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error("This record was updated by someone else — please reload and try again."));
     }
 }

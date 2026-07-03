@@ -7,12 +7,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.notifications.application.NotificationRequest;
+import za.co.handyflow.platform.notifications.application.Recipient;
+import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
+import za.co.handyflow.platform.notifications.application.internal.NotificationService;
+import za.co.handyflow.platform.notifications.domain.model.NotificationSeverity;
+import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.security.domain.model.Guard;
 import za.co.handyflow.platform.security.domain.repository.GuardRepository;
-import za.co.handyflow.platform.shared.EmailService;
-import za.co.handyflow.platform.shared.EmailTemplates;
-import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.security.domain.repository.SiteRepository;
+import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -22,25 +26,33 @@ import java.util.stream.Collectors;
 /**
  * PsiraComplianceScheduler — nightly check for expiring or expired PSiRA registrations.
  *
- * Runs at 07:00 daily.  Emails the tenant's admin email for any guard whose
- * psiraExpiryDate is within 30 days or already expired.
+ * MIGRATION NOTE (2026): previously called EmailService.send() directly against
+ * an admin email that resolveAdminEmail() always returned null for — meaning
+ * every PSiRA compliance breach found by this scheduler was logged and then
+ * silently dropped. It now routes through NotificationService, which:
+ *   1. Writes an IN_APP row for each resolved tenant admin (visible in the bell,
+ *      which the direct-email approach could never do), and
+ *   2. Sends EMAIL via the same pipeline, using TenantAdminRecipients instead
+ *      of the dead-end resolveAdminEmail() TODO.
+ *
+ * Severity: CRITICAL if any guard's PSiRA has already expired (this is a
+ * live regulatory violation the moment that guard is scheduled), WARNING if
+ * only expiring-soon guards were found.
+ *
+ * Runs at 07:00 daily — see class-level rationale below for WHY 07:00 / WHY
+ * 30 days, both unchanged from the original.
  *
  * WHY 07:00 and not midnight?
  * Compliance alerts should land in an inbox at the start of the workday, not
- * at midnight when no one will action them.  A supervisor sees it when they
- * open email in the morning and can act on it before scheduling shifts.
+ * at midnight when no one will action them.
  *
  * WHY 30 days warning?
- * PSiRA renewal takes 5–10 business days minimum.  30 days gives enough lead
+ * PSiRA renewal takes 5–10 business days minimum. 30 days gives enough lead
  * time to submit renewal paperwork without disrupting shift scheduling.
- * 7 days is too short; 60 days creates alert fatigue.
- *
- * WHY per-tenant isolation with separate @Transactional?
- * Same pattern as BookingReminderScheduler.  If one tenant's email config is
- * broken, the others still receive their alerts.
  *
  * PRODUCTION NOTE: Use Quartz JDBC JobStore in multi-instance deployments to
- * prevent duplicate emails from multiple app instances running simultaneously.
+ * prevent duplicate notifications from multiple app instances running
+ * simultaneously.
  */
 @Slf4j
 @Component
@@ -51,7 +63,8 @@ public class PsiraComplianceScheduler {
 
     private final GuardRepository guardRepository;
     private final SiteRepository  siteRepository;
-    private final EmailService    emailService;
+    private final NotificationService notificationService;
+    private final TenantAdminRecipients tenantAdminRecipients;
 
     @Scheduled(cron = "0 0 7 * * *")
     public void checkPsiraExpiry() {
@@ -77,7 +90,6 @@ public class PsiraComplianceScheduler {
 
     @Transactional(readOnly = true)
     public int checkForTenant(TenantId tenantId, LocalDate today, LocalDate warnDate) {
-        // Fetch all active guards with a psiraExpiryDate set
         List<Guard> allGuards = guardRepository.findAllActive(
                 tenantId, org.springframework.data.domain.Pageable.ofSize(500)).getContent();
 
@@ -95,49 +107,55 @@ public class PsiraComplianceScheduler {
             return 0;
         }
 
-        // Build email body and send
-        String body = EmailTemplates.psiraComplianceAlert(
-                expiredGuards.stream().map(g -> new EmailTemplates.GuardExpiryInfo(
-                                g.getFullName(), g.getPsiraNumber(), g.getPsiraExpiryDate(), true))
-                        .collect(Collectors.toList()),
-                expiringGuards.stream().map(g -> new EmailTemplates.GuardExpiryInfo(
-                                g.getFullName(), g.getPsiraNumber(), g.getPsiraExpiryDate(), false))
-                        .collect(Collectors.toList()),
-                today
-        );
-
-        // WHY send to a fixed admin email derived from the tenant?
-        // We don't have a per-tenant admin email field yet (Phase 2 scope).
-        // For now: log that we would send and let the bootstrap config provide
-        // a fallback admin email via application.properties.
-        // Replace this with tenant.adminEmail lookup when available.
-        String adminEmail = resolveAdminEmail(tenantId);
-        if (adminEmail != null) {
-            emailService.send(adminEmail, "PSiRA Compliance Alert — Action Required", body);
-            log.info("[Security] PSiRA alert sent tenant={} expired={} expiring={}",
+        List<Recipient> admins = tenantAdminRecipients.resolveTenantAdmins(tenantId);
+        if (admins.isEmpty()) {
+            log.warn("[Security] PSiRA compliance issues found for tenant={} but no admin recipients "
+                            + "could be resolved. Expired: {} Expiring soon: {}",
                     tenantId.getValue(), expiredGuards.size(), expiringGuards.size());
-        } else {
-            log.warn("[Security] PSiRA compliance issues found for tenant={} but no admin email configured. " +
-                            "Expired: {} Expiring soon: {}",
-                    tenantId.getValue(), expiredGuards.size(), expiringGuards.size());
+            return expiredGuards.size() + expiringGuards.size();
         }
+
+        boolean anyExpired = !expiredGuards.isEmpty();
+        NotificationType type = anyExpired ? NotificationType.PSIRA_EXPIRED : NotificationType.PSIRA_EXPIRING_SOON;
+
+        String title = anyExpired
+                ? expiredGuards.size() + " guard(s) with EXPIRED PSiRA registration"
+                : expiringGuards.size() + " guard(s) with PSiRA expiring within " + WARN_DAYS_BEFORE + " days";
+
+        String message = buildSummary(expiredGuards, expiringGuards);
+
+        notificationService.send(NotificationRequest.builder()
+                .tenantId(tenantId)
+                .type(type)
+                .severity(anyExpired ? NotificationSeverity.CRITICAL : NotificationSeverity.WARNING)
+                .title(title)
+                .message(message)
+                .actionUrl("/security/guards")
+                .sourceModule("security")
+                .recipients(admins)
+                .build());
+
+        log.info("[Security] PSiRA alert sent tenant={} expired={} expiring={}",
+                tenantId.getValue(), expiredGuards.size(), expiringGuards.size());
 
         return expiredGuards.size() + expiringGuards.size();
     }
 
-    /**
-     * Resolves the admin email for the tenant.
-     * Phase 2: replace with TenantRepository lookup for tenant.adminEmail.
-     * For now: reads from application.properties via @Value in a config class,
-     * or returns null to log-only mode.
-     *
-     * WHY log-only as the default?
-     * Sending emails to a wrong address on every nightly run would be worse
-     * than not sending at all.  Log-only is safe until the admin email is
-     * properly configured per-tenant.
-     */
-    private String resolveAdminEmail(TenantId tenantId) {
-        // TODO Phase 2: return tenantRepo.findById(tenantId).map(Tenant::getAdminEmail).orElse(null);
-        return null; // safe default until per-tenant admin email is implemented
+    private String buildSummary(List<Guard> expired, List<Guard> expiring) {
+        StringBuilder sb = new StringBuilder();
+        if (!expired.isEmpty()) {
+            sb.append("Expired: ");
+            sb.append(expired.stream()
+                    .map(g -> g.getFullName() + " (" + g.getPsiraExpiryDate() + ")")
+                    .collect(Collectors.joining(", ")));
+        }
+        if (!expiring.isEmpty()) {
+            if (sb.length() > 0) sb.append(" | ");
+            sb.append("Expiring soon: ");
+            sb.append(expiring.stream()
+                    .map(g -> g.getFullName() + " (" + g.getPsiraExpiryDate() + ")")
+                    .collect(Collectors.joining(", ")));
+        }
+        return sb.toString();
     }
 }

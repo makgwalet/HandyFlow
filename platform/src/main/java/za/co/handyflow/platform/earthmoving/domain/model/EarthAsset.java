@@ -3,6 +3,7 @@
 package za.co.handyflow.platform.earthmoving.domain.model;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import za.co.handyflow.platform.shared.TenantId;
@@ -15,15 +16,14 @@ import java.util.UUID;
 @Entity
 @Table(name = "earthmoving_assets")
 @Getter
-@NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class EarthAsset {
 
     @Id
     private UUID id = UUID.randomUUID();
 
     @Embedded
-    @AttributeOverride(name = "value",
-            column = @Column(name = "tenant_id", nullable = false))
+    @AttributeOverride(name = "value", column = @Column(name = "tenant_id", nullable = false))
     private TenantId tenantId;
 
     @Column(name = "customer_id")
@@ -44,8 +44,11 @@ public class EarthAsset {
     @Column(name = "asset_type", nullable = false)
     private String assetType;
 
-    @Column(nullable = false)
-    private String status = "AVAILABLE";
+    // FIX: was a raw String. See AssetStatus for why that's a bug generator
+    // and how transitions are now validated instead of trusted blindly.
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private AssetStatus status = AssetStatus.AVAILABLE;
 
     @Column(name = "hourly_rate", precision = 15, scale = 2)
     private BigDecimal hourlyRate;
@@ -88,17 +91,17 @@ public class EarthAsset {
     @Column(name = "fleet_number")
     private String fleetNumber;         // e.g. "D9-001", "CAT-EX-003"
 
-    @Column(name = "ownership_type")
+    @Column(name = "ownership_type", nullable = false)
     private String ownershipType = "OWN";  // OWN | HIRED_IN | HIRED_OUT
 
     @Column(name = "hire_supplier")
     private String hireSupplier;        // HIRED_IN: name of company that owns the machine
 
     @Column(name = "hire_start_date")
-    private java.time.LocalDate hireStartDate;
+    private LocalDate hireStartDate;
 
     @Column(name = "hire_end_date")
-    private java.time.LocalDate hireEndDate;
+    private LocalDate hireEndDate;
 
     @Column(name = "current_site")
     private String currentSite;         // Where the machine is deployed right now
@@ -113,10 +116,8 @@ public class EarthAsset {
                                     String assetType, String make, String model,
                                     Integer year, String serialNumber, String registration,
                                     String ownershipType, String hireSupplier,
-                                    java.time.LocalDate hireStartDate,
-                                    java.time.LocalDate hireEndDate,
-                                    java.math.BigDecimal dailyRate,
-                                    java.math.BigDecimal hourlyRate,
+                                    LocalDate hireStartDate, LocalDate hireEndDate,
+                                    BigDecimal dailyRate, BigDecimal hourlyRate,
                                     String notes) {
         EarthAsset a = new EarthAsset();
         a.id = UUID.randomUUID();
@@ -136,52 +137,91 @@ public class EarthAsset {
         a.dailyRate = dailyRate;
         a.hourlyRate = hourlyRate;
         a.notes = notes;
-        a.status = "AVAILABLE";
-        a.currentHours = java.math.BigDecimal.ZERO;
-        a.lastServiceHours = java.math.BigDecimal.ZERO;
-        a.serviceIntervalHours = new java.math.BigDecimal("250");
-        a.createdAt = java.time.Instant.now();
-        a.updatedAt = java.time.Instant.now();
+        a.status = AssetStatus.AVAILABLE;
+        a.currentHours = BigDecimal.ZERO;
+        a.lastServiceHours = BigDecimal.ZERO;
+        a.serviceIntervalHours = new BigDecimal("250");
+        a.createdAt = Instant.now();
+        a.updatedAt = Instant.now();
         return a;
     }
 
-    public void deploy() {
-        this.status    = "DEPLOYED";
+    // ── State transitions ────────────────────────────────────────────────
+    // Every public transition method now funnels through this single guard.
+    // Add a new transition (e.g. a future "COMMISSIONING" state)? Update
+    // AssetStatus's transition table and, if it needs side effects (like
+    // clearing currentSite below), add a case here — one place, not seven.
+
+    private void changeStatus(AssetStatus target) {
+        if (!status.canTransitionTo(target)) {
+            throw new InvalidAssetStatusTransitionException(status, target);
+        }
+        this.status = target;
         this.updatedAt = Instant.now();
     }
 
     public void returnToYard() {
-        this.status    = "AVAILABLE";
+        changeStatus(AssetStatus.AVAILABLE);
         this.currentSite = null;
         this.currentClient = null;
-        this.updatedAt = Instant.now();
     }
 
     public void sendToMaintenance() {
-        this.status    = "MAINTENANCE";
-        this.updatedAt = Instant.now();
+        changeStatus(AssetStatus.MAINTENANCE);
     }
 
     public void retire() {
-        this.status    = "RETIRED";
-        this.updatedAt = Instant.now();
+        changeStatus(AssetStatus.RETIRED);
     }
 
+    public void breakdown() {
+        changeStatus(AssetStatus.BREAKDOWN);
+    }
+
+    public void hireOut() {
+        changeStatus(AssetStatus.HIRED_OUT);
+    }
+
+    /** Deploy to a site/client. Only legal from AVAILABLE (see AssetStatus). */
+    public void deployTo(String siteName, String clientName) {
+        changeStatus(AssetStatus.DEPLOYED);
+        this.currentSite = siteName;
+        this.currentClient = clientName;
+    }
+
+    /**
+     * Status-only transition to DEPLOYED, used by the generic
+     * PATCH /status endpoint which carries no site/client data — unlike
+     * {@link #deployTo}, this deliberately leaves currentSite/currentClient
+     * untouched rather than blanking them out. Prefer the dedicated
+     * {@code /deploy} endpoint ({@link #deployTo}) when you have site
+     * details to record.
+     */
+    public void markDeployed() {
+        changeStatus(AssetStatus.DEPLOYED);
+    }
+
+    // ── Other behaviour ──────────────────────────────────────────────────
+
     public void updateHours(BigDecimal newHours) {
+        if (newHours != null && currentHours != null && newHours.compareTo(currentHours) < 0) {
+            throw new IllegalArgumentException(
+                    "New hour meter reading (" + newHours + ") cannot be lower than the current reading ("
+                            + currentHours + "). Hour meters only count up.");
+        }
         this.currentHours = newHours;
-        this.updatedAt    = Instant.now();
+        this.updatedAt = Instant.now();
     }
 
     public boolean isDueForService() {
         if (currentHours == null || lastServiceHours == null || serviceIntervalHours == null)
             return false;
-        return currentHours.subtract(lastServiceHours)
-                .compareTo(serviceIntervalHours) >= 0;
+        return currentHours.subtract(lastServiceHours).compareTo(serviceIntervalHours) >= 0;
     }
 
     public void recordService(BigDecimal hoursAtService) {
         this.lastServiceHours = hoursAtService;
-        this.updatedAt        = Instant.now();
+        this.updatedAt = Instant.now();
     }
 
     public void softDelete(UUID deletedByUserId) {
@@ -190,27 +230,12 @@ public class EarthAsset {
         this.updatedAt = Instant.now();
     }
 
-    public void breakdown() {
-        this.status = "BREAKDOWN";
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
-
-    public void hireOut() {
-        this.status = "HIRED_OUT";
-    }
-
-    public void deployTo(String siteName, String clientName) {
-        this.status = "DEPLOYED";
-        this.currentSite = siteName;
-        this.currentClient = clientName;
-    }
-
-
-
-
-    public boolean isDeleted() { return deletedAt != null; }
 
     @PreUpdate
-    void onUpdate() { this.updatedAt = Instant.now(); }
-
-
+    void onUpdate() {
+        this.updatedAt = Instant.now();
+    }
 }

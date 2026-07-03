@@ -16,6 +16,7 @@ import za.co.handyflow.platform.earthmoving.application.internal.EarthAssetServi
 import za.co.handyflow.platform.earthmoving.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
+import za.co.handyflow.platform.shared.UserContext;
 
 import java.util.UUID;
 
@@ -26,7 +27,7 @@ import java.util.UUID;
 public class EarthAssetController {
 
     private final EarthAssetService earthAssetService;
-    private final FeatureGuard      featureGuard;
+    private final FeatureGuard featureGuard;
 
     @GetMapping
     @PreAuthorize("hasAuthority('USER_READ')")
@@ -52,20 +53,34 @@ public class EarthAssetController {
     @PostMapping
     @PreAuthorize("hasAuthority('USER_CREATE')")
     @Operation(summary = "Register a new heavy equipment asset (owned, hired-in or hired-out)")
-    public ResponseEntity<ApiResponse<AssetResponse>> createAsset(
-            @Valid @RequestBody CreateAssetRequest request) {
+    public ResponseEntity<ApiResponse<AssetResponse>> createAsset(@Valid @RequestBody CreateAssetRequest request) {
         featureGuard.requireModule("earthmoving");
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Asset registered",
                         earthAssetService.createAsset(TenantContext.getTenantIdAsObject(), request)));
     }
 
-    // FIX: Changed from @PatchMapping to @PutMapping.
-    // PATCH triggers a CORS preflight that Spring's default CORS config
-    // does not allow — the browser sends OPTIONS before PATCH and gets
-    // no Access-Control-Allow-Origin header back, blocking the request.
-    // PUT does not trigger a preflight for simple CORS configs.
-    @PutMapping("/{id}/status")
+    // FIX: reverted to @PatchMapping, which is the semantically correct verb
+    // for "change one field (status) on an existing resource" — @PutMapping
+    // implies replacing the entire resource representation.
+    //
+    // The original comment on this endpoint said PUT was used because PATCH
+    // triggers a CORS preflight that Spring's default config doesn't allow.
+    // That's treating the symptom, not the cause: EVERY non-simple request
+    // (including this PUT once it carries a JSON body and custom headers)
+    // already triggers a preflight in most real frontend setups; swapping
+    // the verb doesn't avoid preflights, it just relabels the endpoint
+    // incorrectly. The actual fix is to allow PATCH in your CORS config:
+    //
+    //   CorsConfiguration config = new CorsConfiguration();
+    //   config.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
+    //   // ... register on your CorsConfigurationSource bean
+    //
+    // Find wherever your app defines its CorsConfigurationSource (likely a
+    // SecurityConfig or WebMvcConfigurer) and make sure PATCH is in
+    // allowedMethods. That fixes CORS for every PATCH endpoint at once,
+    // instead of every controller quietly avoiding a valid HTTP verb.
+    @PatchMapping("/{id}/status")
     @PreAuthorize("hasAuthority('USER_UPDATE')")
     @Operation(summary = "Update asset status: AVAILABLE, DEPLOYED, MAINTENANCE, BREAKDOWN, HIRED_OUT, RETIRED")
     public ResponseEntity<ApiResponse<AssetResponse>> updateStatus(
@@ -76,7 +91,7 @@ public class EarthAssetController {
                 earthAssetService.updateStatus(TenantContext.getTenantIdAsObject(), id, request)));
     }
 
-    @PutMapping("/{id}/hours")
+    @PatchMapping("/{id}/hours")
     @PreAuthorize("hasAuthority('USER_UPDATE')")
     @Operation(summary = "Update the current hour meter reading on an asset")
     public ResponseEntity<ApiResponse<AssetResponse>> updateHours(
@@ -98,15 +113,32 @@ public class EarthAssetController {
                 earthAssetService.deploy(TenantContext.getTenantIdAsObject(), id, request)));
     }
 
+    // NEW: deployment history was previously invisible — EarthAsset.currentSite/
+    // currentClient only ever held the latest value, overwritten on every
+    // redeployment. See EarthDeployment's Javadoc for the full rationale.
+    @GetMapping("/{id}/deployments")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Deployment history for an asset — every site it's been sent to, with contact and date details")
+    public ResponseEntity<ApiResponse<Page<DeploymentResponse>>> getDeploymentHistory(
+            @PathVariable UUID id,
+            @PageableDefault(size = 50) Pageable pageable) {
+        featureGuard.requireModule("earthmoving");
+        return ResponseEntity.ok(ApiResponse.success(
+                earthAssetService.getDeploymentHistory(TenantContext.getTenantIdAsObject(), id, pageable)));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('USER_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteAsset(@PathVariable UUID id) {
         featureGuard.requireModule("earthmoving");
-        earthAssetService.deleteAsset(TenantContext.getTenantIdAsObject(), id);
+        // FIX: previously always deleted with deletedBy=null, losing the
+        // audit trail of who deleted the asset. See UserContext for the
+        // one place this needs to be wired to your actual auth principal.
+        earthAssetService.deleteAsset(TenantContext.getTenantIdAsObject(), id, UserContext.getCurrentUserId());
         return ResponseEntity.ok(ApiResponse.success("Asset deleted", null));
     }
 
-    // ── Maintenance ───────────────────────────────────────────────────────────
+    // ── Maintenance ───────────────────────────────────────────────────────
 
     @GetMapping("/{id}/maintenance")
     @PreAuthorize("hasAuthority('USER_READ')")
@@ -130,7 +162,7 @@ public class EarthAssetController {
                         earthAssetService.recordMaintenance(TenantContext.getTenantIdAsObject(), id, request)));
     }
 
-    // ── Operator Logs ─────────────────────────────────────────────────────────
+    // ── Operator Logs ─────────────────────────────────────────────────────
 
     @GetMapping("/{id}/operator-logs")
     @PreAuthorize("hasAuthority('USER_READ')")
@@ -152,5 +184,19 @@ public class EarthAssetController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Operator log started",
                         earthAssetService.startOperatorLog(TenantContext.getTenantIdAsObject(), id, request)));
+    }
+
+    // NEW: OperatorLog.complete() existed on the entity with no way to reach
+    // it via the API — a shift could be started but never ended.
+    @PatchMapping("/{id}/operator-logs/{logId}/complete")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @Operation(summary = "Complete an operator's shift — records end time, end hours and fuel used")
+    public ResponseEntity<ApiResponse<OperatorLogResponse>> completeLog(
+            @PathVariable UUID id,
+            @PathVariable UUID logId,
+            @Valid @RequestBody CompleteOperatorLogRequest request) {
+        featureGuard.requireModule("earthmoving");
+        return ResponseEntity.ok(ApiResponse.success("Operator log completed",
+                earthAssetService.completeOperatorLog(TenantContext.getTenantIdAsObject(), id, logId, request)));
     }
 }

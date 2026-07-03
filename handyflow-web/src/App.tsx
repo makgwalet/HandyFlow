@@ -13,7 +13,6 @@ import { SecurityPage }                 from "./pages/security/SecurityPage"
 import { ModuleLayout }                 from "./components/layout/ModuleLayout"
 import { useAuthStore }                 from "./store/auth.store"
 import { FuelPage }                     from "./pages/fuel/FuelPage"
-import { EarthMovingPage }              from "./pages/earthmoving/EarthmoingPage"
 import { PropertyPage }                 from "./pages/property/PropertyPage"
 import { FleetPage }                    from "./pages/fleet/FleetPage"
 import { SettingsPage }                 from './pages/settings/SettingsPage'
@@ -47,6 +46,7 @@ import { SupplyChainPage }              from "./pages/supply-chain/SupplyChainPa
 import { ProjectsPage }     from "./pages/projects/ProjectsPage"
 import { ProjectDetailPage } from "./pages/projects/ProjectDetailPage"
 import { ClientPortalPage }  from "./pages/projects/ClientPortalPage"
+import { EarthMovingPage } from "./pages/earthmoving/EarthMovingPage"
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },

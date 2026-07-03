@@ -154,4 +154,12 @@ sms:
     token-secret: ${BULKSMS_TOKEN_SECRET:}
     sender-id: ${BULKSMS_SENDER_ID:HandyFlow}   # max 11 chars for alphanumeric sender ID
 
-
+notifications:
+  email:
+    from-address: "makgwale10111@gmail.com"
+    from-name: "HandyFlow"
+  sms:
+    # "log" (default) = LoggingSmsSender, safe no-op that logs instead of sending.
+    # Set to "twilio" / "clickatell" / etc. once you implement and register a
+    # real SmsSender bean guarded by @ConditionalOnProperty for that value.
+    provider: "log"
