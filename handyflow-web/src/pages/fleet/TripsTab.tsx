@@ -4,11 +4,17 @@
 //   POST /api/v1/fleet/vehicles/{vehicleId}/trips/end
 //   GET  /api/v1/fleet/trips  (global list — new endpoint added to controller)
 // The old frontend called /api/v1/fleet/trips/start which doesn't exist.
+//
+// NEW: logbook export panel — downloads the SARS travel logbook PDF/Excel
+// for a selected vehicle and date range from
+// GET /api/v1/fleet/vehicles/{id}/logbook.pdf|xlsx. This is the frontend
+// half of the backend export that was built with no way to reach it — see
+// downloadLogbook() below.
 
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, Route, CheckCircle, X, AlertCircle, Briefcase, Home } from "lucide-react"
+import { Plus, Route, CheckCircle, X, AlertCircle, Briefcase, Home, FileDown, FileSpreadsheet } from "lucide-react"
 
 interface Vehicle { id: string; registration: string; make: string; model: string; status: string; currentOdometer: number }
 
@@ -36,6 +42,15 @@ const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })
 
+function currentTaxYear(): { from: string; to: string } {
+  const today = new Date()
+  const year = today.getMonth() >= 2 ? today.getFullYear() : today.getFullYear() - 1
+  const from = `${year}-03-01`
+  const febDays = new Date(year + 1, 1, 29).getMonth() === 1 ? 29 : 28
+  const to = `${year + 1}-02-${febDays}`
+  return { from, to }
+}
+
 const EMPTY_START = { vehicleId: "", driverName: "", purpose: "", tripType: "BUSINESS", startLocation: "", startOdometer: "", notes: "" }
 
 export default function TripsTab() {
@@ -51,6 +66,13 @@ export default function TripsTab() {
   const [endNotes, setEndNotes]     = useState("")
   const [apiError, setApiError]     = useState("")
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  const taxYear = currentTaxYear()
+  const [logbookVehicle, setLogbookVehicle] = useState("")
+  const [logbookFrom, setLogbookFrom]       = useState(taxYear.from)
+  const [logbookTo, setLogbookTo]           = useState(taxYear.to)
+  const [logbookError, setLogbookError]     = useState("")
+  const [downloading, setDownloading]       = useState<"pdf" | "xlsx" | null>(null)
 
   const { data: trips = [], isLoading } = useQuery<Trip[]>({
     queryKey: ["fleet-trips-all", filterStatus],
@@ -70,7 +92,6 @@ export default function TripsTab() {
 
   const startTrip = useMutation({
     mutationFn: ({ vehicleId, body }: { vehicleId: string; body: any }) =>
-      // CORRECT URL: vehicle-scoped endpoint
       apiClient.post(`/api/v1/fleet/vehicles/${vehicleId}/trips/start`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["fleet-trips-all"] })
@@ -82,7 +103,6 @@ export default function TripsTab() {
 
   const endTrip = useMutation({
     mutationFn: ({ vehicleId, body }: { vehicleId: string; body: any }) =>
-      // CORRECT URL: vehicle-scoped endpoint
       apiClient.post(`/api/v1/fleet/vehicles/${vehicleId}/trips/end`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["fleet-trips-all"] })
@@ -98,6 +118,39 @@ export default function TripsTab() {
     if (!startForm.startOdometer) errs.startOdometer = "Start odometer is required"
     setFieldErrors(errs)
     return Object.keys(errs).length === 0
+  }
+
+  const downloadLogbook = async (format: "pdf" | "xlsx") => {
+    if (!logbookVehicle) { setLogbookError("Select a vehicle first"); return }
+    setLogbookError("")
+    setDownloading(format)
+    try {
+      const params = new URLSearchParams()
+      if (logbookFrom) params.set("from", logbookFrom)
+      if (logbookTo) params.set("to", logbookTo)
+      const res = await apiClient.get(
+        `/api/v1/fleet/vehicles/${logbookVehicle}/logbook.${format}?${params}`,
+        { responseType: "blob" }
+      )
+      const vehicle = (vehicles as Vehicle[]).find(v => v.id === logbookVehicle)
+      const blob = new Blob([res.data], {
+        type: format === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `logbook-${vehicle?.registration ?? "vehicle"}-${logbookFrom || "period"}.${format}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (e: any) {
+      setLogbookError(e.response?.status === 404
+        ? "No vehicle found, or nothing to export for that period."
+        : "Failed to download logbook. Please try again.")
+    } finally {
+      setDownloading(null)
+    }
   }
 
   const displayTrips = filterType === "ALL" ? (trips as Trip[]) : (trips as Trip[]).filter(t => (t.tripType ?? "BUSINESS") === filterType)
@@ -120,7 +173,6 @@ export default function TripsTab() {
 
   return (
     <div>
-      {/* Stats */}
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {stats.map(s => (
           <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
@@ -130,12 +182,52 @@ export default function TripsTab() {
         ))}
       </div>
 
-      {/* SARS info banner */}
       <div style={{ marginBottom: 18, padding: "10px 14px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, fontSize: 12, color: "#1D4ED8" }}>
         <strong>SARS Logbook:</strong> Classify each trip as Business or Private. Business trips are deductible for travel allowance purposes. Keep odometer readings accurate.
       </div>
 
-      {/* Toolbar */}
+      {/* ── Logbook export panel ─────────────────────────────────────────── */}
+      <div style={{ marginBottom: 22, padding: "16px 18px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <FileDown size={16} color="#1B3A6B" />
+          <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Export SARS Logbook</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto auto", gap: 10, alignItems: "end" }}>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4 }}>Vehicle *</label>
+            <select value={logbookVehicle} onChange={e => { setLogbookVehicle(e.target.value); setLogbookError("") }}
+              style={{ ...inp("_"), background: "#fff" }}>
+              <option value="">Select vehicle...</option>
+              {(vehicles as Vehicle[]).map(v => <option key={v.id} value={v.id}>{v.registration} — {v.make} {v.model}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4 }}>From</label>
+            <input type="date" value={logbookFrom} onChange={e => setLogbookFrom(e.target.value)} style={inp("_")} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4 }}>To</label>
+            <input type="date" value={logbookTo} onChange={e => setLogbookTo(e.target.value)} style={inp("_")} />
+          </div>
+          <button onClick={() => downloadLogbook("pdf")} disabled={!logbookVehicle || downloading !== null}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: !logbookVehicle ? "#E2E8F0" : "#DC2626", color: !logbookVehicle ? "#94A3B8" : "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: !logbookVehicle ? "not-allowed" : "pointer", whiteSpace: "nowrap" as const }}>
+            <FileDown size={14} /> {downloading === "pdf" ? "..." : "PDF"}
+          </button>
+          <button onClick={() => downloadLogbook("xlsx")} disabled={!logbookVehicle || downloading !== null}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: !logbookVehicle ? "#E2E8F0" : "#166534", color: !logbookVehicle ? "#94A3B8" : "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: !logbookVehicle ? "not-allowed" : "pointer", whiteSpace: "nowrap" as const }}>
+            <FileSpreadsheet size={14} /> {downloading === "xlsx" ? "..." : "Excel"}
+          </button>
+        </div>
+        <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 8 }}>
+          Defaults to the current SA tax year (1 Mar – end of Feb). Only completed trips are included.
+        </div>
+        {logbookError && (
+          <div style={{ marginTop: 10, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, fontSize: 12, color: "#DC2626", display: "flex", alignItems: "center", gap: 6 }}>
+            <AlertCircle size={13} />{logbookError}
+          </div>
+        )}
+      </div>
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {["ALL","ACTIVE","COMPLETED","CANCELLED"].map(s => (
@@ -161,7 +253,6 @@ export default function TripsTab() {
         </button>
       </div>
 
-      {/* Trip list */}
       {isLoading ? (
         <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading trips...</div>
       ) : displayTrips.length === 0 ? (
@@ -225,7 +316,6 @@ export default function TripsTab() {
         </div>
       )}
 
-      {/* ── Start Trip Modal ──────────────────────────────────────────────── */}
       {showStart && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
           <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 540, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
@@ -316,7 +406,6 @@ export default function TripsTab() {
         </div>
       )}
 
-      {/* ── End Trip Modal ────────────────────────────────────────────────── */}
       {showEnd && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
           <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
@@ -379,5 +468,4 @@ export default function TripsTab() {
 }
 
 const omit2 = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
-const inp   = (k: string): React.CSSProperties => ({ width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, background: "#fff", outline: "none" })
 const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }

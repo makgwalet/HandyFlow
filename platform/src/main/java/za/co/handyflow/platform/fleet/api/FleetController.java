@@ -7,16 +7,22 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.fleet.application.internal.FleetLogbookService;
 import za.co.handyflow.platform.fleet.application.internal.FleetService;
 import za.co.handyflow.platform.fleet.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
+import za.co.handyflow.platform.shared.UserContext;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @RestController
@@ -26,6 +32,7 @@ import java.util.UUID;
 public class FleetController {
 
     private final FleetService fleetService;
+    private final FleetLogbookService logbookService;
     private final FeatureGuard featureGuard;
 
     // ── Vehicles ──────────────────────────────────────────────────────────────
@@ -59,9 +66,7 @@ public class FleetController {
                         fleetService.createVehicle(TenantContext.getTenantIdAsObject(), request)));
     }
 
-    // FIX: Changed from @PatchMapping to @PutMapping.
-    // PATCH triggers CORS preflight that Spring's default CORS config rejects.
-    @PutMapping("/vehicles/{id}/status")
+    @PatchMapping("/vehicles/{id}/status")
     @PreAuthorize("hasAuthority('USER_UPDATE')")
     @Operation(summary = "Update vehicle status: AVAILABLE, ON_TRIP, MAINTENANCE, BREAKDOWN, RETIRED")
     public ResponseEntity<ApiResponse<VehicleResponse>> updateStatus(
@@ -76,7 +81,7 @@ public class FleetController {
     @PreAuthorize("hasAuthority('USER_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteVehicle(@PathVariable UUID id) {
         featureGuard.requireModule("fleet");
-        fleetService.deleteVehicle(TenantContext.getTenantIdAsObject(), id);
+        fleetService.deleteVehicle(TenantContext.getTenantIdAsObject(), id, UserContext.getCurrentUserId());
         return ResponseEntity.ok(ApiResponse.success("Vehicle deleted", null));
     }
 
@@ -105,7 +110,6 @@ public class FleetController {
 
     // ── Trips ─────────────────────────────────────────────────────────────────
 
-    // Global trip list — all trips across all vehicles, sorted by date
     @GetMapping("/trips")
     @PreAuthorize("hasAuthority('USER_READ')")
     @Operation(summary = "Get all trips across all vehicles (for logbook view)")
@@ -148,6 +152,41 @@ public class FleetController {
         featureGuard.requireModule("fleet");
         return ResponseEntity.ok(ApiResponse.success("Trip ended",
                 fleetService.endTrip(TenantContext.getTenantIdAsObject(), id, request)));
+    }
+
+    // ── SARS Logbook Export ──────────────────────────────────────────────────
+    // Defaults to the current SA tax year (1 March – end of February) if
+    // from/to aren't supplied — see FleetLogbookService.resolveRange().
+
+    @GetMapping(value = "/vehicles/{id}/logbook.pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Download a SARS travel logbook PDF for a vehicle (defaults to current SA tax year)")
+    public ResponseEntity<byte[]> downloadLogbookPdf(
+            @PathVariable UUID id,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        featureGuard.requireModule("fleet");
+        byte[] pdf = logbookService.generatePdf(TenantContext.getTenantIdAsObject(), id, from, to);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"logbook.pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    @GetMapping(value = "/vehicles/{id}/logbook.xlsx",
+            produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Download a SARS travel logbook Excel workbook for a vehicle (defaults to current SA tax year)")
+    public ResponseEntity<byte[]> downloadLogbookExcel(
+            @PathVariable UUID id,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        featureGuard.requireModule("fleet");
+        byte[] excel = logbookService.generateExcel(TenantContext.getTenantIdAsObject(), id, from, to);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"logbook.xlsx\"")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(excel);
     }
 
     // ── Fuel fill-ups ─────────────────────────────────────────────────────────

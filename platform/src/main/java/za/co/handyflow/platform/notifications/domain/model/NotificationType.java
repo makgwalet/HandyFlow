@@ -110,6 +110,7 @@ public enum NotificationType {
     VEHICLE_ROADWORTHY_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
     VEHICLE_INSURANCE_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
     VEHICLE_BREAKDOWN(CRITICAL, Set.of(IN_APP, EMAIL, SMS)),
+    TRIP_RUNNING_LONG(WARNING, Set.of(IN_APP, EMAIL)),
 
     // ── Fuel ─────────────────────────────────────────────────────────────────
     FUEL_TANK_LOW(WARNING, Set.of(IN_APP, EMAIL)),

@@ -19,8 +19,7 @@ public class Trip {
     private UUID id = UUID.randomUUID();
 
     @Embedded
-    @AttributeOverride(name = "value",
-            column = @Column(name = "tenant_id", nullable = false))
+    @AttributeOverride(name = "value", column = @Column(name = "tenant_id", nullable = false))
     private TenantId tenantId;
 
     @Column(name = "vehicle_id", nullable = false)
@@ -34,7 +33,6 @@ public class Trip {
 
     private String purpose;
 
-    // NEW: BUSINESS | PRIVATE — for SARS logbook compliance
     @Column(name = "trip_type", nullable = false)
     private String tripType = "BUSINESS";
 
@@ -59,16 +57,21 @@ public class Trip {
     @Column(name = "fuel_used_litres", precision = 8, scale = 2)
     private BigDecimal fuelUsedLitres;
 
-    // NEW: ACTIVE | COMPLETED | CANCELLED — needed for filtering in logbook
     @Column(name = "status", nullable = false)
     private String status = "ACTIVE";
+
+    // NEW: set once a "this trip has been running a long time" notification
+    // has fired for it, so FleetNotificationScheduler's periodic check never
+    // sends the same alert twice for the same still-open trip. Without this,
+    // every scheduler run (see FleetNotificationScheduler) would re-notify
+    // for every still-active long trip, every time it runs.
+    @Column(name = "long_running_alert_sent", nullable = false)
+    private boolean longRunningAlertSent = false;
 
     private String notes;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
-
-    // ── Factory — 9 args matching FleetService.startTrip ─────────────────────
 
     public static Trip create(TenantId tenantId, UUID vehicleId,
                               UUID guardId, String driverName,
@@ -76,21 +79,19 @@ public class Trip {
                               String startLocation,
                               Integer startOdometer, Instant startAt) {
         Trip t = new Trip();
-        t.tenantId      = tenantId;
-        t.vehicleId     = vehicleId;
-        t.guardId       = guardId;
-        t.driverName    = driverName;
-        t.purpose       = purpose;
-        t.tripType      = tripType != null ? tripType : "BUSINESS";
+        t.tenantId = tenantId;
+        t.vehicleId = vehicleId;
+        t.guardId = guardId;
+        t.driverName = driverName;
+        t.purpose = purpose;
+        t.tripType = tripType != null ? tripType : "BUSINESS";
         t.startLocation = startLocation;
         t.startOdometer = startOdometer;
-        t.startAt       = startAt;
-        t.status        = "ACTIVE";
-        t.createdAt     = Instant.now();
+        t.startAt = startAt;
+        t.status = "ACTIVE";
+        t.createdAt = Instant.now();
         return t;
     }
-
-    // ── Domain logic ──────────────────────────────────────────────────────────
 
     public Integer getDistanceKm() {
         if (endOdometer == null) return null;
@@ -103,15 +104,19 @@ public class Trip {
             throw new IllegalArgumentException(
                     "End odometer (" + endOdometer + ") cannot be less than start (" + startOdometer + ")");
         }
-        this.endLocation    = endLocation;
-        this.endOdometer    = endOdometer;
-        this.endAt          = endAt;
+        this.endLocation = endLocation;
+        this.endOdometer = endOdometer;
+        this.endAt = endAt;
         this.fuelUsedLitres = fuelUsedLitres;
-        this.notes          = notes;
-        this.status         = "COMPLETED";
+        this.notes = notes;
+        this.status = "COMPLETED";
     }
 
     public void cancel() {
         this.status = "CANCELLED";
+    }
+
+    public void markLongRunningAlertSent() {
+        this.longRunningAlertSent = true;
     }
 }

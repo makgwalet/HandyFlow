@@ -107,7 +107,15 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of("http://localhost:5173",
                 "http://localhost:5174" ));
-        config.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS"));
+        // FIX: PATCH was missing from this list. This is the actual root
+        // cause behind every "PATCH triggers a CORS failure, switch to PUT"
+        // workaround that's been found and reverted across this codebase
+        // (earthmoving, fleet, and possibly others not yet audited) — none
+        // of those workarounds could ever have fixed the real problem,
+        // because the real problem was always here: the browser's preflight
+        // OPTIONS request checks this exact list before the real PATCH
+        // request is ever sent, and PATCH was never on it.
+        config.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
         return new UrlBasedCorsConfigurationSource() {{
@@ -117,5 +125,3 @@ public class SecurityConfig {
 
 
 }
-
-

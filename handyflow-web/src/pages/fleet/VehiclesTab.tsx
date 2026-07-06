@@ -78,9 +78,15 @@ export default function VehiclesTab() {
   })
 
   const updateStatus = useMutation({
-    // PUT not PATCH — avoids CORS preflight failures
+    // FIX: was PUT with a comment claiming "avoids CORS preflight failures".
+    // That never actually fixed CORS — PUT with a JSON body triggers a
+    // preflight too, it just relabeled the endpoint with the wrong HTTP verb.
+    // The backend's FleetController now uses @PatchMapping again (the
+    // correct verb for "change one field on an existing resource"), so this
+    // must match it — see FleetController.java's comment for the real CORS
+    // fix (allow PATCH in your CorsConfigurationSource).
     mutationFn: ({ id, status, note }: { id: string; status: string; note: string }) =>
-      apiClient.put(`/api/v1/fleet/vehicles/${id}/status`, { status, note }),
+      apiClient.patch(`/api/v1/fleet/vehicles/${id}/status`, { status, note }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["fleet-vehicles"] }); setShowStatus(null); setNewStatus(""); setStatusNote(""); setApiError("") },
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to update status"),
   })
