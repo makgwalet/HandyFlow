@@ -89,6 +89,14 @@ public class Vehicle {
     @Column(name = "assigned_driver_name")
     private String assignedDriverName;
 
+    // NEW: the real link to a Driver record. assignedDriverName is kept as
+    // a free-text fallback for display and for cases with no linked driver
+    // yet (e.g. historical data, or a temporary/contract driver not worth
+    // registering as a full Driver record) — this field is what actually
+    // enables driver-side compliance tracking and notifications once set.
+    @Column(name = "assigned_driver_id")
+    private UUID assignedDriverId;
+
     private String notes;
 
     @Column(name = "purchase_date")
@@ -249,6 +257,12 @@ public class Vehicle {
     public void recordService(int odometerAtService) {
         this.lastServiceKm = odometerAtService;
         this.lastServiceDate = LocalDate.now();
+        this.updatedAt = Instant.now();
+    }
+
+    /** Pass null to unassign. */
+    public void assignDriver(UUID driverId) {
+        this.assignedDriverId = driverId;
         this.updatedAt = Instant.now();
     }
 

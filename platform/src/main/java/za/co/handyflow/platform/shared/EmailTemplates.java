@@ -808,4 +808,167 @@ public class EmailTemplates {
         """.formatted(today.toString(), rows.toString()));
     }
 
+    // ── Invoicing: quote sent to client ───────────────────────────────────────
+
+    /**
+     * NOTE: there is deliberately no "accept online" link here. The gap
+     * analysis flagged that a client portal doesn't exist yet (everything
+     * is admin-side; "accept" is an internal endpoint) — I'm not fabricating
+     * a link to a page that isn't built. Once a client portal exists, add
+     * a signed-URL parameter here and a button pointing at it.
+     */
+    public static String quoteSentToClient(String clientName, String quoteNumber,
+                                           String companyName, String amount,
+                                           String acceptUrl) {
+        return wrap("""
+            <p>Hi %s,</p>
+            <p>Please find attached your quote from <strong>%s</strong>.</p>
+            <div class="highlight">
+              <p>Quote <strong>%s</strong> &nbsp;&middot;&nbsp; Total: <strong>%s</strong></p>
+            </div>
+            <p style="text-align:center;margin:24px 0;">
+              <a href="%s" class="btn">View &amp; Respond to Quote</a>
+            </p>
+            <p>You can accept or decline online using the button above, or reply to this
+               email if you'd like to discuss any changes.</p>
+            """.formatted(
+                org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(companyName),
+                quoteNumber, amount, acceptUrl));
+    }
+
+    // ── Invoicing: quote expiring soon ─────────────────────────────────────────
+
+    /**
+     * Replaces the old hardcoded "Expires in 7 days" copy in quoteExpiry()
+     * with a real daysRemaining parameter. quoteExpiry() is left in place
+     * unchanged in case something else already calls it — use this one for
+     * any new call site.
+     */
+    public static String quoteExpiringSoon(String clientName, String quoteNumber,
+                                           String companyName, String amount,
+                                           int daysRemaining, String acceptUrl) {
+        return wrap("""
+            <p>Hi %s,</p>
+            <p>Your quote from <strong>%s</strong> is expiring soon.</p>
+            <div class="highlight-amber">
+              <p>Quote <strong>%s</strong> &nbsp;&middot;&nbsp; %s
+                 &nbsp;&middot;&nbsp; Expires in <strong>%d day%s</strong></p>
+            </div>
+            <p style="text-align:center;margin:24px 0;">
+              <a href="%s" class="btn">View &amp; Respond to Quote</a>
+            </p>
+            """.formatted(
+                org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(companyName),
+                quoteNumber, amount, daysRemaining, daysRemaining == 1 ? "" : "s", acceptUrl));
+    }
+
+    // ── Invoicing: payment receipt ─────────────────────────────────────────────
+
+    /**
+     * No PDF attachment — a dedicated receipt PDF generator doesn't exist
+     * yet (flagged in the gap analysis as item #3). This is a confirmation
+     * email only. Add a PDF once InvoicePdfService grows a receipt variant.
+     */
+    public static String paymentReceipt(String clientName, String invoiceNumber,
+                                        String amountPaid, String totalPaidToDate,
+                                        String invoiceTotal, String paymentMethod,
+                                        String reference) {
+        String refLine = (reference != null && !reference.isBlank())
+                ? "<br/>Reference: " + org.springframework.web.util.HtmlUtils.htmlEscape(reference)
+                : "";
+        return wrap("""
+            <p>Hi %s,</p>
+            <p>We confirm receipt of your payment.</p>
+            <div class="highlight-green">
+              <p>Invoice <strong>%s</strong><br/>
+                 Amount received: <strong>%s</strong> (%s)<br/>
+                 Total paid to date: <strong>%s</strong> of <strong>%s</strong>%s</p>
+            </div>
+            <p>Thank you for your payment.</p>
+            """.formatted(
+                org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
+                invoiceNumber, amountPaid, paymentMethod, totalPaidToDate, invoiceTotal, refLine));
+    }
+
+    // ── Invoicing: overdue reminder ────────────────────────────────────────────
+
+    public static String invoiceOverdueReminder(String clientName, String invoiceNumber,
+                                                String amountOutstanding, int daysOverdue,
+                                                String companyName) {
+        return wrap("""
+            <p>Hi %s,</p>
+            <p>This is a reminder that the following invoice from <strong>%s</strong>
+               is now overdue:</p>
+            <div class="highlight-red">
+              <p>Invoice <strong>%s</strong><br/>
+                 Amount outstanding: <strong>%s</strong><br/>
+                 Days overdue: <strong>%d</strong></p>
+            </div>
+            <p>Please arrange payment as soon as possible. If you have already paid,
+               please disregard this reminder and send us your proof of payment.</p>
+            """.formatted(
+                org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(companyName),
+                invoiceNumber, amountOutstanding, daysOverdue));
+    }
+
+    // ── Invoicing: escalating overdue reminder ────────────────────────────────
+
+    /**
+     * Replaces the flat invoiceOverdueReminder() for the escalation job —
+     * urgencyLabel drives visual + copy urgency without needing separate
+     * template methods per stage.
+     */
+    public static String invoiceOverdueReminderEscalating(String clientName, String invoiceNumber,
+                                                          String amountOutstanding, int daysOverdue,
+                                                          String companyName, String urgencyLabel) {
+        String box = daysOverdue >= 14 ? "highlight-red" : "highlight-amber";
+        return wrap("""
+            <p>Hi %s,</p>
+            <p><strong>%s</strong> — this invoice from <strong>%s</strong> remains unpaid.</p>
+            <div class="%s">
+              <p>Invoice <strong>%s</strong><br/>
+                 Amount outstanding: <strong>%s</strong><br/>
+                 Days overdue: <strong>%d</strong></p>
+            </div>
+            <p>Please arrange payment as soon as possible. If you have already paid,
+               please disregard this reminder and send us your proof of payment.</p>
+            """.formatted(
+                org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
+                urgencyLabel,
+                org.springframework.web.util.HtmlUtils.htmlEscape(companyName),
+                box, invoiceNumber, amountOutstanding, daysOverdue));
+    }
+
+    // ── Invoicing: recurring/scheduled invoice generated ───────────────────────
+
+    /**
+     * Same visual treatment as invoiceGeneratedWithPdf, but with copy that's
+     * actually true for this case. invoiceGeneratedWithPdf's wording
+     * ("generated from your accepted quote") was being reused here even
+     * though recurring-schedule invoices have no quote involved at all —
+     * factually wrong copy that a client could reasonably notice and be
+     * confused by.
+     */
+    public static String recurringInvoiceGeneratedWithPdf(String companyName, String invoiceNumber,
+                                                          String clientName, String amount,
+                                                          String scheduleTitle) {
+        return wrap("""
+            <p>Hi %s,</p>
+            <p>A new invoice has been generated for your recurring service with
+               <strong>%s</strong>%s.</p>
+            <div class="highlight">
+              <p>Invoice <strong>%s</strong> &nbsp;&middot;&nbsp; Total: <strong>%s</strong></p>
+            </div>
+            <p>The invoice is attached as a PDF. Please arrange payment according to
+               the terms noted on the invoice.</p>
+            """.formatted(
+                org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(companyName),
+                (scheduleTitle != null && !scheduleTitle.isBlank())
+                        ? " (" + org.springframework.web.util.HtmlUtils.htmlEscape(scheduleTitle) + ")" : "",
+                invoiceNumber, amount));
+    }
 }

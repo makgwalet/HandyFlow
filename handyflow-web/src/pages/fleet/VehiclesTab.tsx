@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import {
   Plus, Car, AlertTriangle, ChevronDown, ChevronUp, X,
-  Edit2, Eye, AlertCircle, CheckCircle, Wrench, Clock,
+  Edit2, Eye, AlertCircle, CheckCircle, Wrench, Clock, UserCog,
 } from "lucide-react"
 
 interface Vehicle {
@@ -14,9 +14,11 @@ interface Vehicle {
   licenceDiscExpiry: string | null; roadworthyExpiry: string | null; insuranceExpiry: string | null
   currentOdometer: number; lastServiceKm: number; serviceIntervalKm: number
   dueForService: boolean; licenceExpiringSoon: boolean; roadworthyExpiringSoon: boolean
-  dailyRate: number | null; assignedDriverName: string | null; notes: string | null
+  dailyRate: number | null; assignedDriverName: string | null; assignedDriverId: string | null; notes: string | null
   createdAt: string
 }
+
+interface Driver { id: string; firstName: string; lastName: string; status: string }
 
 const STATUS_CFG: Record<string, { color: string; bg: string; border: string; label: string; icon: React.ElementType }> = {
   AVAILABLE:   { color: "#166534", bg: "#DCFCE7", border: "#86EFAC",  label: "Available",   icon: CheckCircle  },
@@ -57,6 +59,8 @@ export default function VehiclesTab() {
   const qc = useQueryClient()
   const [showAdd, setShowAdd]         = useState(false)
   const [showStatus, setShowStatus]   = useState<Vehicle | null>(null)
+  const [showAssign, setShowAssign]   = useState<Vehicle | null>(null)
+  const [selectedDriverId, setSelectedDriverId] = useState("")
   const [viewing, setViewing]         = useState<Vehicle | null>(null)
   const [expanded, setExpanded]       = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState("ALL")
@@ -71,6 +75,12 @@ export default function VehiclesTab() {
     queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
   })
 
+  const { data: drivers = [] } = useQuery<Driver[]>({
+    queryKey: ["fleet-drivers"],
+    queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/drivers?size=200")),
+  })
+  const activeDrivers = drivers.filter(d => d.status === "ACTIVE")
+
   const createVehicle = useMutation({
     mutationFn: (body: any) => apiClient.post("/api/v1/fleet/vehicles", body),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["fleet-vehicles"] }); setShowAdd(false); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") },
@@ -78,17 +88,17 @@ export default function VehiclesTab() {
   })
 
   const updateStatus = useMutation({
-    // FIX: was PUT with a comment claiming "avoids CORS preflight failures".
-    // That never actually fixed CORS — PUT with a JSON body triggers a
-    // preflight too, it just relabeled the endpoint with the wrong HTTP verb.
-    // The backend's FleetController now uses @PatchMapping again (the
-    // correct verb for "change one field on an existing resource"), so this
-    // must match it — see FleetController.java's comment for the real CORS
-    // fix (allow PATCH in your CorsConfigurationSource).
     mutationFn: ({ id, status, note }: { id: string; status: string; note: string }) =>
       apiClient.patch(`/api/v1/fleet/vehicles/${id}/status`, { status, note }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["fleet-vehicles"] }); setShowStatus(null); setNewStatus(""); setStatusNote(""); setApiError("") },
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to update status"),
+  })
+
+  const assignDriver = useMutation({
+    mutationFn: ({ id, driverId }: { id: string; driverId: string | null }) =>
+      apiClient.patch(`/api/v1/fleet/vehicles/${id}/driver`, { driverId }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["fleet-vehicles"] }); setShowAssign(null); setSelectedDriverId(""); setApiError("") },
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to update driver assignment"),
   })
 
   const validate = () => {
@@ -129,18 +139,10 @@ export default function VehiclesTab() {
     return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: cfg.bg, color: cfg.color, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: `1px solid ${cfg.border}` }}><Icon size={10} />{cfg.label}</span>
   }
 
-  const ExpiryBadge = ({ label, date }: { label: string; date: string | null }) => {
-    if (!date) return null
-    const days = daysUntil(date)
-    if (days > 60) return null
-    const color = days <= 7 ? "#DC2626" : days <= 30 ? "#D97706" : "#64748B"
-    const bg    = days <= 7 ? "#FEF2F2" : days <= 30 ? "#FFFBEB" : "#F8FAFC"
-    return <span style={{ fontSize: 10, fontWeight: 700, background: bg, color, padding: "1px 7px", borderRadius: 20, flexShrink: 0 }}>{label}: {days}d</span>
-  }
+  const openAssign = (v: Vehicle) => { setShowAssign(v); setSelectedDriverId(v.assignedDriverId ?? ""); setApiError("") }
 
   return (
     <div>
-      {/* Stats */}
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {stats.map(s => (
           <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
@@ -150,7 +152,6 @@ export default function VehiclesTab() {
         ))}
       </div>
 
-      {/* Toolbar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {["ALL", ...STATUSES].map(s => (
@@ -200,7 +201,7 @@ export default function VehiclesTab() {
                       </div>
                       <div style={{ fontSize: 12, color: "#94A3B8" }}>
                         {v.vehicleType}{v.colour ? ` · ${v.colour}` : ""}{v.fuelType ? ` · ${v.fuelType}` : ""}
-                        {v.assignedDriverName ? ` · ${v.assignedDriverName}` : ""}
+                        {v.assignedDriverName ? ` · 👤 ${v.assignedDriverName}` : ""}
                       </div>
                     </div>
                   </div>
@@ -212,6 +213,7 @@ export default function VehiclesTab() {
                     <StatusBadge status={v.status} />
                     <div style={{ display: "flex", gap: 5 }}>
                       <button onClick={() => setViewing(v)} title="View" style={{ background: "#EFF6FF", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#1D4ED8" }}><Eye size={13} /></button>
+                      <button onClick={() => openAssign(v)} title="Assign driver" style={{ background: "#F5F3FF", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#7C3AED" }}><UserCog size={13} /></button>
                       <button onClick={() => { setShowStatus(v); setNewStatus(v.status); setStatusNote(""); setApiError("") }} title="Change status" style={{ background: "#FEF3C7", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#D97706" }}><Edit2 size={13} /></button>
                     </div>
                     <button onClick={() => setExpanded(isOpen ? null : v.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
@@ -219,7 +221,6 @@ export default function VehiclesTab() {
                     </button>
                   </div>
                 </div>
-                {/* Service bar */}
                 <div style={{ padding: "0 20px 12px", background: "#fff" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#94A3B8", marginBottom: 3 }}>
                     <span>Service interval</span>
@@ -229,7 +230,6 @@ export default function VehiclesTab() {
                     <div style={{ height: "100%", width: `${svcPct}%`, borderRadius: 99, background: svcPct >= 100 ? "#DC2626" : svcPct >= 80 ? "#D97706" : "#0D9488", transition: "width 0.4s" }} />
                   </div>
                 </div>
-                {/* Expanded detail */}
                 {isOpen && (
                   <div style={{ borderTop: "1px solid #F1F5F9", padding: "16px 20px", background: "#F8FAFC" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 14 }}>
@@ -270,7 +270,6 @@ export default function VehiclesTab() {
         </div>
       )}
 
-      {/* ── Register Vehicle Modal ─────────────────────────────────────────── */}
       {showAdd && (
         <Overlay onClose={() => setShowAdd(false)}>
           <MHead title="Register Vehicle" onClose={() => setShowAdd(false)} />
@@ -359,8 +358,9 @@ export default function VehiclesTab() {
           <Sect title="Assignment & Rates">
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
-                <label style={lbl}>Assigned Driver</label>
+                <label style={lbl}>Assigned Driver (free text)</label>
                 <input value={form.assignedDriverName} onChange={e => setForm(f => ({ ...f, assignedDriverName: e.target.value }))} placeholder="James Dlamini" style={inp("assignedDriverName")} />
+                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 3 }}>For a linked driver with compliance tracking, use "Assign driver" after registering — see Drivers tab</div>
               </div>
               <div>
                 <label style={lbl}>Daily Rate (R)</label>
@@ -384,7 +384,6 @@ export default function VehiclesTab() {
         </Overlay>
       )}
 
-      {/* ── Status Modal ──────────────────────────────────────────────────── */}
       {showStatus && (
         <Overlay onClose={() => { setShowStatus(null); setApiError("") }}>
           <MHead title={`Update Status — ${showStatus.registration}`} onClose={() => { setShowStatus(null); setApiError("") }} />
@@ -413,7 +412,36 @@ export default function VehiclesTab() {
         </Overlay>
       )}
 
-      {/* ── View Vehicle Modal ────────────────────────────────────────────── */}
+      {/* ── Assign Driver Modal ───────────────────────────────────────────── */}
+      {showAssign && (
+        <Overlay onClose={() => { setShowAssign(null); setApiError("") }}>
+          <MHead title={`Assign Driver — ${showAssign.registration}`} onClose={() => { setShowAssign(null); setApiError("") }} />
+          <div style={{ marginBottom: 16 }}>
+            <label style={lbl}>Driver</label>
+            {activeDrivers.length === 0 ? (
+              <div style={{ padding: "10px 12px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 8, fontSize: 13, color: "#92400E" }}>
+                No active drivers registered yet — add one from the Drivers tab first.
+              </div>
+            ) : (
+              <select value={selectedDriverId} onChange={e => setSelectedDriverId(e.target.value)} style={{ ...inp("_"), width: "100%", background: "#fff" }}>
+                <option value="">Unassigned</option>
+                {activeDrivers.map(d => <option key={d.id} value={d.id}>{d.firstName} {d.lastName}</option>)}
+              </select>
+            )}
+            <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 6 }}>
+              This links the vehicle to a driver record with licence/PrDP compliance tracking. Select "Unassigned" to remove the current assignment.
+            </div>
+          </div>
+          {apiError && <ErrBanner msg={apiError} />}
+          <MFoot
+            onCancel={() => { setShowAssign(null); setApiError("") }}
+            onSubmit={() => assignDriver.mutate({ id: showAssign.id, driverId: selectedDriverId || null })}
+            loading={assignDriver.isPending}
+            label="Save Assignment"
+          />
+        </Overlay>
+      )}
+
       {viewing && (
         <Overlay onClose={() => setViewing(null)}>
           <div style={{ background: "linear-gradient(135deg, #1B3A6B 0%, #0F2A52 100%)", margin: "-28px -28px 24px", padding: "24px 28px", borderRadius: "16px 16px 0 0" }}>
@@ -455,6 +483,7 @@ export default function VehiclesTab() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => { setViewing(null); openAssign(viewing) }} style={{ flex: 1, padding: "10px", background: "#F5F3FF", color: "#7C3AED", border: "1px solid #DDD6FE", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Assign Driver</button>
             <button onClick={() => { setViewing(null); setShowStatus(viewing); setNewStatus(viewing.status); setStatusNote("") }} style={{ flex: 1, padding: "10px", background: "#FFFBEB", color: "#D97706", border: "1px solid #FDE68A", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Change Status</button>
             <button onClick={() => setViewing(null)} style={{ padding: "10px 16px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 13, cursor: "pointer", color: "#374151" }}>Close</button>
           </div>
@@ -463,8 +492,6 @@ export default function VehiclesTab() {
     </div>
   )
 }
-
-// ── Shared ─────────────────────────────────────────────────────────────────────
 
 function Overlay({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
@@ -486,5 +513,4 @@ function ErrBanner({ msg }: { msg: string }) {
   return <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{msg}</div>
 }
 const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
-const inp  = (k: string): React.CSSProperties => ({ width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, background: "#fff", outline: "none" })
 const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }

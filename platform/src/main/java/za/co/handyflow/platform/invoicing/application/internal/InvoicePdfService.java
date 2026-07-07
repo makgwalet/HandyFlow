@@ -147,7 +147,8 @@ public class InvoicePdfService {
         boolean logoAdded = false;
         if (tenant.logoUrl() != null && !tenant.logoUrl().isBlank()) {
             try {
-                Image logo = new Image(ImageDataFactory.create(new URL(tenant.logoUrl())))
+                byte[] imageBytes = decodeLogoBytes(tenant.logoUrl());
+                Image logo = new Image(ImageDataFactory.create(imageBytes))
                         .setMaxHeight(60).setAutoScale(false);
                 left.add(logo);
                 left.add(new Paragraph(tenant.companyName())
@@ -155,7 +156,7 @@ public class InvoicePdfService {
                         .setMarginTop(6).setMarginBottom(2));
                 logoAdded = true;
             } catch (Exception ex) {
-                log.warn("Could not load tenant logo url={}: {}", tenant.logoUrl(), ex.getMessage());
+                log.warn("Could not load logo: {}", ex.getMessage());
             }
         }
         if (!logoAdded) {
@@ -562,4 +563,32 @@ public class InvoicePdfService {
     }
 
     private String nvl(String value) { return value != null ? value : ""; }
+
+    /**
+     * FIXED: TenantService.uploadLogo() always stores the logo as a
+     * "data:<mime>;base64,<data>" URI, never a real HTTP(S) URL. java.net.URL
+     * has no handler for the "data" scheme, so new URL(tenant.logoUrl())
+     * threw MalformedURLException("unknown protocol: data") on every single
+     * call — not intermittently, always, for every tenant that has ever
+     * uploaded a logo. This decodes the base64 payload directly into image
+     * bytes instead of trying to open it as a network resource.
+     *
+     * Still supports a real http(s):// URL as a fallback, in case logoUrl
+     * is ever populated that way in the future (e.g. if logos move to
+     * external object storage).
+     */
+    private byte[] decodeLogoBytes(String logoUrl) throws Exception {
+        if (logoUrl.startsWith("data:")) {
+            int commaIdx = logoUrl.indexOf(',');
+            if (commaIdx < 0) {
+                throw new IllegalArgumentException("Malformed data URI — no comma separator found");
+            }
+            String base64Payload = logoUrl.substring(commaIdx + 1);
+            return java.util.Base64.getDecoder().decode(base64Payload);
+        }
+        // Fallback: genuine URL (http/https/file)
+        try (var in = new URL(logoUrl).openStream()) {
+            return in.readAllBytes();
+        }
+    }
 }

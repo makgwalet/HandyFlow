@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.fleet.application.internal.FleetCostService;
 import za.co.handyflow.platform.fleet.application.internal.FleetLogbookService;
 import za.co.handyflow.platform.fleet.application.internal.FleetService;
 import za.co.handyflow.platform.fleet.dto.*;
@@ -23,6 +24,7 @@ import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.shared.UserContext;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -33,6 +35,7 @@ public class FleetController {
 
     private final FleetService fleetService;
     private final FleetLogbookService logbookService;
+    private final FleetCostService costService;
     private final FeatureGuard featureGuard;
 
     // ── Vehicles ──────────────────────────────────────────────────────────────
@@ -83,6 +86,16 @@ public class FleetController {
         featureGuard.requireModule("fleet");
         fleetService.deleteVehicle(TenantContext.getTenantIdAsObject(), id, UserContext.getCurrentUserId());
         return ResponseEntity.ok(ApiResponse.success("Vehicle deleted", null));
+    }
+
+    @PatchMapping("/vehicles/{id}/driver")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @Operation(summary = "Assign or unassign a driver to a vehicle (pass driverId=null to unassign)")
+    public ResponseEntity<ApiResponse<VehicleResponse>> assignDriver(
+            @PathVariable UUID id, @RequestBody AssignDriverRequest request) {
+        featureGuard.requireModule("fleet");
+        return ResponseEntity.ok(ApiResponse.success("Driver assignment updated",
+                fleetService.assignDriver(TenantContext.getTenantIdAsObject(), id, request.driverId())));
     }
 
     // ── Services ──────────────────────────────────────────────────────────────
@@ -155,8 +168,6 @@ public class FleetController {
     }
 
     // ── SARS Logbook Export ──────────────────────────────────────────────────
-    // Defaults to the current SA tax year (1 March – end of February) if
-    // from/to aren't supplied — see FleetLogbookService.resolveRange().
 
     @GetMapping(value = "/vehicles/{id}/logbook.pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     @PreAuthorize("hasAuthority('USER_READ')")
@@ -187,6 +198,28 @@ public class FleetController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"logbook.xlsx\"")
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(excel);
+    }
+
+    // ── Cost-per-km ───────────────────────────────────────────────────────────
+    // All-time totals — see FleetCostService's Javadoc for why this isn't
+    // date-ranged (yet).
+
+    @GetMapping("/vehicles/{id}/cost-summary")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Cost-per-km breakdown for one vehicle (service + fuel cost over total km driven)")
+    public ResponseEntity<ApiResponse<VehicleCostSummaryResponse>> getVehicleCostSummary(@PathVariable UUID id) {
+        featureGuard.requireModule("fleet");
+        return ResponseEntity.ok(ApiResponse.success(
+                costService.getCostSummary(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/cost-summary")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Cost-per-km breakdown for every vehicle in the fleet, sorted most expensive first")
+    public ResponseEntity<ApiResponse<List<VehicleCostSummaryResponse>>> getFleetCostSummary() {
+        featureGuard.requireModule("fleet");
+        return ResponseEntity.ok(ApiResponse.success(
+                costService.getFleetCostSummary(TenantContext.getTenantIdAsObject())));
     }
 
     // ── Fuel fill-ups ─────────────────────────────────────────────────────────

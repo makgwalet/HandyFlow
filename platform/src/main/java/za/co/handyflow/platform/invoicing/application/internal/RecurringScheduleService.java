@@ -15,6 +15,7 @@ import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Slf4j
@@ -27,6 +28,13 @@ public class RecurringScheduleService {
     private final CrmFacade crmFacade;
     private final InvoiceNumberGenerator     invoiceNumberGenerator;
     private final InvoiceQueryService invoiceQueryService;
+    // FIXED: this field was referenced in logCycleHours() below but never
+    // declared — @RequiredArgsConstructor can only inject fields that exist
+    // on the class, so the reference to paymentTermsResolver.resolveDueDate(...)
+    // failed to compile with "cannot resolve symbol". Adding the field is the
+    // whole fix; Spring wires it automatically since InvoicePaymentTermsResolver
+    // is already a @Component in the same package.
+    private final InvoicePaymentTermsResolver paymentTermsResolver;
 
 // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -289,7 +297,13 @@ public class RecurringScheduleService {
         }
 
         invoiceRepo.save(invoice);
-        invoice.markIssued();
+        // FIXED: was invoice.markIssued() (no-arg) — that overload no longer
+        // exists now that markIssued requires a due date (see
+        // InvoicePaymentTermsResolver). Every other invoice-issuing path
+        // (InvoiceService, InvoicingScheduler) already resolves the due date
+        // through the tenant's payment terms; this path needed the same fix.
+        LocalDate dueDate = paymentTermsResolver.resolveDueDate(tenantId, LocalDate.now());
+        invoice.markIssued(dueDate);
 
         // Update schedule state
         schedule.accumulateHours(billed);

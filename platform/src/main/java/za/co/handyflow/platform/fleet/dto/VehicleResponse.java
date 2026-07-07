@@ -10,5 +10,6 @@ public record VehicleResponse(
         Integer currentOdometer, Integer lastServiceKm,
         Integer serviceIntervalKm, boolean dueForService,
         boolean licenceExpiringSoon, boolean roadworthyExpiringSoon,
-        BigDecimal dailyRate, String notes, Instant createdAt
+        BigDecimal dailyRate, String notes, Instant createdAt,
+        String assignedDriverName, UUID assignedDriverId
 ) {}

@@ -25,15 +25,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/**
- * Read-side operations for the notification bell and the notification
- * preferences screen. Deliberately separate from {@link NotificationService}
- * (the write-side API other modules inject) — the two have different
- * clients (UI-facing controller vs. business modules) and different
- * evolution pressures. Splitting them keeps NotificationService's public
- * surface exactly as small as the "other modules just need to send things"
- * use case requires.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -74,7 +65,6 @@ public class NotificationQueryService {
         Map<String, Boolean> saved = preferenceRepository.findAllForUser(tenantId, userId).stream()
                 .collect(Collectors.toMap(NotificationPreference::getChannel, NotificationPreference::isEnabled));
 
-        // Only EMAIL and SMS are user-configurable — IN_APP always on (see NotificationChannel).
         return Arrays.stream(NotificationChannel.values())
                 .filter(c -> c != NotificationChannel.IN_APP)
                 .map(c -> new NotificationPreferenceResponse(c.name(), saved.getOrDefault(c.name(), true)))
@@ -106,7 +96,16 @@ public class NotificationQueryService {
                 NotificationSeverity.valueOf(n.getSeverity()),
                 n.getTitle(), n.getMessage(),
                 n.getActionUrl(), n.getSourceModule(), n.getSourceEntityId(),
-                n.isRead(), n.getCreatedAt(), n.getReadAt()
+                n.isRead(),
+                // FIXED: these two were swapped. read / readAt / createdAt must
+                // stay in that order to match the NotificationResponse record —
+                // readAt is "when it was marked read" (null if still unread),
+                // createdAt is "when it was raised". Both are Instant, so a swap
+                // here compiles fine and silently corrupts every row returned
+                // to the UI. Always double-check positional record construction
+                // when two adjacent fields share a type.
+                n.getReadAt(),
+                n.getCreatedAt()
         );
     }
 }

@@ -42,17 +42,17 @@ spring:
 
   # ==================== Email — using Gmail SMTP (replace with real credentials) ====================
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: makgwale10111@gmail.com    # ← your actual Gmail
-    password: vvmqpuluhrxrecxh
+    host: localhost
+    port: 1025
+    username:
+    password:
     properties:
       mail:
         smtp:
-          auth: true
+          auth: false
           starttls:
-            enable: true
-            required: true
+            enable: false
+            required: false
 
   task:
     scheduling:
@@ -156,8 +156,8 @@ sms:
 
 notifications:
   email:
-    from-address: "makgwale10111@gmail.com"
-    from-name: "HandyFlow"
+    from-address: "no-reply@handyflow.dev"
+    from-name: "HandyFlow (dev)"
   sms:
     # "log" (default) = LoggingSmsSender, safe no-op that logs instead of sending.
     # Set to "twilio" / "clickatell" / etc. once you implement and register a

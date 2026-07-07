@@ -6,9 +6,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.fleet.domain.model.Driver;
 import za.co.handyflow.platform.fleet.domain.model.Trip;
 import za.co.handyflow.platform.fleet.domain.model.Vehicle;
 import za.co.handyflow.platform.fleet.domain.model.VehicleStatus;
+import za.co.handyflow.platform.fleet.domain.repository.DriverRepository;
 import za.co.handyflow.platform.fleet.domain.repository.TripRepository;
 import za.co.handyflow.platform.fleet.domain.repository.VehicleRepository;
 import za.co.handyflow.platform.notifications.application.NotificationRequest;
@@ -21,46 +23,28 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * *** THIS IS THE FIX FOR THE CONFIRMED FALSE PROMISE ***
- * <p>
- * VehiclesTab.tsx tells the user: "You will be alerted 60, 30, and 7 days
- * before any document expires." Before this class existed, nothing backed
- * that claim — isLicenceExpiringSoon()/isRoadworthyExpiringSoon() only drove
- * UI badges someone has to actively look at. This scheduler is what makes
- * the sentence true.
- * <p>
- * IDEMPOTENCY: fires on an EXACT day match (daysUntil == 60, 30, or 7), not
- * a range (<= 60) — otherwise a vehicle sitting in the 1-59 day window would
- * get re-notified every single day the scheduler runs. This is the same
- * pattern already established in
- * {@code za.co.handyflow.platform.shared.NotificationScheduler
- * .sendPilotCountdownReminders()} (day-count IN-list match) — reused here
- * rather than inventing a second idempotency convention for the same kind
- * of problem.
- * <p>
- * WHY a fleet-specific scheduler instead of adding methods to the existing
- * shared NotificationScheduler? That class talks to the database via raw
- * JdbcTemplate and calls EmailService.send() directly — a simpler,
- * email-only mechanism that predates the full NotificationService pipeline
- * (in-app rows, per-user channel preferences, SMS support). Fleet's
- * VEHICLE_LICENCE_EXPIRING/ROADWORTHY/INSURANCE/SERVICE_DUE/BREAKDOWN
- * NotificationType constants were already defined with IN_APP+EMAIL default
- * channels — clearly intended for the full pipeline, not the raw-SQL one —
- * so this scheduler is built on JPA repositories + NotificationService to
- * match what those constants were designed for.
- * <p>
- * *** ACTION NEEDED IN YOUR NotificationType.java ***: this class uses
- * {@code NotificationType.TRIP_RUNNING_LONG}, which does not exist yet in
- * the catalogue you showed me. Add it to the Fleet section:
+ * *** ACTION NEEDED IN YOUR NotificationType.java *** (Fleet section):
  * <pre>{@code
- * TRIP_RUNNING_LONG(WARNING, Set.of(IN_APP, EMAIL)),
+ * DRIVER_LICENSE_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
+ * DRIVER_PRDP_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
  * }</pre>
- * This won't compile until that constant is added.
+ * This won't compile until both constants are added — same situation as
+ * TRIP_RUNNING_LONG before it.
+ * <p>
+ * Driver compliance mirrors vehicle compliance exactly (same exact-day-match
+ * idempotency at 60/30/7 days — see checkComplianceExpiry() for the
+ * original rationale), with one addition: the driver themselves is notified
+ * directly via {@code Recipient.external(...)}, not just tenant admins.
+ * Drivers generally aren't platform users with logins, so there's no
+ * {@code userId} to attach — external is exactly what that recipient type
+ * exists for. If a driver has no email/phone on file, they're silently
+ * skipped for that reason alone; tenant admins still get notified either way.
  */
 @Slf4j
 @Component
@@ -71,16 +55,14 @@ public class FleetNotificationScheduler {
 
     private final VehicleRepository vehicleRepository;
     private final TripRepository tripRepository;
+    private final DriverRepository driverRepository;
     private final NotificationService notificationService;
     private final TenantAdminRecipients tenantAdminRecipients;
 
     @Value("${fleet.trip.long-running-hours:12}")
     private int longRunningTripHours;
 
-    // ── Compliance document expiry — daily at 08:00 SAST ────────────────────
-    // Same time-of-day as the existing quote-expiry/pilot-countdown jobs in
-    // shared.NotificationScheduler, for one predictable "when do fleet/admin
-    // emails land" expectation across the whole platform.
+    // ── Vehicle compliance document expiry — daily at 08:00 SAST ────────────
 
     @Scheduled(cron = "0 0 8 * * *", zone = "Africa/Johannesburg")
     @Transactional(readOnly = true)
@@ -102,18 +84,13 @@ public class FleetNotificationScheduler {
 
     private int checkDocument(Vehicle vehicle, LocalDate expiry, NotificationType type, String docLabel,
                               Map<TenantId, List<Recipient>> recipientCache) {
-        if (expiry == null) return 0;
-        long daysUntil = ChronoUnit.DAYS.between(LocalDate.now(), expiry);
-        boolean isAlertDay = false;
-        for (int d : COMPLIANCE_ALERT_DAYS) {
-            if (daysUntil == d) { isAlertDay = true; break; }
-        }
-        if (!isAlertDay) return 0;
+        if (expiry == null || !isAlertDay(expiry)) return 0;
 
         List<Recipient> recipients = recipientCache.computeIfAbsent(
                 vehicle.getTenantId(), tenantAdminRecipients::resolveTenantAdmins);
         if (recipients.isEmpty()) return 0;
 
+        long daysUntil = ChronoUnit.DAYS.between(LocalDate.now(), expiry);
         notificationService.send(NotificationRequest.builder()
                 .tenantId(vehicle.getTenantId())
                 .type(type)
@@ -128,10 +105,61 @@ public class FleetNotificationScheduler {
         return 1;
     }
 
+    // ── Driver compliance document expiry — daily at 08:00 SAST ─────────────
+
+    @Scheduled(cron = "0 0 8 * * *", zone = "Africa/Johannesburg")
+    @Transactional(readOnly = true)
+    public void checkDriverComplianceExpiry() {
+        List<Driver> drivers = driverRepository.findAllActiveAcrossTenants();
+        Map<TenantId, List<Recipient>> adminCache = new HashMap<>();
+        int sent = 0;
+
+        for (Driver d : drivers) {
+            sent += checkDriverDocument(d, d.getLicenseExpiry(), NotificationType.DRIVER_LICENSE_EXPIRING,
+                    "Driving licence", adminCache);
+            if (d.isPrdpRequired()) {
+                sent += checkDriverDocument(d, d.getPrdpExpiry(), NotificationType.DRIVER_PRDP_EXPIRING,
+                        "PrDP", adminCache);
+            }
+        }
+        log.info("Driver compliance sweep complete — drivers checked={} notifications sent={}", drivers.size(), sent);
+    }
+
+    private int checkDriverDocument(Driver driver, LocalDate expiry, NotificationType type, String docLabel,
+                                    Map<TenantId, List<Recipient>> adminCache) {
+        if (expiry == null || !isAlertDay(expiry)) return 0;
+
+        List<Recipient> recipients = new ArrayList<>(
+                adminCache.computeIfAbsent(driver.getTenantId(), tenantAdminRecipients::resolveTenantAdmins));
+        if (driver.getEmail() != null || driver.getPhone() != null) {
+            recipients.add(Recipient.external(driver.getFullName(), driver.getEmail(), driver.getPhone()));
+        }
+        if (recipients.isEmpty()) return 0;
+
+        long daysUntil = ChronoUnit.DAYS.between(LocalDate.now(), expiry);
+        notificationService.send(NotificationRequest.builder()
+                .tenantId(driver.getTenantId())
+                .type(type)
+                .title(docLabel + " expiring in " + daysUntil + " days: " + driver.getFullName())
+                .message(driver.getFullName() + "'s " + docLabel.toLowerCase()
+                        + " expires on " + expiry + " (" + daysUntil + " days from now).")
+                .actionUrl("/fleet/drivers/" + driver.getId())
+                .sourceModule("fleet")
+                .sourceEntityId(driver.getId().toString())
+                .recipients(recipients)
+                .build());
+        return 1;
+    }
+
+    private boolean isAlertDay(LocalDate expiry) {
+        long daysUntil = ChronoUnit.DAYS.between(LocalDate.now(), expiry);
+        for (int d : COMPLIANCE_ALERT_DAYS) {
+            if (daysUntil == d) return true;
+        }
+        return false;
+    }
+
     // ── Long-running trip — every 30 minutes ─────────────────────────────────
-    // A shorter interval than the daily compliance sweep because a forgotten
-    // "End Trip" click is a data-quality problem best caught within hours,
-    // not discovered a day later.
 
     @Scheduled(cron = "0 */30 * * * *")
     @Transactional
@@ -147,10 +175,6 @@ public class FleetNotificationScheduler {
             List<Recipient> recipients = recipientCache.computeIfAbsent(
                     trip.getTenantId(), tenantAdminRecipients::resolveTenantAdmins);
 
-            // Mark alerted regardless of whether anyone was actually
-            // notified — otherwise a tenant with zero resolvable recipients
-            // would have this trip re-evaluated (and logged) every 30
-            // minutes forever instead of once.
             trip.markLongRunningAlertSent();
             tripRepository.save(trip);
 

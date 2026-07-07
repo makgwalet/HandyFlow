@@ -63,6 +63,9 @@ public class Quote {
     @Column(name = "rejected_at")
     private Instant rejectedAt;
 
+    @Column(name = "expiry_reminder_sent_at")
+    private Instant expiryReminderSentAt;
+
     @OneToMany(mappedBy = "quote", cascade = CascadeType.ALL,
             orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("sortOrder ASC")
@@ -89,6 +92,9 @@ public class Quote {
     @Column(name = "walkin_client_phone")
     private String walkinClientPhone;
 
+    @Column(name = "public_access_token", unique = true)
+    private UUID publicAccessToken;
+
     @Version
     private Long version;
 
@@ -108,6 +114,10 @@ public class Quote {
         q.createdAt = Instant.now();
         q.updatedAt = Instant.now();
         return q;
+    }
+
+    public void markExpiryReminderSent() {
+        this.expiryReminderSentAt = Instant.now();
     }
 
     public void send() {
@@ -200,6 +210,27 @@ public class Quote {
                             .formatted(status, target)
             );
         }
+    }
+
+    // Called from create() below — every quote gets a token at creation,
+    // not lazily on first send, so it's always ready by the time sendQuote()
+    // needs to build the email link.
+    private void assignPublicAccessToken() {
+        this.publicAccessToken = UUID.randomUUID();
+    }
+
+    /**
+     * Validity is checked LIVE against status/expiresAt rather than a frozen
+     * token-expiry timestamp. This means extending a quote's expiresAt (an
+     * admin action) automatically re-validates any previously sent link,
+     * instead of requiring a new email to go out. The token's only job is
+     * proving "this is the intended recipient for THIS quote" — the
+     * business-validity question is answered the same way it already is
+     * everywhere else in the domain.
+     */
+    public boolean isPubliclyActionable() {
+        return this.status == QuoteStatus.SENT
+                && (this.expiresAt == null || Instant.now().isBefore(this.expiresAt));
     }
 
     public boolean isDeleted() { return deletedAt != null; }

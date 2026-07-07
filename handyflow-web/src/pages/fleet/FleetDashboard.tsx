@@ -1,11 +1,12 @@
 // src/pages/fleet/FleetDashboard.tsx
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Car, Route, Wrench, Fuel, AlertTriangle, CheckCircle, ArrowRight, Clock } from "lucide-react"
+import { Car, Route, Wrench, AlertTriangle, CheckCircle, ArrowRight, TrendingUp } from "lucide-react"
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
 const fmtOdo = (km: number) => `${Number(km).toLocaleString("en-ZA")} km`
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })
+const fmtR = (n: number | null | undefined) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
 const daysUntil = (date: string) => Math.ceil((new Date(date).getTime() - Date.now()) / 86400000)
 
 const STATUS_CFG: Record<string, { color: string; bg: string; label: string }> = {
@@ -20,6 +21,12 @@ const VEHICLE_ICONS: Record<string, string> = {
   SEDAN:"🚗", SUV:"🚙", BAKKIE:"🛻", TRUCK:"🚛", MINIBUS:"🚐", VAN:"🚌", MOTORCYCLE:"🏍️", OTHER:"🚘"
 }
 
+interface CostSummary {
+  vehicleId: string; registration: string; make: string; model: string
+  totalServiceCost: number; totalFuelCost: number; totalCost: number
+  totalKm: number; costPerKm: number | null
+}
+
 export default function FleetDashboard({ onNavigate }: { onNavigate: (t: any) => void }) {
   const { data: vehicles = [] } = useQuery({
     queryKey: ["fleet-vehicles"],
@@ -29,6 +36,11 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (t: any) =>
   const { data: trips = [] } = useQuery({
     queryKey: ["fleet-trips-all"],
     queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/trips?size=200")),
+  })
+
+  const { data: costSummary = [] } = useQuery<CostSummary[]>({
+    queryKey: ["fleet-cost-summary"],
+    queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/cost-summary")),
   })
 
   const vs = vehicles as any[]
@@ -53,9 +65,10 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (t: any) =>
     .filter((t: any) => t.startAt?.startsWith(today.slice(0, 7)))
     .reduce((s: number, t: any) => s + (t.distanceKm ?? 0), 0)
 
+  const rankedCosts = costSummary.filter(c => c.costPerKm !== null).slice(0, 5)
+
   return (
     <div>
-      {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 28 }}>
         {kpis.map(k => (
           <div key={k.label} onClick={() => onNavigate(k.tab)}
@@ -72,7 +85,6 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (t: any) =>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 18 }}>
-        {/* Fleet status list */}
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
             <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Fleet Overview</span>
@@ -103,6 +115,7 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (t: any) =>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
                         <span style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{v.registration}</span>
                         <span style={{ fontSize: 12, color: "#64748B" }}>{v.make} {v.model}</span>
+                        {v.assignedDriverName && <span style={{ fontSize: 11, color: "#7C3AED" }}>· {v.assignedDriverName}</span>}
                         {v.dueForService && <span style={{ fontSize: 10, fontWeight: 700, background: "#FEF3C7", color: "#D97706", padding: "1px 6px", borderRadius: 20, border: "1px solid #FDE68A" }}>SVC DUE</span>}
                         {(v.licenceExpiringSoon || v.roadworthyExpiringSoon) && <span style={{ fontSize: 10, fontWeight: 700, background: "#FEF2F2", color: "#DC2626", padding: "1px 6px", borderRadius: 20 }}>EXPIRING</span>}
                       </div>
@@ -124,11 +137,49 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (t: any) =>
               })}
             </div>
           )}
+
+          {rankedCosts.length > 0 && (
+            <div style={{ marginTop: 24 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <TrendingUp size={15} color="#0F172A" />
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Cost per KM</span>
+                </div>
+                <span style={{ fontSize: 11, color: "#94A3B8" }}>Most expensive first · all-time</span>
+              </div>
+              <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
+                      {["Vehicle", "Service Cost", "Fuel Cost", "Total Cost", "Total KM", "Cost/KM"].map(h => (
+                        <th key={h} style={{ padding: "9px 14px", textAlign: "left", fontWeight: 700, fontSize: 10, color: "#64748B", letterSpacing: "0.04em" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rankedCosts.map((c, i) => (
+                      <tr key={c.vehicleId} style={{ borderBottom: i < rankedCosts.length - 1 ? "1px solid #F1F5F9" : "none", background: "#fff" }}>
+                        <td style={{ padding: "10px 14px" }}>
+                          <div style={{ fontWeight: 700, color: "#0F172A" }}>{c.registration}</div>
+                          <div style={{ fontSize: 11, color: "#94A3B8" }}>{c.make} {c.model}</div>
+                        </td>
+                        <td style={{ padding: "10px 14px", color: "#475569" }}>{fmtR(c.totalServiceCost)}</td>
+                        <td style={{ padding: "10px 14px", color: "#475569" }}>{fmtR(c.totalFuelCost)}</td>
+                        <td style={{ padding: "10px 14px", fontWeight: 600, color: "#0F172A" }}>{fmtR(c.totalCost)}</td>
+                        <td style={{ padding: "10px 14px", color: "#475569" }}>{fmtOdo(c.totalKm)}</td>
+                        <td style={{ padding: "10px 14px", fontWeight: 700, color: i === 0 ? "#DC2626" : "#0D9488" }}>
+                          {c.costPerKm != null ? `R ${c.costPerKm.toFixed(2)}/km` : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Sidebar */}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {/* Monthly summary */}
           <div style={{ background: "#1B3A6B", borderRadius: 12, padding: 20, color: "#fff" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 14, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>This month</div>
             {[
@@ -143,7 +194,6 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (t: any) =>
             ))}
           </div>
 
-          {/* Upcoming expirations */}
           <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 10 }}>Compliance Alerts</div>
             {expiring30.length === 0 ? (
@@ -180,14 +230,14 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (t: any) =>
             )}
           </div>
 
-          {/* Quick actions */}
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 10 }}>Quick actions</div>
             {[
               { label: "Register vehicle",  tab: "vehicles",   color: "#1B3A6B" },
+              { label: "Register driver",   tab: "drivers",    color: "#7C3AED" },
               { label: "Start trip",        tab: "trips",      color: "#0D9488" },
               { label: "Log fuel fill-up",  tab: "fuel",       color: "#D97706" },
-              { label: "Record service",    tab: "services",   color: "#7C3AED" },
+              { label: "Record service",    tab: "services",   color: "#1D4ED8" },
             ].map(a => (
               <button key={a.label} onClick={() => onNavigate(a.tab)}
                 style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left" as const, display: "flex", alignItems: "center", justifyContent: "space-between" }}>

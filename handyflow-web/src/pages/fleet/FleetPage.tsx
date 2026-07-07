@@ -1,18 +1,20 @@
 // src/pages/fleet/FleetPage.tsx
 import { useState } from "react"
-import { Car, Route, Wrench, LayoutDashboard, Fuel, Shield } from "lucide-react"
+import { Car, Route, Wrench, LayoutDashboard, Fuel, Shield, Users } from "lucide-react"
 import FleetDashboard from "./FleetDashboard"
 import VehiclesTab    from "./VehiclesTab"
 import TripsTab       from "./TripsTab"
 import ServicesTab    from "./ServicesTab"
 import FuelTab        from "./FuelTab"
 import ComplianceTab  from "./ComplianceTab"
+import DriversTab     from "./DriversTab"
 
-type Tab = "dashboard" | "vehicles" | "trips" | "services" | "fuel" | "compliance"
+type Tab = "dashboard" | "vehicles" | "trips" | "services" | "fuel" | "compliance" | "drivers"
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "dashboard",  label: "Dashboard",      icon: LayoutDashboard },
   { id: "vehicles",   label: "Vehicles",        icon: Car             },
+  { id: "drivers",    label: "Drivers",         icon: Users            },
   { id: "trips",      label: "Logbook",         icon: Route           },
   { id: "services",   label: "Service History", icon: Wrench          },
   { id: "fuel",       label: "Fuel Log",        icon: Fuel            },
@@ -32,7 +34,7 @@ export function FleetPage() {
           <h1 style={{ fontSize: 24, fontWeight: 800, color: "#0F172A", margin: 0 }}>Fleet Management</h1>
         </div>
         <p style={{ fontSize: 13, color: "#94A3B8", margin: 0, paddingLeft: 46 }}>
-          Vehicle register · Trip logbook · Service history · Fuel tracking · Licence & compliance
+          Vehicle register · Drivers · Trip logbook · Service history · Fuel tracking · Licence & compliance
         </p>
       </div>
 
@@ -59,6 +61,7 @@ export function FleetPage() {
 
         {tab === "dashboard"  && <FleetDashboard onNavigate={setTab} />}
         {tab === "vehicles"   && <VehiclesTab />}
+        {tab === "drivers"    && <DriversTab />}
         {tab === "trips"      && <TripsTab />}
         {tab === "services"   && <ServicesTab />}
         {tab === "fuel"       && <FuelTab />}

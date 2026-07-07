@@ -67,4 +67,18 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
         ORDER BY due_date ASC NULLS LAST
         """, nativeQuery = true)
     List<Invoice> findOutstandingForTenant(@Param("tenantId") String tenantId);
+
+    // Cross-tenant by design — same pattern as QuoteRepository.findExpiredQuotes
+    // and RecurringScheduleRepository.findDueSchedules. This is a nightly
+    // batch job's query, not a tenant-scoped read, so no tenantId filter.
+    @Query("""
+        SELECT i FROM Invoice i
+        WHERE i.status IN (za.co.handyflow.platform.invoicing.domain.model.InvoiceStatus.ISSUED,
+                            za.co.handyflow.platform.invoicing.domain.model.InvoiceStatus.PARTIALLY_PAID,
+                            za.co.handyflow.platform.invoicing.domain.model.InvoiceStatus.OVERDUE)
+        AND i.dueDate IS NOT NULL
+        AND i.dueDate < :today
+        AND i.deletedAt IS NULL
+        """)
+    List<Invoice> findOverdueInvoices(@Param("today") LocalDate today);
 }

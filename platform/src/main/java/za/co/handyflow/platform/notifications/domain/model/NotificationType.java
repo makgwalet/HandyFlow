@@ -111,6 +111,8 @@ public enum NotificationType {
     VEHICLE_INSURANCE_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
     VEHICLE_BREAKDOWN(CRITICAL, Set.of(IN_APP, EMAIL, SMS)),
     TRIP_RUNNING_LONG(WARNING, Set.of(IN_APP, EMAIL)),
+    DRIVER_LICENSE_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
+    DRIVER_PRDP_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
 
     // ── Fuel ─────────────────────────────────────────────────────────────────
     FUEL_TANK_LOW(WARNING, Set.of(IN_APP, EMAIL)),
@@ -125,12 +127,13 @@ public enum NotificationType {
     // ── Invoicing ────────────────────────────────────────────────────────────
     QUOTE_SENT(INFO, Set.of(IN_APP)),
     QUOTE_ACCEPTED(INFO, Set.of(IN_APP, EMAIL)),
+    QUOTE_REJECTED(WARNING, Set.of(IN_APP, EMAIL)),
     QUOTE_EXPIRING_SOON(INFO, Set.of(IN_APP, EMAIL)),
     INVOICE_ISSUED(INFO, Set.of(IN_APP)),
     INVOICE_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
     INVOICE_PAYMENT_RECEIVED(INFO, Set.of(IN_APP, EMAIL)),
     RETAINER_HOURS_OVERAGE(WARNING, Set.of(IN_APP, EMAIL)),
-
+    RECURRING_SCHEDULE_FAILED(CRITICAL, Set.of(IN_APP, EMAIL)),
     // ── Marketing ────────────────────────────────────────────────────────────
     CAMPAIGN_LAUNCHED(INFO, Set.of(IN_APP)),
     CAMPAIGN_COMPLETED(INFO, Set.of(IN_APP)),

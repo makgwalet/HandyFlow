@@ -125,6 +125,12 @@ public class Invoice {
     @Column(name = "credit_amount", nullable = false)
     private BigDecimal creditAmount = BigDecimal.ZERO;
 
+    @Column(name = "overdue_reminder_stage")
+    private Integer overdueReminderStage;
+
+    @Column(name = "last_overdue_reminder_sent_at")
+    private Instant lastOverdueReminderSentAt;
+
     @Version
     private Long version;
 
@@ -197,10 +203,11 @@ public class Invoice {
         }
     }
 
-    public void markIssued() {
+    public void markIssued(LocalDate dueDate) {
         if (this.status == InvoiceStatus.DRAFT) {
             this.status = InvoiceStatus.ISSUED;
             this.issuedAt = Instant.now();
+            this.dueDate = dueDate;
             this.updatedAt = Instant.now();
         }
     }
@@ -338,4 +345,46 @@ public class Invoice {
 
     @PreUpdate
     void onUpdate() { this.updatedAt = Instant.now(); }
+
+    /**
+     * Called by the nightly overdue-detection job. Only ISSUED/PARTIALLY_PAID
+     * invoices can become OVERDUE — PAID/OVERPAID/CANCELLED/DRAFT are all
+     * terminal or not-yet-billable states this doesn't apply to.
+     */
+    public void markOverdue() {
+        if (this.status == InvoiceStatus.ISSUED || this.status == InvoiceStatus.PARTIALLY_PAID) {
+            this.status = InvoiceStatus.OVERDUE;
+            this.updatedAt = Instant.now();
+        }
+    }
+
+    /**
+     * Escalating overdue reminders — thresholds are days-overdue, ascending.
+     * WHY a method here instead of hardcoding the schedule in the scheduler?
+     * "Which threshold applies" is a fact about this invoice's own reminder
+     * history (overdueReminderStage), so the decision belongs on the entity,
+     * the same way markOverdue() and recordPayment() encapsulate their own
+     * state transitions. The scheduler decides *when* to ask; the entity
+     * decides *what the answer is*.
+     *
+     * Returns the highest threshold that is <= daysOverdue AND strictly
+     * greater than whatever was last sent — i.e. "the next escalation step
+     * we haven't sent yet, if we've reached it." Returns null if no new
+     * threshold has been crossed (so the caller sends nothing).
+     */
+    public Integer nextOverdueReminderThreshold(int daysOverdue, int[] ascendingThresholds) {
+        Integer candidate = null;
+        for (int threshold : ascendingThresholds) {
+            if (threshold <= daysOverdue
+                    && (overdueReminderStage == null || threshold > overdueReminderStage)) {
+                candidate = threshold; // keep the highest qualifying one
+            }
+        }
+        return candidate;
+    }
+
+    public void recordOverdueReminderSent(int thresholdDays, Instant sentAt) {
+        this.overdueReminderStage = thresholdDays;
+        this.lastOverdueReminderSentAt = sentAt;
+    }
 }

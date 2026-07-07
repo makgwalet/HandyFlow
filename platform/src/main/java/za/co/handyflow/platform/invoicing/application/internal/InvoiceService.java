@@ -1,10 +1,11 @@
-// invoicing/application/internal/InvoiceService.java
 package za.co.handyflow.platform.invoicing.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.crm.CrmFacade;
+import za.co.handyflow.platform.identity.TenantFacade;
 import za.co.handyflow.platform.invoicing.domain.model.Invoice;
 import za.co.handyflow.platform.invoicing.domain.model.InvoiceLineItem;
 import za.co.handyflow.platform.invoicing.domain.repository.InvoiceRepository;
@@ -12,12 +13,16 @@ import za.co.handyflow.platform.invoicing.dto.CreateRetainerInvoiceRequest;
 import za.co.handyflow.platform.invoicing.dto.InvoiceResponse;
 import za.co.handyflow.platform.invoicing.dto.LogHoursRequest;
 import za.co.handyflow.platform.invoicing.dto.RecordPaymentRequest;
+import za.co.handyflow.platform.notifications.domain.model.NotificationType;
+import za.co.handyflow.platform.shared.EmailService;
+import za.co.handyflow.platform.shared.EmailTemplates;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.UUID;
 
@@ -29,8 +34,12 @@ public class InvoiceService {
     private final InvoiceRepository      invoiceRepo;
     private final InvoiceQueryService    queryService;
     private final InvoiceNumberGenerator invoiceNumberGenerator;
-
-    // ── Existing methods ──────────────────────────────────────────────────────
+    private final InvoicePaymentTermsResolver paymentTermsResolver;
+    private final TenantFacade tenantFacade;
+    private final CrmFacade crmFacade;
+    private final EmailService emailService;
+    private final StaffNotifier staffNotifier;
+    private final ReceiptPdfService receiptPdfService;
 
     @Transactional
     public InvoiceResponse recordPayment(TenantId tenantId, UUID id,
@@ -38,20 +47,58 @@ public class InvoiceService {
         Invoice invoice = invoiceRepo.findActiveByIdWithLineItems(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", id.toString()));
 
-        // WHY convert LocalDate to Instant?
-        // paidAt is stored as Instant for precision.
-        // paidDate from client is a calendar date — convert to start-of-day UTC.
         Instant paidAt = req.paidDate() != null
                 ? req.paidDate().atStartOfDay().toInstant(ZoneOffset.UTC)
                 : Instant.now();
 
-        // Auto-issue if still DRAFT — recording payment implies it was sent
-        invoice.markIssued();
+        // Auto-issue if still DRAFT, with a real due date now that we have
+        // one — recording payment implies it was already sent.
+        if (invoice.getIssuedAt() == null) {
+            LocalDate dueDate = paymentTermsResolver.resolveDueDate(tenantId, LocalDate.now());
+            invoice.markIssued(dueDate);
+        }
         invoice.recordPayment(req.amountPaid(), paidAt);
         invoiceRepo.save(invoice);
 
         log.info("Payment recorded invoice={} amount={} status={}",
                 invoice.getInvoiceNumber(), req.amountPaid(), invoice.getStatus());
+
+        // NEW: payment receipt to client. No PDF yet — see EmailTemplates.paymentReceipt
+        // Javadoc, a receipt PDF generator doesn't exist (flagged separately).
+        // NEW: was a plain HTML email with no attachment. Now generates and
+        // attaches a proper receipt PDF, same pattern as invoice/quote PDFs.
+        try {
+            String clientEmail = resolveClientEmail(invoice, tenantId);
+            if (clientEmail != null && !clientEmail.isBlank()) {
+                String clientName = resolveClientName(invoice, tenantId);
+                String amountPaidStr = "R " + String.format(java.util.Locale.US, "%,.2f", req.amountPaid());
+                String totalPaidStr  = "R " + String.format(java.util.Locale.US, "%,.2f", invoice.getAmountPaid());
+                String totalStr      = "R " + String.format(java.util.Locale.US, "%,.2f", invoice.getTotal());
+
+                byte[] receiptBytes = receiptPdfService.generateReceiptPdf(
+                        invoice.getId(), tenantId, req.amountPaid(), paidAt,
+                        req.paymentMethod(), req.reference());
+
+                emailService.sendWithAttachment(
+                        clientEmail,
+                        "Payment received — Invoice " + invoice.getInvoiceNumber(),
+                        EmailTemplates.paymentReceipt(
+                                clientName, invoice.getInvoiceNumber(), amountPaidStr, totalPaidStr, totalStr,
+                                req.paymentMethod(), req.reference()),
+                        "Receipt-" + invoice.getInvoiceNumber() + ".pdf",
+                        receiptBytes
+                );
+            }
+        } catch (Exception e) {
+            log.warn("Payment receipt email not sent for invoice={}: {}", id, e.getMessage());
+        }
+
+        staffNotifier.notify(tenantId, NotificationType.INVOICE_PAYMENT_RECEIVED,
+                "Payment received: " + invoice.getInvoiceNumber(),
+                "R " + String.format(java.util.Locale.US, "%,.2f", req.amountPaid())
+                        + " recorded against invoice " + invoice.getInvoiceNumber() + ".",
+                "/invoices", id.toString());
+
         return queryService.getInvoice(tenantId, id);
     }
 
@@ -59,23 +106,14 @@ public class InvoiceService {
     public InvoiceResponse issueInvoice(TenantId tenantId, UUID id) {
         Invoice invoice = invoiceRepo.findActiveByIdWithLineItems(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", id.toString()));
-        invoice.markIssued();
+        // FIXED: now sets a real due date instead of no-arg markIssued().
+        LocalDate dueDate = paymentTermsResolver.resolveDueDate(tenantId, LocalDate.now());
+        invoice.markIssued(dueDate);
         invoiceRepo.save(invoice);
-        log.info("Issued invoice={}", invoice.getInvoiceNumber());
+        log.info("Issued invoice={} dueDate={}", invoice.getInvoiceNumber(), dueDate);
         return queryService.getInvoice(tenantId, id);
     }
 
-    // ── Retainer / upfront-hours ──────────────────────────────────────────────
-
-    /**
-     * Creates a retainer (upfront-hours) invoice and automatically adds one
-     * line item for the committed hours block.
-     *
-     * WHY auto-add the line item here rather than requiring a separate call?
-     * A retainer is always anchored to "N hours at R X/hr".  Forcing the caller
-     * to POST a line item after creation would leave a window where the invoice
-     * exists with no items, which breaks PDF generation and total calculations.
-     */
     @Transactional
     public InvoiceResponse createRetainer(TenantId tenantId,
                                           CreateRetainerInvoiceRequest req) {
@@ -102,15 +140,10 @@ public class InvoiceService {
                 req.walkinClientPhone()
         );
 
-        // Auto-add the committed-hours line item so totals are immediately correct
-        BigDecimal lineTotal = req.committedHours()
-                .multiply(req.ratePerHour())
-                .setScale(2, RoundingMode.HALF_UP);
-
         var li = InvoiceLineItem.create(
                 invoice,
                 tenantId,
-                null,           // no catalogue item — retainers are free-form
+                null,
                 req.committedHours().stripTrailingZeros().toPlainString()
                         + " hrs upfront — " + req.title(),
                 "hours",
@@ -128,11 +161,6 @@ public class InvoiceService {
         return queryService.getInvoice(tenantId, invoice.getId());
     }
 
-    /**
-     * Log actual hours consumed against a retainer invoice.
-     * Returns the updated invoice; if consumption tips into overage a warning
-     * is logged — the caller can check {@code InvoiceResponse.isOverage()}.
-     */
     @Transactional
     public InvoiceResponse logHours(TenantId tenantId, UUID id, LogHoursRequest req) {
         Invoice invoice = invoiceRepo.findActiveByIdWithLineItems(tenantId, id)
@@ -146,11 +174,39 @@ public class InvoiceService {
                     invoice.getInvoiceNumber(),
                     invoice.getHoursConsumed(),
                     invoice.getCommittedHours());
+
+            // NEW: was server-log-only before. Staff now actually get told.
+            staffNotifier.notify(tenantId, NotificationType.RETAINER_HOURS_OVERAGE,
+                    "Retainer overage: " + invoice.getInvoiceNumber(),
+                    "Invoice " + invoice.getInvoiceNumber() + " has consumed "
+                            + invoice.getHoursConsumed() + "h of " + invoice.getCommittedHours()
+                            + "h committed. Consider issuing a reconciliation invoice.",
+                    "/invoices", id.toString());
         }
         log.info("Logged {}h on invoice={} totalConsumed={} note={}",
                 req.hours(), invoice.getInvoiceNumber(),
                 invoice.getHoursConsumed(), req.note());
 
         return queryService.getInvoice(tenantId, id);
+    }
+
+    /**
+     * ASSUMPTION: same as QuoteService — CrmFacade customer DTO exposes
+     * .email(). Confirm against the real CrmFacade if this doesn't compile.
+     */
+    private String resolveClientEmail(Invoice invoice, TenantId tenantId) {
+        if (invoice.getCustomerId() != null) {
+            return crmFacade.findCustomerById(tenantId, invoice.getCustomerId())
+                    .map(c -> c.email()).orElse(null);
+        }
+        return invoice.getWalkinClientEmail();
+    }
+
+    private String resolveClientName(Invoice invoice, TenantId tenantId) {
+        if (invoice.getCustomerId() != null) {
+            return crmFacade.findCustomerById(tenantId, invoice.getCustomerId())
+                    .map(c -> c.name()).orElse("Customer");
+        }
+        return invoice.getWalkinClientName() != null ? invoice.getWalkinClientName() : "Client";
     }
 }

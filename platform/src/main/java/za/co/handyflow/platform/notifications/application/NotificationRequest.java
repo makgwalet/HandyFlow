@@ -11,48 +11,63 @@ import java.util.Set;
 
 /**
  * Everything {@link NotificationService#send} needs to raise a notification.
- * Built via {@link #builder()} — with this many optional fields, a
- * telescoping constructor would be unreadable at call sites.
+ *
+ * FIXED: this was previously a hand-written class with record-style accessor
+ * names (tenantId(), type(), ...) but was NOT an actual Java record. To
+ * Jackson — which only recognizes properties via getX()/isX() bean naming or
+ * native record introspection — that meant this class had ZERO visible
+ * properties: an "empty bean". That was invisible until Spring Modulith's
+ * event publication registry (spring-modulith-events-jpa) tried to persist
+ * this object as the payload of NotificationDispatchEvent, to support
+ * redelivering notifications on restart if the app crashes between commit
+ * and dispatch — and Jackson threw InvalidDefinitionException instead.
+ *
+ * Converting to a genuine record fixes serialization AND keeps that
+ * restart-safety guarantee (the alternative — disabling FAIL_ON_EMPTY_BEANS,
+ * or excluding this event from tracking — would silently give up on
+ * redelivery instead of actually fixing the underlying issue).
+ *
+ * Builder API is unchanged — every existing call site
+ * (NotificationRequest.builder()....build()) compiles and behaves
+ * identically; only the internal representation changed.
  */
-public final class NotificationRequest {
-
-    private final TenantId tenantId;
-    private final NotificationType type;
-    private final NotificationSeverity severity;      // null => use type.defaultSeverity()
-    private final Set<NotificationChannel> channels;   // null => use type.defaultChannels()
-    private final String title;
-    private final String message;
-    private final String actionUrl;
-    private final String sourceModule;
-    private final String sourceEntityId;
-    private final List<Recipient> recipients;
-
-    private NotificationRequest(Builder b) {
-        this.tenantId = Objects.requireNonNull(b.tenantId, "tenantId is required");
-        this.type = Objects.requireNonNull(b.type, "type is required");
-        this.severity = b.severity;
-        this.channels = b.channels;
-        this.title = Objects.requireNonNull(b.title, "title is required");
-        this.message = Objects.requireNonNull(b.message, "message is required");
-        this.actionUrl = b.actionUrl;
-        this.sourceModule = Objects.requireNonNull(b.sourceModule, "sourceModule is required");
-        this.sourceEntityId = b.sourceEntityId;
-        if (b.recipients == null || b.recipients.isEmpty()) {
+public record NotificationRequest(
+        TenantId tenantId,
+        NotificationType type,
+        NotificationSeverity severity,
+        Set<NotificationChannel> channels,
+        String title,
+        String message,
+        String actionUrl,
+        String sourceModule,
+        String sourceEntityId,
+        List<Recipient> recipients
+) {
+    public NotificationRequest {
+        Objects.requireNonNull(tenantId, "tenantId is required");
+        Objects.requireNonNull(type, "type is required");
+        Objects.requireNonNull(title, "title is required");
+        Objects.requireNonNull(message, "message is required");
+        Objects.requireNonNull(sourceModule, "sourceModule is required");
+        if (recipients == null || recipients.isEmpty()) {
             throw new IllegalArgumentException("At least one recipient is required");
         }
-        this.recipients = List.copyOf(b.recipients);
+        recipients = List.copyOf(recipients);
     }
 
-    public TenantId tenantId() { return tenantId; }
-    public NotificationType type() { return type; }
-    public NotificationSeverity severity() { return severity != null ? severity : type.defaultSeverity(); }
-    public Set<NotificationChannel> channels() { return channels != null ? channels : type.defaultChannels(); }
-    public String title() { return title; }
-    public String message() { return message; }
-    public String actionUrl() { return actionUrl; }
-    public String sourceModule() { return sourceModule; }
-    public String sourceEntityId() { return sourceEntityId; }
-    public List<Recipient> recipients() { return recipients; }
+    // Explicit overrides of the synthesized record accessors: severity and
+    // channels fall back to the NotificationType's defaults when the caller
+    // didn't specify one. The raw stored value can be null; these two
+    // methods are where the fallback logic lives — same behavior as before.
+    @Override
+    public NotificationSeverity severity() {
+        return severity != null ? severity : type.defaultSeverity();
+    }
+
+    @Override
+    public Set<NotificationChannel> channels() {
+        return channels != null ? channels : type.defaultChannels();
+    }
 
     public static Builder builder() { return new Builder(); }
 
@@ -80,6 +95,9 @@ public final class NotificationRequest {
         public Builder recipients(List<Recipient> recipients) { this.recipients = recipients; return this; }
         public Builder recipient(Recipient recipient) { this.recipients = List.of(recipient); return this; }
 
-        public NotificationRequest build() { return new NotificationRequest(this); }
+        public NotificationRequest build() {
+            return new NotificationRequest(tenantId, type, severity, channels, title,
+                    message, actionUrl, sourceModule, sourceEntityId, recipients);
+        }
     }
 }

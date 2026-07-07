@@ -11,14 +11,17 @@ import za.co.handyflow.platform.crm.CrmFacade;
 import za.co.handyflow.platform.invoicing.domain.model.*;
 import za.co.handyflow.platform.invoicing.domain.repository.*;
 import za.co.handyflow.platform.invoicing.dto.*;
+import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.shared.UserContext;
 import org.springframework.beans.factory.annotation.Value;
 import za.co.handyflow.platform.identity.TenantFacade;
 import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.EmailTemplates;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Slf4j
@@ -31,9 +34,13 @@ public class QuoteService {
     private final CrmFacade crmFacade;
     private final CatalogueFacade catalogueFacade;
     private final QuoteNumberGenerator quoteNumberGenerator;
+    private final InvoiceNumberGenerator invoiceNumberGenerator;
     private final TenantFacade tenantFacade;
     private final EmailService emailService;
     private final InvoicePdfService invoicePdfService;
+    private final QuotePdfService quotePdfService;
+    private final InvoicePaymentTermsResolver paymentTermsResolver;
+    private final StaffNotifier staffNotifier;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -54,7 +61,6 @@ public class QuoteService {
     @Transactional
     public QuoteResponse createQuote(TenantId tenantId, CreateQuoteRequest request) {
 
-        // Business rule: must have either a saved customer OR a walk-in name
         boolean hasCustomer = request.customerId() != null;
         boolean hasWalkin   = request.walkinClientName() != null
                 && !request.walkinClientName().isBlank();
@@ -65,7 +71,6 @@ public class QuoteService {
             );
         }
 
-        // Only validate CRM if a customerId was actually provided
         if (hasCustomer && !crmFacade.customerExists(tenantId, request.customerId())) {
             throw new ResourceNotFoundException("Customer",
                     request.customerId().toString());
@@ -75,7 +80,7 @@ public class QuoteService {
 
         Quote quote = Quote.create(
                 tenantId,
-                request.customerId(),       // null for walk-ins — that's fine now
+                request.customerId(),
                 quoteNumber,
                 request.title(),
                 request.walkinClientName(),
@@ -94,7 +99,6 @@ public class QuoteService {
                                      AddLineItemRequest request) {
         Quote quote = findActiveQuote(tenantId, quoteId);
 
-        // If catalogueItemId provided, fetch defaults from catalogue
         BigDecimal vatRate = request.vatRate();
         if (request.catalogueItemId() != null && vatRate == null) {
             vatRate = catalogueFacade
@@ -120,12 +124,49 @@ public class QuoteService {
         return toResponse(quote);
     }
 
+    /**
+     * Emails the quote PDF directly to the client (external recipient,
+     * bypasses NotificationService — see StaffNotifier's Javadoc) and
+     * raises an IN_APP entry for staff. The email now includes a public
+     * accept/reject link (see acceptUrl below) using the quote's own
+     * publicAccessToken — no login required for the client to respond.
+     */
     @Transactional
     public QuoteResponse sendQuote(TenantId tenantId, UUID quoteId) {
         Quote quote = findActiveQuote(tenantId, quoteId);
         quote.send();
         quoteRepository.save(quote);
         log.info("Sent quote={} expires={}", quoteId, quote.getExpiresAt());
+
+        try {
+            String clientEmail = resolveClientEmail(quote, tenantId);
+            if (clientEmail != null && !clientEmail.isBlank()) {
+                String clientName = resolveClientName(quote, tenantId);
+                tenantFacade.findTenantDetails(tenantId).ifPresent(tenant -> {
+                    byte[] pdfBytes = quotePdfService.generateQuotePdf(quote.getId(), tenantId);
+                    String amount = "R " + String.format(java.util.Locale.US, "%,.2f", quote.getTotal());
+                    String acceptUrl = frontendUrl + "/q/" + quote.getPublicAccessToken();
+                    emailService.sendWithAttachment(
+                            clientEmail,
+                            "Quote " + quote.getQuoteNumber() + " from " + tenant.companyName(),
+                            EmailTemplates.quoteSentToClient(
+                                    clientName, quote.getQuoteNumber(), tenant.companyName(), amount, acceptUrl),
+                            quote.getQuoteNumber() + ".pdf",
+                            pdfBytes
+                    );
+                });
+            } else {
+                log.warn("Quote={} marked SENT but no client email on file — PDF not emailed", quoteId);
+            }
+        } catch (Exception e) {
+            log.warn("Quote-sent email not delivered for quote={}: {}", quoteId, e.getMessage());
+        }
+
+        staffNotifier.notify(tenantId, NotificationType.QUOTE_SENT,
+                "Quote sent: " + quote.getQuoteNumber(),
+                "Quote " + quote.getQuoteNumber() + " was sent to the client.",
+                frontendUrl + "/quotes/" + quoteId, quoteId.toString());
+
         return toResponse(quote);
     }
 
@@ -134,6 +175,27 @@ public class QuoteService {
         Quote quote = findActiveQuote(tenantId, quoteId);
         quote.accept();
         quoteRepository.save(quote);
+
+        staffNotifier.notify(tenantId, NotificationType.QUOTE_ACCEPTED,
+                "Quote accepted: " + quote.getQuoteNumber(),
+                "The client accepted quote " + quote.getQuoteNumber() + ". Ready to convert to an invoice.",
+                frontendUrl + "/quotes/" + quoteId, quoteId.toString());
+
+        return toResponse(quote);
+    }
+
+    @Transactional
+    public QuoteResponse rejectQuote(TenantId tenantId, UUID quoteId) {
+        Quote quote = findActiveQuote(tenantId, quoteId);
+        quote.reject();
+        quoteRepository.save(quote);
+        log.info("Rejected quote={} tenant={}", quoteId, tenantId);
+
+        staffNotifier.notify(tenantId, NotificationType.QUOTE_REJECTED,
+                "Quote rejected: " + quote.getQuoteNumber(),
+                "Quote " + quote.getQuoteNumber() + " was rejected.",
+                frontendUrl + "/quotes/" + quoteId, quoteId.toString());
+
         return toResponse(quote);
     }
 
@@ -147,15 +209,15 @@ public class QuoteService {
             );
         }
 
-        String invoiceNumber = "INV-" + quoteId.toString().substring(0, 8).toUpperCase();
+        String invoiceNumber = invoiceNumberGenerator.next(tenantId);
 
         Invoice invoice = Invoice.createFromQuote(
                 tenantId, quote.getCustomerId(),
                 quote.getId(), invoiceNumber,
                 quote.getSubtotal(), quote.getVatTotal(), quote.getTotal(),
-                quote.getWalkinClientName(),    // ← add
-                quote.getWalkinClientEmail(),   // ← add
-                quote.getWalkinClientPhone()    // ← add
+                quote.getWalkinClientName(),
+                quote.getWalkinClientEmail(),
+                quote.getWalkinClientPhone()
         );
         quote.getLineItems().forEach(qli -> {
             InvoiceLineItem ili = InvoiceLineItem.create(
@@ -168,15 +230,13 @@ public class QuoteService {
         });
 
         invoiceRepository.save(invoice);
-        invoice.markIssued();
+        LocalDate dueDate = paymentTermsResolver.resolveDueDate(tenantId, LocalDate.now());
+        invoice.markIssued(dueDate);
         quote.markInvoiced();
         quoteRepository.save(quote);
 
         log.info("Converted quote={} to invoice={}", quoteId, invoice.getId());
 
-        // ── Email notification ─────────────────────────────────────────────
-        // WHY async? PDF/email must not block the HTTP response.
-        // If email fails, the invoice is already saved — we just log the error.
         try {
             tenantFacade.findTenantDetails(tenantId).ifPresent(tenant -> {
 
@@ -189,11 +249,9 @@ public class QuoteService {
                 String amount = "R " + String.format(
                         java.util.Locale.US, "%,.2f", invoice.getTotal());
 
-                // Generate PDF to attach
                 byte[] pdfBytes = invoicePdfService.generateInvoicePdf(
                         invoice.getId(), tenantId);
 
-                // Send with PDF attachment — client can open directly, no login needed
                 emailService.sendWithAttachment(
                         tenant.email(),
                         "Invoice " + invoiceNumber + " — " + customerName,
@@ -209,15 +267,49 @@ public class QuoteService {
             log.warn("Invoice notification/PDF not sent: {}", e.getMessage());
         }
 
-
         return invoice.getId();
     }
 
     @Transactional
     public void softDeleteQuote(TenantId tenantId, UUID quoteId) {
         Quote quote = findActiveQuote(tenantId, quoteId);
-        quote.softDelete(null);
+        quote.softDelete(UserContext.getCurrentUserId());
         quoteRepository.save(quote);
+    }
+
+    /** Called by InvoicingScheduler's expiry-reminder job. */
+    @Transactional
+    void sendExpiryReminder(Quote quote) {
+        try {
+            long daysRemaining = java.time.Duration.between(
+                    java.time.Instant.now(), quote.getExpiresAt()).toDays() + 1;
+
+            String clientEmail = resolveClientEmail(quote, quote.getTenantId());
+            if (clientEmail != null && !clientEmail.isBlank()) {
+                tenantFacade.findTenantDetails(quote.getTenantId()).ifPresent(tenant -> {
+                    String clientName = resolveClientName(quote, quote.getTenantId());
+                    String amount = "R " + String.format(java.util.Locale.US, "%,.2f", quote.getTotal());
+                    String acceptUrl = frontendUrl + "/q/" + quote.getPublicAccessToken();
+                    emailService.send(
+                            clientEmail,
+                            "Quote " + quote.getQuoteNumber() + " is expiring soon",
+                            EmailTemplates.quoteExpiringSoon(
+                                    clientName, quote.getQuoteNumber(), tenant.companyName(),
+                                    amount, (int) daysRemaining, acceptUrl)
+                    );
+                });
+            }
+
+            staffNotifier.notify(quote.getTenantId(), NotificationType.QUOTE_EXPIRING_SOON,
+                    "Quote expiring soon: " + quote.getQuoteNumber(),
+                    "Quote " + quote.getQuoteNumber() + " expires in " + daysRemaining + " day(s).",
+                    frontendUrl + "/quotes/" + quote.getId(), quote.getId().toString());
+
+            quote.markExpiryReminderSent();
+            quoteRepository.save(quote);
+        } catch (Exception e) {
+            log.warn("Failed to send expiry reminder for quote={}: {}", quote.getId(), e.getMessage());
+        }
     }
 
     private Quote findActiveQuote(TenantId tenantId, UUID quoteId) {
@@ -225,6 +317,23 @@ public class QuoteService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Quote", quoteId.toString()
                 ));
+    }
+
+    private String resolveClientEmail(Quote quote, TenantId tenantId) {
+        if (quote.getCustomerId() != null) {
+            return crmFacade.findCustomerById(tenantId, quote.getCustomerId())
+                    .map(c -> c.email())
+                    .orElse(null);
+        }
+        return quote.getWalkinClientEmail();
+    }
+
+    private String resolveClientName(Quote quote, TenantId tenantId) {
+        if (quote.getCustomerId() != null) {
+            return crmFacade.findCustomerById(tenantId, quote.getCustomerId())
+                    .map(c -> c.name()).orElse("Customer");
+        }
+        return quote.getWalkinClientName() != null ? quote.getWalkinClientName() : "Client";
     }
 
     private QuoteResponse toResponse(Quote q) {
@@ -242,9 +351,9 @@ public class QuoteService {
                 q.getSubtotal(), q.getVatTotal(), q.getTotal(),
                 q.getCurrency(), q.getSentAt(), q.getExpiresAt(),
                 q.getAcceptedAt(), lineItems, q.getCreatedAt(),
-                q.getWalkinClientName(),     // ← new
-                q.getWalkinClientEmail(),    // ← new
-                q.getWalkinClientPhone()     // ← new
+                q.getWalkinClientName(),
+                q.getWalkinClientEmail(),
+                q.getWalkinClientPhone()
         );
     }
 }

@@ -351,8 +351,19 @@ public class FleetService {
                 v.getLicenceDiscExpiry(), v.getRoadworthyExpiry(), v.getInsuranceExpiry(),
                 v.getCurrentOdometer(), v.getLastServiceKm(), v.getServiceIntervalKm(),
                 v.isDueForService(), v.isLicenceExpiringSoon(), v.isRoadworthyExpiringSoon(),
-                v.getDailyRate(), v.getNotes(), v.getCreatedAt()
+                v.getDailyRate(), v.getNotes(), v.getCreatedAt(),
+                v.getAssignedDriverName(), v.getAssignedDriverId()
         );
+    }
+
+    /** Pass null driverId to unassign. */
+    @Transactional
+    public VehicleResponse assignDriver(TenantId tenantId, UUID vehicleId, UUID driverId) {
+        Vehicle vehicle = findActive(tenantId, vehicleId);
+        vehicle.assignDriver(driverId);
+        vehicleRepository.save(vehicle);
+        log.info("Driver assignment updated vehicle={} driver={}", vehicleId, driverId);
+        return toResponse(vehicle);
     }
 
     private ServiceResponse toServiceResponse(VehicleService s) {
