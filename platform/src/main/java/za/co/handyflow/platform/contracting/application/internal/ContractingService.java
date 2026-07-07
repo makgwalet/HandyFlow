@@ -21,8 +21,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
+
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -45,6 +44,7 @@ public class ContractingService {
     private final SigningTokenService            signingTokenService;
     private final EmailService                   emailService;
     private final SmsService                     smsService;    // FIX: SMS now wired
+    private final OtpRateLimitRepository          otpRateLimitRepo;
 
     @Value("${contracting.signing.base-url:http://localhost:5173}")
     private String baseUrl;
@@ -55,49 +55,94 @@ public class ContractingService {
     @Value("${contracting.owner.email:makgwale10111@gmail.com}")
     private String ownerEmail;
 
+    // FIX: every smsService.send(...) call in this class used to run
+    // synchronously, directly inside a @Transactional business method. That's
+    // the same "notification failure poisons the business transaction"
+    // problem already found and fixed once for TenantAdminRecipientsImpl —
+    // if the SMS provider throws (timeout, invalid number, API error), that
+    // exception propagates straight up and rolls back whatever real business
+    // state was just about to commit (a party's decline, a signature, etc.).
+    // This wrapper is the fix: it catches anything the provider throws and
+    // returns false, so a flaky SMS gateway can never take down a legally
+    // significant contract action with it. Every call site below now goes
+    // through this instead of calling smsService.send(...) directly.
+    private boolean safeSms(String phone, String message) {
+        if (phone == null || phone.isBlank()) {
+            log.warn("Skipping SMS — no phone number available. message={}", truncate(message, 60));
+            return false;
+        }
+        try {
+            return smsService.send(phone, message);
+        } catch (Exception e) {
+            log.error("SMS send failed to={} (business action proceeds regardless): {}",
+                    phone, e.getMessage(), e);
+            return false;
+        }
+    }
+
     private static final DateTimeFormatter SAST_FMT =
             DateTimeFormatter.ofPattern("d MMMM yyyy, HH:mm")
                     .withZone(ZoneId.of("Africa/Johannesburg"));
 
     // ── OTP Rate limiting ─────────────────────────────────────────────────────
-    // FIX: rate limiting is now actually enforced (was only documented, not called)
-    // Production replacement: use Redis with TTL keys instead of this in-memory store.
+    // FIX: rate limiting is now database-backed via OtpRateLimit/
+    // OtpRateLimitRepository instead of an in-memory ConcurrentHashMap — see
+    // OtpRateLimit's Javadoc for why (same multi-instance problem as
+    // OtpService.hashStore, fixed the same way: a table instead of Redis,
+    // since this traffic volume doesn't justify standing up new
+    // infrastructure). Semantics are UNCHANGED from the original
+    // ConcurrentHashMap-based version — same thresholds, same window,
+    // same lockout behavior on repeated failures — only the storage
+    // mechanism changed.
 
-    private record RateEntry(AtomicInteger requestCount, AtomicInteger failCount, long windowStart) {}
-    private final ConcurrentHashMap<String, RateEntry> otpRateStore = new ConcurrentHashMap<>();
     private static final int  MAX_OTP_REQUESTS = 3;
     private static final int  MAX_OTP_FAILURES = 5;
     private static final long RATE_WINDOW_MS   = 10 * 60 * 1_000L;
 
     private void checkOtpRateLimit(String partyId) {
-        otpRateStore.compute(partyId, (k, e) -> {
-            long now = System.currentTimeMillis();
-            if (e == null || now - e.windowStart() > RATE_WINDOW_MS)
-                return new RateEntry(new AtomicInteger(1), new AtomicInteger(0), now);
-            if (e.requestCount().get() >= MAX_OTP_REQUESTS)
-                throw new IllegalStateException(
-                        "Too many OTP requests. Please wait 10 minutes before trying again.");
-            e.requestCount().incrementAndGet();
-            return e;
-        });
+        UUID partyUuid = UUID.fromString(partyId);
+        // Pessimistic lock: makes this read-modify-write atomic across
+        // instances, replacing what ConcurrentHashMap.compute(...) gave us
+        // atomically within one JVM — see OtpRateLimitRepository's Javadoc.
+        OtpRateLimit rate = otpRateLimitRepo.findByPartyIdForUpdate(partyUuid).orElse(null);
+
+        if (rate == null) {
+            otpRateLimitRepo.save(OtpRateLimit.startNewWindow(partyUuid, 1, 0));
+            return;
+        }
+        if (rate.isWindowExpired(RATE_WINDOW_MS)) {
+            rate.resetWindow(1, 0);
+            otpRateLimitRepo.save(rate);
+            return;
+        }
+        if (rate.getRequestCount() >= MAX_OTP_REQUESTS) {
+            throw new IllegalStateException(
+                    "Too many OTP requests. Please wait 10 minutes before trying again.");
+        }
+        rate.incrementRequestCount();
+        otpRateLimitRepo.save(rate);
     }
 
     private void recordOtpFailure(String partyId) {
-        otpRateStore.compute(partyId, (k, e) -> {
-            if (e == null)
-                return new RateEntry(new AtomicInteger(0), new AtomicInteger(1),
-                        System.currentTimeMillis());
-            if (e.failCount().incrementAndGet() >= MAX_OTP_FAILURES)
-                return new RateEntry(new AtomicInteger(MAX_OTP_REQUESTS), e.failCount(),
-                        System.currentTimeMillis());
-            return e;
-        });
+        UUID partyUuid = UUID.fromString(partyId);
+        OtpRateLimit rate = otpRateLimitRepo.findByPartyIdForUpdate(partyUuid).orElse(null);
+
+        if (rate == null) {
+            otpRateLimitRepo.save(OtpRateLimit.startNewWindow(partyUuid, 0, 1));
+            return;
+        }
+        rate.incrementFailCount();
+        if (rate.getFailCount() >= MAX_OTP_FAILURES) {
+            rate.lockOutRequests(MAX_OTP_REQUESTS);
+        }
+        otpRateLimitRepo.save(rate);
     }
 
     private void clearOtpFailures(String partyId) {
-        otpRateStore.computeIfPresent(partyId, (k, e) -> {
-            e.failCount().set(0);
-            return e;
+        UUID partyUuid = UUID.fromString(partyId);
+        otpRateLimitRepo.findByPartyIdForUpdate(partyUuid).ifPresent(rate -> {
+            rate.clearFailures();
+            otpRateLimitRepo.save(rate);
         });
     }
 
@@ -133,7 +178,15 @@ public class ContractingService {
                     List<ContractParty> parties = partyRepo.findByContract(c.getId());
                     long signed = parties.stream()
                             .filter(p -> "SIGNED".equals(p.getSigningStatus())).count();
-                    return toContractSummary(c, parties.size(), (int) signed);
+                    // NEW: was previously computed on the frontend from a
+                    // `comments` field this response never actually had —
+                    // see ContractSummaryResponse.unresolvedAmendmentCount's
+                    // comment. Matches this method's existing per-row query
+                    // style (parties are already fetched the same way, one
+                    // query per row) rather than introducing a differently-
+                    // shaped batch query for just this one field.
+                    int unresolved = commentRepo.findUnresolvedAmendments(c.getId()).size();
+                    return toContractSummary(c, parties.size(), (int) signed, unresolved);
                 });
     }
 
@@ -226,8 +279,12 @@ public class ContractingService {
                     tenantId.getValue(), c.getId(), party.getId(), token, expiresAt);
             signingTokenRepo.save(st);
 
-            party.setSigningToken(token);
-            partyRepo.save(party);
+            // FIX: previously also called party.setSigningToken(token) here,
+            // persisting a second, unsynchronized raw copy of the same secret
+            // on contract_parties — see ContractParty.java for the removed
+            // field. The single source of truth for a party's active token is
+            // now signingTokenRepo.findActiveByPartyId(...), used wherever the
+            // raw token needs to be recovered later (e.g. notifyNextParty()).
 
             // Email invitation — async (EmailService is @Async)
             if (party.getEmail() != null && !party.getEmail().isBlank()) {
@@ -251,7 +308,7 @@ public class ContractingService {
                 String smsBody = "HandyFlow: You have been invited to sign \""
                         + truncate(c.getTitle(), 40)
                         + "\". Open: " + signUrl;
-                smsService.send(party.getPhone(), smsBody);
+                safeSms(party.getPhone(), smsBody);
             }
 
             log.info("Signing token issued for party={} contract={}", party.getId(), c.getContractNumber());
@@ -268,6 +325,9 @@ public class ContractingService {
         contractRepo.save(c);
         c.setParties(partyRepo.findByContract(id));
         log.info("Contract {} terminated: {}", c.getContractNumber(), reason);
+        // FIX: nobody was previously notified of a termination at all — see
+        // sendTerminationNotifications()'s Javadoc.
+        sendTerminationNotifications(c, reason);
         return toContractResponse(c);
     }
 
@@ -298,8 +358,8 @@ public class ContractingService {
                 tenantId.getValue(), c.getId(), partyId, token, expiresAt);
         signingTokenRepo.save(st);
 
-        party.setSigningToken(token);
-        partyRepo.save(party);
+        // FIX: see the matching comment in sendForSigning() above — no longer
+        // duplicating the raw token onto ContractParty.
 
         // Resend email
         if (party.getEmail() != null && !party.getEmail().isBlank()) {
@@ -317,7 +377,7 @@ public class ContractingService {
         }
 
         if (party.getPhone() != null && !party.getPhone().isBlank()) {
-            smsService.send(party.getPhone(),
+            safeSms(party.getPhone(),
                     "HandyFlow reminder: Sign \"" + truncate(c.getTitle(), 40)
                             + "\" at: " + signUrl);
         }
@@ -363,7 +423,7 @@ public class ContractingService {
         partyRepo.save(party);
 
         // FIX: SMS now actually sent
-        boolean sent = smsService.send(party.getPhone(),
+        boolean sent = safeSms(party.getPhone(),
                 EmailTemplates.otpSmsText(otp, c.getTitle()));
         if (!sent) {
             log.warn("SMS delivery failed for partyId={} — OTP still stored for retry", partyId);
@@ -376,7 +436,8 @@ public class ContractingService {
     @Transactional
     public ContractResponse signContract(TenantId tenantId, UUID contractId,
                                          UUID partyId, SignContractRequest req,
-                                         String ipAddress, String userAgent) {
+                                         String ipAddress, String userAgent,
+                                         UUID witnessedByUserId) {
         Contract c = findActive(tenantId, contractId);
         List<ContractParty> parties = partyRepo.findByContract(contractId);
         c.setParties(parties);
@@ -392,7 +453,15 @@ public class ContractingService {
         }
         clearOtpFailures(partyId.toString());
 
-        recordSignature(tenantId, contractId, partyId, party, req, ipAddress, userAgent);
+        // FIX: this method already existed with the full correct logic
+        // (OTP verification, signature recording, all-parties-signed check,
+        // notifications) but was never actually called from anywhere —
+        // ContractingController had no endpoint wired to it at all, despite
+        // the frontend (ContractsTab.tsx) calling
+        // POST /{id}/parties/{partyId}/sign expecting exactly this. Only
+        // change needed here was threading witnessedByUserId through to the
+        // audit trail — see ContractSignature.witnessedByUserId's Javadoc.
+        recordSignature(tenantId, contractId, partyId, party, req, ipAddress, userAgent, witnessedByUserId);
 
         // Reload parties after signature
         parties = partyRepo.findByContract(contractId);
@@ -487,7 +556,7 @@ public class ContractingService {
         partyRepo.save(party);
 
         // FIX: SMS now sent
-        boolean sent = smsService.send(party.getPhone(),
+        boolean sent = safeSms(party.getPhone(),
                 EmailTemplates.otpSmsText(otp, c.getTitle()));
         if (!sent) {
             log.warn("SMS delivery failed for partyId={} — check SMS provider config", partyId);
@@ -520,7 +589,7 @@ public class ContractingService {
         }
         clearOtpFailures(partyId.toString());
 
-        recordSignature(tenantId, contractId, partyId, party, req, ipAddress, userAgent);
+        recordSignature(tenantId, contractId, partyId, party, req, ipAddress, userAgent, null);
 
         // Mark token consumed — single-use
         st.setUsedAt(Instant.now());
@@ -581,11 +650,18 @@ public class ContractingService {
                         ownerDisplayName, party.getFullName(),
                         c.getTitle(), c.getContractNumber(), reason, baseUrl));
 
-        // Notify owner by SMS
-        smsService.send(ownerEmail,  // owner phone not in scope yet — use email for now
-                "HandyFlow: " + party.getFullName() + " declined \"" +
-                        truncate(c.getTitle(), 30) + "\"." +
-                        (reason != null ? " Reason: " + truncate(reason, 40) : ""));
+        // FIX: this used to call smsService.send(ownerEmail, ...) — passing an
+        // EMAIL ADDRESS as the phone number parameter, guaranteed to fail (or
+        // worse, roll back this whole decline via the transaction-poisoning
+        // bug fixed above) the moment a real SMS provider is active. There is
+        // no owner phone number configured anywhere in this codebase
+        // (application.yaml only has contracting.owner.name/email) — rather
+        // than invent one, this is skipped with a clear log line. Add
+        // contracting.owner.phone to application.yaml and inject it here via
+        // @Value if owner SMS notifications are actually wanted; the email
+        // notification above already covers this event correctly today.
+        log.info("Owner SMS notification skipped for decline on contract={} — no owner phone number configured",
+                c.getContractNumber());
     }
 
     @Transactional
@@ -616,6 +692,39 @@ public class ContractingService {
                             "Amendment requested: " + c.getTitle(),
                             EmailTemplates.contractAmendmentRequested(
                                     ownerDisplayName, party.getFullName(),
+                                    c.getTitle(), c.getContractNumber(),
+                                    req.clauseRef(), req.comment(), baseUrl)));
+        }
+
+        return toCommentViewWithParties(comment, parties);
+    }
+
+    @Transactional
+    public CommentView addCommentAsStaff(TenantId tenantId, UUID contractId,
+                                         UUID postedByUserId, AddCommentRequest req) {
+        findActive(tenantId, contractId);
+        List<ContractParty> parties = partyRepo.findByContract(contractId);
+
+        // partyId = null -> "posted by internal HandyFlow user", per
+        // ContractComment's own existing Javadoc — this pathway already
+        // existed at the entity/schema level, just had no service method or
+        // controller endpoint actually using it.
+        ContractComment comment = ContractComment.create(
+                tenantId.getValue(), contractId, null,
+                req.comment(), req.clauseRef(), req.isAmendmentRequest());
+        comment.setPostedByUserId(postedByUserId);
+        commentRepo.save(comment);
+
+        if (req.isAmendmentRequest()) {
+            log.info("Amendment requested (internal) on contractId={} by staff userId={} clause={}",
+                    contractId, postedByUserId, req.clauseRef());
+
+            contractRepo.findActiveById(tenantId, contractId).ifPresent(c ->
+                    emailService.send(
+                            ownerEmail,
+                            "Amendment requested: " + c.getTitle(),
+                            EmailTemplates.contractAmendmentRequested(
+                                    ownerDisplayName, "Internal Team",
                                     c.getTitle(), c.getContractNumber(),
                                     req.clauseRef(), req.comment(), baseUrl)));
         }
@@ -669,7 +778,13 @@ public class ContractingService {
     }
 
     private ContractSigningToken findValidToken(String token) {
-        ContractSigningToken st = signingTokenRepo.findByToken(token)
+        // FIX: was signingTokenRepo.findByToken(token) — querying the raw
+        // token column directly. Now hashes the incoming token and looks it
+        // up by tokenHash instead, matching what V56's migration comment
+        // said should happen (and what token_hash's NOT NULL constraint was
+        // added for) but never actually did until now.
+        String tokenHash = signingTokenService.sha256(token);
+        ContractSigningToken st = signingTokenRepo.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new IllegalArgumentException("Signing link not found or already used"));
         if (st.getRevokedAt() != null)
             throw new IllegalArgumentException("This signing link has been revoked. Ask the sender to resend.");
@@ -699,7 +814,7 @@ public class ContractingService {
 
     private void recordSignature(TenantId tenantId, UUID contractId, UUID partyId,
                                  ContractParty party, SignContractRequest req,
-                                 String ipAddress, String userAgent) {
+                                 String ipAddress, String userAgent, UUID witnessedByUserId) {
         String phone = party.getPhone() != null ? party.getPhone() : "";
         String last4 = phone.length() >= 4 ? phone.substring(phone.length() - 4) : phone;
         // FIX: hashOtp is called AFTER verify() consumed the OTP — we hash the submitted code
@@ -707,7 +822,7 @@ public class ContractingService {
         String otpHash = otpService.hashOtp(req.otpCode());
 
         ContractSignature sig = ContractSignature.create(tenantId, contractId, partyId,
-                otpHash, last4, ipAddress, userAgent, req.signatureData());
+                otpHash, last4, ipAddress, userAgent, req.signatureData(), witnessedByUserId);
         signatureRepo.save(sig);
 
         party.markSigned(ipAddress, userAgent);
@@ -730,6 +845,22 @@ public class ContractingService {
                 .filter(p -> "PENDING".equals(p.getSigningStatus()) || "SENT".equals(p.getSigningStatus()))
                 .min(Comparator.comparingInt(ContractParty::getSigningOrder))
                 .ifPresent(next -> {
+                    // FIX: previously read next.getSigningToken() — the raw
+                    // token duplicated onto ContractParty, now removed. The
+                    // party was already issued a token when the contract was
+                    // first sent for signing (sendForSigning() mints one for
+                    // every party up front), so it should still be active here;
+                    // the empty-fallback case would mean something inconsistent
+                    // happened upstream and is logged rather than silently
+                    // sending a broken link.
+                    Optional<ContractSigningToken> activeToken = signingTokenRepo.findActiveByPartyId(next.getId());
+                    if (activeToken.isEmpty()) {
+                        log.warn("No active signing token found for next party={} contract={} — " +
+                                        "cannot include a working signing link in their turn notification",
+                                next.getId(), c.getContractNumber());
+                    }
+                    String signUrl = activeToken.map(t -> baseUrl + "/sign/" + t.getToken()).orElse(baseUrl);
+
                     if (next.getEmail() != null && !next.getEmail().isBlank()) {
                         emailService.send(
                                 next.getEmail(),
@@ -737,10 +868,10 @@ public class ContractingService {
                                 EmailTemplates.contractSigningTurnNotification(
                                         next.getFullName(), c.getTitle(),
                                         c.getContractNumber(),
-                                        baseUrl + "/sign/" + next.getSigningToken()));
+                                        signUrl));
                     }
                     if (next.getPhone() != null && !next.getPhone().isBlank()) {
-                        smsService.send(next.getPhone(),
+                        safeSms(next.getPhone(),
                                 "HandyFlow: It's your turn to sign \""
                                         + truncate(c.getTitle(), 30) + "\". "
                                         + "Check your email for the signing link.");
@@ -750,30 +881,102 @@ public class ContractingService {
                 });
     }
 
+    // FIX: PDF generation could theoretically throw (though generatePdf's own
+    // status-gate check won't fire here since the contract is definitely
+    // SIGNED/TERMINATED by the time this is called) — but this method runs
+    // INSIDE the caller's transaction (signContract/signByToken/terminate),
+    // not its own. An uncaught exception here would roll back a signing or
+    // termination that had already genuinely succeeded, over something as
+    // secondary as attaching a PDF to the notification about it — the same
+    // "notification failure poisons the business transaction" class of bug
+    // already fixed elsewhere this session (see safeSms). Returns null on
+    // failure so callers can fall back to a plain email without an attachment
+    // rather than losing the notification entirely.
+    private byte[] tryGenerateContractPdf(Contract c) {
+        try {
+            List<ContractSignature> signatures = signatureRepo.findByContract(c.getId());
+            return pdfGenerator.generate(c, signatures, "HandyFlow Tenant", null);
+        } catch (Exception e) {
+            log.error("Failed to generate PDF for contract={} — notification will be sent without attachment: {}",
+                    c.getContractNumber(), e.getMessage(), e);
+            return null;
+        }
+    }
+
     private void sendFullyExecutedNotifications(Contract c) {
         String signedAt = SAST_FMT.format(c.getSignedAt() != null ? c.getSignedAt() : Instant.now());
+
+        // FIX: previously only linked back into the app ("View Signed
+        // Contract") — that assumes every recipient has HandyFlow access,
+        // which isn't true: external signers are frequently not tenants or
+        // platform users at all, just a named party who received one signing
+        // link. The PDF is now attached directly so everyone gets a durable
+        // copy regardless of whether they can ever log in.
+        String filename = c.getContractNumber() + ".pdf";
+        byte[] pdf = tryGenerateContractPdf(c);
+
         for (ContractParty party : c.getParties()) {
             // Email all parties
             if (party.getEmail() != null && !party.getEmail().isBlank()) {
-                emailService.send(
-                        party.getEmail(),
-                        "Contract fully executed: " + c.getTitle(),
-                        EmailTemplates.contractFullyExecuted(
-                                party.getFullName(), c.getTitle(),
-                                c.getContractNumber(), signedAt, baseUrl));
+                String subject = "Contract fully executed: " + c.getTitle();
+                String body = EmailTemplates.contractFullyExecuted(
+                        party.getFullName(), c.getTitle(), c.getContractNumber(), signedAt, baseUrl);
+                if (pdf != null) {
+                    emailService.sendWithAttachment(party.getEmail(), subject, body, filename, pdf);
+                } else {
+                    emailService.send(party.getEmail(), subject, body);
+                }
             }
             // SMS confirmation
             if (party.getPhone() != null && !party.getPhone().isBlank()) {
-                smsService.send(party.getPhone(),
+                safeSms(party.getPhone(),
                         "HandyFlow: \"" + truncate(c.getTitle(), 35)
                                 + "\" has been fully signed by all parties. " + signedAt);
             }
         }
         // Also notify owner
-        emailService.send(ownerEmail,
-                "Contract executed: " + c.getTitle(),
-                EmailTemplates.contractFullyExecuted(ownerDisplayName, c.getTitle(),
-                        c.getContractNumber(), signedAt, baseUrl));
+        String ownerSubject = "Contract executed: " + c.getTitle();
+        String ownerBody = EmailTemplates.contractFullyExecuted(ownerDisplayName, c.getTitle(),
+                c.getContractNumber(), signedAt, baseUrl);
+        if (pdf != null) {
+            emailService.sendWithAttachment(ownerEmail, ownerSubject, ownerBody, filename, pdf);
+        } else {
+            emailService.send(ownerEmail, ownerSubject, ownerBody);
+        }
+    }
+
+    // NEW: previously nobody was told when a SIGNED contract was terminated
+    // at all — terminate() just flipped the status and returned, with zero
+    // notification to any party or the owner. Mirrors
+    // sendFullyExecutedNotifications()'s structure and the same defensive
+    // PDF-generation handling.
+    private void sendTerminationNotifications(Contract c, String reason) {
+        String terminatedAt = SAST_FMT.format(c.getTerminatedAt() != null ? c.getTerminatedAt() : Instant.now());
+        String filename = c.getContractNumber() + ".pdf";
+        byte[] pdf = tryGenerateContractPdf(c);
+
+        for (ContractParty party : c.getParties()) {
+            if (party.getEmail() != null && !party.getEmail().isBlank()) {
+                String subject = "Contract terminated: " + c.getTitle();
+                String body = EmailTemplates.contractTerminated(
+                        party.getFullName(), c.getTitle(), c.getContractNumber(),
+                        reason, terminatedAt, baseUrl);
+                if (pdf != null) {
+                    emailService.sendWithAttachment(party.getEmail(), subject, body, filename, pdf);
+                } else {
+                    emailService.send(party.getEmail(), subject, body);
+                }
+            }
+        }
+
+        String ownerSubject = "Contract terminated: " + c.getTitle();
+        String ownerBody = EmailTemplates.contractTerminated(ownerDisplayName, c.getTitle(),
+                c.getContractNumber(), reason, terminatedAt, baseUrl);
+        if (pdf != null) {
+            emailService.sendWithAttachment(ownerEmail, ownerSubject, ownerBody, filename, pdf);
+        } else {
+            emailService.send(ownerEmail, ownerSubject, ownerBody);
+        }
     }
 
     private String maskPhone(String phone) {
@@ -793,6 +996,13 @@ public class ContractingService {
     private ContractResponse toContractResponse(Contract c) {
         List<PartyResponse> partyResponses = c.getParties().stream()
                 .map(this::toPartyResponse).toList();
+        // NEW: comments were entirely missing from this response before —
+        // see ContractResponse.comments' own comment for why. Fetched here
+        // rather than requiring every one of this method's several call
+        // sites to separately load and pass them in.
+        List<ContractParty> parties = c.getParties();
+        List<CommentView> comments = commentRepo.findByContract(c.getId()).stream()
+                .map(comm -> toCommentViewWithParties(comm, parties)).toList();
         return new ContractResponse(
                 c.getId(), c.getContractNumber(), c.getTitle(), c.getContractType(),
                 c.getStatus(), c.getBody(), c.getBodyHash(),
@@ -800,15 +1010,15 @@ public class ContractingService {
                 c.getStartDate(), c.getEndDate(), c.isAutoRenew(), c.getRenewalNoticeDays(),
                 c.getNotes(), c.getSentAt(), c.getSignedAt(),
                 c.getTerminatedAt(), c.getTerminationReason(),
-                partyResponses, c.getCreatedAt(), c.getUpdatedAt());
+                partyResponses, comments, c.getCreatedAt(), c.getUpdatedAt());
     }
 
-    private ContractSummaryResponse toContractSummary(Contract c, int total, int signed) {
+    private ContractSummaryResponse toContractSummary(Contract c, int total, int signed, int unresolvedAmendments) {
         return new ContractSummaryResponse(
                 c.getId(), c.getContractNumber(), c.getTitle(), c.getContractType(),
                 c.getStatus(), c.getValueAmount(), c.getCurrency(),
                 c.getStartDate(), c.getEndDate(), c.isAutoRenew(),
-                signed, total, c.getSentAt(), c.getSignedAt(), c.getCreatedAt());
+                signed, total, unresolvedAmendments, c.getSentAt(), c.getSignedAt(), c.getCreatedAt());
     }
 
     private PartyResponse toPartyResponse(ContractParty p) {

@@ -34,6 +34,9 @@ public class ContractComment {
 
     @Column(name = "party_id")
     private UUID partyId;   // null = posted by internal HandyFlow user
+    
+    @Column(name = "posted_by_user_id")
+    private UUID postedByUserId;
 
     @Column(name = "comment", nullable = false, columnDefinition = "TEXT")
     private String comment;

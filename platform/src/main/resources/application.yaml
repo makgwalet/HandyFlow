@@ -64,18 +64,25 @@ spring:
 app:
   security:
     jwt:
-      # WHY: Secret must be long (256+ bits) and stored in environment
-      # variables in production — NEVER hardcode in production.
-      secret: "GdB35HWCrRPMEutmx3U1vkbITEkLRmpt7zvigkmtzEC"
+      # FIX: was a hardcoded literal value, directly contradicting the
+      # comment immediately above it ("NEVER hardcode in production"). Now
+      # a required env var with no fallback — if JWT_SECRET isn't set, the
+      # app fails to start with a clear error instead of silently signing
+      # every token with a secret that was shared in a chat conversation.
+      secret: ${JWT_SECRET}
       expiration-ms: 86400000  # 24 hours
       refresh-expiration-ms: 604800000  # 7 days
-    encryption: # ADD THIS
-      key: "9D0FVy7gkMA1+Y6RikJn9I1QB5diY6LwETHMMWTQ1pw="  # OR RUN: openssl rand -base64 32
+    encryption:
+      # FIX: same issue as jwt.secret above — was a hardcoded literal.
+      # No fallback default on purpose: this key encrypts sensitive data
+      # (medicalNotes, knownThreats per the note below) and must never
+      # silently run with a known/guessable value.
+      key: ${ENCRYPTION_KEY}
   # IMPORTANT:
-  # - Replace the key above with your own: openssl rand -base64 32
-  # - In production, use an environment variable: ${ENCRYPTION_KEY}
-  # - DO NOT commit the real key to git — treat it like a DB password
-  # - Changing this key WITHOUT a migration script will make all existing
+  # - In production, set JWT_SECRET and ENCRYPTION_KEY as real environment
+  #   variables (or via your secrets manager) — never in this file.
+  # - DO NOT commit real secret values to git — treat them like a DB password.
+  # - Changing ENCRYPTION_KEY WITHOUT a migration script will make all existing
   #   encrypted principal data (medicalNotes, knownThreats) unreadable
 
 
@@ -129,16 +136,29 @@ springdoc:
 # ── Contracting module ────────────────────────────────────────────────────────
 contracting:
   signing:
-    # CRITICAL: use a long random secret in production, stored in env var or secrets manager
-    # Generate: openssl rand -hex 32
-    secret: ${CONTRACTING_SIGNING_SECRET:handyflow-signing-secret-CHANGE-IN-PRODUCTION}
+    # FIX: was ${CONTRACTING_SIGNING_SECRET:handyflow-signing-secret-CHANGE-IN-PRODUCTION}
+    # — a weak, human-readable fallback that stayed silently active if the
+    # env var was never set. This is the HMAC secret signing every
+    # contract-signing token embedded in emailed URLs — if it leaked or was
+    # guessed, someone could forge a valid signing link for any contract
+    # without ever receiving one. No fallback now: a missing
+    # CONTRACTING_SIGNING_SECRET fails startup loudly instead of quietly
+    # running with a known value.
+    secret: ${CONTRACTING_SIGNING_SECRET}
     base-url: ${FRONTEND_URL:http://localhost:5173}
     token-validity-hours: 72
 
   owner:
     # TODO: replace with dynamic lookup from tenant/user profile
     name: ${CONTRACTING_OWNER_NAME:HandyFlow Admin}
-    email: ${CONTRACTING_OWNER_EMAIL:makgwale10111@gmail.com}
+    # FIX: was ${CONTRACTING_OWNER_EMAIL:makgwale10111@gmail.com} — a specific
+    # developer's personal Gmail address baked in as the silent fallback for
+    # every tenant that forgets to configure this. Notifications about
+    # contract declines/completions would go to that person's personal inbox
+    # by default, for every tenant, forever — required now instead, so a
+    # missing value fails startup loudly rather than leaking business
+    # notifications to an unrelated personal account.
+    email: ${CONTRACTING_OWNER_EMAIL}
 
 
 # ── SMS provider ──────────────────────────────────────────────────────────────

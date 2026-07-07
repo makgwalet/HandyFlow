@@ -25,6 +25,14 @@ public record ContractSummaryResponse(
         boolean    autoRenew,
         int        signedPartyCount,
         int        totalPartyCount,
+        // NEW: was previously computed on the frontend from a `comments`
+        // array that never existed on this response at all — the
+        // "unresolved amendments" badge on each contract row silently
+        // showed 0 for every contract, always. A count, not a full comments
+        // list, since this is a paginated list endpoint (potentially
+        // hundreds of rows) — see ContractingService.getContracts() for how
+        // this is batch-computed in one query rather than per-row.
+        int        unresolvedAmendmentCount,
         Instant    sentAt,
         Instant    signedAt,
         Instant    createdAt

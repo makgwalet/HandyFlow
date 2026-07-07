@@ -26,6 +26,23 @@ import java.util.UUID;
  *     @OneToMany mapping is removed from the entity entirely. ContractPartyRepository
  *     provides findByContract(contractId) for when parties are needed. This also
  *     removes the CascadeType.ALL which was accidentally deleting party records.
+ *
+ * *** IMPORTANT — READ BEFORE CALLING getParties() ***
+ * parties is @Transient and starts as an EMPTY list on every entity loaded by
+ * any repository query. It is ONLY populated if something explicitly calls
+ * setParties(...) after separately querying ContractPartyRepository. Calling
+ * getParties() on a Contract you loaded yourself (e.g. in a scheduler, not via
+ * ContractingService) without first calling setParties() will silently iterate
+ * nothing — this is exactly what broke ContractExpiryScheduler's renewal
+ * reminder emails (they were never actually sent, despite logging success).
+ *
+ * NEW: reminder30SentAt/reminder14SentAt/reminder7SentAt/reminder1SentAt —
+ * added by V56 specifically so ContractExpiryScheduler could track which
+ * renewal reminders have already fired and self-heal if a scheduled run is
+ * missed, but the scheduler never actually read or wrote them (it relied
+ * purely on an exact end_date match instead, which can't catch up after a
+ * missed day). See markReminderSent()/isReminderSent() below — these are
+ * what the scheduler should have been using from the start.
  */
 @Entity
 @Table(name = "contracts")
@@ -59,14 +76,19 @@ public class Contract {
     @Column(name = "body_hash")       String    bodyHash;
     @Column(name = "body_locked_at")  Instant   bodyLockedAt;
 
+    // NEW — see class Javadoc. One column per threshold rather than a single
+    // "last reminder sent" field, because each threshold must fire exactly
+    // once independently (a contract could plausibly need its 30-day AND
+    // 7-day reminder in the same scheduler run if it was only just created
+    // with 6 days left on it — each is a distinct notification, not a
+    // replacement for the other).
+    @Column(name = "reminder_30_sent_at") Instant reminder30SentAt;
+    @Column(name = "reminder_14_sent_at") Instant reminder14SentAt;
+    @Column(name = "reminder_7_sent_at")  Instant reminder7SentAt;
+    @Column(name = "reminder_1_sent_at")  Instant reminder1SentAt;
+
     @Version long version;
 
-    /**
-     * FIX §3 + §4: Removed @OneToMany. Parties are loaded via ContractPartyRepository
-     * where needed. This avoids the N+1 EAGER fetch and the broken mappedBy reference.
-     *
-     * The transient list is populated by ContractingService when mapping to ContractResponse.
-     */
     @Transient
     private List<ContractParty> parties = new ArrayList<>();
 
@@ -152,10 +174,40 @@ public class Contract {
         this.bodyLockedAt = Instant.now();
     }
 
-    /** Returns true if all parties in the transient list have SIGNED. */
+    /**
+     * Returns true if all parties in the transient list have SIGNED.
+     * NOTE: relies on the transient parties list actually being populated —
+     * see class Javadoc. Only meaningful when called on a Contract that went
+     * through ContractingService's normal load path.
+     */
     public boolean allPartiesSigned() {
         return !parties.isEmpty() &&
                 parties.stream().allMatch(p -> "SIGNED".equals(p.getSigningStatus()));
+    }
+
+    // ── Renewal reminder tracking ────────────────────────────────────────────
+
+    /** True if the reminder for this specific threshold has already been sent. */
+    public boolean isReminderSent(int thresholdDays) {
+        return switch (thresholdDays) {
+            case 30 -> reminder30SentAt != null;
+            case 14 -> reminder14SentAt != null;
+            case 7  -> reminder7SentAt != null;
+            case 1  -> reminder1SentAt != null;
+            default -> throw new IllegalArgumentException("No reminder tracking for threshold: " + thresholdDays);
+        };
+    }
+
+    public void markReminderSent(int thresholdDays) {
+        Instant now = Instant.now();
+        switch (thresholdDays) {
+            case 30 -> reminder30SentAt = now;
+            case 14 -> reminder14SentAt = now;
+            case 7  -> reminder7SentAt = now;
+            case 1  -> reminder1SentAt = now;
+            default -> throw new IllegalArgumentException("No reminder tracking for threshold: " + thresholdDays);
+        }
+        this.updatedAt = now;
     }
 
     // ── Setters for optional fields ────────────────────────────────────────────

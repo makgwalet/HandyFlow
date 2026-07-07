@@ -4,54 +4,84 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.contracting.domain.model.Contract;
+import za.co.handyflow.platform.contracting.domain.model.ContractParty;
+import za.co.handyflow.platform.contracting.domain.repository.ContractPartyRepository;
 import za.co.handyflow.platform.contracting.domain.repository.ContractRepository;
 import za.co.handyflow.platform.shared.EmailService;
-import za.co.handyflow.platform.shared.EmailTemplates;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * Scheduled jobs for contract lifecycle management.
  *
- * FIX §29: ContractRepository.findExpired() existed but was never called.
- * This scheduler calls it daily at 01:00 SAST and transitions SIGNED → EXPIRED.
- *
- * Jobs:
- *   01:00 daily — expire contracts past their end_date
- *   09:00 daily — send 30/14/7/1-day renewal reminder emails
- *
- * For multi-tenant: findAllTenantIds() scans distinct tenant_ids from contracts.
- * In a larger system this would be replaced with a TenantService lookup.
- *
- * Requires: @EnableScheduling on your @SpringBootApplication class.
+ * *** THREE FIXES IN THIS VERSION — read all three before changing this
+ * class again ***
+ * <p>
+ * 1. THE SILENT FAILURE: the previous version called {@code c.getParties()}
+ * on Contract entities loaded directly from this scheduler's own repository
+ * calls. {@code Contract.parties} is {@code @Transient} and starts empty on
+ * every entity unless something explicitly calls {@code setParties(...)}
+ * after a separate {@code ContractPartyRepository} query — see Contract's
+ * Javadoc. Nothing here ever did that, so every renewal reminder email
+ * silently iterated an empty list and sent nothing, while still logging
+ * "Renewal reminder sent" right after — a false success signal. Fixed by
+ * injecting {@link ContractPartyRepository} and calling
+ * {@code setParties(partyRepo.findByContract(c.getId()))} before touching
+ * {@code c.getParties()} anywhere.
+ * <p>
+ * 2. THE SCALABILITY BUG: {@code findAllTenantIds()} called
+ * {@code contractRepo.findAll()} — loading every Contract row across every
+ * tenant and status, full TEXT body column included, just to extract a
+ * {@code Set<UUID>}. Replaced with
+ * {@link ContractRepository#findDistinctActiveTenantIds()}, a genuine
+ * single-column DISTINCT query.
+ * <p>
+ * 3. THE DEAD COLUMNS: V56 added reminder_30/14/7/1_sent_at specifically so
+ * this scheduler could track which thresholds have already fired and catch
+ * up if a day's run is missed — but the code used only an exact
+ * {@code endDate = today+N} match with no persistence of what had already
+ * been sent. That means a missed run permanently skips that contract's
+ * reminder for that threshold — no way to catch up. Fixed by switching to a
+ * range query ({@link ContractRepository#findSignedExpiringWithin}) plus
+ * {@code Contract.isReminderSent()}/{@code markReminderSent()}, which
+ * actually uses those columns and self-heals across missed runs.
+ * <p>
+ * KNOWN REMAINING GAP: "notify the owner" (the doc comment on the original
+ * version's intent) isn't implemented — there's no user-lookup port
+ * available to this module to resolve {@code Contract.createdBy} to an
+ * email address, mirroring the same integration gap already solved for
+ * Earthmoving/Fleet via {@code TenantAdminRecipients}. Until a dedicated
+ * "resolve this specific user" lookup exists, reminders go out to contract
+ * parties with a real email on file only. Worth revisiting once that lookup
+ * exists rather than guessing at one here.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ContractExpiryScheduler {
 
+    private static final int[] REMINDER_THRESHOLDS = {30, 14, 7, 1};
+
     private final ContractRepository contractRepo;
-    private final EmailService       emailService;
+    private final ContractPartyRepository partyRepo;
+    private final EmailService emailService;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("d MMMM yyyy");
 
-    /**
-     * Expire contracts past their end_date — runs at 01:00 SAST daily.
-     * "Africa/Johannesburg" zone is applied via spring.task.scheduling.zone config.
-     */
     @Scheduled(cron = "0 0 1 * * *", zone = "Africa/Johannesburg")
+    @Transactional
     public void expireContracts() {
         LocalDate today = LocalDate.now();
         log.info("[SCHEDULER] Checking for expired contracts on {}", today);
 
-        Set<UUID> tenantIds = findAllTenantIds();
+        List<UUID> tenantIds = contractRepo.findDistinctActiveTenantIds();
         int count = 0;
 
         for (UUID rawId : tenantIds) {
@@ -73,42 +103,72 @@ public class ContractExpiryScheduler {
     }
 
     /**
-     * Renewal reminders — runs at 09:00 SAST daily.
-     * Sends reminders 30, 14, 7, and 1 days before contract end_date.
+     * Renewal reminders — runs at 09:00 SAST daily. Range-based and
+     * idempotency-tracked per threshold (see class Javadoc, fix #3) instead
+     * of the previous exact-date match.
      */
     @Scheduled(cron = "0 0 9 * * *", zone = "Africa/Johannesburg")
+    @Transactional
     public void sendRenewalReminders() {
         LocalDate today = LocalDate.now();
-        int[] alertDays = {30, 14, 7, 1};
+        LocalDate cutoff = today.plusDays(REMINDER_THRESHOLDS[0]);
         log.info("[SCHEDULER] Checking renewal reminders for {}", today);
 
-        Set<UUID> tenantIds = findAllTenantIds();
+        List<UUID> tenantIds = contractRepo.findDistinctActiveTenantIds();
+        int sent = 0;
 
-        for (int days : alertDays) {
-            LocalDate alertDate = today.plusDays(days);
-            for (UUID rawId : tenantIds) {
-                TenantId tenantId = TenantId.of(rawId);
-                List<Contract> expiring = contractRepo.findExpiringOn(tenantId, alertDate);
-                for (Contract c : expiring) {
-                    sendRenewalReminderEmail(c, days);
+        for (UUID rawId : tenantIds) {
+            TenantId tenantId = TenantId.of(rawId);
+            List<Contract> candidates = contractRepo.findSignedExpiringWithin(tenantId, today, cutoff);
+
+            for (Contract c : candidates) {
+                long daysUntil = ChronoUnit.DAYS.between(today, c.getEndDate());
+                for (int threshold : REMINDER_THRESHOLDS) {
+                    if (daysUntil <= threshold && !c.isReminderSent(threshold)) {
+                        if (sendRenewalReminderEmail(c, (int) daysUntil)) {
+                            sent++;
+                        }
+                        c.markReminderSent(threshold);
+                        contractRepo.save(c);
+                        break;
+                    }
                 }
             }
         }
+        log.info("[SCHEDULER] Renewal reminder run complete — {} emails sent", sent);
     }
 
-    private void sendRenewalReminderEmail(Contract c, int daysLeft) {
+    /**
+     * FIX #1: parties are now actually loaded before being used — previously
+     * this always iterated an empty transient list. Returns true if at least
+     * one email was actually sent, so the caller can report a real count
+     * instead of assuming success.
+     */
+    private boolean sendRenewalReminderEmail(Contract c, int daysLeft) {
+        List<ContractParty> parties = partyRepo.findByContract(c.getId());
+        c.setParties(parties);
+
         String endDate = c.getEndDate() != null ? c.getEndDate().format(DATE_FMT) : "unknown";
         String subject = "Contract expiring in " + daysLeft + " day" + (daysLeft == 1 ? "" : "s")
                 + ": " + c.getTitle();
         String body = buildRenewalBody(c.getTitle(), c.getContractNumber(), endDate, daysLeft);
 
-        // Notify all signed parties and the owner
-        c.getParties().stream()
-                .filter(p -> p.getEmail() != null && !p.getEmail().isBlank())
-                .forEach(p -> emailService.send(p.getEmail(), subject, body));
+        boolean anySent = false;
+        for (ContractParty p : parties) {
+            if (p.getEmail() != null && !p.getEmail().isBlank()) {
+                emailService.send(p.getEmail(), subject, body);
+                anySent = true;
+            }
+        }
 
-        log.info("[SCHEDULER] Renewal reminder sent for contract={} expiresIn={}d",
-                c.getContractNumber(), daysLeft);
+        if (anySent) {
+            log.info("[SCHEDULER] Renewal reminder sent for contract={} expiresIn={}d recipients={}",
+                    c.getContractNumber(), daysLeft, parties.size());
+        } else {
+            log.warn("[SCHEDULER] Renewal reminder due for contract={} expiresIn={}d but no party had a usable "
+                    + "email address — nobody was actually notified", c.getContractNumber(), daysLeft);
+        }
+        return anySent;
     }
 
     private String buildRenewalBody(String title, String number, String endDate, int daysLeft) {
@@ -127,15 +187,5 @@ public class ContractExpiryScheduler {
             </div>
             </body></html>
             """.formatted(title, number, urgency, daysLeft, daysLeft == 1 ? "" : "s", endDate);
-    }
-
-    /**
-     * Finds all distinct tenant IDs that have at least one contract.
-     * In production, replace with a TenantService.findAllActive() call.
-     */
-    private Set<UUID> findAllTenantIds() {
-        return contractRepo.findAll().stream()
-                .map(c -> c.getTenantId())
-                .collect(Collectors.toSet());
     }
 }

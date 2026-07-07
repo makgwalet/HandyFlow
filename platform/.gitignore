@@ -35,3 +35,8 @@ build/
 
 $env:MAIL_USERNAME = "makgwale10111@gmail.com"
 $env:MAIL_PASSWORD = "vvmqpuluhrxrecxh"
+
+.env
+.env.local
+!.env.example
+

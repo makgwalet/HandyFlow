@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import za.co.handyflow.platform.contracting.domain.model.ContractSigningToken;
+import za.co.handyflow.platform.contracting.domain.repository.ContractSigningTokenRepository;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -38,7 +40,18 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SigningTokenService {
 
-    @Value("${contracting.signing.secret:handyflow-signing-secret-change-in-production}")
+    private final ContractSigningTokenRepository signingTokenRepo;
+
+    // FIX: was @Value("${contracting.signing.secret:handyflow-signing-secret-change-in-production}")
+    // — a second, dormant copy of the exact same insecure fallback already
+    // removed from application.yaml. It's currently unreachable in practice
+    // (application.yaml defines contracting.signing.secret via a required
+    // env var with no yaml-level default of its own, so this Java-level
+    // default only matters if that property were ever removed from
+    // application.yaml entirely) — but "currently unreachable" is exactly
+    // the kind of latent landmine that resurfaces the next time someone
+    // refactors config without knowing this was here. No fallback now.
+    @Value("${contracting.signing.secret}")
     private String signingSecret;
 
     @Value("${contracting.signing.base-url:http://localhost:5173}")
@@ -80,7 +93,28 @@ public class SigningTokenService {
 
     /**
      * Validates a signing token. Returns the decoded SigningClaims if valid,
-     * or throws IllegalArgumentException if expired, tampered, or malformed.
+     * or throws IllegalArgumentException if expired, tampered, malformed,
+     * already used, or revoked.
+     * <p>
+     * FIX: previously this method ONLY checked the HMAC signature and the
+     * expiry embedded in the token's own payload — a purely stateless check
+     * against the token string itself, never touching the database. That
+     * meant a token could pass this check even after the party had already
+     * signed (usedAt set) or after a resend had revoked it (revokedAt set),
+     * because those two facts only exist in the database, not in the token.
+     * <p>
+     * Every one of PublicSigningController's endpoints calls this method
+     * first, before doing anything else — {@code submitSign}/{@code decline}
+     * happened to get a DB-backed check anyway because
+     * {@code ContractingService.signByToken()}/{@code declineByToken()}
+     * separately call {@code findValidToken()} — but
+     * {@code getContractForSigning}, {@code requestOtp}, {@code addComment},
+     * and {@code getComments} had no such second check, so a used or revoked
+     * token could still view the contract, request fresh OTPs, and post
+     * comments for the rest of its 72-hour validity window. Strengthening
+     * this one shared method closes the gap for all of them at once, rather
+     * than patching each endpoint (or each ContractingService method)
+     * individually.
      */
     public SigningClaims validateToken(String token) {
         try {
@@ -106,6 +140,18 @@ public class SigningTokenService {
             String expected   = hmacSha256(payload, signingSecret);
             if (!constantTimeEquals(signature, expected))
                 throw new IllegalArgumentException("Invalid signing token — possible tampering");
+
+            // FIX: the DB-backed half of validation, previously missing here.
+            String tokenHash = sha256(token);
+            ContractSigningToken st = signingTokenRepo.findByTokenHash(tokenHash)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Signing link not found — it may have been superseded by a newer one."));
+            if (st.getRevokedAt() != null)
+                throw new IllegalArgumentException(
+                        "This signing link has been revoked. Ask the sender to resend.");
+            if (st.getUsedAt() != null)
+                throw new IllegalArgumentException(
+                        "This signing link has already been used.");
 
             return new SigningClaims(partyId, contractId, tenantId,
                     Instant.ofEpochSecond(expiresAt));

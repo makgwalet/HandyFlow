@@ -17,7 +17,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import {
   CheckCircle, AlertTriangle, Clock, User,
@@ -205,6 +205,12 @@ export default function SigningPage() {
     retry: false,
   })
 
+  // FIX: needed by postCommentMut below — previously this file never
+  // imported/used useQueryClient at all, so a successfully posted comment
+  // had no way to make its way back into the visible contract.comments
+  // list short of a manual page reload.
+  const queryClient = useQueryClient()
+
   useEffect(() => {
     if (!contract) return
 
@@ -260,7 +266,16 @@ export default function SigningPage() {
     mutationFn: () => apiClient.post(`/api/v1/sign/${token}/comment`, {
       comment: commentText, clauseRef: clauseRef || null, isAmendmentRequest: isAmendment,
     }),
-    onSuccess: () => { setCommentText(''); setClauseRef(''); setIsAmendment(false); setErrMsg('') },
+    onSuccess: () => {
+      setCommentText(''); setClauseRef(''); setIsAmendment(false); setErrMsg('')
+      // FIX: was missing entirely — the comment saved correctly on the
+      // backend (confirmed by the 200 response reaching here at all) but
+      // the on-screen comments list is just a snapshot from the initial
+      // GET /contract fetch, which nothing was ever telling to refresh.
+      // Without this, a genuinely successful post looked indistinguishable
+      // from a silently swallowed failure until the page was manually reloaded.
+      queryClient.invalidateQueries({ queryKey: ['public-contract', token] })
+    },
     onError: (e: any) => setErrMsg(e.response?.data?.message ?? 'Failed to post comment'),
   })
 

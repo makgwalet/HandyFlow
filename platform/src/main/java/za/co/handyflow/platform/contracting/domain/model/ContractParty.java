@@ -34,23 +34,28 @@ public class ContractParty {
     @Column(name = "created_at")    Instant createdAt;
     @Column(name = "updated_at")    Instant updatedAt;
 
-    @Column(name = "signing_token", length = 512)
-   private String signingToken;
+    // FIX: removed `signingToken` field (was @Column(name = "signing_token")) —
+    // it duplicated the raw token already stored (correctly, alongside its
+    // SHA-256 hash) on ContractSigningToken, as a second, unsynchronized copy
+    // with none of that entity's expiry/revocation/used tracking. See
+    // ContractingService.notifyNextParty() for where this is now sourced from
+    // instead: signingTokenRepo.findActiveByPartyId(...). signingTokenSentAt
+    // (an audit timestamp, not a secret) is unaffected and stays as-is.
 
-   @Column(name = "signing_token_sent_at")
-   private Instant signingTokenSentAt;
+    @Column(name = "signing_token_sent_at")
+    private Instant signingTokenSentAt;
 
-   @Column(name = "email_sent_at")
-   private Instant emailSentAt;
+    @Column(name = "email_sent_at")
+    private Instant emailSentAt;
 
-   @Column(name = "declined_at")
-   private Instant declinedAt;
+    @Column(name = "declined_at")
+    private Instant declinedAt;
 
-   @Column(name = "decline_reason")
-   private String declineReason;
+    @Column(name = "decline_reason")
+    private String declineReason;
 
-   @Column(name = "viewed_at")
-   private Instant viewedAt;
+    @Column(name = "viewed_at")
+    private Instant viewedAt;
 
     public static ContractParty create(TenantId tenantId, UUID contractId,
                                        String partyType, String partyRole,
@@ -95,9 +100,9 @@ public class ContractParty {
     }
 
     public void setSigningStatus(String status) { this.signingStatus = status; }
-   public void setDeclinedAt(Instant t)        { this.declinedAt = t; }
-   public void setDeclineReason(String r)      { this.declineReason = r; }
-   public void setViewedAt(Instant t)          { this.viewedAt = t; }
-   public void setSigningToken(String token)   { this.signingToken = token; }
-   public void setEmailSentAt(Instant t)       { this.emailSentAt = t; }
+    public void setDeclinedAt(Instant t)        { this.declinedAt = t; }
+    public void setDeclineReason(String r)      { this.declineReason = r; }
+    public void setViewedAt(Instant t)          { this.viewedAt = t; }
+    // FIX: setSigningToken(String) removed along with the field it wrote to.
+    public void setEmailSentAt(Instant t)       { this.emailSentAt = t; }
 }

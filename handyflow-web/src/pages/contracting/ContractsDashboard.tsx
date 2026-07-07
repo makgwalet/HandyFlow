@@ -182,8 +182,14 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                 {pending.slice(0, 4).map(c => {
-                  const unsigned = (c.parties ?? []).filter((p: any) => p.signingStatus !== 'SIGNED').length
-                  const total    = (c.parties ?? []).length
+                  // FIX: was (c.parties ?? []).filter(...) / (c.parties ?? []).length —
+                  // ContractSummaryResponse (what this list endpoint actually
+                  // returns) has never had a `parties` array, only
+                  // signedPartyCount/totalPartyCount as plain integers. That
+                  // meant `total` was always 0, so this line never rendered
+                  // for any contract, ever.
+                  const total    = c.totalPartyCount ?? 0
+                  const unsigned = total - (c.signedPartyCount ?? 0)
                   return (
                     <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 16px', border: '1px solid #BFDBFE', borderLeft: '3px solid #1D4ED8', borderRadius: 8, background: '#F8FBFF' }}>
                       <div>

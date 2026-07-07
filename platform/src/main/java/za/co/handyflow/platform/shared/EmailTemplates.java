@@ -201,6 +201,47 @@ public class EmailTemplates {
             """.formatted(partyName, contractTitle, contractNumber, signedAt, frontendUrl));
     }
 
+    // ── Contracting — contract terminated ────────────────────────────────────
+
+    /**
+     * Sent to all signed parties and the owner when a SIGNED contract is
+     * terminated. NEW — previously nobody was notified of a termination at
+     * all; the contract just silently flipped status with no record of
+     * anyone being told, despite this being exactly as significant an event
+     * as full execution.
+     *
+     * @param partyName      Recipient's name (party or owner)
+     * @param contractTitle  Contract title
+     * @param contractNumber Contract number
+     * @param reason         Termination reason (required by the API, but
+     *                       defensively handled here in case it's ever blank)
+     * @param terminatedAt   Formatted termination timestamp
+     * @param frontendUrl    Base URL
+     */
+    public static String contractTerminated(String partyName, String contractTitle,
+                                            String contractNumber, String reason,
+                                            String terminatedAt, String frontendUrl) {
+        String reasonBlock = (reason != null && !reason.isBlank())
+                ? "<p><strong>Reason:</strong><br/>" + org.springframework.web.util.HtmlUtils.htmlEscape(reason) + "</p>"
+                : "<p style=\"color:#94A3B8;font-size:13px;\">No reason was recorded.</p>";
+
+        return wrap("""
+            <p>Dear <strong>%s</strong>,</p>
+            <p>The following contract has been terminated:</p>
+            <div class="highlight-red">
+              <p><strong>%s</strong> &nbsp;&middot;&nbsp; %s<br/>
+                 <span style="font-size:12px;font-weight:400;color:#4B5563">
+                   Terminated on %s
+                 </span>
+              </p>
+              %s
+            </div>
+            <p>A copy of the contract, including its signing audit trail up to the point
+               of termination, is attached to this email for your records.</p>
+            <a href="%s/contracts" class="btn btn-red">View in HandyFlow</a>
+            """.formatted(partyName, contractTitle, contractNumber, terminatedAt, reasonBlock, frontendUrl));
+    }
+
     // ── Contracting — party declined ─────────────────────────────────────────
 
     /**

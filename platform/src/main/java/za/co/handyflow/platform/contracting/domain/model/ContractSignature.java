@@ -25,10 +25,19 @@ public class ContractSignature {
     @Column(name = "signed_at")    Instant signedAt;
     @Column(name = "signature_data") String signatureData;
 
+    // NEW: distinguishes a signature captured in-person by an authenticated
+    // staff member (witnessing the party sign on a shared device) from the
+    // normal remote flow where the party signs entirely themselves via an
+    // emailed link. Null for the remote flow — only set when
+    // ContractingService.signInPerson() records the signature.
+    @Column(name = "witnessed_by_user_id")
+    UUID witnessedByUserId;
+
     public static ContractSignature create(TenantId tenantId, UUID contractId,
                                            UUID partyId, String otpCodeHash,
                                            String phoneLast4, String ipAddress,
-                                           String userAgent, String signatureData) {
+                                           String userAgent, String signatureData,
+                                           UUID witnessedByUserId) {
         ContractSignature s = new ContractSignature();
         s.id            = UUID.randomUUID();
         s.tenantId      = tenantId.getValue();
@@ -39,6 +48,7 @@ public class ContractSignature {
         s.ipAddress     = ipAddress;
         s.userAgent     = userAgent;
         s.signatureData = signatureData;
+        s.witnessedByUserId = witnessedByUserId;
         s.signedAt      = Instant.now();
         return s;
     }

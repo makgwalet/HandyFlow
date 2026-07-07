@@ -34,6 +34,11 @@ public record ContractResponse(
         Instant    terminatedAt,
         String     terminationReason,
         List<PartyResponse> parties,
+        // NEW: was missing entirely — comments could be posted (once the
+        // staff-comment endpoint exists) but had nowhere to be read back
+        // from on this response, so they'd never actually appear on screen
+        // even after a successful post and a refetch.
+        List<CommentView> comments,
         Instant    createdAt,
         Instant    updatedAt
 ) {}

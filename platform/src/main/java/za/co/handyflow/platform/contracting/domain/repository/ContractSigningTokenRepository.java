@@ -12,13 +12,21 @@ import java.util.UUID;
 
 /**
  * File: contracting/domain/repository/ContractSigningTokenRepository.java
+ *
+ * FIX: findByToken(String) was a Spring Data derived query mapping straight
+ * to WHERE token = ?, querying the raw column directly — despite V56's own
+ * migration comment stating the intent was to look tokens up by
+ * SHA-256(token) instead and stop querying the raw column. That never
+ * actually happened; this repository is the fix. Callers now hash the
+ * incoming token themselves and look it up via findByTokenHash() — see
+ * ContractingService.findValidToken().
  */
 @Repository
 public interface ContractSigningTokenRepository
         extends JpaRepository<ContractSigningToken, UUID> {
 
-    /** Lookup by token string — used to validate every inbound signing request. */
-    Optional<ContractSigningToken> findByToken(String token);
+    /** Lookup by SHA-256(token) — used to validate every inbound signing request. */
+    Optional<ContractSigningToken> findByTokenHash(String tokenHash);
 
     /**
      * Returns the most recent non-revoked, non-used token for a party.

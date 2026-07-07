@@ -223,6 +223,31 @@ public class CreativeService {
         jobRepo.findById(proof.getJobId()).ifPresent(job -> {
             job.requestRevision();
             jobRepo.save(job);
+
+            // FIX: the public controller's success message for this action
+            // literally says "Your designer has been notified" — but nothing
+            // here ever notified anyone. Notify whoever is actually
+            // responsible for the job: the assigned designer if one is set,
+            // falling back to whoever created it if not. Wrapped so a
+            // notification failure can never affect the client-facing
+            // rejection that already succeeded — same principle as every
+            // other notification call site fixed this session.
+            try {
+                UUID recipientId = job.getAssignedTo() != null ? job.getAssignedTo() : job.getCreatedBy();
+                String recipientEmail = fetchUserEmail(recipientId);
+                if (recipientEmail != null) {
+                    emailService.send(recipientEmail,
+                            "Changes requested: " + job.getTitle(),
+                            buildRejectionNotificationEmail(job.getTitle(), proof.getVersionNumber(), req.reason()));
+                } else {
+                    log.warn("Proof={} rejected but no notifiable email found for job={} " +
+                                    "(assignedTo={}, createdBy={}) — nobody was actually notified",
+                            proof.getId(), job.getId(), job.getAssignedTo(), job.getCreatedBy());
+                }
+            } catch (Exception e) {
+                log.error("Failed to send rejection notification for proof={}: {}",
+                        proof.getId(), e.getMessage(), e);
+            }
         });
 
         log.info("Proof={} rejected: {}", proof.getId(), req.reason());
@@ -341,6 +366,65 @@ public class CreativeService {
             return jdbc.queryForObject("SELECT name FROM tenants WHERE id = ?",
                     String.class, tenantId.getValue());
         } catch (Exception e) { return "HandyFlow"; }
+    }
+
+    /**
+     * FIX: was hardcoded to "Team Member" on CreativeController directly,
+     * with a comment claiming it resolved from the DB when it never did —
+     * every team comment was attributed to the same fake name regardless of
+     * who actually wrote it. Moved here (this class already has the jdbc
+     * dependency and the identical pattern in fetchTenantName above) rather
+     * than adding a new dependency to the controller. Falls back to "Team
+     * Member" only if the user genuinely can't be found — not as the
+     * default outcome.
+     */
+    public String fetchUserName(UUID userId) {
+        if (userId == null) return "Team Member";
+        try {
+            return jdbc.queryForObject(
+                    "SELECT TRIM(CONCAT(first_name, ' ', last_name)) FROM users WHERE id = ?",
+                    String.class, userId);
+        } catch (Exception e) {
+            return "Team Member";
+        }
+    }
+
+    /** Returns null (not a placeholder) if no email is found — callers must handle that explicitly. */
+    private String fetchUserEmail(UUID userId) {
+        if (userId == null) return null;
+        try {
+            return jdbc.queryForObject("SELECT email FROM users WHERE id = ?", String.class, userId);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String buildRejectionNotificationEmail(String jobTitle, int versionNumber, String reason) {
+        String reasonHtml = reason != null && !reason.isBlank()
+                ? org.springframework.web.util.HtmlUtils.htmlEscape(reason)
+                : "No specific reason was provided.";
+        return """
+            <!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+            <body style="font-family:Arial,sans-serif;background:#F1F5F9;margin:0;padding:0;">
+              <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+                <div style="background:#1B3A6B;padding:28px 32px;">
+                  <h1 style="color:#fff;margin:0;font-size:20px">Changes Requested</h1>
+                  <p style="color:rgba(255,255,255,0.7);margin:4px 0 0;font-size:13px">Creative Studio — Proof Review</p>
+                </div>
+                <div style="padding:32px;">
+                  <p style="color:#374151;font-size:14px;line-height:1.6">
+                    The client has requested changes on <strong>%s</strong> (Version %d).
+                  </p>
+                  <div style="background:#FEF2F2;border-left:3px solid #DC2626;padding:12px 16px;border-radius:0 8px 8px 0;">
+                    <p style="margin:0;color:#991B1B;font-size:13px;line-height:1.6;">%s</p>
+                  </div>
+                  <p style="color:#64748B;font-size:13px;margin-top:20px;">
+                    Log into HandyFlow to review the full feedback and upload a revised version.
+                  </p>
+                </div>
+              </div>
+            </body></html>
+            """.formatted(jobTitle, versionNumber, reasonHtml);
     }
 
     private String buildApprovalEmail(String tenantName, CreProof proof,
