@@ -30,6 +30,7 @@ const CONTRACT_TYPES = [
   { value: 'SERVICE_LEVEL',     label: 'Service Level Agreement'  },
   { value: 'CONSULTING',        label: 'Consulting Agreement'     },
   { value: 'RETAINER',          label: 'Retainer Agreement'       },
+  { value: 'ACKNOWLEDGMENT_OF_DEBT', label: 'Acknowledgment of Debt' },
   { value: 'OTHER',             label: 'Other'                    },
 ]
 
@@ -37,7 +38,7 @@ const TYPE_COLOR: Record<string, string> = {
   SERVICE_AGREEMENT: '#0D9488', NDA: '#7C3AED', EMPLOYMENT: '#1D4ED8',
   JOINT_VENTURE: '#D97706', EQUIPMENT_HIRE: '#EA580C', LEASE: '#166534',
   SUPPLY: '#0891B2', SUBCONTRACTOR: '#DC2626', SERVICE_LEVEL: '#6366F1',
-  CONSULTING: '#DB2777', RETAINER: '#854D0E', OTHER: '#64748B',
+  CONSULTING: '#DB2777', RETAINER: '#854D0E', ACKNOWLEDGMENT_OF_DEBT: '#B45309', OTHER: '#64748B',
 }
 
 interface Template {

@@ -30,6 +30,15 @@ public enum ActivityType {
     BOOKING_LINKED,
     INVOICE_LINKED,
     QUOTE_LINKED,
+    // NEW: written by CrmFacade.notifyMarketingConsentChanged() — the
+    // Marketing module's opt-in/opt-out flow previously had no facade
+    // method to call at all, so these events never reached a customer's
+    // timeline. Deliberately two distinct types (not one
+    // MARKETING_CONSENT_CHANGED with a boolean payload) to match how
+    // STATUS_CHANGED-style events read on the timeline UI — "opted out"
+    // is a more useful label at a glance than "consent changed: false".
+    MARKETING_OPTED_IN,
+    MARKETING_OPTED_OUT,
 
     // ── POPIA / compliance ────────────────────────────────────────────────
     RETENTION_REVIEW_REQUIRED  // System flag: data retention period expired

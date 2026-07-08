@@ -3,7 +3,7 @@
 // Accessed via: /creative/approve/:token
 // The token comes from the approval email sent by the designer.
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
@@ -15,6 +15,14 @@ import {
 
 const inp: React.CSSProperties = { width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0', borderRadius: 9, fontSize: 14, boxSizing: 'border-box' as const, background: '#fff', outline: 'none', fontFamily: 'inherit' }
 const lbl: React.CSSProperties = { display: 'block', fontSize: 12, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 7 }
+
+// NEW: shared by the comment form and the comment list — "0:45" not "45s".
+const formatTimecode = (seconds: number) => {
+  const total = Math.round(seconds)
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
 
 type View = 'proof' | 'approved' | 'rejected' | 'error' | 'already_done'
 
@@ -31,6 +39,11 @@ export function CreativeApprovePage() {
   const [showComments, setShowComments] = useState(true)
   const [showReject,   setShowReject]   = useState(false)
   const [errorMsg,     setErrorMsg]     = useState('')
+  const [tagTimecode,  setTagTimecode]  = useState(true)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [pendingPin, setPendingPin] = useState<{ x: number; y: number } | null>(null)
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null)
+  const imageWrapRef = useRef<HTMLDivElement>(null)
 
   // Load proof data
   const { data: proof, isLoading, error: loadError } = useQuery<any>({
@@ -69,8 +82,17 @@ export function CreativeApprovePage() {
     mutationFn: () => apiClient.post(`/api/v1/creative/approve/${token}/comments`, {
       comment: comment.trim(),
       authorName: commentName.trim() || 'Client',
+      // NEW: only meaningful for video proofs, and only when the client
+      // actually wants this comment tied to a moment — read at submit time
+      // rather than tracked continuously in state, since we only need the
+      // value once, at the instant of posting.
+      timecodeSeconds: tagTimecode && videoRef.current ? videoRef.current.currentTime : null,
+      // NEW: set only when the client clicked a point on the image before
+      // writing this comment — see the image click handler below.
+      anchorX: pendingPin?.x ?? null,
+      anchorY: pendingPin?.y ?? null,
     }),
-    onSuccess: () => { setCommentSent(true); setComment(''); setTimeout(() => setCommentSent(false), 3000) },
+    onSuccess: () => { setCommentSent(true); setComment(''); setPendingPin(null); setTimeout(() => setCommentSent(false), 3000) },
     onError: (e: any) => setErrorMsg(e.response?.data?.message ?? 'Failed to add comment.'),
   })
 
@@ -165,7 +187,7 @@ export function CreativeApprovePage() {
 
   return (
     <Page tenantName={proof.tenantName}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } } @keyframes fadeIn { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: translateY(0) } }`}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } } @keyframes fadeIn { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: translateY(0) } } @keyframes pulse { 0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1 } 50% { transform: translate(-50%, -50%) scale(1.4); opacity: 0.5 } }`}</style>
 
       {/* Job context header */}
       <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 14, padding: '20px 24px', marginBottom: 20, animation: 'fadeIn 0.3s ease' }}>
@@ -187,6 +209,37 @@ export function CreativeApprovePage() {
         </div>
       </div>
 
+      {/* NEW: multi-stakeholder chain visibility — completely absent for
+          SINGLE-mode proofs, which is the vast majority and behaves exactly
+          as it always has. Shows who this link belongs to and where
+          everyone else in the chain stands, read-only (no tokens exposed). */}
+      {proof.approvalMode && proof.approvalMode !== 'SINGLE' && (
+        <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '14px 18px', marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#1D4ED8', marginBottom: 8 }}>
+            {proof.approvalMode === 'SEQUENTIAL' ? 'Sequential' : 'Parallel'} approval
+            {proof.myApproverName && <> — you are <strong>{proof.myApproverName}</strong></>}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {(proof.otherApprovers ?? []).map((a: any) => {
+              const isMe = a.approverName === proof.myApproverName
+              const label = a.status === 'APPROVED' ? 'Approved'
+                : a.status === 'REJECTED' ? 'Requested changes'
+                : isMe ? 'Your review' : 'Pending';
+              const color = a.status === 'APPROVED' ? '#166534'
+                : a.status === 'REJECTED' ? '#DC2626' : '#94A3B8';
+              return (
+                <div key={a.approvalOrder} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                  <span style={{ color: isMe ? '#1D4ED8' : '#374151', fontWeight: isMe ? 700 : 400 }}>
+                    {a.approvalOrder}. {a.approverName}{isMe && ' (you)'}
+                  </span>
+                  <span style={{ color, fontWeight: 600 }}>{label}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Proof preview */}
       <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 14, overflow: 'hidden', marginBottom: 20, animation: 'fadeIn 0.35s ease' }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -199,13 +252,58 @@ export function CreativeApprovePage() {
         <div style={{ padding: 20, minHeight: 200, background: '#F9FAFB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {proof.fileUrl ? (
             fileIsImage ? (
-              <img
-                src={`data:${proof.fileType || 'image/png'};base64,${proof.fileUrl}`}
-                alt={proof.fileName ?? 'Proof'}
-                style={{ maxWidth: '100%', maxHeight: 600, borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.12)' }}
-              />
+              <div
+                ref={imageWrapRef}
+                onClick={e => {
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  setPendingPin({
+                    x: (e.clientX - rect.left) / rect.width,
+                    y: (e.clientY - rect.top) / rect.height,
+                  })
+                }}
+                title="Click anywhere on the image to pin your next comment to that spot"
+                style={{ position: 'relative', display: 'inline-block', cursor: 'crosshair', lineHeight: 0 }}>
+                <img
+                  src={`data:${proof.fileType || 'image/png'};base64,${proof.fileUrl}`}
+                  alt={proof.fileName ?? 'Proof'}
+                  style={{ maxWidth: '100%', maxHeight: 600, borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', display: 'block' }}
+                />
+                {/* Existing pinned comments — numbered among pinned comments only, not the whole thread */}
+                {(proof.comments ?? [])
+                  .filter((c: any) => c.anchorX != null)
+                  .map((c: any, i: number) => (
+                    <button
+                      key={c.id}
+                      onClick={ev => {
+                        ev.stopPropagation() // don't also register a new pin click
+                        setHighlightedCommentId(c.id)
+                        document.getElementById(`comment-${c.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                        setTimeout(() => setHighlightedCommentId(null), 2000)
+                      }}
+                      title={c.comment}
+                      style={{
+                        position: 'absolute', left: `${c.anchorX * 100}%`, top: `${c.anchorY * 100}%`,
+                        transform: 'translate(-50%, -50%)', width: 24, height: 24, borderRadius: '50%',
+                        background: c.authorType === 'CLIENT' ? '#0D9488' : '#1B3A6B', color: '#fff',
+                        border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                        fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center', padding: 0,
+                      }}>
+                      {i + 1}
+                    </button>
+                  ))}
+                {/* Pending pin — where the next comment will be anchored if submitted */}
+                {pendingPin && (
+                  <div style={{
+                    position: 'absolute', left: `${pendingPin.x * 100}%`, top: `${pendingPin.y * 100}%`,
+                    transform: 'translate(-50%, -50%)', width: 20, height: 20, borderRadius: '50%',
+                    background: 'rgba(217,119,6,0.25)', border: '2px solid #D97706',
+                    animation: 'pulse 1.2s ease-in-out infinite', pointerEvents: 'none',
+                  }} />
+                )}
+              </div>
             ) : fileIsVideo ? (
-              <video controls style={{ maxWidth: '100%', maxHeight: 500, borderRadius: 8 }}>
+              <video ref={videoRef} controls style={{ maxWidth: '100%', maxHeight: 500, borderRadius: 8 }}>
                 <source src={`data:${proof.fileType};base64,${proof.fileUrl}`} type={proof.fileType} />
               </video>
             ) : fileIsPdf ? (
@@ -249,7 +347,9 @@ export function CreativeApprovePage() {
           {showComments && (
             <div style={{ padding: '14px 20px' }}>
               {proof.comments.map((c: any) => (
-                <div key={c.id} style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+                <div key={c.id} id={`comment-${c.id}`}
+                  style={{ display: 'flex', gap: 10, marginBottom: 12, borderRadius: 10, transition: 'background 0.3s',
+                    background: highlightedCommentId === c.id ? '#FEF3C7' : 'transparent', padding: highlightedCommentId === c.id ? 6 : 0 }}>
                   <div style={{ width: 30, height: 30, borderRadius: '50%', background: c.authorType === 'CLIENT' ? '#0D9488' : '#1B3A6B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#fff', fontWeight: 700, flexShrink: 0 }}>
                     {c.authorName.charAt(0).toUpperCase()}
                   </div>
@@ -258,6 +358,21 @@ export function CreativeApprovePage() {
                       <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>{c.authorName}</span>
                       <span style={{ fontSize: 11, color: '#94A3B8' }}>{c.authorType === 'CLIENT' ? 'You' : 'Designer'}</span>
                     </div>
+                    {c.timecodeSeconds != null && (
+                      <button
+                        onClick={() => { if (videoRef.current) { videoRef.current.currentTime = c.timecodeSeconds; videoRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' }) } }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 6, marginRight: 6, padding: '2px 8px', background: '#EFF6FF', color: '#1D4ED8', border: 'none', borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                        ⏱ {formatTimecode(c.timecodeSeconds)}
+                      </button>
+                    )}
+                    {c.anchorX != null && (
+                      <button
+                        onClick={() => imageWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                        title="Scroll up to see where this is pinned on the image"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 6, padding: '2px 8px', background: '#F0FDF9', color: '#0D9488', border: 'none', borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                        📍 Pinned comment
+                      </button>
+                    )}
                     <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{c.comment}</div>
                   </div>
                 </div>
@@ -282,9 +397,42 @@ export function CreativeApprovePage() {
           <div>
             <label style={lbl}>Comment</label>
             <textarea value={comment} onChange={e => setComment(e.target.value)} rows={3}
-              placeholder="Ask a question, share feedback, or leave a note for the designer..."
+              placeholder={fileIsVideo ? "e.g. At this point the logo should be bigger..." : fileIsImage ? "Click a spot on the image above to pin this comment, or just write a general note..." : "Ask a question, share feedback, or leave a note for the designer..."}
               style={{ ...inp, resize: 'vertical' as const }} />
           </div>
+          {fileIsImage && (
+            pendingPin ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#0D9488', fontWeight: 600 }}>
+                📍 This comment will be pinned to that spot on the image
+                <button onClick={() => setPendingPin(null)} style={{ background: 'none', border: 'none', color: '#94A3B8', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', fontWeight: 400 }}>
+                  Clear pin
+                </button>
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: '#94A3B8' }}>
+                Tip: click anywhere on the image above to pin your next comment to a specific spot.
+              </div>
+            )
+          )}
+          {fileIsVideo && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+              <input type="checkbox" checked={tagTimecode} onChange={e => setTagTimecode(e.target.checked)} />
+              Tag this comment to the current moment in the video
+              {/* NOTE: this preview only updates when something else causes a
+                  re-render (typing, toggling the checkbox) — it's not wired
+                  to the video's own timeupdate event, so it can look briefly
+                  stale while the video is playing. Not a functional bug: the
+                  value actually SENT is always read fresh from
+                  videoRef.current.currentTime at the moment "Send comment" is
+                  clicked, in the mutation above — this label is a best-effort
+                  hint, not the source of truth. */}
+              {tagTimecode && videoRef.current && (
+                <span style={{ fontSize: 11, color: '#1D4ED8', fontWeight: 700 }}>
+                  (⏱ {formatTimecode(videoRef.current.currentTime)})
+                </span>
+              )}
+            </label>
+          )}
           {commentSent && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#166534', fontSize: 13, fontWeight: 600 }}>
               <CheckCircle size={14} /> Comment sent — your designer has been notified.
@@ -311,7 +459,7 @@ export function CreativeApprovePage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
           <div>
             <label style={lbl}>Your full name *</label>
-            <input value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Thabo Modise" style={inp} autoComplete="name" />
+            <input value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Your full name" style={inp} autoComplete="name" />
           </div>
           <div>
             <label style={lbl}>Your email address</label>

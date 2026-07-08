@@ -62,6 +62,29 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
                                       @Param("id") UUID id);
 
     /**
+     * NEW: backs CrmFacade.findActiveCustomersWithEmail() — added for the
+     * Marketing module's contact sync, which previously had no facade
+     * method for enumerating the customer base at all and was reading
+     * `customers` directly via raw SQL instead.
+     * <p>
+     * Deliberately does NOT filter on status = 'ACTIVE' — matching every
+     * other findActiveXxx() query in this file, "active" here means "not
+     * soft-deleted" (deletedAt IS NULL), not a specific business status.
+     * A customer marked INACTIVE or BLOCKED hasn't been deleted and may
+     * still validly want marketing email; only findAllActiveByStatus and
+     * findActiveUpdatedBefore narrow by business status, for their own
+     * specific purposes.
+     */
+    @Query("""
+            SELECT c FROM Customer c
+            WHERE c.tenantId = :tenantId
+              AND c.deletedAt IS NULL
+              AND c.email IS NOT NULL
+            ORDER BY c.name ASC
+            """)
+    List<Customer> findAllActiveWithEmail(@Param("tenantId") TenantId tenantId);
+
+    /**
      * Full-text search using Postgres tsvector (GIN indexed in V8).
      *
      * WHY native query?

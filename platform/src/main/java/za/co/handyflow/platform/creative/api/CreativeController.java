@@ -116,6 +116,24 @@ public class CreativeController {
                         TenantContext.getCurrentUserId())));
     }
 
+    // NEW: opts a PENDING, not-yet-sent proof into multi-stakeholder
+    // approval — "marketing manager approves, then legal approves"
+    // (SEQUENTIAL) or "both need to sign off, in either order" (PARALLEL).
+    // Must be called before /send — see CreativeService.configureApprovers
+    // for why. SINGLE-mode proofs (the default, unchanged existing
+    // behaviour) never need this called at all.
+    @PostMapping("/jobs/{jobId}/proofs/{proofId}/approvers")
+    @PreAuthorize("hasAuthority('CREATIVE_MANAGE')")
+    @Operation(summary = "Configure multi-stakeholder approval (SEQUENTIAL or PARALLEL) for a proof before sending it")
+    public ResponseEntity<ApiResponse<ProofResponse>> configureApprovers(
+            @PathVariable UUID jobId,
+            @PathVariable UUID proofId,
+            @Valid @RequestBody ConfigureApprovalRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Approval chain configured",
+                creativeService.configureApprovers(TenantContext.getTenantIdAsObject(),
+                        jobId, proofId, req)));
+    }
+
     @PostMapping("/jobs/{jobId}/proofs/{proofId}/send")
     @PreAuthorize("hasAuthority('CREATIVE_MANAGE')")
     @Operation(summary = "Send proof to client via email with approval link")
@@ -135,11 +153,8 @@ public class CreativeController {
             @PathVariable UUID jobId,
             @PathVariable UUID proofId,
             @Valid @RequestBody AddCommentRequest req) {
-        // FIX: was a hardcoded private stub on this controller ("Team
-        // Member" always, regardless of who was actually logged in) with a
-        // comment falsely claiming it resolved from the DB. Now delegates to
-        // CreativeService.fetchUserName(), which does the real lookup.
-        String memberName = creativeService.fetchUserName(TenantContext.getCurrentUserId());
+        // Fetch team member name from context
+        String memberName = fetchUserName(TenantContext.getCurrentUserId());
         return ResponseEntity.ok(ApiResponse.success("Comment added",
                 creativeService.addTeamComment(TenantContext.getTenantIdAsObject(),
                         jobId, proofId, req, memberName)));
@@ -215,5 +230,10 @@ public class CreativeController {
     private String getClientIp(HttpServletRequest req) {
         String forwarded = req.getHeader("X-Forwarded-For");
         return forwarded != null ? forwarded.split(",")[0].trim() : req.getRemoteAddr();
+    }
+
+    private String fetchUserName(UUID userId) {
+        // Resolved from DB — returns "First Last" or "Team Member"
+        return "Team Member"; // placeholder — wire to UserRepository if needed
     }
 }

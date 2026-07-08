@@ -8,5 +8,8 @@ public record CommentResponse(
         String  authorName,
         String  authorType,   // TEAM | CLIENT
         String  comment,
+        Double  timecodeSeconds,
+        Double  anchorX,
+        Double  anchorY,
         Instant createdAt
 ) {}

@@ -29,6 +29,7 @@ import { CreativePage }                 from './pages/creative/CreativePage'
 import { DeskPage }                     from './pages/desk/DeskPage'
 import { TasksPage }                    from './pages/tasks/TasksPage'
 import { MarketingPage }                from './pages/marketing/MarketingPage'
+import UnsubscribePage                  from './pages/marketing/UnsubscribePage'
 import { RecruiterPage }                from './pages/recruiter/RecruiterPage'
 import { PosPage }                      from './pages/pos/PosPage'
 import { AccountantPage }               from "./pages/accountant/AccountantPage"
@@ -47,6 +48,7 @@ import { ProjectsPage }     from "./pages/projects/ProjectsPage"
 import { ProjectDetailPage } from "./pages/projects/ProjectDetailPage"
 import { ClientPortalPage }  from "./pages/projects/ClientPortalPage"
 import { EarthMovingPage } from "./pages/earthmoving/EarthMovingPage"
+import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage"
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -67,6 +69,7 @@ export default function App() {
           <Route path="/login"    element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+          <Route path="/forgot-password"           element={<ForgotPasswordPage />} />
 
           {/* Client portal — public, intentionally outside ModuleLayout (no nav bar) */}
           <Route path="/projects/portal/:token" element={<ClientPortalPage />} />
@@ -75,6 +78,7 @@ export default function App() {
           {/* Token-secured routes — also outside ModuleLayout */}
           <Route path="/sign/:token"                   element={<SigningPage />} />
           <Route path="/creative/approve/:token"       element={<CreativeApprovePage />} />
+          <Route path="/unsubscribe/:token"            element={<UnsubscribePage />} />
 
           {/* All module pages — inside ModuleLayout so the nav bar appears */}
           <Route element={<ProtectedRoute><ModuleLayout /></ProtectedRoute>}>
@@ -112,7 +116,7 @@ export default function App() {
             <Route path="/recurring/new"          element={<CreateRecurringSchedulePage />} />
             <Route path="/recurring"              element={<InvoicingPage />} />
             <Route path="/supply-chain"           element={<SupplyChainPage />} />
-
+            
             {/* ── Projects ── */}
             {/*
              * /projects        → ProjectsPage (dashboard + list, single-page shell like ClinicPage)

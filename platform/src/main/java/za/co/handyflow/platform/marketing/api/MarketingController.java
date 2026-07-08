@@ -6,6 +6,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +17,7 @@ import za.co.handyflow.platform.marketing.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
+import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
@@ -168,5 +172,29 @@ public class MarketingController {
         marketingService.handleUnsubscribe(token);
         return ResponseEntity.ok(ApiResponse.success(
                 "You have been unsubscribed. You will no longer receive marketing emails.", null));
+    }
+
+    // ── PUBLIC open/click tracking (no auth — fired directly by an email client) ──
+    // SecurityConfig must have /api/v1/marketing/track/** in permitAll() too —
+    // same requirement as unsubscribe above, easy to miss adding twice.
+
+    @GetMapping(value = "/track/open/{campaignContactId}", produces = MediaType.IMAGE_GIF_VALUE)
+    @Operation(summary = "PUBLIC — 1x1 tracking pixel, records a campaign email open")
+    public ResponseEntity<byte[]> trackOpen(@PathVariable UUID campaignContactId) {
+        byte[] pixel = marketingService.trackOpen(campaignContactId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CACHE_CONTROL, "no-store, no-cache, must-revalidate")
+                .contentType(MediaType.IMAGE_GIF)
+                .body(pixel);
+    }
+
+    @GetMapping("/track/click/{campaignContactId}")
+    @Operation(summary = "PUBLIC — records a campaign link click, then redirects to the real destination")
+    public ResponseEntity<Void> trackClick(@PathVariable UUID campaignContactId,
+                                           @RequestParam String url) {
+        String target = marketingService.trackClick(campaignContactId, url);
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create(target))
+                .build();
     }
 }

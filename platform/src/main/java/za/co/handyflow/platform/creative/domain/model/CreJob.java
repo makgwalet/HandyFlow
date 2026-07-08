@@ -41,6 +41,11 @@ public class CreJob {
 
     private String notes;
 
+    // NEW: prevents CreativeNotificationScheduler's overdue-job alert from
+    // firing every single day for the same job once it crosses its due
+    // date — same idempotency principle as the proof reminder above.
+    @Column(name = "overdue_alert_sent_at") private Instant overdueAlertSentAt;
+
     @Column(name = "assigned_to") private UUID    assignedTo;
     @Column(name = "created_by")  private UUID    createdBy;
     @Column(name = "created_at")  private Instant createdAt;
@@ -50,10 +55,10 @@ public class CreJob {
     @Version private Long version;
 
     public static CreJob create(TenantId tenantId, UUID customerId, String clientName,
-                                 String clientEmail, String title, String jobType,
-                                 String description, String brief, String priority,
-                                 LocalDate dueDate, BigDecimal budget, BigDecimal quotedAmount,
-                                 UUID assignedTo, String notes, UUID createdBy) {
+                                String clientEmail, String title, String jobType,
+                                String description, String brief, String priority,
+                                LocalDate dueDate, BigDecimal budget, BigDecimal quotedAmount,
+                                UUID assignedTo, String notes, UUID createdBy) {
         CreJob j        = new CreJob();
         j.tenantId      = tenantId;
         j.customerId    = customerId;
@@ -89,11 +94,13 @@ public class CreJob {
     }
     public void cancel()             { this.status = "CANCELLED"; touch(); }
 
+    public void markOverdueAlertSent() { this.overdueAlertSentAt = Instant.now(); }
+
     public void updateDetails(String title, String description, String brief,
-                               String priority, LocalDate dueDate,
-                               BigDecimal budget, BigDecimal quotedAmount,
-                               UUID assignedTo, String notes,
-                               String clientEmail) {
+                              String priority, LocalDate dueDate,
+                              BigDecimal budget, BigDecimal quotedAmount,
+                              UUID assignedTo, String notes,
+                              String clientEmail) {
         if (title        != null) this.title        = title;
         if (description  != null) this.description  = description;
         if (brief        != null) this.brief        = brief;

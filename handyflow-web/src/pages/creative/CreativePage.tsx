@@ -1,5 +1,5 @@
 // src/pages/creative/CreativePage.tsx
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import {
@@ -25,13 +25,18 @@ interface Proof {
   id: string; versionNumber: number; title: string | null
   fileName: string | null; fileType: string | null; hasFile: boolean
   status: string; approvalToken: string; tokenExpiresAt: string | null
-  sentAt: string | null; sentToEmail: string | null
+  sentAt: string | null; sentToEmail: string | null; viewedAt: string | null
   approvedAt: string | null; approvedByName: string | null
   rejectionReason: string | null; notes: string | null
   comments: Comment[]
+  approvalMode: string; approvers: Approver[]
   createdAt: string
 }
-interface Comment { id: string; authorName: string; authorType: string; comment: string; createdAt: string }
+interface Approver {
+  id: string; approverName: string; approverEmail: string; approvalOrder: number
+  status: string; sentAt: string | null; approvedAt: string | null; rejectionReason: string | null
+}
+interface Comment { id: string; authorName: string; authorType: string; comment: string; timecodeSeconds: number | null; anchorX: number | null; anchorY: number | null; createdAt: string }
 interface Deliverable { id: string; fileName: string; fileType: string | null; fileSize: number | null; notes: string | null; createdAt: string }
 interface Summary { briefingCount: number; inProgressCount: number; awaitingApprovalCount: number; inRevisionCount: number; approvedCount: number; deliveredCount: number; overdueCount: number }
 
@@ -67,6 +72,10 @@ const lbl: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 7
 const fmtDate  = (d: any) => d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 const fmtDT    = (d: any) => d ? new Date(d).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'
 const fmtR     = (n: any) => n ? `R ${Number(n).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}` : '—'
+const formatTimecode = (seconds: number) => {
+  const total = Math.round(seconds)
+  return `${Math.floor(total / 60)}:${(total % 60).toString().padStart(2, '0')}`
+}
 const isOverdue = (d: string | null, status: string) =>
   d && !['APPROVED','DELIVERED','INVOICED','CANCELLED'].includes(status) && new Date(d) < new Date()
 
@@ -99,12 +108,131 @@ function ConfirmModal({ title, message, confirmLabel = 'Confirm', danger = false
   )
 }
 
-// ── Job Detail Modal ───────────────────────────────────────────────────────
+// ── Proof File Preview ─────────────────────────────────────────────────────
+// NEW: previously there was no way to view a proof's actual file anywhere in
+// the staff UI at all — only hasFile: boolean was exposed. Fetches the raw
+// file as a blob (a plain <img src="/api/..."> won't work here — that
+// endpoint requires the JWT Authorization header, which only apiClient
+// attaches; same reasoning as Fleet's logbook PDF download) and renders it
+// as an object URL, revoked on unmount to avoid leaking memory.
+function ProofFilePreview({ jobId, proofId, fileType, maxHeight = 400, onVideoRef, onImageClick, pins, pendingPin }: {
+  jobId: string; proofId: string; fileType: string | null; maxHeight?: number
+  onVideoRef?: (el: HTMLVideoElement | null) => void
+  // NEW: kept optional so this component stays a plain, non-interactive
+  // preview in contexts that don't want pin behaviour (the comparison
+  // modal, specifically) — the proof card opts in by passing these, the
+  // comparison modal just doesn't.
+  onImageClick?: (x: number, y: number) => void
+  pins?: { id: string; x: number; y: number; label: string; color: string; onClick: () => void }[]
+  pendingPin?: { x: number; y: number } | null
+}) {
+  const [url, setUrl]     = useState<string | null>(null)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    let objectUrl: string | null = null
+    let cancelled = false
+    setUrl(null); setError(false)
+    apiClient.get(`/api/v1/creative/jobs/${jobId}/proofs/${proofId}/file`, { responseType: 'blob' })
+      .then(res => {
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(res.data)
+        setUrl(objectUrl)
+      })
+      .catch(() => { if (!cancelled) setError(true) })
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+      onVideoRef?.(null) // preview is going away — parent shouldn't hold a stale ref
+    }
+  }, [jobId, proofId])
+
+  if (error) {
+    return <div style={{ padding: 24, textAlign: 'center', color: '#94A3B8', fontSize: 12, border: '1px dashed #E2E8F0', borderRadius: 8 }}>Preview unavailable</div>
+  }
+  if (!url) {
+    return <div style={{ padding: 24, textAlign: 'center', color: '#94A3B8', fontSize: 12, border: '1px dashed #E2E8F0', borderRadius: 8 }}>Loading preview…</div>
+  }
+
+  const isImage = fileType?.startsWith('image/')
+  const isVideo = fileType?.startsWith('video/')
+
+  if (isImage) {
+    if (!onImageClick) {
+      // Non-interactive context (e.g. comparison modal) — plain image, no overlay.
+      return <img src={url} style={{ maxWidth: '100%', maxHeight, borderRadius: 8, border: '1px solid #E2E8F0', display: 'block', margin: '0 auto', objectFit: 'contain' as const }} />
+    }
+    return (
+      <div
+        onClick={e => {
+          const rect = e.currentTarget.getBoundingClientRect()
+          onImageClick((e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height)
+        }}
+        title="Click anywhere on the image to pin your next comment to that spot"
+        style={{ position: 'relative', display: 'inline-block', cursor: 'crosshair', lineHeight: 0, margin: '0 auto' }}>
+        <img src={url} style={{ maxWidth: '100%', maxHeight, borderRadius: 8, border: '1px solid #E2E8F0', display: 'block', objectFit: 'contain' as const }} />
+        {(pins ?? []).map(p => (
+          <button key={p.id} onClick={ev => { ev.stopPropagation(); p.onClick() }} title={p.label}
+            style={{ position: 'absolute', left: `${p.x * 100}%`, top: `${p.y * 100}%`, transform: 'translate(-50%, -50%)',
+              width: 22, height: 22, borderRadius: '50%', background: p.color, color: '#fff', border: '2px solid #fff',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.3)', fontSize: 10, fontWeight: 700, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+            {p.label}
+          </button>
+        ))}
+        {pendingPin && (
+          <div style={{ position: 'absolute', left: `${pendingPin.x * 100}%`, top: `${pendingPin.y * 100}%`,
+            transform: 'translate(-50%, -50%)', width: 18, height: 18, borderRadius: '50%',
+            background: 'rgba(217,119,6,0.25)', border: '2px solid #D97706', pointerEvents: 'none' }} />
+        )}
+      </div>
+    )
+  }
+  if (isVideo) {
+    // NEW: previously videos fell into the same "download to view" bucket as
+    // PDFs — no actual in-browser playback for staff at all. ref is exposed
+    // via onVideoRef so the parent (the proof card's comment box) can read
+    // currentTime when tagging a timecode, and seek it when a timecoded
+    // comment is clicked.
+    return (
+      <video ref={el => onVideoRef?.(el)} controls src={url}
+        style={{ maxWidth: '100%', maxHeight, borderRadius: 8, display: 'block', margin: '0 auto' }} />
+    )
+  }
+  // PDFs: no in-browser preview built yet (flagged separately in the gap
+  // analysis as needing server-side thumbnailing) — offer a direct download
+  // of the fetched blob instead of nothing.
+  return (
+    <div style={{ padding: 24, textAlign: 'center', border: '1px dashed #E2E8F0', borderRadius: 8 }}>
+      <div style={{ fontSize: 12, color: '#64748B', marginBottom: 8 }}>
+        Preview not available for {fileType ?? 'this file type'}
+      </div>
+      <a href={url} download style={{ fontSize: 12, color: '#1B3A6B', fontWeight: 700, textDecoration: 'none' }}>
+        Download to view
+      </a>
+    </div>
+  )
+}
+
+
 function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => void; onRefresh: () => void }) {
   const qc = useQueryClient()
   const [tab, setTab]               = useState<'details'|'proofs'|'deliverables'|'brief'>('details')
   const [showUploadProof, setShowUploadProof] = useState(false)
+  const [showCompare, setShowCompare] = useState(false)
+  const [expandedPreview, setExpandedPreview] = useState<string | null>(null)
+  const [tagTimecode, setTagTimecode] = useState(true)
+  const videoElRef = useRef<HTMLVideoElement | null>(null)
+  const [pendingPin, setPendingPin] = useState<{ x: number; y: number } | null>(null)
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null)
+
+  // FIX: pendingPin is shared state at the modal level (one JobDetailModal
+  // handles every proof version), not scoped per-proof — without this, a
+  // pin placed while viewing Version 1 would incorrectly still appear if
+  // the user then expanded Version 2's preview without submitting first.
+  useEffect(() => { setPendingPin(null) }, [expandedPreview])
   const [showSendProof,   setShowSendProof]   = useState<string | null>(null)
+  const [showConfigureApprovers, setShowConfigureApprovers] = useState<string | null>(null)
   const [showAddDeliverable, setShowAddDeliverable] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm]   = useState(false)
   const [newComment, setNewComment]   = useState('')
@@ -114,6 +242,10 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
   const [uploadNotes, setUploadNotes] = useState('')
   const [sendEmail,   setSendEmail]   = useState(job.clientEmail ?? '')
   const [sendMessage, setSendMessage] = useState('')
+  const [approvalModeSelect, setApprovalModeSelect] = useState<'SEQUENTIAL' | 'PARALLEL'>('SEQUENTIAL')
+  const [approverRows, setApproverRows] = useState<{ approverName: string; approverEmail: string }[]>([
+    { approverName: '', approverEmail: '' }, { approverName: '', approverEmail: '' },
+  ])
   const [delFile,     setDelFile]     = useState('')
   const [delName,     setDelName]     = useState('')
   const [delNotes,    setDelNotes]    = useState('')
@@ -154,10 +286,28 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
     onError: (e: any) => setError(e.response?.data?.message || 'Failed to send proof'),
   })
 
+  const configureApprovers = useMutation({
+    mutationFn: ({ proofId, mode, approvers }: any) =>
+      apiClient.post(`/api/v1/creative/jobs/${job.id}/proofs/${proofId}/approvers`, { mode, approvers }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['creative-proofs', job.id] })
+      setShowConfigureApprovers(null); setError('')
+    },
+    onError: (e: any) => setError(e.response?.data?.message || 'Failed to configure approval chain'),
+  })
+
   const addComment = useMutation({
     mutationFn: ({ proofId, comment }: any) =>
-      apiClient.post(`/api/v1/creative/jobs/${job.id}/proofs/${proofId}/comments`, { comment }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['creative-proofs', job.id] }); setNewComment('') },
+      apiClient.post(`/api/v1/creative/jobs/${job.id}/proofs/${proofId}/comments`, {
+        comment,
+        // NEW: same tagging mechanism as the public approval page — staff
+        // can tie their own notes to a moment in the video too, not just
+        // read the client's.
+        timecodeSeconds: tagTimecode && videoElRef.current ? videoElRef.current.currentTime : null,
+        anchorX: pendingPin?.x ?? null,
+        anchorY: pendingPin?.y ?? null,
+      }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['creative-proofs', job.id] }); setNewComment(''); setPendingPin(null) },
   })
 
   const addDeliverable = useMutation({
@@ -341,7 +491,12 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
 
           {tab === 'proofs' && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 14 }}>
+                {(proofs as Proof[]).length >= 2 && (
+                  <button onClick={() => setShowCompare(true)} style={btnSecondary}>
+                    <Layers size={13} /> Compare Versions
+                  </button>
+                )}
                 {!['DELIVERED','INVOICED','CANCELLED'].includes(job.status) && (
                   <button onClick={() => setShowUploadProof(true)} style={btnPrimary}>
                     <Upload size={13} /> Upload New Version
@@ -375,9 +530,36 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                             </div>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            {proof.hasFile && (
+                              <button onClick={() => setExpandedPreview(expandedPreview === proof.id ? null : proof.id)}
+                                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', background: expandedPreview === proof.id ? '#EFF6FF' : '#F1F5F9', color: expandedPreview === proof.id ? '#1D4ED8' : '#64748B', border: 'none', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                                <Eye size={11} /> {expandedPreview === proof.id ? 'Hide' : 'Preview'}
+                              </button>
+                            )}
                             <span style={{ background: ps.bg, color: ps.color, padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{ps.label}</span>
                           </div>
                         </div>
+
+                        {expandedPreview === proof.id && (
+                          <div style={{ marginBottom: 12 }}>
+                            <ProofFilePreview jobId={job.id} proofId={proof.id} fileType={proof.fileType}
+                              onVideoRef={el => { videoElRef.current = el }}
+                              onImageClick={(x, y) => setPendingPin({ x, y })}
+                              pendingPin={pendingPin}
+                              pins={proof.comments
+                                .filter(c => c.anchorX != null && c.anchorY != null)
+                                .map((c, i) => ({
+                                  id: c.id, x: c.anchorX!, y: c.anchorY!,
+                                  label: String(i + 1),
+                                  color: c.authorType === 'CLIENT' ? '#0D9488' : '#1B3A6B',
+                                  onClick: () => {
+                                    setHighlightedCommentId(c.id)
+                                    document.getElementById(`staff-comment-${c.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                    setTimeout(() => setHighlightedCommentId(null), 2000)
+                                  },
+                                }))} />
+                          </div>
+                        )}
 
                         {proof.status === 'APPROVED' && (
                           <div style={{ padding: '8px 12px', background: '#DCFCE7', borderRadius: 8, marginBottom: 12, fontSize: 12, color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -391,17 +573,77 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                           </div>
                         )}
 
-                        {/* Approval link */}
-                        {proof.status === 'PENDING' && (
-                          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                            <button onClick={() => { setShowSendProof(proof.id); setSendEmail(job.clientEmail ?? ''); setError('') }}
-                              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#1B3A6B', color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                              <Send size={11} /> Send to client
+                        {/* Approval link / chain */}
+                        {proof.status === 'PENDING' && !proof.sentAt && proof.approvalMode === 'SINGLE' && (
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                              <button onClick={() => { setShowSendProof(proof.id); setSendEmail(job.clientEmail ?? ''); setError('') }}
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#1B3A6B', color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                <Send size={11} /> Send to client
+                              </button>
+                              <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/creative/approve/${proof.approvalToken}`)}
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#F1F5F9', color: '#374151', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>
+                                <Link2 size={11} /> Copy link
+                              </button>
+                            </div>
+                            {/* NEW: opt-in entry point to multi-stakeholder approval —
+                                everything above stays exactly as it always has for the
+                                simple single-approver case. */}
+                            <button onClick={() => { setShowConfigureApprovers(proof.id); setError('') }}
+                              style={{ background: 'none', border: 'none', padding: 0, color: '#1B3A6B', fontSize: 11, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>
+                              Need more than one approver? Configure an approval chain →
                             </button>
-                            <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/creative/approve/${proof.approvalToken}`)}
-                              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#F1F5F9', color: '#374151', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>
-                              <Link2 size={11} /> Copy link
-                            </button>
+                          </div>
+                        )}
+
+                        {proof.status === 'PENDING' && !proof.sentAt && proof.approvalMode !== 'SINGLE' && (
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: 6 }}>
+                              {proof.approvalMode === 'SEQUENTIAL' ? 'Sequential' : 'Parallel'} approval chain configured
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+                              {proof.approvers.map(a => (
+                                <div key={a.id} style={{ fontSize: 12, color: '#374151' }}>
+                                  {a.approvalOrder}. {a.approverName} <span style={{ color: '#94A3B8' }}>({a.approverEmail})</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button onClick={() => sendProof.mutate({ proofId: proof.id, email: proof.approvers[0]?.approverEmail, message: null })}
+                                disabled={sendProof.isPending}
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#1B3A6B', color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                <Send size={11} /> {sendProof.isPending ? 'Sending…' : 'Send for approval'}
+                              </button>
+                              <button onClick={() => { setShowConfigureApprovers(proof.id); setError('') }}
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#F1F5F9', color: '#374151', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>
+                                Edit approvers
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {proof.sentAt && proof.approvalMode !== 'SINGLE' && (
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: 6 }}>
+                              Approval chain ({proof.approvalMode === 'SEQUENTIAL' ? 'sequential' : 'parallel'})
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                              {proof.approvers.map(a => {
+                                const badge = a.status === 'APPROVED'
+                                  ? { bg: '#DCFCE7', color: '#166534', label: 'Approved' }
+                                  : a.status === 'REJECTED'
+                                  ? { bg: '#FEF2F2', color: '#DC2626', label: 'Rejected' }
+                                  : a.sentAt
+                                  ? { bg: '#EFF6FF', color: '#1D4ED8', label: 'Awaiting review' }
+                                  : { bg: '#F1F5F9', color: '#94A3B8', label: 'Waiting for turn' }
+                                return (
+                                  <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 10px', background: '#F9FAFB', borderRadius: 6 }}>
+                                    <span style={{ fontSize: 12, color: '#374151' }}>{a.approvalOrder}. {a.approverName}</span>
+                                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: badge.bg, color: badge.color }}>{badge.label}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
                           </div>
                         )}
 
@@ -410,7 +652,9 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                           <div style={{ marginTop: 10 }}>
                             <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Comments ({proof.comments.length})</div>
                             {proof.comments.map(c => (
-                              <div key={c.id} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                              <div key={c.id} id={`staff-comment-${c.id}`}
+                                style={{ display: 'flex', gap: 8, marginBottom: 8, borderRadius: 8, transition: 'background 0.3s',
+                                  background: highlightedCommentId === c.id ? '#FEF3C7' : 'transparent', padding: highlightedCommentId === c.id ? 4 : 0 }}>
                                 <div style={{ width: 24, height: 24, borderRadius: '50%', background: c.authorType === 'CLIENT' ? '#0D9488' : '#1B3A6B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', fontWeight: 700, flexShrink: 0 }}>
                                   {c.authorName.charAt(0).toUpperCase()}
                                 </div>
@@ -419,6 +663,21 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                                     <span style={{ fontSize: 12, fontWeight: 700, color: '#0F172A' }}>{c.authorName}</span>
                                     <span style={{ fontSize: 10, color: '#94A3B8' }}>{c.authorType === 'CLIENT' ? 'Client' : 'Team'} · {fmtDate(c.createdAt)}</span>
                                   </div>
+                                  {c.timecodeSeconds != null && (
+                                    <button
+                                      onClick={() => { if (videoElRef.current) { videoElRef.current.currentTime = c.timecodeSeconds! } }}
+                                      title={expandedPreview === proof.id ? 'Seek video to this moment' : 'Expand the preview above to seek'}
+                                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 4, marginRight: 4, padding: '1px 7px', background: '#EFF6FF', color: '#1D4ED8', border: 'none', borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
+                                      ⏱ {formatTimecode(c.timecodeSeconds)}
+                                    </button>
+                                  )}
+                                  {c.anchorX != null && (
+                                    <span
+                                      title={expandedPreview === proof.id ? 'See the pin marker on the image above' : 'Expand the preview above to see the pin'}
+                                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 4, padding: '1px 7px', background: '#F0FDF9', color: '#0D9488', borderRadius: 20, fontSize: 10, fontWeight: 700 }}>
+                                      📍 Pinned
+                                    </span>
+                                  )}
                                   <div style={{ fontSize: 13, color: '#374151' }}>{c.comment}</div>
                                 </div>
                               </div>
@@ -428,14 +687,30 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
 
                         {/* Add team comment */}
                         {['PENDING','IN_REVISION'].includes(job.status) && proof.status === 'PENDING' && (
-                          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                            <input value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Add internal note..."
-                              onKeyDown={e => { if (e.key === 'Enter' && newComment.trim()) { addComment.mutate({ proofId: proof.id, comment: newComment }); }}}
-                              style={{ ...inp, flex: 1, fontSize: 13 }} />
-                            <button onClick={() => addComment.mutate({ proofId: proof.id, comment: newComment })} disabled={!newComment.trim()}
-                              style={{ ...btnPrimary, padding: '8px 12px', opacity: !newComment.trim() ? 0.5 : 1 }}>
-                              <MessageSquare size={13} />
-                            </button>
+                          <div style={{ marginTop: 10 }}>
+                            {proof.fileType?.startsWith('video/') && expandedPreview === proof.id && (
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#64748B', marginBottom: 6, cursor: 'pointer' }}>
+                                <input type="checkbox" checked={tagTimecode} onChange={e => setTagTimecode(e.target.checked)} />
+                                Tag to current moment in video
+                              </label>
+                            )}
+                            {proof.fileType?.startsWith('image/') && expandedPreview === proof.id && pendingPin && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#0D9488', fontWeight: 600, marginBottom: 6 }}>
+                                📍 Will pin to that spot on the image
+                                <button onClick={() => setPendingPin(null)} style={{ background: 'none', border: 'none', color: '#94A3B8', fontSize: 10, cursor: 'pointer', textDecoration: 'underline', fontWeight: 400 }}>
+                                  Clear
+                                </button>
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <input value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Add internal note..."
+                                onKeyDown={e => { if (e.key === 'Enter' && newComment.trim()) { addComment.mutate({ proofId: proof.id, comment: newComment }); }}}
+                                style={{ ...inp, flex: 1, fontSize: 13 }} />
+                              <button onClick={() => addComment.mutate({ proofId: proof.id, comment: newComment })} disabled={!newComment.trim()}
+                                style={{ ...btnPrimary, padding: '8px 12px', opacity: !newComment.trim() ? 0.5 : 1 }}>
+                                <MessageSquare size={13} />
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -501,6 +776,10 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
               <div style={{ padding: '10px 12px', background: '#EFF6FF', borderRadius: 8, fontSize: 12, color: '#1D4ED8' }}>
                 The client will receive a secure link to view and approve the proof. No HandyFlow account required.
               </div>
+              <button onClick={() => { setShowSendProof(null); setShowConfigureApprovers(showSendProof); setError('') }}
+                style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', color: '#1B3A6B', fontSize: 11, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>
+                Need more than one approver instead? Configure an approval chain →
+              </button>
             </div>
             {error && <div style={{ marginTop: 10, padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>{error}</div>}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
@@ -509,6 +788,88 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                 onClick={() => sendProof.mutate({ proofId: showSendProof, email: sendEmail, message: sendMessage || null })}
                 style={{ ...btnPrimary, opacity: !sendEmail ? 0.5 : 1 }}>
                 {sendProof.isPending ? 'Sending...' : <><Send size={13} /> Send proof</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW: Configure Approval Chain Modal — the actual UI for the
+          multi-stakeholder feature. Sequential vs parallel toggle, a
+          dynamic list of approver name/email rows, save calls
+          configureApprovers which only succeeds on a PENDING, not-yet-sent
+          proof (enforced server-side too — this is just keeping the UI
+          honest about when the action is available). */}
+      {showConfigureApprovers && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, backdropFilter: 'blur(2px)' }}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: 520, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Configure approval chain</h3>
+              <button onClick={() => setShowConfigureApprovers(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={18} /></button>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={lbl}>Approval mode</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['SEQUENTIAL', 'PARALLEL'] as const).map(mode => (
+                  <button key={mode} onClick={() => setApprovalModeSelect(mode)}
+                    style={{
+                      flex: 1, padding: '10px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      border: approvalModeSelect === mode ? '2px solid #1B3A6B' : '1px solid #E2E8F0',
+                      background: approvalModeSelect === mode ? '#EFF6FF' : '#fff',
+                      color: approvalModeSelect === mode ? '#1B3A6B' : '#64748B',
+                    }}>
+                    {mode === 'SEQUENTIAL' ? 'Sequential — approve in order' : 'Parallel — anyone, any order'}
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 6 }}>
+                {approvalModeSelect === 'SEQUENTIAL'
+                  ? 'Only approver 1 is notified first — approver 2 is only emailed once approver 1 signs off, and so on.'
+                  : 'All approvers are emailed at once — the proof is approved once everyone has said yes, in any order.'}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={lbl}>Approvers {approvalModeSelect === 'SEQUENTIAL' ? '(in order)' : ''}</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {approverRows.map((row, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, color: '#94A3B8', width: 16, flexShrink: 0 }}>{i + 1}.</span>
+                    <input placeholder="Name" value={row.approverName}
+                      onChange={e => setApproverRows(rows => rows.map((r, idx) => idx === i ? { ...r, approverName: e.target.value } : r))}
+                      style={{ ...inp, flex: 1 }} />
+                    <input placeholder="Email" type="email" value={row.approverEmail}
+                      onChange={e => setApproverRows(rows => rows.map((r, idx) => idx === i ? { ...r, approverEmail: e.target.value } : r))}
+                      style={{ ...inp, flex: 1 }} />
+                    {approverRows.length > 1 && (
+                      <button onClick={() => setApproverRows(rows => rows.filter((_, idx) => idx !== i))}
+                        style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer', display: 'flex', flexShrink: 0 }}>
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => setApproverRows(rows => [...rows, { approverName: '', approverEmail: '' }])}
+                style={{ marginTop: 8, background: 'none', border: 'none', padding: 0, color: '#1B3A6B', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                + Add another approver
+              </button>
+            </div>
+
+            {error && <div style={{ marginTop: 10, padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>{error}</div>}
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+              <button onClick={() => setShowConfigureApprovers(null)} style={btnSecondary}>Cancel</button>
+              <button
+                disabled={configureApprovers.isPending || approverRows.some(r => !r.approverName.trim() || !r.approverEmail.trim())}
+                onClick={() => configureApprovers.mutate({
+                  proofId: showConfigureApprovers,
+                  mode: approvalModeSelect,
+                  approvers: approverRows.map(r => ({ approverName: r.approverName.trim(), approverEmail: r.approverEmail.trim() })),
+                })}
+                style={btnPrimary}>
+                {configureApprovers.isPending ? 'Saving…' : 'Save approval chain'}
               </button>
             </div>
           </div>
@@ -577,6 +938,10 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
         </div>
       )}
 
+      {showCompare && (
+        <CompareVersionsModal jobId={job.id} proofs={proofs as Proof[]} onClose={() => setShowCompare(false)} />
+      )}
+
       {showDeleteConfirm && (
         <ConfirmModal
           title="Delete job?"
@@ -591,7 +956,70 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
   )
 }
 
-// ── Create Job Modal ───────────────────────────────────────────────────────
+// ── Compare Versions Modal ─────────────────────────────────────────────────
+// NEW: side-by-side comparison between any two proof versions. No backend
+// change needed beyond the file-preview endpoint above — GET .../proofs
+// already returns every version, this is purely a view over data that
+// already existed.
+function CompareVersionsModal({ jobId, proofs, onClose }: {
+  jobId: string; proofs: Proof[]; onClose: () => void
+}) {
+  const sorted = [...proofs].sort((a, b) => b.versionNumber - a.versionNumber)
+  const [leftId, setLeftId]   = useState(sorted[1]?.id ?? sorted[0]?.id)
+  const [rightId, setRightId] = useState(sorted[0]?.id)
+
+  const left  = proofs.find(p => p.id === leftId)
+  const right = proofs.find(p => p.id === rightId)
+
+  const columns = [
+    { id: leftId, set: setLeftId, proof: left },
+    { id: rightId, set: setRightId, proof: right },
+  ]
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: 20, backdropFilter: 'blur(2px)' }}>
+      <div style={{ background: '#fff', borderRadius: 16, padding: 26, width: '100%', maxWidth: 960, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 80px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Compare Versions</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={18} /></button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+          {columns.map((col, i) => (
+            <div key={i}>
+              <select value={col.id} onChange={e => col.set(e.target.value)} style={{ ...inp, marginBottom: 10, fontWeight: 600 }}>
+                {sorted.map(p => (
+                  <option key={p.id} value={p.id}>
+                    Version {p.versionNumber}{p.title ? ` — ${p.title}` : ''}
+                  </option>
+                ))}
+              </select>
+              {col.proof && (
+                <>
+                  <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 10 }}>
+                    {col.proof.fileName ?? 'No file'} · {fmtDate(col.proof.createdAt)}
+                    {col.proof.status === 'APPROVED' && (
+                      <span style={{ marginLeft: 6, color: '#166534', fontWeight: 700 }}>· Approved</span>
+                    )}
+                  </div>
+                  {col.proof.hasFile ? (
+                    <ProofFilePreview jobId={jobId} proofId={col.proof.id} fileType={col.proof.fileType} maxHeight={440} />
+                  ) : (
+                    <div style={{ padding: 24, textAlign: 'center', color: '#94A3B8', fontSize: 12, border: '1px dashed #E2E8F0', borderRadius: 8 }}>
+                      No file on this version
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
 function CreateJobModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({
     clientName: '', clientEmail: '', title: '', jobType: 'LOGO',

@@ -17,14 +17,14 @@ const TYPE_COLOR: Record<string, string> = {
   SERVICE_AGREEMENT: '#0D9488', NDA: '#7C3AED', EMPLOYMENT: '#1D4ED8',
   JOINT_VENTURE: '#D97706', EQUIPMENT_HIRE: '#EA580C', LEASE: '#166534',
   SUBCONTRACTOR: '#DC2626', SERVICE_LEVEL: '#0891B2', CONSULTING: '#DB2777',
-  RETAINER: '#854D0E', SUPPLY: '#475569', OTHER: '#64748B',
+  RETAINER: '#854D0E', SUPPLY: '#475569', ACKNOWLEDGMENT_OF_DEBT: '#B45309', OTHER: '#64748B',
 }
 
 const TYPE_LABEL: Record<string, string> = {
   SERVICE_AGREEMENT: 'Service Agreement', NDA: 'NDA', EMPLOYMENT: 'Employment',
   JOINT_VENTURE: 'Joint Venture', EQUIPMENT_HIRE: 'Equipment Hire', LEASE: 'Lease',
   SUBCONTRACTOR: 'Subcontractor', SERVICE_LEVEL: 'SLA', CONSULTING: 'Consulting',
-  RETAINER: 'Retainer', SUPPLY: 'Supply Agreement', OTHER: 'Other',
+  RETAINER: 'Retainer', SUPPLY: 'Supply Agreement', ACKNOWLEDGMENT_OF_DEBT: 'Acknowledgment of Debt', OTHER: 'Other',
 }
 
 export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any) => void }) {
@@ -182,14 +182,8 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                 {pending.slice(0, 4).map(c => {
-                  // FIX: was (c.parties ?? []).filter(...) / (c.parties ?? []).length —
-                  // ContractSummaryResponse (what this list endpoint actually
-                  // returns) has never had a `parties` array, only
-                  // signedPartyCount/totalPartyCount as plain integers. That
-                  // meant `total` was always 0, so this line never rendered
-                  // for any contract, ever.
-                  const total    = c.totalPartyCount ?? 0
-                  const unsigned = total - (c.signedPartyCount ?? 0)
+                  const unsigned = (c.parties ?? []).filter((p: any) => p.signingStatus !== 'SIGNED').length
+                  const total    = (c.parties ?? []).length
                   return (
                     <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 16px', border: '1px solid #BFDBFE', borderLeft: '3px solid #1D4ED8', borderRadius: 8, background: '#F8FBFF' }}>
                       <div>

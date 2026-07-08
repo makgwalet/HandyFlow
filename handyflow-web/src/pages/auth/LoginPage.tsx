@@ -40,6 +40,14 @@ export function LoginPage() {
         permissions: data.permissions,
       }
       setAuth(data.accessToken, user)
+
+      // Route straight to the lock screen if the account can't be used yet.
+      // Keeps a suspended/cancelled tenant from ever seeing a half-loaded
+      // dashboard before the lockout kicks in — see AccountLockedOverlay.
+      if (data.subscriptionStatus === 'SUSPENDED' || data.subscriptionStatus === 'CANCELLED') {
+        navigate('/account-locked')
+        return
+      }
       navigate('/dashboard')
     },
   })
@@ -74,13 +82,24 @@ export function LoginPage() {
               error={errors.email?.message}
               {...register('email')}
             />
-            <Input
-              label="Password"
-              type="password"
-              placeholder="••••••••"
-              error={errors.password?.message}
-              {...register('password')}
-            />
+
+            <div>
+              <div className="flex items-center justify-between mb-[5px]">
+                <label className="text-sm font-medium text-gray-700">Password</label>
+                <a
+                  href="/forgot-password"
+                  className="text-sm text-blue-600 font-medium hover:underline"
+                >
+                  Forgot password?
+                </a>
+              </div>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                error={errors.password?.message}
+                {...register('password')}
+              />
+            </div>
 
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -96,7 +115,7 @@ export function LoginPage() {
           <p className="mt-4 text-center text-sm text-gray-500">
             Don't have an account?{' '}
             <a href="/register" className="text-blue-600 font-medium hover:underline">
-              Start your free pilot
+              Start your free trial
             </a>
           </p>
         </div>

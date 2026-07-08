@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.creative.domain.model.CreJob;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -30,4 +32,15 @@ public interface CreJobRepository extends JpaRepository<CreJob, UUID> {
         AND j.deletedAt IS NULL
         """)
     long countByStatus(TenantId tenantId, String status);
+
+    // NEW: backs CreativeNotificationScheduler's overdue-job alert.
+    // Cross-tenant, same reasoning as CreProofRepository's reminder query.
+    @Query("""
+        SELECT j FROM CreJob j
+        WHERE j.deletedAt IS NULL
+        AND j.status NOT IN ('APPROVED','DELIVERED','INVOICED','CANCELLED')
+        AND j.dueDate < :today
+        AND j.overdueAlertSentAt IS NULL
+        """)
+    List<CreJob> findOverdueNeedingAlert(LocalDate today);
 }

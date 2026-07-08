@@ -303,6 +303,28 @@ public class Customer {
                 Map.of("invoiceId", invoiceId.toString()), null, triggeredBy));
     }
 
+    /**
+     * NEW: Called by CrmFacade when the Marketing module records a
+     * customer opting in or out of marketing email — same cross-module
+     * activity-recording shape as recordBookingLinked/recordInvoiceLinked
+     * above, just for a consent change instead of a booking/invoice link.
+     * <p>
+     * SCOPE NOTE: this only appends a timeline entry, the same lightweight
+     * treatment BOOKING_LINKED/INVOICE_LINKED already get. It deliberately
+     * does NOT touch CustomerConsent (the formal POPIA Section 11
+     * lawful-basis/per-purpose consent record) — partially withdrawing
+     * just the "MARKETING" purpose from a consent record that may also
+     * cover other purposes (SERVICE_DELIVERY, ANALYTICS, etc.) is real
+     * business logic that belongs with whatever already manages
+     * CustomerConsent, not invented here without seeing that service. If
+     * marketing opt-outs should also update CustomerConsent, that's a
+     * distinct, larger piece of work.
+     */
+    public void recordMarketingConsentChanged(boolean optedIn, UUID triggeredBy) {
+        ActivityType type = optedIn ? ActivityType.MARKETING_OPTED_IN : ActivityType.MARKETING_OPTED_OUT;
+        addActivity(CustomerActivity.of(this, type, Map.of("optedIn", optedIn), null, triggeredBy));
+    }
+
     public boolean isDeleted() {
         return deletedAt != null;
     }

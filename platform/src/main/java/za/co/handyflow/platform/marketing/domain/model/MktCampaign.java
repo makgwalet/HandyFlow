@@ -37,6 +37,13 @@ public class MktCampaign {
     @Column(name = "delivered_count") private int deliveredCount = 0;
     @Column(name = "bounced_count")   private int bouncedCount   = 0;
     @Column(name = "unsubscribed_count") private int unsubscribedCount = 0;
+    // NEW: previously entirely absent — AnalyticsTab.tsx and CampaignsTab.tsx
+    // both already referenced c.openCount/c.clickCount extensively (open
+    // rate, click rate, CTOR, per-campaign detail view), silently rendering
+    // as 0 for every campaign via their own ?? 0 fallbacks. The frontend was
+    // built assuming this data existed; it just never did on the backend.
+    @Column(name = "open_count")      private int openCount      = 0;
+    @Column(name = "click_count")     private int clickCount     = 0;
     @Column(name = "from_name")     private String fromName;
     @Column(name = "reply_to")      private String replyTo;
     @Column(name = "created_by")    private UUID   createdBy;
@@ -47,10 +54,10 @@ public class MktCampaign {
     @Version private Long version;
 
     public static MktCampaign create(TenantId tenantId, String name, String channel,
-                                      UUID templateId, String subject, String htmlBody,
-                                      String audienceType, String audienceFilter,
-                                      Instant scheduledAt, String fromName,
-                                      String replyTo, UUID createdBy) {
+                                     UUID templateId, String subject, String htmlBody,
+                                     String audienceType, String audienceFilter,
+                                     Instant scheduledAt, String fromName,
+                                     String replyTo, UUID createdBy) {
         MktCampaign c      = new MktCampaign();
         c.tenantId         = tenantId;
         c.name             = name;
@@ -80,6 +87,8 @@ public class MktCampaign {
     public void incrementSent()          { this.sentCount++; touch(); }
     public void incrementBounced()       { this.bouncedCount++; touch(); }
     public void incrementUnsubscribed()  { this.unsubscribedCount++; touch(); }
+    public void incrementOpened()        { this.openCount++; touch(); }
+    public void incrementClicked()       { this.clickCount++; touch(); }
 
     private void touch() { this.updatedAt = Instant.now(); }
 

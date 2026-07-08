@@ -18,6 +18,10 @@ public record CampaignResponse(
         int     sentCount,
         int     bouncedCount,
         int     unsubscribedCount,
+        // NEW: the fields the frontend already expected — see MktCampaign's
+        // own comment on why these didn't exist until now.
+        int     openCount,
+        int     clickCount,
         String  fromName,
         String  replyTo,
         Instant createdAt

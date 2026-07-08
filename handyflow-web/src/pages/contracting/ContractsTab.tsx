@@ -61,6 +61,7 @@ const CONTRACT_TYPES = [
   { value: 'SERVICE_LEVEL',     label: 'Service Level Agreement' },
   { value: 'CONSULTING',        label: 'Consulting Agreement' },
   { value: 'RETAINER',          label: 'Retainer Agreement'   },
+  { value: 'ACKNOWLEDGMENT_OF_DEBT', label: 'Acknowledgment of Debt' },
   { value: 'OTHER',             label: 'Other'                },
 ]
 

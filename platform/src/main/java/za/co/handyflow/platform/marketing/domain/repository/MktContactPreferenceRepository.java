@@ -39,4 +39,15 @@ public interface MktContactPreferenceRepository extends JpaRepository<MktContact
     long countOptedIn(TenantId tenantId);
 
     boolean existsByTenantIdAndEmail(TenantId tenantId, String email);
+
+    // NEW: backs syncCrmContacts()'s fix — was calling
+    // existsByTenantIdAndEmail() once per CRM customer row, a genuine N+1
+    // query pattern (a tenant with a few hundred customers meant a few
+    // hundred extra round-trips for what should be one sync operation).
+    // One query, returns which of the candidate emails already exist.
+    @Query("""
+        SELECT p.email FROM MktContactPreference p
+        WHERE p.tenantId = :tenantId AND p.email IN :emails
+        """)
+    List<String> findExistingEmails(TenantId tenantId, List<String> emails);
 }

@@ -18,10 +18,20 @@ public record ProofResponse(
         Instant tokenExpiresAt,
         Instant sentAt,
         String  sentToEmail,
+        // NEW: the "client has seen it, why haven't they responded" signal
+        // the gap analysis flagged as missing — captured on the backend now,
+        // exposed here so it's actually visible to staff, not just recorded.
+        Instant viewedAt,
         Instant approvedAt,
         String  approvedByName,
         String  rejectionReason,
         String  notes,
         List<CommentResponse> comments,
+        // NEW: multi-stakeholder approval — approvalMode is always present
+        // (defaults to "SINGLE"); approvers is empty for SINGLE-mode
+        // proofs, populated once a staff member has configured multiple
+        // reviewers via configureApprovers().
+        String  approvalMode,
+        List<ApproverResponse> approvers,
         Instant createdAt
 ) {}

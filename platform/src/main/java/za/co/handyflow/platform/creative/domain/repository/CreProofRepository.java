@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.creative.domain.model.CreProof;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,4 +20,13 @@ public interface CreProofRepository extends JpaRepository<CreProof, UUID> {
 
     @Query("SELECT p FROM CreProof p WHERE p.jobId = :jobId AND p.status = 'PENDING'")
     List<CreProof> findPendingByJobId(UUID jobId);
+
+    // NEW: backs CreativeNotificationScheduler's unapproved-proof reminder.
+    // Cross-tenant on purpose — a scheduled job runs once for the whole
+    // platform, not per-request like everything else in this repository
+    // (same pattern as Fleet/Contracting's scheduler-only repository
+    // methods).
+    @Query("SELECT p FROM CreProof p WHERE p.status = 'PENDING' AND p.sentAt IS NOT NULL " +
+            "AND p.sentAt < :cutoff AND p.reminderSentAt IS NULL")
+    List<CreProof> findPendingNeedingReminder(Instant cutoff);
 }
