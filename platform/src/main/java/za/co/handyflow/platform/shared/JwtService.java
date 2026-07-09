@@ -33,6 +33,17 @@ public class JwtService {
         this.expirationMs = expirationMs;
     }
 
+    // NEW: backs the fix to AuthResponse.expiresIn, which was hardcoded to
+    // 86400L in two separate places (AuthService.buildAuthResponse() and
+    // UserManagementService.acceptInvitation()) — completely independent
+    // of this class's own configured app.security.jwt.expiration-ms.
+    // Whatever the real token's expiry actually is, this is the one place
+    // that value should be read from, so the two can never silently drift
+    // apart again.
+    public long getExpirationSeconds() {
+        return expirationMs / 1000;
+    }
+
     public String generateToken(UUID userId, UUID tenantId,
                                 String email, String firstName,
                                 String lastName, Set<String> permissions) {

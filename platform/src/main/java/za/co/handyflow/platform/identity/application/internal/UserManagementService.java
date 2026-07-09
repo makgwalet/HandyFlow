@@ -24,6 +24,7 @@ public class UserManagementService {
     private final RoleRepository           roleRepository;
     private final PermissionRepository     permissionRepository;
     private final UserInvitationRepository invitationRepository;
+    private final TenantRepository         tenantRepository;
     private final PasswordEncoder          passwordEncoder;
     private final EmailService             emailService;
     private final JwtService               jwtService;
@@ -97,7 +98,7 @@ public class UserManagementService {
 
     @Transactional
     public InvitationResponse inviteUser(TenantId tenantId, UUID invitedBy,
-                                          InviteUserRequest req) {
+                                         InviteUserRequest req) {
         String email = req.email().toLowerCase().trim();
 
         if (userRepository.existsByTenantIdAndEmail(tenantId, email))
@@ -110,27 +111,30 @@ public class UserManagementService {
 
         Role role = req.roleId() != null
                 ? roleRepository.findByIdAndTenantId(req.roleId(), tenantId)
-                        .orElseThrow(() -> bad("Role not found"))
+                .orElseThrow(() -> bad("Role not found"))
                 : roleRepository.findByNameAndTenantId("EMPLOYEE", tenantId)
-                        .orElseGet(() -> createDefaultEmployeeRole(tenantId));
+                .orElseGet(() -> createDefaultEmployeeRole(tenantId));
 
         UserInvitation inv = UserInvitation.create(
                 tenantId, email, req.firstName(), req.lastName(),
                 req.jobTitle(), req.department(), role, invitedBy);
         invitationRepository.save(inv);
 
-        // Send invitation email using the existing EmailService.send()
+        // FIX: was bare inline HTML with no company name, inviter name,
+        // or role name — role.getName() was sitting right here unused.
+        // invitedByName and companyName need their own lookups since
+        // this method only had UUIDs/TenantId to work with, not the
+        // actual names.
         String link    = "https://app.handyflow.co.za/invite/accept?token=" + inv.getToken();
         String subject = "You've been invited to HandyFlow";
-        String html    = """
-            <p>Hi %s,</p>
-            <p>You've been invited to join your company on HandyFlow.</p>
-            <p><a href="%s" style="background:#1B3A6B;color:white;padding:12px 24px;
-               border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">
-               Accept invitation
-            </a></p>
-            <p>This link expires in 72 hours.</p>
-            """.formatted(req.firstName(), link);
+        String invitedByName = userRepository.findByIdAndTenantId(invitedBy, tenantId)
+                .map(u -> u.getFirstName() + " " + u.getLastName())
+                .orElse("A team member");
+        String companyName = tenantRepository.findById(tenantId.getValue())
+                .map(Tenant::getName)
+                .orElse("your company");
+        String html = EmailTemplates.userInvitation(
+                req.firstName(), invitedByName, companyName, role.getName(), link);
 
         try {
             emailService.send(email, subject, html);
@@ -197,6 +201,19 @@ public class UserManagementService {
 
         log.info("Invitation accepted: user={} tenant={}", user.getId(), inv.getTenantId());
 
+        // FIX: same two bugs as AuthService.buildAuthResponse() — 86400L
+        // hardcoded independent of JwtService's real configured expiry,
+        // and subscriptionStatus missing entirely from the record this
+        // constructs. Fetches the real Tenant rather than assuming
+        // "ACTIVE" — accepting an invitation is normally sent by an
+        // already-active tenant, but that's an assumption, not a
+        // guarantee (a tenant could theoretically be suspended in the
+        // window between an invite being sent and being accepted), and
+        // AuthService already proves the real value is one query away.
+        Tenant tenant = tenantRepository.findById(inv.getTenantId().getValue())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Tenant", inv.getTenantId().getValue().toString()));
+
         // Return an AuthResponse so the user is logged in immediately after accepting
         String token = jwtService.generateToken(
                 user.getId(),
@@ -206,13 +223,14 @@ public class UserManagementService {
                 user.getPermissionNames()
         );
         return new AuthResponse(
-                token, "Bearer", 86400L,
+                token, "Bearer", jwtService.getExpirationSeconds(),
                 user.getId(),
                 inv.getTenantId().getValue(),
                 user.getEmail(),
                 user.getFirstName(),
                 user.getLastName(),
-                user.getPermissionNames()
+                user.getPermissionNames(),
+                tenant.getStatus().name()
         );
     }
 
@@ -244,7 +262,7 @@ public class UserManagementService {
 
     @Transactional
     public RoleResponse updateRolePermissions(TenantId tenantId, UUID roleId,
-                                               Set<UUID> permissionIds) {
+                                              Set<UUID> permissionIds) {
         Role role = roleRepository.findByIdAndTenantId(roleId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Role", roleId.toString()));
 

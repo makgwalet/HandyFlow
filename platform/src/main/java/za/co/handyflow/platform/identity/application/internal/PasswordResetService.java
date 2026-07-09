@@ -119,6 +119,19 @@ public class PasswordResetService {
         prt.markUsed();
         resetTokenRepository.save(prt);
 
+        // NEW: previously nothing sent here at all — a password could be
+        // reset with no confirmation to the account owner, and no way
+        // for them to notice if it wasn't actually them. Wrapped
+        // defensively since the reset itself is already complete by this
+        // point; a failed send here must never undo that.
+        try {
+            emailService.send(user.getEmail(),
+                    "Your HandyFlow password was changed",
+                    EmailTemplates.passwordChanged(user.getFirstName()));
+        } catch (Exception e) {
+            log.error("Failed to send password-changed confirmation to={}: {}", user.getEmail(), e.getMessage());
+        }
+
         log.info("Password reset successful for userId={}", user.getId());
     }
 }

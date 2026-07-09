@@ -13,6 +13,8 @@ import za.co.handyflow.platform.identity.domain.repository.UserRepository;
 import za.co.handyflow.platform.identity.dto.request.LoginRequest;
 import za.co.handyflow.platform.identity.dto.request.RegisterRequest;
 import za.co.handyflow.platform.identity.dto.response.AuthResponse;
+import za.co.handyflow.platform.shared.EmailService;
+import za.co.handyflow.platform.shared.EmailTemplates;
 import za.co.handyflow.platform.shared.JwtService;
 
 @Slf4j
@@ -25,6 +27,8 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RoleService roleService;
+    private final EmailService emailService;
+    private final EmailVerificationService emailVerificationService;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -46,6 +50,9 @@ public class AuthService {
                 request.companyName(),
                 request.slug(),
                 request.email(),
+                request.phone(),
+                request.businessType(),
+                request.promoCode(),
                 request.moduleKeys()
         );
         tenantRepository.save(tenant);
@@ -63,6 +70,27 @@ public class AuthService {
         userRepository.save(owner);
 
         log.info("Registered new tenant={} owner={}", tenant.getSlug(), owner.getId());
+
+        // NEW: previously nothing sent here at all — confirmed zero
+        // emails fired anywhere in this method. A failed send must never
+        // block registration itself, which is why the account is already
+        // fully created and saved above before this runs.
+        //
+        // Token created first specifically so the welcome email below
+        // can carry the real verify link — merged into the same email
+        // rather than a separate second one (see EmailTemplates.
+        // registrationConfirmation()'s own comment for why).
+        try {
+            String verifyToken = emailVerificationService.createToken(owner.getId(), tenant.getId());
+            String verifyLink = "https://app.handyflow.co.za/verify-email?token=" + verifyToken;
+            emailService.send(owner.getEmail(),
+                    "Welcome to HandyFlow — your account is ready",
+                    EmailTemplates.registrationConfirmation(
+                            owner.getFirstName(), tenant.getName(), tenant.getSlug(),
+                            request.moduleKeys(), verifyLink));
+        } catch (Exception e) {
+            log.error("Failed to send registration confirmation to={}: {}", owner.getEmail(), e.getMessage());
+        }
 
         return buildAuthResponse(owner, tenant);
     }
@@ -107,16 +135,27 @@ public class AuthService {
                 user.getPermissionNames()
         );
 
+        // FIX: expiresIn was hardcoded to 86400L, completely independent
+        // of JwtService's own configured app.security.jwt.expiration-ms —
+        // the two could silently drift apart with no compile-time or
+        // runtime signal. Now derived from the same value the token
+        // itself is actually signed with.
+        //
+        // FIX: subscriptionStatus previously didn't exist on this record
+        // at all — LoginPage.tsx's redirect to AccountLockedPage could
+        // never fire since it was always checking undefined. tenant is
+        // already available right here, so this needs no new query.
         return new AuthResponse(
                 token,
                 "Bearer",
-                86400L,
+                jwtService.getExpirationSeconds(),
                 user.getId(),
                 tenant.getId(),
                 user.getEmail(),
                 user.getFirstName(),
                 user.getLastName(),
-                user.getPermissionNames()
+                user.getPermissionNames(),
+                tenant.getStatus().name()
         );
     }
 }

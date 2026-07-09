@@ -24,6 +24,22 @@ public record RegisterRequest(
         @NotBlank(message = "Password is required")
         @Size(min = 8, message = "Password must be at least 8 characters")
         String password,
+        // NEW: RegisterPage.tsx has always collected this in a real input
+        // field, but it was never included in the actual request payload
+        // (and this DTO had no field to receive it even if it had been) —
+        // confirmed silently dropped on both sides.
+        String phone,
+        // NEW: RegisterPage.tsx has already been extended (independently
+        // of this fix) to collect and send both of these — an
+        // industry-first "what kind of business are you?" picker and a
+        // promo code field, both apparently built ahead of backend
+        // support. Neither had a field to land in here, meaning both
+        // were being silently dropped on every registration. Both
+        // optional and stored as-is — see the migration's own comment
+        // for why this is deliberately storage only, not validation or
+        // discount application.
+        String businessType,
+        String promoCode,
         // WHY optional? Existing clients not sending moduleKeys still work.
         // New onboarding flow sends ["security", "fleet"] etc.
         List<String> moduleKeys

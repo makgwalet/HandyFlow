@@ -70,11 +70,23 @@ public class Tenant extends AggregateRoot<Tenant> {
     @Column(name = "trading_name")
     private String tradingName;
 
+    // NEW: registration metadata, set once at signup — see
+    // V_tenant_registration_metadata.sql for the full reasoning.
+    // Deliberately just storage: businessType is descriptive only, and
+    // promoCode is recorded as entered, not validated or applied.
+    @Column(name = "business_type")
+    private String businessType;
+
+    @Column(name = "promo_code")
+    private String promoCode;
+
     // WHY a static factory method instead of a public constructor?
     // Factory methods have NAMES — "register" tells you the intent.
     // They can enforce business rules before the object exists.
     // They can register domain events as part of creation.
-    public static Tenant register(String name, String slug, String email, java.util.List<String> moduleKeys) {
+    public static Tenant register(String name, String slug, String email, String phone,
+                                  String businessType, String promoCode,
+                                  java.util.List<String> moduleKeys) {
         validateSlug(slug);
 
         Tenant tenant = new Tenant();
@@ -83,6 +95,9 @@ public class Tenant extends AggregateRoot<Tenant> {
         tenant.name = name;
         tenant.slug = slug.toLowerCase().trim();
         tenant.email = email.toLowerCase().trim();
+        tenant.phone = phone;
+        tenant.businessType = businessType;
+        tenant.promoCode = promoCode;
         tenant.status = TenantStatus.TRIAL;
 
         // Register domain event — Spring Data publishes this after save()
@@ -150,4 +165,3 @@ public class Tenant extends AggregateRoot<Tenant> {
         //this.updatedAt = Instant.now();
     }
 }
-

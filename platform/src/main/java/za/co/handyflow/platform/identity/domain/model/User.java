@@ -46,6 +46,15 @@ public class User extends AggregateRoot<User> {
     @Column(nullable = false)
     private UserStatus status;
 
+    // NEW: deliberately non-blocking — verifying tracks and nudges, it
+    // doesn't gate login or app usage. See V_email_verification.sql for
+    // the full reasoning.
+    @Column(name = "email_verified", nullable = false)
+    private boolean emailVerified = false;
+
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",
@@ -112,6 +121,11 @@ public class User extends AggregateRoot<User> {
 
     public void deactivate() {
         this.status = UserStatus.INACTIVE;
+    }
+
+    public void verifyEmail() {
+        this.emailVerified   = true;
+        this.emailVerifiedAt = Instant.now();
     }
 
     // ── Permission resolution ─────────────────────────────────────────────────

@@ -50,6 +50,7 @@ import { ClientPortalPage }  from "./pages/projects/ClientPortalPage"
 import { EarthMovingPage } from "./pages/earthmoving/EarthMovingPage"
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage"
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage"
+import { VerifyEmailPage } from "./pages/auth/VerifyEmailPage"
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -72,6 +73,7 @@ export default function App() {
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/forgot-password"           element={<ForgotPasswordPage />} />
           <Route path="/reset-password"            element={<ResetPasswordPage />} />
+          <Route path="/verify-email"              element={<VerifyEmailPage />} />
 
           {/* Client portal — public, intentionally outside ModuleLayout (no nav bar) */}
           <Route path="/projects/portal/:token" element={<ClientPortalPage />} />
