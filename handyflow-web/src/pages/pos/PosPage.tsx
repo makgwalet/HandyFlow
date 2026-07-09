@@ -94,6 +94,10 @@ type Tab = 'sell' | 'stock' | 'transactions' | 'orders'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Standard SA VAT rate — used as the fallback when a cart line's catalogue
+// item can't be matched, or has no vatRate set. Otherwise each line now uses
+// that item's own vatRate (see the totals calculation below) rather than
+// this flat constant applied to every sale regardless of item.
 const VAT_RATE = 0.15
 
 const fmtR = (n: number | null | undefined) =>
@@ -403,6 +407,19 @@ export function PosPage() {
   const [showReceive,  setShowReceive] = useState<PurchaseOrder | null>(null)
   const [showRefund,   setShowRefund]  = useState<Transaction | null>(null)
   const [showReceipt,  setShowReceipt] = useState<Transaction | null>(null)
+
+  // NEW: was never called at all — the modal below used to build its own,
+  // simpler receipt directly from the Transaction object already in memory,
+  // which has no tenant name/address/VAT number and no subtotal/VAT
+  // breakdown. This is the actual endpoint built for that purpose.
+  const { data: receiptData, isLoading: receiptLoading } = useQuery({
+    queryKey: ['pos-receipt', showReceipt?.id],
+    queryFn: async () => {
+      const r = await apiClient.get(`/api/v1/pos/transactions/${showReceipt!.id}/receipt`)
+      return r.data?.data ?? r.data
+    },
+    enabled: !!showReceipt,
+  })
   const [expandedTxn,  setExpanded]    = useState<string | null>(null)
 
   // form state
@@ -648,7 +665,18 @@ export function PosPage() {
       const base   = item.unitPrice * item.qty
       const disc   = base * (item.discountPct / 100)
       const net    = base - disc
-      const vat    = net * VAT_RATE
+      // FIX: was checking catItem?.vatExempt (a boolean) — corrected after
+      // confirming CatalogueItem has no such field at all. It already has a
+      // fully-wired per-item vatRate percentage instead, which
+      // CatalogueService.toSummary() already includes in exactly the
+      // /api/v1/catalogue/items response this page already fetches — a
+      // VAT-exempt item is simply one with vatRate = 0 already set, no new
+      // field needed anywhere. Falls back to the standard rate if the item
+      // can't be matched or vatRate is missing, same safe default the
+      // backend uses.
+      const catItem = (catalogueItems as any[]).find(c => c.id === item.catalogueItemId)
+      const vatRate = catItem?.vatRate != null ? catItem.vatRate / 100 : VAT_RATE
+      const vat     = net * vatRate
       return {
         subtotal: acc.subtotal + base,
         discount: acc.discount + disc,
@@ -1636,40 +1664,65 @@ export function PosPage() {
         <div style={MODAL_BG}>
           <div style={modalBox(420)}>
             {modalHeader(`Receipt — ${showReceipt.transactionNumber}`, () => setShowReceipt(null))}
-            <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 10, padding: 16, fontFamily: 'monospace', fontSize: 12, lineHeight: 1.9 }}>
-              <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 14, marginBottom: 2 }}>HandyFlow</div>
-              <div style={{ textAlign: 'center', color: '#64748B', fontSize: 10, marginBottom: 10 }}>ECTA-compliant electronic receipt</div>
-              <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: 8, marginBottom: 8 }}>
-                <div>TXN: {showReceipt.transactionNumber}</div>
-                <div>Date: {fmtDate(showReceipt.createdAt)}</div>
-                {showReceipt.servedByName && <div>Cashier: {showReceipt.servedByName}</div>}
-                {showReceipt.customerName && <div>Customer: {showReceipt.customerName}</div>}
-              </div>
-              <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: 8, marginBottom: 8 }}>
-                {showReceipt.items?.map(li => (
-                  <div key={li.id} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{li.itemName} ×{li.qty}</span>
-                    <span>{fmtR(li.lineTotal)}</span>
-                  </div>
-                ))}
-              </div>
-              <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
-                  <span>Payment</span><span>{showReceipt.paymentMethod}</span>
-                </div>
-                {(showReceipt.changeGiven ?? 0) > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
-                    <span>Change</span><span>{fmtR(showReceipt.changeGiven)}</span>
-                  </div>
+            {receiptLoading || !receiptData ? (
+              <div style={{ padding: '40px 20px', textAlign: 'center' as const, color: '#94A3B8' }}>Loading receipt…</div>
+            ) : (
+              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 10, padding: 16, fontFamily: 'monospace', fontSize: 12, lineHeight: 1.9 }}>
+                {/* FIX: was a hardcoded "HandyFlow" — now the tenant's real
+                    name, plus address/VAT number when available. */}
+                <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{receiptData.tenantName}</div>
+                {receiptData.tenantAddress && (
+                  <div style={{ textAlign: 'center', color: '#64748B', fontSize: 10 }}>{receiptData.tenantAddress}</div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 14, marginTop: 4 }}>
-                  <span>TOTAL</span><span>{fmtR(showReceipt.totalAmount)}</span>
+                {receiptData.tenantVatNumber && (
+                  <div style={{ textAlign: 'center', color: '#64748B', fontSize: 10 }}>VAT: {receiptData.tenantVatNumber}</div>
+                )}
+                <div style={{ textAlign: 'center', color: '#64748B', fontSize: 10, marginBottom: 10, marginTop: 2 }}>ECTA-compliant electronic receipt</div>
+                <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: 8, marginBottom: 8 }}>
+                  <div>TXN: {receiptData.transactionNumber}</div>
+                  <div>Date: {fmtDate(receiptData.createdAt)}</div>
+                  {receiptData.cashierName && <div>Cashier: {receiptData.cashierName}</div>}
+                  {receiptData.customerName && <div>Customer: {receiptData.customerName}</div>}
+                </div>
+                <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: 8, marginBottom: 8 }}>
+                  {receiptData.items?.map((li: any, i: number) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>{li.itemName} ×{li.qty}</span>
+                      <span>{fmtR(li.lineTotal)}</span>
+                    </div>
+                  ))}
+                </div>
+                {/* NEW: the subtotal/discount/VAT breakdown was completely
+                    absent before — only a flat TOTAL was ever shown. */}
+                <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                    <span>Subtotal</span><span>{fmtR(receiptData.subtotal)}</span>
+                  </div>
+                  {(receiptData.discountAmount ?? 0) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                      <span>Discount</span><span>-{fmtR(receiptData.discountAmount)}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                    <span>VAT</span><span>{fmtR(receiptData.vatAmount)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                    <span>Payment</span><span>{receiptData.paymentMethod}</span>
+                  </div>
+                  {(receiptData.changeGiven ?? 0) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                      <span>Change</span><span>{fmtR(receiptData.changeGiven)}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 14, marginTop: 4 }}>
+                    <span>TOTAL</span><span>{fmtR(receiptData.totalAmount)}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14 }}>
               <button onClick={() => setShowReceipt(null)} style={btnCancel}>Close</button>
-              <button onClick={() => window.print()} style={btnPrimary()}>
+              <button onClick={() => window.print()} style={btnPrimary()} disabled={!receiptData}>
                 <Printer size={13} /> Print
               </button>
             </div>

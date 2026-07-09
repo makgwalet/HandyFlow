@@ -26,7 +26,7 @@ public interface DeskTicketRepository extends JpaRepository<DeskTicket, UUID> {
             t.createdAt DESC
         """)
     Page<DeskTicket> findAll(TenantId tenantId, String status,
-                              String channel, String priority, Pageable pageable);
+                             String channel, String priority, Pageable pageable);
 
     Optional<DeskTicket> findByIdAndTenantId(UUID id, TenantId tenantId);
 
@@ -50,10 +50,17 @@ public interface DeskTicketRepository extends JpaRepository<DeskTicket, UUID> {
     long countSlaBreached(TenantId tenantId);
 
     // Find tickets past their SLA deadline — for scheduler
+    // FIX: was only excluding RESOLVED/CLOSED — a ticket currently
+    // WAITING_ON_CUSTOMER/WAITING_ON_THIRD_PARTY has a dueAt that hasn't
+    // been adjusted yet for its current, still-ongoing pause (that
+    // adjustment only happens when the ticket resumes — see
+    // DeskTicket.resumeIfPaused()). Comparing that frozen deadline
+    // directly would incorrectly flag a ticket as breached while it's
+    // legitimately paused waiting on someone else to respond.
     @Query("""
         SELECT t FROM DeskTicket t
         WHERE t.slaBreached = false
-        AND t.status NOT IN ('RESOLVED','CLOSED')
+        AND t.status NOT IN ('RESOLVED','CLOSED','WAITING_ON_CUSTOMER','WAITING_ON_THIRD_PARTY')
         AND t.dueAt IS NOT NULL
         AND t.dueAt < :now
         AND t.deletedAt IS NULL

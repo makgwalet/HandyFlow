@@ -32,4 +32,12 @@ public interface PosStockItemRepository extends JpaRepository<PosStockItem, UUID
 
     @Query("SELECT COUNT(s) FROM PosStockItem s WHERE s.tenantId = :tenantId AND s.trackStock = true AND s.qtyOnHand <= s.reorderLevel")
     long countLowStock(TenantId tenantId);
+
+    // NEW: backs the fix to PosService.getSummary(), which was previously
+    // calling the raw JpaRepository.count() — no tenant filter at all,
+    // returning a count of stock items across every tenant in the database
+    // rather than just the current one. Every other line in that method
+    // already scopes by tenantId; this one didn't.
+    @Query("SELECT COUNT(s) FROM PosStockItem s WHERE s.tenantId = :tenantId")
+    long countByTenantId(TenantId tenantId);
 }

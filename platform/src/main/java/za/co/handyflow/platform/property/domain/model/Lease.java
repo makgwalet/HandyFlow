@@ -82,6 +82,15 @@ public class Lease {
     @Column(name = "deleted_by")
     private UUID deletedBy;
 
+    // NEW: backs the lease-expiry scheduler. Tracks the most urgent
+    // threshold (90/60/30 days) a notice has already been sent for, so the
+    // scheduler can send a fresh notice only when a lease crosses into a
+    // MORE urgent bucket than last notified — not a lower/equal one, and
+    // not a plain re-check that would otherwise re-send the same notice
+    // every single day once a lease enters the 90-day window.
+    @Column(name = "last_expiry_notice_days") private Integer lastExpiryNoticeDays;
+    @Column(name = "last_expiry_notice_at")   private Instant lastExpiryNoticeAt;
+
     @Version
     private Long version;
 
@@ -125,6 +134,16 @@ public class Lease {
     public void confirmDeposit() {
         this.depositPaid = true;
         this.updatedAt   = Instant.now();
+    }
+
+    // NEW: called by the expiry scheduler once a notice has actually been
+    // sent for a given threshold — records how urgent the last notice sent
+    // was, so a later, more urgent threshold still triggers a fresh notice,
+    // but the same or a less urgent one doesn't re-send.
+    public void recordExpiryNotice(int thresholdDays) {
+        this.lastExpiryNoticeDays = thresholdDays;
+        this.lastExpiryNoticeAt   = Instant.now();
+        this.updatedAt            = Instant.now();
     }
 
     public boolean isActive()     { return "ACTIVE".equals(status); }

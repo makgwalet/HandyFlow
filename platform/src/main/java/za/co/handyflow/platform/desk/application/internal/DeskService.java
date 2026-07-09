@@ -51,8 +51,8 @@ public class DeskService {
 
     @Transactional(readOnly = true)
     public Page<TicketResponse> getTickets(TenantId tenantId, String status,
-                                            String channel, String priority,
-                                            Pageable pageable) {
+                                           String channel, String priority,
+                                           Pageable pageable) {
         return ticketRepo.findAll(tenantId, status, channel, priority, pageable)
                 .map(t -> toTicketResponse(t, false));
     }
@@ -64,14 +64,14 @@ public class DeskService {
 
     @Transactional
     public TicketResponse createTicket(TenantId tenantId, UUID createdBy,
-                                        CreateTicketRequest req) {
+                                       CreateTicketRequest req) {
         // Generate ticket number: TKT-0001, TKT-0002, ...
         int seq = ticketRepo.findMaxTicketSequence(tenantId) + 1;
         String ticketNumber = "TKT-%04d".formatted(seq);
 
         // Calculate SLA due date based on priority
         Instant dueAt = slaRepo.findByTenantIdAndPriority(tenantId,
-                req.priority() != null ? req.priority() : "NORMAL")
+                        req.priority() != null ? req.priority() : "NORMAL")
                 .map(sla -> sla.calculateDueAt(Instant.now()))
                 .orElse(Instant.now().plusSeconds(72 * 3600)); // default 72h
 
@@ -92,6 +92,17 @@ public class DeskService {
         if (req.assignedTo() != null) {
             notifyAssignee(ticket, req.assignedTo());
         }
+
+        // NEW: previously nobody was told a new ticket existed at all,
+        // unless it happened to be assigned at creation (which the public
+        // portal form never does — a customer has no way to pick an
+        // assignee). A ticket submitted via the portal could sit
+        // completely unseen until someone happened to check the
+        // dashboard. Fires regardless of whether an assignee was also
+        // set above — "a new ticket landed in the queue" and "you
+        // specifically were assigned this" are two different signals,
+        // not a redundant pair.
+        notifyTeamNewTicket(ticket);
 
         log.info("Created ticket={} priority={} channel={}", ticketNumber,
                 req.priority(), req.channel());
@@ -141,7 +152,7 @@ public class DeskService {
 
     @Transactional
     public TicketResponse addComment(TenantId tenantId, UUID id,
-                                      DeskAddCommentRequest req, String staffName) {
+                                     DeskAddCommentRequest req, String staffName) {
         DeskTicket ticket = findTicket(tenantId, id);
 
         DeskComment comment = DeskComment.create(
@@ -204,6 +215,14 @@ public class DeskService {
             ticket.startProgress();
             ticketRepo.save(ticket);
         }
+
+        // NEW: previously nothing told anyone a customer had replied at
+        // all — the comment just sat in the thread until someone happened
+        // to open the ticket. Notifies the assigned agent directly if
+        // there is one; falls back to the team if the ticket is still
+        // unassigned, since a reply going completely unnoticed on an
+        // unassigned ticket is worse than a slightly broader alert.
+        notifyOfCustomerReply(ticket, req.body(), authorName);
 
         log.info("Customer comment added to ticket={}", ticket.getTicketNumber());
     }
@@ -311,13 +330,87 @@ public class DeskService {
                 emailService.send(email,
                         "Ticket assigned to you: " + ticket.getTicketNumber(),
                         "<p>You have been assigned ticket <strong>" + ticket.getTicketNumber()
-                        + "</strong>: " + ticket.getSubject() + "</p>"
-                        + "<p>Priority: <strong>" + ticket.getPriority() + "</strong></p>"
-                        + "<p><a href=\"https://app.handyflow.co.za/desk/tickets/"
-                        + ticket.getId() + "\">View ticket</a></p>");
+                                + "</strong>: " + ticket.getSubject() + "</p>"
+                                + "<p>Priority: <strong>" + ticket.getPriority() + "</strong></p>"
+                                + "<p><a href=\"https://app.handyflow.co.za/desk/tickets/"
+                                + ticket.getId() + "\">View ticket</a></p>");
             }
         } catch (Exception e) {
             log.warn("Could not notify assignee: {}", e.getMessage());
+        }
+    }
+
+    // NEW: same tenant-admin-email lookup pattern already used everywhere
+    // else in this codebase for "notify the team" (Marketing, Property,
+    // SCM's ScmNotificationService.findAdminEmail all use the identical
+    // approach). Fires for every new ticket, INTERNAL or HELPDESK alike —
+    // V36's migration comment mentions a future special HandyFlow-admin
+    // tenant to route INTERNAL tickets to, but nothing in this codebase
+    // implements that yet, so this deliberately keeps to the current,
+    // actual architecture: every ticket belongs to exactly one tenant,
+    // notify that tenant's own registered contact.
+    private void notifyTeamNewTicket(DeskTicket ticket) {
+        try {
+            String email = jdbc.queryForObject(
+                    "SELECT email FROM tenants WHERE id = ?", String.class, ticket.getTenantId().getValue());
+            if (email == null || email.isBlank()) return;
+            String channelLabel = "INTERNAL".equals(ticket.getChannel()) ? "Internal issue" : "Customer support";
+            emailService.send(email,
+                    "New ticket: " + ticket.getTicketNumber() + " — " + ticket.getSubject(),
+                    "<p>A new " + channelLabel.toLowerCase() + " ticket has been submitted"
+                            + ("HELPDESK".equals(ticket.getChannel()) ? " via the customer portal." : ".") + "</p>"
+                            + "<p><strong>" + ticket.getTicketNumber() + "</strong>: " + ticket.getSubject() + "</p>"
+                            + "<p>From: " + ticket.getRequesterName()
+                            + (ticket.getRequesterEmail() != null ? " (" + ticket.getRequesterEmail() + ")" : "") + "<br/>"
+                            + "Priority: <strong>" + ticket.getPriority() + "</strong> &middot; Channel: " + channelLabel + "</p>"
+                            + "<p><a href=\"https://app.handyflow.co.za/desk/tickets/"
+                            + ticket.getId() + "\">View ticket</a></p>");
+        } catch (Exception e) {
+            log.warn("Could not notify team of new ticket={}: {}", ticket.getTicketNumber(), e.getMessage());
+        }
+    }
+
+    // NEW: same reasoning and lookup patterns already used above — direct
+    // assignee notification mirrors notifyAssignee(), team fallback
+    // mirrors notifyTeamNewTicket(). Kept as simple, separate try/catch
+    // blocks per branch rather than a shared abstraction, matching how
+    // the other notify* helpers in this class are already written.
+    private void notifyOfCustomerReply(DeskTicket ticket, String replyBody, String customerName) {
+        if (ticket.getAssignedTo() != null) {
+            try {
+                String email = jdbc.queryForObject(
+                        "SELECT email FROM users WHERE id = ?", String.class, ticket.getAssignedTo());
+                if (email != null) {
+                    emailService.send(email,
+                            "Customer replied — " + ticket.getTicketNumber(),
+                            "<p><strong>" + customerName + "</strong> has replied to ticket <strong>"
+                                    + ticket.getTicketNumber() + "</strong>: " + ticket.getSubject() + "</p>"
+                                    + "<blockquote style=\"border-left:3px solid #0D9488;padding-left:12px\">"
+                                    + replyBody + "</blockquote>"
+                                    + "<p><a href=\"https://app.handyflow.co.za/desk/tickets/"
+                                    + ticket.getId() + "\">View ticket</a></p>");
+                }
+            } catch (Exception e) {
+                log.warn("Could not notify assignee of customer reply on ticket={}: {}",
+                        ticket.getTicketNumber(), e.getMessage());
+            }
+        } else {
+            try {
+                String email = jdbc.queryForObject(
+                        "SELECT email FROM tenants WHERE id = ?", String.class, ticket.getTenantId().getValue());
+                if (email == null || email.isBlank()) return;
+                emailService.send(email,
+                        "Customer replied (unassigned) — " + ticket.getTicketNumber(),
+                        "<p><strong>" + customerName + "</strong> has replied to an unassigned ticket <strong>"
+                                + ticket.getTicketNumber() + "</strong>: " + ticket.getSubject() + "</p>"
+                                + "<blockquote style=\"border-left:3px solid #0D9488;padding-left:12px\">"
+                                + replyBody + "</blockquote>"
+                                + "<p><a href=\"https://app.handyflow.co.za/desk/tickets/"
+                                + ticket.getId() + "\">View and assign ticket</a></p>");
+            } catch (Exception e) {
+                log.warn("Could not notify team of customer reply on ticket={}: {}",
+                        ticket.getTicketNumber(), e.getMessage());
+            }
         }
     }
 
@@ -328,10 +421,10 @@ public class DeskService {
             emailService.send(ticket.getRequesterEmail(),
                     "Update on your ticket: " + ticket.getTicketNumber(),
                     "<p>Hi " + ticket.getRequesterName() + ",</p>"
-                    + "<p>" + staffName + " has replied to your support ticket.</p>"
-                    + "<blockquote style=\"border-left:3px solid #0D9488;padding-left:12px\">"
-                    + reply + "</blockquote>"
-                    + "<p><a href=\"" + publicUrl + "\">View ticket and reply</a></p>");
+                            + "<p>" + staffName + " has replied to your support ticket.</p>"
+                            + "<blockquote style=\"border-left:3px solid #0D9488;padding-left:12px\">"
+                            + reply + "</blockquote>"
+                            + "<p><a href=\"" + publicUrl + "\">View ticket and reply</a></p>");
         } catch (Exception e) {
             log.warn("Could not notify requester of reply: {}", e.getMessage());
         }
@@ -345,10 +438,10 @@ public class DeskService {
             emailService.send(ticket.getRequesterEmail(),
                     "Ticket resolved: " + ticket.getTicketNumber(),
                     "<p>Hi " + ticket.getRequesterName() + ",</p>"
-                    + "<p>Your support ticket <strong>" + ticket.getTicketNumber()
-                    + "</strong> has been resolved.</p>"
-                    + "<p>If you're not satisfied with the resolution, you can reopen it:</p>"
-                    + "<p><a href=\"" + publicUrl + "\">View and respond to ticket</a></p>");
+                            + "<p>Your support ticket <strong>" + ticket.getTicketNumber()
+                            + "</strong> has been resolved.</p>"
+                            + "<p>If you're not satisfied with the resolution, you can reopen it:</p>"
+                            + "<p><a href=\"" + publicUrl + "\">View and respond to ticket</a></p>");
         } catch (Exception e) {
             log.warn("Could not notify requester of resolution: {}", e.getMessage());
         }
@@ -384,7 +477,7 @@ public class DeskService {
 
         List<DeskCommentResponse> comments = includeComments
                 ? commentRepo.findByTicketIdOrderByCreatedAtAsc(t.getId())
-                        .stream().map(this::toCommentResponse).toList()
+                .stream().map(this::toCommentResponse).toList()
                 : List.of();
 
         return new TicketResponse(

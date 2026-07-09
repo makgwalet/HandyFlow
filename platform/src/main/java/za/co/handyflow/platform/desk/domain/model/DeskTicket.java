@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -48,6 +49,14 @@ public class DeskTicket {
     @Column(name = "sla_breached")      private boolean slaBreached = false;
     @Column(name = "due_at")            private Instant dueAt;
 
+    // NEW: backs the SLA-pause fix. V36's own migration comment says "SLA
+    // clock pauses on WAITING_ON_CUSTOMER" — the timestamps existed to
+    // support that, but nothing anywhere ever actually paused anything.
+    // dueAt was a fixed deadline set once at creation and never adjusted,
+    // meaning a ticket waiting five days on a slow customer would show as
+    // SLA-breached through no fault of the support team at all.
+    @Column(name = "paused_at") private Instant pausedAt;
+
     // Public portal
     @Column(name = "public_token", unique = true) private String publicToken;
 
@@ -63,11 +72,11 @@ public class DeskTicket {
     // ── Factory ───────────────────────────────────────────────────────────────
 
     public static DeskTicket create(TenantId tenantId, String ticketNumber,
-                                     String channel, String requesterName,
-                                     String requesterEmail, String requesterPhone,
-                                     UUID customerId, String subject, String description,
-                                     UUID categoryId, String priority,
-                                     Instant dueAt, UUID createdBy) {
+                                    String channel, String requesterName,
+                                    String requesterEmail, String requesterPhone,
+                                    UUID customerId, String subject, String description,
+                                    UUID categoryId, String priority,
+                                    Instant dueAt, UUID createdBy) {
         DeskTicket t      = new DeskTicket();
         t.tenantId        = tenantId;
         t.ticketNumber    = ticketNumber;
@@ -84,7 +93,7 @@ public class DeskTicket {
         t.createdBy       = createdBy;
         t.status          = "OPEN";
         t.publicToken     = UUID.randomUUID().toString().replace("-","")
-                          + UUID.randomUUID().toString().replace("-","");
+                + UUID.randomUUID().toString().replace("-","");
         t.createdAt       = Instant.now();
         t.updatedAt       = Instant.now();
         return t;
@@ -98,11 +107,27 @@ public class DeskTicket {
         touch();
     }
 
-    public void startProgress() { transition("IN_PROGRESS"); }
-    public void waitOnCustomer() { transition("WAITING_ON_CUSTOMER"); }
-    public void waitOnThirdParty() { transition("WAITING_ON_THIRD_PARTY"); }
+    public void startProgress() {
+        resumeIfPaused();
+        transition("IN_PROGRESS");
+    }
+
+    // FIX: these previously did nothing but flip the status string — the
+    // SLA deadline kept counting down the whole time a ticket sat waiting
+    // on someone else to respond. Now actually records when the pause
+    // began; see resumeIfPaused() for the other half.
+    public void waitOnCustomer() {
+        if (this.pausedAt == null) this.pausedAt = Instant.now();
+        transition("WAITING_ON_CUSTOMER");
+    }
+
+    public void waitOnThirdParty() {
+        if (this.pausedAt == null) this.pausedAt = Instant.now();
+        transition("WAITING_ON_THIRD_PARTY");
+    }
 
     public void resolve() {
+        resumeIfPaused();
         this.status     = "RESOLVED";
         this.resolvedAt = Instant.now();
         touch();
@@ -133,7 +158,7 @@ public class DeskTicket {
     }
 
     public void updateDetails(String subject, String description,
-                               UUID categoryId, String priority, String notes) {
+                              UUID categoryId, String priority, String notes) {
         if (subject     != null) this.subject     = subject;
         if (description != null) this.description = description;
         if (categoryId  != null) this.categoryId  = categoryId;
@@ -144,6 +169,19 @@ public class DeskTicket {
 
     private void transition(String newStatus) { this.status = newStatus; touch(); }
     private void touch() { this.updatedAt = Instant.now(); }
+
+    // NEW: the other half of the SLA-pause fix. Extends dueAt by however
+    // long the ticket was actually paused, so the deadline reflects real
+    // support-team-controlled time rather than wall-clock time that
+    // includes waiting on someone else. A no-op when pausedAt is null
+    // (e.g. starting fresh from OPEN, never having been paused at all).
+    private void resumeIfPaused() {
+        if (pausedAt != null && dueAt != null) {
+            Duration pauseDuration = Duration.between(pausedAt, Instant.now());
+            dueAt = dueAt.plus(pauseDuration);
+        }
+        pausedAt = null;
+    }
 
     public boolean isOpen()     { return !"CLOSED".equals(status) && !"RESOLVED".equals(status); }
     public boolean isResolved() { return "RESOLVED".equals(status) || "CLOSED".equals(status); }

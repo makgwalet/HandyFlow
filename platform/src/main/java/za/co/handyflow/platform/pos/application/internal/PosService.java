@@ -45,6 +45,7 @@ public class PosService {
     private final PosStockAdjustmentItemRepository adjustmentItemRepo;
     private final CatalogueItemRepository        catalogueItemRepo;
     private final ObjectMapper                   objectMapper;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Summary
@@ -64,7 +65,12 @@ public class PosService {
         BigDecimal salesThisMonth  = transactionRepo.sumSalesBetween(tenantId, monthFrom, to);
         long txToday               = transactionRepo.countSalesBetween(tenantId, dayFrom, to);
         long txMonth               = transactionRepo.countSalesBetween(tenantId, monthFrom, to);
-        long totalStockItems       = stockItemRepo.count();
+        // FIX: was stockItemRepo.count() — the raw, un-scoped JpaRepository
+        // method, counting stock items across every tenant in the database.
+        // Every other line in this method already correctly scopes by
+        // tenantId; this one didn't, so "total stock items" on the dashboard
+        // was showing the wrong number to every single tenant.
+        long totalStockItems       = stockItemRepo.countByTenantId(tenantId);
         long lowStockItems         = stockItemRepo.countLowStock(tenantId);
         long pendingOrders         = purchaseOrderRepo.findAll(tenantId, Pageable.unpaged())
                 .stream().filter(p -> "ORDERED".equals(p.getStatus()) || "PARTIALLY_RECEIVED".equals(p.getStatus()))
@@ -367,9 +373,25 @@ public class PosService {
         refund.setTotals(subtotal, totalVat, BigDecimal.ZERO, totalAmount);
         transactionRepo.save(refund);
 
-        // Mark original as REFUNDED if fully refunded
-        original.markRefunded();
-        transactionRepo.save(original);
+        // FIX: was original.markRefunded() called unconditionally — the
+        // comment above it said "if fully refunded" but the code never
+        // actually checked that condition. Refunding one item out of five
+        // marked the entire transaction REFUNDED, misrepresenting a sale
+        // that was 80% still legitimate and unreturned.
+        //
+        // Reuses getAlreadyRefundedQty() (already used above to validate
+        // this refund's requested quantities) rather than introducing a
+        // second way of computing the same thing — called here after the
+        // new refund is saved, so its sum now includes this refund too.
+        // Only marks REFUNDED once every original line item's cumulative
+        // refunded quantity has caught up to what was originally sold.
+        boolean fullyRefunded = originalItems.stream().allMatch(origItem ->
+                getAlreadyRefundedQty(tenantId, original.getId(), origItem.getId())
+                        .compareTo(origItem.getQty()) >= 0);
+        if (fullyRefunded) {
+            original.markRefunded();
+            transactionRepo.save(original);
+        }
 
         log.info("[POS] Refund {} processed against {}. Amount: {}", refNum,
                 original.getTransactionNumber(), totalAmount);
@@ -442,12 +464,25 @@ public class PosService {
                 .orElseThrow(() -> new NotFoundException("Transaction not found"));
         List<PosTransactionItem> items = transactionItemRepo.findByTransactionId(transactionId);
 
-        // Tenant info — pulled from tenant profile in production; using placeholders here
-        // In production: inject TenantProfileService and call tenantProfileService.getProfile(tenantId)
-        String tenantName    = "HandyFlow Business";
-        String tenantAddress = "";
-        String tenantPhone   = "";
-        String tenantVatNum  = null; // populate from tenant profile when available
+        // FIX: was hardcoded literals — "HandyFlow Business" as the tenant
+        // name (not the actual business's name), empty address/phone, null
+        // VAT number, with a comment admitting these were placeholders.
+        // Confirmed the frontend never even called this endpoint at all
+        // (it built its own separate, simpler receipt inline instead) — so
+        // fixing only the frontend to call this endpoint wouldn't have
+        // helped; this endpoint itself needed fixing first.
+        //
+        // Now pulls the real tenants.name/phone/vat_number/address columns
+        // (V9__tenant_company_details.sql — the same columns the Invoicing
+        // module's PDF generation already relies on). address is JSONB
+        // ({street, suburb, city, province, postalCode}, the same shape
+        // used for CRM customer addresses elsewhere in this codebase) —
+        // flattened into a single display line for the receipt.
+        TenantProfile profile = fetchTenantProfile(tenantId);
+        String tenantName    = profile.name();
+        String tenantAddress = profile.address();
+        String tenantPhone   = profile.phone();
+        String tenantVatNum  = profile.vatNumber();
 
         List<ReceiptResponse.ReceiptLineItem> lineItems = items.stream().map(i ->
                 new ReceiptResponse.ReceiptLineItem(
@@ -455,14 +490,25 @@ public class PosService {
                         i.getDiscountPct(), i.getVatRate(), i.getLineTotal())
         ).toList();
 
-        String html = buildHtmlReceipt(txn, items, tenantName, tenantVatNum);
+        String html = buildHtmlReceipt(txn, items, tenantName, tenantAddress, tenantPhone, tenantVatNum);
 
+        // FIX: vatAmount and discountAmount were passed in each other's
+        // positional slots — the record declares (subtotal, discountAmount,
+        // vatAmount, totalAmount) but this call passed (subtotal, VAT,
+        // discount, total). Compiles fine since records take positional
+        // args with no named-parameter checking, but every receipt showed
+        // the real VAT amount labelled "Discount" and the real discount
+        // amount labelled "VAT" — confirmed against a real receipt where a
+        // R575 total (subtotal R500 + correct 15% VAT of R75, no discount
+        // at all) displayed as "Discount -R75 / VAT R0", making the totals
+        // look like they didn't add up when the underlying math was
+        // actually correct throughout — only the two labels were swapped.
         return new ReceiptResponse(
                 tenantName, tenantAddress, tenantPhone, tenantVatNum,
                 txn.getTransactionNumber(), txn.getCreatedAt(),
                 txn.getServedByName(), txn.getCustomerName(),
                 lineItems,
-                txn.getSubtotal(), txn.getVatAmount(), txn.getDiscountAmount(), txn.getTotalAmount(),
+                txn.getSubtotal(), txn.getDiscountAmount(), txn.getVatAmount(), txn.getTotalAmount(),
                 txn.getPaymentMethod(), txn.getAmountTendered(), txn.getChangeGiven(),
                 txn.getPaymentRef(),
                 "Thank you for your business!",
@@ -784,18 +830,26 @@ public class PosService {
     // Private helpers
     // ═══════════════════════════════════════════════════════════════════════════
 
+    // FIX: was calling isVatExempt() via reflection on CatalogueItem — confirmed
+    // that method genuinely doesn't exist on the real entity (CatalogueItem.java
+    // has no vatExempt field at all). Every call threw, every throw was silently
+    // caught, and the catch block always returned the standard rate — every item
+    // was charged 15% on every sale, unconditionally, regardless of any actual
+    // exemption.
+    //
+    // CORRECTION from an earlier version of this fix: CatalogueItem doesn't need
+    // a new vatExempt boolean added to it at all. It already has a fully-wired
+    // per-item `vatRate` field (BigDecimal, defaults to 15.00, settable via the
+    // existing PUT /catalogue/items/{id} endpoint) — an item that should be
+    // VAT-exempt is simply one with vatRate = 0.00 already set on it. The
+    // `vat_exempt` boolean column POS's own V55 migration added to
+    // catalogue_items looks like an unfinished, redundant second mechanism that
+    // was never actually wired into the entity — this uses the one that already
+    // works instead of finishing the one that doesn't.
     private BigDecimal resolveVatRate(TenantId tenantId, UUID catalogueItemId) {
         if (catalogueItemId == null) return VAT_RATE_STANDARD;
         return catalogueItemRepo.findById(catalogueItemId)
-                .map(cat -> {
-                    // If catalogue item has vatExempt flag, return 0, else 15
-                    try {
-                        var vatExempt = cat.getClass().getMethod("isVatExempt").invoke(cat);
-                        return Boolean.TRUE.equals(vatExempt) ? BigDecimal.ZERO : VAT_RATE_STANDARD;
-                    } catch (Exception e) {
-                        return VAT_RATE_STANDARD;
-                    }
-                })
+                .map(cat -> cat.getVatRate() != null ? cat.getVatRate() : VAT_RATE_STANDARD)
                 .orElse(VAT_RATE_STANDARD);
     }
 
@@ -857,13 +911,19 @@ public class PosService {
     }
 
     private String buildHtmlReceipt(PosTransaction txn, List<PosTransactionItem> items,
-                                    String tenantName, String vatNumber) {
+                                    String tenantName, String tenantAddress,
+                                    String tenantPhone, String vatNumber) {
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm")
                 .withZone(ZONE_SA);
 
         StringBuilder sb = new StringBuilder();
         sb.append("<html><body style='font-family:monospace;max-width:300px;margin:0 auto'>");
         sb.append("<div style='text-align:center'><strong>").append(tenantName).append("</strong><br/>");
+        // NEW: previously never rendered at all, regardless of whether real
+        // data existed — conditionally shown now so this is ready the
+        // moment tenantAddress/tenantPhone get wired to a real source.
+        if (tenantAddress != null && !tenantAddress.isBlank()) sb.append(tenantAddress).append("<br/>");
+        if (tenantPhone != null && !tenantPhone.isBlank()) sb.append("Tel: ").append(tenantPhone).append("<br/>");
         if (vatNumber != null) sb.append("VAT: ").append(vatNumber).append("<br/>");
         sb.append("</div><hr/>");
         sb.append("<div>TXN: ").append(txn.getTransactionNumber()).append("<br/>");
@@ -883,7 +943,12 @@ public class PosService {
         if (txn.getDiscountAmount().compareTo(BigDecimal.ZERO) > 0) {
             sb.append("<tr><td>Discount</td><td align='right'>- R ").append(txn.getDiscountAmount()).append("</td></tr>");
         }
-        sb.append("<tr><td>VAT (15%)</td><td align='right'>R ").append(txn.getVatAmount()).append("</td></tr>");
+        // FIX: was hardcoded "VAT (15%)" — no longer accurate now that VAT is
+        // resolved per catalogue item (see resolveVatRate()); a cart mixing
+        // standard-rated and VAT-exempt items has a blended effective rate
+        // that isn't 15%, so labelling it as a fixed percentage is actively
+        // misleading. Just "VAT" with the real computed amount instead.
+        sb.append("<tr><td>VAT</td><td align='right'>R ").append(txn.getVatAmount()).append("</td></tr>");
         sb.append("<tr><td><strong>TOTAL</strong></td><td align='right'><strong>R ")
                 .append(txn.getTotalAmount()).append("</strong></td></tr>");
         if (txn.isCashPayment() && txn.getAmountTendered() != null) {
@@ -894,6 +959,48 @@ public class PosService {
         sb.append("<div style='text-align:center'>Thank you for your business!</div>");
         sb.append("</body></html>");
         return sb.toString();
+    }
+
+    // Same jdbc-lookup pattern already proven correct elsewhere in this
+    // codebase (Creative/Marketing services use the identical approach).
+    /** name/phone/vatNumber/address (already formatted to a single display line, or null) */
+    private record TenantProfile(String name, String phone, String vatNumber, String address) {}
+
+    // Pulls the real company details set up for PDF invoice generation
+    // (V9__tenant_company_details.sql) — the receipt now shows the same
+    // business identity the Invoicing module's PDFs already use, rather
+    // than duplicating a separate, incomplete lookup.
+    private TenantProfile fetchTenantProfile(TenantId tenantId) {
+        try {
+            java.util.Map<String, Object> row = jdbc.queryForMap(
+                    "SELECT name, phone, vat_number, address::text AS address FROM tenants WHERE id = ?",
+                    tenantId.getValue());
+            String name      = (String) row.get("name");
+            String phone     = (String) row.get("phone");
+            String vatNumber = (String) row.get("vat_number");
+            String address   = formatAddress((String) row.get("address"));
+            return new TenantProfile(name != null ? name : "Your Business", phone, vatNumber, address);
+        } catch (Exception e) {
+            return new TenantProfile("Your Business", null, null, null);
+        }
+    }
+
+    // address is JSONB — {street, suburb, city, province, postalCode}, the
+    // same shape CRM customer addresses already use — flattened into one
+    // display-friendly line, skipping any parts that weren't filled in.
+    private String formatAddress(String addressJson) {
+        if (addressJson == null || addressJson.isBlank()) return null;
+        try {
+            java.util.Map<String, String> addr = objectMapper.readValue(
+                    addressJson, new TypeReference<java.util.Map<String, String>>() {});
+            return java.util.stream.Stream.of(
+                            addr.get("street"), addr.get("suburb"), addr.get("city"),
+                            addr.get("province"), addr.get("postalCode"))
+                    .filter(s -> s != null && !s.isBlank())
+                    .collect(java.util.stream.Collectors.joining(", "));
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ── Mappers ───────────────────────────────────────────────────────────────

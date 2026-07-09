@@ -19,6 +19,19 @@ const TABS = [
 
 export function PropertyPage() {
   const [tab, setTab] = useState<Tab>("dashboard")
+  // NEW: carries an optional filter/lease-id handed off by the Dashboard's
+  // own navigation (e.g. "Leases expiring soon" -> Leases tab pre-filtered,
+  // or a specific outstanding payment -> Payments tab with that lease
+  // pre-selected). Plain tab-bar clicks below always clear this — only
+  // Dashboard-originated navigation should ever set it, so switching tabs
+  // manually never inherits a stale filter from an earlier Dashboard click.
+  const [navPayload, setNavPayload] = useState<{ leasesFilter?: string; paymentsLeaseId?: string }>({})
+
+  const goToTab = (id: Tab) => { setTab(id); setNavPayload({}) }
+  const navigateFromDashboard = (id: Tab, payload?: { leasesFilter?: string; paymentsLeaseId?: string }) => {
+    setTab(id)
+    setNavPayload(payload ?? {})
+  }
 
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -40,7 +53,7 @@ export function PropertyPage() {
             const Icon   = t.icon
             const active = tab === t.id
             return (
-              <button key={t.id} onClick={() => setTab(t.id)}
+              <button key={t.id} onClick={() => goToTab(t.id)}
                 style={{
                   display: "flex", alignItems: "center", gap: 6, padding: "10px 18px",
                   background: "none", border: "none", whiteSpace: "nowrap" as const,
@@ -54,10 +67,10 @@ export function PropertyPage() {
           })}
         </div>
 
-        {tab === "dashboard"   && <PropertyDashboard onNavigate={setTab} />}
+        {tab === "dashboard"   && <PropertyDashboard onNavigate={navigateFromDashboard} />}
         {tab === "properties"  && <PropertiesTab />}
-        {tab === "leases"      && <LeasesTab />}
-        {tab === "payments"    && <PaymentsTab />}
+        {tab === "leases"      && <LeasesTab initialFilter={navPayload.leasesFilter} />}
+        {tab === "payments"    && <PaymentsTab initialLeaseId={navPayload.paymentsLeaseId} />}
         {tab === "inspections" && <InspectionsTab />}
       </div>
     </div>

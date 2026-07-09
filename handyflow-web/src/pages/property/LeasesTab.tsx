@@ -18,9 +18,14 @@ const STATUS_CFG: Record<string, { color: string; bg: string; border: string }> 
 const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none", background: "#fff" }
 const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
 
-export default function LeasesTab() {
+export default function LeasesTab({ initialFilter }: { initialFilter?: string }) {
   const qc = useQueryClient()
-  const [statusFilter, setStatus] = useState("")
+  // FIX: previously always started at "" (All) regardless of how this tab
+  // was reached — clicking "Leases expiring soon" on the Dashboard just
+  // switched to this tab with no filter applied, same generic list as
+  // navigating here directly. initialFilter lets the Dashboard hand off
+  // which view to land on.
+  const [statusFilter, setStatus] = useState(initialFilter ?? "")
   const [expanded, setExpanded]   = useState<string | null>(null)
   const [showCreate, setCreate]   = useState(false)
   const [showRenew, setRenew]     = useState<any | null>(null)
@@ -42,10 +47,20 @@ export default function LeasesTab() {
     queryKey: ["leases", statusFilter],
     queryFn: async () => {
       const params = new URLSearchParams({ size: "100" })
-      if (statusFilter) params.set("status", statusFilter)
+      // NEW: "Expiring soon" isn't a real lease status the backend knows
+      // about (chk_lease_status only allows ACTIVE/PENDING/EXPIRED/
+      // TERMINATED) — it's LeaseResponse's own already-computed
+      // expiringSoon boolean, applied as a client-side filter over active
+      // leases below, not sent as a query param.
+      const backendStatus = statusFilter === "EXPIRING_SOON" ? "ACTIVE" : statusFilter
+      if (backendStatus) params.set("status", backendStatus)
       return unwrap(await apiClient.get(`/api/v1/property/leases?${params}`))
     },
   })
+
+  const visibleLeases = statusFilter === "EXPIRING_SOON"
+    ? (leases as any[]).filter(l => l.expiringSoon)
+    : (leases as any[])
 
   const { data: units = [] } = useQuery<any[]>({
     queryKey: ["units-all"],
@@ -87,7 +102,7 @@ export default function LeasesTab() {
       {/* Toolbar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {[{ k: "", l: "All" },{ k: "ACTIVE", l: "Active" },{ k: "PENDING", l: "Pending" },{ k: "EXPIRED", l: "Expired" },{ k: "TERMINATED", l: "Terminated" }].map(s => (
+          {[{ k: "", l: "All" },{ k: "ACTIVE", l: "Active" },{ k: "PENDING", l: "Pending" },{ k: "EXPIRED", l: "Expired" },{ k: "TERMINATED", l: "Terminated" },{ k: "EXPIRING_SOON", l: "Expiring soon" }].map(s => (
             <button key={s.k} onClick={() => setStatus(s.k)}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none",
                 background: statusFilter === s.k ? "#1B3A6B" : "#F1F5F9",
@@ -104,14 +119,14 @@ export default function LeasesTab() {
 
       {isLoading ? (
         <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading...</div>
-      ) : (leases as any[]).length === 0 ? (
+      ) : (visibleLeases).length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
           <FileText size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
           <div style={{ fontWeight: 600, color: "#475569" }}>No leases found</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {(leases as any[]).map(l => {
+          {(visibleLeases).map(l => {
             const cfg    = STATUS_CFG[l.status] ?? STATUS_CFG.ACTIVE
             const isOpen = expanded === l.id
             return (

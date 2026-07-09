@@ -6,7 +6,9 @@ import { Building2, TrendingUp, AlertTriangle, Calendar, ArrowRight, Users } fro
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
 const fmtR   = (n: any) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
 
-export default function PropertyDashboard({ onNavigate }: { onNavigate: (t: any) => void }) {
+export default function PropertyDashboard({ onNavigate }: {
+  onNavigate: (t: any, payload?: { leasesFilter?: string; paymentsLeaseId?: string }) => void
+}) {
   const { data: properties = [] } = useQuery<any[]>({ queryKey: ["properties"],
     queryFn: async () => unwrap(await apiClient.get("/api/v1/property/properties?size=200")) })
   const { data: leases = [] } = useQuery<any[]>({ queryKey: ["leases"],
@@ -88,7 +90,8 @@ export default function PropertyDashboard({ onNavigate }: { onNavigate: (t: any)
                   const balance = Number(p.amountDue) - Number(p.amountPaid)
                   const overdue = p.status === "OVERDUE"
                   return (
-                    <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", border: `1px solid ${overdue ? "#FECACA" : "#FDE68A"}`, borderLeft: `3px solid ${overdue ? "#DC2626" : "#D97706"}`, borderRadius: 8, background: overdue ? "#FFF5F5" : "#FFFBEB" }}>
+                    <div key={p.id} onClick={() => onNavigate("payments", { paymentsLeaseId: p.leaseId })}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", border: `1px solid ${overdue ? "#FECACA" : "#FDE68A"}`, borderLeft: `3px solid ${overdue ? "#DC2626" : "#D97706"}`, borderRadius: 8, background: overdue ? "#FFF5F5" : "#FFFBEB", cursor: "pointer" }}>
                       <div>
                         <div style={{ fontWeight: 600, fontSize: 13, color: "#0F172A" }}>
                           {p.periodMonth}/{p.periodYear}
@@ -108,13 +111,25 @@ export default function PropertyDashboard({ onNavigate }: { onNavigate: (t: any)
           {/* Expiring leases */}
           {expiringSoon.length > 0 && (
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12 }}>
-                <Calendar size={14} color="#D97706" />
-                <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>Leases expiring soon</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                  <Calendar size={14} color="#D97706" />
+                  <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>Leases expiring soon</span>
+                </div>
+                {/* NEW: this is the exact case the original module review
+                    flagged as unconfirmed — "we can't confirm whether View
+                    expiring leases navigates correctly to LeasesTab
+                    filtered to expiring, or just to the unfiltered tab."
+                    Confirmed it was the latter; this closes it. */}
+                <button onClick={() => onNavigate("leases", { leasesFilter: "EXPIRING_SOON" })}
+                  style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#1B3A6B", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+                  View all <ArrowRight size={13} />
+                </button>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                 {expiringSoon.map((l: any) => (
-                  <div key={l.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", border: "1px solid #FDE68A", borderLeft: "3px solid #D97706", borderRadius: 8, background: "#FFFBEB" }}>
+                  <div key={l.id} onClick={() => onNavigate("leases", { leasesFilter: "EXPIRING_SOON" })}
+                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", border: "1px solid #FDE68A", borderLeft: "3px solid #D97706", borderRadius: 8, background: "#FFFBEB", cursor: "pointer" }}>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 13, color: "#0F172A" }}>{l.lesseeName}</div>
                       <div style={{ fontSize: 11, color: "#64748B" }}>Expires {l.endDate}</div>

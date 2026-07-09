@@ -66,7 +66,20 @@ export default function PropertiesTab() {
   const addUnit = useMutation({
     mutationFn: ({ id, body }: { id: string; body: any }) =>
       apiClient.post(`/api/v1/property/properties/${id}/units`, body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["property", showAddUnit] }); setShowUnit(null); setError("") },
+    // FIX: was only invalidating ["property", showAddUnit] — the single
+    // expanded property's detail query. PropertyResponse.totalUnits/
+    // vacantUnits/occupiedUnits are computed server-side and returned by
+    // BOTH that query and the ["properties"] list query, but adding a unit
+    // never invalidated the list — so the Properties tab's own list view
+    // and the Dashboard's occupancy bars kept showing the old unit count
+    // until the global 30s staleTime expired or a manual refresh happened.
+    // createProperty/deleteProperty below both already invalidate the list
+    // correctly; this brings addUnit in line with them.
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["property", showAddUnit] })
+      qc.invalidateQueries({ queryKey: ["properties"] })
+      setShowUnit(null); setError("")
+    },
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to add unit"),
   })
 

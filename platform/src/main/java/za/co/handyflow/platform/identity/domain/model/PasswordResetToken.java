@@ -41,7 +41,7 @@ public class PasswordResetToken {
         // 64-char secure random token
         prt.token     = UUID.randomUUID().toString().replace("-", "")
                       + UUID.randomUUID().toString().replace("-", "");
-        prt.expiresAt = Instant.now().plusSeconds(3600); // 1 hour
+        prt.expiresAt = Instant.now().plusSeconds(900); // 1 hour
         return prt;
     }
 

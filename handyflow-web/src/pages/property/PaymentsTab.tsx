@@ -1,5 +1,5 @@
 // src/pages/property/PaymentsTab.tsx
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Plus, X, AlertTriangle, CheckCircle, Clock, CreditCard } from "lucide-react"
@@ -21,7 +21,7 @@ const STATUS_CFG: Record<string, { color: string; bg: string; border: string; ic
 const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none", background: "#fff" }
 const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
 
-export default function PaymentsTab() {
+export default function PaymentsTab({ initialLeaseId }: { initialLeaseId?: string }) {
   const qc = useQueryClient()
   const [selectedLease, setLease] = useState<any | null>(null)
   const [showCreate, setCreate]   = useState(false)
@@ -42,6 +42,22 @@ export default function PaymentsTab() {
     queryKey: ["leases", "ACTIVE"],
     queryFn: async () => unwrap(await apiClient.get("/api/v1/property/leases?status=ACTIVE&size=200")),
   })
+
+  // NEW: previously "View all" on the Dashboard's arrears list just
+  // switched to this tab with nothing selected — same blank state as
+  // navigating here directly, even though the Dashboard already knew
+  // exactly which payment (and therefore which lease) the user clicked.
+  // This tab has no cross-lease "all outstanding" list view to filter
+  // into (it's built around picking one lease at a time), so rather than
+  // pretend to filter a view that doesn't exist, this jumps straight to
+  // the specific lease behind whatever was clicked. Waits for the leases
+  // list to actually load before selecting, since initialLeaseId is
+  // available on the very first render but the matching lease isn't yet.
+  useEffect(() => {
+    if (!initialLeaseId || selectedLease) return
+    const match = (leases as any[]).find(l => l.id === initialLeaseId)
+    if (match) setLease(match)
+  }, [initialLeaseId, leases, selectedLease])
 
   const { data: outstanding = [] } = useQuery<any[]>({
     queryKey: ["outstanding"],
@@ -102,12 +118,24 @@ export default function PaymentsTab() {
           {os.length > 0 && (
             <div style={{ marginTop: 20 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>Overdue</div>
-              {os.slice(0, 8).map((p: any) => (
-                <div key={p.id} style={{ padding: "8px 12px", marginBottom: 6, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7 }}>
-                  <div style={{ fontWeight: 600, fontSize: 12, color: "#DC2626" }}>{MONTH_NAMES[p.periodMonth]} {p.periodYear}</div>
-                  <div style={{ fontSize: 11, color: "#94A3B8" }}>{fmtR(Number(p.amountDue) - Number(p.amountPaid))} outstanding</div>
-                </div>
-              ))}
+              {os.slice(0, 8).map((p: any) => {
+                // FIX: these rows had no click behaviour at all — a flat
+                // list of overdue periods with no way to act on any of
+                // them, even though each one clearly belongs to a specific
+                // lease (p.leaseId). Selects that lease the same way
+                // clicking it directly in "Active leases" above does.
+                // Falls back to a no-op if the lease isn't in the active
+                // list (e.g. it's since been terminated) rather than
+                // erroring.
+                const matchingLease = (leases as any[]).find(l => l.id === p.leaseId)
+                return (
+                  <div key={p.id} onClick={() => matchingLease && setLease(matchingLease)}
+                    style={{ padding: "8px 12px", marginBottom: 6, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, cursor: matchingLease ? "pointer" : "default" }}>
+                    <div style={{ fontWeight: 600, fontSize: 12, color: "#DC2626" }}>{MONTH_NAMES[p.periodMonth]} {p.periodYear}</div>
+                    <div style={{ fontSize: 11, color: "#94A3B8" }}>{fmtR(Number(p.amountDue) - Number(p.amountPaid))} outstanding</div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

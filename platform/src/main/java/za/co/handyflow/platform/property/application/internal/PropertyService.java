@@ -20,7 +20,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -38,8 +40,32 @@ public class PropertyService {
 
     @Transactional(readOnly = true)
     public Page<PropertyResponse> getProperties(TenantId tenantId, Pageable pageable) {
+        // FIX: was `.map(p -> toPropertyResponse(p, List.of()))` — a
+        // hardcoded empty list for every single property, meaning
+        // totalUnits/vacantUnits/occupiedUnits were always 0 for every
+        // property in the list view (and the Dashboard, which reads the
+        // same endpoint), regardless of how many units actually existed.
+        // Confirmed against a real tenant with active leases and a real
+        // rent roll still showing "0/0 units" on every card.
+        //
+        // One count query for the whole page (not per-property — see
+        // PropertyRepository.countUnitsByProperty's own comment for why
+        // this isn't a JOIN FETCH on the paginated query itself), merged
+        // into each response by property id.
+        Map<UUID, long[]> countsByProperty = propertyRepository.countUnitsByProperty(tenantId).stream()
+                .collect(Collectors.toMap(
+                        row -> (UUID) row[0],
+                        row -> new long[]{
+                                ((Number) row[1]).longValue(),
+                                ((Number) row[2]).longValue(),
+                                ((Number) row[3]).longValue()
+                        }));
+
         return propertyRepository.findAllActive(tenantId, pageable)
-                .map(p -> toPropertyResponse(p, List.of()));
+                .map(p -> {
+                    long[] counts = countsByProperty.getOrDefault(p.getId(), new long[]{0L, 0L, 0L});
+                    return toPropertyResponse(p, List.of(), counts[0], counts[1], counts[2]);
+                });
     }
 
     @Transactional(readOnly = true)
@@ -372,9 +398,19 @@ public class PropertyService {
     private PropertyResponse toPropertyResponse(Property p, List<UnitResponse> units) {
         long vacant   = units.stream().filter(u -> "VACANT".equals(u.status())).count();
         long occupied = units.stream().filter(u -> "OCCUPIED".equals(u.status())).count();
+        return toPropertyResponse(p, units, units.size(), vacant, occupied);
+    }
+
+    // NEW: used by getProperties() (the list view) where the full units
+    // list isn't loaded (deliberately, to keep the paginated query cheap —
+    // see PropertyRepository.countUnitsByProperty), just the counts. The
+    // 2-arg overload above still computes counts from a real units list
+    // for getProperty()/createProperty(), which do have one.
+    private PropertyResponse toPropertyResponse(Property p, List<UnitResponse> units,
+                                                long total, long vacant, long occupied) {
         return new PropertyResponse(p.getId(), p.getName(), p.getPropertyType(), p.getAddress(),
                 p.getDescription(), p.getCustomerId(), p.getPurchasePrice(), p.getMarketValue(),
-                units.size(), vacant, occupied, units, p.getCreatedAt());
+                (int) total, vacant, occupied, units, p.getCreatedAt());
     }
 
     private UnitResponse toUnitResponse(Unit u) {

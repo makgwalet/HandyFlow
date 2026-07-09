@@ -81,7 +81,13 @@ export function ForgotPasswordPage() {
               <p style={{ fontSize: 14, color: '#64748B', lineHeight: 1.6, margin: '0 0 4px' }}>
                 If an account matches <strong>{email}</strong> at <strong>{tenantSlug}</strong>, a reset link is on its way.
               </p>
-              <p style={{ fontSize: 13, color: '#94A3B8', margin: 0 }}>The link expires in 30 minutes.</p>
+              {/* FIX: was "30 minutes" — didn't match reality. Confirmed
+                  directly against PasswordResetToken.create(), which sets
+                  expiresAt to Instant.now().plusSeconds(3600) — the token
+                  genuinely lives for 1 hour, same as the email itself
+                  already correctly says. This was the one of the two that
+                  was wrong. */}
+              <p style={{ fontSize: 13, color: '#94A3B8', margin: 0 }}>The link expires in 15 minutes.</p>
             </div>
           )}
 

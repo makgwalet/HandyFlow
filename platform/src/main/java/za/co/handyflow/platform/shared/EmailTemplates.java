@@ -1012,4 +1012,85 @@ public class EmailTemplates {
                         ? " (" + org.springframework.web.util.HtmlUtils.htmlEscape(scheduleTitle) + ")" : "",
                 invoiceNumber, amount));
     }
+
+    // NEW: previously a payment that only partially covered what was owed
+    // (LeasePayment.recordPayment()'s own domain logic produces PARTIAL as
+    // a first-class outcome, not an edge case) got zero acknowledgment at
+    // all — rentReceipt() only fired on the fully-PAID branch. A tenant
+    // paying part of their rent deserves to know it was received, and
+    // exactly what's still outstanding.
+    public static String rentPartialPayment(String lesseeName, String amountPaid,
+                                            String balance, String period,
+                                            String paidDate, String reference) {
+        String refLine = (reference != null && !reference.isBlank())
+                ? " &nbsp;&middot;&nbsp; Ref: " + org.springframework.web.util.HtmlUtils.htmlEscape(reference)
+                : "";
+        return wrap("""
+            <p>Dear <strong>%s</strong>,</p>
+            <p>We confirm receipt of a partial rental payment:</p>
+            <div class="highlight-amber">
+              <p>Amount received: <strong>R%s</strong><br/>
+                 Period: <strong>%s</strong><br/>
+                 Paid: %s%s<br/>
+                 Balance still due: <strong>R%s</strong></p>
+            </div>
+            <p>Thank you for your payment. Please arrange payment of the remaining balance
+               as soon as possible.</p>
+            """.formatted(lesseeName, amountPaid, period, paidDate, refLine, balance));
+    }
+
+    // NEW: no lease-expiry warning existed at all before — a tenant had no
+    // way of finding out their lease was ending except checking the date
+    // themselves. Sent at 90/60/30 days out, more urgent tone the closer it
+    // gets — see PropertyScheduler for the threshold logic.
+    public static String leaseExpiringTenant(String lesseeName, String propertyName,
+                                             String unitNumber, String endDate, int daysRemaining) {
+        String cssClass = daysRemaining <= 30 ? "highlight-red"
+                : daysRemaining <= 60 ? "highlight-amber" : "highlight";
+        return wrap("""
+            <p>Dear <strong>%s</strong>,</p>
+            <p>This is a reminder that your lease is approaching its end date.</p>
+            <div class="%s">
+              <p><strong>%s — Unit %s</strong><br/>
+                 Lease end date: <strong>%s</strong> (%d days remaining)</p>
+            </div>
+            <p>If you'd like to discuss renewing your lease, please contact your landlord
+               as soon as possible. If no arrangement is made, the lease will end on the
+               date above.</p>
+            """.formatted(lesseeName, cssClass, propertyName, unitNumber, endDate, daysRemaining));
+    }
+
+    // NEW: staff/landlord-facing counterpart — sent to the tenant's own
+    // registered contact email (the property management business itself,
+    // same lookup ScmNotificationService already uses for its own
+    // "admin email" notifications), so a lease isn't only flagged to the
+    // renter with no internal visibility for whoever needs to action a
+    // renewal or re-listing.
+    public static String leaseExpiringLandlord(String lesseeName, String propertyName,
+                                               String unitNumber, String endDate, int daysRemaining) {
+        String cssClass = daysRemaining <= 30 ? "highlight-red"
+                : daysRemaining <= 60 ? "highlight-amber" : "highlight";
+        return wrap("""
+            <p>A lease is approaching its end date and may need action.</p>
+            <div class="%s">
+              <p><strong>%s — Unit %s</strong><br/>
+                 Tenant: <strong>%s</strong><br/>
+                 Lease end date: <strong>%s</strong> (%d days remaining)</p>
+            </div>
+            <p>Log in to HandyFlow to renew the lease, apply an escalation, or begin the
+               move-out process if it won't be renewed.</p>
+            """.formatted(cssClass, propertyName, unitNumber, lesseeName, endDate, daysRemaining));
+    }
+
+    public static String passwordReset(String firstName, String resetLink) {
+        return wrap("""
+            <p>Hi %s,</p>
+            <p>We received a request to reset your HandyFlow password.</p>
+            <p><a href="%s" class="btn">Reset password</a></p>
+            <p>This link expires in <strong>15 minutes</strong>.</p>
+            <p>If you didn't request this, you can safely ignore this email.
+               Your password has not been changed.</p>
+            """.formatted(firstName, resetLink));
+    }
+
 }

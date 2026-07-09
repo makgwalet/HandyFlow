@@ -14,6 +14,7 @@ import za.co.handyflow.platform.identity.domain.repository.UserRepository;
 import za.co.handyflow.platform.identity.dto.request.ForgotPasswordRequest;
 import za.co.handyflow.platform.identity.dto.request.ResetPasswordRequest;
 import za.co.handyflow.platform.shared.EmailService;
+import za.co.handyflow.platform.shared.EmailTemplates;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -64,21 +65,17 @@ public class PasswordResetService {
         resetTokenRepository.save(prt);
 
         // Send reset email
+        // FIX: was a bare, unstyled inline HTML string — the only
+        // transactional email in the platform not using the shared
+        // wrap()/.btn template every other email is built with. See
+        // EmailTemplates.passwordReset()'s own comment for the full
+        // reasoning, including the 30-minutes-vs-1-hour discrepancy this
+        // was found alongside (this email's "1 hour" was already correct
+        // — confirmed directly against PasswordResetToken.create()'s
+        // actual 3600-second expiry; the frontend copy was wrong instead).
         String link    = "https://app.handyflow.co.za/reset-password?token=" + prt.getToken();
         String subject = "Reset your HandyFlow password";
-        String html    = """
-                <p>Hi %s,</p>
-                <p>We received a request to reset your HandyFlow password.</p>
-                <p>
-                  <a href="%s" style="background:#1B3A6B;color:white;padding:12px 24px;
-                     border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">
-                     Reset password
-                  </a>
-                </p>
-                <p>This link expires in <strong>1 hour</strong>.</p>
-                <p>If you didn't request this, you can safely ignore this email.
-                   Your password has not been changed.</p>
-                """.formatted(user.getFirstName(), link);
+        String html    = EmailTemplates.passwordReset(user.getFirstName(), link);
 
         try {
             emailService.send(req.email(), subject, html);
