@@ -68,6 +68,67 @@ public class EmailTemplates {
 
     // ── Existing templates (unchanged) ────────────────────────────────────────
 
+    // ── Auth ─────────────────────────────────────────────────────────────────
+
+
+    // NEW: previously AuthService.register() fired zero emails at all —
+    // confirmed nothing anywhere sent a welcome/confirmation on signup.
+    // The one piece of information a new user will most reliably forget
+    // is their own company slug, since it's not something they'd ever
+    // need to type again until their next login — put front and center
+    // here rather than buried in a paragraph.
+    public static String registrationConfirmation(String firstName, String companyName,
+                                                  String slug, java.util.List<String> moduleKeys) {
+        String modulesList = (moduleKeys != null && !moduleKeys.isEmpty())
+                ? moduleKeys.stream().map(m -> "&bull; " + m).collect(java.util.stream.Collectors.joining("<br/>"))
+                : "&bull; Core CRM &amp; Invoicing";
+        return wrap("""
+            <p>Hi %s,</p>
+            <p>Welcome to HandyFlow! Your account for <strong>%s</strong> is ready.</p>
+            <div class="highlight-green">
+              <p>Your company slug: <strong>%s</strong><br/>
+                 You'll need this every time you sign in — worth bookmarking your login page now.</p>
+            </div>
+            <p>Modules on your account:<br/>%s</p>
+            <p>Your 60-day free pilot has started — no charges until it ends.</p>
+            <p>Getting started:<br/>
+               &bull; Add your team under Settings &rarr; Users<br/>
+               &bull; Add your first customer<br/>
+               &bull; Explore the modules you signed up for</p>
+            """.formatted(firstName, companyName, slug, modulesList));
+    }
+
+    // NEW: replaces UserManagementService.inviteUser()'s previous bare
+    // inline HTML — confirmed it was missing the company name, inviter
+    // name, and role name entirely, even though role.getName() was sitting
+    // right there unused in that same method.
+    public static String userInvitation(String firstName, String invitedByName,
+                                        String companyName, String roleName, String link) {
+        return wrap("""
+            <p>Hi %s,</p>
+            <p><strong>%s</strong> has invited you to join <strong>%s</strong> on HandyFlow, as <strong>%s</strong>.</p>
+            <p><a href="%s" class="btn">Accept invitation</a></p>
+            <p>This link expires in <strong>72 hours</strong>.</p>
+            """.formatted(firstName, invitedByName, companyName, roleName, link));
+    }
+
+    // NEW: previously PasswordResetService.resetPassword() completed a
+    // reset with no follow-up at all — no confirmation that it happened,
+    // and no way for the real account owner to know if it wasn't them.
+    // This is a standard security notification every major platform sends
+    // after a credential change; this codebase had none.
+    public static String passwordChanged(String firstName) {
+        return wrap("""
+            <p>Hi %s,</p>
+            <p>Your HandyFlow password was just changed.</p>
+            <div class="highlight-amber">
+              <p>If you made this change, no action is needed.<br/>
+                 If you did <strong>not</strong> request this change, please contact support
+                 immediately — someone else may have access to your account.</p>
+            </div>
+            """.formatted(firstName));
+    }
+
     public static String quoteExpiry(String firstName, String quoteNumber,
                                      String customerName, String amount,
                                      String frontendUrl) {
