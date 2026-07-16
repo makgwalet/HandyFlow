@@ -13,6 +13,7 @@ import za.co.handyflow.platform.identity.domain.repository.UserRepository;
 import za.co.handyflow.platform.identity.dto.request.LoginRequest;
 import za.co.handyflow.platform.identity.dto.request.RegisterRequest;
 import za.co.handyflow.platform.identity.dto.response.AuthResponse;
+import za.co.handyflow.platform.billing.application.SubscriptionQueryFacade;
 import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.EmailTemplates;
 import za.co.handyflow.platform.shared.JwtService;
@@ -24,6 +25,7 @@ public class AuthService {
 
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
+    private final SubscriptionQueryFacade subscriptionQueryFacade;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RoleService roleService;
@@ -141,10 +143,35 @@ public class AuthService {
         // runtime signal. Now derived from the same value the token
         // itself is actually signed with.
         //
-        // FIX: subscriptionStatus previously didn't exist on this record
-        // at all — LoginPage.tsx's redirect to AccountLockedPage could
-        // never fire since it was always checking undefined. tenant is
-        // already available right here, so this needs no new query.
+        // FIX: subscriptionStatus previously read tenant.getStatus() —
+        // confirmed via real testing this is a completely separate,
+        // disconnected status field from Subscription.status, which is
+        // what FeatureGuard actually enforces against at module-access
+        // time. A tenant could be genuinely SUSPENDED (FeatureGuard
+        // correctly blocking every module) while Tenant.status still
+        // showed TRIAL, meaning this field would never reflect the real
+        // suspension and LoginPage.tsx's redirect to AccountLockedPage
+        // could never fire despite the tenant actually being locked out.
+        // SubscriptionQueryFacade is the same cross-module-safe facade
+        // pattern used elsewhere in this codebase (IdentityFacade,
+        // TenantFacade) — not a new sync point to maintain, just reading
+        // from the one source that's already correct. Also a strict
+        // improvement on its own merits: Subscription's status enum
+        // includes PAST_DUE, which TenantStatus has no way to represent
+        // at all.
+        //
+        // Wrapped defensively — a missing subscription (extremely
+        // unlikely given BillingEventHandlers creates one immediately on
+        // TenantCreatedEvent, but not impossible) must never block login
+        // itself.
+        String subscriptionStatus;
+        try {
+            subscriptionStatus = subscriptionQueryFacade.getSubscription(tenant.getTenantId()).status();
+        } catch (Exception e) {
+            log.warn("Could not resolve subscription status for tenant={}: {}", tenant.getId(), e.getMessage());
+            subscriptionStatus = null;
+        }
+
         return new AuthResponse(
                 token,
                 "Bearer",
@@ -155,7 +182,7 @@ public class AuthService {
                 user.getFirstName(),
                 user.getLastName(),
                 user.getPermissionNames(),
-                tenant.getStatus().name()
+                subscriptionStatus
         );
     }
 }

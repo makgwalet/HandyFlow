@@ -59,6 +59,26 @@ public class ModuleService {
         var existing = tenantModuleRepo.findByTenantAndKey(
                 tenantId.getValue(), moduleKey);
 
+        // FIX: trialDays was previously used as-is — a fresh, independent
+        // clock starting from right now, regardless of where the
+        // account's OWN trial already was. Confirmed via real data this
+        // produces exactly the staggered-expiry problem: a batch of
+        // modules all activated together share one trial end date, while
+        // anything added later runs its own, completely separate clock —
+        // multiple simultaneous, uncoordinated trial windows on one
+        // tenant, several of which had already silently expired while
+        // the account itself was suspended and unable to act on any of
+        // them.
+        //
+        // Every module trial now converges on the SAME decision moment
+        // the account itself converges on — capped at
+        // subscriptions.pilot_ends_at, never past it. A module added on
+        // day 58 of a 60-day trial genuinely only gets 2 days — shown
+        // honestly, not padded with an artificial minimum, since a
+        // minimum would just reintroduce the same staggering this exists
+        // to eliminate.
+        int cappedTrialDays = capTrialDaysToAccountTrial(tenantId, trialDays);
+
         TenantModule module;
         if (existing.isPresent()) {
             module = existing.get();
@@ -69,14 +89,37 @@ public class ModuleService {
             // Re-activate cancelled/suspended module
             module.activate();
         } else {
-            module = trialDays > 0
-                    ? TenantModule.createTrial(tenantId.getValue(), moduleKey, trialDays)
+            module = cappedTrialDays > 0
+                    ? TenantModule.createTrial(tenantId.getValue(), moduleKey, cappedTrialDays)
                     : TenantModule.createActive(tenantId.getValue(), moduleKey);
         }
 
         tenantModuleRepo.save(module);
         log.info("Activated module={} tenant={} status={}", moduleKey, tenantId, module.getStatus());
         return toTenantModuleResponse(module, tenantId);
+    }
+
+    // Returns the requested trial length, or however many whole days
+    // remain until the account's own trial ends, whichever is smaller.
+    // Falls back to the requested length uncapped if the account has no
+    // pilot window at all (e.g. already on a paid plan) or the lookup
+    // fails for any reason — a missing cap should never block module
+    // activation outright.
+    private int capTrialDaysToAccountTrial(TenantId tenantId, int requestedTrialDays) {
+        try {
+            java.sql.Timestamp pilotEndsAt = jdbc.queryForObject(
+                    "SELECT pilot_ends_at FROM subscriptions WHERE tenant_id = ?",
+                    java.sql.Timestamp.class, tenantId.getValue());
+            if (pilotEndsAt == null) return requestedTrialDays;
+
+            long daysUntilAccountTrialEnds = java.time.temporal.ChronoUnit.DAYS.between(
+                    Instant.now(), pilotEndsAt.toInstant());
+            return (int) Math.max(0, Math.min(requestedTrialDays, daysUntilAccountTrialEnds));
+        } catch (Exception e) {
+            log.warn("Could not resolve account trial end for tenant={}, using requested trial days uncapped: {}",
+                    tenantId, e.getMessage());
+            return requestedTrialDays;
+        }
     }
 
     @Transactional
@@ -102,64 +145,105 @@ public class ModuleService {
                 });
     }
 
+    // NEW: called when an account's own trial/subscription ends (see
+    // SubscriptionService.suspendExpiredPilots()/suspendGraceExpired()).
+    // Confirmed via real data this was genuinely needed: without it, a
+    // module still sitting in TRIAL status (not yet expired, not yet
+    // cancelled) at the exact moment the account gets suspended stays in
+    // that ambiguous state indefinitely — meaning if the account is ever
+    // reactivated later, that module could silently reappear as
+    // accessible again with no explicit re-activation decision, purely
+    // because its own trial happened not to have expired yet. Matches
+    // the explicit direction this was built to: when the account trial
+    // ends, every module trial ends with it, together — not staggered,
+    // not left dangling, no silent survivors.
+    //
+    // Reuses the same findByTenantAndKey + cancel() pattern
+    // cancelModule() already uses above, rather than a raw bulk SQL
+    // update, so any side effects the entity's own cancel() method has
+    // (timestamps, domain events, whatever else it does) aren't bypassed
+    // — only the read-only lookup of which keys need cancelling goes
+    // through jdbc directly.
+    @Transactional
+    public void cancelAllTrialModules(TenantId tenantId) {
+        List<String> trialModuleKeys = jdbc.queryForList(
+                "SELECT module_key FROM tenant_modules WHERE tenant_id = ? AND status = 'TRIAL'",
+                String.class, tenantId.getValue());
+
+        for (String moduleKey : trialModuleKeys) {
+            try {
+                tenantModuleRepo.findByTenantAndKey(tenantId.getValue(), moduleKey)
+                        .ifPresent(module -> {
+                            module.cancel();
+                            tenantModuleRepo.save(module);
+                        });
+            } catch (Exception e) {
+                log.warn("Failed to cancel trial module={} for tenant={}: {}", moduleKey, tenantId, e.getMessage());
+            }
+        }
+
+        log.info("Cancelled {} trial module(s) for tenant={} — account trial/subscription ended",
+                trialModuleKeys.size(), tenantId);
+    }
+
     @Transactional(readOnly = true)
     public boolean hasAccess(TenantId tenantId, String moduleKey) {
         return tenantModuleRepo.hasAccess(tenantId.getValue(), moduleKey);
     }
 
-@Transactional(readOnly = true)
-public CancelPreviewResponse getCancelPreview(TenantId tenantId, String moduleKey) {
-    // WHY JDBC here? We need to count records across modules without
-    // creating cross-module JPA dependencies.
-    // Each count query is module-specific and safe to read.
-    int recordCount = switch (moduleKey) {
-        case "hr"          -> countRows("hr_employees",    tenantId);
-        case "security"    -> countRows("security_guards", tenantId);
-        case "fleet"       -> countRows("fleet_vehicles",  tenantId);
-        case "fuel"        -> countRows("fuel_tanks",       tenantId);
-        case "property"    -> countRows("property_properties", tenantId);
-        case "clinic"      -> countRows("clinic_patients", tenantId);
-        case "bookings"    -> countRows("bookings",        tenantId);
-        case "events"      -> countRows("events",          tenantId);
-        case "accounting"  -> countRows("acc_accounts",   tenantId);
-        case "expenses"    -> countRows("expense_claims",  tenantId);
-        case "contracting" -> countRows("contracts",       tenantId);
-        case "invoicing"   -> countRows("invoices",        tenantId);
-        case "earthmoving" -> countRows("earthmoving_assets", tenantId);
-        default -> 0;
-    };
+    @Transactional(readOnly = true)
+    public CancelPreviewResponse getCancelPreview(TenantId tenantId, String moduleKey) {
+        // WHY JDBC here? We need to count records across modules without
+        // creating cross-module JPA dependencies.
+        // Each count query is module-specific and safe to read.
+        int recordCount = switch (moduleKey) {
+            case "hr"          -> countRows("hr_employees",    tenantId);
+            case "security"    -> countRows("security_guards", tenantId);
+            case "fleet"       -> countRows("fleet_vehicles",  tenantId);
+            case "fuel"        -> countRows("fuel_tanks",       tenantId);
+            case "property"    -> countRows("property_properties", tenantId);
+            case "clinic"      -> countRows("clinic_patients", tenantId);
+            case "bookings"    -> countRows("bookings",        tenantId);
+            case "events"      -> countRows("events",          tenantId);
+            case "accounting"  -> countRows("acc_accounts",   tenantId);
+            case "expenses"    -> countRows("expense_claims",  tenantId);
+            case "contracting" -> countRows("contracts",       tenantId);
+            case "invoicing"   -> countRows("invoices",        tenantId);
+            case "earthmoving" -> countRows("earthmoving_assets", tenantId);
+            default -> 0;
+        };
 
-    // Calculate access until date for display
-    var existing = tenantModuleRepo.findByTenantAndKey(tenantId.getValue(), moduleKey);
-    Instant accessUntil = existing.map(m -> {
-        // Simulate cancel to get the grace period end date
-        var sim = TenantModule.createActive(tenantId.getValue(), moduleKey);
-        return sim.calculateEndOfBillingPeriodPublic();
-    }).orElse(null);
+        // Calculate access until date for display
+        var existing = tenantModuleRepo.findByTenantAndKey(tenantId.getValue(), moduleKey);
+        Instant accessUntil = existing.map(m -> {
+            // Simulate cancel to get the grace period end date
+            var sim = TenantModule.createActive(tenantId.getValue(), moduleKey);
+            return sim.calculateEndOfBillingPeriodPublic();
+        }).orElse(null);
 
-    String moduleName = catalogueRepo.findByKey(moduleKey)
-        .map(ModuleCatalogue::getName).orElse(moduleKey);
+        String moduleName = catalogueRepo.findByKey(moduleKey)
+                .map(ModuleCatalogue::getName).orElse(moduleKey);
 
-    return new CancelPreviewResponse(
-        moduleKey, moduleName, recordCount,
-        recordCount > 0
-            ? "Cancelling will hide " + recordCount + " records. Your data is kept and restored if you re-activate."
-            : "No data will be affected.",
-        accessUntil
-    );
-}
-
-private int countRows(String table, TenantId tenantId) {
-    try {
-        Integer count = jdbc.queryForObject(
-            "SELECT COUNT(*) FROM " + table + " WHERE tenant_id = ?",
-            Integer.class, tenantId.getValue());
-        return count != null ? count : 0;
-    } catch (Exception e) {
-        log.warn("Could not count rows in {}: {}", table, e.getMessage());
-        return 0;
+        return new CancelPreviewResponse(
+                moduleKey, moduleName, recordCount,
+                recordCount > 0
+                        ? "Cancelling will hide " + recordCount + " records. Your data is kept and restored if you re-activate."
+                        : "No data will be affected.",
+                accessUntil
+        );
     }
-}
+
+    private int countRows(String table, TenantId tenantId) {
+        try {
+            Integer count = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM " + table + " WHERE tenant_id = ?",
+                    Integer.class, tenantId.getValue());
+            return count != null ? count : 0;
+        } catch (Exception e) {
+            log.warn("Could not count rows in {}: {}", table, e.getMessage());
+            return 0;
+        }
+    }
 
     // ── Mappers ───────────────────────────────────────────────────────────────
 
@@ -182,4 +266,3 @@ private int countRows(String table, TenantId tenantId) {
                 m.isAccessible());
     }
 }
-

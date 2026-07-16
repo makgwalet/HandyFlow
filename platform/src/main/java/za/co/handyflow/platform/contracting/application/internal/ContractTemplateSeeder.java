@@ -193,7 +193,7 @@ public class ContractTemplateSeeder {
         agreed.</p>
 
         <h3>7. Termination</h3>
-        <p>This Agreement commences on {{start_date}} and terminates upon the completion of the Project.
+        <p>This Agreement commences on {{start_date|date}} and terminates upon the completion of the Project.
         It may also be terminated:</p>
         <ul>
           <li>By mutual written consent.</li>
@@ -228,13 +228,13 @@ public class ContractTemplateSeeder {
         <p>Description: {{equipment_description}}<br/>Serial Number/ID: {{serial_number}}</p>
 
         <h3>3. Hire Period</h3>
-        <p>The hire commences on {{hire_start_date}} and terminates on {{hire_end_date}}. Any extension
+        <p>The hire commences on {{hire_start_date|date}} and terminates on {{hire_end_date|date}}. Any extension
         must be agreed upon in writing. Failure to return the equipment by the end date will incur a
         late fee of R{{daily_penalty_fee}} per day.</p>
 
         <h3>4. Rental Fees &amp; Deposit</h3>
         <p><strong>Rental Fee:</strong> The Hirer shall pay R{{daily_rate}} per day. Total payment of
-        R{{total_amount}} is due on or before {{payment_due_date}}.</p>
+        R{{total_amount}} is due on or before {{payment_due_date|date}}.</p>
         <p><strong>Deposit:</strong> A refundable deposit of R{{deposit_amount}} is payable upon signing.
         The Owner may withhold all or part of this deposit to cover damages, cleaning fees, or
         outstanding rental charges.</p>
@@ -404,8 +404,8 @@ public class ContractTemplateSeeder {
         Contractor.</p>
 
         <h3>3. Commencement and Duration</h3>
-        <p>The Work shall commence on {{start_date}} and is expected to be completed by
-        {{completion_date}}, unless extended by written agreement.</p>
+        <p>The Work shall commence on {{start_date|date}} and is expected to be completed by
+        {{completion_date|date}}, unless extended by written agreement.</p>
 
         <h3>4. Payment Terms</h3>
         <p><strong>Fees:</strong> The Contractor shall pay the Subcontractor R{{total_fee}} for the
@@ -462,7 +462,7 @@ public class ContractTemplateSeeder {
         {{deliverables_description}}.</p>
 
         <h3>3. Term</h3>
-        <p>This engagement commences on {{start_date}} and continues until {{end_date}}, unless
+        <p>This engagement commences on {{start_date|date}} and continues until {{end_date|date}}, unless
         terminated earlier in accordance with Clause 8.</p>
 
         <h3>4. Fees &amp; Payment</h3>
@@ -528,7 +528,7 @@ public class ContractTemplateSeeder {
         operational requirements.</p>
 
         <h3>3. Commencement &amp; Probation</h3>
-        <p>Employment commences on {{start_date}}. The first {{probation_months}} months shall be a
+        <p>Employment commences on {{start_date|date}}. The first {{probation_months}} months shall be a
         probationary period, during which either party may terminate employment on one week's written
         notice. The Employer shall evaluate the Employee's performance before the end of probation and
         provide an opportunity to improve before any decision not to confirm employment.</p>
@@ -655,7 +655,7 @@ public class ContractTemplateSeeder {
 
         <h3>4. Repayment</h3>
         <p>The Debt (together with accrued interest) shall be repaid as follows: {{repayment_schedule}},
-        commencing on {{first_payment_date}}.</p>
+        commencing on {{first_payment_date|date}}.</p>
 
         <h3>5. Acceleration</h3>
         <p>Should the Debtor fail to make any payment on the due date and fail to remedy this within 7

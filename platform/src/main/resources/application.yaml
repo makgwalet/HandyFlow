@@ -70,7 +70,12 @@ app:
       # app fails to start with a clear error instead of silently signing
       # every token with a secret that was shared in a chat conversation.
       secret: ${JWT_SECRET}
-      expiration-ms: 86400000  # 24 hours
+      expiration-ms: 900000  # 15 minutes — this is the config change that
+        # actually makes the refresh-token mechanism
+        # built earlier this session matter day-to-day.
+        # A 24h token made refresh a rarely-exercised
+        # path; short-lived access + rotation is the
+      # whole point of that design.
       refresh-expiration-ms: 604800000  # 7 days
     encryption:
       # FIX: same issue as jwt.secret above — was a hardcoded literal.

@@ -55,6 +55,15 @@ public class User extends AggregateRoot<User> {
     @Column(name = "email_verified_at")
     private Instant emailVerifiedAt;
 
+    // NEW: opt-in flag for billing communication routing — false by
+    // default, since most users at a tenant (a guard supervisor, a
+    // clinic receptionist) have no reason to receive the subscription
+    // invoice. Only users a tenant admin explicitly designates should
+    // get billing comms via this path. See the new BillingRecipientResolver
+    // for how this is actually used.
+    @Column(name = "receives_billing_comms", nullable = false)
+    private boolean receivesBillingComms = false;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",
@@ -97,6 +106,7 @@ public class User extends AggregateRoot<User> {
     public void setPhone(String phone)            { this.phone      = phone; }
     public void setJobTitle(String jobTitle)      { this.jobTitle   = jobTitle; }
     public void setDepartment(String department)  { this.department = department; }
+    public void setReceivesBillingComms(boolean receivesBillingComms) { this.receivesBillingComms = receivesBillingComms; }
 
     // ── Role management ───────────────────────────────────────────────────────
 

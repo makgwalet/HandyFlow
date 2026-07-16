@@ -113,6 +113,29 @@ const ErrBox = ({ msg }: { msg: string }) =>
     </div>
   ) : null
 
+// NEW: shared by humanizeActionError (below) and the edit modal — both
+// need the raw {{token}} names still present in some text, just for
+// different purposes (formatting a message vs. building edit-form
+// fields), so the extraction itself lives in one place.
+const extractPlaceholderTokens = (text: string): string[] =>
+  Array.from((text ?? '').matchAll(/\{\{([^}]+)\}\}/g))
+    .map(m => m[1].split('|')[0].trim())
+
+// NEW: the backend's "Contract has unresolved variables: {{hirer_name}},
+// {{equipment_description}}, ..." message is accurate but shows raw
+// double-brace placeholder syntax straight to whoever's using the app —
+// not something a non-technical user should have to parse. This extracts
+// the {{token}} names and rebuilds a plain-English sentence instead.
+// Anything that isn't this specific error shape passes through unchanged.
+const humanizeActionError = (msg: string): string => {
+  if (!msg || !msg.includes('{{')) return msg
+  const fields = extractPlaceholderTokens(msg)
+    .map(f => f.replace(/_/g, ' '))
+    .map(f => f.replace(/\b\w/g, c => c.toUpperCase()))
+  if (fields.length === 0) return msg
+  return `This contract still has unfilled placeholders: ${fields.join(', ')}. Fill these in before it can be sent for signing.`
+}
+
 // ─── Signature canvas ─────────────────────────────────────────────────────────
 
 function SignatureCanvas({ onCapture }: { onCapture: (data: string | null) => void }) {
@@ -195,6 +218,15 @@ export default function ContractsTab() {
   const [showCreate,   setShowCreate]   = useState(false)
   const [showParty,    setShowParty]    = useState<string | null>(null)
   const [showTerminate,setShowTerminate]= useState<string | null>(null)
+  // NEW: drives the edit modal for filling in remaining {{variables}} and
+  // other peripheral fields on a DRAFT/UNDER_REVIEW contract.
+  const [showEditContract, setShowEditContract] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({
+    valueAmount: '', startDate: '', endDate: '',
+    autoRenew: false, renewalNoticeDays: '30', notes: '',
+    variables: {} as Record<string, string>,
+  })
+  const ef = (k: string, v: any) => setEditForm(p => ({ ...p, [k]: v }))
   const [showOtp,      setShowOtp]      = useState<{ contractId: string; partyId: string; name: string; isResend: boolean } | null>(null)
   const [showSign,     setShowSign]     = useState<{ contractId: string; partyId: string } | null>(null)
   const [showComments, setShowComments] = useState<string | null>(null)
@@ -268,6 +300,15 @@ export default function ContractsTab() {
       apiClient.post(`/api/v1/contracts/${id}/${action}`, body ?? {}),
     onSuccess: () => { invalidate(); setShowTerminate(null); setTerminateReason(''); setError('') },
     onError: (e: any) => setError(e.response?.data?.message ?? 'Action failed'),
+  })
+
+  // NEW: fills in remaining {{variables}} and/or updates dates, value,
+  // notes, auto-renew on a DRAFT/UNDER_REVIEW contract.
+  const updateContract = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: any }) =>
+      apiClient.put(`/api/v1/contracts/${id}`, body),
+    onSuccess: () => { invalidate(); setShowEditContract(null); setError('') },
+    onError: (e: any) => setError(e.response?.data?.message ?? 'Failed to update contract'),
   })
 
   const addParty = useMutation({
@@ -345,6 +386,13 @@ export default function ContractsTab() {
     sf('variables', {})
   }
 
+  // NEW: drives the live warning banner in the Template Variables section
+  // below — recomputed on every keystroke since it reads live form state.
+  const templateVarKeys = selectedTemplate?.variables
+    ? Object.keys(selectedTemplate.variables as Record<string, string>)
+    : []
+  const unfilledVarKeys = templateVarKeys.filter(k => !(form.variables[k] ?? '').trim())
+
   const getNextActions = (status: string) => {
     if (status === 'DRAFT')        return [{ label: 'Submit for Review', action: 'submit-for-review', color: '#1D4ED8', bg: '#EFF6FF' }]
     if (status === 'UNDER_REVIEW') return [{ label: 'Send for Signing',  action: 'send-for-signing',  color: '#166534', bg: '#DCFCE7' }]
@@ -418,7 +466,7 @@ export default function ContractsTab() {
             return (
               <div key={c.id} style={{ border: `1px solid ${cfg.border}`, borderLeft: `3px solid ${cfg.color}`, borderRadius: 10, overflow: 'hidden' }}>
                 {/* Row header */}
-                <div onClick={() => setExpanded(isOpen ? null : c.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 18px', cursor: 'pointer', background: isOpen ? '#F8FAFC' : '#fff' }}>
+                <div onClick={() => { setExpanded(isOpen ? null : c.id); setError('') }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 18px', cursor: 'pointer', background: isOpen ? '#F8FAFC' : '#fff' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4, flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, fontSize: 14, color: '#0F172A' }}>{c.title}</span>
@@ -686,6 +734,29 @@ export default function ContractsTab() {
 
                     {/* Action buttons */}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                      {/* NEW: previously no way to fill in remaining
+                          {{variables}} or edit anything after creation —
+                          only visible for DRAFT/UNDER_REVIEW, matching
+                          Contract.assertEditable()'s backend guard exactly. */}
+                      {(c.status === 'DRAFT' || c.status === 'UNDER_REVIEW') && (
+                        <button
+                          onClick={() => {
+                            setEditForm({
+                              valueAmount: c.valueAmount != null ? String(c.valueAmount) : '',
+                              startDate: c.startDate ?? '',
+                              endDate: c.endDate ?? '',
+                              autoRenew: !!c.autoRenew,
+                              renewalNoticeDays: c.renewalNoticeDays != null ? String(c.renewalNoticeDays) : '30',
+                              notes: c.notes ?? '',
+                              variables: {},
+                            })
+                            setShowEditContract(c.id)
+                            setError('')
+                          }}
+                          style={{ padding: '8px 16px', borderRadius: 7, fontSize: 13, cursor: 'pointer', border: '1px solid #E2E8F0', fontWeight: 600, background: '#F8FAFC', color: '#374151' }}>
+                          Edit
+                        </button>
+                      )}
                       {getNextActions(c.status).map(({ label, action, color, bg }) => (
                         <button key={action}
                           onClick={() => {
@@ -698,6 +769,14 @@ export default function ContractsTab() {
                         </button>
                       ))}
                     </div>
+                    {/* NEW: previously nothing rendered here at all — a failed
+                        Send for Signing / Submit for Review set the error
+                        state but had no ErrBox to show it, so it was
+                        silently invisible unless some unrelated modal
+                        happened to also be open. humanizeActionError turns
+                        the raw "unresolved variables: {{token}}, ..."
+                        message into a readable field list. */}
+                    <ErrBox msg={humanizeActionError(error)} />
 
                     {c.terminationReason && (
                       <div style={{ marginTop: 10, padding: '9px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, fontSize: 12, color: '#DC2626' }}>
@@ -783,8 +862,29 @@ export default function ContractsTab() {
             {/* Template variable fields */}
             {selectedTemplate && selectedTemplate.variables && Object.keys(selectedTemplate.variables).length > 0 && (
               <Sect title="Template Variables">
-                <div style={{ marginBottom: 10, padding: '9px 12px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 8, fontSize: 12, color: '#1D4ED8' }}>
-                  Fill these placeholders to populate the contract body. Leave blank to fill in later.
+                {/* FIX: was a static "Leave blank to fill in later" banner
+                    with no indication of what happens later. Sending for
+                    signing genuinely blocks on ANY unfilled placeholder
+                    (see ContractingService.sendForSigning() ->
+                    findUnresolved()) — this now says so explicitly and
+                    names exactly which fields are still blank, live, as
+                    the person fills the form in. Still non-blocking here:
+                    saving an incomplete DRAFT is a legitimate, intentional
+                    part of this workflow, not something to prevent. */}
+                <div style={{
+                  marginBottom: 10, padding: '9px 12px', borderRadius: 8, fontSize: 12,
+                  background: unfilledVarKeys.length > 0 ? '#FFFBEB' : '#F0FDF4',
+                  border: `1px solid ${unfilledVarKeys.length > 0 ? '#FDE68A' : '#BBF7D0'}`,
+                  color: unfilledVarKeys.length > 0 ? '#92400E' : '#166534',
+                }}>
+                  {unfilledVarKeys.length > 0 ? (
+                    <>
+                      You can save this as a draft with blanks, but <strong>{unfilledVarKeys.length} placeholder{unfilledVarKeys.length !== 1 ? 's' : ''}</strong> must
+                      be filled in before it can be sent for signing: {unfilledVarKeys.map(k => k.replace(/_/g, ' ')).join(', ')}.
+                    </>
+                  ) : (
+                    <>All placeholders are filled — this contract will be ready to send for signing once reviewed.</>
+                  )}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                   {Object.entries(selectedTemplate.variables as Record<string, string>).map(([key, type]) => (
@@ -806,7 +906,7 @@ export default function ContractsTab() {
               </Sect>
             )}
 
-            <ErrBox msg={error} />
+            <ErrBox msg={humanizeActionError(error)} />
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
               <button onClick={() => setShowCreate(false)} style={btnC}>Cancel</button>
               <button
@@ -891,7 +991,7 @@ export default function ContractsTab() {
                 </div>
               </div>
             </div>
-            <ErrBox msg={error} />
+            <ErrBox msg={humanizeActionError(error)} />
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
               <button onClick={() => setShowParty(null)} style={btnC}>Cancel</button>
               <button
@@ -944,7 +1044,7 @@ export default function ContractsTab() {
               IP address, user-agent, phone last-4 and timestamp are captured in the audit trail.
             </div>
 
-            <ErrBox msg={error} />
+            <ErrBox msg={humanizeActionError(error)} />
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>
               <button onClick={() => setShowOtp(null)} style={btnC}>Cancel</button>
               <button
@@ -1007,7 +1107,7 @@ export default function ContractsTab() {
               under the Electronic Communications and Transactions Act 25 of 2002.
             </div>
 
-            <ErrBox msg={error} />
+            <ErrBox msg={humanizeActionError(error)} />
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button onClick={() => { setShowSign(null); setOtpCode(''); setSignatureData(null); setError('') }} style={btnC}>Cancel</button>
               <button
@@ -1039,7 +1139,7 @@ export default function ContractsTab() {
                 placeholder="e.g. Mutual agreement — services no longer required"
                 style={{ ...inp, resize: 'vertical' }} />
             </div>
-            <ErrBox msg={error} />
+            <ErrBox msg={humanizeActionError(error)} />
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button onClick={() => setShowTerminate(null)} style={btnC}>Cancel</button>
               <button
@@ -1047,6 +1147,137 @@ export default function ContractsTab() {
                 onClick={() => contractAction.mutate({ id: showTerminate, action: 'terminate', body: { reason: terminateReason } })}
                 style={btnP('#DC2626')}>
                 {contractAction.isPending ? 'Terminating…' : 'Terminate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW: Edit Contract modal — there was previously no path back to a
+          contract once it had blanks left in it at creation time. Shows
+          whichever {{tokens}} are still actually present in the loaded
+          contract's body (not a static template schema, since some
+          variables may already be resolved and gone), plus the same
+          peripheral fields the create flow collects. */}
+      {showEditContract && (
+        <div style={MODAL}>
+          <div style={mBox(620)}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>Edit Contract</h3>
+              <button onClick={() => setShowEditContract(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={20} color="#94A3B8" /></button>
+            </div>
+
+            {(() => {
+              const isCurrent = contractDetail && contractDetail.id === showEditContract
+              const remainingTokens = isCurrent ? extractPlaceholderTokens(contractDetail.body ?? '') : []
+              // NEW: cross-reference the contract's own template (now that
+              // ContractResponse exposes templateId) for each remaining
+              // field's REAL declared type, instead of guessing from the
+              // key name — the guess missed "hire_start"/"hire_end" (no
+              // "_date" suffix) on a custom template, which let a raw
+              // string get typed into a date field on a contract that was
+              // then actually signed. Falls back to the same heuristic as
+              // before only if the template can't be found (deleted since,
+              // or the contract was never created from a template at all).
+              const sourceTemplate = isCurrent
+                ? (templates as any[]).find(t => t.id === contractDetail.templateId)
+                : null
+              const fieldType = (key: string): 'date' | 'number' | 'text' => {
+                const declared = sourceTemplate?.variables?.[key]
+                if (declared === 'date' || declared === 'number' || declared === 'text') return declared
+                if (/date/i.test(key)) return 'date'
+                if (/amount|price|rate|fee|deposit|total|salary|pct|percentage/i.test(key)) return 'number'
+                return 'text'
+              }
+              return (
+                <>
+                  {remainingTokens.length > 0 && (
+                    <Sect title="Remaining Placeholders">
+                      <div style={{ marginBottom: 10, padding: '9px 12px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, fontSize: 12, color: '#92400E' }}>
+                        Still blank in the contract body. Leave any blank to fill in later — only the ones you enter here get updated.
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                        {remainingTokens.map(key => (
+                          <div key={key}>
+                            <label style={lbl}>{key.replace(/_/g, ' ')}</label>
+                            <input
+                              type={fieldType(key)}
+                              value={editForm.variables[key] ?? ''}
+                              onChange={e => ef('variables', { ...editForm.variables, [key]: e.target.value })}
+                              placeholder={`Enter ${key.replace(/_/g, ' ')}`}
+                              style={inp}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </Sect>
+                  )}
+
+                  <Sect title="Contract Details">
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                      <div>
+                        <label style={lbl}>Value (R)</label>
+                        <input type="number" value={editForm.valueAmount} onChange={e => ef('valueAmount', e.target.value)} style={inp} />
+                      </div>
+                      <div>
+                        <label style={lbl}>Start Date</label>
+                        <input type="date" value={editForm.startDate} onChange={e => ef('startDate', e.target.value)} style={inp} />
+                      </div>
+                      <div>
+                        <label style={lbl}>End Date</label>
+                        <input type="date" value={editForm.endDate} min={editForm.startDate} onChange={e => ef('endDate', e.target.value)} style={inp} />
+                      </div>
+                      <div style={{ gridColumn: '1/-1' }}>
+                        <label style={lbl}>Notes</label>
+                        <textarea value={editForm.notes} onChange={e => ef('notes', e.target.value)} rows={2} style={{ ...inp, resize: 'vertical' }} />
+                      </div>
+                      <div style={{ gridColumn: '1/-1', display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 500, color: '#374151', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={editForm.autoRenew} onChange={e => ef('autoRenew', e.target.checked)} />
+                          Auto-renew on expiry
+                        </label>
+                        {editForm.autoRenew && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                            <span style={{ fontSize: 12, color: '#64748B' }}>Renewal notice</span>
+                            <input type="number" value={editForm.renewalNoticeDays} onChange={e => ef('renewalNoticeDays', e.target.value)} style={{ ...inp, width: 70 }} />
+                            <span style={{ fontSize: 12, color: '#64748B' }}>days</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </Sect>
+                </>
+              )
+            })()}
+
+            <ErrBox msg={humanizeActionError(error)} />
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+              <button onClick={() => setShowEditContract(null)} style={btnC}>Cancel</button>
+              <button
+                disabled={updateContract.isPending}
+                onClick={() => {
+                  // Only send variables actually typed into — an omitted
+                  // key leaves that {{token}} untouched for a future edit
+                  // rather than baking in an empty string, same
+                  // leave-blank semantics as contract creation.
+                  const filledVars = Object.fromEntries(
+                    Object.entries(editForm.variables as Record<string, string>).filter(([, v]) => (v ?? '').trim() !== '')
+                  )
+                  updateContract.mutate({
+                    id: showEditContract,
+                    body: {
+                      variables: Object.keys(filledVars).length ? filledVars : null,
+                      valueAmount: editForm.valueAmount !== '' ? parseFloat(editForm.valueAmount) : null,
+                      startDate: editForm.startDate || null,
+                      endDate: editForm.endDate || null,
+                      notes: editForm.notes || null,
+                      autoRenew: editForm.autoRenew,
+                      renewalNoticeDays: editForm.autoRenew ? (Number(editForm.renewalNoticeDays) || 30) : null,
+                    },
+                  })
+                }}
+                style={btnP()}>
+                {updateContract.isPending ? 'Saving…' : 'Save Changes'}
               </button>
             </div>
           </div>

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import {
   Plus, X, Mail, Shield, UserCheck, UserX,
-  ChevronDown, ChevronUp, Check, Pencil, Clock,
+  ChevronDown, ChevronUp, Check, Pencil, Clock, AlertTriangle,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -52,6 +52,13 @@ export default function TeamTab() {
   const [editRole, setEditRole]       = useState<Role | null>(null)
   const [error, setError]             = useState('')
   const [expandedRole, setExpandedRole] = useState<string | null>(null)
+  // NEW: replaces the two raw window.confirm() calls (deactivate user,
+  // cancel invitation) with a styled modal matching this file's own
+  // Modal component. null = closed; set with the specifics of whichever
+  // action is pending confirmation.
+  const [confirmAction, setConfirmAction] = useState<{
+    title: string; message: string; confirmLabel: string; onConfirm: () => void
+  } | null>(null)
 
   const [inviteForm, setInviteForm] = useState({
     email: '', firstName: '', lastName: '', jobTitle: '', department: '', roleId: '',
@@ -96,7 +103,11 @@ export default function TeamTab() {
   })
   const deactivateMutation = useMutation({
     mutationFn: (id: string) => apiClient.post(`/api/v1/identity/users/${id}/deactivate`),
-    onSuccess: () => invalidate(),
+    // NEW: closes the confirm modal on success. On error, isPending
+    // still resolves to false automatically (no onError needed for
+    // that) — the modal just stays open with the button re-enabled so
+    // the user can retry or cancel instead of it silently vanishing.
+    onSuccess: () => { invalidate(); setConfirmAction(null) },
   })
   const reactivateMutation = useMutation({
     mutationFn: (id: string) => apiClient.post(`/api/v1/identity/users/${id}/reactivate`),
@@ -104,7 +115,7 @@ export default function TeamTab() {
   })
   const cancelInviteMutation = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/api/v1/identity/invitations/${id}`),
-    onSuccess: () => invalidate(),
+    onSuccess: () => { invalidate(); setConfirmAction(null) },
   })
   const createRoleMutation = useMutation({
     mutationFn: (body: any) => apiClient.post('/api/v1/identity/roles', body),
@@ -206,7 +217,12 @@ export default function TeamTab() {
                               <Pencil size={12} /> Edit
                             </button>
                             {u.status === 'ACTIVE' ? (
-                              <button onClick={() => { if (confirm(`Deactivate ${u.firstName}?`)) deactivateMutation.mutate(u.id) }}
+                              <button onClick={() => setConfirmAction({
+                                title: 'Deactivate team member',
+                                message: `Deactivate ${u.firstName} ${u.lastName}? They'll lose access immediately. Their account and history are kept and can be restored by reactivating them later.`,
+                                confirmLabel: 'Deactivate',
+                                onConfirm: () => deactivateMutation.mutate(u.id),
+                              })}
                                 style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, fontSize: 12, color: '#DC2626', cursor: 'pointer' }}>
                                 <UserX size={12} /> Deactivate
                               </button>
@@ -329,7 +345,12 @@ export default function TeamTab() {
                         </td>
                         <td style={{ padding: '14px 16px' }}>
                           {inv.status === 'PENDING' && (
-                            <button onClick={() => { if (confirm('Cancel this invitation?')) cancelInviteMutation.mutate(inv.id) }}
+                            <button onClick={() => setConfirmAction({
+                              title: 'Cancel invitation',
+                              message: `Cancel the invitation sent to ${inv.firstName} ${inv.lastName}? They won't be able to accept it anymore, and you'll need to send a new invitation if you change your mind.`,
+                              confirmLabel: 'Cancel invitation',
+                              onConfirm: () => cancelInviteMutation.mutate(inv.id),
+                            })}
                               style={{ padding: '5px 10px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, fontSize: 12, color: '#DC2626', cursor: 'pointer' }}>
                               Cancel
                             </button>
@@ -476,6 +497,23 @@ export default function TeamTab() {
           />
         </Modal>
       )}
+
+      {/* ── CONFIRM MODAL ──────────────────────────────────────────────── */}
+      {/* NEW: shared confirm dialog for destructive actions (deactivate
+          user, cancel invitation) — replaces raw window.confirm() calls.
+          Only one of these two mutations can be in flight at a time
+          since only one confirmAction can be open, so it's safe to OR
+          their isPending flags for the button's loading state. */}
+      {confirmAction && (
+        <ConfirmModal
+          title={confirmAction.title}
+          message={confirmAction.message}
+          confirmLabel={confirmAction.confirmLabel}
+          onConfirm={confirmAction.onConfirm}
+          onCancel={() => setConfirmAction(null)}
+          loading={deactivateMutation.isPending || cancelInviteMutation.isPending}
+        />
+      )}
     </div>
   )
 }
@@ -532,6 +570,46 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={20} /></button>
         </div>
         {children}
+      </div>
+    </div>
+  )
+}
+// NEW: styled replacement for window.confirm(). Deliberately its own
+// small component rather than a variant of Modal above — Modal is built
+// around a title bar + arbitrary form content + Footer, whereas this is
+// a fixed icon/title/message/two-button shape that never needs to grow
+// form fields. Kept in this file rather than a shared components dir
+// since TeamTab is currently its only caller.
+function ConfirmModal({ title, message, confirmLabel, onConfirm, onCancel, loading }: {
+  title: string
+  message: string
+  confirmLabel: string
+  onConfirm: () => void
+  onCancel: () => void
+  loading: boolean
+}) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
+      <div style={{ background: 'white', borderRadius: 16, padding: 26, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+        <div style={{ display: 'flex', gap: 14, marginBottom: 22 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <AlertTriangle size={20} color="#DC2626" />
+          </div>
+          <div>
+            <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700, color: '#0F172A' }}>{title}</h3>
+            <p style={{ margin: 0, fontSize: 13.5, color: '#64748B', lineHeight: 1.5 }}>{message}</p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button onClick={onCancel} disabled={loading}
+            style={{ padding: '10px 18px', border: '1px solid #E2E8F0', borderRadius: 9, background: 'white', fontSize: 14, cursor: loading ? 'default' : 'pointer', color: '#374151' }}>
+            Cancel
+          </button>
+          <button onClick={onConfirm} disabled={loading}
+            style={{ padding: '10px 22px', background: loading ? '#F3A6A6' : '#DC2626', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer' }}>
+            {loading ? 'Working...' : confirmLabel}
+          </button>
+        </div>
       </div>
     </div>
   )

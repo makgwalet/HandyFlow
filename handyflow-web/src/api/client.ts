@@ -106,6 +106,30 @@ apiClient.interceptors.response.use(
     // entire mechanism exists for — an expired access token — was never
     // triggering the refresh flow at all before this fix.
     //
+    // NEW: 402 for account-level lockout — redirects straight to the same
+    // AccountLockedPage a fresh login already shows (LoginPage.tsx
+    // checks subscriptionStatus at login time), rather than let this
+    // surface as a raw error wherever the user happened to be clicking.
+    // Confirmed via real testing this was genuinely happening —
+    // FeatureGuard.requireModule() correctly throws 402 mid-session for
+    // a suspended tenant, but nothing caught it specially.
+    //
+    // FIX: was matching on message text containing "suspended" — too
+    // narrow, confirmed against FeatureGuard.java's actual source.
+    // Every 402 it throws is a genuine account-level lockout (SUSPENDED,
+    // CANCELLED, or no active subscription at all) — the message-text
+    // check was missing the "cancelled" and "expired" cases entirely,
+    // since neither contains the word "suspended". The one non-lockout
+    // case ("module not included in your plan", which needs an upgrade
+    // prompt, not a full lockout) is thrown as 403, not 402 — confirmed
+    // directly in the same file. That means matching on the status code
+    // alone is both simpler and more complete than the message check it
+    // replaces, not a loosening of it.
+    if (status === 402) {
+      window.location.href = '/account-locked'
+      return Promise.reject(error)
+    }
+
     // 403 is genuinely ambiguous in this app though: it also means a
     // properly-authenticated user just lacks a specific permission, and
     // that case must never be treated the same as an auth failure — see

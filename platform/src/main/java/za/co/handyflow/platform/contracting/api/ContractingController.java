@@ -77,6 +77,24 @@ public class ContractingController {
                         TenantContext.getCurrentUserId())));
     }
 
+    // NEW: was no way to edit a contract at all after creation — a
+    // contract created with blanks left in it (see ContractsTab.tsx's
+    // "Leave blank to fill in later" flow) had no path back to actually
+    // finish it short of deleting and recreating it, and sendForSigning()'s
+    // unresolved-variable check was consequently a dead end. Only
+    // DRAFT/UNDER_REVIEW contracts can be edited — enforced by
+    // Contract.assertEditable(), which every mutator this hits already
+    // goes through.
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
+    @Operation(summary = "Edit a DRAFT or UNDER_REVIEW contract — fill in remaining {{variables}} and/or update dates, value, notes, auto-renew")
+    public ResponseEntity<ApiResponse<ContractResponse>> updateContract(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateContractRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Contract updated",
+                contractingService.updateContract(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
     @PostMapping("/{id}/submit-for-review")
     @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
     @Operation(summary = "Submit contract for internal review (DRAFT → UNDER_REVIEW)")

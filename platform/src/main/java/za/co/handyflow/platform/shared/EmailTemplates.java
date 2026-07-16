@@ -160,6 +160,25 @@ public class EmailTemplates {
             """.formatted(firstName));
     }
 
+    // NEW: replaces SubscriptionService.notifySuspended()'s previous
+    // stub, which only logged and sent nothing — confirmed exactly the
+    // gap the original module review flagged. Uses highlight-red rather
+    // than amber/green, since this is the one genuinely urgent email in
+    // this file — access is actually cut off, not just a heads-up.
+    public static String accountSuspended(String tenantName, int gracePeriodDaysUsed) {
+        return wrap("""
+            <p>Hi,</p>
+            <p>Your HandyFlow account for <strong>%s</strong> has been suspended due to non-payment.</p>
+            <div class="highlight-red">
+              <p>The %d-day grace period after your payment became overdue has now passed,
+                 and access to your account has been paused.</p>
+            </div>
+            <p>To restore access immediately, please settle your outstanding balance.
+               Your data has not been deleted and will be fully available again as soon
+               as payment is received.</p>
+            """.formatted(tenantName, gracePeriodDaysUsed));
+    }
+
     public static String quoteExpiry(String firstName, String quoteNumber,
                                      String customerName, String amount,
                                      String frontendUrl) {
@@ -1173,6 +1192,4 @@ public class EmailTemplates {
                         ? " (" + org.springframework.web.util.HtmlUtils.htmlEscape(scheduleTitle) + ")" : "",
                 invoiceNumber, amount));
     }
-
-
 }

@@ -49,6 +49,11 @@ export default function ServicesTab() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["fleet-services", selectedVehicle] })
       qc.invalidateQueries({ queryKey: ["fleet-vehicles"] })
+      // FIX: same gap FuelTab.tsx's logFuel mutation had — a recorded
+      // service's cost feeds directly into FleetCostService.summarize()'s
+      // totalServiceCost/costPerKm, so FleetDashboard.tsx's cost-per-km
+      // table would go stale after recording a service without this.
+      qc.invalidateQueries({ queryKey: ["fleet-cost-summary"] })
       setShowAdd(false); setForm(EMPTY_FORM); setApiError("")
     },
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to record service"),

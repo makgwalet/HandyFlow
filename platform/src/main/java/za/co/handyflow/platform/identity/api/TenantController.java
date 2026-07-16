@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.identity.TenantDetails;
 import za.co.handyflow.platform.identity.application.internal.TenantService;
 import za.co.handyflow.platform.identity.dto.UpdateTenantProfileRequest;
+import za.co.handyflow.platform.identity.dto.UpdateBillingContactRequest;
 import za.co.handyflow.platform.identity.dto.UploadLogoRequest;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -46,5 +47,20 @@ public class TenantController {
             @Valid @RequestBody UploadLogoRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Logo updated",
                 tenantService.uploadLogo(TenantContext.getTenantIdAsObject(), req)));
+    }
+
+    // NEW: designate a dedicated billing contact, separate from the
+    // tenant's own login/notification email — see
+    // BillingRecipientResolver for how this is actually used to route
+    // subscription invoices, receipts, and past-due notices away from
+    // every active user and toward whoever the tenant admin actually
+    // wants seeing that.
+    @PutMapping("/me/billing-contact")
+    @PreAuthorize("hasAuthority('SETTINGS_MANAGE')")
+    @Operation(summary = "Set the dedicated billing contact for subscription/payment communications")
+    public ResponseEntity<ApiResponse<TenantDetails>> updateBillingContact(
+            @Valid @RequestBody UpdateBillingContactRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Billing contact updated",
+                tenantService.updateBillingContact(TenantContext.getTenantIdAsObject(), req)));
     }
 }

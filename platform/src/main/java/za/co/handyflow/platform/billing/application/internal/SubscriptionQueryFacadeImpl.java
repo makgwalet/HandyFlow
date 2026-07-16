@@ -29,7 +29,7 @@ class SubscriptionQueryFacadeImpl implements SubscriptionQueryFacade {
                         "Subscription", tenantId.toString()));
 
         boolean suspended = "SUSPENDED".equals(sub.getStatus().toString())
-                         || "CANCELLED".equals(sub.getStatus().toString());
+                || "CANCELLED".equals(sub.getStatus().toString());
 
         Long graceDaysRemaining = "PAST_DUE".equals(sub.getStatus().toString())
                 ? sub.graceDaysRemaining()
@@ -57,6 +57,19 @@ class SubscriptionQueryFacadeImpl implements SubscriptionQueryFacade {
                 .stream()
                 .map(this::toPlanResponse)
                 .toList();
+    }
+
+    // NEW: backs the fix to UserManagementService.inviteUser() — confirmed
+    // that method previously had zero user-count check against the
+    // tenant's actual plan limit, meaning any tenant could invite
+    // unlimited users regardless of what they're paying for.
+    @Override
+    @Transactional(readOnly = true)
+    public int getMaxUsers(TenantId tenantId) {
+        Subscription sub = subscriptionRepository.findByTenantId(tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Subscription", tenantId.toString()));
+        return sub.getPlan().getMaxUsers();
     }
 
     private PlanResponse toPlanResponse(Plan plan) {

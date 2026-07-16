@@ -17,6 +17,15 @@ import java.util.UUID;
 public record ContractResponse(
         UUID       id,
         String     contractNumber,
+        // NEW: previously absent — the frontend had no way to know which
+        // template a contract came from once created, which meant the
+        // Edit modal could only guess a remaining {{variable}}'s type
+        // (date/number/text) from its key name. That guess missed a real
+        // custom template using "hire_start"/"hire_end" (no "_date"
+        // suffix), producing a plain-text input that let a raw string get
+        // typed straight into a signed contract's date field. Nullable —
+        // blank/no-template contracts have no template to reference.
+        UUID       templateId,
         String     title,
         String     contractType,
         String     status,

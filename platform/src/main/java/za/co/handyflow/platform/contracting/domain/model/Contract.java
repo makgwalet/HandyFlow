@@ -175,6 +175,39 @@ public class Contract {
     }
 
     /**
+     * NEW: body previously had no mutator at all after create() — this is
+     * what makes it possible to fill in remaining {{template}} variables
+     * (or make any other body edit) on a contract that's still DRAFT or
+     * UNDER_REVIEW. Guarded by assertEditable(), same convention as
+     * terminate()/send()/submitForReview() — the business rule for when a
+     * contract may be edited lives here on the entity, not scattered into
+     * the service.
+     */
+    public void updateBody(String body) {
+        assertEditable();
+        this.body      = body;
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * A contract may only be edited (body, dates, value, notes, auto-renew)
+     * while it's still DRAFT or UNDER_REVIEW. Once sendForSigning() locks
+     * the body (lockBody()) the bodyHash exists specifically to detect
+     * tampering — allowing further edits past that point would defeat the
+     * point of that hash. Safe to add to the existing setDates()/
+     * setValueAmount()/setNotes()/setAutoRenew() setters below with zero
+     * behavior change: every one of their real call sites only ever runs
+     * during createContract(), on a brand-new contract that is always
+     * DRAFT at that point — verified against every setter call site in
+     * ContractingService.java before adding this.
+     */
+    private void assertEditable() {
+        if (!List.of("DRAFT", "UNDER_REVIEW").contains(status))
+            throw new IllegalStateException(
+                    "Only DRAFT or UNDER_REVIEW contracts can be edited (current status: " + status + ")");
+    }
+
+    /**
      * Returns true if all parties in the transient list have SIGNED.
      * NOTE: relies on the transient parties list actually being populated —
      * see class Javadoc. Only meaningful when called on a Contract that went
@@ -213,22 +246,26 @@ public class Contract {
     // ── Setters for optional fields ────────────────────────────────────────────
 
     public void setDates(LocalDate startDate, LocalDate endDate) {
+        assertEditable();
         this.startDate = startDate;
         this.endDate   = endDate;
         this.updatedAt = Instant.now();
     }
 
     public void setValueAmount(BigDecimal valueAmount) {
+        assertEditable();
         this.valueAmount = valueAmount;
         this.updatedAt   = Instant.now();
     }
 
     public void setNotes(String notes) {
+        assertEditable();
         this.notes     = notes;
         this.updatedAt = Instant.now();
     }
 
     public void setAutoRenew(boolean autoRenew, int renewalNoticeDays) {
+        assertEditable();
         this.autoRenew          = autoRenew;
         this.renewalNoticeDays  = renewalNoticeDays;
         this.updatedAt          = Instant.now();

@@ -80,6 +80,21 @@ public class Tenant extends AggregateRoot<Tenant> {
     @Column(name = "promo_code")
     private String promoCode;
 
+    // NEW: dedicated billing contact, separate from the tenant's own
+    // login/notification email. Set via Settings by the tenant admin —
+    // see updateBillingContact() below and TenantController's new
+    // endpoint. Null by default; resolvers using this field must fall
+    // back to something else when it's unset, never assume it's always
+    // populated.
+    @Column(name = "billing_email")
+    private String billingEmail;
+
+    @Column(name = "billing_contact_name")
+    private String billingContactName;
+
+    @Column(name = "billing_phone")
+    private String billingPhone;
+
     // WHY a static factory method instead of a public constructor?
     // Factory methods have NAMES — "register" tells you the intent.
     // They can enforce business rules before the object exists.
@@ -164,4 +179,11 @@ public class Tenant extends AggregateRoot<Tenant> {
         this.logoUrl = logoUrl;
         //this.updatedAt = Instant.now();
     }
+
+    public void updateBillingContact(String billingEmail, String billingContactName, String billingPhone) {
+        this.billingEmail       = billingEmail;
+        this.billingContactName = billingContactName;
+        this.billingPhone       = billingPhone;
+    }
 }
+

@@ -30,7 +30,24 @@ export default function FuelTab() {
 
   const logFuel = useMutation({
     mutationFn: (body: any) => apiClient.post(`/api/v1/fleet/vehicles/${selectedVehicle}/fuel`, body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["fleet-fuel", selectedVehicle] }); setShowAdd(false); setForm(EMPTY_FORM); setApiError("") },
+    // FIX: previously only invalidated fleet-fuel. Confirmed via
+    // FleetService.logFuel() that logging a fill-up can also advance the
+    // vehicle's currentOdometer (when odometerAtFillup exceeds the stored
+    // reading) and flip dueForService — the exact same side effect
+    // endTrip() has, and the exact same reason ServicesTab.tsx's own
+    // addService mutation already invalidates fleet-vehicles too. Without
+    // this, the vehicle list, dashboard KPIs, and service-due badges could
+    // all show a stale odometer/status until something unrelated happened
+    // to refetch them.
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fleet-fuel", selectedVehicle] })
+      qc.invalidateQueries({ queryKey: ["fleet-vehicles"] })
+      // Fuel cost feeds directly into FleetCostService.summarize()'s
+      // totalFuelCost/costPerKm — FleetDashboard.tsx's cost-per-km table
+      // would go stale the same way the vehicle list would without this.
+      qc.invalidateQueries({ queryKey: ["fleet-cost-summary"] })
+      setShowAdd(false); setForm(EMPTY_FORM); setApiError("")
+    },
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to log fuel"),
   })
 

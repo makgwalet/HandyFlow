@@ -51,6 +51,8 @@ import { EarthMovingPage } from "./pages/earthmoving/EarthMovingPage"
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage"
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage"
 import { VerifyEmailPage } from "./pages/auth/VerifyEmailPage"
+import { AccountLockedPage } from "./pages/auth/AccountLockedPage"
+import { SessionExpiryModal } from "./components/SessionExpiryModal"
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -66,6 +68,13 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        {/* NEW: mounted globally, outside Routes, so the warning can show
+            regardless of which page is currently active — the whole
+            point is catching a user sitting idle on any screen, not just
+            specific ones. The component itself checks isAuthenticated
+            internally and renders nothing when logged out, so this is
+            safe to always render. */}
+        <SessionExpiryModal />
         <Routes>
           {/* Public routes */}
           <Route path="/login"    element={<LoginPage />} />
@@ -74,6 +83,16 @@ export default function App() {
           <Route path="/forgot-password"           element={<ForgotPasswordPage />} />
           <Route path="/reset-password"            element={<ResetPasswordPage />} />
           <Route path="/verify-email"              element={<VerifyEmailPage />} />
+          {/* NEW: was never wired into the router at all — confirmed via
+              real testing this meant BOTH LoginPage.tsx's own redirect
+              (added earlier when fixing subscriptionStatus) AND the
+              client.ts 402 interceptor were both redirecting to a route
+              that's never existed. Placed alongside the other
+              auth-adjacent pages, outside ProtectedRoute, since a
+              suspended tenant still holds a genuinely valid login token
+              — they're authenticated but blocked, not logged out, so
+              this needs to be reachable regardless of session state. */}
+          <Route path="/account-locked"            element={<AccountLockedPage />} />
 
           {/* Client portal — public, intentionally outside ModuleLayout (no nav bar) */}
           <Route path="/projects/portal/:token" element={<ClientPortalPage />} />

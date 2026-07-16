@@ -9,6 +9,7 @@ import za.co.handyflow.platform.billing.domain.model.Subscription;
 import za.co.handyflow.platform.billing.domain.repository.PlanRepository;
 import za.co.handyflow.platform.billing.domain.repository.SubscriptionRepository;
 import za.co.handyflow.platform.shared.EmailService;
+import za.co.handyflow.platform.shared.EmailTemplates;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.Instant;
@@ -22,6 +23,12 @@ public class SubscriptionService {
     private final SubscriptionRepository subscriptionRepository;
     private final PlanRepository         planRepository;
     private final EmailService           emailService;
+    // NEW: backs the fix to both suspension paths below — same module
+    // (billing.application.internal) as this class, no boundary crossing.
+    private final ModuleService          moduleService;
+    // NEW: backs the fix to notifySuspended() below.
+    private final za.co.handyflow.platform.notifications.application.BillingRecipients billingRecipients;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     // ── Create trial ──────────────────────────────────────────────────────────
 
@@ -91,6 +98,20 @@ public class SubscriptionService {
                     subscriptionRepository.save(sub);
                     log.warn("SUSPENDED tenant={} — grace period expired", sub.getTenantId());
 
+                    // NEW: previously nothing here touched module-level
+                    // trials at all — confirmed via real data this left
+                    // any module still in TRIAL status dangling
+                    // indefinitely, able to silently reappear as
+                    // accessible if the account was ever reactivated
+                    // later with no explicit re-activation decision.
+                    // Every module trial ends with the account's, together.
+                    try {
+                        moduleService.cancelAllTrialModules(sub.getTenantId());
+                    } catch (Exception e) {
+                        log.error("Failed to cancel trial modules for tenant={}: {}",
+                                sub.getTenantId(), e.getMessage());
+                    }
+
                     // Notify tenant
                     try {
                         notifySuspended(sub);
@@ -128,6 +149,17 @@ public class SubscriptionService {
             sub.suspend();
             subscriptionRepository.save(sub);
             log.info("Suspended expired pilot for tenant={}", sub.getTenantId());
+
+            // NEW: same fix as suspendGraceExpired() above — every module
+            // trial ends together with the account's own trial, rather
+            // than lingering in an ambiguous TRIAL state that could
+            // silently reappear later.
+            try {
+                moduleService.cancelAllTrialModules(sub.getTenantId());
+            } catch (Exception e) {
+                log.error("Failed to cancel trial modules for tenant={}: {}",
+                        sub.getTenantId(), e.getMessage());
+            }
         });
         if (!expired.isEmpty()) {
             log.info("Suspended {} expired pilot subscriptions", expired.size());
@@ -142,10 +174,41 @@ public class SubscriptionService {
                         "No subscription found for tenant: " + tenantId));
     }
 
+    // FIX: was a stub — logged and sent nothing at all, confirmed exactly
+    // the gap the original module review flagged ("notifySuspended() in
+    // Billing is a stub"). Resolves the right recipients via
+    // BillingRecipients (the dedicated billing contact if one's set,
+    // falling back to opted-in users, then the tenant's first user) and
+    // actually sends EmailTemplates.accountSuspended() to each of them.
+    //
+    // Kept the failed-send catch in suspendGraceExpired() (the caller)
+    // rather than adding a second one here — a failure resolving
+    // recipients or sending must never block the suspension itself from
+    // being recorded, which is already guaranteed by that existing
+    // try/catch around this call.
     private void notifySuspended(Subscription sub) {
-        // Fetch tenant email via JDBC in the scheduler — here we just log
-        // The scheduler (BillingScheduler) fetches emails and calls this
-        log.info("Suspension notification queued for tenant={}", sub.getTenantId());
+        za.co.handyflow.platform.shared.TenantId tenantId = sub.getTenantId();
+        String tenantName;
+        try {
+            tenantName = jdbc.queryForObject(
+                    "SELECT name FROM tenants WHERE id = ?", String.class, tenantId.getValue());
+        } catch (Exception e) {
+            tenantName = "your business";
+        }
+
+        String html = EmailTemplates.accountSuspended(tenantName, sub.getGracePeriodDays());
+        String subject = "Your HandyFlow account has been suspended";
+
+        billingRecipients.resolveBillingRecipients(tenantId).forEach(recipient -> {
+            try {
+                emailService.send(recipient.email(), subject, html);
+            } catch (Exception e) {
+                log.error("Failed to send suspension email to={} tenant={}: {}",
+                        recipient.email(), tenantId, e.getMessage());
+            }
+        });
+
+        log.info("Suspension notification sent for tenant={}", tenantId);
     }
 
     private String gracePeriodEmail(String tenantName, String email, int graceDays) {

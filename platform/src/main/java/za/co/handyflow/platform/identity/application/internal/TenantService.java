@@ -8,6 +8,7 @@ import za.co.handyflow.platform.identity.TenantDetails;
 import za.co.handyflow.platform.identity.domain.model.Tenant;
 import za.co.handyflow.platform.identity.domain.repository.TenantRepository;
 import za.co.handyflow.platform.identity.dto.UpdateTenantProfileRequest;
+import za.co.handyflow.platform.identity.dto.UpdateBillingContactRequest;
 import za.co.handyflow.platform.identity.dto.UploadLogoRequest;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
@@ -50,6 +51,23 @@ public class TenantService {
         tenant.updateLogo(logoData);
         tenantRepository.save(tenant);
         log.info("Updated logo for tenant={}", tenantId);
+        return toDetails(tenant);
+    }
+
+    // NEW: persists correctly, but toDetails()/TenantDetails below don't
+    // yet surface billingEmail/billingContactName/billingPhone back in
+    // the response — TenantDetails is a record I don't have the source
+    // for, and extending its shape without seeing every caller risks the
+    // same class of breakage flagged elsewhere in this codebase for
+    // AuthResponse. The write is complete and correct; confirming it
+    // back to the frontend needs that file.
+    @Transactional
+    public TenantDetails updateBillingContact(TenantId tenantId, UpdateBillingContactRequest req) {
+        Tenant tenant = tenantRepository.findById(tenantId.getValue())
+                .orElseThrow(() -> new ResourceNotFoundException("Tenant", tenantId.getValue().toString()));
+        tenant.updateBillingContact(req.billingEmail(), req.billingContactName(), req.billingPhone());
+        tenantRepository.save(tenant);
+        log.info("Updated billing contact for tenant={}", tenantId);
         return toDetails(tenant);
     }
 

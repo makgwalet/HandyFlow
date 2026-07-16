@@ -18,6 +18,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.shared.SmsService;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -235,6 +236,64 @@ public class ContractingService {
         contractRepo.save(contract);
         log.info("Created contract={} tenant={}", number, tenantId);
         return toContractResponse(contract);
+    }
+
+    /**
+     * NEW: fills in remaining {{template}} variables (or edits the other
+     * peripheral fields) on a contract that's still DRAFT or UNDER_REVIEW —
+     * there was previously no way to do this at all once a contract was
+     * created with blanks left in it (see ContractsTab.tsx's "Leave blank
+     * to fill in later" flow), which meant sendForSigning()'s unresolved-
+     * variable check was a dead end with no path back to actually finish
+     * the contract short of deleting and recreating it.
+     * <p>
+     * Resolves variables against the contract's CURRENT body, not a
+     * re-fetched template — c.getBody() already holds whatever {{tokens}}
+     * are still unresolved (anything already filled at creation time was
+     * already substituted and is no longer present as a token), so this
+     * is exactly the same incremental-fill behavior createContract() uses,
+     * just applied a second time. All other fields are optional partial
+     * updates — only touched when actually provided.
+     * <p>
+     * Editability itself (DRAFT/UNDER_REVIEW only) is NOT checked here —
+     * every mutator this calls (updateBody(), setDates(), etc.) already
+     * self-guards via Contract.assertEditable(), consistent with this
+     * codebase's existing convention of keeping status-transition rules on
+     * the entity rather than the service.
+     */
+    @Transactional
+    public ContractResponse updateContract(TenantId tenantId, UUID id, UpdateContractRequest req) {
+        Contract c = findActive(tenantId, id);
+
+        if (req.variables() != null && !req.variables().isEmpty()) {
+            Map<String, String> safeVars = new HashMap<>();
+            for (var entry : req.variables().entrySet())
+                safeVars.put(entry.getKey(),
+                        HtmlUtils.htmlEscape(entry.getValue() != null ? entry.getValue() : ""));
+            String newBody = variableResolver.resolve(c.getBody() != null ? c.getBody() : "", safeVars);
+            c.updateBody(newBody);
+        }
+
+        // setDates()/setAutoRenew() take both their params together, so a
+        // partial update (only startDate provided, say) must be merged
+        // against the existing value rather than nulling the other one out.
+        if (req.startDate() != null || req.endDate() != null) {
+            LocalDate newStart = req.startDate() != null ? req.startDate() : c.getStartDate();
+            LocalDate newEnd    = req.endDate()   != null ? req.endDate()   : c.getEndDate();
+            c.setDates(newStart, newEnd);
+        }
+        if (req.valueAmount() != null) c.setValueAmount(req.valueAmount());
+        if (req.notes()       != null) c.setNotes(req.notes());
+        if (req.autoRenew() != null || req.renewalNoticeDays() != null) {
+            boolean newAutoRenew   = req.autoRenew() != null ? req.autoRenew() : c.isAutoRenew();
+            int     newNoticeDays  = req.renewalNoticeDays() != null ? req.renewalNoticeDays() : c.getRenewalNoticeDays();
+            c.setAutoRenew(newAutoRenew, newNoticeDays);
+        }
+
+        contractRepo.save(c);
+        c.setParties(partyRepo.findByContract(id));
+        log.info("Updated contract={} tenant={}", c.getContractNumber(), tenantId);
+        return toContractResponse(c);
     }
 
     @Transactional
@@ -1004,7 +1063,7 @@ public class ContractingService {
         List<CommentView> comments = commentRepo.findByContract(c.getId()).stream()
                 .map(comm -> toCommentViewWithParties(comm, parties)).toList();
         return new ContractResponse(
-                c.getId(), c.getContractNumber(), c.getTitle(), c.getContractType(),
+                c.getId(), c.getContractNumber(), c.getTemplateId(), c.getTitle(), c.getContractType(),
                 c.getStatus(), c.getBody(), c.getBodyHash(),
                 c.getValueAmount(), c.getCurrency(),
                 c.getStartDate(), c.getEndDate(), c.isAutoRenew(), c.getRenewalNoticeDays(),

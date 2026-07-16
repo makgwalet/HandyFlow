@@ -28,6 +28,9 @@ public class UserManagementService {
     private final PasswordEncoder          passwordEncoder;
     private final EmailService             emailService;
     private final JwtService               jwtService;
+    // NEW: backs user-count enforcement below.
+    private final za.co.handyflow.platform.billing.application.SubscriptionQueryFacade subscriptionQueryFacade;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     // ── Helper: throw with 400 BAD_REQUEST ───────────────────────────────────
     private static HandyFlowException bad(String message) {
@@ -100,6 +103,51 @@ public class UserManagementService {
     public InvitationResponse inviteUser(TenantId tenantId, UUID invitedBy,
                                          InviteUserRequest req) {
         String email = req.email().toLowerCase().trim();
+
+        // FIX: previously no check existed here at all — confirmed via
+        // real testing that plans.max_users, which genuinely exists in
+        // the schema, was never actually enforced anywhere. Any tenant
+        // could invite unlimited users regardless of what their plan
+        // pays for. Counts active users plus pending invitations
+        // together — a pending invite that hasn't been accepted yet
+        // still represents a seat that's about to be consumed, and
+        // ignoring it would let someone send five simultaneous invites
+        // to dodge a four-user limit.
+        int maxUsers = subscriptionQueryFacade.getMaxUsers(tenantId);
+        if (maxUsers >= 0) { // -1 = unlimited, matching the same sentinel convention used elsewhere in this schema
+            Integer activeUserCount = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM users WHERE tenant_id = ? AND status = 'ACTIVE'",
+                    Integer.class, tenantId.getValue());
+            long pendingInviteCount = invitationRepository.findByTenantIdOrderByCreatedAtDesc(tenantId).stream()
+                    .filter(UserInvitation::isPending)
+                    .count();
+            int currentTotal = (activeUserCount != null ? activeUserCount : 0) + (int) pendingInviteCount;
+
+            if (currentTotal >= maxUsers) {
+                // FIX: was HttpStatus.PAYMENT_REQUIRED (402) in an
+                // earlier version of this fix. Confirmed via real testing
+                // this collides with client.ts's account-lockout
+                // interceptor — that logic correctly catches every 402
+                // FeatureGuard throws (all genuine account-level
+                // lockouts), but has no way to distinguish THIS 402 from
+                // those, since it only checks status code. A routine
+                // "you've hit your user limit" rejection was redirecting
+                // straight to AccountLockedPage showing "your trial has
+                // ended" — completely wrong message for what actually
+                // happened. 409 is also a better semantic fit on its own
+                // merits: this isn't "please pay us", it's "this action
+                // conflicts with your current user count" — and it isn't
+                // special-cased anywhere in client.ts, so it simply
+                // propagates as a normal error for the calling UI to
+                // handle inline, the correct behaviour for a
+                // validation-style failure, not a full-page lockout.
+                throw new HandyFlowException(
+                        "Your plan allows up to " + maxUsers + " users. " +
+                                "You currently have " + currentTotal + " (active + pending invites). " +
+                                "Upgrade your plan to invite more.",
+                        org.springframework.http.HttpStatus.CONFLICT, "USER_LIMIT_EXCEEDED");
+            }
+        }
 
         if (userRepository.existsByTenantIdAndEmail(tenantId, email))
             throw bad("A user with email " + email + " already exists in this company");
