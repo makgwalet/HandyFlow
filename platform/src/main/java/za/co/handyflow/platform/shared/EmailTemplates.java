@@ -179,6 +179,28 @@ public class EmailTemplates {
             """.formatted(tenantName, gracePeriodDaysUsed));
     }
 
+    // NEW: SubscriptionService.changePlan() previously had no notification
+    // at all — no way for a tenant to know their plan/price actually
+    // changed besides noticing a different number whenever billing
+    // eventually catches up. Green highlight for an upgrade, amber for a
+    // downgrade, matching this file's existing color-language convention
+    // (red = urgent/access-affecting, amber = heads-up, green = good news).
+    public static String planChanged(String tenantName, String oldPlanName, String newPlanName,
+                                     int newPriceRands, boolean isUpgrade) {
+        String highlightClass = isUpgrade ? "highlight-green" : "highlight-amber";
+        String changeWord     = isUpgrade ? "upgraded" : "changed";
+        return wrap("""
+            <p>Hi,</p>
+            <p>Your HandyFlow plan for <strong>%s</strong> has been %s from
+               <strong>%s</strong> to <strong>%s</strong>.</p>
+            <div class="%s">
+              <p>New monthly price: <strong>R %d/month</strong></p>
+            </div>
+            <p>This takes effect immediately — no action needed on your part.</p>
+            <a href="https://app.handyflow.co.za/billing" class="btn">View your plan</a>
+            """.formatted(tenantName, changeWord, oldPlanName, newPlanName, highlightClass, newPriceRands));
+    }
+
     public static String quoteExpiry(String firstName, String quoteNumber,
                                      String customerName, String amount,
                                      String frontendUrl) {

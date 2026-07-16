@@ -14,6 +14,7 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -140,6 +141,63 @@ public class SubscriptionService {
         }
     }
 
+    // ── Change plan (upgrade/downgrade) ───────────────────────────────────────
+
+    /**
+     * NEW: previously no way to change a tenant's plan at all after
+     * creation. Immediate effect, no proration — see Subscription.
+     * changePlan()'s own Javadoc for the full reasoning on why. Blocks a
+     * downgrade if the target plan's max_users is below the tenant's
+     * current ACTIVE user count, reusing the exact same query already
+     * verified in UserManagementService.inviteUser()'s own plan-limit
+     * enforcement. Deliberately counts ACTIVE users only, not + pending
+     * invites like that method does — this is a different concern
+     * (shrinking room for an existing team) from inviteUser()'s (not
+     * over-committing beyond what's paid for), and pending invites
+     * haven't consumed a real seat yet.
+     */
+    @Transactional
+    public void changePlan(TenantId tenantId, UUID newPlanId) {
+        Subscription sub = findSubscription(tenantId);
+        Plan newPlan = planRepository.findById(newPlanId)
+                .filter(Plan::isActive)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "No active plan found with id: " + newPlanId));
+
+        if (sub.getPlan().getId().equals(newPlan.getId())) {
+            throw new IllegalArgumentException(
+                    "Already on the " + newPlan.getDisplayName() + " plan");
+        }
+
+        if (newPlan.getMaxUsers() >= 0) { // -1 = unlimited, same sentinel convention used elsewhere
+            Integer activeUserCount = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM users WHERE tenant_id = ? AND status = 'ACTIVE'",
+                    Integer.class, tenantId.getValue());
+            int count = activeUserCount != null ? activeUserCount : 0;
+            if (count > newPlan.getMaxUsers()) {
+                throw new IllegalStateException(
+                        "The " + newPlan.getDisplayName() + " plan allows up to " + newPlan.getMaxUsers() +
+                                " users, but you currently have " + count + " active users. " +
+                                "Deactivate some users before downgrading.");
+            }
+        }
+
+        Plan oldPlan = sub.getPlan();
+        sub.changePlan(newPlan);
+        subscriptionRepository.save(sub);
+        log.info("Changed plan for tenant={} from={} to={}", tenantId, oldPlan.getName(), newPlan.getName());
+
+        // NEW: notify billing recipients of the change. Wrapped here, same
+        // as suspendGraceExpired()'s own call to notifySuspended() — a
+        // failure resolving recipients or sending must never undo/block a
+        // plan change that's already been saved.
+        try {
+            notifyPlanChanged(tenantId, oldPlan, newPlan);
+        } catch (Exception e) {
+            log.error("Failed to send plan-change notification for tenant={}: {}", tenantId, e.getMessage());
+        }
+    }
+
     // ── Existing: expire pilots ───────────────────────────────────────────────
 
     @Transactional
@@ -209,6 +267,39 @@ public class SubscriptionService {
         });
 
         log.info("Suspension notification sent for tenant={}", tenantId);
+    }
+
+    // NEW: called from changePlan() above. Same structure as
+    // notifySuspended() just above — resolve billing recipients, send to
+    // each with its own try/catch so one bad address doesn't stop the
+    // others, and the whole thing is wrapped by its caller so a failure
+    // here can never undo the plan change that's already been saved.
+    private void notifyPlanChanged(TenantId tenantId, Plan oldPlan, Plan newPlan) {
+        String tenantName;
+        try {
+            tenantName = jdbc.queryForObject(
+                    "SELECT name FROM tenants WHERE id = ?", String.class, tenantId.getValue());
+        } catch (Exception e) {
+            tenantName = "your business";
+        }
+
+        boolean isUpgrade = newPlan.getPriceCents() > oldPlan.getPriceCents();
+        String html = EmailTemplates.planChanged(
+                tenantName, oldPlan.getDisplayName(), newPlan.getDisplayName(),
+                newPlan.priceInRands(), isUpgrade);
+        String subject = "Your HandyFlow plan has " + (isUpgrade ? "been upgraded" : "changed")
+                + " to " + newPlan.getDisplayName();
+
+        billingRecipients.resolveBillingRecipients(tenantId).forEach(recipient -> {
+            try {
+                emailService.send(recipient.email(), subject, html);
+            } catch (Exception e) {
+                log.error("Failed to send plan-change email to={} tenant={}: {}",
+                        recipient.email(), tenantId, e.getMessage());
+            }
+        });
+
+        log.info("Plan-change notification sent for tenant={} newPlan={}", tenantId, newPlan.getName());
     }
 
     private String gracePeriodEmail(String tenantName, String email, int graceDays) {

@@ -68,7 +68,10 @@ export function BillingPage() {
   const qc = useQueryClient()
   const [tab, setTab]                   = useState<'modules' | 'subscription'>('modules')
   const [confirmCancel, setConfirmCancel] = useState<CancelPreview | null>(null)
-  const [activating, setActivating]     = useState<string | null>(null)
+  // NEW: was previously fired immediately on click with zero confirmation
+  // — replaced with a confirm-before-add modal, matching the existing
+  // confirm-before-remove (cancel-preview) flow's own pattern.
+  const [confirmActivate, setConfirmActivate] = useState<CatalogueModule | null>(null)
 
   const { data: subscription } = useQuery<Subscription>({
     queryKey: ['subscription'],
@@ -94,8 +97,8 @@ export function BillingPage() {
   const activate = useMutation({
     mutationFn: (moduleKey: string) =>
       apiClient.post('/api/v1/billing/modules/activate', { moduleKey }),
-    onSuccess: () => { invalidate(); setActivating(null) },
-    onError: (e: any) => alert(e.response?.data?.message || 'Failed to activate module'),
+    onSuccess: () => { invalidate(); setConfirmActivate(null) },
+    onError: (e: any) => alert(e.response?.data?.message || 'Failed to add app'),
   })
 
   const fetchPreview = useMutation({
@@ -108,7 +111,7 @@ export function BillingPage() {
     mutationFn: (moduleKey: string) =>
       apiClient.delete(`/api/v1/billing/modules/${moduleKey}`),
     onSuccess: () => { invalidate(); setConfirmCancel(null) },
-    onError: (e: any) => alert(e.response?.data?.message || 'Failed to cancel module'),
+    onError: (e: any) => alert(e.response?.data?.message || 'Failed to remove app'),
   })
 
   // Active module keys set
@@ -130,8 +133,8 @@ export function BillingPage() {
 
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', margin: '0 0 4px' }}>Billing & Modules</h1>
-        <p style={{ fontSize: 13, color: '#94A3B8', margin: 0 }}>Manage your active modules and subscription</p>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', margin: '0 0 4px' }}>Billing & Apps</h1>
+        <p style={{ fontSize: 13, color: '#94A3B8', margin: 0 }}>Manage your active apps and subscription</p>
       </div>
 
       {/* Subscription banner */}
@@ -141,7 +144,7 @@ export function BillingPage() {
             {[
               { label: 'Status', value: subscription.status },
               { label: 'Plan',   value: subscription.planDisplayName },
-              { label: 'Active modules', value: `${tenantModules.length + CORE_KEYS.length}` },
+              { label: 'Active apps', value: `${tenantModules.length + CORE_KEYS.length}` },
               { label: 'After trial', value: `R ${monthlyTotal.toLocaleString('en-ZA')}/mo` },
               ...(subscription.status === 'PILOT' && subscription.pilotDaysRemaining != null
                 ? [{ label: 'Pilot ends', value: `${subscription.pilotDaysRemaining} days left` }]
@@ -165,8 +168,8 @@ export function BillingPage() {
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid #E2E8F0', marginBottom: 24 }}>
         {[
-          { id: 'modules' as const,      label: 'My Modules' },
-          { id: 'subscription' as const, label: 'Add Modules' },
+          { id: 'modules' as const,      label: 'My Apps' },
+          { id: 'subscription' as const, label: 'Add Apps' },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             style={{ padding: '10px 20px', background: 'none', border: 'none', borderBottom: tab === t.id ? '2px solid #0D9488' : '2px solid transparent', color: tab === t.id ? '#0D9488' : '#64748B', fontWeight: tab === t.id ? 700 : 400, fontSize: 14, cursor: 'pointer', marginBottom: -1 }}>
@@ -210,21 +213,21 @@ export function BillingPage() {
             </div>
           </div>
 
-          {/* Active paid modules */}
+          {/* Active paid apps */}
           <div style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.06em', marginBottom: 12 }}>
-            ACTIVE MODULES ({tenantModules.length})
+            ACTIVE APPS ({tenantModules.length})
           </div>
 
           {loadingMine ? (
-            <div style={{ textAlign: 'center', padding: 40, color: '#94A3B8' }}>Loading modules...</div>
+            <div style={{ textAlign: 'center', padding: 40, color: '#94A3B8' }}>Loading apps...</div>
           ) : tenantModules.length === 0 ? (
             <div style={{ background: 'white', border: '2px dashed #E2E8F0', borderRadius: 14, padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
               <Zap size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
-              <div style={{ fontWeight: 600, color: '#475569', marginBottom: 4 }}>No additional modules yet</div>
-              <div style={{ fontSize: 13, marginBottom: 16 }}>Add industry or business modules to unlock more features.</div>
+              <div style={{ fontWeight: 600, color: '#475569', marginBottom: 4 }}>No additional apps yet</div>
+              <div style={{ fontSize: 13, marginBottom: 16 }}>Add industry or business apps to unlock more features.</div>
               <button onClick={() => setTab('subscription')}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 18px', background: '#1B3A6B', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-                <Plus size={15} /> Browse modules
+                <Plus size={15} /> Browse apps
               </button>
             </div>
           ) : (
@@ -274,7 +277,7 @@ export function BillingPage() {
                         <button
                           onClick={() => fetchPreview.mutate(m.moduleKey)}
                           disabled={fetchPreview.isPending}
-                          title="Cancel module"
+                          title="Remove app"
                           style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: '#DC2626', display: 'flex' }}>
                           <X size={13} />
                         </button>
@@ -294,8 +297,8 @@ export function BillingPage() {
           {availableToAdd.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94A3B8' }}>
               <Check size={40} style={{ marginBottom: 12, color: '#0D9488', opacity: 0.6 }} />
-              <div style={{ fontWeight: 600, color: '#475569', marginBottom: 4 }}>All modules are active</div>
-              <div style={{ fontSize: 13 }}>You have access to every available module.</div>
+              <div style={{ fontWeight: 600, color: '#475569', marginBottom: 4 }}>All apps are active</div>
+              <div style={{ fontSize: 13 }}>You have access to every available app.</div>
             </div>
           ) : (
             Object.entries(grouped).sort().map(([category, mods]) => (
@@ -307,7 +310,6 @@ export function BillingPage() {
                   {mods.sort((a, b) => a.sortOrder - b.sortOrder).map(m => {
                     const Icon = MODULE_ICONS[m.key] || Package
                     const c    = MODULE_COLORS[m.key] || { bg: '#F8FAFC', color: '#64748B' }
-                    const isActivating = activating === m.key && activate.isPending
                     return (
                       <div key={m.key} style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 12, padding: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
@@ -325,10 +327,9 @@ export function BillingPage() {
                             <div style={{ fontSize: 11, color: '#0D9488', fontWeight: 500 }}>60-day free trial</div>
                           </div>
                           <button
-                            onClick={() => { setActivating(m.key); activate.mutate(m.key) }}
-                            disabled={isActivating}
-                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: isActivating ? '#F1F5F9' : '#1B3A6B', color: isActivating ? '#94A3B8' : 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: isActivating ? 'not-allowed' : 'pointer' }}>
-                            {isActivating ? <><Clock size={13} /> Activating...</> : <><Plus size={13} /> Add</>}
+                            onClick={() => setConfirmActivate(m)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: '#1B3A6B', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                            <Plus size={13} /> Add
                           </button>
                         </div>
                       </div>
@@ -346,7 +347,7 @@ export function BillingPage() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ background: 'white', borderRadius: 16, padding: 28, width: 460, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>Cancel {confirmCancel.moduleName}?</h3>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>Remove {confirmCancel.moduleName}?</h3>
               <button onClick={() => setConfirmCancel(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={20} /></button>
             </div>
 
@@ -378,7 +379,7 @@ export function BillingPage() {
               <div style={{ padding: '12px 16px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 10, marginBottom: 14 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <Check size={15} color="#16A34A" style={{ marginTop: 1 }} />
-                  <div style={{ fontSize: 13, color: '#166534' }}>No data will be affected. You can reactivate this module at any time.</div>
+                  <div style={{ fontSize: 13, color: '#166534' }}>No data will be affected. You can reactivate this app at any time.</div>
                 </div>
               </div>
             )}
@@ -390,18 +391,70 @@ export function BillingPage() {
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button onClick={() => setConfirmCancel(null)}
                 style={{ padding: '10px 18px', border: '1px solid #E2E8F0', borderRadius: 9, background: 'white', fontSize: 14, cursor: 'pointer', color: '#374151' }}>
-                Keep module
+                Keep app
               </button>
               <button
                 onClick={() => cancelModule.mutate(confirmCancel.moduleKey)}
                 disabled={cancelModule.isPending}
                 style={{ padding: '10px 20px', background: '#DC2626', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-                {cancelModule.isPending ? 'Cancelling...' : 'Yes, cancel module'}
+                {cancelModule.isPending ? 'Removing...' : 'Yes, remove app'}
               </button>
             </div>
           </div>
         </div>
       )}
+      {/* ── Confirm add modal ───────────────────────────────────────── */}
+      {/* NEW: "Add" previously fired the activation immediately on click
+          with no confirmation step at all — this closes that gap,
+          matching the confirm-before-remove modal above. */}
+      {confirmActivate && (() => {
+        const Icon = MODULE_ICONS[confirmActivate.key] || Package
+        const c    = MODULE_COLORS[confirmActivate.key] || { bg: '#F8FAFC', color: '#64748B' }
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+            <div style={{ background: 'white', borderRadius: 16, padding: 28, width: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon size={19} color={c.color} />
+                  </div>
+                  <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>Add {confirmActivate.name}?</h3>
+                </div>
+                <button onClick={() => setConfirmActivate(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={20} /></button>
+              </div>
+
+              <div style={{ padding: '12px 16px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 10, marginBottom: 16 }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Zap size={15} color="#16A34A" style={{ marginTop: 1, flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: '#166534' }}>60 days free, then R {Number(confirmActivate.monthlyPrice).toLocaleString('en-ZA')}/mo</div>
+                    <div style={{ fontSize: 12, color: '#15803D', marginTop: 2 }}>
+                      You won't be charged until the trial ends. Remove it any time before then at no cost.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ fontSize: 13, color: '#64748B', marginBottom: 20, lineHeight: 1.5 }}>
+                {confirmActivate.description}
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button onClick={() => setConfirmActivate(null)}
+                  style={{ padding: '10px 18px', border: '1px solid #E2E8F0', borderRadius: 9, background: 'white', fontSize: 14, cursor: 'pointer', color: '#374151' }}>
+                  Cancel
+                </button>
+                <button
+                  onClick={() => activate.mutate(confirmActivate.key)}
+                  disabled={activate.isPending}
+                  style={{ padding: '10px 20px', background: '#1B3A6B', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                  {activate.isPending ? 'Adding...' : 'Yes, add app'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

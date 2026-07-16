@@ -21,7 +21,7 @@ public class Subscription {
 
     @Embedded
     @AttributeOverride(name = "value",
-        column = @Column(name = "tenant_id", nullable = false))
+            column = @Column(name = "tenant_id", nullable = false))
     private TenantId tenantId;
 
     @ManyToOne(fetch = FetchType.EAGER)
@@ -128,6 +128,42 @@ public class Subscription {
         this.cancelledAt         = Instant.now();
         this.cancellationReason  = reason;
         this.updatedAt           = Instant.now();
+    }
+
+    /**
+     * NEW: previously there was no way to change a tenant's plan at all
+     * after creation — plan was set once in createPilot() and never
+     * touched by activate()/markPastDue()/suspend()/reinstate()/cancel().
+     * <p>
+     * Deliberately does NOT touch currentPeriodStart/currentPeriodEnd —
+     * there's no invoicing/proration system anywhere in this codebase to
+     * make mid-cycle proration mean anything real yet, so a plan change
+     * takes effect immediately at the new price with the existing billing
+     * cycle dates left alone.
+     * <p>
+     * Deliberately does NOT touch any TenantModule/ModuleSubscription
+     * records — whether a plan's includedModules should reconcile against
+     * a tenant's currently-active modules is the exact open question from
+     * the plan-limits review (§6.3: does included_module_count mean
+     * "included in price" or "hard cap"?) that's still waiting on an
+     * explicit decision. This method stays out of that entirely rather
+     * than silently resolving it.
+     * <p>
+     * Only checks that the subscription is in an accessible state
+     * (PILOT/ACTIVE/PAST_DUE) — SUSPENDED/CANCELLED must be reinstated or
+     * reactivated first, matching SubscriptionStatus's own transition
+     * graph where SUSPENDED can only go to ACTIVE or CANCELLED, not stay
+     * SUSPENDED with a different plan. The user-count downgrade guard
+     * needs a DB query this entity has no access to — that lives in
+     * SubscriptionService.changePlan(), called before this.
+     */
+    public void changePlan(Plan newPlan) {
+        if (!isAccessible()) {
+            throw new IllegalStateException(
+                    "Cannot change plan while subscription is " + status + ". Reinstate or reactivate first.");
+        }
+        this.plan      = newPlan;
+        this.updatedAt = Instant.now();
     }
 
     // ── Query helpers ─────────────────────────────────────────────────────────

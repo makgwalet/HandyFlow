@@ -5,12 +5,14 @@ import za.co.handyflow.platform.billing.application.internal.SubscriptionService
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.billing.dto.ChangePlanRequest;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
@@ -39,6 +41,22 @@ public class SubscriptionController {
     public ResponseEntity<ApiResponse<java.util.List<PlanResponse>>> getPlans() {
         var plans = subscriptionQueryFacade.getAvailablePlans();
         return ResponseEntity.ok(ApiResponse.success(plans));
+    }
+
+    // NEW: previously no way to change a tenant's plan at all after
+    // creation — see Subscription.changePlan()'s own Javadoc for the full
+    // reasoning (no proration, doesn't touch modules). Same permission as
+    // this controller's other subscription-mutating endpoints below.
+    @PostMapping("/subscription/change-plan")
+    @PreAuthorize("hasAuthority('BILLING_MANAGE')")
+    @Operation(summary = "Change the tenant's plan — takes effect immediately, no proration " +
+            "(no invoicing system exists yet to make mid-cycle proration meaningful)")
+    public ResponseEntity<ApiResponse<SubscriptionResponse>> changePlan(
+            @Valid @RequestBody ChangePlanRequest req) {
+        var tenantId = TenantContext.getTenantIdAsObject();
+        subscriptionService.changePlan(tenantId, req.planId());
+        var response = subscriptionQueryFacade.getSubscription(tenantId);
+        return ResponseEntity.ok(ApiResponse.success("Plan changed successfully", response));
     }
 
     // ── B5: Payment locking ───────────────────────────────────────────────────
@@ -80,8 +98,8 @@ public class SubscriptionController {
                     LIMIT 1
                     """, tenantId);
             return new String[]{
-                (String) row.getOrDefault("name",  "HandyFlow Tenant"),
-                (String) row.getOrDefault("email", "")
+                    (String) row.getOrDefault("name",  "HandyFlow Tenant"),
+                    (String) row.getOrDefault("email", "")
             };
         } catch (Exception e) {
             log.warn("Could not fetch tenant details: {}", e.getMessage());

@@ -88,6 +88,50 @@ const QUICK_ACTIONS = [
   { label: 'Add catalogue item',  sub: 'Catalogue', icon: Plus,     bg: '#F3E8FF', color: '#7C3AED', route: '/catalogue' },
 ]
 
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+// NEW: replaces the hardcoded "Good morning" — picks a time-of-day- and
+// day-aware greeting. Deterministic on purpose: the pick uses day-of-year
+// as its seed, not Math.random(), so refreshing the page mid-session
+// always shows the SAME phrase (same day + same hour bucket => same
+// index), while the phrase still naturally rotates day to day and
+// switches the moment the clock crosses into a new bucket. Weekend
+// flavor only blends into the morning/afternoon buckets — "Happy
+// Saturday" at 2am doesn't make sense, so evening/night stay mood-based
+// regardless of weekday.
+function getGreeting(firstName: string | undefined): string {
+  const now  = new Date()
+  const day  = now.getDay()
+  const hour = now.getHours()
+  const isWeekend = day === 0 || day === 6
+  const dayOfYear = Math.floor(
+    (now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86_400_000
+  )
+  const name = firstName ? `, ${firstName}` : ''
+
+  let options: string[]
+
+  if (hour < 5) {
+    options = [`Burning the midnight oil${name}`, `Still up${name}?`, `Night owl hours${name}`]
+  } else if (hour < 8) {
+    options = [`Early start${name}`, `Rise and grind${name}`, `Coffee time${name}`]
+  } else if (hour < 12) {
+    options = isWeekend
+      ? [`Happy ${DAY_NAMES[day]}${name}`, `Good morning${name}`, `Lazy ${DAY_NAMES[day]} morning${name}`]
+      : [`Good morning${name}`, `Morning${name}`, `Hope your day's off to a good start${name}`]
+  } else if (hour < 17) {
+    options = isWeekend
+      ? [`Happy ${DAY_NAMES[day]}${name}`, `Good afternoon${name}`, `Enjoying the ${DAY_NAMES[day]}${name}`]
+      : [`Good afternoon${name}`, `Good day${name}`, `Halfway through the day${name}`]
+  } else if (hour < 21) {
+    options = [`Good evening${name}`, `Evening${name}`, `Winding down${name}?`]
+  } else {
+    options = [`Burning the midnight oil${name}`, `Working late${name}?`, `Night shift${name}`]
+  }
+
+  return options[dayOfYear % options.length]
+}
+
 function AppTileCard({ app, onClick }: { app: AppTile; onClick: () => void }) {
   const [hovered, setHovered] = useState(false)
   return (
@@ -189,7 +233,15 @@ export function DashboardPage() {
     { label: 'Customers',     value: customerCount,  sub: customersThisMonth > 0 ? `↑ ${customersThisMonth} this month` : 'No new this month', positive: customersThisMonth > 0, icon: Users,       bg: '#EFF6FF', iconColor: '#2563EB' },
     { label: 'Active quotes', value: activeQuotes,   sub: invoicedQuotes > 0 ? `${invoicedQuotes} invoiced` : 'None invoiced yet',                                                icon: FileText,    bg: '#F0FDF4', iconColor: '#16A34A' },
     { label: 'Revenue MTD',   value: revenueMTD > 0 ? `R ${(revenueMTD / 1000).toFixed(0)}K` : 'R 0', sub: totalQuoted > 0 ? `R ${(totalQuoted / 1000).toFixed(0)}K quoted` : 'No quotes yet',   icon: TrendingUp,  bg: '#FEFCE8', iconColor: '#CA8A04' },
-    { label: 'Pilot days',    value: subscription?.pilotDaysRemaining ?? '—', sub: subscription?.pilotEndsAt ? `Ends ${new Date(subscription.pilotEndsAt).toLocaleDateString('en-ZA')}` : 'Loading…', icon: Clock, bg: '#FFF1F2', iconColor: '#BE123C' },
+    // FIX: this was 'Active apps' with the same count already shown right
+    // below in the Your Apps section header ("N active apps on your
+    // plan") — a duplicate sitting directly above its own duplicate.
+    // Next renewal date is genuinely new information instead, and isn't
+    // shown anywhere else now that the detailed subscription card was
+    // simplified to a link-out prompt.
+    subscription?.status === 'PILOT'
+      ? { label: 'Pilot days',    value: subscription?.pilotDaysRemaining ?? '—', sub: subscription?.pilotEndsAt ? `Ends ${new Date(subscription.pilotEndsAt).toLocaleDateString('en-ZA')}` : 'Loading…', icon: Clock, bg: '#FFF1F2', iconColor: '#BE123C' }
+      : { label: 'Next renewal',  value: subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : '—', sub: subscription?.priceInRands != null ? `R ${subscription.priceInRands}/month` : '', icon: Clock, bg: '#EFF6FF', iconColor: '#2563EB' },
   ]
 
   return (
@@ -321,7 +373,7 @@ export function DashboardPage() {
         {/* Welcome row */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 }}>
           <div>
-            <h1 style={{ fontSize: 26, fontWeight: 800, color: '#0F172A', margin: '0 0 6px', letterSpacing: '-0.5px' }}>Good morning, {user?.firstName}</h1>
+            <h1 style={{ fontSize: 26, fontWeight: 800, color: '#0F172A', margin: '0 0 6px', letterSpacing: '-0.5px' }}>{getGreeting(user?.firstName)}</h1>
             <p style={{ fontSize: 13, color: '#94A3B8', margin: 0 }}>
               {today}{subscription && <> &nbsp;·&nbsp; <strong style={{ color: '#64748B' }}>{subscription.planDisplayName} plan</strong></>}
             </p>
@@ -371,25 +423,38 @@ export function DashboardPage() {
         </div>
 
         {/* Subscription */}
+        {/* FIX: this used to duplicate BillingPage.tsx's own subscription
+            summary (Status/Plan/Price/Period, plus a pilot-days circle)
+            almost field-for-field — but with none of Billing's actual
+            controls (add/remove apps, cancel, etc.), so it was read-only
+            information sitting in two places at once. The plan name and
+            pilot countdown are already visible in the welcome row above;
+            this is now just a lightweight prompt pointing at the one page
+            that actually manages the subscription, instead of a second,
+            static copy of the same numbers. */}
         {subscription && (
-          <div style={{ background: 'white', border: '1px solid #E8EDF5', borderRadius: 16, padding: '20px 24px', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <p style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', margin: 0 }}>Current subscription</p>
-              <span style={{ background: subscription.status === 'PILOT' ? '#FEF3C7' : '#DCFCE7', color: subscription.status === 'PILOT' ? '#92400E' : '#166534', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 20 }}>{subscription.status}</span>
+          <button onClick={() => navigate('/billing')}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: 'white', border: '1px solid #E8EDF5', borderRadius: 16, padding: '18px 24px',
+              boxShadow: '0 1px 6px rgba(0,0,0,0.04)', cursor: 'pointer', textAlign: 'left',
+            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 12, background: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <CreditCard size={18} color="#1B3A6B" />
+              </div>
+              <div>
+                <p style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', margin: '0 0 2px' }}>
+                  {subscription.planDisplayName} plan
+                  <span style={{ marginLeft: 8, background: subscription.status === 'PILOT' ? '#FEF3C7' : '#DCFCE7', color: subscription.status === 'PILOT' ? '#92400E' : '#166534', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>{subscription.status}</span>
+                </p>
+                <p style={{ fontSize: 12, color: '#94A3B8', margin: 0 }}>
+                  {activeApps.length} active {activeApps.length === 1 ? 'app' : 'apps'} · manage billing and apps
+                </p>
+              </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, paddingTop: 16, borderTop: '1px solid #F1F5F9' }}>
-              {[
-                { label: 'Plan',          value: subscription.planDisplayName },
-                { label: 'Monthly price', value: `R ${subscription.priceInRands}/month` },
-                { label: 'Period ends',   value: new Date(subscription.currentPeriodEnd).toLocaleDateString('en-ZA') },
-              ].map(item => (
-                <div key={item.label}>
-                  <p style={{ fontSize: 11, color: '#94A3B8', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{item.label}</p>
-                  <p style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', margin: 0 }}>{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+            <ChevronRight size={18} color="#CBD5E1" />
+          </button>
         )}
       </main>
     </div>
