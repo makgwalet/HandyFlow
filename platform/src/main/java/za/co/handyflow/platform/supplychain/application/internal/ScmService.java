@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.shared.HandyFlowException;
@@ -18,6 +19,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -32,10 +35,16 @@ public class ScmService {
     private final ScGoodsReceiptRepository    grRepo;
     private final ScGrLineRepository          grLineRepo;
     private final ScSupplierInvoiceRepository invoiceRepo;
+    // NEW: backs supplier invoice attachments (upload/list/download/delete).
+    private final ScSupplierInvoiceAttachmentRepository attachmentRepo;
     private final ScPoLineRepository          poLineRepo;
     private final ScSupplierItemRepository    supplierItemRepo;
     private final SequenceService             sequenceService;
     private final ScmNotificationService      notificationService;
+    // NEW: backs generatePoPdf() below — same jdbc-based tenant-lookup
+    // pattern already used in ScmNotificationService/SubscriptionController.
+    private final JdbcTemplate                jdbc;
+    private final ScPoPdfGenerator            poPdfGenerator;
 
     /** Tolerance for 3-way match: invoice may differ from PO by up to this fraction. */
     private static final BigDecimal MATCH_TOLERANCE = new BigDecimal("0.02"); // 2%
@@ -297,14 +306,45 @@ public class ScmService {
     public ScPurchaseOrder rejectPurchaseOrder(TenantId tenantId, UUID id, String reason) {
         ScPurchaseOrder po = getPurchaseOrder(tenantId, id);
         po.reject(reason);
-        return poRepo.save(po);
+        ScPurchaseOrder saved = poRepo.save(po);
+        // FIX (Tier 1 gap analysis): notifyPoRejected existed but was never
+        // called — a buyer's PO was silently returned to DRAFT with no alert.
+        notificationService.notifyPoRejected(tenantId.getValue(), po.getOrderNumber(), reason);
+        return saved;
     }
 
     @Transactional
     public ScPurchaseOrder markSent(TenantId tenantId, UUID id) {
         ScPurchaseOrder po = getPurchaseOrder(tenantId, id);
         po.send();
-        return poRepo.save(po);
+        ScPurchaseOrder saved = poRepo.save(po);
+
+        // FIX (Tier 1 gap analysis): "Mark Sent" was previously just a
+        // status flip — the supplier never received anything unless
+        // someone manually emailed them outside the system. Fetches the
+        // supplier's contactEmail and sends directly to them.
+        ScSupplier supplier = getSupplier(tenantId, po.getSupplierId());
+
+        // NEW: attach the actual PO PDF. Deliberately caught here rather
+        // than left to propagate — a PDF-rendering failure must never
+        // block the PO's own send() transition (already committed above)
+        // or prevent the supplier from being notified at all.
+        // notifyPoSentToSupplier() falls back to a plain email when
+        // pdfBytes is null.
+        byte[] pdfBytes = null;
+        try {
+            pdfBytes = buildPoPdfBytes(tenantId, po, supplier);
+        } catch (Exception e) {
+            log.error("[SCM] Failed to generate PO PDF for supplier email, po={}: {}", po.getOrderNumber(), e.getMessage());
+        }
+
+        notificationService.notifyPoSentToSupplier(tenantId.getValue(),
+                supplier.getContactEmail(), supplier.getName(),
+                po.getOrderNumber(), po.getTotalAmount(),
+                po.getRequiredByDate(),
+                pdfBytes);
+
+        return saved;
     }
 
     @Transactional
@@ -328,11 +368,53 @@ public class ScmService {
         return poLineRepo.findByPurchaseOrderId(poId);
     }
 
+    /**
+     * NEW: generates the formal Purchase Order PDF — flagged in the gap
+     * analysis as "the single most common missing artifact" for a
+     * procurement system. Deliberately does NOT attempt to fetch a flat
+     * tenant address — Tenant.address is a JSONB map (see identity
+     * module's Tenant.java), and guessing at its key names for a raw SQL
+     * extraction risked producing a wrong or malformed address on a
+     * document that goes out to real suppliers. tenantVat IS a flat
+     * column, so that's included; ContractPdfGenerator (this codebase's
+     * other PDF generator) follows the exact same scope for the same
+     * reason.
+     */
+    @Transactional(readOnly = true)
+    public byte[] generatePoPdf(TenantId tenantId, UUID poId) {
+        ScPurchaseOrder po = getPurchaseOrder(tenantId, poId);
+        ScSupplier supplier = getSupplier(tenantId, po.getSupplierId());
+        return buildPoPdfBytes(tenantId, po, supplier);
+    }
+
+    /**
+     * NEW: shared by generatePoPdf() and markSent() — the latter already
+     * has po and supplier loaded (it needs them for the transition and
+     * the email itself), so this avoids a redundant tenant-isolation
+     * re-fetch of both on that path.
+     */
+    private byte[] buildPoPdfBytes(TenantId tenantId, ScPurchaseOrder po, ScSupplier supplier) {
+        List<ScPoLine> lines = poLineRepo.findByPurchaseOrderId(po.getId());
+        String[] tenantDetails = findTenantDetails(tenantId.getValue());
+        return poPdfGenerator.generate(po, lines, tenantDetails[0], tenantDetails[1],
+                formatSupplierAddress(supplier), supplier.getContactName(), supplier.getContactPhone());
+    }
+
     // ── Goods Receipts ────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public Page<ScGoodsReceipt> getGoodsReceipts(TenantId tenantId, Pageable pageable) {
         return grRepo.findByTenantId(tenantId.getValue(), pageable);
+    }
+
+    // NEW: backs the goods-receipt picker in the Record Invoice form —
+    // see ScGoodsReceiptRepository.findByTenantIdAndPurchaseOrderId()'s
+    // own comment for why this exists. Same tenant-isolation-check
+    // pattern as getPurchaseOrderLines() just below.
+    @Transactional(readOnly = true)
+    public List<ScGoodsReceipt> getGoodsReceiptsForPurchaseOrder(TenantId tenantId, UUID poId) {
+        getPurchaseOrder(tenantId, poId);
+        return grRepo.findByTenantIdAndPurchaseOrderId(tenantId.getValue(), poId);
     }
 
     @Transactional
@@ -475,6 +557,19 @@ public class ScmService {
 
         ScSupplierInvoice saved = invoiceRepo.save(inv);
         log.info("[SCM] Supplier invoice {} created matchStatus={}", invoiceNumber, saved.getMatchStatus());
+
+        // FIX (Tier 1 gap analysis): notifyInvoiceDisputed existed but was
+        // never called — a disputed invoice sat with no alert until someone
+        // happened to open the Invoices tab. Only fetches the supplier when
+        // actually needed (dispute case), not on every invoice creation.
+        if (saved.getMatchStatus() == MatchStatus.DISPUTE) {
+            String supplierName = supplierRepo.findByTenantIdAndId(tid, saved.getSupplierId())
+                    .map(ScSupplier::getName)
+                    .orElse("Unknown supplier");
+            notificationService.notifyInvoiceDisputed(tid, saved.getInvoiceNumber(),
+                    supplierName, saved.getMatchNotes());
+        }
+
         return saved;
     }
 
@@ -498,6 +593,137 @@ public class ScmService {
         return invoiceRepo.save(inv);
     }
 
+    /**
+     * NEW (Tier 1 gap analysis): resolves a DISPUTED invoice by overriding
+     * the match and approving it anyway — see ScSupplierInvoice.
+     * overrideDisputeAndApprove()'s own Javadoc for the full reasoning.
+     */
+    @Transactional
+    public ScSupplierInvoice overrideDisputedInvoice(TenantId tenantId, UUID id,
+                                                     UUID approverId, String approverName, String reason) {
+        ScSupplierInvoice inv = invoiceRepo.findByTenantIdAndId(tenantId.getValue(), id)
+                .orElseThrow(() -> new HandyFlowException("Invoice not found",
+                        HttpStatus.NOT_FOUND, "NOT_FOUND"));
+        inv.overrideDisputeAndApprove(approverId, approverName, reason);
+        log.info("[SCM] Invoice {} dispute overridden and approved by {}", inv.getInvoiceNumber(), approverName);
+        return invoiceRepo.save(inv);
+    }
+
+    /**
+     * NEW (Tier 1 gap analysis): the other real resolution for a DISPUTED
+     * invoice — reject it rather than override-approve it. Written
+     * generally rather than DISPUTED-only since there was previously no
+     * cancel path for ANY invoice status (except PAID, which the entity
+     * itself still blocks).
+     */
+    @Transactional
+    public ScSupplierInvoice cancelSupplierInvoice(TenantId tenantId, UUID id, String reason) {
+        ScSupplierInvoice inv = invoiceRepo.findByTenantIdAndId(tenantId.getValue(), id)
+                .orElseThrow(() -> new HandyFlowException("Invoice not found",
+                        HttpStatus.NOT_FOUND, "NOT_FOUND"));
+        inv.cancel(reason);
+        log.info("[SCM] Invoice {} cancelled: {}", inv.getInvoiceNumber(), reason);
+        return invoiceRepo.save(inv);
+    }
+
+    // ── Supplier invoice attachments ────────────────────────────────────────
+    // NEW: gap-analysis item — "No file attachments — can't attach a
+    // supplier's actual invoice PDF/photo to ScSupplierInvoice, so there's
+    // no OCR/document trail for AP audit." Base64-in-DB, following
+    // Creative's own proven working pattern (CreProof/CreDeliverable) since
+    // there's no S3/object storage available in this environment yet — see
+    // ScSupplierInvoiceAttachment's class Javadoc for the two real gaps in
+    // Creative's version that are fixed here (honest column naming, an
+    // actual file-size cap).
+
+    // Creative's equivalent upload path has no size check anywhere at all —
+    // confirmed by reading its whole service layer. 10MB is a reasonable
+    // ceiling for a scanned invoice or delivery-note photo; tune if that's
+    // wrong for real usage.
+    private static final long MAX_ATTACHMENT_BYTES = 10L * 1024 * 1024;
+
+    @Transactional
+    public AttachmentResponse uploadInvoiceAttachment(TenantId tenantId, UUID invoiceId,
+                                                      UploadAttachmentRequest req,
+                                                      UUID uploadedBy, String uploadedByName) {
+        invoiceRepo.findByTenantIdAndId(tenantId.getValue(), invoiceId)
+                .orElseThrow(() -> new HandyFlowException("Invoice not found",
+                        HttpStatus.NOT_FOUND, "NOT_FOUND"));
+
+        // Base64 is ~4/3 the size of the raw bytes it encodes — this is an
+        // estimate, not an exact decode-then-measure, deliberately: decoding
+        // a potentially-huge string just to reject it wastes exactly the
+        // work this check exists to avoid. Close enough to catch anything
+        // meaningfully over the limit.
+        long approxDecodedBytes = (req.fileContentBase64().length() * 3L) / 4;
+        if (approxDecodedBytes > MAX_ATTACHMENT_BYTES) {
+            throw new IllegalArgumentException(
+                    "File is too large — maximum attachment size is "
+                            + (MAX_ATTACHMENT_BYTES / (1024 * 1024)) + "MB");
+        }
+
+        ScSupplierInvoiceAttachment attachment = ScSupplierInvoiceAttachment.create(
+                tenantId.getValue(), invoiceId, req.fileName(),
+                req.contentType() != null ? req.contentType() : "application/octet-stream",
+                req.fileSizeBytes(), req.fileContentBase64(), uploadedBy, uploadedByName);
+        attachmentRepo.save(attachment);
+        log.info("[SCM] Attachment '{}' uploaded for invoice={}", req.fileName(), invoiceId);
+        return toAttachmentResponse(attachment);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AttachmentResponse> getInvoiceAttachments(TenantId tenantId, UUID invoiceId) {
+        invoiceRepo.findByTenantIdAndId(tenantId.getValue(), invoiceId)
+                .orElseThrow(() -> new HandyFlowException("Invoice not found",
+                        HttpStatus.NOT_FOUND, "NOT_FOUND"));
+        // Uses the projection query — never fetches file_content_base64 for
+        // a list call. See AttachmentSummaryProjection's own comment.
+        return attachmentRepo.findSummariesByInvoice(tenantId.getValue(), invoiceId).stream()
+                .map(p -> new AttachmentResponse(p.getId(), p.getFileName(), p.getContentType(),
+                        p.getFileSizeBytes(), p.getUploadedByName(), p.getCreatedAt()))
+                .toList();
+    }
+
+    public record AttachmentFile(byte[] content, String contentType, String fileName) {}
+
+    @Transactional(readOnly = true)
+    public AttachmentFile downloadInvoiceAttachment(TenantId tenantId, UUID invoiceId, UUID attachmentId) {
+        invoiceRepo.findByTenantIdAndId(tenantId.getValue(), invoiceId)
+                .orElseThrow(() -> new HandyFlowException("Invoice not found",
+                        HttpStatus.NOT_FOUND, "NOT_FOUND"));
+        ScSupplierInvoiceAttachment a = attachmentRepo.findByTenantIdAndId(tenantId.getValue(), attachmentId)
+                .orElseThrow(() -> new HandyFlowException("Attachment not found",
+                        HttpStatus.NOT_FOUND, "NOT_FOUND"));
+        if (!a.getSupplierInvoiceId().equals(invoiceId)) {
+            throw new HandyFlowException("Attachment does not belong to this invoice",
+                    HttpStatus.BAD_REQUEST, "MISMATCHED_INVOICE");
+        }
+        byte[] content = java.util.Base64.getDecoder().decode(a.getFileContentBase64());
+        String contentType = a.getContentType() != null && !a.getContentType().isBlank()
+                ? a.getContentType() : "application/octet-stream";
+        return new AttachmentFile(content, contentType, a.getFileName());
+    }
+
+    @Transactional
+    public void deleteInvoiceAttachment(TenantId tenantId, UUID invoiceId, UUID attachmentId) {
+        invoiceRepo.findByTenantIdAndId(tenantId.getValue(), invoiceId)
+                .orElseThrow(() -> new HandyFlowException("Invoice not found",
+                        HttpStatus.NOT_FOUND, "NOT_FOUND"));
+        ScSupplierInvoiceAttachment a = attachmentRepo.findByTenantIdAndId(tenantId.getValue(), attachmentId)
+                .orElseThrow(() -> new HandyFlowException("Attachment not found",
+                        HttpStatus.NOT_FOUND, "NOT_FOUND"));
+        if (!a.getSupplierInvoiceId().equals(invoiceId)) {
+            throw new HandyFlowException("Attachment does not belong to this invoice",
+                    HttpStatus.BAD_REQUEST, "MISMATCHED_INVOICE");
+        }
+        attachmentRepo.delete(a);
+    }
+
+    private AttachmentResponse toAttachmentResponse(ScSupplierInvoiceAttachment a) {
+        return new AttachmentResponse(a.getId(), a.getFileName(), a.getContentType(),
+                a.getFileSizeBytes(), a.getUploadedByName(), a.getCreatedAt());
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private void recalculatePoTotals(ScPurchaseOrder po) {
@@ -507,6 +733,34 @@ public class ScmService {
         BigDecimal vat = lines.stream().map(ScPoLine::getVatAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         po.recalculateTotals(sub, vat, sub.add(vat));
+    }
+
+    /**
+     * NEW: backs generatePoPdf(). Returns [tenantName, tenantVat] — same
+     * jdbc.queryForMap() pattern already used in SubscriptionController.
+     * fetchTenantDetails(), and the same tenant_id column reference
+     * already proven correct in ScmNotificationService.findAdminEmail()/
+     * findTenantName().
+     */
+    private String[] findTenantDetails(UUID tenantId) {
+        try {
+            var row = jdbc.queryForMap(
+                    "SELECT name, vat_number FROM tenants WHERE tenant_id = ?", tenantId);
+            return new String[]{
+                    (String) row.getOrDefault("name", "HandyFlow Tenant"),
+                    (String) row.get("vat_number")
+            };
+        } catch (Exception e) {
+            log.warn("[SCM] Could not fetch tenant details for PO PDF, tenant={}: {}", tenantId, e.getMessage());
+            return new String[]{"HandyFlow Tenant", null};
+        }
+    }
+
+    /** NEW: backs generatePoPdf() — ScSupplier's address fields ARE flat columns, unlike Tenant's JSONB one. */
+    private String formatSupplierAddress(ScSupplier s) {
+        return Stream.of(s.getStreet(), s.getSuburb(), s.getCity(), s.getProvince(), s.getPostalCode())
+                .filter(v -> v != null && !v.isBlank())
+                .collect(Collectors.joining(", "));
     }
 
     /**

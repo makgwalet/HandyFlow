@@ -2,10 +2,15 @@
 import React, { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, FileText, CheckCircle, CreditCard, AlertTriangle } from "lucide-react"
+import { Plus, FileText, CheckCircle, CreditCard, AlertTriangle, Paperclip, Trash2 } from "lucide-react"
+import { Modal, ErrBox, ModalFooter, Field } from "./scm.shared"
 
 interface Supplier { id: string; name: string }
 interface PO { id: string; orderNumber: string }
+// NEW (Tier 1 gap analysis): backs the GR-linking picker.
+interface GoodsReceipt { id: string; receiptNumber: string; status: string }
+// NEW: backs supplier invoice attachments.
+interface Attachment { id: string; fileName: string; contentType: string; fileSizeBytes: number; uploadedByName: string | null; createdAt: string }
 interface Invoice {
   id: string; invoiceNumber: string; supplierInvoiceRef: string | null
   supplierId: string; purchaseOrderId: string | null; goodsReceiptId: string | null
@@ -40,13 +45,40 @@ const MATCH_BADGE: Record<string, { bg: string; color: string; label: string }> 
 
 const STATUS_FILTERS = ["", "RECEIVED", "UNDER_REVIEW", "APPROVED", "DISPUTED", "PAID"]
 
+// NEW: backs the Record Invoice form's field-specific validation —
+// names exactly which required fields are still empty, and which keys
+// to red-border, instead of one bundled message naming every possible
+// field regardless of which ones actually are missing.
+const REQUIRED_INVOICE_FIELDS: { key: string; label: string }[] = [
+  { key: "supplierId",  label: "Supplier" },
+  { key: "invoiceDate", label: "Invoice Date" },
+  { key: "dueDate",     label: "Due Date" },
+  { key: "subtotal",    label: "Subtotal" },
+  { key: "totalAmount", label: "Total (incl. VAT)" },
+]
+
+function joinWithAnd(items: string[]): string {
+  if (items.length === 1) return items[0]
+  if (items.length === 2) return `${items[0]} and ${items[1]}`
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`
+}
+
 export function InvoicesTab() {
   const qc = useQueryClient()
   const [statusFilter, setStatusFilter] = useState("")
   const [selected, setSelected] = useState<Invoice | null>(null)
+  // NEW: gap-analysis item — supplier invoice attachments.
+  const [attachError, setAttachError] = useState("")
+  const [uploadingAttachment, setUploadingAttachment] = useState(false)
+  const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024 // matches ScmService's own cap — checked client-side too, so a huge file is rejected before wasting time base64-encoding it
   const [showCreate, setShowCreate] = useState(false)
   const [showMarkPaid, setShowMarkPaid] = useState(false)
   const [paymentRef, setPaymentRef] = useState("")
+  // NEW (Tier 1 gap analysis): drives a shared reason-entry panel for
+  // both dispute-resolution actions, rather than two near-duplicate
+  // sub-panels — same visual pattern as showMarkPaid/paymentRef above.
+  const [reasonAction, setReasonAction] = useState<"override" | "cancel" | null>(null)
+  const [reasonText, setReasonText] = useState("")
   const [err, setErr] = useState("")
 
   const initF = () => ({
@@ -54,7 +86,38 @@ export function InvoicesTab() {
     invoiceDate: "", dueDate: "", subtotal: "", vatAmount: "", totalAmount: "", notes: ""
   })
   const [form, setForm] = useState(initF())
-  const sf = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
+  // NEW: drives per-field red-border highlighting on the Record Invoice
+  // form. Previously "Supplier, dates, subtotal and total are required"
+  // named every possibly-missing field regardless of which ones actually
+  // were — confirmed via a real screenshot where Supplier/Invoice Date/
+  // Subtotal/Total were all filled in and only Due Date was empty, but
+  // the message gave no indication of that.
+  const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set())
+  const sf = (k: string, v: string) => {
+    setForm(p => ({ ...p, [k]: v }))
+    setInvalidFields(prev => {
+      if (!prev.has(k)) return prev
+      const next = new Set(prev)
+      next.delete(k)
+      return next
+    })
+  }
+
+  // NEW: replaces the old single bundled boolean check. Returns false
+  // and sets both a specific message and the exact set of field keys to
+  // red-border when something's missing, rather than naming every
+  // possibly-required field regardless of which ones actually are.
+  const validateInvoiceForm = (): boolean => {
+    const missing = REQUIRED_INVOICE_FIELDS.filter(f => !String((form as any)[f.key] ?? "").trim())
+    if (missing.length === 0) {
+      setInvalidFields(new Set())
+      return true
+    }
+    setInvalidFields(new Set(missing.map(f => f.key)))
+    setErr(`${joinWithAnd(missing.map(f => f.label))} ${missing.length === 1 ? "is" : "are"} required`)
+    return false
+  }
+  const fieldStyle = (key: string) => invalidFields.has(key) ? { ...inp, border: "1.5px solid #DC2626" } : inp
 
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
     queryKey: ["scm-invoices", statusFilter],
@@ -78,11 +141,92 @@ export function InvoicesTab() {
     }, staleTime: 60_000,
   })
 
+  // NEW (Tier 1 gap analysis): backs the GR-linking field below —
+  // previously form.goodsReceiptId existed in state but had no input to
+  // set it from anywhere, so the 3-way match's GR-posted check could
+  // never actually be exercised from this UI. Scoped to the currently
+  // selected PO — only fetches once one is chosen.
+  const { data: poGoodsReceipts = [] } = useQuery<GoodsReceipt[]>({
+    queryKey: ["scm-po-goods-receipts", form.purchaseOrderId],
+    queryFn: async () => {
+      const r = await apiClient.get(`/api/v1/supply-chain/purchase-orders/${form.purchaseOrderId}/goods-receipts`)
+      const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : []
+    },
+    enabled: !!form.purchaseOrderId,
+    staleTime: 30_000,
+  })
+
   const invalidate = () => { qc.invalidateQueries({ queryKey: ["scm-invoices"] }); qc.invalidateQueries({ queryKey: ["scm-summary"] }) }
+
+  // NEW: gap-analysis item — supplier invoice attachments. Metadata-only
+  // list, enabled only once an invoice is selected.
+  const { data: attachments = [], refetch: refetchAttachments } = useQuery<Attachment[]>({
+    queryKey: ["scm-invoice-attachments", selected?.id],
+    queryFn: async () => {
+      const r = await apiClient.get(`/api/v1/supply-chain/supplier-invoices/${selected!.id}/attachments`)
+      const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : []
+    },
+    enabled: !!selected,
+  })
+
+  // Client-side size check first — rejects an obviously-too-large file
+  // before spending time base64-encoding it, but the real enforcement is
+  // server-side (ScmService.uploadInvoiceAttachment) since a client check
+  // alone is trivially bypassable.
+  const uploadAttachment = async (file: File) => {
+    setAttachError("")
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setAttachError(`File is too large — maximum attachment size is ${MAX_ATTACHMENT_BYTES / (1024 * 1024)}MB`)
+      return
+    }
+    setUploadingAttachment(true)
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(((reader.result as string) || "").split(",")[1] ?? "")
+        reader.onerror = () => reject(reader.error)
+        reader.readAsDataURL(file)
+      })
+      await apiClient.post(`/api/v1/supply-chain/supplier-invoices/${selected!.id}/attachments`, {
+        fileName: file.name,
+        contentType: file.type || "application/octet-stream",
+        fileSizeBytes: file.size,
+        fileContentBase64: base64,
+      })
+      refetchAttachments()
+    } catch (e: any) {
+      setAttachError(e.response?.data?.message || "Failed to upload attachment")
+    } finally {
+      setUploadingAttachment(false)
+    }
+  }
+
+  // Blob download — same pattern as the PO PDF download button, since this
+  // endpoint requires the Bearer auth header apiClient attaches, which a
+  // plain anchor link can't carry.
+  const downloadAttachment = async (att: Attachment) => {
+    try {
+      const res = await apiClient.get(`/api/v1/supply-chain/supplier-invoices/${selected!.id}/attachments/${att.id}`, { responseType: "blob" })
+      const blob = new Blob([res.data], { type: att.contentType })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url; a.download = att.fileName
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      setAttachError(e.response?.data?.message || "Failed to download attachment")
+    }
+  }
+
+  const deleteAttachMut = useMutation({
+    mutationFn: (attachmentId: string) => apiClient.delete(`/api/v1/supply-chain/supplier-invoices/${selected!.id}/attachments/${attachmentId}`),
+    onSuccess: () => refetchAttachments(),
+    onError: (e: any) => setAttachError(e.response?.data?.message || "Failed to delete attachment"),
+  })
 
   const createMut = useMutation({
     mutationFn: (b: any) => apiClient.post("/api/v1/supply-chain/supplier-invoices", b),
-    onSuccess: () => { invalidate(); setShowCreate(false); setForm(initF()); setErr("") },
+    onSuccess: () => { invalidate(); setShowCreate(false); setForm(initF()); setErr(""); setInvalidFields(new Set()) },
     onError: (e: any) => setErr(e.response?.data?.message || "Failed to record invoice"),
   })
   const approveMut = useMutation({
@@ -94,6 +238,19 @@ export function InvoicesTab() {
     mutationFn: ({ id, ref }: { id: string; ref: string }) => apiClient.post(`/api/v1/supply-chain/supplier-invoices/${id}/pay`, { paymentReference: ref }),
     onSuccess: (r) => { invalidate(); const inv = r.data?.data ?? r.data; if (inv?.id) setSelected(inv); setShowMarkPaid(false); setPaymentRef("") },
     onError: (e: any) => setErr(e.response?.data?.message || "Failed to mark paid"),
+  })
+  // NEW (Tier 1 gap analysis): resolves a DISPUTED invoice one of two
+  // ways — override the mismatch and approve it anyway, or cancel it.
+  // Previously neither was possible; a disputed invoice was a dead end.
+  const overrideMut = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => apiClient.post(`/api/v1/supply-chain/supplier-invoices/${id}/override-dispute`, { reason }),
+    onSuccess: (r) => { invalidate(); const inv = r.data?.data ?? r.data; if (inv?.id) setSelected(inv); setReasonAction(null); setReasonText("") },
+    onError: (e: any) => setErr(e.response?.data?.message || "Failed to override dispute"),
+  })
+  const cancelInvoiceMut = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => apiClient.post(`/api/v1/supply-chain/supplier-invoices/${id}/cancel`, { reason }),
+    onSuccess: (r) => { invalidate(); const inv = r.data?.data ?? r.data; if (inv?.id) setSelected(inv); setReasonAction(null); setReasonText("") },
+    onError: (e: any) => setErr(e.response?.data?.message || "Failed to cancel invoice"),
   })
 
   const overdue = invoices.filter(isOverdue).length
@@ -121,7 +278,7 @@ export function InvoicesTab() {
             </button>
           ))}
         </div>
-        <button onClick={() => { setShowCreate(true); setErr("") }}
+        <button onClick={() => { setShowCreate(true); setErr(""); setInvalidFields(new Set()) }}
           style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: ACCENT, color: "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={14} /> Record Invoice
         </button>
@@ -145,7 +302,7 @@ export function InvoicesTab() {
                     const mb  = MATCH_BADGE[inv.matchStatus] ?? MATCH_BADGE.PENDING
                     const odd = isOverdue(inv)
                     return (
-                      <tr key={inv.id} onClick={() => { setSelected(inv); setErr("") }}
+                      <tr key={inv.id} onClick={() => { setSelected(inv); setErr(""); setAttachError("") }}
                         style={{ borderTop: "1px solid #F1F5F9", background: odd ? "#FEF2F2" : i % 2 === 0 ? "#fff" : "#FAFAFA", cursor: "pointer" }}
                         onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#F0F7FF"}
                         onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = odd ? "#FEF2F2" : i % 2 === 0 ? "#fff" : "#FAFAFA"}
@@ -168,15 +325,9 @@ export function InvoicesTab() {
 
       {/* Invoice detail panel */}
       {selected && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 560, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 3 }}>{selected.invoiceNumber}</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Supplier Invoice</div>
-              </div>
-              <button onClick={() => { setSelected(null); setErr("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 20, lineHeight: 1 }}>×</button>
-            </div>
+        <Modal
+          title={<><div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 3 }}>{selected.invoiceNumber}</div>Supplier Invoice</>}
+          onClose={() => { setSelected(null); setErr(""); setAttachError("") }}>
 
             {/* Match status banner */}
             {selected.matchStatus !== "PENDING" && (
@@ -220,11 +371,54 @@ export function InvoicesTab() {
             {selected.approvedByName && <div style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>Approved by {selected.approvedByName} on {fmtD(selected.approvedAt)}</div>}
             {selected.notes && <div style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>Notes: {selected.notes}</div>}
 
-            {err && <div style={{ marginBottom: 12, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#DC2626", fontSize: 13 }}>{err}</div>}
+            {/* NEW: gap-analysis item — supplier invoice attachments.
+                Base64-in-DB, following Creative's own proven pattern
+                since there's no S3 available in dev — see
+                ScSupplierInvoiceAttachment.java's class Javadoc. */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  Attachments{attachments.length > 0 ? ` (${attachments.length})` : ""}
+                </div>
+                <label style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, cursor: uploadingAttachment ? "default" : "pointer", color: "#374151", opacity: uploadingAttachment ? .6 : 1 }}>
+                  <Paperclip size={12} />
+                  {uploadingAttachment ? "Uploading…" : "Add File"}
+                  <input type="file" style={{ display: "none" }} disabled={uploadingAttachment}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadAttachment(f); e.target.value = "" }} />
+                </label>
+              </div>
+              {attachError && <ErrBox msg={attachError} />}
+              {attachments.length === 0
+                ? <div style={{ fontSize: 12, color: "#94A3B8" }}>No attachments yet.</div>
+                : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {attachments.map(a => (
+                      <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 10px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7 }}>
+                        <button onClick={() => downloadAttachment(a)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: ACCENT, fontWeight: 600, textAlign: "left", padding: 0 }}>
+                          {a.fileName}
+                        </button>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                          <span style={{ fontSize: 11, color: "#94A3B8" }}>{(a.fileSizeBytes / 1024).toFixed(0)} KB</span>
+                          <button onClick={() => deleteAttachMut.mutate(a.id)} disabled={deleteAttachMut.isPending}
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "#DC2626", display: "flex" }}>
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              }
+            </div>
 
-            {/* Actions */}
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button onClick={() => { setSelected(null); setErr("") }} style={{ padding: "9px 16px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 13, cursor: "pointer", color: "#64748B" }}>Close</button>
+            {err && <ErrBox msg={err} />}
+
+            {/* Actions — custom multi-button row, doesn't fit ModalFooter's
+                generic two-button shape (up to 4 buttons depending on
+                status), so this stays as its own thing rather than being
+                forced into it. */}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
+              <button onClick={() => { setSelected(null); setErr(""); setAttachError("") }} style={{ padding: "9px 16px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 13, cursor: "pointer", color: "#64748B" }}>Close</button>
               {(selected.status === "RECEIVED" || selected.status === "UNDER_REVIEW") && (
                 <button onClick={() => approveMut.mutate(selected.id)} disabled={approveMut.isPending}
                   style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 16px", background: "#DCFCE7", color: "#166534", border: "1px solid #86EFAC", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
@@ -236,6 +430,20 @@ export function InvoicesTab() {
                   style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 16px", background: "#DBEAFE", color: "#1D4ED8", border: "1px solid #93C5FD", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                   <CreditCard size={13} /> Mark as Paid
                 </button>
+              )}
+              {/* NEW (Tier 1 gap analysis): previously a DISPUTED invoice
+                  had no action available here at all — just "Close". */}
+              {selected.status === "DISPUTED" && (
+                <>
+                  <button onClick={() => { setReasonAction("override"); setReasonText(""); setErr("") }}
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 16px", background: "#EDE9FE", color: "#7C3AED", border: "1px solid #C4B5FD", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    <CheckCircle size={13} /> Override &amp; Approve
+                  </button>
+                  <button onClick={() => { setReasonAction("cancel"); setReasonText(""); setErr("") }}
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 16px", background: "#FEE2E2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    <AlertTriangle size={13} /> Cancel Invoice
+                  </button>
+                </>
               )}
             </div>
 
@@ -254,77 +462,108 @@ export function InvoicesTab() {
                 </div>
               </div>
             )}
-          </div>
-        </div>
+
+            {/* NEW (Tier 1 gap analysis): shared reason-entry panel for
+                both dispute-resolution actions — same visual pattern as
+                the mark-paid panel above. */}
+            {reasonAction && (
+              <div style={{ marginTop: 14, padding: "14px 16px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>
+                  {reasonAction === "override" ? "Reason for overriding this dispute *" : "Reason for cancelling this invoice *"}
+                </label>
+                <input value={reasonText} onChange={e => setReasonText(e.target.value)}
+                  placeholder={reasonAction === "override" ? "e.g. Variance confirmed acceptable with supplier" : "e.g. Duplicate invoice — requesting corrected copy"}
+                  style={inp} autoFocus />
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
+                  <button onClick={() => { setReasonAction(null); setReasonText("") }} style={{ padding: "7px 14px", border: "1px solid #E2E8F0", borderRadius: 8, background: "#fff", fontSize: 12, cursor: "pointer" }}>Cancel</button>
+                  <button onClick={() => {
+                      if (!reasonText.trim()) return
+                      if (reasonAction === "override") overrideMut.mutate({ id: selected.id, reason: reasonText.trim() })
+                      else cancelInvoiceMut.mutate({ id: selected.id, reason: reasonText.trim() })
+                    }}
+                    disabled={!reasonText.trim() || overrideMut.isPending || cancelInvoiceMut.isPending}
+                    style={{ padding: "7px 14px", background: reasonAction === "override" ? "#7C3AED" : "#DC2626", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: !reasonText.trim() ? .5 : 1 }}>
+                    {(overrideMut.isPending || cancelInvoiceMut.isPending) ? "Saving…" : reasonAction === "override" ? "Confirm Override" : "Confirm Cancellation"}
+                  </button>
+                </div>
+              </div>
+            )}
+        </Modal>
       )}
 
       {/* Create Invoice Modal */}
       {showCreate && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 560, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Record Supplier Invoice</h3>
-              <button onClick={() => { setShowCreate(false); setErr("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 20, lineHeight: 1 }}>×</button>
-            </div>
+        <Modal title="Record Supplier Invoice" onClose={() => { setShowCreate(false); setErr(""); setInvalidFields(new Set()) }}>
             <div style={{ marginBottom: 14, padding: "10px 12px", background: "#FFFBEB", border: "1px solid #FCD34D", borderRadius: 8, fontSize: 12, color: "#92400E" }}>
               Linking a PO and GR enables 3-way matching — HandyFlow will automatically compare amounts and flag discrepancies.
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div style={{ gridColumn: "span 2" }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Supplier *</label>
-                <select value={form.supplierId} onChange={e => sf("supplierId", e.target.value)} style={inp}>
+              <Field label="Supplier *" span={2}>
+                <select value={form.supplierId} onChange={e => sf("supplierId", e.target.value)} style={fieldStyle("supplierId")}>
                   <option value="">Select supplier…</option>
                   {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Link to PO (optional)</label>
-                <select value={form.purchaseOrderId} onChange={e => sf("purchaseOrderId", e.target.value)} style={inp}>
+              </Field>
+              <Field label="Link to PO (optional)">
+                <select value={form.purchaseOrderId}
+                  onChange={e => setForm(p => ({ ...p, purchaseOrderId: e.target.value, goodsReceiptId: "" }))}
+                  style={inp}>
                   <option value="">No PO linked</option>
                   {openPOs.map(p => <option key={p.id} value={p.id}>{p.orderNumber}</option>)}
                 </select>
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Supplier's Invoice Ref</label>
+              </Field>
+              {/* NEW (Tier 1 gap analysis): only shown once a PO is
+                  selected, since a GR only makes sense in relation to a
+                  specific PO. This is what closes the gap where the 3-way
+                  match's GR-posted check was correctly implemented on the
+                  backend but structurally unreachable from this form. */}
+              {form.purchaseOrderId && (
+                <Field label="Link to Goods Receipt (optional)">
+                  <select value={form.goodsReceiptId} onChange={e => sf("goodsReceiptId", e.target.value)} style={inp}>
+                    <option value="">No GR linked</option>
+                    {poGoodsReceipts.map(g => (
+                      <option key={g.id} value={g.id}>{g.receiptNumber} — {g.status === "POSTED" ? "Posted" : "Draft"}</option>
+                    ))}
+                  </select>
+                  {poGoodsReceipts.length === 0 && (
+                    <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>No goods receipts recorded against this PO yet.</div>
+                  )}
+                </Field>
+              )}
+              <Field label="Supplier's Invoice Ref">
                 <input value={form.supplierInvoiceRef} onChange={e => sf("supplierInvoiceRef", e.target.value)} placeholder="INV-2026-1234" style={inp} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Invoice Date *</label>
-                <input type="date" value={form.invoiceDate} onChange={e => sf("invoiceDate", e.target.value)} style={inp} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Due Date *</label>
-                <input type="date" value={form.dueDate} onChange={e => sf("dueDate", e.target.value)} style={inp} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Subtotal (R) *</label>
-                <input type="number" value={form.subtotal} onChange={e => sf("subtotal", e.target.value)} placeholder="0.00" style={inp} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>VAT Amount (R)</label>
+              </Field>
+              <Field label="Invoice Date *">
+                <input type="date" value={form.invoiceDate} onChange={e => sf("invoiceDate", e.target.value)} style={fieldStyle("invoiceDate")} />
+              </Field>
+              <Field label="Due Date *">
+                <input type="date" value={form.dueDate} onChange={e => sf("dueDate", e.target.value)} style={fieldStyle("dueDate")} />
+              </Field>
+              <Field label="Subtotal (R) *">
+                <input type="number" value={form.subtotal} onChange={e => sf("subtotal", e.target.value)} placeholder="0.00" style={fieldStyle("subtotal")} />
+              </Field>
+              <Field label="VAT Amount (R)">
                 <input type="number" value={form.vatAmount} onChange={e => sf("vatAmount", e.target.value)} placeholder="0.00" style={inp} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Total (incl. VAT) *</label>
-                <input type="number" value={form.totalAmount} onChange={e => sf("totalAmount", e.target.value)} placeholder="0.00" style={inp} />
-              </div>
-              <div style={{ gridColumn: "span 2" }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Notes</label>
+              </Field>
+              <Field label="Total (incl. VAT) *">
+                <input type="number" value={form.totalAmount} onChange={e => sf("totalAmount", e.target.value)} placeholder="0.00" style={fieldStyle("totalAmount")} />
+              </Field>
+              <Field label="Notes" span={2}>
                 <textarea value={form.notes} onChange={e => sf("notes", e.target.value)} style={{ ...inp, minHeight: 50, resize: "vertical" }} />
-              </div>
+              </Field>
             </div>
-            {err && <div style={{ marginTop: 10, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#DC2626", fontSize: 13 }}>{err}</div>}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-              <button onClick={() => { setShowCreate(false); setErr("") }} style={{ padding: "9px 16px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 13, cursor: "pointer", color: "#64748B" }}>Cancel</button>
-              <button onClick={() => {
-                if (!form.supplierId || !form.invoiceDate || !form.dueDate || !form.subtotal || !form.totalAmount) { setErr("Supplier, dates, subtotal and total are required"); return }
+            {err && <ErrBox msg={err} />}
+            <ModalFooter
+              onCancel={() => { setShowCreate(false); setErr(""); setInvalidFields(new Set()) }}
+              onConfirm={() => {
+                if (!validateInvoiceForm()) return
                 createMut.mutate({ supplierId: form.supplierId, purchaseOrderId: form.purchaseOrderId || null, goodsReceiptId: form.goodsReceiptId || null, supplierInvoiceRef: form.supplierInvoiceRef || null, invoiceDate: form.invoiceDate, dueDate: form.dueDate, currency: "ZAR", subtotal: parseFloat(form.subtotal), vatAmount: parseFloat(form.vatAmount) || 0, totalAmount: parseFloat(form.totalAmount), notes: form.notes || null })
-              }} disabled={createMut.isPending} style={{ padding: "9px 18px", background: ACCENT, color: "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: createMut.isPending ? .6 : 1 }}>
-                {createMut.isPending ? "Recording…" : "Record Invoice"}
-              </button>
-            </div>
-          </div>
-        </div>
+              }}
+              label={createMut.isPending ? "Recording…" : "Record Invoice"}
+              loading={createMut.isPending}
+              accent={ACCENT}
+            />
+        </Modal>
       )}
     </div>
   )

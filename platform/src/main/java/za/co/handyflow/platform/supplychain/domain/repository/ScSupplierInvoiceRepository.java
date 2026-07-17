@@ -59,6 +59,9 @@ public interface ScSupplierInvoiceRepository extends JpaRepository<ScSupplierInv
             """, nativeQuery = true)
     List<Object[]> findAllOverdueGroupedByTenant();
 
-    @Query("SELECT COALESCE(MAX(CAST(SUBSTRING(i.invoiceNumber, 6) AS int)), 0) FROM ScSupplierInvoice i WHERE i.tenantId = :tenantId")
-    int findMaxInvoiceSequence(@Param("tenantId") UUID tenantId);
+    // FIX (Tier 1 gap analysis): findMaxInvoiceSequence removed — dead
+    // code with zero call sites. ScmService.createSupplierInvoice() uses
+    // SequenceService.next(tid, "SINV") for atomic numbering instead.
+    // Same leftover-from-before-migration situation as
+    // ScGoodsReceiptRepository.findMaxReceiptSequence.
 }

@@ -3,6 +3,7 @@ import React, { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Plus, Package, AlertTriangle, TrendingUp, ChevronDown, ChevronUp } from "lucide-react"
+import { Modal, ErrBox, ModalFooter, Field } from "./scm.shared"
 
 interface Location { id: string; name: string; locationType: string; isDefault: boolean }
 interface InventoryItem {
@@ -15,6 +16,8 @@ interface Movement {
   unitCost: number | null; referenceType: string | null; referenceNumber: string | null
   createdByName: string | null; createdAt: string; notes: string | null
 }
+// NEW: backs the catalogue-item search picker below.
+interface CatalogueItem { id: string; name: string; description: string | null; unit: string | null; defaultPrice: number | null; categoryName: string | null }
 
 const ACCENT = "#D97706"
 const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 9, fontSize: 14, boxSizing: "border-box", outline: "none", background: "#fff" }
@@ -40,6 +43,12 @@ export function InventoryTab() {
   const [expandedItem, setExpandedItem] = useState<string | null>(null)
   const [showOpening, setShowOpening] = useState(false)
   const [err, setErr] = useState("")
+  // NEW (Tier 1 gap analysis): drives the catalogue-item search picker —
+  // previously "Set Opening Stock" required typing a raw catalogue-item
+  // UUID by hand, unlike Location right next to it in the same modal,
+  // which was already a proper dropdown.
+  const [itemQuery, setItemQuery] = useState("")
+  const [showItemDropdown, setShowItemDropdown] = useState(false)
 
   const initF = () => ({ catalogueItemId: "", locationId: "", qty: "", unitCost: "", reorderPoint: "", reorderQty: "", binLocation: "" })
   const [form, setForm] = useState(initF())
@@ -50,6 +59,26 @@ export function InventoryTab() {
     queryFn: async () => { const r = await apiClient.get("/api/v1/supply-chain/locations"); const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : [] },
     staleTime: 120_000,
   })
+
+  // NEW (Tier 1 gap analysis): fetched once (empty query = all items),
+  // filtered client-side as the person types — same pattern already used
+  // elsewhere in this module (e.g. suppliers fetched at size=200 and
+  // filtered in the UI) rather than a search-as-you-type network call
+  // per keystroke.
+  //
+  // NOTE: GET /api/v1/catalogue/items is currently permission-gated to
+  // INVOICE_CREATE/POS_READ/POS_MANAGE/POS_SELL — none of which are SCM
+  // permissions. A warehouse/SCM-only user may get a 403 here until
+  // that's resolved on the Catalogue module's own side.
+  const { data: catalogueItems = [] } = useQuery<CatalogueItem[]>({
+    queryKey: ["catalogue-items-all"],
+    queryFn: async () => { const r = await apiClient.get("/api/v1/catalogue/items"); const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : [] },
+    staleTime: 60_000,
+  })
+  const itemNameById = new Map(catalogueItems.map(i => [i.id, i.name]))
+  const filteredItems = itemQuery.trim()
+    ? catalogueItems.filter(i => i.name.toLowerCase().includes(itemQuery.trim().toLowerCase()))
+    : catalogueItems
 
   const { data: inventory = [], isLoading } = useQuery<InventoryItem[]>({
     queryKey: ["scm-inventory", selectedLocation],
@@ -69,7 +98,7 @@ export function InventoryTab() {
 
   const openingMut = useMutation({
     mutationFn: (b: any) => apiClient.post("/api/v1/supply-chain/inventory/opening", b),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["scm-inventory"] }); setShowOpening(false); setForm(initF()); setErr("") },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["scm-inventory"] }); setShowOpening(false); setForm(initF()); setErr(""); setItemQuery("") },
     onError: (e: any) => setErr(e.response?.data?.message || "Failed to set opening stock"),
   })
 
@@ -97,7 +126,7 @@ export function InventoryTab() {
               <AlertTriangle size={13} /> {lowCount} low stock
             </div>
           )}
-          <button onClick={() => { setShowOpening(true); setErr("") }}
+          <button onClick={() => { setShowOpening(true); setErr(""); setItemQuery(""); setShowItemDropdown(false) }}
             style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: ACCENT, color: "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
             <Plus size={14} /> Set Opening Stock
           </button>
@@ -131,7 +160,7 @@ export function InventoryTab() {
                       {/* Item identity */}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", marginBottom: 2 }}>
-                          Item {item.catalogueItemId.slice(0, 12)}…
+                          {itemNameById.get(item.catalogueItemId) ?? `Item ${item.catalogueItemId.slice(0, 12)}…`}
                           {item.binLocation && <span style={{ fontSize: 11, color: "#94A3B8", marginLeft: 8 }}>Bin: {item.binLocation}</span>}
                           {isLow && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, background: isCritical ? "#FEE2E2" : "#FEF3C7", color: isCritical ? "#DC2626" : "#92400E", padding: "1px 6px", borderRadius: 20 }}>{isCritical ? "OUT OF STOCK" : "LOW STOCK"}</span>}
                         </div>
@@ -195,57 +224,73 @@ export function InventoryTab() {
 
       {/* Opening Stock Modal */}
       {showOpening && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Set Opening Stock</h3>
-              <button onClick={() => setShowOpening(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 20, lineHeight: 1 }}>×</button>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div style={{ gridColumn: "span 2" }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Location *</label>
-                <select value={form.locationId} onChange={e => sf("locationId", e.target.value)} style={inp}>
-                  <option value="">Select location…</option>
-                  {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
+        <Modal title="Set Opening Stock" onClose={() => { setShowOpening(false); setItemQuery(""); setShowItemDropdown(false) }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Location *" span={2}>
+              <select value={form.locationId} onChange={e => sf("locationId", e.target.value)} style={inp}>
+                <option value="">Select location…</option>
+                {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Catalogue Item *" span={2}>
+              <div style={{ position: "relative" }}>
+                <input
+                  value={form.catalogueItemId ? (itemNameById.get(form.catalogueItemId) ?? "") : itemQuery}
+                  onChange={e => { setItemQuery(e.target.value); sf("catalogueItemId", ""); setShowItemDropdown(true) }}
+                  onFocus={() => setShowItemDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowItemDropdown(false), 150)}
+                  placeholder="Search catalogue items…"
+                  style={inp}
+                />
+                {showItemDropdown && (
+                  <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, marginTop: 4, maxHeight: 220, overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
+                    {filteredItems.length === 0
+                      ? <div style={{ padding: "10px 12px", fontSize: 13, color: "#94A3B8" }}>No matching items</div>
+                      : filteredItems.slice(0, 30).map(i => (
+                        <div key={i.id}
+                          onMouseDown={() => { sf("catalogueItemId", i.id); setItemQuery(""); setShowItemDropdown(false) }}
+                          style={{ padding: "9px 12px", fontSize: 13, cursor: "pointer", borderBottom: "1px solid #F1F5F9" }}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#FFFBEB"}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "#fff"}>
+                          <div style={{ fontWeight: 600, color: "#0F172A" }}>{i.name}</div>
+                          {(i.categoryName || i.unit) && (
+                            <div style={{ fontSize: 11, color: "#94A3B8" }}>{[i.categoryName, i.unit].filter(Boolean).join(" · ")}</div>
+                          )}
+                        </div>
+                      ))
+                    }
+                  </div>
+                )}
               </div>
-              <div style={{ gridColumn: "span 2" }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Catalogue Item ID *</label>
-                <input value={form.catalogueItemId} onChange={e => sf("catalogueItemId", e.target.value)} placeholder="UUID from catalogue" style={inp} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Opening Qty *</label>
-                <input type="number" value={form.qty} onChange={e => sf("qty", e.target.value)} placeholder="0.00" style={inp} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Unit Cost (R)</label>
-                <input type="number" value={form.unitCost} onChange={e => sf("unitCost", e.target.value)} placeholder="0.00" style={inp} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Reorder Point</label>
-                <input type="number" value={form.reorderPoint} onChange={e => sf("reorderPoint", e.target.value)} placeholder="10" style={inp} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Reorder Qty</label>
-                <input type="number" value={form.reorderQty} onChange={e => sf("reorderQty", e.target.value)} placeholder="50" style={inp} />
-              </div>
-              <div style={{ gridColumn: "span 2" }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Bin Location</label>
-                <input value={form.binLocation} onChange={e => sf("binLocation", e.target.value)} placeholder="A-12-3" style={inp} />
-              </div>
-            </div>
-            {err && <div style={{ marginTop: 10, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#DC2626", fontSize: 13 }}>{err}</div>}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-              <button onClick={() => setShowOpening(false)} style={{ padding: "9px 16px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 13, cursor: "pointer", color: "#64748B" }}>Cancel</button>
-              <button onClick={() => {
-                if (!form.locationId || !form.catalogueItemId || !form.qty) { setErr("Location, catalogue item and quantity are required"); return }
-                openingMut.mutate({ locationId: form.locationId, catalogueItemId: form.catalogueItemId, qty: parseFloat(form.qty), unitCost: form.unitCost ? parseFloat(form.unitCost) : null, reorderPoint: form.reorderPoint ? parseFloat(form.reorderPoint) : null, reorderQty: form.reorderQty ? parseFloat(form.reorderQty) : null, binLocation: form.binLocation || null })
-              }} disabled={openingMut.isPending} style={{ padding: "9px 18px", background: ACCENT, color: "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: openingMut.isPending ? .6 : 1 }}>
-                {openingMut.isPending ? "Saving…" : "Set Stock"}
-              </button>
-            </div>
+            </Field>
+            <Field label="Opening Qty *">
+              <input type="number" value={form.qty} onChange={e => sf("qty", e.target.value)} placeholder="0.00" style={inp} />
+            </Field>
+            <Field label="Unit Cost (R)">
+              <input type="number" value={form.unitCost} onChange={e => sf("unitCost", e.target.value)} placeholder="0.00" style={inp} />
+            </Field>
+            <Field label="Reorder Point">
+              <input type="number" value={form.reorderPoint} onChange={e => sf("reorderPoint", e.target.value)} placeholder="10" style={inp} />
+            </Field>
+            <Field label="Reorder Qty">
+              <input type="number" value={form.reorderQty} onChange={e => sf("reorderQty", e.target.value)} placeholder="50" style={inp} />
+            </Field>
+            <Field label="Bin Location" span={2}>
+              <input value={form.binLocation} onChange={e => sf("binLocation", e.target.value)} placeholder="A-12-3" style={inp} />
+            </Field>
           </div>
-        </div>
+          {err && <ErrBox msg={err} />}
+          <ModalFooter
+            onCancel={() => { setShowOpening(false); setItemQuery(""); setShowItemDropdown(false) }}
+            onConfirm={() => {
+              if (!form.locationId || !form.catalogueItemId || !form.qty) { setErr("Location, catalogue item and quantity are required"); return }
+              openingMut.mutate({ locationId: form.locationId, catalogueItemId: form.catalogueItemId, qty: parseFloat(form.qty), unitCost: form.unitCost ? parseFloat(form.unitCost) : null, reorderPoint: form.reorderPoint ? parseFloat(form.reorderPoint) : null, reorderQty: form.reorderQty ? parseFloat(form.reorderQty) : null, binLocation: form.binLocation || null })
+            }}
+            label={openingMut.isPending ? "Saving…" : "Set Stock"}
+            loading={openingMut.isPending}
+            accent={ACCENT}
+          />
+        </Modal>
       )}
     </div>
   )

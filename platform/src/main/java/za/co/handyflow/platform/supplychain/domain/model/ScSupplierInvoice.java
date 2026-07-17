@@ -114,6 +114,45 @@ public class ScSupplierInvoice {
         touch();
     }
 
+    /**
+     * NEW (Tier 1 gap analysis): previously a DISPUTED invoice was a
+     * genuine dead end — approve() only accepts RECEIVED/UNDER_REVIEW, so
+     * a disputed invoice could never be approved even if a manager
+     * decided the variance was acceptable. MatchStatus.OVERRIDDEN already
+     * existed in the enum specifically for this ("manager forced approval
+     * despite mismatch — reason in match_notes") but nothing ever set it.
+     * The override reason is appended to matchNotes rather than replacing
+     * it, so the original dispute reason stays in the audit trail
+     * alongside why it was overridden.
+     */
+    public void overrideDisputeAndApprove(UUID approverId, String approverName, String overrideReason) {
+        if (status != InvoiceStatus.DISPUTED)
+            throw new IllegalStateException("Only DISPUTED invoices can be override-approved — current: " + status);
+        matchStatus    = MatchStatus.OVERRIDDEN;
+        matchNotes     = (matchNotes != null ? matchNotes + " | " : "") + "Overridden: " + overrideReason;
+        status         = InvoiceStatus.APPROVED;
+        approvedBy     = approverId;
+        approvedByName = approverName;
+        approvedAt     = Instant.now();
+        touch();
+    }
+
+    /**
+     * NEW (Tier 1 gap analysis): there was previously no way to cancel a
+     * supplier invoice in ANY status — not just DISPUTED ones. Needed as
+     * the second real resolution option for a dispute (reject the invoice
+     * back to the supplier, as opposed to overriding and paying it
+     * anyway), but written generally since the gap applied to every
+     * status, not only DISPUTED.
+     */
+    public void cancel(String reason) {
+        if (status == InvoiceStatus.PAID)
+            throw new IllegalStateException("Cannot cancel a PAID invoice");
+        status     = InvoiceStatus.CANCELLED;
+        matchNotes = (matchNotes != null ? matchNotes + " | " : "") + "Cancelled: " + reason;
+        touch();
+    }
+
     public void markPaid(String paymentReference) {
         if (status != InvoiceStatus.APPROVED)
             throw new IllegalStateException("Only APPROVED invoices can be marked paid — current: " + status);

@@ -2,7 +2,8 @@
 import React, { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, ChevronLeft, Send, CheckCircle, XCircle, Package, AlertTriangle } from "lucide-react"
+import { Plus, ChevronLeft, Send, CheckCircle, XCircle, Package, AlertTriangle, Download } from "lucide-react"
+import { Modal, ErrBox, ModalFooter, Field } from "./scm.shared"
 
 interface Supplier { id: string; name: string; paymentTermsDays: number }
 interface Location { id: string; name: string; locationType: string }
@@ -84,6 +85,31 @@ export function PurchaseOrdersTab() {
   const addLineMut = useMutation({ mutationFn: (b: any) => apiClient.post(`/api/v1/supply-chain/purchase-orders/${detail!.id}/lines`, b), onSuccess: (r) => { invalidateLines(); invalidate(); setShowAddLine(false); setLineForm(initLine()); setErr(""); const po = r.data?.data ?? r.data; if (po) setDetail(po) }, onError: (e: any) => setErr(e.response?.data?.message || "Failed to add line") })
   const actionMut  = useMutation({ mutationFn: ({ action, body }: { action: string; body?: any }) => apiClient.post(`/api/v1/supply-chain/purchase-orders/${detail!.id}/${action}`, body), onSuccess: (r) => { invalidate(); const po = r.data?.data ?? r.data; if (po?.id) setDetail(po); setShowReject(false); setRejectReason("") }, onError: (e: any) => setErr(e.response?.data?.message || "Action failed") })
 
+  // NEW (gap analysis): "the single most common missing artifact" for a
+  // procurement system. Blob download rather than a plain <a href> —
+  // this endpoint requires the Bearer auth header apiClient already
+  // attaches, which a plain anchor link can't carry.
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
+  const downloadPdf = async (po: PO) => {
+    setDownloadingPdf(true)
+    try {
+      const res = await apiClient.get(`/api/v1/supply-chain/purchase-orders/${po.id}/pdf`, { responseType: "blob" })
+      const blob = new Blob([res.data], { type: "application/pdf" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${po.orderNumber}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      setErr(e.response?.data?.message || "Failed to download PDF")
+    } finally {
+      setDownloadingPdf(false)
+    }
+  }
+
   if (detail) {
     const st = STATUS_CFG[detail.status] ?? STATUS_CFG.DRAFT
     return (
@@ -113,23 +139,43 @@ export function PurchaseOrdersTab() {
           </div>
           {/* Action buttons */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {/* NEW (gap analysis): available regardless of status, unlike
+                the lifecycle-transition buttons below — this is a
+                reference/download action, not a state change. */}
+            <ActionBtn onClick={() => downloadPdf(detail)} color="#374151" bg="#F8FAFC" border="#E2E8F0" icon={Download}>
+              {downloadingPdf ? "Downloading…" : "Download PDF"}
+            </ActionBtn>
             {detail.status === "DRAFT" && (
               <>
                 <ActionBtn onClick={() => { setShowAddLine(true); setErr("") }} color={ACCENT} bg="#FEF3C7" border="#FCD34D" icon={Plus}>Add Line</ActionBtn>
-                <ActionBtn onClick={() => actionMut.mutate({ action: "submit" })} color="#1D4ED8" bg="#DBEAFE" border="#93C5FD" icon={Send}>Submit for Approval</ActionBtn>
+                <ActionBtn onClick={() => { setErr(""); actionMut.mutate({ action: "submit" }) }} color="#1D4ED8" bg="#DBEAFE" border="#93C5FD" icon={Send}>Submit for Approval</ActionBtn>
               </>
             )}
             {detail.status === "PENDING_APPROVAL" && (
               <>
-                <ActionBtn onClick={() => actionMut.mutate({ action: "approve" })} color="#166534" bg="#DCFCE7" border="#86EFAC" icon={CheckCircle}>Approve</ActionBtn>
+                <ActionBtn onClick={() => { setErr(""); actionMut.mutate({ action: "approve" }) }} color="#166534" bg="#DCFCE7" border="#86EFAC" icon={CheckCircle}>Approve</ActionBtn>
                 <ActionBtn onClick={() => { setShowReject(true); setErr("") }} color="#DC2626" bg="#FEE2E2" border="#FECACA" icon={XCircle}>Reject</ActionBtn>
               </>
             )}
             {detail.status === "APPROVED" && (
-              <ActionBtn onClick={() => actionMut.mutate({ action: "send" })} color="#7C3AED" bg="#EDE9FE" border="#C4B5FD" icon={Send}>Mark as Sent</ActionBtn>
+              <ActionBtn onClick={() => { setErr(""); actionMut.mutate({ action: "send" }) }} color="#7C3AED" bg="#EDE9FE" border="#C4B5FD" icon={Send}>Mark as Sent</ActionBtn>
             )}
           </div>
         </div>
+
+        {/* NEW: previously nothing rendered here at all — Submit for
+            Approval / Approve / Mark as Sent all mutate directly from
+            this view (it's a full inline detail view, not a modal, so
+            it fell outside the Modal/ErrBox consolidation pass, which
+            only touched the actual popup modals below). A failed
+            action set the err state but had nothing to display it —
+            confirmed via a real "Cannot submit a PO with no lines"
+            response that produced no visible warning at all. Placed
+            outside the header's flex row on purpose — that row is
+            justifyContent: space-between with two children already;
+            adding this as a third child there would squeeze it in
+            sideways instead of showing as a proper full-width block. */}
+        {err && <ErrBox msg={err} />}
 
         {/* Lines table */}
         <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
@@ -192,11 +238,11 @@ export function PurchaseOrdersTab() {
         {showAddLine && (
           <Modal title="Add Line Item" onClose={() => { setShowAddLine(false); setErr("") }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Fld label="Item Name *" span={2}><input value={lineForm.itemName} onChange={e => slf("itemName", e.target.value)} placeholder="Concrete blocks 190mm" style={inp} autoFocus /></Fld>
-              <Fld label="Supplier SKU"><input value={lineForm.supplierSku} onChange={e => slf("supplierSku", e.target.value)} placeholder="CB-190" style={inp} /></Fld>
-              <Fld label="VAT Rate (%)"><input type="number" value={lineForm.vatRate} onChange={e => slf("vatRate", e.target.value)} style={inp} /></Fld>
-              <Fld label="Qty Ordered *"><input type="number" value={lineForm.qtyOrdered} onChange={e => slf("qtyOrdered", e.target.value)} style={inp} /></Fld>
-              <Fld label="Unit Cost (R) *"><input type="number" value={lineForm.unitCost} onChange={e => slf("unitCost", e.target.value)} style={inp} /></Fld>
+              <Field label="Item Name *" span={2}><input value={lineForm.itemName} onChange={e => slf("itemName", e.target.value)} placeholder="Concrete blocks 190mm" style={inp} autoFocus /></Field>
+              <Field label="Supplier SKU"><input value={lineForm.supplierSku} onChange={e => slf("supplierSku", e.target.value)} placeholder="CB-190" style={inp} /></Field>
+              <Field label="VAT Rate (%)"><input type="number" value={lineForm.vatRate} onChange={e => slf("vatRate", e.target.value)} style={inp} /></Field>
+              <Field label="Qty Ordered *"><input type="number" value={lineForm.qtyOrdered} onChange={e => slf("qtyOrdered", e.target.value)} style={inp} /></Field>
+              <Field label="Unit Cost (R) *"><input type="number" value={lineForm.unitCost} onChange={e => slf("unitCost", e.target.value)} style={inp} /></Field>
             </div>
             {err && <ErrBox msg={err} />}
             <ModalFooter onCancel={() => { setShowAddLine(false); setErr("") }} onConfirm={() => {
@@ -265,22 +311,22 @@ export function PurchaseOrdersTab() {
       {showCreate && (
         <Modal title="New Purchase Order" onClose={() => { setShowCreate(false); setErr("") }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Fld label="Supplier *" span={2}>
+            <Field label="Supplier *" span={2}>
               <select value={poForm.supplierId} onChange={e => spf("supplierId", e.target.value)} style={inp}>
                 <option value="">Select supplier…</option>
                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
-            </Fld>
-            <Fld label="Deliver To">
+            </Field>
+            <Field label="Deliver To">
               <select value={poForm.deliverToLocation} onChange={e => spf("deliverToLocation", e.target.value)} style={inp}>
                 <option value="">Select location…</option>
                 {locations.map(l => <option key={l.id} value={l.id}>{l.name} ({l.locationType})</option>)}
               </select>
-            </Fld>
-            <Fld label="Required By Date"><input type="date" value={poForm.requiredByDate} onChange={e => spf("requiredByDate", e.target.value)} style={inp} /></Fld>
-            <Fld label="Project Reference"><input value={poForm.projectRef} onChange={e => spf("projectRef", e.target.value)} placeholder="PRJ-001" style={inp} /></Fld>
-            <Fld label="Notes"><input value={poForm.notes} onChange={e => spf("notes", e.target.value)} style={inp} /></Fld>
-            <Fld label="Internal Notes" span={2}><textarea value={poForm.internalNotes} onChange={e => spf("internalNotes", e.target.value)} style={{ ...inp, minHeight: 48, resize: "vertical" }} /></Fld>
+            </Field>
+            <Field label="Required By Date"><input type="date" value={poForm.requiredByDate} onChange={e => spf("requiredByDate", e.target.value)} style={inp} /></Field>
+            <Field label="Project Reference"><input value={poForm.projectRef} onChange={e => spf("projectRef", e.target.value)} placeholder="PRJ-001" style={inp} /></Field>
+            <Field label="Notes"><input value={poForm.notes} onChange={e => spf("notes", e.target.value)} style={inp} /></Field>
+            <Field label="Internal Notes" span={2}><textarea value={poForm.internalNotes} onChange={e => spf("internalNotes", e.target.value)} style={{ ...inp, minHeight: 48, resize: "vertical" }} /></Field>
           </div>
           <div style={{ marginTop: 12, padding: "10px 12px", background: "#FFFBEB", borderRadius: 8, fontSize: 12, color: "#92400E" }}>
             ℹ After creating the PO you can add line items before submitting for approval.
@@ -298,31 +344,4 @@ export function PurchaseOrdersTab() {
 
 function ActionBtn({ onClick, color, bg, border, icon: Icon, children }: any) {
   return <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: bg, color, border: `1px solid ${border}`, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}><Icon size={13} />{children}</button>
-}
-function Fld({ label, children, span }: { label: string; children: React.ReactNode; span?: number }) {
-  return <div style={{ gridColumn: span ? `span ${span}` : undefined }}><label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>{label}</label>{children}</div>
-}
-function ErrBox({ msg }: { msg: string }) {
-  return <div style={{ marginTop: 10, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#DC2626", fontSize: 13 }}>{msg}</div>
-}
-function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-      <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 580, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{title}</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 20, lineHeight: 1 }}>×</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-}
-function ModalFooter({ onCancel, onConfirm, label, loading, accent }: { onCancel: () => void; onConfirm: () => void; label: string; loading?: boolean; accent?: string }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-      <button onClick={onCancel} style={{ padding: "9px 16px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 13, cursor: "pointer", color: "#64748B" }}>Cancel</button>
-      <button onClick={onConfirm} disabled={loading} style={{ padding: "9px 18px", background: accent ?? "#D97706", color: "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: loading ? .6 : 1 }}>{label}</button>
-    </div>
-  )
 }

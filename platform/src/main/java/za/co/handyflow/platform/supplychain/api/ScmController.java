@@ -6,7 +6,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -261,6 +263,32 @@ public class ScmController {
                 scmService.getPurchaseOrderLines(TenantContext.getTenantIdAsObject(), id)));
     }
 
+    // NEW: flagged in the gap analysis as "the single most common missing
+    // artifact" for a procurement system. Matches Contracting's own
+    // download-filename convention (attachment; filename="{id}.pdf").
+    @GetMapping(value = "/purchase-orders/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAuthority('SCM_READ')")
+    @Operation(summary = "Download a formal Purchase Order PDF")
+    public ResponseEntity<byte[]> downloadPoPdf(@PathVariable UUID id) {
+        byte[] pdf = scmService.generatePoPdf(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + id + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    // NEW: backs the goods-receipt picker in the Record Invoice form —
+    // previously that field existed in form state but had no input to
+    // set it from, meaning the 3-way match's GR-posted check could never
+    // actually be exercised from the UI. Scoped to one PO at a time.
+    @GetMapping("/purchase-orders/{id}/goods-receipts")
+    @PreAuthorize("hasAuthority('SCM_READ')")
+    @Operation(summary = "Goods receipts recorded against a specific purchase order — used to link a GR when recording a supplier invoice")
+    public ResponseEntity<ApiResponse<List<ScGoodsReceipt>>> getGoodsReceiptsForPo(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                scmService.getGoodsReceiptsForPurchaseOrder(TenantContext.getTenantIdAsObject(), id)));
+    }
+
     @PostMapping("/purchase-orders/{id}/lines")
     @PreAuthorize("hasAuthority('SCM_ORDER')")
     @Operation(summary = "Add a line item to a draft purchase order")
@@ -347,5 +375,77 @@ public class ScmController {
             @PathVariable UUID id, @Valid @RequestBody MarkPaidRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Invoice marked as paid",
                 scmService.markPaid(TenantContext.getTenantIdAsObject(), id, req.paymentReference())));
+    }
+
+    // NEW (Tier 1 gap analysis): previously a DISPUTED invoice had no
+    // resolution path at all, front or back end. SCM_ADMIN (not
+    // SCM_INVOICE) since this is a manager-level override of a flagged
+    // discrepancy, matching PO approval's own permission level.
+    @PostMapping("/supplier-invoices/{id}/override-dispute")
+    @PreAuthorize("hasAuthority('SCM_ADMIN')")
+    @Operation(summary = "Override a disputed invoice and approve it anyway — records the override reason for audit")
+    public ResponseEntity<ApiResponse<ScSupplierInvoice>> overrideDispute(
+            @PathVariable UUID id, @Valid @RequestBody OverrideDisputeRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Dispute overridden — invoice approved",
+                scmService.overrideDisputedInvoice(TenantContext.getTenantIdAsObject(), id,
+                        TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName(), req.reason())));
+    }
+
+    // NEW (Tier 1 gap analysis): the other real resolution for a disputed
+    // invoice — reject it instead of overriding it. SCM_INVOICE, same
+    // level as approve/pay, since rejecting isn't a mismatch override.
+    @PostMapping("/supplier-invoices/{id}/cancel")
+    @PreAuthorize("hasAuthority('SCM_INVOICE')")
+    @Operation(summary = "Cancel a supplier invoice")
+    public ResponseEntity<ApiResponse<ScSupplierInvoice>> cancelInvoice(
+            @PathVariable UUID id, @Valid @RequestBody CancelSupplierInvoiceRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Invoice cancelled",
+                scmService.cancelSupplierInvoice(TenantContext.getTenantIdAsObject(), id, req.reason())));
+    }
+
+    // ── Supplier invoice attachments ────────────────────────────────────────
+    // NEW: gap-analysis item — no way to attach a supplier's actual
+    // invoice PDF/photo or delivery note for the AP audit trail. Base64-
+    // in-DB, following Creative's own proven working pattern — see
+    // ScSupplierInvoiceAttachment's class Javadoc for the full reasoning
+    // and the two real gaps in Creative's version fixed here.
+
+    @GetMapping("/supplier-invoices/{id}/attachments")
+    @PreAuthorize("hasAuthority('SCM_READ')")
+    @Operation(summary = "List attachments on a supplier invoice — metadata only, no file content")
+    public ResponseEntity<ApiResponse<List<AttachmentResponse>>> getInvoiceAttachments(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                scmService.getInvoiceAttachments(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/supplier-invoices/{id}/attachments")
+    @PreAuthorize("hasAuthority('SCM_INVOICE')")
+    @Operation(summary = "Upload an attachment to a supplier invoice (max 10MB)")
+    public ResponseEntity<ApiResponse<AttachmentResponse>> uploadInvoiceAttachment(
+            @PathVariable UUID id, @Valid @RequestBody UploadAttachmentRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Attachment uploaded",
+                scmService.uploadInvoiceAttachment(TenantContext.getTenantIdAsObject(), id, req,
+                        TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
+    }
+
+    @GetMapping("/supplier-invoices/{id}/attachments/{attachmentId}")
+    @PreAuthorize("hasAuthority('SCM_READ')")
+    @Operation(summary = "Download a supplier invoice attachment")
+    public ResponseEntity<byte[]> downloadInvoiceAttachment(
+            @PathVariable UUID id, @PathVariable UUID attachmentId) {
+        var file = scmService.downloadInvoiceAttachment(TenantContext.getTenantIdAsObject(), id, attachmentId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.fileName() + "\"")
+                .contentType(MediaType.parseMediaType(file.contentType()))
+                .body(file.content());
+    }
+
+    @DeleteMapping("/supplier-invoices/{id}/attachments/{attachmentId}")
+    @PreAuthorize("hasAuthority('SCM_INVOICE')")
+    @Operation(summary = "Delete a supplier invoice attachment")
+    public ResponseEntity<ApiResponse<Void>> deleteInvoiceAttachment(
+            @PathVariable UUID id, @PathVariable UUID attachmentId) {
+        scmService.deleteInvoiceAttachment(TenantContext.getTenantIdAsObject(), id, attachmentId);
+        return ResponseEntity.ok(ApiResponse.success("Attachment deleted", null));
     }
 }
