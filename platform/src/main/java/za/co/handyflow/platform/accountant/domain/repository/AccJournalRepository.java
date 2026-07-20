@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import za.co.handyflow.platform.accountant.domain.model.AccJournal;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -53,4 +54,17 @@ public interface AccJournalRepository extends JpaRepository<AccJournal, UUID> {
     List<AccJournal> findPostedInRange(@Param("clientId") UUID clientId,
                                        @Param("from") java.time.LocalDate from,
                                        @Param("to")   java.time.LocalDate to);
+
+    /**
+     * NEW: fixes a real multi-tenant data-isolation gap — same pattern
+     * as FeeNoteRepository.findByTenantIdAndId(). approveJournal() and
+     * postJournal() previously used plain findById() with no tenant
+     * check at all; this is what they use instead.
+     */
+    @Query("""
+        SELECT j FROM AccountantJournal j
+        WHERE j.tenantId = :tenantId
+          AND j.id = :id
+    """)
+    Optional<AccJournal> findByTenantIdAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
 }

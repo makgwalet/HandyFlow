@@ -28,6 +28,9 @@ public record ClientResponse(
         int overdueDeadlines,
         BigDecimal wip,                  // unbilled WIP
         BigDecimal outstandingInvoices,
-        Instant createdAt
+        Instant createdAt,
+        // NEW: closes the audit's "client-facing deadline reminder
+        // emails" gap — per-client opt-out, defaults to true.
+        boolean clientDeadlineRemindersEnabled
 ) {
 }

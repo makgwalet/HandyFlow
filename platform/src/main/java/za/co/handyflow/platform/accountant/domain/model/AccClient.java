@@ -38,9 +38,20 @@ public class AccClient {
     @Column(name = "sars_agent_date") private LocalDate sarsAgentDate;
     @Column(name = "tcs_pin")                        private String tcsPin;
     @Column(name = "tcs_pin_expiry")                 private LocalDate tcsPinExpiry;
+    // NEW: closes the audit's "TCS PIN expiry reminders" gap. Same
+    // belt-and-braces pattern as AccountantTaxDeadline's own
+    // reminder30Sent/reminder7Sent/reminder1Sent — see the migration's
+    // own comment for why both a flag AND an exact-date match are used
+    // together, not just one or the other.
+    @Column(name = "tcs_pin_reminder_30_sent", nullable = false) private boolean tcsPinReminder30Sent = false;
+    @Column(name = "tcs_pin_reminder_7_sent",  nullable = false) private boolean tcsPinReminder7Sent  = false;
+    @Column(name = "tcs_pin_reminder_1_sent",  nullable = false) private boolean tcsPinReminder1Sent  = false;
     @Column(name = "cipc_anniversary_date")          private LocalDate cipcAnniversaryDate;
     @Column(name = "cipc_last_return_date")          private LocalDate cipcLastReturnDate;
     @Column(name = "onboarding_status", nullable = false) private String onboardingStatus = "NEW";
+    // NEW: closes the audit's "client-facing deadline reminder emails"
+    // gap. Defaults to true — see the migration's own comment for why.
+    @Column(name = "client_deadline_reminders_enabled", nullable = false) private boolean clientDeadlineRemindersEnabled = true;
     @Column(name = "crm_customer_id")                private UUID crmCustomerId;
     @Column(name = "linked_tenant_id")               private UUID linkedTenantId;
     @Column(name = "contact_email")                  private String contactEmail;
@@ -93,12 +104,28 @@ public class AccClient {
     public void updateTcsPin(String pin, LocalDate expiry) {
         this.tcsPin      = pin;
         this.tcsPinExpiry = expiry;
+        // NEW: reset reminder flags whenever the PIN/expiry changes —
+        // otherwise a new, later expiry date could silently never
+        // trigger reminders if the flags were already true from
+        // tracking a previous, now-irrelevant expiry cycle.
+        this.tcsPinReminder30Sent = false;
+        this.tcsPinReminder7Sent  = false;
+        this.tcsPinReminder1Sent  = false;
         this.updatedAt   = Instant.now();
     }
+
+    public void markTcsPinReminder30Sent() { this.tcsPinReminder30Sent = true; this.updatedAt = Instant.now(); }
+    public void markTcsPinReminder7Sent()  { this.tcsPinReminder7Sent  = true; this.updatedAt = Instant.now(); }
+    public void markTcsPinReminder1Sent()  { this.tcsPinReminder1Sent  = true; this.updatedAt = Instant.now(); }
 
     public void setOnboardingStatus(String status) {
         this.onboardingStatus = status;
         this.updatedAt        = Instant.now();
+    }
+
+    public void setClientDeadlineRemindersEnabled(boolean enabled) {
+        this.clientDeadlineRemindersEnabled = enabled;
+        this.updatedAt = Instant.now();
     }
 
     public void softDelete() {

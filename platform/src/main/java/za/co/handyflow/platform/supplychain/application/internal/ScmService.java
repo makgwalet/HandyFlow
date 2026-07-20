@@ -45,6 +45,9 @@ public class ScmService {
     // pattern already used in ScmNotificationService/SubscriptionController.
     private final JdbcTemplate                jdbc;
     private final ScPoPdfGenerator            poPdfGenerator;
+    // NEW: backs generateGrnPdf()/generateRemittanceAdvicePdf() below.
+    private final ScGrnPdfGenerator           grnPdfGenerator;
+    private final ScRemittanceAdvicePdfGenerator remittanceAdvicePdfGenerator;
 
     /** Tolerance for 3-way match: invoice may differ from PO by up to this fraction. */
     private static final BigDecimal MATCH_TOLERANCE = new BigDecimal("0.02"); // 2%
@@ -400,6 +403,48 @@ public class ScmService {
                 formatSupplierAddress(supplier), supplier.getContactName(), supplier.getContactPhone());
     }
 
+    /**
+     * NEW: generates the Goods Received Note PDF — flagged in the gap
+     * analysis "for warehouse/delivery sign-off and dispute evidence".
+     * Same tenant-address scoping decision as generatePoPdf() — see that
+     * method's own comment for why tenant address is deliberately not
+     * attempted (Tenant.address is a JSONB map with unverified key names).
+     * The GR's own "deliver to" location DOES have a flat address column,
+     * so that's used directly.
+     */
+    @Transactional(readOnly = true)
+    public byte[] generateGrnPdf(TenantId tenantId, UUID grId) {
+        UUID tid = tenantId.getValue();
+        ScGoodsReceipt gr = grRepo.findByTenantIdAndId(tid, grId)
+                .orElseThrow(() -> new HandyFlowException("Goods receipt not found",
+                        HttpStatus.NOT_FOUND, "NOT_FOUND"));
+        List<ScGrLine> lines = grLineRepo.findByGoodsReceiptId(gr.getId());
+        ScSupplier supplier = getSupplier(tenantId, gr.getSupplierId());
+        String[] tenantDetails = findTenantDetails(tid);
+
+        String poNumber = null;
+        if (gr.getPurchaseOrderId() != null) {
+            poNumber = poRepo.findByTenantIdAndId(tid, gr.getPurchaseOrderId())
+                    .map(ScPurchaseOrder::getOrderNumber)
+                    .orElse(null);
+        }
+
+        String locationName = null;
+        String locationAddress = null;
+        if (gr.getReceivedTo() != null) {
+            var loc = locationRepo.findActiveByTenantIdAndId(tid, gr.getReceivedTo()).orElse(null);
+            if (loc != null) {
+                locationName = loc.getName();
+                locationAddress = loc.getAddress();
+            }
+        }
+
+        return grnPdfGenerator.generate(gr, lines, tenantDetails[0], tenantDetails[1],
+                poNumber, locationName, locationAddress,
+                supplier.getName(), formatSupplierAddress(supplier),
+                supplier.getContactName(), supplier.getContactPhone());
+    }
+
     // ── Goods Receipts ────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
@@ -591,6 +636,31 @@ public class ScmService {
                         HttpStatus.NOT_FOUND, "NOT_FOUND"));
         inv.markPaid(paymentRef);
         return invoiceRepo.save(inv);
+    }
+
+    /**
+     * NEW: generates a remittance advice PDF — flagged in the gap
+     * analysis as a missing notification when an invoice is marked paid.
+     * Guarded to PAID invoices only — a "remittance advice" for an
+     * invoice that hasn't actually been paid would be actively
+     * misleading, not just premature, so this throws rather than
+     * generating a document that claims a payment that didn't happen.
+     */
+    @Transactional(readOnly = true)
+    public byte[] generateRemittanceAdvicePdf(TenantId tenantId, UUID invoiceId) {
+        ScSupplierInvoice inv = invoiceRepo.findByTenantIdAndId(tenantId.getValue(), invoiceId)
+                .orElseThrow(() -> new HandyFlowException("Invoice not found",
+                        HttpStatus.NOT_FOUND, "NOT_FOUND"));
+        if (inv.getStatus() != InvoiceStatus.PAID) {
+            throw new IllegalArgumentException(
+                    "Remittance advice is only available for paid invoices — current status: " + inv.getStatus());
+        }
+        ScSupplier supplier = getSupplier(tenantId, inv.getSupplierId());
+        String[] tenantDetails = findTenantDetails(tenantId.getValue());
+
+        return remittanceAdvicePdfGenerator.generate(inv, tenantDetails[0], tenantDetails[1],
+                supplier.getName(), formatSupplierAddress(supplier),
+                supplier.getContactName(), supplier.getContactPhone());
     }
 
     /**

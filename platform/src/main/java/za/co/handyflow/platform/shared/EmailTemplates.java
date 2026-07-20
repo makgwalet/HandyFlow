@@ -697,6 +697,115 @@ public class EmailTemplates {
     }
 
     /**
+     * NEW: client-facing deadline reminder — closes the audit's gap
+     * ("reminder emails go only to the firm... never to the client").
+     * Deliberately a SEPARATE template from taxDeadlineReminder() just
+     * above, not a raw CC of it — that internal version includes
+     * penalty-rate figures and "this is a reminder for your client"
+     * framing, neither of which belongs in something the client
+     * themselves receives. Same D-30/D-7/D-1 urgency-color pattern.
+     */
+    public static String clientDeadlineReminder(String firmName, String deadlineType,
+                                                String dueDate, int daysUntilDue) {
+        String urgency = daysUntilDue == 1 ? "highlight-red" : daysUntilDue <= 7 ? "highlight-amber" : "highlight";
+        String friendlyType = switch (deadlineType) {
+            case "VAT201" -> "VAT return";
+            case "EMP201" -> "PAYE/UIF/SDL return";
+            case "EMP501" -> "PAYE reconciliation";
+            case "ITR14"  -> "company income tax return";
+            case "ITR12"  -> "income tax return";
+            case "IRP6_P1", "IRP6_P2", "IRP6_P3" -> "provisional tax payment";
+            case "CIPC_RETURN" -> "annual CIPC return";
+            default -> deadlineType;
+        };
+        return wrap("""
+            <p>This is a reminder that your %s is due soon.</p>
+            <div class="%s">
+              <p>Due date: <strong>%s</strong><br/>
+                 Days remaining: <strong>%d</strong></p>
+            </div>
+            <p>Please send us any outstanding documents or information in good time so we can
+               complete this on your behalf before the deadline.</p>
+            <p>If you have any questions, please don't hesitate to contact %s.</p>
+            """.formatted(friendlyType, urgency, dueDate, daysUntilDue, firmName));
+    }
+
+    /**
+     * NEW: TCS PIN expiry reminder — sent at D-30, D-7, D-1, same tiered
+     * pattern as taxDeadlineReminder() just above. Closes the accountant
+     * module audit's "TCS PIN expiry reminders" quick-win gap.
+     */
+    public static String tcsPinExpiryReminder(String clientName, String expiryDate, int daysUntilExpiry) {
+        String urgency = daysUntilExpiry == 1 ? "highlight-red" : daysUntilExpiry <= 7 ? "highlight-amber" : "highlight";
+        return wrap("""
+            <p>This is a compliance reminder for your client's Tax Compliance Status (TCS) PIN:</p>
+            <div class="%s">
+              <p><strong>%s</strong><br/>
+                 TCS PIN expires: <strong>%s</strong><br/>
+                 Days remaining: <strong>%d</strong></p>
+            </div>
+            <p>A lapsed TCS PIN can delay SARS-related processes for this client (tender applications,
+               good-standing verification, etc.). Please follow up to renew it before expiry.</p>
+            <a href="#" class="btn">Open HandyFlow</a>
+            """.formatted(urgency, clientName, expiryDate, daysUntilExpiry));
+    }
+
+    /**
+     * NEW: FICA document expiry reminder — closes the accountant module
+     * audit's "FICA/TCS PIN expiry reminders" gap for the FICA half.
+     * Same tiered D-30/D-7/D-1 pattern and urgency-color logic as
+     * tcsPinExpiryReminder() just above.
+     */
+    public static String ficaDocumentExpiryReminder(String clientName, String docType, String fileName,
+                                                    String expiryDate, int daysUntilExpiry) {
+        String urgency = daysUntilExpiry == 1 ? "highlight-red" : daysUntilExpiry <= 7 ? "highlight-amber" : "highlight";
+        String friendlyType = switch (docType) {
+            case "ID_COPY" -> "ID copy";
+            case "PROOF_OF_ADDRESS" -> "proof of address";
+            case "BENEFICIAL_OWNERSHIP" -> "beneficial ownership declaration";
+            case "COMPANY_DOCUMENTS" -> "company registration documents";
+            case "TRUST_DEED" -> "trust deed";
+            default -> "FICA document";
+        };
+        return wrap("""
+            <p>This is a compliance reminder for a client's FICA documentation:</p>
+            <div class="%s">
+              <p><strong>%s</strong> — %s<br/>
+                 File: <strong>%s</strong><br/>
+                 Expires: <strong>%s</strong><br/>
+                 Days remaining: <strong>%d</strong></p>
+            </div>
+            <p>An expired FICA document can affect this client's compliance standing.
+               Please follow up to obtain a renewed copy before expiry.</p>
+            <a href="#" class="btn">Open HandyFlow</a>
+            """.formatted(urgency, clientName, friendlyType, fileName, expiryDate, daysUntilExpiry));
+    }
+
+    /**
+     * NEW: client portal invite — closes the "client portal" gap. This
+     * is genuinely a link to a page that doesn't exist yet (the portal
+     * frontend is still being built) — unlike quoteSentToClient()'s own
+     * comment about deliberately omitting a link to an unbuilt page,
+     * here the whole point of the email IS the link, so omitting it
+     * would make the email useless. The exact path
+     * (/accountant/portal/auth/accept-invite) is a placeholder matching
+     * the namespace already agreed for this feature — confirm/adjust
+     * once real frontend routing exists.
+     */
+    public static String portalInvite(String clientName, String firmName, String acceptUrl) {
+        return wrap("""
+            <p>Dear <strong>%s</strong>,</p>
+            <p><strong>%s</strong> has invited you to their client portal, where you'll be able to
+               view your documents, fee notes, and compliance status online.</p>
+            <p style="text-align:center;margin:24px 0;">
+              <a href="%s" class="btn">Accept Invite &amp; Set Up Your Account</a>
+            </p>
+            <p style="color:#94A3B8;font-size:13px;">This invite link expires in 7 days.
+               If you weren't expecting this invitation, you can safely ignore this email.</p>
+            """.formatted(clientName, firmName, acceptUrl));
+    }
+
+    /**
      * Fee note / invoice email to client.
      */
     public static String feeNote(String clientName, String invoiceNumber,
@@ -713,6 +822,26 @@ public class EmailTemplates {
                Quote the invoice number as your payment reference.</p>
             <a href="#" class="btn btn-teal">View Invoice</a>
             """.formatted(clientName, invoiceNumber, amount, dueDate));
+    }
+
+    /**
+     * NEW: payment confirmation — closes gap #2 from the accountant
+     * module audit ("no 'invoice paid' confirmation to the client").
+     * Sent only when a fee note reaches PAID (not on a partial payment)
+     * — see AccountantService.recordPayment()'s own comment for why.
+     */
+    public static String paymentReceived(String clientName, String invoiceNumber,
+                                         String totalAmount, String paymentDate) {
+        return wrap("""
+            <p>Dear <strong>%s</strong>,</p>
+            <p>Thank you — we've received your payment and this invoice is now settled in full.</p>
+            <div class="highlight-green">
+              <p>Invoice: <strong>%s</strong><br/>
+                 Amount: <strong>R%s</strong><br/>
+                 Payment date: <strong>%s</strong></p>
+            </div>
+            <p>No further action is needed on this invoice. Please keep this email for your records.</p>
+            """.formatted(clientName, invoiceNumber, totalAmount, paymentDate));
     }
 
     /**

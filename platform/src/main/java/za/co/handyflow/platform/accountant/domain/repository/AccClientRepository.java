@@ -60,4 +60,37 @@ public interface AccClientRepository extends JpaRepository<AccClient, UUID> {
     """)
     List<AccClient> findWithExpiredTcsPin(@Param("tenantId") TenantId tenantId,
                                           @Param("cutoff") LocalDate cutoff);
+
+    /**
+     * NEW: closes the audit's "TCS PIN expiry reminders" gap. Global
+     * (no tenant filter) — matches TaxDeadlineRepository.
+     * findPendingReminder30/7/1()'s exact pattern, since the daily
+     * scheduler processes every tenant's clients in one query, then
+     * resolves each client's own tenant to find the right firm email to
+     * notify (same structure as AccountantScheduler.sendReminders()
+     * already uses for tax deadlines).
+     */
+    @Query("""
+        SELECT c FROM AccountantClient c
+        WHERE c.deletedAt IS NULL
+          AND c.tcsPinExpiry = :targetDate
+          AND c.tcsPinReminder30Sent = false
+    """)
+    List<AccClient> findTcsPinPendingReminder30(@Param("targetDate") LocalDate targetDate);
+
+    @Query("""
+        SELECT c FROM AccountantClient c
+        WHERE c.deletedAt IS NULL
+          AND c.tcsPinExpiry = :targetDate
+          AND c.tcsPinReminder7Sent = false
+    """)
+    List<AccClient> findTcsPinPendingReminder7(@Param("targetDate") LocalDate targetDate);
+
+    @Query("""
+        SELECT c FROM AccountantClient c
+        WHERE c.deletedAt IS NULL
+          AND c.tcsPinExpiry = :targetDate
+          AND c.tcsPinReminder1Sent = false
+    """)
+    List<AccClient> findTcsPinPendingReminder1(@Param("targetDate") LocalDate targetDate);
 }

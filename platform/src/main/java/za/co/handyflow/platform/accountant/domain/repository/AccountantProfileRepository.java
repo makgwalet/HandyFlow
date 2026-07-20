@@ -15,4 +15,14 @@ public interface AccountantProfileRepository extends JpaRepository<AccountantPro
 
     @Query("SELECT p FROM AccountantProfile p WHERE p.tenantId = :tenantId")
     Optional<AccountantProfile> findByTenantId(@Param("tenantId") TenantId tenantId);
+
+    /**
+     * NEW: closes the "portal fee note PDF download" gap. Native SQL,
+     * not JPQL — avoids needing to construct a TenantId object at all
+     * (its exact constructor/factory API was never seen directly this
+     * session, only ever received via TenantContext), by querying the
+     * raw tenant_id column directly instead of the embedded JPA type.
+     */
+    @Query(value = "SELECT * FROM accountant_profiles WHERE tenant_id = :tenantId", nativeQuery = true)
+    Optional<AccountantProfile> findByTenantIdRaw(@Param("tenantId") UUID tenantId);
 }

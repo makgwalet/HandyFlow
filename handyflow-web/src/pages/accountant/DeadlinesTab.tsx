@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Calendar, CheckCircle, AlertTriangle, Clock, Filter, ChevronDown } from "lucide-react"
+import { Calendar, CheckCircle, AlertTriangle, Clock, Filter, ChevronDown, Layers } from "lucide-react"
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return Array.isArray(p) ? p : p?.content ?? [] }
 const fmtD   = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
@@ -28,6 +28,22 @@ export default function DeadlinesTab() {
   const [filing,       setFiling]       = useState<any>(null)
   const [fileForm,     setFileForm]     = useState({ filedDate: "", sarsReference: "", filingAmount: "", notes: "" })
   const [error, setError] = useState("")
+
+  // NEW: closes the accountant module audit's "bulk deadline
+  // generation" quick-win gap — generateDeadlines was per-client only;
+  // a practice with many clients had to click through each one
+  // individually at year-start.
+  const [bulkResult, setBulkResult] = useState<any>(null)
+  const generateAllMutation = useMutation({
+    mutationFn: () => apiClient.post("/api/v1/accountant/deadlines/generate-all", { periodYear: new Date().getFullYear() }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["acc-deadlines"] })
+      qc.invalidateQueries({ queryKey: ["accountant-dashboard"] })
+      setBulkResult(r.data?.data ?? r.data)
+      setError("")
+    },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to generate deadlines"),
+  })
 
   const today = new Date().toISOString().split("T")[0]
   const in90  = new Date(Date.now() + 90 * 864e5).toISOString().split("T")[0]
@@ -70,7 +86,7 @@ export default function DeadlinesTab() {
   return (
     <div>
       {/* Summary strip */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
         {[
           { l: "Overdue",  v: overdue, color: "#DC2626", bg: "#FEF2F2" },
           { l: "Pending",  v: pending, color: "#D97706", bg: "#FFFBEB" },
@@ -88,7 +104,31 @@ export default function DeadlinesTab() {
             Clear filter
           </button>
         )}
+        {/* NEW: closes the audit's "bulk deadline generation" gap. */}
+        <button onClick={() => { setBulkResult(null); generateAllMutation.mutate() }}
+          disabled={generateAllMutation.isPending}
+          style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+          <Layers size={14} />
+          {generateAllMutation.isPending ? "Generating..." : `Generate ${new Date().getFullYear()} Deadlines — All Clients`}
+        </button>
       </div>
+
+      {bulkResult && (
+        <div style={{
+          marginBottom: 20, padding: "12px 16px", borderRadius: 10,
+          background: bulkResult.failures?.length > 0 ? "#FFFBEB" : "#DCFCE7",
+          border: `1px solid ${bulkResult.failures?.length > 0 ? "#FDE68A" : "#86EFAC"}`,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: bulkResult.failures?.length > 0 ? "#92400E" : "#166534", marginBottom: bulkResult.failures?.length > 0 ? 6 : 0 }}>
+            Generated deadlines for {bulkResult.succeeded} of {bulkResult.totalClients} client{bulkResult.totalClients !== 1 ? "s" : ""}.
+          </div>
+          {bulkResult.failures?.length > 0 && (
+            <div style={{ fontSize: 12, color: "#92400E" }}>
+              {bulkResult.failures.map((f: string, i: number) => <div key={i}>{"\u26a0"} {f}</div>)}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>

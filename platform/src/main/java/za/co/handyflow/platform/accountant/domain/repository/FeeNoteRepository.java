@@ -72,4 +72,23 @@ public interface FeeNoteRepository extends JpaRepository<FeeNote, UUID> {
         ORDER BY f.createdAt DESC
     """)
     List<FeeNote> findDrafts(@Param("tenantId") UUID tenantId);
+
+    /**
+     * NEW: fixes a real multi-tenant data-isolation gap. sendFeeNote()
+     * and fileFiling() previously used plain findById() with no tenant
+     * check at all — any authenticated user from ANY tenant could
+     * potentially reach another tenant's fee note by guessing/enumerating
+     * a UUID. This is what recordPayment() and the corrected
+     * sendFeeNote() use instead. The same pattern exists on
+     * AccJournalRepository/TaxDeadlineRepository (approveJournal(),
+     * postJournal(), fileFiling()) — not fixed here, since those get
+     * touched again for the journals-visibility work next; flagged
+     * clearly rather than silently left in place.
+     */
+    @Query("""
+        SELECT f FROM AccountantFeeNote f
+        WHERE f.tenantId = :tenantId
+          AND f.id = :id
+    """)
+    Optional<FeeNote> findByTenantIdAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
 }

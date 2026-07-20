@@ -80,6 +80,19 @@ public class FeeNote {
         this.updatedAt = Instant.now();
     }
 
+    public void applyPayment(BigDecimal totalPaidToDate) {
+        if ("WRITTEN_OFF".equals(status)) {
+            throw new IllegalStateException("Cannot record a payment against a written-off fee note");
+        }
+        if (totalPaidToDate.compareTo(total) >= 0) {
+            this.status = "PAID";
+            this.paidAt = Instant.now();
+        } else if (totalPaidToDate.compareTo(BigDecimal.ZERO) > 0) {
+            this.status = "PARTIAL";
+        }
+        this.updatedAt = Instant.now();
+    }
+
     public void markOverdue() {
         if (!"PAID".equals(status) && !"WRITTEN_OFF".equals(status)) {
             this.status    = "OVERDUE";

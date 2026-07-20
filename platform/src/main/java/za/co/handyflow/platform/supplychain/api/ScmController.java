@@ -335,6 +335,19 @@ public class ScmController {
                         lines)));
     }
 
+    // NEW: flagged in the gap analysis "for warehouse/delivery sign-off
+    // and dispute evidence" — no PDF export existed anywhere for GRNs.
+    @GetMapping(value = "/goods-receipts/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAuthority('SCM_READ')")
+    @Operation(summary = "Download a Goods Received Note PDF")
+    public ResponseEntity<byte[]> downloadGrnPdf(@PathVariable UUID id) {
+        byte[] pdf = scmService.generateGrnPdf(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + id + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
     // ── Supplier Invoices ─────────────────────────────────────────────────────
 
     @GetMapping("/supplier-invoices")
@@ -447,5 +460,20 @@ public class ScmController {
             @PathVariable UUID id, @PathVariable UUID attachmentId) {
         scmService.deleteInvoiceAttachment(TenantContext.getTenantIdAsObject(), id, attachmentId);
         return ResponseEntity.ok(ApiResponse.success("Attachment deleted", null));
+    }
+
+    // NEW: flagged in the gap analysis — "remittance advice to the
+    // supplier when an invoice is marked paid" was missing entirely.
+    // Only available once the invoice is actually PAID — see
+    // ScmService.generateRemittanceAdvicePdf()'s own guard.
+    @GetMapping(value = "/supplier-invoices/{id}/remittance-advice", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAuthority('SCM_READ')")
+    @Operation(summary = "Download a remittance advice PDF for a paid supplier invoice")
+    public ResponseEntity<byte[]> downloadRemittanceAdvice(@PathVariable UUID id) {
+        byte[] pdf = scmService.generateRemittanceAdvicePdf(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + id + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 }

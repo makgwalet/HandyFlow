@@ -2,14 +2,17 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Briefcase, BarChart2, Users, Calendar, Clock, FileText, X, Settings } from "lucide-react"
+import { Briefcase, BarChart2, Users, Calendar, Clock, FileText, X, Settings, BookOpen } from "lucide-react"
 import AccountantDashboard from "./AccountantDashboard"
 import ClientsTab          from "./ClientsTab"
 import DeadlinesTab        from "./DeadlinesTab"
 import TimeTab             from "./TimeTab"
 import BillingTab          from "./BillingTab"
+// NEW: closes the #2 must-fix gap from the accountant module audit —
+// journals were fully modeled and postable but had no tab at all.
+import JournalsTab         from "./JournalsTab"
 
-type Tab = "dashboard" | "clients" | "deadlines" | "time" | "billing"
+type Tab = "dashboard" | "clients" | "deadlines" | "time" | "billing" | "journals"
 
 const TABS = [
   { id: "dashboard" as Tab, label: "Dashboard",  icon: BarChart2 },
@@ -17,6 +20,7 @@ const TABS = [
   { id: "deadlines" as Tab, label: "Compliance", icon: Calendar  },
   { id: "time"      as Tab, label: "Time",       icon: Clock     },
   { id: "billing"   as Tab, label: "Billing",    icon: FileText  },
+  { id: "journals"  as Tab, label: "Journals",   icon: BookOpen  },
 ]
 
 const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }
@@ -140,10 +144,11 @@ export function AccountantPage() {
         </div>
 
         {tab === "dashboard" && <AccountantDashboard onNavigate={setTab} />}
-        {tab === "clients"   && <ClientsTab />}
+        {tab === "clients"   && <ClientsTab onNavigate={setTab} />}
         {tab === "deadlines" && <DeadlinesTab />}
         {tab === "time"      && <TimeTab />}
         {tab === "billing"   && <BillingTab />}
+        {tab === "journals"  && <JournalsTab />}
       </div>
 
       {/* Practice profile modal */}

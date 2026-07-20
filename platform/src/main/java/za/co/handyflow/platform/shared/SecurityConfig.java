@@ -32,6 +32,9 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     private final AdminJwtFilter adminJwtFilter;
     private final GuardJwtFilter guardJwtFilter;
+    // NEW: closes the "client portal" gap. No import needed —
+    // PortalJwtFilter lives in this same shared package.
+    private final PortalJwtFilter portalJwtFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -70,6 +73,13 @@ public class SecurityConfig {
                                 "/api/v1/admin/auth/totp/setup",
                                 "/api/v1/admin/auth/totp/confirm",
                                 "/api/v1/portal/**",
+                                // NEW: closes the "client portal" gap —
+                                // only /auth/** is public (register,
+                                // login). Everything else under
+                                // /api/v1/accountant/portal/** falls
+                                // through to .anyRequest().authenticated(),
+                                // satisfied by portalJwtFilter below.
+                                "/api/v1/accountant/portal/auth/**",
                                 "/api/v1/auth/guard/**",   // guard login — no tenant JWT required
                                 "/api/v1/security/cameras/motion-webhook",   // camera webhook — auth via webhookSecret, not JWT
                                 "/webjars/**",           // ← SpringDoc needs this
@@ -83,6 +93,8 @@ public class SecurityConfig {
                 .addFilterBefore(adminJwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(guardJwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                // NEW: closes the "client portal" gap.
+                .addFilterBefore(portalJwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 

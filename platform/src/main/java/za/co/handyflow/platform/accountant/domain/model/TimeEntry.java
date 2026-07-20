@@ -78,6 +78,45 @@ public class TimeEntry {
         this.updatedAt = Instant.now();
     }
 
+    /**
+     * NEW: closes the accountant module audit's "time entry edit/delete"
+     * gap. A BILLED entry's hours/rate were already copied into a real
+     * FeeNoteLine at generation time (FeeNoteLine.forTimeEntry()) — an
+     * invoice built from those numbers may already be sitting in a
+     * client's inbox. Editing the source entry after the fact would
+     * silently diverge from what was actually invoiced, and deleting it
+     * would leave that FeeNoteLine's timeEntryId pointing at nothing.
+     * Same discipline markBilled() above already enforces in the other
+     * direction (only UNBILLED can become BILLED); this is the mirror
+     * guard for going backwards.
+     */
+    public boolean isEditable() {
+        return !"BILLED".equals(status);
+    }
+
+    public void update(LocalDate entryDate, String activityType, String description,
+                       BigDecimal hours, BigDecimal hourlyRate, boolean billable) {
+        if (!isEditable()) {
+            throw new IllegalStateException(
+                    "Cannot edit a time entry that has already been billed"
+                            + (invoiceId != null ? " (invoice " + invoiceId + ")" : ""));
+        }
+        this.entryDate    = entryDate;
+        this.activityType = activityType;
+        this.description  = description;
+        this.hours        = hours;
+        this.hourlyRate   = hourlyRate;
+        this.billable     = billable;
+        // Status only re-derives from billable when the entry hasn't
+        // been explicitly written off — editing content shouldn't
+        // silently un-write-off something someone deliberately decided
+        // not to bill.
+        if (!"WRITTEN_OFF".equals(this.status)) {
+            this.status = billable ? "UNBILLED" : "NON_BILLABLE";
+        }
+        this.updatedAt = Instant.now();
+    }
+
     public void writeOff() {
         this.status    = "WRITTEN_OFF";
         this.updatedAt = Instant.now();

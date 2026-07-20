@@ -5,6 +5,7 @@ import {
   Users, ShoppingCart, FileText, Package, AlertTriangle,
   Clock, TrendingUp, ArrowRight, CheckCircle
 } from "lucide-react"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts"
 
 interface Summary {
   totalSuppliers: number; openPurchaseOrders: number; pendingInvoices: number
@@ -17,6 +18,9 @@ interface PO {
 interface LowStockItem {
   id: string; catalogueItemId: string; qtyOnHand: number; reorderPoint: number; avgCost: number
 }
+// NEW: backs real item names on the low-stock chart — same fix already
+// applied in InventoryTab.tsx for the identical truncated-UUID issue.
+interface CatalogueItem { id: string; name: string }
 
 const fmtR  = (n: number) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 const fmtD  = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
@@ -96,8 +100,31 @@ export function ScmDashboard({ onNav }: { onNav: (tab: ScmTab) => void }) {
     staleTime: 60_000,
   })
 
+  // NEW: same fix already applied in InventoryTab.tsx — fetched once,
+  // used to show real item names instead of truncated UUIDs. A chart
+  // labeled with raw UUIDs would be useless, so this is a prerequisite
+  // for the low-stock chart below, not just a cosmetic fix.
+  const { data: catalogueItems = [] } = useQuery<CatalogueItem[]>({
+    queryKey: ["catalogue-items-all-dashboard"],
+    queryFn: async () => { const r = await apiClient.get("/api/v1/catalogue/items"); const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : [] },
+    staleTime: 60_000,
+  })
+  const itemNameById = new Map(catalogueItems.map(i => [i.id, i.name]))
+
   const pos = recentPOs?.content ?? []
   const s = summary
+
+  // NEW: dashboard trend chart — the one genuinely chartable dataset
+  // without new backend work. Summary only returns current-moment
+  // counts, not historical data, so a real spend/volume-over-time trend
+  // isn't possible without a new aggregation endpoint; this is scoped
+  // to what's actually available, not a placeholder pretending otherwise.
+  const lowStockChartData = (lowStock ?? []).slice(0, 8).map(item => ({
+    name: itemNameById.get(item.catalogueItemId) ?? `Item ${item.catalogueItemId.slice(0, 8)}…`,
+    onHand: item.qtyOnHand,
+    reorderPoint: item.reorderPoint,
+    critical: item.qtyOnHand === 0,
+  }))
 
   return (
     <div>
@@ -172,26 +199,30 @@ export function ScmDashboard({ onNav }: { onNav: (tab: ScmTab) => void }) {
                 <TrendingUp size={28} style={{ opacity: .3, marginBottom: 8 }} />
                 <div style={{ fontSize: 13 }}>All stock levels healthy</div>
               </div>
-            : <div style={{ border: "1px solid #FCD34D", borderRadius: 10, overflow: "hidden" }}>
-                {lowStock.slice(0, 8).map((item, i) => {
-                  const pct = item.reorderPoint > 0 ? Math.round((item.qtyOnHand / item.reorderPoint) * 100) : 0
-                  const critical = pct === 0
-                  return (
-                    <div key={item.id} style={{ padding: "10px 14px", borderTop: i > 0 ? "1px solid #FEF3C7" : "none", background: critical ? "#FEF2F2" : "#FFFBEB" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: critical ? "#DC2626" : "#92400E" }}>
-                          {critical && "⚠ "}Item {item.catalogueItemId.slice(0, 8)}…
-                        </div>
-                        <div style={{ fontSize: 11, color: "#64748B" }}>
-                          {item.qtyOnHand.toFixed(1)} / {item.reorderPoint.toFixed(1)}
-                        </div>
-                      </div>
-                      <div style={{ height: 4, background: "#E2E8F0", borderRadius: 2 }}>
-                        <div style={{ height: "100%", width: `${Math.min(pct, 100)}%`, background: critical ? "#EF4444" : "#F59E0B", borderRadius: 2 }} />
-                      </div>
-                    </div>
-                  )
-                })}
+            : <div style={{ border: "1px solid #FCD34D", borderRadius: 10, padding: "14px 10px 6px 6px", background: "#FFFBEB" }}>
+                {/* NEW: dashboard trend chart — quantity on hand vs
+                    reorder point per item, real item names (not
+                    truncated UUIDs). Critical items (zero on hand)
+                    render in red instead of amber, same distinction the
+                    old list made via its "⚠" prefix. */}
+                <ResponsiveContainer width="100%" height={Math.max(180, lowStockChartData.length * 34)}>
+                  <BarChart data={lowStockChartData} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#FDE68A" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 10, fill: "#92400E" }} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="name" width={110}
+                      tick={{ fontSize: 11, fill: "#78350F" }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #FCD34D" }}
+                      formatter={(value: number, key: string) => [value.toFixed(1), key === "onHand" ? "On Hand" : "Reorder Point"]}
+                    />
+                    <Bar dataKey="reorderPoint" fill="#FDE68A" radius={[0, 4, 4, 0]} barSize={8} name="Reorder Point" />
+                    <Bar dataKey="onHand" radius={[0, 4, 4, 0]} barSize={8} name="On Hand">
+                      {lowStockChartData.map((d, i) => (
+                        <Cell key={i} fill={d.critical ? "#EF4444" : "#F59E0B"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
           }
         </div>

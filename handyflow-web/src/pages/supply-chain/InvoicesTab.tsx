@@ -2,7 +2,7 @@
 import React, { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, FileText, CheckCircle, CreditCard, AlertTriangle, Paperclip, Trash2 } from "lucide-react"
+import { Plus, FileText, CheckCircle, CreditCard, AlertTriangle, Paperclip, Trash2, Download } from "lucide-react"
 import { Modal, ErrBox, ModalFooter, Field } from "./scm.shared"
 
 interface Supplier { id: string; name: string }
@@ -218,6 +218,27 @@ export function InvoicesTab() {
     }
   }
 
+  // NEW: gap-analysis item — "remittance advice to the supplier when an
+  // invoice is marked paid" was missing entirely. Same blob-download
+  // pattern as the PO PDF / attachment downloads.
+  const [downloadingRemittance, setDownloadingRemittance] = useState(false)
+  const downloadRemittanceAdvice = async (invoiceId: string) => {
+    setDownloadingRemittance(true)
+    try {
+      const res = await apiClient.get(`/api/v1/supply-chain/supplier-invoices/${invoiceId}/remittance-advice`, { responseType: "blob" })
+      const blob = new Blob([res.data], { type: "application/pdf" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url; a.download = `remittance-advice-${selected?.invoiceNumber ?? invoiceId}.pdf`
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      setErr(e.response?.data?.message || "Failed to download remittance advice")
+    } finally {
+      setDownloadingRemittance(false)
+    }
+  }
+
   const deleteAttachMut = useMutation({
     mutationFn: (attachmentId: string) => apiClient.delete(`/api/v1/supply-chain/supplier-invoices/${selected!.id}/attachments/${attachmentId}`),
     onSuccess: () => refetchAttachments(),
@@ -364,8 +385,19 @@ export function InvoicesTab() {
             {/* Payment info */}
             {selected.status === "PAID" && (
               <div style={{ marginBottom: 16, padding: "10px 14px", background: "#DCFCE7", border: "1px solid #86EFAC", borderRadius: 9 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#166534" }}>✓ Paid {fmtD(selected.paidAt)}</div>
-                {selected.paymentReference && <div style={{ fontSize: 12, color: "#166534" }}>Ref: {selected.paymentReference}</div>}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#166534" }}>✓ Paid {fmtD(selected.paidAt)}</div>
+                    {selected.paymentReference && <div style={{ fontSize: 12, color: "#166534" }}>Ref: {selected.paymentReference}</div>}
+                  </div>
+                  {/* NEW: gap-analysis item — remittance advice PDF,
+                      only downloadable once actually paid, matching the
+                      backend's own guard. */}
+                  <button onClick={() => downloadRemittanceAdvice(selected.id)} disabled={downloadingRemittance}
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#fff", border: "1px solid #86EFAC", borderRadius: 7, fontSize: 12, fontWeight: 600, color: "#166534", cursor: "pointer" }}>
+                    <Download size={12} /> {downloadingRemittance ? "Downloading…" : "Remittance Advice"}
+                  </button>
+                </div>
               </div>
             )}
             {selected.approvedByName && <div style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>Approved by {selected.approvedByName} on {fmtD(selected.approvedAt)}</div>}

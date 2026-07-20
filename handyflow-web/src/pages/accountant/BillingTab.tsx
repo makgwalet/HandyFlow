@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { FileText, Plus, X, Send, AlertTriangle } from "lucide-react"
+import { FileText, Plus, X, Send, AlertTriangle, DollarSign, Download } from "lucide-react"
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return Array.isArray(p) ? p : p?.content ?? [] }
 const fmtR   = (n: any) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
@@ -26,6 +26,15 @@ export default function BillingTab() {
   const [selClient, setSelClient] = useState("")
   const [error, setError]       = useState("")
   const [sending, setSending]   = useState<string | null>(null)
+
+  // NEW: closes the #1 must-fix gap from the accountant module audit —
+  // "billing has no money-in loop". A fee note previously had no path
+  // to ever being marked paid once sent.
+  const [payingId, setPayingId] = useState<string | null>(null)
+  const PAY_INIT = () => ({ amount: "", paymentDate: new Date().toISOString().split("T")[0], paymentMethod: "EFT", reference: "", notes: "" })
+  const [payForm, setPayForm] = useState(PAY_INIT())
+  const [payError, setPayError] = useState("")
+  const [expandedPayments, setExpandedPayments] = useState<string | null>(null)
 
   const INIT = () => ({
     clientId: "", invoiceDate: new Date().toISOString().split("T")[0],
@@ -68,6 +77,50 @@ export default function BillingTab() {
     mutationFn: (id: string) => apiClient.post(`/api/v1/accountant/fee-notes/${id}/send`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["acc-outstanding"] }); setSending(null) },
     onError: (e: any) => { setSending(null); alert(e.response?.data?.message ?? "Failed to send") },
+  })
+
+  // NEW: closes the "quick win" gap from the accountant module audit —
+  // fee note PDF generation. Same blob-download pattern used throughout
+  // this codebase — this endpoint requires the Bearer auth header
+  // apiClient attaches, which a plain anchor link can't carry.
+  const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null)
+  const downloadPdf = async (inv: any) => {
+    setDownloadingPdf(inv.id)
+    try {
+      const res = await apiClient.get(`/api/v1/accountant/fee-notes/${inv.id}/pdf`, { responseType: "blob" })
+      const blob = new Blob([res.data], { type: "application/pdf" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url; a.download = `${inv.invoiceNumber}.pdf`
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      setError(e.response?.data?.message ?? "Failed to download PDF")
+    } finally {
+      setDownloadingPdf(null)
+    }
+  }
+
+  // NEW: payment history for whichever invoice's "View payments" is
+  // currently expanded — only fetched when actually needed.
+  const { data: paymentHistory = [] } = useQuery<any[]>({
+    queryKey: ["acc-payments", expandedPayments],
+    queryFn: async () => expandedPayments
+      ? unwrap(await apiClient.get(`/api/v1/accountant/fee-notes/${expandedPayments}/payments`))
+      : [],
+    enabled: !!expandedPayments,
+  })
+
+  const recordPayment = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: any }) =>
+      apiClient.post(`/api/v1/accountant/fee-notes/${id}/payments`, body),
+    onSuccess: (_r, { id }) => {
+      qc.invalidateQueries({ queryKey: ["acc-outstanding"] })
+      qc.invalidateQueries({ queryKey: ["accountant-dashboard"] })
+      qc.invalidateQueries({ queryKey: ["acc-payments", id] })
+      setPayingId(null); setPayForm(PAY_INIT()); setPayError("")
+    },
+    onError: (e: any) => setPayError(e.response?.data?.message ?? "Failed to record payment"),
   })
 
   // Derived totals for the generate form
@@ -132,36 +185,91 @@ export default function BillingTab() {
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               {(outstanding as any[]).map((inv: any) => {
                 const sc = STATUS_CFG[inv.status] ?? STATUS_CFG.SENT
+                const canPay = inv.status === "SENT" || inv.status === "PARTIAL" || inv.status === "OVERDUE"
                 return (
-                  <div key={inv.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", border: `1px solid ${inv.daysOverdue > 0 ? "#FECACA" : "#E2E8F0"}`, borderLeft: `3px solid ${inv.daysOverdue > 0 ? "#DC2626" : "#1D4ED8"}`, borderRadius: 10, background: "#fff", gap: 10, flexWrap: "wrap" }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                        <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{inv.clientName}</span>
-                        <span style={{ fontFamily: "monospace", fontSize: 12, color: "#64748B" }}>{inv.invoiceNumber}</span>
-                        <span style={{ background: sc.bg, color: sc.color, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{sc.label}</span>
-                        {inv.daysOverdue > 0 && (
-                          <span style={{ background: "#FEF2F2", color: "#DC2626", padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", gap: 3 }}>
-                            <AlertTriangle size={9} />{inv.daysOverdue}d overdue
-                          </span>
-                        )}
+                  <div key={inv.id}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", border: `1px solid ${inv.daysOverdue > 0 ? "#FECACA" : "#E2E8F0"}`, borderLeft: `3px solid ${inv.daysOverdue > 0 ? "#DC2626" : "#1D4ED8"}`, borderRadius: 10, background: "#fff", gap: 10, flexWrap: "wrap" }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{inv.clientName}</span>
+                          <span style={{ fontFamily: "monospace", fontSize: 12, color: "#64748B" }}>{inv.invoiceNumber}</span>
+                          <span style={{ background: sc.bg, color: sc.color, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{sc.label}</span>
+                          {inv.daysOverdue > 0 && (
+                            <span style={{ background: "#FEF2F2", color: "#DC2626", padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", gap: 3 }}>
+                              <AlertTriangle size={9} />{inv.daysOverdue}d overdue
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                          Due: {fmtD(inv.dueDate)} · Issued: {fmtD(inv.invoiceDate)}
+                          {/* NEW: closes the audit's #1 must-fix gap — a
+                              way to actually see and record payments,
+                              not just watch an invoice sit as SENT
+                              forever. */}
+                          {inv.status !== "DRAFT" && (
+                            <>
+                              {" · "}
+                              <button onClick={() => setExpandedPayments(expandedPayments === inv.id ? null : inv.id)}
+                                style={{ fontSize: 12, color: "#1B3A6B", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}>
+                                {expandedPayments === inv.id ? "Hide payments" : "View payments"}
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 12, color: "#94A3B8" }}>Due: {fmtD(inv.dueDate)} · Issued: {fmtD(inv.invoiceDate)}</div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
-                      <div style={{ textAlign: "right" as const }}>
-                        <div style={{ fontWeight: 800, fontSize: 15, color: "#0F172A" }}>{fmtR(inv.total)}</div>
-                        {inv.balance < inv.total && (
-                          <div style={{ fontSize: 11, color: "#0D9488" }}>Balance: {fmtR(inv.balance)}</div>
-                        )}
-                      </div>
-                      {inv.status === "DRAFT" && (
-                        <button onClick={() => { setSending(inv.id); sendNote.mutate(inv.id) }}
-                          disabled={sending === inv.id}
-                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                          <Send size={12} />{sending === inv.id ? "Sending..." : "Send"}
+                      <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
+                        <div style={{ textAlign: "right" as const }}>
+                          <div style={{ fontWeight: 800, fontSize: 15, color: "#0F172A" }}>{fmtR(inv.total)}</div>
+                          {inv.balance < inv.total && (
+                            <div style={{ fontSize: 11, color: "#0D9488" }}>Balance: {fmtR(inv.balance)}</div>
+                          )}
+                        </div>
+                        {/* NEW: closes the "quick win" gap from the audit
+                            — fee note PDF generation. Available
+                            regardless of status, unlike Send/Record
+                            Payment — this is a reference/download
+                            action, not a state change. */}
+                        <button onClick={() => downloadPdf(inv)} disabled={downloadingPdf === inv.id}
+                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#F8FAFC", color: "#374151", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          <Download size={12} />{downloadingPdf === inv.id ? "Downloading..." : "PDF"}
                         </button>
-                      )}
+                        {inv.status === "DRAFT" && (
+                          <button onClick={() => { setSending(inv.id); sendNote.mutate(inv.id) }}
+                            disabled={sending === inv.id}
+                            style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                            <Send size={12} />{sending === inv.id ? "Sending..." : "Send"}
+                          </button>
+                        )}
+                        {canPay && (
+                          <button onClick={() => { setPayingId(inv.id); setPayForm({ ...PAY_INIT(), amount: String(inv.balance ?? inv.total) }); setPayError("") }}
+                            style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#DCFCE7", color: "#166534", border: "1px solid #86EFAC", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                            <DollarSign size={12} /> Record Payment
+                          </button>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Payment history — expanded inline below the row */}
+                    {expandedPayments === inv.id && (
+                      <div style={{ margin: "4px 4px 0 18px", padding: "10px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8 }}>
+                        {paymentHistory.length === 0 ? (
+                          <div style={{ fontSize: 12, color: "#94A3B8" }}>No payments recorded yet.</div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            {paymentHistory.map((p: any) => (
+                              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                                <span style={{ color: "#64748B" }}>
+                                  {fmtD(p.paymentDate)} · {p.paymentMethod.replace("_", " ")}
+                                  {p.reference ? ` · Ref: ${p.reference}` : ""}
+                                  {p.recordedByName ? ` · by ${p.recordedByName}` : ""}
+                                </span>
+                                <span style={{ fontWeight: 700, color: "#166534" }}>{fmtR(p.amount)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -262,6 +370,61 @@ export default function BillingTab() {
                 onClick={() => generateNote.mutate({ clientId: form.clientId, invoiceDate: form.invoiceDate, dueDate: form.dueDate, timeEntryIds: form.timeEntryIds, fixedFee: form.fixedFee ? parseFloat(form.fixedFee) : null, includeVat: form.includeVat, notes: form.notes || null })}
                 style={{ padding: "9px 22px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {generateNote.isPending ? "Generating..." : "Generate Fee Note"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW: Record Payment modal — closes the #1 must-fix gap from the
+          accountant module audit ("billing has no money-in loop"). */}
+      {payingId && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>Record Payment</h3>
+              <button onClick={() => setPayingId(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={20} /></button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={lbl}>Amount (R) *</label>
+                <input type="number" min="0.01" step="0.01" value={payForm.amount}
+                  onChange={e => setPayForm(p => ({ ...p, amount: e.target.value }))} placeholder="0.00" style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Payment date *</label>
+                <input type="date" value={payForm.paymentDate}
+                  onChange={e => setPayForm(p => ({ ...p, paymentDate: e.target.value }))} style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Payment method *</label>
+                <select value={payForm.paymentMethod} onChange={e => setPayForm(p => ({ ...p, paymentMethod: e.target.value }))} style={{ ...inp, background: "#fff" }}>
+                  <option value="EFT">EFT</option>
+                  <option value="CASH">Cash</option>
+                  <option value="CARD">Card</option>
+                  <option value="DEBIT_ORDER">Debit order</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+              <div>
+                <label style={lbl}>Reference</label>
+                <input value={payForm.reference} onChange={e => setPayForm(p => ({ ...p, reference: e.target.value }))} placeholder="Bank reference or receipt number" style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Notes</label>
+                <textarea value={payForm.notes} onChange={e => setPayForm(p => ({ ...p, notes: e.target.value }))} rows={2} style={{ ...inp, resize: "vertical" as const }} />
+              </div>
+            </div>
+            {payError && <div style={{ marginTop: 12, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{payError}</div>}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+              <button onClick={() => setPayingId(null)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer" }}>Cancel</button>
+              <button disabled={!payForm.amount || parseFloat(payForm.amount) <= 0 || !payForm.paymentDate || recordPayment.isPending}
+                onClick={() => recordPayment.mutate({
+                  id: payingId,
+                  body: { amount: parseFloat(payForm.amount), paymentDate: payForm.paymentDate, paymentMethod: payForm.paymentMethod, reference: payForm.reference || null, notes: payForm.notes || null }
+                })}
+                style={{ padding: "9px 22px", background: "#166534", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                {recordPayment.isPending ? "Recording..." : "Record Payment"}
               </button>
             </div>
           </div>

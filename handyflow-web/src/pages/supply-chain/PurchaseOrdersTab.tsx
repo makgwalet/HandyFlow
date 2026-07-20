@@ -8,6 +8,8 @@ import { Modal, ErrBox, ModalFooter, Field } from "./scm.shared"
 interface Supplier { id: string; name: string; paymentTermsDays: number }
 interface Location { id: string; name: string; locationType: string }
 interface PoLine { id: string; itemName: string; supplierSku: string | null; qtyOrdered: number; qtyReceived: number; unitCost: number; vatRate: number; lineTotal: number; lineTotalIncl: number; isFullyReceived: boolean }
+// NEW: backs the Goods Receipts section in the PO detail view.
+interface GoodsReceipt { id: string; receiptNumber: string; status: string; receivedDate: string }
 interface PO {
   id: string; orderNumber: string; supplierName: string; supplierId: string; status: string
   totalAmount: number; subtotal: number; vatAmount: number; orderDate: string
@@ -66,6 +68,16 @@ export function PurchaseOrdersTab() {
     staleTime: 30_000,
   })
 
+  // NEW: gap-analysis item — no way to see or download a GRN for a PO's
+  // deliveries. Reuses the same endpoint already built for InvoicesTab's
+  // GR-linking picker.
+  const { data: goodsReceipts = [] } = useQuery<GoodsReceipt[]>({
+    queryKey: ["scm-po-goods-receipts-detail", detail?.id],
+    queryFn: async () => { const r = await apiClient.get(`/api/v1/supply-chain/purchase-orders/${detail!.id}/goods-receipts`); const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : [] },
+    enabled: !!detail,
+    staleTime: 30_000,
+  })
+
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["scm-suppliers-list"],
     queryFn: async () => { const r = await apiClient.get("/api/v1/supply-chain/suppliers?size=200"); const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : d?.content ?? [] },
@@ -107,6 +119,29 @@ export function PurchaseOrdersTab() {
       setErr(e.response?.data?.message || "Failed to download PDF")
     } finally {
       setDownloadingPdf(false)
+    }
+  }
+
+  // NEW: gap-analysis item — "for warehouse/delivery sign-off and dispute
+  // evidence". Same blob-download pattern as the PO PDF.
+  const [downloadingGrnId, setDownloadingGrnId] = useState<string | null>(null)
+  const downloadGrn = async (gr: GoodsReceipt) => {
+    setDownloadingGrnId(gr.id)
+    try {
+      const res = await apiClient.get(`/api/v1/supply-chain/goods-receipts/${gr.id}/pdf`, { responseType: "blob" })
+      const blob = new Blob([res.data], { type: "application/pdf" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${gr.receiptNumber}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      setErr(e.response?.data?.message || "Failed to download GRN")
+    } finally {
+      setDownloadingGrnId(null)
     }
   }
 
@@ -208,6 +243,32 @@ export function PurchaseOrdersTab() {
               </table>
           }
         </div>
+
+        {/* NEW: gap-analysis item — no way to see or download a GRN for
+            this PO's deliveries. Only shown once at least one GR exists,
+            since most POs won't have one until goods actually arrive. */}
+        {goodsReceipts.length > 0 && (
+          <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
+            <div style={{ background: "#F8FAFC", padding: "10px 16px", fontSize: 12, fontWeight: 700, color: "#475569" }}>Goods Receipts</div>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {goodsReceipts.map((gr, i) => (
+                <div key={gr.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderTop: i > 0 ? "1px solid #F1F5F9" : "none" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT }}>{gr.receiptNumber}</span>
+                    <span style={{ fontSize: 11, color: "#94A3B8" }}>{gr.receivedDate ? fmtD(gr.receivedDate) : "—"}</span>
+                    <span style={{ background: gr.status === "POSTED" ? "#DCFCE7" : "#F1F5F9", color: gr.status === "POSTED" ? "#166534" : "#475569", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20 }}>
+                      {gr.status}
+                    </span>
+                  </div>
+                  <button onClick={() => downloadGrn(gr)} disabled={downloadingGrnId === gr.id}
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 11, fontWeight: 600, color: "#374151", cursor: "pointer" }}>
+                    <Download size={11} /> {downloadingGrnId === gr.id ? "Downloading…" : "Download GRN"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Totals */}
         <div style={{ display: "flex", justifyContent: "flex-end" }}>

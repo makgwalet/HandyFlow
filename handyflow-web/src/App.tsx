@@ -12,6 +12,8 @@ import { BillingPage }                  from "./pages/billing/BillingPage"
 import { SecurityPage }                 from "./pages/security/SecurityPage"
 import { ModuleLayout }                 from "./components/layout/ModuleLayout"
 import { useAuthStore }                 from "./store/auth.store"
+// NEW: closes "not added to App.tsx, redirects to saas".
+import { usePortalAuthStore }           from "./store/portalAuth.store"
 import { FuelPage }                     from "./pages/fuel/FuelPage"
 import { PropertyPage }                 from "./pages/property/PropertyPage"
 import { FleetPage }                    from "./pages/fleet/FleetPage"
@@ -33,6 +35,14 @@ import UnsubscribePage                  from './pages/marketing/UnsubscribePage'
 import { RecruiterPage }                from './pages/recruiter/RecruiterPage'
 import { PosPage }                      from './pages/pos/PosPage'
 import { AccountantPage }               from "./pages/accountant/AccountantPage"
+// NEW: closes "not added to App.tsx, redirects to saas" — the invite
+// email's link (/accountant/portal/auth/accept-invite) was already
+// hardcoded server-side; these are the pages it was always meant to
+// point at.
+import { PortalLoginPage }              from "./pages/accountant-portal/PortalLoginPage"
+import { PortalAcceptInvitePage }       from "./pages/accountant-portal/PortalAcceptInvitePage"
+import { PortalHomePage }               from "./pages/accountant-portal/PortalHomePage"
+import { PortalClientDetailPage }       from "./pages/accountant-portal/PortalClientDetailPage"
 import { CreativeApprovePage }          from "./pages/creative/CreativeApprovePage"
 import { AccountsPayablePage }          from "./pages/ap/AccountsPayablePage"
 import { ProfilePage }                  from "./pages/settings/ProfilePage"
@@ -61,6 +71,17 @@ const queryClient = new QueryClient({
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore(s => s.token)
   if (!token) return <Navigate to="/login" replace />
+  return <>{children}</>
+}
+
+// NEW: closes "not added to App.tsx, redirects to saas" — deliberately
+// checks usePortalAuthStore, not useAuthStore, and redirects to the
+// portal's own login page, not the staff one. A portal session and a
+// staff session are genuinely separate; this guard must never
+// accidentally accept one for the other.
+function PortalProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = usePortalAuthStore(s => s.token)
+  if (!token) return <Navigate to="/accountant/portal/login" replace />
   return <>{children}</>
 }
 
@@ -97,6 +118,21 @@ export default function App() {
           {/* Client portal — public, intentionally outside ModuleLayout (no nav bar) */}
           <Route path="/projects/portal/:token" element={<ClientPortalPage />} />
           <Route path="/portal/:token" element={<ClientPortalPage />} />
+
+          {/* NEW: Accountant client portal — closes "not added to
+              App.tsx, redirects to saas". Path matches exactly what the
+              invite email already sends (EmailTemplates.portalInvite),
+              built server-side before this frontend existed — not
+              changed to match a different frontend convention, since
+              changing it now would break live invite links already
+              sent. Genuinely outside ModuleLayout and outside the
+              staff ProtectedRoute — a portal user is not staff and
+              must never see the staff nav bar or be subject to staff
+              auth. */}
+          <Route path="/accountant/portal/login"              element={<PortalLoginPage />} />
+          <Route path="/accountant/portal/auth/accept-invite" element={<PortalAcceptInvitePage />} />
+          <Route path="/accountant/portal" element={<PortalProtectedRoute><PortalHomePage /></PortalProtectedRoute>} />
+          <Route path="/accountant/portal/clients/:clientId" element={<PortalProtectedRoute><PortalClientDetailPage /></PortalProtectedRoute>} />
 
           {/* Token-secured routes — also outside ModuleLayout */}
           <Route path="/sign/:token"                   element={<SigningPage />} />

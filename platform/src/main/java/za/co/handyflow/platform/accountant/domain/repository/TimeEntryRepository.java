@@ -65,4 +65,15 @@ public interface TimeEntryRepository extends JpaRepository<TimeEntry, UUID> {
                                        @Param("practitionerId") UUID practitionerId,
                                        @Param("from") LocalDate from,
                                        @Param("to")   LocalDate to);
+
+    /**
+     * NEW: closes the audit's "time entry edit/delete" gap. No
+     * single-record tenant-safe lookup existed on this repository at
+     * all before this — every other query returns a list scoped by
+     * client/tenant, but nothing let a single entry be fetched and
+     * verified as belonging to the caller's tenant before editing or
+     * deleting it.
+     */
+    @Query("SELECT t FROM AccountantTimeEntry t WHERE t.tenantId = :tenantId AND t.id = :id")
+    java.util.Optional<TimeEntry> findByTenantIdAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
 }

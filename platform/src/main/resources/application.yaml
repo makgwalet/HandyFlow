@@ -74,9 +74,23 @@ app:
         # actually makes the refresh-token mechanism
         # built earlier this session matter day-to-day.
         # A 24h token made refresh a rarely-exercised
-        # path; short-lived access + rotation is the
+      # path; short-lived access + rotation is the
       # whole point of that design.
       refresh-expiration-ms: 604800000  # 7 days
+    # NEW: closes the "client portal" gap. Deliberately a SEPARATE
+    # secret from jwt.secret above — staff/admin tokens and portal
+    # tokens are different trust boundaries (internal employees vs
+    # external, untrusted clients). Same "no fallback" policy as
+    # jwt.secret/encryption.key: PORTAL_JWT_SECRET must be a genuinely
+    # random value distinct from JWT_SECRET, and a missing env var
+    # should fail startup loudly, not silently reuse or default to
+    # anything.
+    portal-jwt:
+      secret: ${PORTAL_JWT_SECRET}
+      expiration-ms: 604800000  # 7 days — portal sessions are long-lived
+        # by design (a client checking their fee notes monthly
+        # shouldn't need to re-login every day), unlike the 15-minute
+      # staff token above.
     encryption:
       # FIX: same issue as jwt.secret above — was a hardcoded literal.
       # No fallback default on purpose: this key encrypts sensitive data

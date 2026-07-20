@@ -2,10 +2,13 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, X, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Users, Search } from "lucide-react"
+import { Plus, X, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Users, Search, Paperclip, Trash2, Download } from "lucide-react"
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
 const fmtD   = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
+// NEW: closes the "unified client detail page" gap — no money-
+// formatting helper existed anywhere in this file until now.
+const fmtR   = (n: any) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
 
 const ENTITY_TYPES = ["PTY_LTD","CC","SOLE_PROP","TRUST","NPO","INDIVIDUAL","PARTNERSHIP","FOREIGN","ARTIST","TRADER","OTHER"]
 const RISK_CFG: Record<string, { color: string; bg: string }> = {
@@ -17,10 +20,57 @@ const RISK_CFG: Record<string, { color: string; bg: string }> = {
 const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none", background: "#fff" }
 const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
 
-export default function ClientsTab() {
+// NEW: closes the "unified client detail page" gap — onNavigate lets
+// the Client Workspace modal's "View all" links switch to the relevant
+// full tab (Compliance/Billing/Journals/Time), matching the exact
+// pattern AccountantDashboard already uses.
+export default function ClientsTab({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const qc = useQueryClient()
   const [search, setSearch]     = useState("")
   const [expanded, setExpanded] = useState<string | null>(null)
+  // NEW: closes the "unified client detail page" gap.
+  const [workspaceFor, setWorkspaceFor] = useState<any>(null)
+  const { data: clientDetail, isLoading: detailLoading, isError: detailIsError } = useQuery<any>({
+    queryKey: ["acc-client-detail", workspaceFor?.id],
+    queryFn: async () => {
+      const r = await apiClient.get(`/api/v1/accountant/clients/${workspaceFor.id}/detail`)
+      return r.data?.data ?? r.data
+    },
+    enabled: !!workspaceFor,
+  })
+
+  // NEW: closes "where to send the invite on the frontend" — the
+  // Client Workspace modal is already this app's one-stop view per
+  // client, so portal access management lives here too, not as a
+  // separate page. Kept as its own query rather than folded into
+  // ClientDetailResponse — a client will realistically have 1-3 portal
+  // grants ever, and this stays consistent with how other small,
+  // per-section data (e.g. JournalsTab's coaAccounts) is fetched
+  // independently rather than bloating one aggregate response.
+  const { data: portalGrants = [], isLoading: grantsLoading } = useQuery<any[]>({
+    queryKey: ["acc-portal-grants", workspaceFor?.id],
+    queryFn: async () => unwrap(await apiClient.get(`/api/v1/accountant/clients/${workspaceFor.id}/portal-invites`)),
+    enabled: !!workspaceFor,
+  })
+
+  const [showInvite, setShowInvite] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteError, setInviteError] = useState("")
+
+  const inviteMut = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/accountant/clients/${workspaceFor.id}/portal-invites`, { email: inviteEmail }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["acc-portal-grants", workspaceFor?.id] })
+      setShowInvite(false); setInviteEmail(""); setInviteError("")
+    },
+    onError: (e: any) => setInviteError(e.response?.data?.message ?? "Failed to send invite"),
+  })
+
+  const revokeMut = useMutation({
+    mutationFn: (grantId: string) => apiClient.post(`/api/v1/accountant/clients/${workspaceFor.id}/portal-invites/${grantId}/revoke`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["acc-portal-grants", workspaceFor?.id] }),
+  })
+
   const [showCreate, setCreate] = useState(false)
   const [error, setError]       = useState("")
 
@@ -53,10 +103,102 @@ export default function ClientsTab() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["acc-clients"] }),
   })
 
+  // NEW: closes the audit's "client-facing deadline reminder emails"
+  // gap — the toggle behind the per-client opt-out.
+  const toggleReminders = useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      apiClient.post(`/api/v1/accountant/clients/${id}/deadline-reminders?enabled=${enabled}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["acc-clients"] }),
+  })
+
   const generateDeadlines = useMutation({
     mutationFn: (id: string) => apiClient.post(`/api/v1/accountant/clients/${id}/deadlines/generate`, { periodYear: new Date().getFullYear() }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["acc-clients"] }),
   })
+
+  // NEW: closes the accountant module audit's "document/attachment
+  // storage on client records" gap. Base64-in-DB — same pattern already
+  // proven for SCM's supplier invoice attachments, since there's no S3
+  // in this environment yet.
+  const [docsOpenFor, setDocsOpenFor] = useState<string | null>(null)
+  const [docType, setDocType] = useState("ID_COPY")
+  const [docExpiry, setDocExpiry] = useState("")
+  const [uploadingDoc, setUploadingDoc] = useState(false)
+  const [docError, setDocError] = useState("")
+  const MAX_DOC_BYTES = 10 * 1024 * 1024
+  // NEW: matches AccountantService.ALLOWED_FICA_DOC_TYPES exactly — see
+  // that constant's own comment for why. This is the fast client-side
+  // check; the server-side one is the real enforcement.
+  const ALLOWED_DOC_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png",
+    "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
+
+  const { data: ficaDocs = [], refetch: refetchDocs } = useQuery<any[]>({
+    queryKey: ["acc-fica-docs", docsOpenFor],
+    queryFn: async () => docsOpenFor
+      ? unwrap(await apiClient.get(`/api/v1/accountant/clients/${docsOpenFor}/fica-documents`))
+      : [],
+    enabled: !!docsOpenFor,
+  })
+
+  const uploadDoc = async (clientId: string, file: File) => {
+    setDocError("")
+    if (!ALLOWED_DOC_TYPES.includes(file.type)) {
+      setDocError("Unsupported file type — please upload a PDF, JPG, PNG, or Word document")
+      return
+    }
+    if (file.size > MAX_DOC_BYTES) {
+      setDocError(`File is too large — maximum is ${MAX_DOC_BYTES / (1024 * 1024)}MB`)
+      return
+    }
+    setUploadingDoc(true)
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(((reader.result as string) || "").split(",")[1] ?? "")
+        reader.onerror = () => reject(reader.error)
+        reader.readAsDataURL(file)
+      })
+      await apiClient.post(`/api/v1/accountant/clients/${clientId}/fica-documents`, {
+        docType, fileName: file.name, contentType: file.type || "application/octet-stream",
+        fileSizeBytes: file.size, fileContentBase64: base64, expiryDate: docExpiry || null,
+      })
+      refetchDocs()
+    } catch (e: any) {
+      setDocError(e.response?.data?.message ?? "Failed to upload document")
+    } finally {
+      setUploadingDoc(false)
+    }
+  }
+
+  const downloadDoc = async (clientId: string, doc: any) => {
+    try {
+      const res = await apiClient.get(`/api/v1/accountant/clients/${clientId}/fica-documents/${doc.id}`, { responseType: "blob" })
+      const blob = new Blob([res.data], { type: doc.contentType })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url; a.download = doc.fileName
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      setDocError(e.response?.data?.message ?? "Failed to download document")
+    }
+  }
+
+  const verifyDoc = useMutation({
+    mutationFn: ({ clientId, docId }: { clientId: string; docId: string }) =>
+      apiClient.post(`/api/v1/accountant/clients/${clientId}/fica-documents/${docId}/verify`),
+    onSuccess: () => refetchDocs(),
+    onError: (e: any) => setDocError(e.response?.data?.message ?? "Failed to verify document"),
+  })
+
+  const deleteDoc = useMutation({
+    mutationFn: ({ clientId, docId }: { clientId: string; docId: string }) =>
+      apiClient.delete(`/api/v1/accountant/clients/${clientId}/fica-documents/${docId}`),
+    onSuccess: () => refetchDocs(),
+    onError: (e: any) => setDocError(e.response?.data?.message ?? "Failed to delete document"),
+  })
+
+  const DOC_TYPES = ["ID_COPY", "PROOF_OF_ADDRESS", "BENEFICIAL_OWNERSHIP", "COMPANY_DOCUMENTS", "TRUST_DEED", "OTHER"]
 
   const filtered = (clients as any[]).filter(c =>
     !search || c.tradingName?.toLowerCase().includes(search.toLowerCase()) ||
@@ -95,7 +237,10 @@ export default function ClientsTab() {
                   style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 20px", cursor: "pointer", background: isOpen ? "#F8FAFC" : "#fff" }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{c.tradingName}</span>
+                      <button onClick={e => { e.stopPropagation(); setWorkspaceFor(c) }}
+                        style={{ fontWeight: 700, fontSize: 14, color: "#1B3A6B", background: "none", border: "none", padding: 0, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2 }}>
+                        {c.tradingName}
+                      </button>
                       <span style={{ background: "#F8FAFC", color: "#64748B", padding: "1px 7px", borderRadius: 20, fontSize: 11, border: "1px solid #E2E8F0" }}>{c.entityType.replace("_"," ")}</span>
                       <span style={{ background: risk.bg, color: risk.color, padding: "1px 7px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{c.riskRating}</span>
                       {!c.ficaCompleted && <span style={{ background: "#FFFBEB", color: "#D97706", padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700, border: "1px solid #FDE68A" }}>FICA pending</span>}
@@ -154,7 +299,79 @@ export default function ClientsTab() {
                         style={{ padding: "6px 12px", background: "#F0FDF4", color: "#166534", border: "1px solid #86EFAC", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                         Generate {new Date().getFullYear()} deadlines
                       </button>
+                      {/* NEW: closes the audit's "document/attachment
+                          storage on client records" gap. */}
+                      <button onClick={() => { setDocsOpenFor(docsOpenFor === c.id ? null : c.id); setDocError("") }}
+                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#F8FAFC", color: "#374151", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        <Paperclip size={12} /> {docsOpenFor === c.id ? "Hide documents" : "FICA documents"}
+                      </button>
+                      {/* NEW: closes the audit's "client-facing deadline
+                          reminder emails" gap — the per-client toggle. */}
+                      <label style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, color: "#374151", cursor: "pointer" }}>
+                        <input type="checkbox" checked={c.clientDeadlineRemindersEnabled}
+                          onChange={e => toggleReminders.mutate({ id: c.id, enabled: e.target.checked })}
+                          style={{ width: 14, height: 14 }} />
+                        Email client deadline reminders
+                      </label>
                     </div>
+
+                    {docsOpenFor === c.id && (
+                      <div style={{ marginTop: 14, padding: "12px 14px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 9 }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+                          <select value={docType} onChange={e => setDocType(e.target.value)}
+                            style={{ padding: "6px 10px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, background: "#fff" }}>
+                            {DOC_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+                          </select>
+                          <input type="date" value={docExpiry} onChange={e => setDocExpiry(e.target.value)}
+                            placeholder="Expiry (optional)"
+                            style={{ padding: "6px 10px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12 }} />
+                          <label style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: uploadingDoc ? "default" : "pointer", opacity: uploadingDoc ? .6 : 1 }}>
+                            <Paperclip size={12} />
+                            {uploadingDoc ? "Uploading..." : "Add File"}
+                            <input type="file" style={{ display: "none" }} disabled={uploadingDoc}
+                              onChange={e => { const f = e.target.files?.[0]; if (f) uploadDoc(c.id, f); e.target.value = "" }} />
+                          </label>
+                        </div>
+                        {docError && <div style={{ marginBottom: 10, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, fontSize: 12, color: "#DC2626" }}>{docError}</div>}
+                        {ficaDocs.length === 0 ? (
+                          <div style={{ fontSize: 12, color: "#94A3B8" }}>No documents uploaded yet.</div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            {ficaDocs.map((d: any) => (
+                              <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7 }}>
+                                <div>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                                    <button onClick={() => downloadDoc(c.id, d)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#1B3A6B", fontWeight: 600, padding: 0 }}>
+                                      {d.fileName}
+                                    </button>
+                                    <span style={{ background: "#F1F5F9", color: "#64748B", padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>{d.docType.replace(/_/g, " ")}</span>
+                                    {d.verified
+                                      ? <span style={{ background: "#DCFCE7", color: "#166534", padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", gap: 3 }}><CheckCircle size={9} /> Verified</span>
+                                      : <span style={{ background: "#FFFBEB", color: "#D97706", padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>Unverified</span>}
+                                  </div>
+                                  <div style={{ fontSize: 11, color: "#94A3B8" }}>
+                                    {(d.fileSizeBytes / 1024).toFixed(0)} KB
+                                    {d.expiryDate && ` · Expires ${d.expiryDate}`}
+                                  </div>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  {!d.verified && (
+                                    <button onClick={() => verifyDoc.mutate({ clientId: c.id, docId: d.id })}
+                                      style={{ padding: "4px 10px", background: "#F0FDF4", color: "#166534", border: "1px solid #86EFAC", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                                      Verify
+                                    </button>
+                                  )}
+                                  <button onClick={() => deleteDoc.mutate({ clientId: c.id, docId: d.id })}
+                                    style={{ background: "none", border: "none", cursor: "pointer", color: "#DC2626", display: "flex" }}>
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -234,6 +451,199 @@ export default function ClientsTab() {
                 onClick={() => createClient.mutate({ ...form, vatCategory: form.vatCategory || null, registeredName: form.registeredName || null, registrationNumber: form.registrationNumber || null, taxReferenceNumber: form.taxReferenceNumber || null, vatNumber: form.vatNumber || null, contactEmail: form.contactEmail || null, contactPhone: form.contactPhone || null })}
                 style={{ padding: "9px 22px", background: !form.tradingName ? "#94A3B8" : "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {createClient.isPending ? "Adding..." : "Add Client"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW: Client Workspace — closes the "unified client detail
+          page" gap. Deliberately a modal, not a routed page — this
+          module's tabs are managed by local React state in
+          AccountantPage.tsx, not URL routing, and there's no visibility
+          into any broader routing infrastructure to build a real page
+          against safely. Each section shows the 10 most recent items
+          with a "View all" link that switches to the corresponding
+          full tab, rather than duplicating each tab's own full
+          pagination/filtering inside this modal. */}
+      {workspaceFor && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
+          <div style={{ background: "#fff", borderRadius: 16, width: 760, maxHeight: "88vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ position: "sticky", top: 0, background: "#fff", borderBottom: "1px solid #E2E8F0", padding: "20px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 1 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{workspaceFor.tradingName}</h3>
+                <p style={{ margin: "3px 0 0", fontSize: 12, color: "#64748B" }}>{workspaceFor.entityType?.replace("_", " ")} · {workspaceFor.riskRating} risk</p>
+              </div>
+              <button onClick={() => setWorkspaceFor(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={20} /></button>
+            </div>
+
+            <div style={{ padding: "20px 28px" }}>
+              {detailLoading ? (
+                <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading client workspace...</div>
+              ) : detailIsError ? (
+                <div style={{ textAlign: "center", padding: 40, color: "#DC2626" }}>Couldn't load this client's workspace.</div>
+              ) : clientDetail && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+
+                  {/* Deadlines */}
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>Deadlines</div>
+                      {onNavigate && <button onClick={() => onNavigate("deadlines")} style={{ fontSize: 12, color: "#1B3A6B", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>View all →</button>}
+                    </div>
+                    {(clientDetail.recentDeadlines ?? []).length === 0 ? (
+                      <div style={{ fontSize: 12, color: "#94A3B8" }}>No deadlines recorded.</div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        {clientDetail.recentDeadlines.map((d: any) => (
+                          <div key={d.id} style={{ display: "flex", justifyContent: "space-between", padding: "7px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12 }}>
+                            <span>{d.deadlineType} · {fmtD(d.adjustedDueDate)}</span>
+                            <span style={{ fontWeight: 600, color: d.status === "OVERDUE" ? "#DC2626" : d.status === "FILED" ? "#166534" : "#D97706" }}>{d.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Fee Notes */}
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>Fee Notes</div>
+                      {onNavigate && <button onClick={() => onNavigate("billing")} style={{ fontSize: 12, color: "#1B3A6B", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>View all →</button>}
+                    </div>
+                    {(clientDetail.recentFeeNotes ?? []).length === 0 ? (
+                      <div style={{ fontSize: 12, color: "#94A3B8" }}>No fee notes yet.</div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        {clientDetail.recentFeeNotes.map((f: any) => (
+                          <div key={f.id} style={{ display: "flex", justifyContent: "space-between", padding: "7px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12 }}>
+                            <span>{f.invoiceNumber} · {fmtD(f.invoiceDate)}</span>
+                            <span style={{ display: "flex", gap: 10 }}>
+                              <span style={{ fontWeight: 600 }}>{fmtR(f.total)}</span>
+                              <span style={{ color: f.status === "PAID" ? "#166534" : f.status === "OVERDUE" ? "#DC2626" : "#64748B" }}>{f.status}</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Journals */}
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>Journals</div>
+                      {onNavigate && <button onClick={() => onNavigate("journals")} style={{ fontSize: 12, color: "#1B3A6B", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>View all →</button>}
+                    </div>
+                    {(clientDetail.recentJournals ?? []).length === 0 ? (
+                      <div style={{ fontSize: 12, color: "#94A3B8" }}>No journals yet.</div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        {clientDetail.recentJournals.map((j: any) => (
+                          <div key={j.id} style={{ display: "flex", justifyContent: "space-between", padding: "7px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12 }}>
+                            <span style={{ fontFamily: "monospace" }}>{j.reference} · {fmtD(j.journalDate)}</span>
+                            <span style={{ color: j.status === "POSTED" ? "#166534" : "#64748B" }}>{j.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Time Entries */}
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>Time</div>
+                      {onNavigate && <button onClick={() => onNavigate("time")} style={{ fontSize: 12, color: "#1B3A6B", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>View all →</button>}
+                    </div>
+                    {(clientDetail.recentTimeEntries ?? []).length === 0 ? (
+                      <div style={{ fontSize: 12, color: "#94A3B8" }}>No time logged yet.</div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        {clientDetail.recentTimeEntries.map((t: any) => (
+                          <div key={t.id} style={{ display: "flex", justifyContent: "space-between", padding: "7px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12 }}>
+                            <span>{t.activityType?.replace("_", " ")} · {fmtD(t.entryDate)}</span>
+                            <span style={{ display: "flex", gap: 10 }}>
+                              <span style={{ fontWeight: 600 }}>{fmtR(t.lineTotal)}</span>
+                              <span style={{ color: t.status === "BILLED" ? "#166534" : "#64748B" }}>{t.status}</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* NEW: Portal Access — closes "where to send the invite
+                      on the frontend". Same section shape as the other
+                      four, but with an inline invite form instead of a
+                      "View all" link — there's no separate full tab for
+                      this to link out to. */}
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>Portal Access</div>
+                      <button onClick={() => { setShowInvite(true); setInviteError("") }}
+                        style={{ fontSize: 12, color: "#1B3A6B", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+                        + Invite to portal
+                      </button>
+                    </div>
+                    {grantsLoading ? (
+                      <div style={{ fontSize: 12, color: "#94A3B8" }}>Loading...</div>
+                    ) : portalGrants.length === 0 ? (
+                      <div style={{ fontSize: 12, color: "#94A3B8" }}>No portal invites sent yet.</div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        {portalGrants.map((g: any) => {
+                          const cfg: Record<string, { color: string; bg: string }> = {
+                            PENDING: { color: "#D97706", bg: "#FFFBEB" },
+                            ACTIVE:  { color: "#166534", bg: "#DCFCE7" },
+                            REVOKED: { color: "#64748B", bg: "#F1F5F9" },
+                          }
+                          const c = cfg[g.status] ?? cfg.REVOKED
+                          return (
+                            <div key={g.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12 }}>
+                              <span>{g.inviteEmail} · {fmtD(g.invitedAt)}</span>
+                              <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <span style={{ background: c.bg, color: c.color, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{g.status}</span>
+                                {g.status !== "REVOKED" && (
+                                  <button onClick={() => revokeMut.mutate(g.id)} disabled={revokeMut.isPending}
+                                    style={{ background: "none", border: "none", cursor: "pointer", color: "#DC2626", fontSize: 11, fontWeight: 600 }}>
+                                    Revoke
+                                  </button>
+                                )}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW: Invite to Portal modal — closes "where to send the
+          invite on the frontend". */}
+      {showInvite && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, backdropFilter: "blur(2px)" }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700 }}>Invite to Portal</h3>
+            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#64748B" }}>
+              {workspaceFor?.tradingName} will receive an email with a link to set up their portal account.
+            </p>
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Client contact email *</label>
+              <input type="email" autoFocus value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="contact@client.co.za"
+                style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
+            </div>
+            {inviteError && <div style={{ marginTop: 12, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{inviteError}</div>}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+              <button onClick={() => setShowInvite(false)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer" }}>Cancel</button>
+              <button disabled={!inviteEmail || inviteMut.isPending}
+                onClick={() => inviteMut.mutate()}
+                style={{ padding: "9px 22px", background: !inviteEmail ? "#94A3B8" : "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                {inviteMut.isPending ? "Sending..." : "Send Invite"}
               </button>
             </div>
           </div>
