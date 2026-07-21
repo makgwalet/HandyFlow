@@ -63,6 +63,14 @@ import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage"
 import { VerifyEmailPage } from "./pages/auth/VerifyEmailPage"
 import { AccountLockedPage } from "./pages/auth/AccountLockedPage"
 import { SessionExpiryModal } from "./components/SessionExpiryModal"
+// Recruiter public careers/apply pages — no auth, no ModuleLayout, same
+// shape as ClientPortalPage. NOTE: the "View posting" link inside
+// RecruiterPage.tsx and the offer-letter/interview-scheduled emails
+// already hardcode this exact URL scheme (/careers/:tenantSlug and
+// /careers/:tenantSlug/:jobSlug) — these routes complete a contract that
+// already existed in shipped code, not a fresh URL design.
+import { CareersListPage } from "./pages/careers/CareersListPage"
+import { JobApplyPage }    from "./pages/careers/JobApplyPage"
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -138,6 +146,14 @@ export default function App() {
           <Route path="/sign/:token"                   element={<SigningPage />} />
           <Route path="/creative/approve/:token"       element={<CreativeApprovePage />} />
           <Route path="/unsubscribe/:token"            element={<UnsubscribePage />} />
+
+          {/* Recruiter public careers/apply — public, outside ModuleLayout,
+              no login. NOTE: /careers/track/:token (the applicant portal
+              already promised in offer-letter/interview emails via
+              RecruiterService's hardcoded portalUrl) is NOT yet wired up —
+              still a dead link until that page is built separately. */}
+          <Route path="/careers/:tenantSlug"                element={<CareersListPage />} />
+          <Route path="/careers/:tenantSlug/:jobSlug"       element={<JobApplyPage />} />
 
           {/* All module pages — inside ModuleLayout so the nav bar appears */}
           <Route element={<ProtectedRoute><ModuleLayout /></ProtectedRoute>}>

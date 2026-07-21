@@ -11,5 +11,6 @@ public record SubmitApplicationRequest(
         String portfolioUrl,
         String cvBase64,       // base64-encoded PDF
         String cvFileName,
-        String source          // CAREERS_PAGE, LINKEDIN, REFERRAL etc.
+        String source,         // CAREERS_PAGE, LINKEDIN, REFERRAL etc.
+        String referrerName    // free text, only meaningful when source=REFERRAL — candidate has no way to know internal user IDs
 ) {}

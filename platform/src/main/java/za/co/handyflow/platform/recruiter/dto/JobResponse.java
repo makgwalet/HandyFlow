@@ -9,5 +9,7 @@ public record JobResponse(
         String     description, String requirements, String benefits,
         BigDecimal salaryMin, BigDecimal salaryMax, boolean showSalary,
         String     status, String slug, LocalDate closesAt,
-        int        applicationCount, Instant createdAt
+        int        applicationCount,
+        String     companyName,   // null on staff-facing responses (they know their own company); populated on public careers responses
+        Instant createdAt
 ) {}

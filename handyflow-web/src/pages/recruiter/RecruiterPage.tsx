@@ -1,6 +1,6 @@
 // src/pages/recruiter/RecruiterPage.tsx
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import {
   Plus, X, Search, Download, ChevronRight, Star,
@@ -27,13 +27,21 @@ interface Application {
   stage: string; source: string; score: number | null
   notes: string | null; rejectionReason: string | null
   hrEmployeeId: string | null
-  interviews: Interview[]; stageHistory: StageHistory[]
+  interviews: Interview[]; history: StageHistory[]
   appliedAt: string; stageChangedAt: string; hiredAt: string | null
+  offeredSalary: number | null; offeredSalaryFrequency: string | null
+  offeredStartDate: string | null; offerBenefits: string | null
+  offerLetterSentAt: string | null
+  referrerName: string | null; referredByUserId: string | null; referredByUserName: string | null
+  referralBonusAmount: number | null; referralBonusStatus: string | null; referralBonusPaidAt: string | null
 }
 interface Interview {
   id: string; interviewType: string; scheduledAt: string | null
   interviewerName: string | null; outcome: string | null
-  notes: string | null; score: number | null; createdAt: string
+  notes: string | null; score: number | null; location: string | null
+  panelists: { userId: string; userName: string | null }[]
+  roundTemplateId: string | null; roundName: string | null; roundSequence: number | null
+  createdAt: string
 }
 interface StageHistory {
   fromStage: string | null; toStage: string; changedByName: string | null
@@ -122,6 +130,166 @@ function ConfirmModal({ title, message, danger = false, confirmLabel, loading, o
   )
 }
 
+function CompareModal({ applicationIds, onClose }: { applicationIds: string[]; onClose: () => void }) {
+  const results = useQueries({
+    queries: applicationIds.map(id => ({
+      queryKey: ['rec-application', id],
+      queryFn: async () => {
+        const r = await apiClient.get(`/api/v1/recruiter/applications/${id}`)
+        return r.data?.data ?? r.data
+      },
+    })),
+  })
+
+  const loading = results.some(r => r.isLoading)
+  const candidates = results.map(r => r.data as Application | undefined).filter(Boolean) as Application[]
+
+  const [cvError, setCvError] = useState('')
+  const viewCv = async (id: string) => {
+    setCvError('')
+    try {
+      const r = await apiClient.get(`/api/v1/recruiter/applications/${id}/cv`, { responseType: 'blob' })
+      window.open(URL.createObjectURL(new Blob([r.data], { type: 'application/pdf' })), '_blank')
+    } catch (e: any) {
+      const data = e?.response?.data
+      if (data instanceof Blob) {
+        try { setCvError(JSON.parse(await data.text())?.message || 'Failed to load CV') }
+        catch { setCvError('Failed to load CV') }
+      } else {
+        setCvError(e.response?.data?.message || 'Failed to load CV')
+      }
+    }
+  }
+
+  const rowStyle = { padding: '10px 16px', borderBottom: '1px solid #F1F5F9', fontSize: 13, verticalAlign: 'top' as const }
+  const labelStyle = { padding: '10px 16px', borderBottom: '1px solid #F1F5F9', fontSize: 11, fontWeight: 700, color: '#64748B', letterSpacing: '0.03em', textTransform: 'uppercase' as const, whiteSpace: 'nowrap' as const, background: '#F8FAFC', width: 140 }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, backdropFilter: 'blur(2px)', padding: 20 }}>
+      <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 980, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' as const, boxShadow: '0 25px 80px rgba(0,0,0,0.3)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid #E2E8F0' }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Compare candidates</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={20} /></button>
+        </div>
+
+        <div style={{ overflow: 'auto', flex: 1 }}>
+          {loading ? (
+            <div style={{ padding: 40, textAlign: 'center' as const, color: '#94A3B8', fontSize: 13 }}>Loading candidates...</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+              <thead>
+                <tr>
+                  <th style={{ ...labelStyle, background: '#fff' }}></th>
+                  {candidates.map(c => {
+                    const sc = STAGE[c.stage] ?? STAGE.APPLIED
+                    return (
+                      <th key={c.id} style={{ padding: '14px 16px', borderBottom: '1px solid #E2E8F0', textAlign: 'left' as const, minWidth: 200 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                          <div style={{ width: 30, height: 30, borderRadius: '50%', background: sc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: sc.color }}>{(c.applicantName ?? 'A').charAt(0).toUpperCase()}</span>
+                          </div>
+                          <div style={{ fontWeight: 800, fontSize: 14, color: '#0F172A' }}>{c.applicantName}</div>
+                        </div>
+                        <div style={{ fontSize: 12, color: '#64748B', fontWeight: 400 }}>{c.jobTitle}</div>
+                      </th>
+                    )
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style={labelStyle}>Stage</td>
+                  {candidates.map(c => {
+                    const sc = STAGE[c.stage] ?? STAGE.APPLIED
+                    return (
+                      <td key={c.id} style={rowStyle}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                          {sc.label}
+                        </span>
+                      </td>
+                    )
+                  })}
+                </tr>
+                <tr>
+                  <td style={labelStyle}>Score</td>
+                  {candidates.map(c => (
+                    <td key={c.id} style={{ ...rowStyle, color: '#F59E0B', fontWeight: 700 }}>
+                      {c.score ? '★'.repeat(c.score) + '☆'.repeat(5 - c.score) : <span style={{ color: '#CBD5E1' }}>Not scored</span>}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td style={labelStyle}>Source</td>
+                  {candidates.map(c => (
+                    <td key={c.id} style={rowStyle}>{c.source?.replace('_', ' ') ?? '—'}</td>
+                  ))}
+                </tr>
+                <tr>
+                  <td style={labelStyle}>Applied</td>
+                  {candidates.map(c => (
+                    <td key={c.id} style={rowStyle}>{fmtDate(c.appliedAt)}</td>
+                  ))}
+                </tr>
+                <tr>
+                  <td style={labelStyle}>Interviews</td>
+                  {candidates.map(c => {
+                    const interviews = c.interviews ?? []
+                    const passed = interviews.filter(iv => iv.outcome === 'PASSED').length
+                    const failed = interviews.filter(iv => iv.outcome === 'FAILED').length
+                    return (
+                      <td key={c.id} style={rowStyle}>
+                        {interviews.length === 0 ? <span style={{ color: '#CBD5E1' }}>None yet</span> : (
+                          <>
+                            {interviews.length} total
+                            {(passed > 0 || failed > 0) && (
+                              <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
+                                {passed > 0 && <span style={{ color: '#166534' }}>{passed} passed</span>}
+                                {passed > 0 && failed > 0 && ' · '}
+                                {failed > 0 && <span style={{ color: '#DC2626' }}>{failed} failed</span>}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </td>
+                    )
+                  })}
+                </tr>
+                <tr>
+                  <td style={labelStyle}>Notes</td>
+                  {candidates.map(c => (
+                    <td key={c.id} style={{ ...rowStyle, color: '#374151', maxWidth: 220 }}>
+                      {c.notes || <span style={{ color: '#CBD5E1' }}>—</span>}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td style={{ ...labelStyle, borderBottom: 'none' }}>CV</td>
+                  {candidates.map(c => (
+                    <td key={c.id} style={{ ...rowStyle, borderBottom: 'none' }}>
+                      {c.hasCv ? (
+                        <button onClick={() => viewCv(c.id)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: '#F5F3FF', color: '#7C3AED', border: '1px solid #DDD6FE', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                          <FileText size={11} /> View CV
+                        </button>
+                      ) : <span style={{ color: '#CBD5E1' }}>—</span>}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {cvError && (
+          <div style={{ margin: '0 24px 16px', padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 12, color: '#DC2626' }}>
+            {cvError}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Application Detail Slide-over ──────────────────────────────────────────
 function ApplicationDetail({ app: initial, onClose, onUpdated }: {
   app: Application; onClose: () => void; onUpdated: () => void
@@ -130,19 +298,34 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
   const [tab, setTab]             = useState<'overview'|'interviews'|'history'>('overview')
   const [showMoveModal, setShowMoveModal] = useState(false)
   const [showInterview, setShowInterview] = useState(false)
+  const [showReferral, setShowReferral] = useState(false)
+  const [refUserId, setRefUserId] = useState('')
+  const [refBonusAmount, setRefBonusAmount] = useState('')
+  const [refBonusStatus, setRefBonusStatus] = useState('')
   const [showConvert,   setShowConvert]   = useState(false)
   const [showReject,    setShowReject]    = useState(false)
   const [targetStage, setTargetStage]     = useState('')
   const [stageNotes,  setStageNotes]      = useState('')
   const [rejectReason, setRejectReason]   = useState('')
+  const [offerSalary, setOfferSalary]     = useState('')
+  const [offerFrequency, setOfferFrequency] = useState('MONTHLY')
+  const [offerStartDate, setOfferStartDate] = useState('')
+  const [offerBenefits, setOfferBenefits] = useState('')
   const [scoreVal,    setScoreVal]        = useState<number | null>(initial.score)
   const [notes,       setNotes]           = useState(initial.notes ?? '')
   const [ivType,      setIvType]          = useState('VIDEO')
   const [ivScheduled, setIvScheduled]     = useState('')
   const [ivInterviewer, setIvInterviewer] = useState('')
+  const [ivInterviewerId, setIvInterviewerId] = useState('')
+  const [ivMode, setIvMode]               = useState<'team' | 'external'>('team')
+  const [ivLocation, setIvLocation]       = useState('')
+  const [ivPanelistIds, setIvPanelistIds] = useState<string[]>([])
+  const [ivRoundId, setIvRoundId]         = useState('')
   const [startDate,   setStartDate]       = useState(new Date().toISOString().split('T')[0])
   const [jobTitle,    setJobTitle]        = useState(initial.jobTitle ?? '')
   const [department,  setDepartment]      = useState('')
+  const [createHrRecord, setCreateHrRecord] = useState(true)
+  const [grossSalary, setGrossSalary]     = useState('')
   const [error, setError]                 = useState('')
 
   // Load full detail
@@ -162,13 +345,107 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
     onUpdated()
   }
 
+  // Fetched only while the Schedule Interview modal is open — no point
+  // hitting this endpoint on every panel render.
+  const { data: tenantUsers } = useQuery<{ id: string; email: string; firstName: string; lastName: string; status: string }[]>({
+    queryKey: ['identity-users'],
+    queryFn: async () => {
+      const r = await apiClient.get('/api/v1/identity/users')
+      return r.data?.data ?? r.data
+    },
+    enabled: showInterview || showReferral,
+  })
+  const activeUsers = (tenantUsers ?? []).filter(u => u.status === 'ACTIVE')
+
+  interface Round { id: string; name: string; sequence: number; description: string | null }
+  const { data: jobRounds } = useQuery<Round[]>({
+    queryKey: ['job-interview-rounds', app?.jobId],
+    queryFn: async () => {
+      const r = await apiClient.get(`/api/v1/recruiter/jobs/${app!.jobId}/interview-rounds`)
+      return r.data?.data ?? r.data
+    },
+    enabled: showInterview && !!app?.jobId,
+  })
+
   const moveStage = useMutation({
     mutationFn: ({ stage, notes, reason }: any) =>
       apiClient.post(`/api/v1/recruiter/applications/${app!.id}/stage`, {
         stage, notes: notes || null, rejectionReason: reason || null,
+        // Only meaningful when stage === 'OFFER' — backend ignores these
+        // for every other stage. Sent as null rather than omitted so an
+        // accidental partial fill doesn't silently carry over from a
+        // previous open of this modal.
+        offeredSalary: stage === 'OFFER' && offerSalary !== '' ? Number(offerSalary) : null,
+        offeredSalaryFrequency: stage === 'OFFER' ? offerFrequency : null,
+        offeredStartDate: stage === 'OFFER' && offerStartDate !== '' ? offerStartDate : null,
+        offerBenefits: stage === 'OFFER' && offerBenefits !== '' ? offerBenefits : null,
       }),
-    onSuccess: () => { invalidate(); setShowMoveModal(false); setShowReject(false); setStageNotes(''); setRejectReason('') },
+    onSuccess: () => {
+      invalidate(); setShowMoveModal(false); setShowReject(false)
+      setStageNotes(''); setRejectReason('')
+      setOfferSalary(''); setOfferStartDate(''); setOfferBenefits('')
+    },
     onError: (e: any) => setError(e.response?.data?.message || 'Failed'),
+  })
+
+  const parseBlobError = async (e: any, fallback: string) => {
+    const data = e?.response?.data
+    if (data instanceof Blob) {
+      try {
+        const json = JSON.parse(await data.text())
+        return json?.message || fallback
+      } catch { return fallback }
+    }
+    return e?.response?.data?.message || fallback
+  }
+
+  // window.open(blobUrl) always opens the browser's PDF viewer regardless of
+  // the server's Content-Disposition header — that header only affects
+  // direct HTTP navigation, not a blob: URL constructed client-side from an
+  // already-fetched response. A temporary <a download> element is the only
+  // way to force an actual file download from a blob.
+  const downloadBlob = (data: BlobPart, filename: string) => {
+    const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const downloadOfferLetter = useMutation({
+    mutationFn: async () => {
+      const r = await apiClient.get(`/api/v1/recruiter/applications/${app!.id}/offer-letter`, { responseType: 'blob' })
+      downloadBlob(r.data, `Offer Letter - ${app?.applicantName ?? 'candidate'}.pdf`)
+    },
+    onError: async (e: any) => setError(await parseBlobError(e, 'Failed to download offer letter — offer terms may not be recorded yet')),
+  })
+
+  const sendOfferLetter = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/recruiter/applications/${app!.id}/offer-letter/send`),
+    onSuccess: () => invalidate(),
+    onError: (e: any) => setError(e.response?.data?.message || 'Failed to send offer letter'),
+  })
+
+  const downloadScorecard = useMutation({
+    mutationFn: async () => {
+      const r = await apiClient.get(`/api/v1/recruiter/applications/${app!.id}/scorecard`, { responseType: 'blob' })
+      downloadBlob(r.data, `Scorecard - ${app?.applicantName ?? 'candidate'}.pdf`)
+    },
+    onError: async (e: any) => setError(await parseBlobError(e, 'Failed to download scorecard')),
+  })
+
+  // window.open, not downloadBlob — this is View CV, meant to preview
+  // inline in a new tab, unlike the offer-letter/scorecard buttons which
+  // were explicitly changed to force a real download earlier this session.
+  const viewCv = useMutation({
+    mutationFn: async () => {
+      const r = await apiClient.get(`/api/v1/recruiter/applications/${app!.id}/cv`, { responseType: 'blob' })
+      window.open(URL.createObjectURL(new Blob([r.data], { type: 'application/pdf' })), '_blank')
+    },
+    onError: async (e: any) => setError(await parseBlobError(e, 'Failed to load CV — none may be on file for this candidate')),
   })
 
   const score = useMutation({
@@ -182,15 +459,41 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
     mutationFn: () => apiClient.post(`/api/v1/recruiter/applications/${app!.id}/interviews`, {
       interviewType: ivType,
       scheduledAt: ivScheduled ? new Date(ivScheduled).toISOString() : null,
+      interviewerId: ivMode === 'team' && ivInterviewerId !== '' ? ivInterviewerId : null,
       interviewerName: ivInterviewer || null,
+      location: ivLocation || null,
+      panelists: ivPanelistIds.map(id => {
+        const u = activeUsers.find(u => u.id === id)
+        return { userId: id, userName: u ? `${u.firstName} ${u.lastName}` : null }
+      }),
+      roundTemplateId: ivRoundId || null,
     }),
-    onSuccess: () => { invalidate(); setShowInterview(false); setIvScheduled(''); setIvInterviewer('') },
+    onSuccess: () => {
+      invalidate(); setShowInterview(false); setIvScheduled('')
+      setIvInterviewer(''); setIvInterviewerId(''); setIvMode('team'); setIvLocation('')
+      setIvPanelistIds([]); setIvRoundId('')
+    },
     onError: (e: any) => setError(e.response?.data?.message || 'Failed'),
+  })
+
+  const updateReferral = useMutation({
+    mutationFn: () => apiClient.put(`/api/v1/recruiter/applications/${app!.id}/referral`, {
+      referredByUserId: refUserId || null,
+      bonusAmount: refBonusAmount !== '' ? Number(refBonusAmount) : null,
+      bonusStatus: refBonusStatus || null,
+    }),
+    onSuccess: () => { invalidate(); setShowReferral(false) },
+    onError: (e: any) => setError(e.response?.data?.message || 'Failed to update referral'),
   })
 
   const convertToEmployee = useMutation({
     mutationFn: () => apiClient.post(`/api/v1/recruiter/applications/${app!.id}/convert-to-employee`, {
       startDate, jobTitle, department: department || null,
+      createHrRecord,
+      // grossSalary is required by the backend when createHrRecord is true —
+      // send null (not empty string) when unset or when this is an external
+      // placement, so it doesn't accidentally coerce to 0.
+      grossSalary: createHrRecord && grossSalary !== '' ? Number(grossSalary) : null,
     }),
     onSuccess: () => { invalidate(); setShowConvert(false) },
     onError: (e: any) => setError(e.response?.data?.message || 'Failed to convert'),
@@ -198,6 +501,11 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
 
   const sc   = STAGE[app?.stage ?? 'APPLIED'] ?? STAGE.APPLIED
   const availableStages = PIPELINE_STAGES.filter(s => s !== app?.stage)
+  // Mirrors RecApplication.isActive() on the backend — HIRED/REJECTED/WITHDRAWN
+  // are terminal. Backend now rejects moveStage/scheduleInterview on these
+  // with a 400 (APPLICATION_TERMINAL); this just keeps the buttons from
+  // appearing clickable in the first place.
+  const isTerminal = app?.stage === 'HIRED' || app?.stage === 'REJECTED' || app?.stage === 'WITHDRAWN'
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'stretch', justifyContent: 'flex-end', zIndex: 1000 }}>
@@ -235,7 +543,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
 
           {/* Action buttons */}
           <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 14 }}>
-            {availableStages.filter(s => !['REJECTED'].includes(s)).map(s => {
+            {!isTerminal && availableStages.filter(s => !['REJECTED'].includes(s)).map(s => {
               const cfg = STAGE[s]
               return (
                 <button key={s} onClick={() => { setTargetStage(s); setShowMoveModal(true) }}
@@ -244,16 +552,18 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                 </button>
               )
             })}
-            {app?.stage !== 'REJECTED' && app?.stage !== 'WITHDRAWN' && (
+            {!isTerminal && (
               <button onClick={() => setShowReject(true)}
                 style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                 <X size={10} /> Reject
               </button>
             )}
-            <button onClick={() => setShowInterview(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-              <Calendar size={10} /> Schedule interview
-            </button>
+            {!isTerminal && (
+              <button onClick={() => setShowInterview(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                <Calendar size={10} /> Schedule interview
+              </button>
+            )}
             {app?.stage === 'HIRED' && !app?.hrEmployeeId && (
               <button onClick={() => setShowConvert(true)}
                 style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#DCFCE7', color: '#166534', border: '1px solid #86EFAC', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
@@ -261,9 +571,32 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
               </button>
             )}
             {app?.hasCv && (
-              <button style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#F5F3FF', color: '#7C3AED', border: '1px solid #DDD6FE', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-                <FileText size={10} /> View CV
+              <button onClick={() => viewCv.mutate()} disabled={viewCv.isPending}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#F5F3FF', color: '#7C3AED', border: '1px solid #DDD6FE', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                <FileText size={10} /> {viewCv.isPending ? 'Loading...' : 'View CV'}
               </button>
+            )}
+            <button onClick={() => downloadScorecard.mutate()} disabled={downloadScorecard.isPending}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#F8FAFC', color: '#334155', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+              <FileText size={10} /> {downloadScorecard.isPending ? 'Preparing...' : 'Scorecard PDF'}
+            </button>
+            {app?.offeredSalary != null && (
+              <>
+                <button onClick={() => downloadOfferLetter.mutate()} disabled={downloadOfferLetter.isPending}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#F8FAFC', color: '#334155', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                  <FileText size={10} /> {downloadOfferLetter.isPending ? 'Preparing...' : 'Offer letter PDF'}
+                </button>
+                {app?.offerLetterSentAt ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#DCFCE7', color: '#166534', border: '1px solid #86EFAC', borderRadius: 7, fontSize: 11, fontWeight: 700 }}>
+                    <CheckCircle size={10} /> Sent {fmtDate(app.offerLetterSentAt)}
+                  </span>
+                ) : (
+                  <button onClick={() => sendOfferLetter.mutate()} disabled={sendOfferLetter.isPending}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#DCFCE7', color: '#166534', border: '1px solid #86EFAC', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                    <Calendar size={10} /> {sendOfferLetter.isPending ? 'Sending...' : 'Send offer letter'}
+                  </button>
+                )}
+              </>
             )}
           </div>
 
@@ -272,7 +605,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
             {(['overview','interviews','history'] as const).map(t => (
               <button key={t} onClick={() => setTab(t)}
                 style={{ padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t ? '#1B3A6B' : '#9CA3AF', borderBottom: `2px solid ${tab === t ? '#1B3A6B' : 'transparent'}`, marginBottom: -1, textTransform: 'capitalize' }}>
-                {t === 'interviews' ? `Interviews (${app?.interviews?.length ?? 0})` : t === 'history' ? `History (${app?.stageHistory?.length ?? 0})` : 'Overview'}
+                {t === 'interviews' ? `Interviews (${app?.interviews?.length ?? 0})` : t === 'history' ? `History (${app?.history?.length ?? 0})` : 'Overview'}
               </button>
             ))}
           </div>
@@ -323,6 +656,49 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                   <div style={{ fontSize: 13, color: '#374151' }}>{app.rejectionReason}</div>
                 </div>
               )}
+
+              {/* Referral */}
+              <div style={{ marginTop: 14, padding: '12px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 9 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Referral</div>
+                    {app?.referredByUserId ? (
+                      <>
+                        <div style={{ fontSize: 13, color: '#0F172A', fontWeight: 600 }}>{app.referredByUserName}</div>
+                        {app.referrerName && app.referrerName !== app.referredByUserName && (
+                          <div style={{ fontSize: 11, color: '#94A3B8' }}>Candidate said: {app.referrerName}</div>
+                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                          {app.referralBonusAmount != null && (
+                            <span style={{ fontSize: 12, color: '#374151', fontWeight: 600 }}>R {Number(app.referralBonusAmount).toLocaleString()}</span>
+                          )}
+                          {app.referralBonusStatus && app.referralBonusStatus !== 'NOT_SET' && (
+                            <span style={{
+                              fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                              background: app.referralBonusStatus === 'PAID' ? '#DCFCE7' : app.referralBonusStatus === 'APPROVED' ? '#EFF6FF' : '#FEF3C7',
+                              color: app.referralBonusStatus === 'PAID' ? '#166534' : app.referralBonusStatus === 'APPROVED' ? '#1D4ED8' : '#92400E',
+                            }}>
+                              {app.referralBonusStatus}{app.referralBonusStatus === 'PAID' && app.referralBonusPaidAt ? ` · ${fmtDate(app.referralBonusPaidAt)}` : ''}
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    ) : app?.referrerName ? (
+                      <div style={{ fontSize: 13, color: '#0F172A' }}>Candidate said: <strong>{app.referrerName}</strong> <span style={{ color: '#94A3B8', fontWeight: 400 }}>(unverified)</span></div>
+                    ) : (
+                      <div style={{ fontSize: 12, color: '#94A3B8' }}>No referral on this application</div>
+                    )}
+                  </div>
+                  <button onClick={() => {
+                    setRefUserId(app?.referredByUserId ?? '')
+                    setRefBonusAmount(app?.referralBonusAmount != null ? String(app.referralBonusAmount) : '')
+                    setRefBonusStatus(app?.referralBonusStatus ?? '')
+                    setShowReferral(true)
+                  }} style={{ background: 'none', border: '1px solid #E2E8F0', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, color: '#374151', cursor: 'pointer', whiteSpace: 'nowrap' as const }}>
+                    {app?.referredByUserId ? 'Edit' : 'Link referral'}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -347,10 +723,19 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                           <Icon size={14} color="#1D4ED8" />
                         </div>
                         <div>
-                          <div style={{ fontWeight: 700, fontSize: 13, color: '#0F172A' }}>{iv.interviewType.replace('_',' ')}</div>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {iv.interviewType.replace('_',' ')}
+                            {iv.roundName && (
+                              <span style={{ fontSize: 10, fontWeight: 700, color: '#7C3AED', background: '#F5F3FF', padding: '2px 7px', borderRadius: 10 }}>
+                                {iv.roundSequence != null ? `${iv.roundSequence}. ` : ''}{iv.roundName}
+                              </span>
+                            )}
+                          </div>
                           <div style={{ fontSize: 11, color: '#94A3B8' }}>
                             {iv.scheduledAt ? fmtDT(iv.scheduledAt) : 'Not scheduled'}
                             {iv.interviewerName && ` · ${iv.interviewerName}`}
+                            {iv.panelists && iv.panelists.length > 0 &&
+                              ` + ${iv.panelists.map(p => p.userName).filter(Boolean).join(', ')}`}
                           </div>
                         </div>
                       </div>
@@ -359,6 +744,14 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                       )}
                     </div>
                     {iv.score && <div style={{ fontSize: 13, color: '#F59E0B' }}>{'★'.repeat(iv.score)}{'☆'.repeat(5 - iv.score)}</div>}
+                    {iv.location && (
+                      <div style={{ fontSize: 12, color: '#1D4ED8', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <MapPin size={11} />
+                        {iv.location.startsWith('http') ? (
+                          <a href={iv.location} target="_blank" rel="noreferrer" style={{ color: '#1D4ED8' }}>{iv.location}</a>
+                        ) : iv.location}
+                      </div>
+                    )}
                     {iv.notes && <div style={{ fontSize: 12, color: '#64748B', marginTop: 6 }}>{iv.notes}</div>}
                   </div>
                 )
@@ -368,15 +761,15 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
 
           {tab === 'history' && (
             <div>
-              {(app?.stageHistory ?? []).length === 0 ? (
+              {(app?.history ?? []).length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#94A3B8' }}>No stage history</div>
-              ) : (app?.stageHistory ?? []).map((h: StageHistory, i: number) => {
+              ) : (app?.history ?? []).map((h: StageHistory, i: number) => {
                 const toStage = STAGE[h.toStage] ?? STAGE.APPLIED
                 return (
                   <div key={i} style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                       <div style={{ width: 10, height: 10, borderRadius: '50%', background: toStage.dot, marginTop: 4, flexShrink: 0 }} />
-                      {i < (app?.stageHistory?.length ?? 0) - 1 && <div style={{ width: 1, flex: 1, background: '#E2E8F0', marginTop: 4 }} />}
+                      {i < (app?.history?.length ?? 0) - 1 && <div style={{ width: 1, flex: 1, background: '#E2E8F0', marginTop: 4 }} />}
                     </div>
                     <div style={{ flex: 1, paddingBottom: 12 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
@@ -405,6 +798,34 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
               <button onClick={() => setShowMoveModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={18} /></button>
             </div>
             <div>
+              {targetStage === 'OFFER' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14, padding: 12, background: '#F8FAFC', borderRadius: 8, border: '1px solid #E2E8F0' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#166534', textTransform: 'uppercase' as const }}>Offer terms</div>
+                  <div>
+                    <label style={lbl}>Gross salary (monthly) *</label>
+                    <input type="number" min="0" step="0.01" value={offerSalary} onChange={e => setOfferSalary(e.target.value)}
+                      placeholder="e.g. 32000" style={inp} />
+                  </div>
+                  <div>
+                    <label style={lbl}>Pay frequency</label>
+                    <select value={offerFrequency} onChange={e => setOfferFrequency(e.target.value)} style={{ ...inp, background: '#fff' }}>
+                      {['MONTHLY', 'WEEKLY', 'BIWEEKLY', 'ANNUALLY'].map(f => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={lbl}>Proposed start date</label>
+                    <input type="date" value={offerStartDate} onChange={e => setOfferStartDate(e.target.value)} style={inp} />
+                  </div>
+                  <div>
+                    <label style={lbl}>Benefits (optional)</label>
+                    <textarea value={offerBenefits} onChange={e => setOfferBenefits(e.target.value)} rows={2}
+                      placeholder="Medical aid, 13th cheque, etc." style={{ ...inp, resize: 'none' as const, fontFamily: 'inherit' }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94A3B8' }}>
+                    These terms are required before an offer letter can be generated or sent.
+                  </div>
+                </div>
+              )}
               <label style={lbl}>Notes (optional)</label>
               <textarea value={stageNotes} onChange={e => setStageNotes(e.target.value)} rows={3}
                 placeholder="Add context about this stage move..."
@@ -460,7 +881,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
       {/* Schedule Interview Modal */}
       {showInterview && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, backdropFilter: 'blur(2px)' }}>
-          <div style={{ background: '#fff', borderRadius: 14, padding: 28, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: 28, width: 460, maxHeight: '88vh', overflowY: 'auto' as const, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Schedule Interview</h3>
               <button onClick={() => setShowInterview(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={18} /></button>
@@ -476,9 +897,92 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                 <label style={lbl}>Date & time</label>
                 <input type="datetime-local" value={ivScheduled} onChange={e => setIvScheduled(e.target.value)} style={inp} />
               </div>
+              {(jobRounds ?? []).length > 0 && (
+                <div>
+                  <label style={lbl}>Round (optional)</label>
+                  <select value={ivRoundId} onChange={e => setIvRoundId(e.target.value)} style={{ ...inp, background: '#fff' }}>
+                    <option value="">No specific round</option>
+                    {jobRounds!.map(r => (
+                      <option key={r.id} value={r.id}>{r.sequence}. {r.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
-                <label style={lbl}>Interviewer name</label>
-                <input value={ivInterviewer} onChange={e => setIvInterviewer(e.target.value)} placeholder="Thabo Modise" style={inp} />
+                <label style={lbl}>Interviewer</label>
+                <div style={{ display: 'flex', gap: 7, marginBottom: 8 }}>
+                  <button type="button" onClick={() => { setIvMode('team'); setIvInterviewer(''); }}
+                    style={{ flex: 1, padding: '6px 10px', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                      background: ivMode === 'team' ? '#EFF6FF' : '#F8FAFC',
+                      color: ivMode === 'team' ? '#1D4ED8' : '#64748B',
+                      border: `1px solid ${ivMode === 'team' ? '#BFDBFE' : '#E2E8F0'}` }}>
+                    From team
+                  </button>
+                  <button type="button" onClick={() => { setIvMode('external'); setIvInterviewerId(''); }}
+                    style={{ flex: 1, padding: '6px 10px', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                      background: ivMode === 'external' ? '#EFF6FF' : '#F8FAFC',
+                      color: ivMode === 'external' ? '#1D4ED8' : '#64748B',
+                      border: `1px solid ${ivMode === 'external' ? '#BFDBFE' : '#E2E8F0'}` }}>
+                    External / other
+                  </button>
+                </div>
+                {ivMode === 'team' ? (
+                  <>
+                    <select value={ivInterviewerId} onChange={e => {
+                      const id = e.target.value
+                      setIvInterviewerId(id)
+                      const u = activeUsers.find(u => u.id === id)
+                      setIvInterviewer(u ? `${u.firstName} ${u.lastName}` : '')
+                      setIvPanelistIds(prev => prev.filter(pid => pid !== id))
+                    }} style={{ ...inp, background: '#fff' }}>
+                      <option value="">Select a team member...</option>
+                      {activeUsers.map(u => (
+                        <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
+                      ))}
+                    </select>
+                    <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 5 }}>
+                      They'll get an email and in-app notification once this is scheduled.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <input value={ivInterviewer} onChange={e => setIvInterviewer(e.target.value)} placeholder="Thabo Modise" style={inp} />
+                    <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 5 }}>
+                      Not a platform user — no notification will be sent, this is just a label.
+                    </div>
+                  </>
+                )}
+              </div>
+              {activeUsers.length > 0 && (
+                <div>
+                  <label style={lbl}>Additional panelists (optional)</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6, maxHeight: 120, overflowY: 'auto' as const, border: '1px solid #E2E8F0', borderRadius: 8, padding: 8 }}>
+                    {activeUsers.filter(u => u.id !== ivInterviewerId).map(u => {
+                      const selected = ivPanelistIds.includes(u.id)
+                      return (
+                        <button key={u.id} type="button"
+                          onClick={() => setIvPanelistIds(prev => selected ? prev.filter(id => id !== u.id) : [...prev, u.id])}
+                          style={{
+                            padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                            background: selected ? '#EFF6FF' : '#F8FAFC',
+                            color: selected ? '#1D4ED8' : '#64748B',
+                            border: `1px solid ${selected ? '#BFDBFE' : '#E2E8F0'}`,
+                          }}>
+                          {u.firstName} {u.lastName}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 5 }}>
+                    Each panelist gets their own email and in-app notification, same as the primary interviewer.
+                  </div>
+                </div>
+              )}
+              <div>
+                <label style={lbl}>{ivType === 'VIDEO' ? 'Meeting link' : ivType === 'PHONE' ? 'Number to call' : 'Venue'} (optional)</label>
+                <input value={ivLocation} onChange={e => setIvLocation(e.target.value)}
+                  placeholder={ivType === 'VIDEO' ? 'https://meet.google.com/...' : ivType === 'PHONE' ? '+27 82 123 4567' : '123 Main Street, Sandton'}
+                  style={inp} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
@@ -490,15 +994,97 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
         </div>
       )}
 
+      {/* Link Referral Modal */}
+      {showReferral && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, backdropFilter: 'blur(2px)' }}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: 28, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Link referral</h3>
+              <button onClick={() => setShowReferral(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={18} /></button>
+            </div>
+            {app?.referrerName && (
+              <div style={{ fontSize: 12, color: '#64748B', marginBottom: 14, padding: '8px 10px', background: '#F8FAFC', borderRadius: 7 }}>
+                Candidate said they were referred by: <strong>{app.referrerName}</strong>
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={lbl}>Referred by (team member)</label>
+                <select value={refUserId} onChange={e => setRefUserId(e.target.value)} style={{ ...inp, background: '#fff' }}>
+                  <option value="">Not linked</option>
+                  {activeUsers.map(u => (
+                    <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={lbl}>Bonus amount (R)</label>
+                <input type="number" min="0" value={refBonusAmount} onChange={e => setRefBonusAmount(e.target.value)} placeholder="e.g. 5000" style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Bonus status</label>
+                <select value={refBonusStatus} onChange={e => setRefBonusStatus(e.target.value)} style={{ ...inp, background: '#fff' }}>
+                  <option value="">Leave unchanged</option>
+                  {['NOT_SET', 'PENDING', 'APPROVED', 'PAID'].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 5 }}>
+                  Set automatically to PENDING once the candidate is hired, if linked. Approve and mark paid manually.
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+              <button onClick={() => setShowReferral(false)} style={btnS}>Cancel</button>
+              <button onClick={() => updateReferral.mutate()} disabled={updateReferral.isPending} style={btnP}>
+                {updateReferral.isPending ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Convert to HR Employee Modal */}
       {showConvert && (
-        <ConfirmModal title="Convert to HR employee" message={`Create an HR employee record for ${app?.applicantName}? Their profile will be pre-filled from their application.`}
-          confirmLabel="Create employee record" loading={convertToEmployee.isPending}
+        <ConfirmModal title="Convert to HR employee"
+          message={createHrRecord
+            ? `Create an HR employee record for ${app?.applicantName}? Their profile will be pre-filled from their application.`
+            : `Mark ${app?.applicantName} as placed — no HR record will be created. Use this for candidates placed at a client company rather than hired internally.`}
+          confirmLabel={createHrRecord ? 'Create employee record' : 'Mark as placed'} loading={convertToEmployee.isPending}
           onConfirm={() => convertToEmployee.mutate()} onCancel={() => setShowConvert(false)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14 }}>
+            <div>
+              <label style={lbl}>Placement type</label>
+              <div style={{ display: 'flex', gap: 7 }}>
+                <button type="button" onClick={() => setCreateHrRecord(true)}
+                  style={{ flex: 1, padding: '7px 10px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    background: createHrRecord ? '#DCFCE7' : '#F8FAFC',
+                    color: createHrRecord ? '#166534' : '#64748B',
+                    border: `1px solid ${createHrRecord ? '#86EFAC' : '#E2E8F0'}` }}>
+                  Internal hire
+                </button>
+                <button type="button" onClick={() => setCreateHrRecord(false)}
+                  style={{ flex: 1, padding: '7px 10px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    background: !createHrRecord ? '#EFF6FF' : '#F8FAFC',
+                    color: !createHrRecord ? '#1D4ED8' : '#64748B',
+                    border: `1px solid ${!createHrRecord ? '#BFDBFE' : '#E2E8F0'}` }}>
+                  External placement
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 5 }}>
+                {createHrRecord
+                  ? 'Creates an employee record in HR — this tenant is the employer.'
+                  : "Candidate joins a client company, not this tenant — no HR record is created."}
+              </div>
+            </div>
             <div><label style={lbl}>Job title</label><input value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder={initial.jobTitle ?? ''} style={inp} /></div>
             <div><label style={lbl}>Department</label><input value={department} onChange={e => setDepartment(e.target.value)} placeholder="Operations" style={inp} /></div>
             <div><label style={lbl}>Start date *</label><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inp} /></div>
+            {createHrRecord && (
+              <div>
+                <label style={lbl}>Gross salary (monthly) *</label>
+                <input type="number" min="0" step="0.01" value={grossSalary} onChange={e => setGrossSalary(e.target.value)}
+                  placeholder="e.g. 32000" style={inp} />
+              </div>
+            )}
           </div>
           {error && <div style={{ padding: '8px 12px', background: '#FEF2F2', borderRadius: 8, fontSize: 13, color: '#DC2626', marginBottom: 10 }}>{error}</div>}
         </ConfirmModal>
@@ -508,6 +1094,74 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
 }
 
 // ── Create / Edit Job Modal ────────────────────────────────────────────────
+function InterviewRoundsSection({ jobId }: { jobId: string }) {
+  const qc = useQueryClient()
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [error, setError] = useState('')
+
+  interface Round { id: string; name: string; sequence: number; description: string | null }
+  const { data: rounds } = useQuery<Round[]>({
+    queryKey: ['job-interview-rounds', jobId],
+    queryFn: async () => {
+      const r = await apiClient.get(`/api/v1/recruiter/jobs/${jobId}/interview-rounds`)
+      return r.data?.data ?? r.data
+    },
+  })
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['job-interview-rounds', jobId] })
+
+  const addRound = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/recruiter/jobs/${jobId}/interview-rounds`, {
+      name, sequence: (rounds?.length ?? 0) + 1, description: description || null,
+    }),
+    onSuccess: () => { invalidate(); setName(''); setDescription('') },
+    onError: (e: any) => setError(e.response?.data?.message || 'Failed to add round'),
+  })
+
+  const deleteRound = useMutation({
+    mutationFn: (roundId: string) => apiClient.delete(`/api/v1/recruiter/jobs/${jobId}/interview-rounds/${roundId}`),
+    onSuccess: () => invalidate(),
+    onError: (e: any) => setError(e.response?.data?.message || 'Failed to remove round — it may already have interviews scheduled against it'),
+  })
+
+  return (
+    <div style={{ gridColumn: '1/-1', borderTop: '1px solid #E2E8F0', paddingTop: 16, marginTop: 4 }}>
+      <label style={lbl}>Interview process (optional)</label>
+      <p style={{ fontSize: 12, color: '#94A3B8', margin: '0 0 10px' }}>
+        Define the rounds candidates for this role go through — e.g. Phone Screen, Technical, Final. Shown when scheduling an interview.
+      </p>
+      {(rounds ?? []).length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 6, marginBottom: 10 }}>
+          {rounds!.map(r => (
+            <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 7 }}>
+              <span style={{ fontSize: 13, color: '#0F172A' }}>
+                <strong>{r.sequence}.</strong> {r.name}
+                {r.description && <span style={{ color: '#94A3B8', fontWeight: 400 }}> — {r.description}</span>}
+              </span>
+              <button onClick={() => deleteRound.mutate(r.id)} disabled={deleteRound.isPending}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}>
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Round name, e.g. Technical"
+          style={{ ...inp, flex: 1 }} />
+        <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Description (optional)"
+          style={{ ...inp, flex: 1 }} />
+        <button onClick={() => name.trim() && addRound.mutate()} disabled={!name.trim() || addRound.isPending}
+          style={{ ...btnS, opacity: !name.trim() ? 0.5 : 1, whiteSpace: 'nowrap' as const }}>
+          {addRound.isPending ? 'Adding...' : 'Add round'}
+        </button>
+      </div>
+      {error && <div style={{ marginTop: 8, fontSize: 12, color: '#DC2626' }}>{error}</div>}
+    </div>
+  )
+}
+
 function JobModal({ job, onClose, onSaved }: { job?: Job; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({
     title:           job?.title ?? '',
@@ -613,6 +1267,7 @@ function JobModal({ job, onClose, onSaved }: { job?: Job; onClose: () => void; o
             <textarea value={form.benefits} onChange={e => f('benefits', e.target.value)} rows={3}
               placeholder="Medical aid, pension, performance bonuses, company vehicle, leave policy..." style={{ ...inp, resize: 'vertical' as const, fontFamily: 'inherit' }} />
           </div>
+          {job && <InterviewRoundsSection jobId={job.id} />}
         </div>
 
         {error && <div style={{ marginTop: 12, padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>{error}</div>}
@@ -643,6 +1298,8 @@ export function RecruiterPage() {
   const [selectedApp,   setSelectedApp]   = useState<Application | null>(null)
   const [showDeleteJob, setShowDeleteJob] = useState<Job | null>(null)
   const [showPublish,   setShowPublish]   = useState<Job | null>(null)
+  const [compareIds,    setCompareIds]    = useState<string[]>([])
+  const [showCompare,   setShowCompare]   = useState(false)
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['rec-jobs'] })
@@ -948,7 +1605,7 @@ export function RecruiterPage() {
                 <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
-                      {['Applicant', 'Job', 'Stage', 'Score', 'Source', 'Applied', 'CV', ''].map(h => (
+                      {['', 'Applicant', 'Job', 'Stage', 'Score', 'Source', 'Applied', 'CV', ''].map(h => (
                         <th key={h} style={{ padding: '10px 16px', textAlign: 'left' as const, fontSize: 11, fontWeight: 700, color: '#64748B', letterSpacing: '0.05em' }}>{h}</th>
                       ))}
                     </tr>
@@ -956,11 +1613,17 @@ export function RecruiterPage() {
                   <tbody>
                     {filteredApps.map((a, i) => {
                       const sc = STAGE[a.stage] ?? STAGE.APPLIED
+                      const checked = compareIds.includes(a.id)
                       return (
                         <tr key={a.id} onClick={() => setSelectedApp(a)}
                           style={{ background: i % 2 === 0 ? '#fff' : '#FAFAFA', cursor: 'pointer', transition: 'background 0.1s' }}
                           onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#F0F9FF'}
                           onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? '#fff' : '#FAFAFA'}>
+                          <td style={{ padding: '12px 8px 12px 16px' }} onClick={e => e.stopPropagation()}>
+                            <input type="checkbox" checked={checked}
+                              onChange={() => setCompareIds(prev => checked ? prev.filter(id => id !== a.id) : [...prev, a.id])}
+                              style={{ width: 15, height: 15, cursor: 'pointer' }} />
+                          </td>
                           <td style={{ padding: '12px 16px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                               <div style={{ width: 28, height: 28, borderRadius: '50%', background: sc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -997,6 +1660,23 @@ export function RecruiterPage() {
           )}
         </div>
       </div>
+
+      {compareIds.length > 0 && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#0F172A', color: '#fff', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 10px 40px rgba(0,0,0,0.3)', zIndex: 900 }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>{compareIds.length} candidate{compareIds.length === 1 ? '' : 's'} selected</span>
+          <button onClick={() => setShowCompare(true)} disabled={compareIds.length < 2}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: compareIds.length < 2 ? '#334155' : '#fff', color: compareIds.length < 2 ? '#94A3B8' : '#0F172A', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: compareIds.length < 2 ? 'default' : 'pointer' }}>
+            <Users size={13} /> Compare
+          </button>
+          <button onClick={() => setCompareIds([])} style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', display: 'flex' }}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {showCompare && (
+        <CompareModal applicationIds={compareIds} onClose={() => setShowCompare(false)} />
+      )}
 
       {/* Modals */}
       {(showCreate || editJob) && (

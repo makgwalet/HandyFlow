@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.recruiter.application.internal.RecruiterPdfGenerator;
 import za.co.handyflow.platform.recruiter.application.internal.RecruiterService;
 import za.co.handyflow.platform.recruiter.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -37,6 +38,7 @@ import java.util.UUID;
 public class RecruiterController {
 
     private final RecruiterService recruiterService;
+    private final RecruiterPdfGenerator recruiterPdfGenerator;
 
     // ── Summary ───────────────────────────────────────────────────────────────
 
@@ -105,6 +107,45 @@ public class RecruiterController {
         return ResponseEntity.ok(ApiResponse.success("Job deleted", null));
     }
 
+    // ── Interview round templates ───────────────────────────────────────────────
+
+    @GetMapping("/jobs/{jobId}/interview-rounds")
+    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    @Operation(summary = "List a job's defined interview rounds, in order")
+    public ResponseEntity<ApiResponse<List<InterviewRoundResponse>>> getInterviewRounds(
+            @PathVariable UUID jobId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                recruiterService.getInterviewRounds(TenantContext.getTenantIdAsObject(), jobId)));
+    }
+
+    @PostMapping("/jobs/{jobId}/interview-rounds")
+    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @Operation(summary = "Add an interview round to a job's process")
+    public ResponseEntity<ApiResponse<InterviewRoundResponse>> createInterviewRound(
+            @PathVariable UUID jobId, @Valid @RequestBody InterviewRoundRequest req) {
+        return ResponseEntity.status(201).body(ApiResponse.success("Round added",
+                recruiterService.createInterviewRound(TenantContext.getTenantIdAsObject(), jobId, req)));
+    }
+
+    @PutMapping("/jobs/{jobId}/interview-rounds/{roundId}")
+    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @Operation(summary = "Edit an interview round's name, sequence, or description")
+    public ResponseEntity<ApiResponse<InterviewRoundResponse>> updateInterviewRound(
+            @PathVariable UUID jobId, @PathVariable UUID roundId,
+            @Valid @RequestBody InterviewRoundRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Round updated",
+                recruiterService.updateInterviewRound(TenantContext.getTenantIdAsObject(), jobId, roundId, req)));
+    }
+
+    @DeleteMapping("/jobs/{jobId}/interview-rounds/{roundId}")
+    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @Operation(summary = "Remove an interview round — fails if any scheduled interview already references it")
+    public ResponseEntity<ApiResponse<Void>> deleteInterviewRound(
+            @PathVariable UUID jobId, @PathVariable UUID roundId) {
+        recruiterService.deleteInterviewRound(TenantContext.getTenantIdAsObject(), jobId, roundId);
+        return ResponseEntity.ok(ApiResponse.success("Round removed", null));
+    }
+
     // ── Applications — staff pipeline management ──────────────────────────────
 
     @GetMapping("/applications")
@@ -159,6 +200,16 @@ public class RecruiterController {
                 recruiterService.scheduleInterview(TenantContext.getTenantIdAsObject(), id, req)));
     }
 
+    @PostMapping("/applications/{appId}/interviews/{intId}/reschedule")
+    @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
+    @Operation(summary = "Reschedule or postpone an interview with a reason — closes out the old interview and creates a new one")
+    public ResponseEntity<ApiResponse<InterviewResponse>> rescheduleInterview(
+            @PathVariable UUID appId, @PathVariable UUID intId,
+            @Valid @RequestBody RescheduleInterviewRequest req) {
+        return ResponseEntity.status(201).body(ApiResponse.success("Interview rescheduled",
+                recruiterService.rescheduleInterview(TenantContext.getTenantIdAsObject(), appId, intId, req)));
+    }
+
     @PostMapping("/applications/{appId}/interviews/{intId}/outcome")
     @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
     @Operation(summary = "Record interview outcome")
@@ -172,14 +223,74 @@ public class RecruiterController {
 
     @PostMapping("/applications/{id}/convert-to-employee")
     @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
-    @Operation(summary = "Convert hired applicant to HR employee — pre-fills employee record")
+    @Operation(summary = "Convert hired applicant to HR employee, or mark as placed externally — application must already be HIRED")
     public ResponseEntity<ApiResponse<UUID>> convertToEmployee(
             @PathVariable UUID id,
             @Valid @RequestBody ConvertToEmployeeRequest req) {
         UUID employeeId = recruiterService.convertToEmployee(
-                TenantContext.getTenantIdAsObject(), id, req);
-        return ResponseEntity.ok(ApiResponse.success(
-                "Employee record created — go to HR to complete onboarding", employeeId));
+                TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId());
+        // employeeId is null for external/agency placements (createHrRecord=false) —
+        // no hr_employees row was created, so message accordingly.
+        String message = employeeId != null
+                ? "Employee record created — go to HR to complete onboarding"
+                : "Application marked as placed — no HR record created";
+        return ResponseEntity.ok(ApiResponse.success(message, employeeId));
+    }
+
+    // ── PDFs ─────────────────────────────────────────────────────────────────
+
+    @GetMapping("/applications/{id}/offer-letter")
+    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    @Operation(summary = "Download the offer letter PDF — application must have offer terms recorded (move to OFFER with salary details first)")
+    public ResponseEntity<byte[]> downloadOfferLetter(@PathVariable UUID id) {
+        byte[] pdf = recruiterPdfGenerator.generateOfferLetter(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=offer-letter.pdf")
+                .body(pdf);
+    }
+
+    @PostMapping("/applications/{id}/offer-letter/send")
+    @PreAuthorize("hasAuthority('RECRUITER_MANAGE')")
+    @Operation(summary = "Generate the offer letter PDF and email it to the applicant as an attachment")
+    public ResponseEntity<ApiResponse<Void>> sendOfferLetter(@PathVariable UUID id) {
+        recruiterService.sendOfferLetter(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok(ApiResponse.success("Offer letter sent", null));
+    }
+
+    @GetMapping("/applications/{id}/scorecard")
+    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    @Operation(summary = "Download a one-page candidate scorecard PDF (interviews, scores, notes) for hiring-committee review")
+    public ResponseEntity<byte[]> downloadScorecard(@PathVariable UUID id) {
+        byte[] pdf = recruiterPdfGenerator.generateScorecard(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=candidate-scorecard.pdf")
+                .body(pdf);
+    }
+
+    @GetMapping("/applications/{id}/cv")
+    @PreAuthorize("hasAuthority('RECRUITER_READ')")
+    @Operation(summary = "View the candidate's uploaded CV — 404 if none was uploaded")
+    public ResponseEntity<byte[]> viewCv(@PathVariable UUID id) {
+        byte[] pdf = recruiterService.getCvBytes(TenantContext.getTenantIdAsObject(), id);
+        // "inline", not "attachment" — this is View CV, meant to open in a
+        // preview tab, unlike the offer-letter/scorecard downloads (which
+        // were explicitly corrected to attachment earlier this session
+        // because those are documents meant to be saved).
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "inline; filename=cv.pdf")
+                .body(pdf);
+    }
+
+    @PutMapping("/applications/{id}/referral")
+    @PreAuthorize("hasAuthority('RECRUITER_ADMIN')")
+    @Operation(summary = "Link a referral to a real employee and/or update bonus status — RECRUITER_ADMIN since this drives an actual payout")
+    public ResponseEntity<ApiResponse<ApplicationResponse>> updateReferral(
+            @PathVariable UUID id, @RequestBody LinkReferralRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Referral updated",
+                recruiterService.updateReferral(TenantContext.getTenantIdAsObject(), id, req)));
     }
 
     // ── PUBLIC careers page — no auth ─────────────────────────────────────────
