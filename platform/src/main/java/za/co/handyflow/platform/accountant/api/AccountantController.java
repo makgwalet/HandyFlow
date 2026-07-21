@@ -312,7 +312,19 @@ public class AccountantController {
     public ResponseEntity<ApiResponse<TimeEntryResponse>> logTime(
             @Valid @RequestBody CreateTimeEntryRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Time logged",
-                accountantService.logTime(TenantContext.getTenantIdAsObject(), req)));
+                accountantService.logTime(TenantContext.getTenantIdAsObject(), req,
+                        TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
+    }
+
+    // NEW: closes the accountant module audit's "staff-level time
+    // report" gap.
+    @GetMapping("/time/staff-summary")
+    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @Operation(summary = "Time summary per staff member for a date range — hours, billable hours, amount billed")
+    public ResponseEntity<ApiResponse<List<StaffTimeSummaryResponse>>> getStaffTimeSummary(
+            @RequestParam java.time.LocalDate from, @RequestParam java.time.LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success("Staff time summary",
+                accountantService.getStaffTimeSummary(TenantContext.getTenantIdAsObject(), from, to)));
     }
 
     // NEW: closes the audit's "time entry edit/delete" gap. Both reject

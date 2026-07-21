@@ -57,6 +57,43 @@ export default function ClientsTab({ onNavigate }: { onNavigate?: (tab: string) 
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteError, setInviteError] = useState("")
 
+  // NEW: closes the "document requests" gap — asking a client for
+  // specific documents/information, distinct from Portal Access (which
+  // grants login) and from Workpapers (which manages files staff
+  // already have). Lives in the Client Workspace modal, matching
+  // Portal Access's own scale of interactivity, not the richer
+  // folder/version/audit system Workpapers needed its own tab for.
+  const { data: docRequests = [], isLoading: docRequestsLoading } = useQuery<any[]>({
+    queryKey: ["acc-doc-requests", workspaceFor?.id],
+    queryFn: async () => unwrap(await apiClient.get(`/api/v1/accountant/clients/${workspaceFor.id}/document-requests`)),
+    enabled: !!workspaceFor,
+  })
+
+  const [showNewDocRequest, setShowNewDocRequest] = useState(false)
+  const DOC_REQUEST_INIT = () => ({ description: "", items: [""], dueDate: "" })
+  const [docRequestForm, setDocRequestForm] = useState(DOC_REQUEST_INIT())
+  const [docRequestError, setDocRequestError] = useState("")
+
+  const createDocRequestMut = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/accountant/clients/${workspaceFor.id}/document-requests`, {
+      description: docRequestForm.description,
+      items: docRequestForm.items.map(i => i.trim()).filter(Boolean),
+      dueDate: docRequestForm.dueDate || null,
+      folderId: null,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["acc-doc-requests", workspaceFor?.id] })
+      setShowNewDocRequest(false); setDocRequestForm(DOC_REQUEST_INIT()); setDocRequestError("")
+    },
+    onError: (e: any) => setDocRequestError(e.response?.data?.message ?? "Failed to create request"),
+  })
+
+  const docRequestStatusMut = useMutation({
+    mutationFn: ({ requestId, status }: any) =>
+      apiClient.post(`/api/v1/accountant/clients/${workspaceFor.id}/document-requests/${requestId}/status`, { status }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["acc-doc-requests", workspaceFor?.id] }),
+  })
+
   const inviteMut = useMutation({
     mutationFn: () => apiClient.post(`/api/v1/accountant/clients/${workspaceFor.id}/portal-invites`, { email: inviteEmail }),
     onSuccess: () => {
@@ -78,6 +115,10 @@ export default function ClientsTab({ onNavigate }: { onNavigate?: (tab: string) 
     entityType: "PTY_LTD", tradingName: "", registeredName: "", registrationNumber: "",
     taxReferenceNumber: "", vatNumber: "", vatCategory: "", yearEndMonth: 2,
     contactEmail: "", contactPhone: "",
+    // NEW: closes the "clientOnboardingWelcome() never called" gap.
+    // Defaults false, deliberately — see backend CreateClientRequest's
+    // own comment for why this is opt-in, not opt-out.
+    sendWelcomeEmail: false,
   })
   const [form, setForm] = useState(INIT())
   const f = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
@@ -444,6 +485,21 @@ export default function ClientsTab({ onNavigate }: { onNavigate?: (tab: string) 
               </div>
             </div>
 
+            {/* NEW: closes the "clientOnboardingWelcome() never called"
+                gap. Unchecked by default — see CreateClientRequest's
+                own comment for why. */}
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 4 }}>
+              <input type="checkbox" id="send-welcome-email" checked={form.sendWelcomeEmail}
+                onChange={e => f("sendWelcomeEmail", e.target.checked)}
+                style={{ width: 16, height: 16, marginTop: 2 }} />
+              <label htmlFor="send-welcome-email" style={{ fontSize: 13, color: "#374151", cursor: "pointer" }}>
+                Send a welcome email to this client
+                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>
+                  Only for genuinely new relationships — leave unchecked if you're entering an existing client's details.
+                </div>
+              </label>
+            </div>
+
             {error && <div style={{ marginTop: 14, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{error}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setCreate(false)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
@@ -616,6 +672,52 @@ export default function ClientsTab({ onNavigate }: { onNavigate?: (tab: string) 
                     )}
                   </div>
 
+                  {/* NEW: Document Requests — closes the "document
+                      requests" gap. Same section shape as Portal
+                      Access — inline create form, no separate tab. */}
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>Document Requests</div>
+                      <button onClick={() => { setShowNewDocRequest(true); setDocRequestError("") }}
+                        style={{ fontSize: 12, color: "#1B3A6B", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+                        + New request
+                      </button>
+                    </div>
+                    {docRequestsLoading ? (
+                      <div style={{ fontSize: 12, color: "#94A3B8" }}>Loading...</div>
+                    ) : docRequests.length === 0 ? (
+                      <div style={{ fontSize: 12, color: "#94A3B8" }}>No document requests yet.</div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        {docRequests.map((r: any) => {
+                          const cfg: Record<string, { color: string; bg: string }> = {
+                            PENDING:   { color: "#D97706", bg: "#FFFBEB" },
+                            PARTIAL:   { color: "#1D4ED8", bg: "#EFF6FF" },
+                            COMPLETE:  { color: "#166534", bg: "#DCFCE7" },
+                            CANCELLED: { color: "#64748B", bg: "#F1F5F9" },
+                          }
+                          const c = cfg[r.status] ?? cfg.PENDING
+                          return (
+                            <div key={r.id} style={{ padding: "8px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: r.items?.length ? 5 : 0 }}>
+                                <span>{r.description}{r.dueDate && ` · Due ${fmtD(r.dueDate)}`}</span>
+                                <select value={r.status} onChange={e => docRequestStatusMut.mutate({ requestId: r.id, status: e.target.value })}
+                                  style={{ background: c.bg, color: c.color, border: "none", padding: "2px 6px", borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                                  {["PENDING", "PARTIAL", "COMPLETE", "CANCELLED"].map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                              </div>
+                              {r.items?.length > 0 && (
+                                <ul style={{ margin: 0, paddingLeft: 16, color: "#64748B" }}>
+                                  {r.items.map((item: string, i: number) => <li key={i}>{item}</li>)}
+                                </ul>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+
                 </div>
               )}
             </div>
@@ -644,6 +746,53 @@ export default function ClientsTab({ onNavigate }: { onNavigate?: (tab: string) 
                 onClick={() => inviteMut.mutate()}
                 style={{ padding: "9px 22px", background: !inviteEmail ? "#94A3B8" : "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {inviteMut.isPending ? "Sending..." : "Send Invite"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW: New Document Request modal — closes the "document
+          requests" gap. */}
+      {showNewDocRequest && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, backdropFilter: "blur(2px)" }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <h3 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700 }}>New Document Request</h3>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Description *</label>
+              <input autoFocus value={docRequestForm.description} onChange={e => setDocRequestForm(p => ({ ...p, description: e.target.value }))} placeholder="e.g. Documents needed for 2026 tax return"
+                style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Items</label>
+              {docRequestForm.items.map((item, i) => (
+                <div key={i} style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                  <input value={item} onChange={e => setDocRequestForm(p => ({ ...p, items: p.items.map((it, idx) => idx === i ? e.target.value : it) }))}
+                    placeholder={`Item ${i + 1}`}
+                    style={{ flex: 1, padding: "8px 10px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 13 }} />
+                  {docRequestForm.items.length > 1 && (
+                    <button onClick={() => setDocRequestForm(p => ({ ...p, items: p.items.filter((_, idx) => idx !== i) }))}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "#DC2626", padding: 4 }}>✕</button>
+                  )}
+                </div>
+              ))}
+              <button onClick={() => setDocRequestForm(p => ({ ...p, items: [...p.items, ""] }))}
+                style={{ padding: "5px 10px", background: "#F8FAFC", color: "#374151", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                + Add item
+              </button>
+            </div>
+            <div style={{ marginBottom: 6 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Due date (optional)</label>
+              <input type="date" value={docRequestForm.dueDate} onChange={e => setDocRequestForm(p => ({ ...p, dueDate: e.target.value }))}
+                style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
+            </div>
+            {docRequestError && <div style={{ marginTop: 12, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{docRequestError}</div>}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+              <button onClick={() => setShowNewDocRequest(false)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer" }}>Cancel</button>
+              <button disabled={!docRequestForm.description || docRequestForm.items.every(i => !i.trim()) || createDocRequestMut.isPending}
+                onClick={() => createDocRequestMut.mutate()}
+                style={{ padding: "9px 22px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                {createDocRequestMut.isPending ? "Sending..." : "Send Request"}
               </button>
             </div>
           </div>

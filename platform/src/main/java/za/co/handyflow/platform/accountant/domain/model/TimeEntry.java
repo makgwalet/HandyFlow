@@ -23,6 +23,9 @@ public class TimeEntry {
     @Column(name = "tenant_id",       nullable = false) private UUID       tenantId;
     @Column(name = "client_id",       nullable = false) private UUID       clientId;
     @Column(name = "practitioner_id")                   private UUID       practitionerId;
+    // NEW: closes the "staff-level time report" gap. See the migration's
+    // own comment — no backfill for existing rows, deliberately.
+    @Column(name = "practitioner_name", length = 255)    private String     practitionerName;
     @Column(name = "entry_date",      nullable = false) private LocalDate  entryDate;
     @Column(name = "activity_type",   nullable = false) private String     activityType;
     @Column(name = "description",     columnDefinition = "TEXT") private String description;
@@ -42,22 +45,23 @@ public class TimeEntry {
 
     // ── Factory ───────────────────────────────────────────────────────────────
 
-    public static TimeEntry create(UUID tenantId, UUID clientId, UUID practitionerId,
+    public static TimeEntry create(UUID tenantId, UUID clientId, UUID practitionerId, String practitionerName,
                                    LocalDate entryDate, String activityType, String description,
                                    BigDecimal hours, BigDecimal hourlyRate, boolean billable) {
         TimeEntry t = new TimeEntry();
-        t.tenantId       = tenantId;
-        t.clientId       = clientId;
-        t.practitionerId = practitionerId;
-        t.entryDate      = entryDate;
-        t.activityType   = activityType;
-        t.description    = description;
-        t.hours          = hours;
-        t.hourlyRate     = hourlyRate;
-        t.billable       = billable;
-        t.status         = billable ? "UNBILLED" : "NON_BILLABLE";
-        t.createdAt      = Instant.now();
-        t.updatedAt      = Instant.now();
+        t.tenantId         = tenantId;
+        t.clientId         = clientId;
+        t.practitionerId   = practitionerId;
+        t.practitionerName = practitionerName;
+        t.entryDate        = entryDate;
+        t.activityType     = activityType;
+        t.description      = description;
+        t.hours            = hours;
+        t.hourlyRate       = hourlyRate;
+        t.billable         = billable;
+        t.status           = billable ? "UNBILLED" : "NON_BILLABLE";
+        t.createdAt        = Instant.now();
+        t.updatedAt        = Instant.now();
         return t;
     }
 

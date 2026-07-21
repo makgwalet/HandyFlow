@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Briefcase, BarChart2, Users, Calendar, Clock, FileText, X, Settings, BookOpen } from "lucide-react"
+import { Briefcase, BarChart2, Users, Calendar, Clock, FileText, X, Settings, BookOpen, FolderOpen } from "lucide-react"
 import AccountantDashboard from "./AccountantDashboard"
 import ClientsTab          from "./ClientsTab"
 import DeadlinesTab        from "./DeadlinesTab"
@@ -11,8 +11,10 @@ import BillingTab          from "./BillingTab"
 // NEW: closes the #2 must-fix gap from the accountant module audit —
 // journals were fully modeled and postable but had no tab at all.
 import JournalsTab         from "./JournalsTab"
+// NEW: closes the "larger workpaper system" gap.
+import WorkpapersTab       from "./WorkpapersTab"
 
-type Tab = "dashboard" | "clients" | "deadlines" | "time" | "billing" | "journals"
+type Tab = "dashboard" | "clients" | "deadlines" | "time" | "billing" | "journals" | "workpapers"
 
 const TABS = [
   { id: "dashboard" as Tab, label: "Dashboard",  icon: BarChart2 },
@@ -21,6 +23,7 @@ const TABS = [
   { id: "time"      as Tab, label: "Time",       icon: Clock     },
   { id: "billing"   as Tab, label: "Billing",    icon: FileText  },
   { id: "journals"  as Tab, label: "Journals",   icon: BookOpen  },
+  { id: "workpapers" as Tab, label: "Workpapers", icon: FolderOpen },
 ]
 
 const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }
@@ -149,6 +152,7 @@ export function AccountantPage() {
         {tab === "time"      && <TimeTab />}
         {tab === "billing"   && <BillingTab />}
         {tab === "journals"  && <JournalsTab />}
+        {tab === "workpapers" && <WorkpapersTab />}
       </div>
 
       {/* Practice profile modal */}

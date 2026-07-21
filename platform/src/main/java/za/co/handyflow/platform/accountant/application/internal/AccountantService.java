@@ -84,6 +84,28 @@ public class AccountantService {
                 req.contactEmail(), req.contactPhone());
         clientRepo.save(client);
         log.info("Created acc_client={} entity={} tenant={}", client.getTradingName(), client.getEntityType(), tenantId);
+
+        // NEW: closes the "clientOnboardingWelcome() never called" gap.
+        // Deliberately opt-in (req.sendWelcomeEmail()) — see
+        // CreateClientRequest's own comment for why a firm bulk-entering
+        // an existing book of clients should never accidentally spam
+        // long-standing clients with a "welcome, your file has just
+        // been set up" email.
+        if (req.sendWelcomeEmail()) {
+            if (client.getContactEmail() != null && !client.getContactEmail().isBlank()) {
+                String firmName = profileRepo.findByTenantId(tenantId)
+                        .map(AccountantProfile::getFirmName)
+                        .orElse("your accountant");
+                emailService.send(client.getContactEmail(),
+                        "Welcome to " + firmName,
+                        za.co.handyflow.platform.shared.EmailTemplates.clientOnboardingWelcome(
+                                client.getTradingName(), firmName, client.getContactEmail()));
+            } else {
+                log.warn("sendWelcomeEmail=true for client={} but no contact email on file — no email sent",
+                        client.getId());
+            }
+        }
+
         return toClientResponse(client, tenantId);
     }
 
@@ -206,9 +228,24 @@ public class AccountantService {
     }
 
     @Transactional
+    // FIX: was deadlineRepo.findById(deadlineId) — no tenant check at
+    // all, and the clientId parameter was accepted but never actually
+    // used to verify the deadline belonged to that client either. Same
+    // bug pattern already fixed twice elsewhere in this module (fee
+    // notes, journals), never applied here until now.
+    // <p>
+    // Deliberately reuses findByClient() and findActive() — both
+    // already confirmed to exist and compile — rather than adding a
+    // new method to TaxDeadlineRepository.java, whose real source was
+    // never actually shown this session. Blindly rewriting a file
+    // whose current content isn't known would risk overwriting or
+    // conflicting with methods this service has no visibility into.
     public TaxDeadlineResponse fileFiling(TenantId tenantId, UUID clientId, UUID deadlineId,
                                           FileDeadlineRequest req) {
-        TaxDeadline deadline = deadlineRepo.findById(deadlineId)
+        findActive(tenantId, clientId);
+        TaxDeadline deadline = deadlineRepo.findByClient(clientId).stream()
+                .filter(d -> d.getId().equals(deadlineId))
+                .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Deadline", deadlineId.toString()));
         deadline.markFiled(req.filedDate(), req.sarsReference(), req.filingAmount());
         deadlineRepo.save(deadline);
@@ -580,13 +617,43 @@ public class AccountantService {
     // ── L6: Time tracking & billing ───────────────────────────────────────────
 
     @Transactional
-    public TimeEntryResponse logTime(TenantId tenantId, CreateTimeEntryRequest req) {
+    // FIX: was req.practitionerId() — trusting a client-supplied value.
+    // Found while scoping the "staff-level time report" gap: the
+    // frontend form never actually sent this field at all (confirmed
+    // directly against TimeTab.tsx — no practitioner field exists in
+    // its form state), meaning practitioner_id has almost certainly
+    // been NULL for every entry ever logged. Also a real correctness
+    // issue independent of that: taking practitioner identity from
+    // request data at all means, in principle, any staff member could
+    // claim time belongs to someone else. Now derived from the
+    // authenticated session instead, matching how uploaded_by/
+    // recorded_by already work elsewhere in this module.
+    public TimeEntryResponse logTime(TenantId tenantId, CreateTimeEntryRequest req,
+                                     UUID practitionerId, String practitionerName) {
         findActive(tenantId, req.clientId());
-        TimeEntry entry = TimeEntry.create(tenantId.getValue(), req.clientId(), req.practitionerId(),
+        TimeEntry entry = TimeEntry.create(tenantId.getValue(), req.clientId(), practitionerId, practitionerName,
                 req.entryDate(), req.activityType(), req.description(),
                 req.hours(), req.hourlyRate(), req.billable());
         timeEntryRepo.save(entry);
         return toTimeEntryResponse(entry);
+    }
+
+    /**
+     * NEW: closes the accountant module audit's "staff-level time
+     * report" gap — the actual report, not just the query it's built
+     * on. A NULL practitionerId group (entries logged before this
+     * session's fix to logTime() actually captured identity) is
+     * labeled "Unassigned" rather than hidden — an honest reflection
+     * of real historical data, not papered over.
+     */
+    @Transactional(readOnly = true)
+    public List<StaffTimeSummaryResponse> getStaffTimeSummary(TenantId tenantId, LocalDate from, LocalDate to) {
+        return timeEntryRepo.findStaffSummary(tenantId.getValue(), from, to).stream()
+                .map(p -> new StaffTimeSummaryResponse(
+                        p.getPractitionerId(),
+                        p.getPractitionerId() == null ? "Unassigned" : (p.getPractitionerName() != null ? p.getPractitionerName() : "Unknown"),
+                        p.getTotalHours(), p.getBillableHours(), p.getTotalBilled(), p.getEntryCount()))
+                .toList();
     }
 
     @Transactional(readOnly = true)

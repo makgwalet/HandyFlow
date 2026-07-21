@@ -17,6 +17,22 @@ export default function TimeTab() {
   const [showLog, setShowLog]   = useState(false)
   const [selClient, setSelClient] = useState<string>("ALL")
   const [error, setError] = useState("")
+  // NEW: closes the accountant module audit's "staff-level time
+  // report" gap.
+  const [view, setView] = useState<"my-time" | "staff-report">("my-time")
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
+  const todayStr = now.toISOString().split("T")[0]
+  const [reportFrom, setReportFrom] = useState(monthStart)
+  const [reportTo, setReportTo] = useState(todayStr)
+
+  const { data: staffSummary = [], isLoading: staffLoading } = useQuery<any[]>({
+    queryKey: ["acc-staff-time-summary", reportFrom, reportTo],
+    queryFn: async () => unwrap(await apiClient.get("/api/v1/accountant/time/staff-summary", {
+      params: { from: reportFrom, to: reportTo },
+    })),
+    enabled: view === "staff-report",
+  })
 
   const INIT = () => ({
     clientId: "", entryDate: new Date().toISOString().split("T")[0],
@@ -113,6 +129,20 @@ export default function TimeTab() {
 
   return (
     <div>
+      {/* NEW: closes the "staff-level time report" gap. */}
+      <div style={{ display: "flex", gap: 2, marginBottom: 18, border: "1px solid #E2E8F0", borderRadius: 10, width: "fit-content", overflow: "hidden" }}>
+        <button onClick={() => setView("my-time")}
+          style={{ padding: "8px 16px", border: "none", background: view === "my-time" ? "#1B3A6B" : "#fff", color: view === "my-time" ? "#fff" : "#64748B", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          Time Entries
+        </button>
+        <button onClick={() => setView("staff-report")}
+          style={{ padding: "8px 16px", border: "none", background: view === "staff-report" ? "#1B3A6B" : "#fff", color: view === "staff-report" ? "#fff" : "#64748B", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          Staff Report
+        </button>
+      </div>
+
+      {view === "my-time" && (
+      <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <div style={{ background: "#F0FDF9", border: "1px solid #99F6E4", borderRadius: 9, padding: "10px 16px" }}>
@@ -198,6 +228,55 @@ export default function TimeTab() {
               </div>
             )
           })}
+        </div>
+      )}
+      </>
+      )}
+
+      {view === "staff-report" && (
+        <div>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-end", marginBottom: 20, flexWrap: "wrap" }}>
+            <div>
+              <label style={lbl}>From</label>
+              <input type="date" value={reportFrom} onChange={e => setReportFrom(e.target.value)} style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>To</label>
+              <input type="date" value={reportTo} onChange={e => setReportTo(e.target.value)} style={inp} />
+            </div>
+          </div>
+
+          {staffLoading ? (
+            <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading...</div>
+          ) : staffSummary.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "50px 20px", color: "#94A3B8" }}>
+              <TrendingUp size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
+              <div>No time logged in this period.</div>
+            </div>
+          ) : (
+            <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#F8FAFC" }}>
+                    {["Staff Member", "Total Hours", "Billable Hours", "Amount Billed", "Entries"].map(h => (
+                      <th key={h} style={{ padding: "10px 14px", textAlign: h === "Staff Member" ? "left" as const : "right" as const, fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {staffSummary.map((s: any) => (
+                    <tr key={s.practitionerId ?? "unassigned"} style={{ borderTop: "1px solid #F1F5F9" }}>
+                      <td style={{ padding: "10px 14px", fontSize: 13, fontWeight: 600, color: s.practitionerName === "Unassigned" ? "#94A3B8" : "#0F172A" }}>{s.practitionerName}</td>
+                      <td style={{ padding: "10px 14px", fontSize: 13, textAlign: "right" as const }}>{Number(s.totalHours ?? 0).toFixed(2)}h</td>
+                      <td style={{ padding: "10px 14px", fontSize: 13, textAlign: "right" as const, color: "#0D9488" }}>{Number(s.billableHours ?? 0).toFixed(2)}h</td>
+                      <td style={{ padding: "10px 14px", fontSize: 13, fontWeight: 700, textAlign: "right" as const }}>{fmtR(s.totalBilled)}</td>
+                      <td style={{ padding: "10px 14px", fontSize: 13, textAlign: "right" as const, color: "#94A3B8" }}>{s.entryCount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

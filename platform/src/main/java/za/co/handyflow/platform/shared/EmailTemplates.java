@@ -731,6 +731,34 @@ public class EmailTemplates {
     }
 
     /**
+     * NEW: closes the "document requests" gap — confirmed via real
+     * testing that document requests were being created with no
+     * notification to the client at all, a silent database record with
+     * no way for the client to actually find out something was
+     * requested of them. Items are rendered as a real bulleted list,
+     * not a comma-joined string, so a client scanning the email can
+     * actually tell what's being asked for.
+     */
+    public static String documentRequestCreated(String clientName, String firmName, String description,
+                                                java.util.List<String> items, String dueDate) {
+        String itemsHtml = items.stream()
+                .map(i -> "<li>" + org.springframework.web.util.HtmlUtils.htmlEscape(i) + "</li>")
+                .collect(java.util.stream.Collectors.joining());
+        return wrap("""
+            <p><strong>%s</strong> has requested the following from you:</p>
+            <p style="font-weight:600;margin-bottom:6px;">%s</p>
+            <ul style="margin:0 0 16px;padding-left:20px;">%s</ul>
+            %s
+            <p>Please send these through at your earliest convenience. If you have any questions,
+               please don't hesitate to contact %s.</p>
+            """.formatted(firmName, description, itemsHtml,
+                dueDate != null
+                        ? "<div class=\"highlight-amber\"><p>Due by: <strong>" + dueDate + "</strong></p></div>"
+                        : "",
+                firmName));
+    }
+
+    /**
      * NEW: TCS PIN expiry reminder — sent at D-30, D-7, D-1, same tiered
      * pattern as taxDeadlineReminder() just above. Closes the accountant
      * module audit's "TCS PIN expiry reminders" quick-win gap.

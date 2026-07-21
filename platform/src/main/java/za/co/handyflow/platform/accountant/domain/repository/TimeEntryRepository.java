@@ -76,4 +76,41 @@ public interface TimeEntryRepository extends JpaRepository<TimeEntry, UUID> {
      */
     @Query("SELECT t FROM AccountantTimeEntry t WHERE t.tenantId = :tenantId AND t.id = :id")
     java.util.Optional<TimeEntry> findByTenantIdAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
+
+    /**
+     * NEW: closes the accountant module audit's "staff-level time
+     * report" gap — the actual aggregate answering "what did each team
+     * member bill this period", not just findByPractitioner()'s
+     * one-practitioner-at-a-time detail view. Groups by practitionerId
+     * across every client for the tenant. A NULL practitionerId group
+     * (historical entries logged before AccountantService.logTime()
+     * was fixed to actually capture this) is a real, expected
+     * possibility — handled as "Unassigned" in the service layer, not
+     * hidden or excluded here.
+     */
+    interface StaffTimeSummaryProjection {
+        UUID getPractitionerId();
+        String getPractitionerName();
+        BigDecimal getTotalHours();
+        BigDecimal getBillableHours();
+        BigDecimal getTotalBilled();
+        Long getEntryCount();
+    }
+
+    @Query("""
+        SELECT t.practitionerId as practitionerId,
+               MAX(t.practitionerName) as practitionerName,
+               COALESCE(SUM(t.hours), 0) as totalHours,
+               COALESCE(SUM(CASE WHEN t.billable = true THEN t.hours ELSE 0 END), 0) as billableHours,
+               COALESCE(SUM(CASE WHEN t.billable = true THEN t.hours * t.hourlyRate ELSE 0 END), 0) as totalBilled,
+               COUNT(t) as entryCount
+        FROM AccountantTimeEntry t
+        WHERE t.tenantId  = :tenantId
+          AND t.entryDate BETWEEN :from AND :to
+        GROUP BY t.practitionerId
+        ORDER BY totalHours DESC
+    """)
+    List<StaffTimeSummaryProjection> findStaffSummary(@Param("tenantId") UUID tenantId,
+                                                      @Param("from") LocalDate from,
+                                                      @Param("to") LocalDate to);
 }
