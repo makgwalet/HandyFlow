@@ -9,7 +9,7 @@ interface JournalLine { id: string; accountId: string; accountCode: string; acco
   description: string; debitAmount: number; creditAmount: number }
 interface Journal { id: string; entryNumber: string; entryDate: string; description: string
   reference: string; entryType: string; status: string; totalDebit: number; totalCredit: number
-  balanced: boolean; lines: JournalLine[]; createdAt: string }
+  balanced: boolean; lines: JournalLine[]; createdBy: string | null; createdAt: string }
 
 const STATUS: Record<string, { label: string; bg: string; color: string }> = {
   DRAFT:    { label: "Draft",    bg: "#F1F5F9", color: "#475569" },
@@ -67,7 +67,14 @@ export default function JournalEntriesTab() {
 
   const totalDebit  = lines.reduce((s, l) => s + (parseFloat(l.debit)  || 0), 0)
   const totalCredit = lines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0)
-  const balanced    = Math.abs(totalDebit - totalCredit) < 0.01 && totalDebit > 0
+  // A line with BOTH a debit and a credit filled in isn't valid — the
+  // backend rejects it explicitly now rather than silently discarding
+  // the credit value, but the column-sum check below would still say
+  // "balanced" for exactly that broken case (both columns summed
+  // independently look fine even though one side gets thrown away line
+  // by line). Caught live: don't let this indicator lie again.
+  const mixedLines  = lines.filter(l => (parseFloat(l.debit) || 0) > 0 && (parseFloat(l.credit) || 0) > 0)
+  const balanced    = Math.abs(totalDebit - totalCredit) < 0.01 && totalDebit > 0 && mixedLines.length === 0
 
   const create = useMutation({
     mutationFn: () => apiClient.post("/api/v1/accounting/journal-entries", {
@@ -95,6 +102,7 @@ export default function JournalEntriesTab() {
   const post = useMutation({
     mutationFn: (id: string) => apiClient.post(`/api/v1/accounting/journal-entries/${id}/post`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["journals"] }),
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to post journal entry"),
   })
 
   const reverse = useMutation({
@@ -142,6 +150,18 @@ export default function JournalEntriesTab() {
           </button>
         ))}
       </div>
+
+      {/* Table-level error — Post is clicked directly from a row, not
+          from within a modal, so it needs its own visible error area
+          rather than relying on the Create/Reverse modals' error blocks,
+          which a Post failure would never reach. */}
+      {error && !showCreate && !reverseTarget && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px",
+          background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8,
+          fontSize: 13, color: "#DC2626", marginBottom: 16 }}>
+          <AlertCircle size={14} />{error}
+        </div>
+      )}
 
       {/* Table */}
       <div style={{ background: "white", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
@@ -195,7 +215,7 @@ export default function JournalEntriesTab() {
                       <td style={{ padding: "12px 14px" }}>
                         <div style={{ display: "flex", gap: 5 }} onClick={e => e.stopPropagation()}>
                           {j.status === "DRAFT" && (
-                            <button onClick={() => post.mutate(j.id)} disabled={post.isPending}
+                            <button onClick={() => { setError(""); post.mutate(j.id) }} disabled={post.isPending}
                               style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px",
                                 background: "#F0FDF4", color: "#166534", border: "1px solid #BBF7D0",
                                 borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
@@ -318,28 +338,38 @@ export default function JournalEntriesTab() {
                   <div key={h} style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</div>
                 ))}
               </div>
-              {lines.map(l => (
-                <div key={l.tempId} style={{ display: "grid", gridTemplateColumns: "3fr 2fr 1fr 1fr 32px", gap: 8, marginBottom: 8, alignItems: "center" }}>
-                  <select value={l.accountId} onChange={e => updateLine(l.tempId, "accountId", e.target.value)}
-                    style={{ ...inp, fontSize: 12 }}>
-                    <option value="">Select account...</option>
-                    {accounts.map(a => (
-                      <option key={a.id} value={a.id}>{a.accountCode} — {a.accountName}</option>
-                    ))}
-                  </select>
-                  <input value={l.description} onChange={e => updateLine(l.tempId, "description", e.target.value)}
-                    placeholder="Optional note" style={{ ...inp, fontSize: 12 }} />
-                  <input type="number" value={l.debit} onChange={e => updateLine(l.tempId, "debit", e.target.value)}
-                    placeholder="0.00" style={{ ...inp, fontSize: 12 }} />
-                  <input type="number" value={l.credit} onChange={e => updateLine(l.tempId, "credit", e.target.value)}
-                    placeholder="0.00" style={{ ...inp, fontSize: 12 }} />
-                  <button onClick={() => removeLine(l.tempId)} disabled={lines.length <= 2}
-                    style={{ background: "none", border: "none", cursor: lines.length <= 2 ? "not-allowed" : "pointer",
-                      color: lines.length <= 2 ? "#CBD5E1" : "#FDA4AF", padding: 4, borderRadius: 6, display: "flex" }}>
-                    <Trash2 size={14} />
-                  </button>
+              {lines.map(l => {
+                const isMixed = (parseFloat(l.debit) || 0) > 0 && (parseFloat(l.credit) || 0) > 0
+                return (
+                <div key={l.tempId}>
+                  <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr 1fr 1fr 32px", gap: 8, marginBottom: isMixed ? 3 : 8, alignItems: "center" }}>
+                    <select value={l.accountId} onChange={e => updateLine(l.tempId, "accountId", e.target.value)}
+                      style={{ ...inp, fontSize: 12 }}>
+                      <option value="">Select account...</option>
+                      {accounts.map(a => (
+                        <option key={a.id} value={a.id}>{a.accountCode} — {a.accountName}</option>
+                      ))}
+                    </select>
+                    <input value={l.description} onChange={e => updateLine(l.tempId, "description", e.target.value)}
+                      placeholder="Optional note" style={{ ...inp, fontSize: 12 }} />
+                    <input type="number" value={l.debit} onChange={e => updateLine(l.tempId, "debit", e.target.value)}
+                      placeholder="0.00" style={{ ...inp, fontSize: 12, ...(isMixed ? { borderColor: "#FCA5A5", background: "#FEF2F2" } : {}) }} />
+                    <input type="number" value={l.credit} onChange={e => updateLine(l.tempId, "credit", e.target.value)}
+                      placeholder="0.00" style={{ ...inp, fontSize: 12, ...(isMixed ? { borderColor: "#FCA5A5", background: "#FEF2F2" } : {}) }} />
+                    <button onClick={() => removeLine(l.tempId)} disabled={lines.length <= 2}
+                      style={{ background: "none", border: "none", cursor: lines.length <= 2 ? "not-allowed" : "pointer",
+                        color: lines.length <= 2 ? "#CBD5E1" : "#FDA4AF", padding: 4, borderRadius: 6, display: "flex" }}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                  {isMixed && (
+                    <div style={{ fontSize: 11, color: "#DC2626", marginBottom: 8, marginLeft: 2 }}>
+                      Pick one — a line can't be both a debit and a credit
+                    </div>
+                  )}
                 </div>
-              ))}
+                )
+              })}
               <button onClick={addLine}
                 style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#1B3A6B",
                   background: "none", border: "1px dashed #BFDBFE", borderRadius: 7, padding: "6px 12px", cursor: "pointer" }}>
@@ -355,7 +385,11 @@ export default function JournalEntriesTab() {
               <span style={{ color: "#64748B" }}>Total Credit: </span>
               <strong style={{ color: "#0D9488", marginRight: 20 }}>{fmtR(totalCredit)}</strong>
               <strong style={{ color: balanced ? "#166534" : "#DC2626" }}>
-                {balanced ? "✓ Balanced" : `✗ Off by R${Math.abs(totalDebit - totalCredit).toFixed(2)}`}
+                {balanced
+                  ? "✓ Balanced"
+                  : mixedLines.length > 0
+                    ? "✗ Fix the line(s) marked above"
+                    : `✗ Off by R${Math.abs(totalDebit - totalCredit).toFixed(2)}`}
               </strong>
             </div>
 

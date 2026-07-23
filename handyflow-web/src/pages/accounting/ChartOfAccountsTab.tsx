@@ -1,7 +1,8 @@
 // src/pages/accounting/ChartOfAccountsTab.tsx
-import { useQuery } from "@tanstack/react-query"
+import { useState } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { BookOpen, AlertCircle } from "lucide-react"
+import { BookOpen, AlertCircle, Plus, X } from "lucide-react"
 
 interface Account {
   id: string; accountCode: string; accountName: string
@@ -20,13 +21,33 @@ const TYPE_COLOR: Record<string, { bg: string; color: string }> = {
 const fmtR = (n: number) =>
   n == null ? "—" : `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
 
+const inp: React.CSSProperties = {
+  width: "100%", padding: "8px 12px", border: "1.5px solid #E2E8F0",
+  borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box",
+}
+
 export default function ChartOfAccountsTab() {
+  const qc = useQueryClient()
+  const [showCreate, setShowCreate] = useState(false)
+  const [form, setForm] = useState({ accountCode: "", accountName: "", accountType: "EXPENSE", accountSubtype: "", description: "" })
+  const [error, setError] = useState("")
+
   const { data: accounts = [], isLoading, isError } = useQuery<Account[]>({
     queryKey: ["coa"],
     queryFn: async () => {
       const res = await apiClient.get("/api/v1/accounting/accounts")
       return (res.data?.data ?? res.data) as Account[]
     },
+  })
+
+  const createAccount = useMutation({
+    mutationFn: () => apiClient.post("/api/v1/accounting/accounts", form),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["coa"] })
+      setShowCreate(false); setError("")
+      setForm({ accountCode: "", accountName: "", accountType: "EXPENSE", accountSubtype: "", description: "" })
+    },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to create account"),
   })
 
   const grouped = accounts.reduce((acc, a) => {
@@ -60,6 +81,11 @@ export default function ChartOfAccountsTab() {
             )
           })}
         </div>
+        <button onClick={() => { setShowCreate(true); setError("") }}
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "#0D9488", color: "white",
+            border: "none", borderRadius: 9, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginLeft: 12 }}>
+          <Plus size={14} /> Add Account
+        </button>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -123,6 +149,75 @@ export default function ChartOfAccountsTab() {
           )
         })}
       </div>
+
+      {showCreate && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex",
+          alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
+          <div style={{ background: "white", borderRadius: 16, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Add Custom Account</h3>
+              <button onClick={() => setShowCreate(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={18} /></button>
+            </div>
+            <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 16px" }}>
+              The 47 seeded accounts cover most cases — this is for the one or two a real business always ends up needing.
+            </p>
+            <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 5 }}>Code *</label>
+                <input value={form.accountCode} onChange={e => setForm(f => ({ ...f, accountCode: e.target.value }))}
+                  placeholder="5250" style={inp} />
+              </div>
+              <div style={{ flex: 2 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 5 }}>Name *</label>
+                <input value={form.accountName} onChange={e => setForm(f => ({ ...f, accountName: e.target.value }))}
+                  placeholder="Security Callout Fees" style={inp} />
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 5 }}>Type *</label>
+              <div style={{ display: "flex", gap: 6 }}>
+                {types.map(t => {
+                  const c = TYPE_COLOR[t]
+                  const active = form.accountType === t
+                  return (
+                    <button key={t} type="button" onClick={() => setForm(f => ({ ...f, accountType: t }))}
+                      style={{ flex: 1, padding: "7px 8px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                        border: `1.5px solid ${active ? c.color : "#E2E8F0"}`,
+                        background: active ? c.bg : "white", color: active ? c.color : "#94A3B8" }}>
+                      {t}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 5 }}>Subtype (optional)</label>
+              <input value={form.accountSubtype} onChange={e => setForm(f => ({ ...f, accountSubtype: e.target.value }))}
+                placeholder="e.g. OPERATING" style={inp} />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 5 }}>Description (optional)</label>
+              <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} style={inp} />
+            </div>
+            {error && (
+              <div style={{ padding: "8px 12px", background: "#FEF2F2", borderRadius: 8,
+                fontSize: 12, color: "#DC2626", marginBottom: 12 }}>{error}</div>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={() => setShowCreate(false)}
+                style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "white", fontSize: 13, cursor: "pointer", color: "#374151" }}>Cancel</button>
+              <button disabled={createAccount.isPending || !form.accountCode || !form.accountName}
+                onClick={() => createAccount.mutate()}
+                style={{ padding: "9px 20px", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700,
+                  background: "#0D9488", color: "white", cursor: "pointer",
+                  opacity: (!form.accountCode || !form.accountName) ? 0.5 : 1 }}>
+                {createAccount.isPending ? "Creating..." : "Create Account"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

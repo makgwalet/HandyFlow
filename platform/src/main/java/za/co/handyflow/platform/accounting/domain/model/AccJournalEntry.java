@@ -29,6 +29,7 @@ public class AccJournalEntry {
     @Column(name = "total_debit")  BigDecimal totalDebit  = BigDecimal.ZERO;
     @Column(name = "total_credit") BigDecimal totalCredit = BigDecimal.ZERO;
     @Column(name = "posted_at")    Instant postedAt;
+    @Column(name = "created_by")   UUID createdBy;
     @Column(name = "created_at")   Instant createdAt;
     @Column(name = "updated_at")   Instant updatedAt;
     @Column(name = "deleted_at")   Instant deletedAt;
@@ -41,6 +42,21 @@ public class AccJournalEntry {
     public static AccJournalEntry create(TenantId tenantId, String entryNumber,
                                          LocalDate entryDate, String description,
                                          String reference, String entryType) {
+        return create(tenantId, entryNumber, entryDate, description, reference, entryType, null);
+    }
+
+    // Overload, not a signature change — AccountingFacade (AP) and
+    // reconcileWithNewJournal() both call the 6-arg version above and
+    // stay completely untouched. createdBy is only ever real for entries
+    // created through the manual "New Journal Entry" flow — those two
+    // other paths represent business events that are already reviewed
+    // elsewhere (AP's own bill maker-checker, a staff member's deliberate
+    // reconciliation click), so createdBy stays null for them, and the
+    // maker-checker check added alongside this treats null as "skip".
+    public static AccJournalEntry create(TenantId tenantId, String entryNumber,
+                                         LocalDate entryDate, String description,
+                                         String reference, String entryType,
+                                         UUID createdBy) {
         AccJournalEntry e = new AccJournalEntry();
         e.id          = UUID.randomUUID();
         e.tenantId    = tenantId.getValue();
@@ -52,6 +68,7 @@ public class AccJournalEntry {
         e.status      = "DRAFT";
         e.totalDebit  = BigDecimal.ZERO;
         e.totalCredit = BigDecimal.ZERO;
+        e.createdBy   = createdBy;
         e.createdAt   = Instant.now();
         e.updatedAt   = Instant.now();
         return e;

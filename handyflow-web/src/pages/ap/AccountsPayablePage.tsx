@@ -4,10 +4,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import {
   FileText, CreditCard, AlertTriangle, CheckCircle,
-  Clock, TrendingDown, BarChart2, Calendar,
+  Clock, TrendingDown, BarChart2, Calendar, Users, RefreshCw, Landmark,
 } from "lucide-react"
 import { BillsTab }   from "./BillsTab"
 import { BatchesTab } from "./BatchesTab"
+import AgingTab from "./AgingTab"
+import { RecurringBillsTab } from "./RecurringBillsTab"
+import { SupplierBankingTab } from "./SupplierBankingTab"
 
 interface Summary {
   totalOutstanding: number; overdueAmount: number
@@ -21,7 +24,7 @@ const fmtR = (n: any) =>
 
 export function AccountsPayablePage() {
   const qc = useQueryClient()
-  const [tab, setTab] = useState<"bills" | "batches">("bills")
+  const [tab, setTab] = useState<"bills" | "batches" | "aging" | "recurring" | "suppliers">("bills")
 
   const { data: summary } = useQuery<Summary>({
     queryKey: ["ap-summary"],
@@ -88,8 +91,11 @@ export function AccountsPayablePage() {
       <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 14 }}>
         <div style={{ display: "flex", borderBottom: "1px solid #E2E8F0", padding: "0 24px" }}>
           {([
-            { key: "bills",   label: "Bills",       icon: <FileText size={14} /> },
-            { key: "batches", label: "EFT Batches", icon: <CreditCard size={14} /> },
+            { key: "bills",     label: "Bills",       icon: <FileText size={14} /> },
+            { key: "batches",   label: "EFT Batches", icon: <CreditCard size={14} /> },
+            { key: "aging",     label: "Aging",       icon: <Users size={14} /> },
+            { key: "recurring", label: "Recurring",   icon: <RefreshCw size={14} /> },
+            { key: "suppliers", label: "Suppliers",   icon: <Landmark size={14} /> },
           ] as const).map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               style={{ display: "flex", alignItems: "center", gap: 6, padding: "14px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", border: "none", background: "none", color: tab === t.key ? "#1B3A6B" : "#9CA3AF", borderBottom: `2px solid ${tab === t.key ? "#1B3A6B" : "transparent"}`, marginBottom: -1 }}>
@@ -98,8 +104,11 @@ export function AccountsPayablePage() {
           ))}
         </div>
         <div style={{ padding: 24 }}>
-          {tab === "bills"   && <BillsTab onRefreshSummary={() => qc.invalidateQueries({ queryKey: ["ap-summary"] })} />}
-          {tab === "batches" && <BatchesTab onRefreshSummary={() => qc.invalidateQueries({ queryKey: ["ap-summary"] })} />}
+          {tab === "bills"     && <BillsTab onRefreshSummary={() => qc.invalidateQueries({ queryKey: ["ap-summary"] })} />}
+          {tab === "batches"   && <BatchesTab onRefreshSummary={() => qc.invalidateQueries({ queryKey: ["ap-summary"] })} />}
+          {tab === "aging"     && <AgingTab />}
+          {tab === "recurring" && <RecurringBillsTab onRefreshSummary={() => qc.invalidateQueries({ queryKey: ["ap-summary"] })} />}
+          {tab === "suppliers" && <SupplierBankingTab />}
         </div>
       </div>
     </div>

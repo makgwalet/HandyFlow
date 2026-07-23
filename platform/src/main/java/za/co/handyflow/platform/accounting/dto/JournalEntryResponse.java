@@ -18,6 +18,7 @@ public record JournalEntryResponse(
         BigDecimal totalCredit,
         boolean balanced,
         List<JournalLineResponse> lines,
+        UUID createdBy,
         Instant createdAt
 ) {
     public record JournalLineResponse(

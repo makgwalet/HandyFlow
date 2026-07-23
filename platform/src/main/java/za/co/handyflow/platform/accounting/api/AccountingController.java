@@ -50,6 +50,15 @@ public class AccountingController {
                 accountingService.getAccountsByType(TenantContext.getTenantIdAsObject(), type)));
     }
 
+    @PostMapping("/accounts")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Create a custom account — the 47 seeded accounts cover most cases, this is for the one or two a real business always ends up needing")
+    public ResponseEntity<ApiResponse<AccountResponse>> createAccount(
+            @Valid @RequestBody CreateAccountRequest req) {
+        return ResponseEntity.status(201).body(ApiResponse.success("Account created",
+                accountingService.createAccount(TenantContext.getTenantIdAsObject(), req)));
+    }
+
     // ── Journal Entries ───────────────────────────────────────────────────────
 
     @GetMapping("/journal-entries")
@@ -67,16 +76,18 @@ public class AccountingController {
     public ResponseEntity<ApiResponse<JournalEntryResponse>> createJournalEntry(
             @Valid @RequestBody CreateJournalEntryRequest req) {
         return ResponseEntity.status(201).body(ApiResponse.success("Journal entry created",
-                accountingService.createJournalEntry(TenantContext.getTenantIdAsObject(), req)));
+                accountingService.createJournalEntry(TenantContext.getTenantIdAsObject(), req,
+                        TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/journal-entries/{id}/post")
     @PreAuthorize("hasAuthority('USER_READ')")
-    @Operation(summary = "Post a DRAFT journal entry (locks it — cannot be edited after posting)")
+    @Operation(summary = "Post a DRAFT journal entry (locks it — cannot be edited after posting). Requires a different person from whoever created it, if a creator was recorded.")
     public ResponseEntity<ApiResponse<JournalEntryResponse>> postJournalEntry(
             @PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Journal entry posted",
-                accountingService.postJournalEntry(TenantContext.getTenantIdAsObject(), id)));
+                accountingService.postJournalEntryWithReview(TenantContext.getTenantIdAsObject(), id,
+                        TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/journal-entries/{id}/reverse")
@@ -109,6 +120,26 @@ public class AccountingController {
                 accountingService.createBankAccount(TenantContext.getTenantIdAsObject(), req)));
     }
 
+    @PutMapping("/bank-accounts/{id}/link-account")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Link (or relink) a bank account to its Chart of Accounts entry — required before reconciliation's match-candidates search can work, since bank accounts aren't linked automatically at creation")
+    public ResponseEntity<ApiResponse<BankAccountResponse>> linkBankAccount(
+            @PathVariable UUID id,
+            @Valid @RequestBody LinkBankAccountRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Bank account linked",
+                accountingService.linkBankAccount(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @PutMapping("/bank-accounts/{id}/low-balance-threshold")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Set or clear (pass null) this account's low-balance alert threshold. No threshold set means no alerting for that account.")
+    public ResponseEntity<ApiResponse<BankAccountResponse>> setLowBalanceThreshold(
+            @PathVariable UUID id,
+            @RequestBody SetLowBalanceThresholdRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Threshold updated",
+                accountingService.updateLowBalanceThreshold(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
     @GetMapping("/bank-accounts/{id}/transactions")
     @PreAuthorize("hasAuthority('USER_READ')")
     @Operation(summary = "List transactions for a bank account (paginated, newest first)")
@@ -126,6 +157,45 @@ public class AccountingController {
             @Valid @RequestBody AddBankTransactionRequest req) {
         return ResponseEntity.status(201).body(ApiResponse.success("Transaction recorded",
                 accountingService.addTransaction(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @PostMapping("/bank-accounts/{id}/transactions/import")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Bulk import bank transactions from a generic 4-column CSV (Date, Description, Reference, Amount — signed, header row expected). Duplicates are skipped, not errored.")
+    public ResponseEntity<ApiResponse<ImportBankTransactionsResponse>> importBankTransactions(
+            @PathVariable UUID id,
+            @Valid @RequestBody ImportBankTransactionsRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Import complete",
+                accountingService.importBankTransactions(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @GetMapping("/bank-accounts/{id}/transactions/{txId}/match-candidates")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Suggested journal line matches for reconciling this bank transaction, best match first")
+    public ResponseEntity<ApiResponse<List<MatchCandidateResponse>>> getMatchCandidates(
+            @PathVariable UUID id, @PathVariable UUID txId) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                accountingService.getMatchCandidates(TenantContext.getTenantIdAsObject(), id, txId)));
+    }
+
+    @PostMapping("/bank-accounts/{id}/transactions/{txId}/reconcile")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Reconcile a bank transaction against an existing journal line")
+    public ResponseEntity<ApiResponse<BankTransactionResponse>> reconcileTransaction(
+            @PathVariable UUID id, @PathVariable UUID txId,
+            @Valid @RequestBody ReconcileRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Transaction reconciled",
+                accountingService.reconcileTransaction(TenantContext.getTenantIdAsObject(), id, txId, req)));
+    }
+
+    @PostMapping("/bank-accounts/{id}/transactions/{txId}/reconcile-new")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Reconcile a bank transaction by creating a new journal entry for it (no existing match — bank fees, direct debits, etc.)")
+    public ResponseEntity<ApiResponse<BankTransactionResponse>> reconcileWithNewJournal(
+            @PathVariable UUID id, @PathVariable UUID txId,
+            @Valid @RequestBody ReconcileWithNewJournalRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Transaction reconciled",
+                accountingService.reconcileWithNewJournal(TenantContext.getTenantIdAsObject(), id, txId, req)));
     }
 
     // ── VAT ───────────────────────────────────────────────────────────────────
@@ -154,6 +224,14 @@ public class AccountingController {
     public ResponseEntity<ApiResponse<VatPeriodResponse>> closeVatPeriod(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("VAT period closed",
                 accountingService.closeVatPeriod(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/vat-periods/{id}/attach-vat201")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Attach a freshly-calculated VAT201 result to this period, using the period's own date range. Safe to call more than once — replaces, not accumulates.")
+    public ResponseEntity<ApiResponse<VatPeriodResponse>> attachVat201ToPeriod(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("VAT201 result attached",
+                accountingService.attachVat201ToPeriod(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @GetMapping("/reports/vat201")
@@ -196,6 +274,17 @@ public class AccountingController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return ResponseEntity.ok(ApiResponse.success("Success",
                 accountingService.getBalanceSheet(TenantContext.getTenantIdAsObject(), from, to)));
+    }
+
+    @GetMapping("/reports/drill-down")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Drill down from any P&L / Balance Sheet / Trial Balance line into the underlying posted journal lines for that account and date range")
+    public ResponseEntity<ApiResponse<AccountDrillDownResponse>> getAccountDrillDown(
+            @RequestParam String accountCode,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                accountingService.getAccountDrillDown(TenantContext.getTenantIdAsObject(), accountCode, from, to)));
     }
 
     @GetMapping("/reports/ar-aging")
@@ -248,6 +337,14 @@ public class AccountingController {
         byte[] pdf = reportPdfService.generateVat201(
                 TenantContext.getTenantIdAsObject(), from, to);
         return pdfResponse(pdf, "vat201-" + from + "-to-" + to + ".pdf");
+    }
+
+    @GetMapping("/reports/ar-aging/pdf")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Download AR aging report as PDF — no date range, always as-at-today like the JSON version")
+    public ResponseEntity<byte[]> getArAgingPdf() {
+        byte[] pdf = reportPdfService.generateArAging(TenantContext.getTenantIdAsObject());
+        return pdfResponse(pdf, "ar-aging-" + LocalDate.now() + ".pdf");
     }
 
     // ── Chart data endpoints ──────────────────────────────────────────────────

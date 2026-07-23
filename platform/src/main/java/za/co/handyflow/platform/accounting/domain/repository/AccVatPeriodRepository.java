@@ -36,5 +36,20 @@ public interface AccVatPeriodRepository extends JpaRepository<AccVatPeriod, UUID
             @Param("from") LocalDate from,
             @Param("to")   LocalDate to);
 
+    /**
+     * Find all OPEN VAT periods across all tenants past their own end
+     * date — deliberately NOT a stored "OVERDUE" status. This module has
+     * already hit two real bugs from guessing at unverified VARCHAR-
+     * length/CHECK-constraint values on status-like columns (entry_type,
+     * ap_bills status) — "overdue" here is just a query condition
+     * (status still 'OPEN', periodEnd in the past), computed fresh each
+     * time the scheduler runs, with no schema risk at all.
+     */
+    @Query("""
+        SELECT v FROM AccVatPeriod v
+        WHERE v.status = 'OPEN'
+        AND v.periodEnd < :today
+        """)
+    List<AccVatPeriod> findOpenPeriodsOverdue(@Param("today") LocalDate today);
 
 }

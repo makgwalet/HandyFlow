@@ -25,6 +25,7 @@ public class AccBankAccount {
     @Column(name = "account_type")   String accountType;
     String currency = "ZAR";
     @Column(name = "current_balance") BigDecimal currentBalance = BigDecimal.ZERO;
+    @Column(name = "low_balance_threshold") BigDecimal lowBalanceThreshold;
     boolean active = true;
     @Column(name = "created_at") Instant createdAt;
     @Column(name = "updated_at") Instant updatedAt;
@@ -53,5 +54,26 @@ public class AccBankAccount {
     public void updateBalance(BigDecimal newBalance) {
         this.currentBalance = newBalance;
         this.updatedAt      = Instant.now();
+    }
+
+    // WHY THIS EXISTS: create() never took an accountId param at all — a
+    // bank account created through the normal flow has no linked Chart of
+    // Accounts entry, full stop, with no way to set one afterward either.
+    // That's not a hypothetical gap — it's exactly what surfaced as a live
+    // 409 when reconciliation's match-candidates search tried to use a
+    // null accountId. This lets an already-existing bank account (like
+    // one created before this fix existed) get linked retroactively,
+    // without needing to delete and recreate it.
+    public void linkAccount(UUID accountId) {
+        this.accountId = accountId;
+        this.updatedAt = Instant.now();
+    }
+
+    // threshold == null clears it — disables low-balance alerting for
+    // this account entirely, not an error state. A savings account
+    // sitting "low" on purpose shouldn't need a threshold at all.
+    public void setLowBalanceThreshold(BigDecimal threshold) {
+        this.lowBalanceThreshold = threshold;
+        this.updatedAt = Instant.now();
     }
 }

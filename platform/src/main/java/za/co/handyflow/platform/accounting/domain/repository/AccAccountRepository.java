@@ -20,6 +20,9 @@ public interface AccAccountRepository extends JpaRepository<AccAccount, UUID> {
     @Query("SELECT a FROM AccAccount a WHERE a.tenantId = :#{#tenantId.value} AND a.id = :id")
     Optional<AccAccount> findByTenantAndId(TenantId tenantId, UUID id);
 
+    @Query("SELECT a FROM AccAccount a WHERE a.tenantId = :#{#tenantId.value} AND a.accountCode = :code")
+    Optional<AccAccount> findByTenantAndCode(TenantId tenantId, String code);
+
     @Query("SELECT COUNT(a) FROM AccAccount a WHERE a.tenantId = :#{#tenantId.value}")
     long countByTenant(TenantId tenantId);
 }

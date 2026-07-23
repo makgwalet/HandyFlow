@@ -16,6 +16,7 @@ import com.itextpdf.layout.properties.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import za.co.handyflow.platform.accounting.dto.AgingReportResponse;
 import za.co.handyflow.platform.accounting.dto.FinancialReportResponse;
 import za.co.handyflow.platform.accounting.dto.Vat201Response;
 import za.co.handyflow.platform.identity.TenantDetails;
@@ -85,6 +86,12 @@ public class AccountingReportPdfService {
         TenantDetails tenant = resolveTenant(tenantId);
         Vat201Response vat = accountingService.getVat201(tenantId, from, to);
         return buildVat201Pdf(tenant, vat);
+    }
+
+    public byte[] generateArAging(TenantId tenantId) {
+        TenantDetails tenant = resolveTenant(tenantId);
+        AgingReportResponse aging = accountingService.getArAging(tenantId);
+        return buildArAgingPdf(tenant, aging);
     }
 
     // ── Font helper ───────────────────────────────────────────────────────────
@@ -385,6 +392,103 @@ public class AccountingReportPdfService {
             return baos.toByteArray();
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate VAT201 PDF", e);
+        }
+    }
+
+    // ── AR Aging builder ──────────────────────────────────────────────────────
+
+    private byte[] buildArAgingPdf(TenantDetails tenant, AgingReportResponse aging) {
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            PdfDocument pdf = new PdfDocument(new PdfWriter(baos));
+            Document doc = new Document(pdf, PageSize.A4);
+            doc.setMargins(36, 50, 50, 50);
+
+            PdfFont regular = font("LiberationSans-Regular.ttf");
+            PdfFont bold    = font("LiberationSans-Bold.ttf");
+
+            // Header
+            Table header = new Table(UnitValue.createPercentArray(new float[]{60, 40}))
+                    .useAllAvailableWidth().setMarginBottom(24);
+            Cell left = new Cell().setBorder(Border.NO_BORDER).setPadding(16)
+                    .setBackgroundColor(RED);
+            left.add(new Paragraph("ACCOUNTS RECEIVABLE AGING")
+                    .setFont(bold).setFontSize(18).setFontColor(WHITE).setMarginBottom(4));
+            left.add(new Paragraph(tenant.companyName())
+                    .setFont(regular).setFontSize(10).setFontColor(WHITE));
+            Cell right = new Cell().setBorder(Border.NO_BORDER).setPadding(16)
+                    .setBackgroundColor(LIGHT_BG).setTextAlignment(TextAlignment.RIGHT);
+            right.add(new Paragraph("As At")
+                    .setFont(bold).setFontSize(8).setFontColor(TEXT_GRAY)
+                    .setCharacterSpacing(0.5f).setMarginBottom(4));
+            right.add(new Paragraph(aging.asAt().format(DATE_FMT))
+                    .setFont(regular).setFontSize(9).setFontColor(TEXT_DARK));
+            header.addCell(left);
+            header.addCell(right);
+            doc.add(header);
+
+            // Bucket summary boxes
+            record Bucket(String label, BigDecimal value, DeviceRgb color) {}
+            List<Bucket> buckets = List.of(
+                    new Bucket("Current",    aging.current(),    GREEN),
+                    new Bucket("1-30 days",  aging.days1to30(),  AMBER),
+                    new Bucket("31-60 days", aging.days31to60(), new DeviceRgb(0xC2, 0x41, 0x0C)),
+                    new Bucket("61-90 days", aging.days61to90(), new DeviceRgb(0xB9, 0x1C, 0x1C)),
+                    new Bucket("90+ days",   aging.over90(),     new DeviceRgb(0x7F, 0x1D, 0x1D))
+            );
+            Table bucketRow = new Table(UnitValue.createPercentArray(new float[]{20, 20, 20, 20, 20}))
+                    .useAllAvailableWidth().setMarginBottom(20);
+            for (Bucket b : buckets) {
+                Cell c = new Cell().setBackgroundColor(LIGHT_BG).setBorder(Border.NO_BORDER).setPadding(10);
+                c.add(new Paragraph(b.label().toUpperCase())
+                        .setFont(bold).setFontSize(7).setFontColor(TEXT_GRAY).setCharacterSpacing(0.3f).setMarginBottom(3));
+                c.add(new Paragraph(fmtR(b.value()))
+                        .setFont(bold).setFontSize(11).setFontColor(b.color()));
+                bucketRow.addCell(c);
+            }
+            doc.add(bucketRow);
+
+            // Invoice lines
+            Table t = new Table(UnitValue.createPercentArray(new float[]{18, 27, 15, 13, 15, 12}))
+                    .useAllAvailableWidth();
+            for (String h : List.of("Invoice", "Customer", "Due Date", "Days", "Balance", "Bucket")) {
+                boolean rightAlign = "Days".equals(h) || "Balance".equals(h);
+                t.addCell(new Cell().setBackgroundColor(NAVY).setBorder(Border.NO_BORDER)
+                        .setPadding(8)
+                        .add(new Paragraph(h).setFont(bold).setFontSize(8).setFontColor(WHITE)
+                                .setTextAlignment(rightAlign ? TextAlignment.RIGHT : TextAlignment.LEFT)));
+            }
+            for (int i = 0; i < aging.lines().size(); i++) {
+                AgingReportResponse.AgingLine line = aging.lines().get(i);
+                DeviceRgb bg = i % 2 == 0 ? LIGHT_BG : WHITE;
+                t.addCell(rowCell(line.invoiceNumber(), bg, bold, TextAlignment.LEFT));
+                t.addCell(rowCell(line.customerName() != null ? line.customerName() : "Walk-in client", bg, regular, TextAlignment.LEFT));
+                t.addCell(rowCell(line.dueDate() != null ? line.dueDate().format(DATE_FMT) : "—", bg, regular, TextAlignment.LEFT));
+                t.addCell(rowCell(line.daysOverdue() > 0 ? String.valueOf(line.daysOverdue()) : "—", bg, regular, TextAlignment.RIGHT));
+                t.addCell(rowCell(fmtR(line.balance()), bg, bold, TextAlignment.RIGHT));
+                t.addCell(rowCell(line.bucket(), bg, regular, TextAlignment.LEFT));
+            }
+            doc.add(t);
+
+            // Total bar
+            Table total = new Table(UnitValue.createPercentArray(new float[]{60, 40}))
+                    .useAllAvailableWidth().setMarginTop(16);
+            total.addCell(new Cell().setBackgroundColor(NAVY).setBorder(Border.NO_BORDER)
+                    .setPadding(14)
+                    .add(new Paragraph("TOTAL OUTSTANDING AR")
+                            .setFont(bold).setFontSize(11).setFontColor(WHITE)));
+            total.addCell(new Cell().setBackgroundColor(NAVY).setBorder(Border.NO_BORDER)
+                    .setPadding(14).setTextAlignment(TextAlignment.RIGHT)
+                    .add(new Paragraph(fmtR(aging.total()))
+                            .setFont(bold).setFontSize(14)
+                            .setFontColor(aging.total().compareTo(BigDecimal.ZERO) > 0 ? RED : GREEN)));
+            doc.add(total);
+
+            footer(doc, tenant, regular);
+            doc.close();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate AR aging PDF", e);
         }
     }
 

@@ -58,6 +58,15 @@ export default function VatReturnsTab() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["vat-periods"] }); setSelectedPeriod(null) },
   })
 
+  const attach = useMutation({
+    mutationFn: (id: string) => apiClient.post(`/api/v1/accounting/vat-periods/${id}/attach-vat201`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["vat-periods"] }); setError("") },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to attach VAT201 result"),
+  })
+
+  const openPeriod = periods.find(p => p.status === "OPEN")
+  const datesMatchOpenPeriod = openPeriod && openPeriod.periodStart === vatFrom && openPeriod.periodEnd === vatTo
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
@@ -114,6 +123,36 @@ export default function VatReturnsTab() {
               </div>
             ))}
           </div>
+        )}
+
+        {vat201 && openPeriod && (
+          <div style={{ marginTop: 14, padding: "12px 14px", borderRadius: 8,
+            background: datesMatchOpenPeriod ? "#F0FDF4" : "#FFFBEB",
+            display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+            <div style={{ fontSize: 12, color: datesMatchOpenPeriod ? "#166534" : "#92400E" }}>
+              {datesMatchOpenPeriod ? (
+                <>Matches your open period ({fmtDt(openPeriod.periodStart)} – {fmtDt(openPeriod.periodEnd)}).</>
+              ) : (
+                <>Your open period is {fmtDt(openPeriod.periodStart)} – {fmtDt(openPeriod.periodEnd)}, different from the dates above.
+                  Attaching recalculates using the <strong>period's own dates</strong>, not what's shown here.</>
+              )}
+            </div>
+            <button disabled={attach.isPending} onClick={() => attach.mutate(openPeriod.id)}
+              style={{ padding: "7px 14px", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 700,
+                background: "#7C3AED", color: "white", cursor: "pointer", whiteSpace: "nowrap" as const }}>
+              {attach.isPending ? "Attaching..." : "Attach to open period"}
+            </button>
+          </div>
+        )}
+        {vat201 && !openPeriod && (
+          <div style={{ marginTop: 14, padding: "12px 14px", background: "#F1F5F9", borderRadius: 8,
+            fontSize: 12, color: "#64748B" }}>
+            No open VAT period to attach this to — create one first.
+          </div>
+        )}
+        {error && (
+          <div style={{ marginTop: 12, padding: "8px 12px", background: "#FEF2F2", borderRadius: 8,
+            fontSize: 12, color: "#DC2626" }}>{error}</div>
         )}
       </div>
 

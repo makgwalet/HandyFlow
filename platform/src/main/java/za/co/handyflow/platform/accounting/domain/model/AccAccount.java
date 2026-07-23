@@ -31,6 +31,16 @@ public class AccAccount {
 
     public static AccAccount create(TenantId tenantId, String code, String name,
                                     String type, String subtype, boolean isSystem) {
+        return create(tenantId, code, name, type, subtype, isSystem, null);
+    }
+
+    // Overload, not a signature change — ChartOfAccountsSeeder calls the
+    // 6-arg version 48 times; this keeps that untouched and adds
+    // description only where it's actually needed (custom account
+    // creation).
+    public static AccAccount create(TenantId tenantId, String code, String name,
+                                    String type, String subtype, boolean isSystem,
+                                    String description) {
         AccAccount a = new AccAccount();
         a.id             = UUID.randomUUID();
         a.tenantId       = tenantId.getValue();
@@ -41,6 +51,7 @@ public class AccAccount {
         a.isSystem       = isSystem;
         a.active         = true;
         a.openingBalance = BigDecimal.ZERO;
+        a.description    = description;
         a.createdAt      = Instant.now();
         a.updatedAt      = Instant.now();
         return a;

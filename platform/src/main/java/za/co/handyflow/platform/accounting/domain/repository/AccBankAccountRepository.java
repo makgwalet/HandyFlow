@@ -16,4 +16,15 @@ public interface AccBankAccountRepository extends JpaRepository<AccBankAccount, 
 
     @Query("SELECT b FROM AccBankAccount b WHERE b.tenantId = :#{#tenantId.value} AND b.id = :id AND b.deletedAt IS NULL")
     Optional<AccBankAccount> findActiveById(TenantId tenantId, UUID id);
+
+    // Cross-tenant, used by AccountingNotificationScheduler — no tenant
+    // param since the scheduler runs once for the whole platform, same
+    // pattern as AccVatPeriodRepository.findOpenPeriodsEndingBetween().
+    @Query("""
+        SELECT b FROM AccBankAccount b
+        WHERE b.active = true AND b.deletedAt IS NULL
+        AND b.lowBalanceThreshold IS NOT NULL
+        AND b.currentBalance < b.lowBalanceThreshold
+        """)
+    List<AccBankAccount> findAllAccountsBelowThreshold();
 }

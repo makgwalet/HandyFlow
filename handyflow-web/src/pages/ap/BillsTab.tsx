@@ -5,7 +5,7 @@ import { apiClient } from "../../api/client"
 import {
   Plus, X, CheckCircle, XCircle, Search, Download,
   FileText, Upload, AlertTriangle, ChevronRight,
-  DollarSign, Clock, Edit3, Paperclip, Loader2,
+  DollarSign, Clock, Edit3, Paperclip, Loader2, Mail,
 } from "lucide-react"
 
 interface Bill {
@@ -17,10 +17,13 @@ interface Bill {
   daysUntilDue: number; hasAttachment: boolean; hasPop: boolean
   paymentRef: string | null; batchId: string | null
   notes: string | null; paidAt: string | null; createdAt: string
+  firstApprovedBy: string | null; firstApprovedAt: string | null
+  possibleDuplicateWarning?: string | null
 }
 
 const STATUS: Record<string, { color: string; bg: string; border: string; dot: string; label: string }> = {
-  DRAFT:     { color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0", dot: "#CBD5E1", label: "Draft" },
+  DRAFT:            { color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0", dot: "#CBD5E1", label: "Draft" },
+  SECOND_APPROVAL:  { color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE", dot: "#A78BFA", label: "Awaiting 2nd approval" },
   APPROVED:  { color: "#166534", bg: "#DCFCE7", border: "#86EFAC", dot: "#22C55E", label: "Approved" },
   PAID:      { color: "#1D4ED8", bg: "#EFF6FF", border: "#BFDBFE", dot: "#3B82F6", label: "Paid" },
   OVERDUE:   { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", dot: "#EF4444", label: "Overdue" },
@@ -79,6 +82,8 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
   const [showPopUpload, setShowPopUpload] = useState(false)
   const [showAttachUpload, setShowAttachUpload] = useState(false)
   const [error, setError]  = useState("")
+  const [remittanceNotice, setRemittanceNotice] = useState("")
+  const [duplicateWarning, setDuplicateWarning] = useState("")
   const [payRef, setPayRef] = useState("")
   const [popFile, setPopFile] = useState(""); const [popName, setPopName] = useState("")
   const [attFile, setAttFile] = useState(""); const [attName, setAttName] = useState("")
@@ -118,7 +123,14 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
 
   const createBill = useMutation({
     mutationFn: (body: any) => apiClient.post("/api/v1/ap/bills", body),
-    onSuccess: () => { invalidate(); setShowCreate(false); setForm(initForm()); setError("") },
+    onSuccess: (r: any) => {
+      invalidate(); setShowCreate(false); setForm(initForm()); setError("")
+      const created: Bill = r.data?.data ?? r.data
+      // A duplicate warning is exactly that — a warning, not a failure.
+      // The bill was created either way; this just needs to actually be
+      // seen rather than close along with the modal and vanish.
+      if (created?.possibleDuplicateWarning) setDuplicateWarning(created.possibleDuplicateWarning)
+    },
     onError: (e: any) => setError(e.response?.data?.message || "Failed to create bill"),
   })
 
@@ -150,6 +162,12 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
     mutationFn: () => apiClient.post(`/api/v1/ap/bills/${selected?.id}/pop`, { fileBase64: popFile, fileName: popName }),
     onSuccess: (r: any) => { invalidate(); setShowPopUpload(false); setPopFile(""); setPopName(""); setSelected(r.data?.data ?? r.data) },
     onError: (e: any) => setError(e.response?.data?.message || "Upload failed"),
+  })
+
+  const sendRemittance = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/ap/bills/${selected?.id}/send-remittance`),
+    onSuccess: () => setRemittanceNotice("Remittance email sent."),
+    onError: (e: any) => setError(e.response?.data?.message || "Failed to send remittance email"),
   })
 
   const uploadAttach = useMutation({
@@ -191,6 +209,21 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
   return (
     <div>
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+
+      {duplicateWarning && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+          padding: "12px 16px", background: "#FFFBEB", border: "1.5px solid #FDE68A", borderRadius: 10,
+          marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <AlertTriangle size={16} color="#D97706" />
+            <span style={{ fontSize: 13, color: "#92400E" }}>{duplicateWarning}</span>
+          </div>
+          <button onClick={() => setDuplicateWarning("")}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#D97706", display: "flex" }}>
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Toolbar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
@@ -281,10 +314,10 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
                     </td>
                     <td style={{ padding: "12px 16px" }}>
                       <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                        {b.status === "DRAFT" && (
+                        {["DRAFT","SECOND_APPROVAL"].includes(b.status) && (
                           <button onClick={e => { e.stopPropagation(); setSelected(b); setShowApprove(true) }}
                             style={{ padding: "4px 10px", background: "#DCFCE7", color: "#166534", border: "1px solid #86EFAC", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}>
-                            <CheckCircle size={10} /> Approve
+                            <CheckCircle size={10} /> {b.status === "SECOND_APPROVAL" ? "Approve (2nd)" : "Approve"}
                           </button>
                         )}
                         {["APPROVED","OVERDUE"].includes(b.status) && !b.batchId && (
@@ -326,7 +359,7 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
                   <span style={{ fontSize: 12, color: "#94A3B8" }}>#{selected.billNumber}</span>
                 </div>
               </div>
-              <button onClick={() => setSelected(null)} style={{ background: "#F1F5F9", border: "none", borderRadius: "50%", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#64748B" }}><X size={14} /></button>
+              <button onClick={() => { setSelected(null); setRemittanceNotice("") }} style={{ background: "#F1F5F9", border: "none", borderRadius: "50%", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#64748B" }}><X size={14} /></button>
             </div>
 
             {/* Amount hero */}
@@ -381,6 +414,19 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
               )}
             </div>
 
+            {["PAID"].includes(selected.status) && (
+              <div style={{ marginBottom: 20 }}>
+                <button onClick={() => { setError(""); setRemittanceNotice(""); sendRemittance.mutate() }}
+                  disabled={sendRemittance.isPending}
+                  style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", border: "1.5px solid #DDD6FE", borderRadius: 9, background: "#F5F3FF", fontSize: 12, cursor: "pointer", color: "#7C3AED", fontWeight: 600 }}>
+                  <Mail size={13} /> {sendRemittance.isPending ? "Sending..." : "Email remittance advice to supplier"}
+                </button>
+                {remittanceNotice && (
+                  <div style={{ marginTop: 8, padding: "7px 12px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 7, fontSize: 12, color: "#166534" }}>{remittanceNotice}</div>
+                )}
+              </div>
+            )}
+
             {error && <div style={{ marginBottom: 12, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{error}</div>}
 
             {/* Actions */}
@@ -393,6 +439,12 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
                   <CheckCircle size={14} /> Approve bill
                 </button>
               </>}
+              {selected.status === "SECOND_APPROVAL" && (
+                <button onClick={() => setShowApprove(true)}
+                  style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px", background: "#F5F3FF", color: "#7C3AED", border: "1.5px solid #DDD6FE", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                  <CheckCircle size={14} /> Give second approval
+                </button>
+              )}
               {["APPROVED","OVERDUE"].includes(selected.status) && !selected.batchId && (
                 <button onClick={() => setShowPayModal(true)}
                   style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px", background: "#EFF6FF", color: "#1D4ED8", border: "1.5px solid #BFDBFE", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
@@ -546,7 +598,15 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
       )}
 
       {showApprove && selected && (
-        <ConfirmModal title="Approve bill?" message={`Approve ${selected.supplierName} bill #${selected.billNumber} for ${fmtR(selected.totalAmount)}? A journal entry (DR Expense / CR Accounts Payable) will be posted automatically.`} confirmLabel="Approve bill" loading={approveBill.isPending} onConfirm={() => approveBill.mutate()} onCancel={() => setShowApprove(false)} />
+        <ConfirmModal
+          title={selected.status === "SECOND_APPROVAL" ? "Give second approval?" : "Approve bill?"}
+          message={
+            selected.status === "SECOND_APPROVAL"
+              ? `This bill (${selected.supplierName}, #${selected.billNumber}, ${fmtR(selected.totalAmount)}) already has one approval and needs a second, different person to confirm it. If you gave the first approval yourself, this will be rejected. Approving now posts the journal entry (DR Expense / CR Accounts Payable).`
+              : `Approve ${selected.supplierName} bill #${selected.billNumber} for ${fmtR(selected.totalAmount)}? ${selected.totalAmount > 10000 ? "This exceeds the second-approval threshold — a different person will need to approve it again before the journal posts." : "A journal entry (DR Expense / CR Accounts Payable) will be posted automatically."}`
+          }
+          confirmLabel={selected.status === "SECOND_APPROVAL" ? "Give second approval" : "Approve bill"}
+          loading={approveBill.isPending} onConfirm={() => approveBill.mutate()} onCancel={() => setShowApprove(false)} />
       )}
       {showCancel && selected && (
         <ConfirmModal title="Cancel bill?" message={`Cancel bill #${selected.billNumber} from ${selected.supplierName}? This cannot be undone.`} confirmLabel="Cancel bill" danger loading={cancelBill.isPending} onConfirm={() => cancelBill.mutate()} onCancel={() => setShowCancel(false)} />

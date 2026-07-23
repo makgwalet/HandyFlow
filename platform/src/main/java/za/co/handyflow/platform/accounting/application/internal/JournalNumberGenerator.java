@@ -36,14 +36,23 @@ public class JournalNumberGenerator {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String next(TenantId tenantId) {
         int year = LocalDate.now().getYear();
-        String tenantStr = tenantId.getValue().toString();
+
+        // FIX: was tenantId.getValue().toString() — bound as a plain
+        // String, which Postgres rejected against the uuid-typed
+        // tenant_id column ("column tenant_id is of type uuid but
+        // expression is of type character varying"). Pass the raw UUID
+        // directly instead, matching every other JDBC call in this
+        // codebase (jdbc.update(..., tenantId.getValue(), ...), never
+        // .toString()'d). ON CONFLICT ... DO NOTHING means this INSERT
+        // only actually runs the first time a given tenant+year needs a
+        // sequence row — likely why this sat latent until now.
 
         // Upsert the sequence row if it doesn't exist yet
         jdbc.update("""
             INSERT INTO acc_journal_sequences (tenant_id, year, last_seq)
             VALUES (?, ?, 0)
             ON CONFLICT (tenant_id, year) DO NOTHING
-            """, tenantStr, year);
+            """, tenantId.getValue(), year);
 
         // Atomic increment with row-level lock — no race condition possible
         Integer seq = jdbc.queryForObject("""
@@ -51,7 +60,7 @@ public class JournalNumberGenerator {
             SET last_seq = last_seq + 1
             WHERE tenant_id = ? AND year = ?
             RETURNING last_seq
-            """, Integer.class, tenantStr, year);
+            """, Integer.class, tenantId.getValue(), year);
 
         String number = String.format("JE-%d-%05d", year, seq != null ? seq : 1);
         log.debug("Generated journal number={} tenant={}", number, tenantId);

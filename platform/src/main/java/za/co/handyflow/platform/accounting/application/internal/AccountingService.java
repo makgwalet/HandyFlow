@@ -13,8 +13,10 @@ import za.co.handyflow.platform.crm.CrmFacade;
 import za.co.handyflow.platform.invoicing.domain.model.Invoice;
 import za.co.handyflow.platform.invoicing.domain.repository.InvoiceRepository;
 import za.co.handyflow.platform.shared.EmailService;
+import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
+import org.springframework.http.HttpStatus;
 import za.co.handyflow.platform.accounting.dto.MonthlySummaryResponse;
 import java.time.YearMonth;
 
@@ -54,6 +56,34 @@ public class AccountingService {
         return accountRepo.findByType(tenantId, type).stream().map(this::toAccountResponse).toList();
     }
 
+    private static final Set<String> VALID_ACCOUNT_TYPES =
+            Set.of("ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE");
+
+    @Transactional
+    public AccountResponse createAccount(TenantId tenantId, CreateAccountRequest req) {
+        coaSeeder.seedForTenant(tenantId); // same "ensure seeded first" pattern createJournalEntry() already uses
+
+        if (!VALID_ACCOUNT_TYPES.contains(req.accountType())) {
+            throw new IllegalArgumentException(
+                    "accountType must be one of " + VALID_ACCOUNT_TYPES);
+        }
+        boolean codeExists = accountRepo.findAllActive(tenantId).stream()
+                .anyMatch(a -> a.getAccountCode().equals(req.accountCode()));
+        if (codeExists) {
+            throw new IllegalArgumentException("Account code '" + req.accountCode() + "' already exists");
+        }
+
+        // isSystem=false — distinguishes custom accounts from the 47
+        // seeded ones, in case future logic ever needs to (e.g. blocking
+        // edits/deletes on seeded accounts but allowing them on custom
+        // ones — not built here, just kept possible).
+        AccAccount account = AccAccount.create(tenantId, req.accountCode(), req.accountName(),
+                req.accountType(), req.accountSubtype(), false, req.description());
+        accountRepo.save(account);
+        log.info("Created custom account={} code={} tenant={}", account.getId(), req.accountCode(), tenantId);
+        return toAccountResponse(account);
+    }
+
     // ── Journal Entries ───────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
@@ -68,6 +98,20 @@ public class AccountingService {
     @Transactional
     public JournalEntryResponse createJournalEntry(TenantId tenantId,
                                                    CreateJournalEntryRequest req) {
+        return createJournalEntry(tenantId, req, null);
+    }
+
+    // New overload — the only caller that should ever pass a real
+    // createdBy is the controller's own POST /journal-entries endpoint
+    // (the manual "New Journal Entry" flow). AccountingFacade and
+    // reconcileWithNewJournal() keep calling the 2-arg version above
+    // unchanged, so createdBy stays null for AP- and reconciliation-
+    // triggered journals — correct, since those already went through
+    // their own review elsewhere and don't need a second one here.
+    @Transactional
+    public JournalEntryResponse createJournalEntry(TenantId tenantId,
+                                                   CreateJournalEntryRequest req,
+                                                   UUID createdBy) {
         coaSeeder.seedForTenant(tenantId);
 
         if (req.lines() == null || req.lines().size() < 2)
@@ -81,17 +125,30 @@ public class AccountingService {
             throw new IllegalArgumentException(
                     "Journal entry must have at least one debit and one credit line");
 
-        for (var lr : req.lines()) {
+        for (int li = 0; li < req.lines().size(); li++) {
+            var lr = req.lines().get(li);
             BigDecimal d = lr.debitAmount()  != null ? lr.debitAmount()  : BigDecimal.ZERO;
             BigDecimal c = lr.creditAmount() != null ? lr.creditAmount() : BigDecimal.ZERO;
             if (d.compareTo(BigDecimal.ZERO) < 0 || c.compareTo(BigDecimal.ZERO) < 0)
                 throw new IllegalArgumentException("Journal line amounts must be positive");
+            // A line with BOTH a debit and a credit filled in used to
+            // silently lose the credit value entirely — the line-building
+            // logic below picks debit-only whenever debit > 0, discarding
+            // whatever credit was also entered without any error. Caught
+            // live: the frontend summed both columns independently and
+            // said "Balanced" for an entry the backend then rejected for
+            // a reason the UI never explained. Rejecting explicitly here,
+            // before any data gets thrown away, instead of after.
+            if (d.compareTo(BigDecimal.ZERO) > 0 && c.compareTo(BigDecimal.ZERO) > 0)
+                throw new IllegalArgumentException(
+                        "Line " + (li + 1) + " has both a debit and a credit amount — "
+                                + "each line must be one or the other, not both");
         }
 
         String entryNumber = numberGen.next(tenantId);
         AccJournalEntry entry = AccJournalEntry.create(
                 tenantId, entryNumber, req.entryDate(),
-                req.description(), req.reference(), req.entryType());
+                req.description(), req.reference(), req.entryType(), createdBy);
         journalRepo.save(entry);
 
         int i = 0;
@@ -111,7 +168,7 @@ public class AccountingService {
                             " ≠ credits R" + entry.getTotalCredit());
 
         journalRepo.save(entry);
-        log.info("Created journal entry={} tenant={}", entryNumber, tenantId);
+        log.info("Created journal entry={} tenant={} createdBy={}", entryNumber, tenantId, createdBy);
 
         Map<UUID, AccAccount> accountMap = accountRepo.findAllActive(tenantId)
                 .stream().collect(Collectors.toMap(AccAccount::getId, a -> a));
@@ -131,6 +188,31 @@ public class AccountingService {
         Map<UUID, AccAccount> accountMap = accountRepo.findAllActive(tenantId)
                 .stream().collect(Collectors.toMap(AccAccount::getId, a -> a));
         return toJournalResponse(entry, accountMap);
+    }
+
+    /**
+     * The maker-checker-enforcing post — this is what the controller's
+     * own POST /journal-entries/{id}/post endpoint calls, NOT
+     * postJournalEntry() directly. AccountingFacade (AP) and
+     * reconcileWithNewJournal() both still call the plain
+     * postJournalEntry() above, unchanged — this check only applies to
+     * journals posted through the manual Journal Entries UI.
+     * <p>
+     * createdBy == null (every entry created before this feature existed,
+     * or anything created via the facade/reconciliation paths) skips the
+     * check entirely rather than blocking — this is a going-forward
+     * control, not a retroactive lockout of existing data.
+     */
+    @Transactional
+    public JournalEntryResponse postJournalEntryWithReview(TenantId tenantId, UUID id, UUID postedBy) {
+        AccJournalEntry entry = journalRepo.findActiveById(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("JournalEntry", id.toString()));
+        if (entry.getCreatedBy() != null && entry.getCreatedBy().equals(postedBy)) {
+            throw new HandyFlowException(
+                    "This journal entry was created by you — a different person must post it",
+                    HttpStatus.BAD_REQUEST, "SAME_PERSON");
+        }
+        return postJournalEntry(tenantId, id);
     }
 
     @Transactional
@@ -193,6 +275,40 @@ public class AccountingService {
         return toBankAccountResponse(bank);
     }
 
+    // See AccBankAccount.linkAccount()'s own comment for why this exists —
+    // create() never sets accountId, so every bank account needs this
+    // (or an equivalent) called at least once before reconciliation's
+    // match-candidates search can work at all.
+    @Transactional
+    public BankAccountResponse linkBankAccount(TenantId tenantId, UUID bankAccountId, LinkBankAccountRequest req) {
+        AccBankAccount bank = bankAccountRepo.findActiveById(tenantId, bankAccountId)
+                .orElseThrow(() -> new ResourceNotFoundException("BankAccount", bankAccountId.toString()));
+        accountRepo.findByTenantAndId(tenantId, req.accountId())
+                .orElseThrow(() -> new ResourceNotFoundException("Account", req.accountId().toString()));
+
+        bank.linkAccount(req.accountId());
+        bankAccountRepo.save(bank);
+        log.info("Linked bank account={} to GL account={}", bankAccountId, req.accountId());
+        return toBankAccountResponse(bank);
+    }
+
+    // threshold == null clears it, disabling low-balance alerting for
+    // this account rather than erroring — see setLowBalanceThreshold()'s
+    // own comment on AccBankAccount.
+    @Transactional
+    public BankAccountResponse updateLowBalanceThreshold(TenantId tenantId, UUID bankAccountId,
+                                                         SetLowBalanceThresholdRequest req) {
+        AccBankAccount bank = bankAccountRepo.findActiveById(tenantId, bankAccountId)
+                .orElseThrow(() -> new ResourceNotFoundException("BankAccount", bankAccountId.toString()));
+        if (req.threshold() != null && req.threshold().compareTo(BigDecimal.ZERO) < 0)
+            throw new IllegalArgumentException("Threshold cannot be negative");
+
+        bank.setLowBalanceThreshold(req.threshold());
+        bankAccountRepo.save(bank);
+        log.info("Set low-balance threshold={} for bank account={}", req.threshold(), bankAccountId);
+        return toBankAccountResponse(bank);
+    }
+
     @Transactional
     public BankAccountResponse addTransaction(TenantId tenantId, UUID bankAccountId,
                                               AddBankTransactionRequest req) {
@@ -226,6 +342,271 @@ public class AccountingService {
                 .map(this::toBankTransactionResponse);
     }
 
+    // ── Bank statement import ────────────────────────────────────────────────
+
+    private static final DateTimeFormatter ISO_DATE_FMT = DateTimeFormatter.ISO_LOCAL_DATE;
+    private static final DateTimeFormatter SA_DATE_FMT  = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+    /**
+     * Generic 4-column CSV import: Date, Description, Reference, Amount
+     * (header row expected, skipped automatically). Amount is signed —
+     * positive = money in, negative = money out — translated into the
+     * always-positive-amount + transactionType shape AccBankTransaction
+     * actually stores. Duplicate rows (same account/date/amount/
+     * description as something already imported) are skipped, not
+     * errored, since re-uploading the same statement by mistake is a
+     * realistic thing to happen.
+     */
+    @Transactional
+    public ImportBankTransactionsResponse importBankTransactions(TenantId tenantId, UUID bankAccountId,
+                                                                 ImportBankTransactionsRequest req) {
+        AccBankAccount bank = bankAccountRepo.findActiveById(tenantId, bankAccountId)
+                .orElseThrow(() -> new ResourceNotFoundException("BankAccount", bankAccountId.toString()));
+
+        String csv;
+        try {
+            csv = new String(Base64.getDecoder().decode(req.csvBase64()), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Could not decode CSV file — expected base64");
+        }
+
+        String[] rawLines = csv.split("\r?\n");
+        int imported = 0, skipped = 0, failed = 0;
+        List<String> errors = new ArrayList<>();
+        BigDecimal runningBalance = bank.getCurrentBalance();
+
+        // Row 0 assumed to be a header — skipped unconditionally, matching
+        // "Date,Description,Reference,Amount" as documented.
+        for (int i = 1; i < rawLines.length; i++) {
+            String raw = rawLines[i].trim();
+            if (raw.isEmpty()) continue;
+
+            List<String> cols = parseCsvLine(raw);
+            if (cols.size() < 4) {
+                failed++;
+                errors.add("Row " + (i + 1) + ": expected 4 columns (Date, Description, Reference, Amount), got " + cols.size());
+                continue;
+            }
+
+            try {
+                LocalDate date = parseFlexibleDate(cols.get(0));
+                String description = cols.get(1);
+                String reference = cols.get(2);
+                BigDecimal signedAmount = parseAmount(cols.get(3));
+
+                String transactionType = signedAmount.compareTo(BigDecimal.ZERO) >= 0 ? "CREDIT" : "DEBIT";
+                BigDecimal amount = signedAmount.abs();
+
+                if (bankTxRepo.existsDuplicate(tenantId, bankAccountId, date, amount, description)) {
+                    skipped++;
+                    continue;
+                }
+
+                runningBalance = "CREDIT".equals(transactionType)
+                        ? runningBalance.add(amount)
+                        : runningBalance.subtract(amount);
+
+                AccBankTransaction tx = AccBankTransaction.create(tenantId, bankAccountId,
+                        date, description, reference, amount, transactionType, runningBalance);
+                bankTxRepo.save(tx);
+                imported++;
+            } catch (Exception e) {
+                failed++;
+                errors.add("Row " + (i + 1) + ": " + e.getMessage());
+            }
+        }
+
+        bank.updateBalance(runningBalance);
+        bankAccountRepo.save(bank);
+
+        log.info("Imported {} bank transactions ({} skipped duplicates, {} failed) bankAccount={} newBalance={}",
+                imported, skipped, failed, bankAccountId, runningBalance);
+
+        return new ImportBankTransactionsResponse(imported, skipped, failed, errors, runningBalance);
+    }
+
+    // Basic quote-aware CSV split — handles "field, with a comma" but not
+    // escaped ("") quotes within a quoted field. A full RFC4180 parser
+    // felt like overkill for a generic 4-column importer; this covers the
+    // realistic case (bank descriptions containing commas) without it.
+    private List<String> parseCsvLine(String line) {
+        List<String> result = new ArrayList<>();
+        StringBuilder field = new StringBuilder();
+        boolean inQuotes = false;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (c == ',' && !inQuotes) {
+                result.add(field.toString().trim());
+                field.setLength(0);
+            } else {
+                field.append(c);
+            }
+        }
+        result.add(field.toString().trim());
+        return result;
+    }
+
+    private LocalDate parseFlexibleDate(String s) {
+        String trimmed = s.trim();
+        try {
+            return LocalDate.parse(trimmed, ISO_DATE_FMT);
+        } catch (Exception e) {
+            return LocalDate.parse(trimmed, SA_DATE_FMT); // dd/MM/yyyy — let this throw naturally if still bad
+        }
+    }
+
+    // Defensive against "R 1234.56" / " 1234.56 " style pasted values —
+    // does NOT handle thousands-separator commas, since comma is the CSV
+    // delimiter itself; those need proper quoting in the source file.
+    private BigDecimal parseAmount(String s) {
+        String cleaned = s.trim().replace("R", "").replace(" ", "");
+        return new BigDecimal(cleaned);
+    }
+
+    // ── Reconciliation ────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<MatchCandidateResponse> getMatchCandidates(TenantId tenantId, UUID bankAccountId, UUID transactionId) {
+        AccBankAccount bank = bankAccountRepo.findActiveById(tenantId, bankAccountId)
+                .orElseThrow(() -> new ResourceNotFoundException("BankAccount", bankAccountId.toString()));
+        AccBankTransaction tx = bankTxRepo.findById(transactionId)
+                .filter(t -> t.getBankAccountId().equals(bankAccountId))
+                .orElseThrow(() -> new ResourceNotFoundException("BankTransaction", transactionId.toString()));
+
+        if (bank.getAccountId() == null) {
+            throw new IllegalStateException(
+                    "This bank account has no linked Chart of Accounts entry — cannot suggest matches");
+        }
+
+        // +/- 30 days around the transaction date — a real bank statement
+        // rarely lines up exactly with when a journal was actually entered.
+        LocalDate from = tx.getTransactionDate().minusDays(30);
+        LocalDate to   = tx.getTransactionDate().plusDays(30);
+        List<AccJournalEntry> entries = journalRepo.findPostedInRange(tenantId, from, to);
+
+        Set<UUID> alreadyLinked = new HashSet<>(bankTxRepo.findLinkedJournalLineIds(tenantId));
+
+        // Money IN to the bank account is a DEBIT to that GL account
+        // (increasing an asset); money OUT is a CREDIT — matching exactly
+        // how AP's own postPaymentJournal() already credits a bank
+        // account when a payment goes out.
+        boolean wantDebitLine = "CREDIT".equals(tx.getTransactionType());
+
+        List<MatchCandidateResponse> candidates = new ArrayList<>();
+        for (AccJournalEntry entry : entries) {
+            for (AccJournalLine line : entry.getLines()) {
+                if (!bank.getAccountId().equals(line.getAccountId())) continue;
+                if (alreadyLinked.contains(line.getId())) continue;
+
+                BigDecimal lineAmount = wantDebitLine ? line.getDebitAmount() : line.getCreditAmount();
+                if (lineAmount == null || lineAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+                boolean exact = lineAmount.compareTo(tx.getAmount()) == 0
+                        && entry.getEntryDate().equals(tx.getTransactionDate());
+
+                candidates.add(new MatchCandidateResponse(line.getId(), entry.getId(), entry.getEntryNumber(),
+                        entry.getEntryDate(), entry.getDescription(), lineAmount, exact));
+            }
+        }
+
+        // Exact matches first, then closest amount, then closest date.
+        candidates.sort((a, b) -> {
+            if (a.exactMatch() != b.exactMatch()) return a.exactMatch() ? -1 : 1;
+            int amountCmp = a.amount().subtract(tx.getAmount()).abs()
+                    .compareTo(b.amount().subtract(tx.getAmount()).abs());
+            if (amountCmp != 0) return amountCmp;
+            long aDays = Math.abs(ChronoUnit.DAYS.between(a.entryDate(), tx.getTransactionDate()));
+            long bDays = Math.abs(ChronoUnit.DAYS.between(b.entryDate(), tx.getTransactionDate()));
+            return Long.compare(aDays, bDays);
+        });
+
+        return candidates;
+    }
+
+    @Transactional
+    public BankTransactionResponse reconcileTransaction(TenantId tenantId, UUID bankAccountId,
+                                                        UUID transactionId, ReconcileRequest req) {
+        bankAccountRepo.findActiveById(tenantId, bankAccountId)
+                .orElseThrow(() -> new ResourceNotFoundException("BankAccount", bankAccountId.toString()));
+        AccBankTransaction tx = bankTxRepo.findById(transactionId)
+                .filter(t -> t.getBankAccountId().equals(bankAccountId))
+                .orElseThrow(() -> new ResourceNotFoundException("BankTransaction", transactionId.toString()));
+
+        if (tx.isReconciled())
+            throw new IllegalStateException("This transaction is already reconciled");
+        if (bankTxRepo.findLinkedJournalLineIds(tenantId).contains(req.journalLineId()))
+            throw new IllegalStateException("That journal line is already linked to a different transaction");
+
+        tx.reconcile(req.journalLineId());
+        bankTxRepo.save(tx);
+        log.info("Reconciled bank transaction={} to journalLine={}", transactionId, req.journalLineId());
+        return toBankTransactionResponse(tx);
+    }
+
+    /**
+     * For transactions with no existing journal to match against — the
+     * common case for most real transactions on a first import. Creates
+     * a brand-new two-line journal entry (bank's own GL account
+     * automatically on the correct side per the transaction's direction,
+     * otherAccountId as the other side) and links the bank line straight
+     * to it. Same underlying createJournalEntry()/postJournalEntry() this
+     * class already exposes — no separate posting logic reimplemented.
+     */
+    @Transactional
+    public BankTransactionResponse reconcileWithNewJournal(TenantId tenantId, UUID bankAccountId,
+                                                           UUID transactionId, ReconcileWithNewJournalRequest req) {
+        AccBankAccount bank = bankAccountRepo.findActiveById(tenantId, bankAccountId)
+                .orElseThrow(() -> new ResourceNotFoundException("BankAccount", bankAccountId.toString()));
+        AccBankTransaction tx = bankTxRepo.findById(transactionId)
+                .filter(t -> t.getBankAccountId().equals(bankAccountId))
+                .orElseThrow(() -> new ResourceNotFoundException("BankTransaction", transactionId.toString()));
+
+        if (tx.isReconciled())
+            throw new IllegalStateException("This transaction is already reconciled");
+        if (bank.getAccountId() == null)
+            throw new IllegalStateException(
+                    "This bank account has no linked Chart of Accounts entry — cannot create a journal entry for it");
+
+        boolean isMoneyIn = "CREDIT".equals(tx.getTransactionType());
+        String description = req.description() != null ? req.description() : tx.getDescription();
+
+        List<CreateJournalEntryRequest.JournalLineRequest> lines = isMoneyIn
+                ? List.of(
+                new CreateJournalEntryRequest.JournalLineRequest(bank.getAccountId(), description, tx.getAmount(), null),
+                new CreateJournalEntryRequest.JournalLineRequest(req.otherAccountId(), description, null, tx.getAmount()))
+                : List.of(
+                new CreateJournalEntryRequest.JournalLineRequest(req.otherAccountId(), description, tx.getAmount(), null),
+                new CreateJournalEntryRequest.JournalLineRequest(bank.getAccountId(), description, null, tx.getAmount()));
+
+        // entryType: "MANUAL", not "BANK_RECONCILIATION" as originally
+        // written here — that value hit a real acc_journal_entries_
+        // entry_type_check constraint violation. "MANUAL" is used
+        // deliberately instead: it's AccJournalEntry.create()'s own
+        // null-fallback default, and it's the exact value AP's
+        // postApprovalJournal() already posts successfully via
+        // AccountingFacade, confirmed against real data earlier this
+        // session — not a second guess at an unverified constraint.
+        CreateJournalEntryRequest createReq = new CreateJournalEntryRequest(
+                tx.getTransactionDate(), description, tx.getReference(), "MANUAL", lines);
+
+        JournalEntryResponse created = createJournalEntry(tenantId, createReq);
+        JournalEntryResponse posted  = postJournalEntry(tenantId, created.id());
+
+        UUID bankLineId = posted.lines().stream()
+                .filter(l -> bank.getAccountId().equals(l.accountId()))
+                .findFirst()
+                .map(JournalEntryResponse.JournalLineResponse::id)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Could not find the bank account's line in the newly created journal entry"));
+
+        tx.reconcile(bankLineId);
+        bankTxRepo.save(tx);
+        log.info("Reconciled bank transaction={} via new journal={}", transactionId, posted.entryNumber());
+        return toBankTransactionResponse(tx);
+    }
+
     // ── VAT ───────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
@@ -255,6 +636,33 @@ public class AccountingService {
             throw new IllegalStateException("VAT period is not OPEN");
         period.close();
         vatPeriodRepo.save(period);
+        return toVatPeriodResponse(period);
+    }
+
+    /**
+     * Attach a freshly-calculated VAT201 result to a period — the exact
+     * gap the original audit named: "no button to attach a calculated
+     * VAT201 result to a specific period before closing it. An
+     * accountant has to manually copy numbers across." Recomputes using
+     * the PERIOD's own periodStart/periodEnd, not whatever from/to the
+     * calculator currently happens to show — so the attached figures
+     * always genuinely correspond to that period's real boundaries.
+     * Safe to call more than once (e.g. after a late invoice is added):
+     * see AccVatPeriod.attachVat201Result()'s own comment for why that's
+     * a replace, not an accumulate.
+     */
+    @Transactional
+    public VatPeriodResponse attachVat201ToPeriod(TenantId tenantId, UUID periodId) {
+        AccVatPeriod period = vatPeriodRepo.findByTenantAndId(tenantId, periodId)
+                .orElseThrow(() -> new ResourceNotFoundException("VatPeriod", periodId.toString()));
+        if (!"OPEN".equals(period.getStatus()))
+            throw new IllegalStateException("Only OPEN periods can have a VAT201 result attached");
+
+        Vat201Response vat201 = getVat201(tenantId, period.getPeriodStart(), period.getPeriodEnd());
+        period.attachVat201Result(vat201.outputVat(), vat201.inputVat());
+        vatPeriodRepo.save(period);
+        log.info("Attached VAT201 result to period={} outputVat={} inputVat={}",
+                periodId, vat201.outputVat(), vat201.inputVat());
         return toVatPeriodResponse(period);
     }
 
@@ -393,6 +801,33 @@ public class AccountingService {
                 .stream().collect(Collectors.toMap(AccAccount::getId, a -> a));
         Map<UUID, BigDecimal> balances = computeBalancesWithOpeningBalances(entries, accounts);
 
+        // THE FIX: buildLines() below only ever reads ASSET/LIABILITY/
+        // EQUITY account types — every journal line that hits an INCOME
+        // or EXPENSE account (i.e. every revenue and cost posting ever
+        // made) was silently invisible to the Balance Sheet, with no
+        // closing entry ever folding that activity into Equity. Assets
+        // would only ever equal Liabilities + Equity by coincidence, for
+        // a tenant that happened to break exactly even. Confirmed
+        // directly against real data: zero journal lines have ever
+        // touched account 3020 or 3040 for this tenant, for any period.
+        //
+        // Fix: compute Net Profit the identical way getProfitAndLoss()
+        // already does (same buildLines() calls, same sign convention),
+        // then fold it into the real "Current Year Earnings" (3040)
+        // account before the Equity section is built — not an ad-hoc
+        // synthetic line, but the actual seeded account that exists
+        // specifically for this purpose.
+        var incomeLinesForClose  = buildLines(accounts, balances, "INCOME",  true);
+        var expenseLinesForClose = buildLines(accounts, balances, "EXPENSE", false);
+        BigDecimal netProfitForClose = sum(incomeLinesForClose).subtract(sum(expenseLinesForClose));
+
+        accountRepo.findByTenantAndCode(tenantId, "3040").ifPresent(currentYearEarnings ->
+                balances.merge(currentYearEarnings.getId(), netProfitForClose.negate(), BigDecimal::add));
+        // .negate() because buildLines() negates EQUITY balances again on
+        // the way out (positiveIsCredit=true) — storing the pre-negated
+        // value here means a real profit displays as a positive Equity
+        // contribution, not a negative one.
+
         var assetLines     = buildLines(accounts, balances, "ASSET",     false);
         var liabilityLines = buildLines(accounts, balances, "LIABILITY", true);
         var equityLines    = buildLines(accounts, balances, "EQUITY",    true);
@@ -406,6 +841,42 @@ public class AccountingService {
                         new FinancialReportResponse.ReportSection("Liabilities", liabilityLines, totalLiabilities),
                         new FinancialReportResponse.ReportSection("Equity",      equityLines,    totalEquity)),
                 totalLiabilities.add(totalEquity));
+    }
+
+    /**
+     * Drill down from any report line (P&L, Balance Sheet, or Trial
+     * Balance — all three work identically here) into the actual POSTED
+     * journal lines that fed its displayed amount. Deliberately the same
+     * source query (findPostedInRange, filtered to this account) every
+     * report method already uses — this isn't a separate reimplementation
+     * that could drift out of sync with what the reports themselves show.
+     */
+    @Transactional(readOnly = true)
+    public AccountDrillDownResponse getAccountDrillDown(TenantId tenantId, String accountCode,
+                                                        LocalDate from, LocalDate to) {
+        AccAccount account = accountRepo.findByTenantAndCode(tenantId, accountCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Account", accountCode));
+
+        List<AccJournalEntry> entries = journalRepo.findPostedInRange(tenantId, from, to);
+
+        List<AccountDrillDownResponse.DrillDownLine> lines = new ArrayList<>();
+        BigDecimal totalDebit = BigDecimal.ZERO, totalCredit = BigDecimal.ZERO;
+        for (AccJournalEntry entry : entries) {
+            for (AccJournalLine line : entry.getLines()) {
+                if (!account.getId().equals(line.getAccountId())) continue;
+                lines.add(new AccountDrillDownResponse.DrillDownLine(
+                        entry.getId(), entry.getEntryNumber(), entry.getEntryDate(),
+                        entry.getDescription(), line.getDescription(),
+                        line.getDebitAmount(), line.getCreditAmount()));
+                totalDebit  = totalDebit.add(line.getDebitAmount());
+                totalCredit = totalCredit.add(line.getCreditAmount());
+            }
+        }
+        lines.sort(Comparator.comparing(AccountDrillDownResponse.DrillDownLine::entryDate));
+
+        return new AccountDrillDownResponse(account.getAccountCode(), account.getAccountName(),
+                account.getOpeningBalance(), lines, totalDebit, totalCredit,
+                totalDebit.subtract(totalCredit));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -467,20 +938,23 @@ public class AccountingService {
                 }).toList();
         return new JournalEntryResponse(e.getId(), e.getEntryNumber(), e.getEntryDate(),
                 e.getDescription(), e.getReference(), e.getEntryType(), e.getStatus(),
-                e.getTotalDebit(), e.getTotalCredit(), e.isBalanced(), lines, e.getCreatedAt());
+                e.getTotalDebit(), e.getTotalCredit(), e.isBalanced(), lines,
+                e.getCreatedBy(), e.getCreatedAt());
     }
 
     private BankAccountResponse toBankAccountResponse(AccBankAccount b) {
         return new BankAccountResponse(b.getId(), b.getBankName(), b.getAccountName(),
                 b.getAccountNumber(), b.getBranchCode(), b.getAccountType(),
-                b.getCurrency(), b.getCurrentBalance(), b.isActive());
+                b.getCurrency(), b.getCurrentBalance(), b.isActive(), b.getAccountId(),
+                b.getLowBalanceThreshold());
     }
 
     private BankTransactionResponse toBankTransactionResponse(AccBankTransaction t) {
         return new BankTransactionResponse(t.getId(), t.getBankAccountId(),
                 t.getTransactionDate(), t.getDescription(), t.getReference(),
                 t.getAmount(), t.getTransactionType(), t.getBalanceAfter(),
-                t.isReconciled(), t.getCreatedAt());
+                t.isReconciled(), t.getCreatedAt(),
+                t.getJournalLineId(), t.getReconciledAt());
     }
 
     private VatPeriodResponse toVatPeriodResponse(AccVatPeriod v) {
@@ -536,22 +1010,34 @@ public class AccountingService {
     /**
      * Send VAT period closing reminder.
      * Called by AccountingNotificationScheduler when a period closes within 7 days.
+     * pdfBytes is nullable — the scheduler generates it separately (this
+     * class can't inject AccountingReportPdfService itself, since that
+     * service already injects AccountingService — would be circular) and
+     * passes null if PDF generation failed, so a reminder still goes out
+     * even without the attachment rather than not sending at all.
      */
     public void sendVatReminder(TenantId tenantId, String recipientEmail,
-                                String companyName, LocalDate periodEnd, BigDecimal estimatedVat) {
+                                String companyName, LocalDate periodEnd, BigDecimal estimatedVat,
+                                byte[] pdfBytes) {
         String subject = "VAT Period Closing Soon — " + periodEnd.format(
                 DateTimeFormatter.ofPattern("d MMM yyyy"));
         String body = vatReminderEmail(companyName, periodEnd, estimatedVat);
-        emailService.send(recipientEmail, subject, body);
-        log.info("Sent VAT reminder to={} periodEnd={}", recipientEmail, periodEnd);
+        if (pdfBytes != null) {
+            emailService.sendWithAttachment(recipientEmail, subject, body, "VAT201-summary.pdf", pdfBytes);
+        } else {
+            emailService.send(recipientEmail, subject, body);
+        }
+        log.info("Sent VAT reminder to={} periodEnd={} withPdf={}", recipientEmail, periodEnd, pdfBytes != null);
     }
 
     /**
      * Send overdue AR alert.
      * Called by AccountingNotificationScheduler daily for outstanding invoices > 30 days.
+     * Same nullable-pdfBytes reasoning as sendVatReminder() above.
      */
     public void sendOverdueArAlert(TenantId tenantId, String recipientEmail,
-                                   String companyName, AgingReportResponse aging) {
+                                   String companyName, AgingReportResponse aging,
+                                   byte[] pdfBytes) {
         long overdueCount = aging.lines().stream()
                 .filter(l -> !"CURRENT".equals(l.bucket())).count();
         if (overdueCount == 0) return;  // nothing overdue, skip
@@ -562,8 +1048,13 @@ public class AccountingService {
         String subject = String.format("Overdue Invoices Alert — %d invoice%s, %s outstanding",
                 overdueCount, overdueCount == 1 ? "" : "s", fmtAmount(overdueTotal));
         String body = overdueArEmail(companyName, aging, overdueCount, overdueTotal);
-        emailService.send(recipientEmail, subject, body);
-        log.info("Sent overdue AR alert to={} overdueCount={} total={}", recipientEmail, overdueCount, overdueTotal);
+        if (pdfBytes != null) {
+            emailService.sendWithAttachment(recipientEmail, subject, body, "AR-aging-report.pdf", pdfBytes);
+        } else {
+            emailService.send(recipientEmail, subject, body);
+        }
+        log.info("Sent overdue AR alert to={} overdueCount={} total={} withPdf={}",
+                recipientEmail, overdueCount, overdueTotal, pdfBytes != null);
     }
 
     private String fmtAmount(BigDecimal v) {
@@ -633,6 +1124,94 @@ public class AccountingService {
             </body></html>
             """.formatted(company, overdueCount, overdueCount == 1 ? "" : "s",
                 fmtAmount(overdueTotal), rows);
+    }
+
+    /**
+     * Called daily by AccountingNotificationScheduler for every tenant
+     * with at least one bank account below its own threshold. Fires
+     * every day the condition persists, not just once — matching the
+     * confirmed pattern NoShowAlertScheduler already uses for an
+     * unresolved shift, since a persistently low balance is the same
+     * kind of ongoing problem, not a one-off heads-up.
+     */
+    public void sendLowBalanceAlert(TenantId tenantId, String recipientEmail,
+                                    String companyName, List<AccBankAccount> lowAccounts) {
+        String subject = String.format("Low Bank Balance — %d account%s below threshold",
+                lowAccounts.size(), lowAccounts.size() == 1 ? "" : "s");
+        String body = lowBalanceEmail(companyName, lowAccounts);
+        emailService.send(recipientEmail, subject, body);
+        log.info("Sent low balance alert to={} accountCount={}", recipientEmail, lowAccounts.size());
+    }
+
+    /**
+     * Called daily by AccountingNotificationScheduler for every OPEN VAT
+     * period past its own end date. Same daily-repeat-until-resolved
+     * reasoning as sendLowBalanceAlert() above — an overdue VAT period is
+     * an active compliance risk, not a one-time reminder that should go
+     * quiet while the actual problem is still unresolved.
+     */
+    public void sendVatOverdueEscalation(TenantId tenantId, String recipientEmail,
+                                         String companyName, LocalDate periodEnd, long daysOverdue) {
+        String subject = String.format("VAT Period Overdue — %d day%s past due",
+                daysOverdue, daysOverdue == 1 ? "" : "s");
+        String body = vatOverdueEmail(companyName, periodEnd, daysOverdue);
+        emailService.send(recipientEmail, subject, body);
+        log.info("Sent VAT overdue escalation to={} periodEnd={} daysOverdue={}",
+                recipientEmail, periodEnd, daysOverdue);
+    }
+
+    private String lowBalanceEmail(String company, List<AccBankAccount> lowAccounts) {
+        StringBuilder rows = new StringBuilder();
+        for (AccBankAccount b : lowAccounts) {
+            rows.append(String.format(
+                    "<tr><td style='padding:8px;border-bottom:1px solid #F1F5F9'>%s — %s</td>"
+                            + "<td style='padding:8px;border-bottom:1px solid #F1F5F9;text-align:right;color:#DC2626;font-weight:600'>%s</td>"
+                            + "<td style='padding:8px;border-bottom:1px solid #F1F5F9;text-align:right;color:#64748B'>%s</td></tr>",
+                    b.getBankName(), b.getAccountName(),
+                    fmtAmount(b.getCurrentBalance()), fmtAmount(b.getLowBalanceThreshold())));
+        }
+
+        return """
+            <!DOCTYPE html>
+            <html><body style="font-family:Arial,sans-serif;color:#0F172A;max-width:600px;margin:0 auto;padding:20px">
+              <div style="background:#DC2626;padding:24px;border-radius:8px 8px 0 0">
+                <h1 style="color:white;margin:0;font-size:20px">Low Bank Balance Alert</h1>
+                <p style="color:#FEE2E2;margin:6px 0 0;font-size:13px">%s</p>
+              </div>
+              <div style="background:#FEF2F2;padding:24px;border-radius:0 0 8px 8px">
+                <p style="font-size:15px">The following account%s below the threshold you set:</p>
+                <table style="width:100%%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;margin:16px 0">
+                  <thead>
+                    <tr style="background:#0F172A">
+                      <th style="padding:10px;color:white;font-size:11px;text-align:left">Account</th>
+                      <th style="padding:10px;color:white;font-size:11px;text-align:right">Current Balance</th>
+                      <th style="padding:10px;color:white;font-size:11px;text-align:right">Threshold</th>
+                    </tr>
+                  </thead>
+                  <tbody>%s</tbody>
+                </table>
+                <p style="font-size:13px;color:#64748B">This will keep sending daily until the balance is back above the threshold, or you change/clear the threshold on that account.</p>
+              </div>
+            </body></html>
+            """.formatted(company, lowAccounts.size() == 1 ? " is" : "s are", rows);
+    }
+
+    private String vatOverdueEmail(String company, LocalDate periodEnd, long daysOverdue) {
+        return """
+            <!DOCTYPE html>
+            <html><body style="font-family:Arial,sans-serif;color:#0F172A;max-width:600px;margin:0 auto;padding:20px">
+              <div style="background:#7F1D1D;padding:24px;border-radius:8px 8px 0 0">
+                <h1 style="color:white;margin:0;font-size:20px">⚠ VAT Period Overdue</h1>
+                <p style="color:#FECACA;margin:6px 0 0;font-size:13px">%s</p>
+              </div>
+              <div style="background:#FEF2F2;padding:24px;border-radius:0 0 8px 8px">
+                <p style="font-size:15px">Your VAT period that ended <strong>%s</strong> is still open —
+                  <strong style="color:#7F1D1D">%d day%s overdue</strong>.</p>
+                <p style="font-size:13px;color:#64748B">Missing a SARS VAT201 deadline can carry real penalties. Log in to HandyFlow, review and close this period, and submit as soon as possible. This reminder will repeat daily until the period is closed.</p>
+              </div>
+            </body></html>
+            """.formatted(company, periodEnd.format(DateTimeFormatter.ofPattern("d MMMM yyyy")),
+                daysOverdue, daysOverdue == 1 ? "" : "s");
     }
 
 }

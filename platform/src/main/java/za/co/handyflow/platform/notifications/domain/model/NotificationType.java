@@ -58,6 +58,7 @@ public enum NotificationType {
     // ── Accounts Payable ────────────────────────────────────────────────────
     BILL_DUE_SOON(INFO, Set.of(IN_APP, EMAIL)),
     BILL_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+    BILL_PENDING_APPROVAL(INFO, Set.of(IN_APP, EMAIL)),
     EFT_BATCH_SUBMITTED(INFO, Set.of(IN_APP)),
     EFT_BATCH_PAID(INFO, Set.of(IN_APP)),
 

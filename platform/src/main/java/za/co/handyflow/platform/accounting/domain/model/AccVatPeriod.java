@@ -52,6 +52,22 @@ public class AccVatPeriod {
         this.updatedAt = Instant.now();
     }
 
+    // WHY THIS EXISTS, SEPARATE FROM addOutputVat/addInputVat ABOVE:
+    // those are additive and nothing in the codebase actually calls them
+    // — outputVat/inputVat sit permanently at zero on every period ever
+    // created. This is a REPLACE, not an add: attaching a freshly
+    // calculated VAT201 result to a period should set it to that result,
+    // not accumulate on top of whatever was there before. Re-attaching
+    // after a late invoice gets added (a real, expected workflow) stays
+    // idempotent this way — the period always reflects the most recent
+    // calculation, not a running total of every time someone clicked
+    // "attach".
+    public void attachVat201Result(BigDecimal outputVat, BigDecimal inputVat) {
+        this.outputVat = outputVat;
+        this.inputVat  = inputVat;
+        this.updatedAt = Instant.now();
+    }
+
     public BigDecimal getVatPayable() {
         return outputVat.subtract(inputVat);
     }
