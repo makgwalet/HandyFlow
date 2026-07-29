@@ -238,31 +238,40 @@ public class QuoteService {
         log.info("Converted quote={} to invoice={}", quoteId, invoice.getId());
 
         try {
-            tenantFacade.findTenantDetails(tenantId).ifPresent(tenant -> {
+            // FIX: this previously emailed tenant.email() — the business's own
+            // company email — instead of the customer's. Every other send in
+            // this file (sendQuote, sendExpiryReminder) correctly resolves the
+            // client's email first and skips sending (with a log line) if none
+            // is on file; this path had drifted from that pattern. Reusing
+            // resolveClientEmail/resolveClientName here also removes the
+            // duplicate inline customer-name lookup that was sitting right
+            // next to the bug.
+            String clientEmail = resolveClientEmail(quote, tenantId);
+            if (clientEmail != null && !clientEmail.isBlank()) {
+                String customerName = resolveClientName(quote, tenantId);
+                tenantFacade.findTenantDetails(tenantId).ifPresent(tenant -> {
 
-                String customerName = (quote.getCustomerId() != null)
-                        ? crmFacade.findCustomerById(tenantId, quote.getCustomerId())
-                        .map(c -> c.name()).orElse("Customer")
-                        : (quote.getWalkinClientName() != null
-                        ? quote.getWalkinClientName() : "Walk-in Client");
+                    String amount = "R " + String.format(
+                            java.util.Locale.US, "%,.2f", invoice.getTotal());
 
-                String amount = "R " + String.format(
-                        java.util.Locale.US, "%,.2f", invoice.getTotal());
+                    byte[] pdfBytes = invoicePdfService.generateInvoicePdf(
+                            invoice.getId(), tenantId);
 
-                byte[] pdfBytes = invoicePdfService.generateInvoicePdf(
-                        invoice.getId(), tenantId);
-
-                emailService.sendWithAttachment(
-                        tenant.email(),
-                        "Invoice " + invoiceNumber + " — " + customerName,
-                        EmailTemplates.invoiceGeneratedWithPdf(
-                                tenant.companyName(), invoiceNumber,
-                                customerName, amount
-                        ),
-                        invoiceNumber + ".pdf",
-                        pdfBytes
-                );
-            });
+                    emailService.sendWithAttachment(
+                            clientEmail,
+                            "Invoice " + invoiceNumber + " — " + customerName,
+                            EmailTemplates.invoiceGeneratedWithPdf(
+                                    tenant.companyName(), invoiceNumber,
+                                    customerName, amount
+                            ),
+                            invoiceNumber + ".pdf",
+                            pdfBytes
+                    );
+                });
+            } else {
+                log.warn("Invoice={} converted from quote={} but no client email on file — PDF not emailed",
+                        invoiceNumber, quoteId);
+            }
         } catch (Exception e) {
             log.warn("Invoice notification/PDF not sent: {}", e.getMessage());
         }
@@ -353,7 +362,10 @@ public class QuoteService {
                 q.getAcceptedAt(), lineItems, q.getCreatedAt(),
                 q.getWalkinClientName(),
                 q.getWalkinClientEmail(),
-                q.getWalkinClientPhone()
+                q.getWalkinClientPhone(),
+                q.getFirstViewedAt(),
+                q.getLastViewedAt(),
+                q.getViewCount()
         );
     }
 }

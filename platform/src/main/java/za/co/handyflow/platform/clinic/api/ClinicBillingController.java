@@ -5,16 +5,23 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.clinic.application.internal.ClinicBillingService;
+import za.co.handyflow.platform.clinic.application.internal.ClinicClaimSubmissionPdfService;
+import za.co.handyflow.platform.clinic.application.internal.ClinicPatientInvoicePdfService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicService;
+import za.co.handyflow.platform.clinic.application.internal.ClinicStatementOfAccountPdfService;
 import za.co.handyflow.platform.clinic.dto.billing.*;
 import za.co.handyflow.platform.clinic.dto.ConsultationResponse;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,6 +33,9 @@ public class ClinicBillingController {
 
     private final ClinicBillingService billingService;
     private final ClinicService        clinicService;  // FIX #8 — for unbilled consultations
+    private final ClinicPatientInvoicePdfService patientInvoicePdfService;
+    private final ClinicClaimSubmissionPdfService claimSubmissionPdfService;
+    private final ClinicStatementOfAccountPdfService statementOfAccountPdfService;
 
     // ── Claims ────────────────────────────────────────────────────────────────
 
@@ -67,6 +77,19 @@ public class ClinicBillingController {
                 billingService.submitClaim(TenantContext.getTenantIdAsObject(), id, referenceNumber)));
     }
 
+    /**
+     * FIX: "no batch claim submission" gap — practices with volume typically
+     * want to submit several claims at once rather than one at a time.
+     */
+    @PostMapping("/claims/batch-submit")
+    @PreAuthorize("hasAuthority('CLINIC_BILLING_WRITE')")
+    @Operation(summary = "Submit multiple claims to the medical aid switch in one call")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.clinic.dto.billing.BatchSubmitClaimsResponse>> batchSubmitClaims(
+            @jakarta.validation.Valid @RequestBody za.co.handyflow.platform.clinic.dto.billing.BatchSubmitClaimsRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Batch submit complete",
+                billingService.batchSubmitClaims(TenantContext.getTenantIdAsObject(), req.claimIds())));
+    }
+
     @PostMapping("/claims/{id}/{action}")
     @PreAuthorize("hasAuthority('CLINIC_BILLING_WRITE')")
     @Operation(summary = "Update claim status: accept | reject | paid | partial")
@@ -81,21 +104,107 @@ public class ClinicBillingController {
                         TenantContext.getTenantIdAsObject(), id, action, reason, schemeAmount)));
     }
 
-    // ── FIX #6: Outstanding / Payments / Revenue ──────────────────────────────
-    // These power BillingTab's three views. Outstanding derives from claims;
-    // Payments and Revenue return empty until the payments table is built.
+    /**
+     * FIX: "no patient invoice/receipt PDF" gap — self-pay/co-pay amount
+     * after the medical aid scheme's contribution had no printable document,
+     * despite ClinicClaim already tracking patientPortion separately.
+     */
+    @GetMapping("/claims/{id}/patient-invoice-pdf")
+    @PreAuthorize("hasAuthority('CLINIC_BILLING_READ')")
+    @Operation(summary = "Download patient-portion invoice/receipt PDF for a claim")
+    public ResponseEntity<byte[]> downloadPatientInvoicePdf(@PathVariable UUID id) {
+        byte[] pdf = patientInvoicePdfService.generate(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"patient-invoice-" + id + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .contentLength(pdf.length)
+                .body(pdf);
+    }
+
+    /**
+     * FIX: "no claim submission form/EDI record" gap — a printable record
+     * of what was actually submitted to the scheme, for dispute resolution.
+     */
+    @GetMapping("/claims/{id}/submission-pdf")
+    @PreAuthorize("hasAuthority('CLINIC_BILLING_READ')")
+    @Operation(summary = "Download the claim submission record PDF")
+    public ResponseEntity<byte[]> downloadClaimSubmissionPdf(@PathVariable UUID id) {
+        byte[] pdf = claimSubmissionPdfService.generate(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"claim-submission-" + id + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .contentLength(pdf.length)
+                .body(pdf);
+    }
+
+    /**
+     * FIX: "no patient statement of account" gap — nothing aggregated a
+     * patient's full billing history across claims/visits into one document.
+     */
+    @GetMapping("/patients/{patientId}/statement-pdf")
+    @PreAuthorize("hasAuthority('CLINIC_BILLING_READ')")
+    @Operation(summary = "Download a statement of account PDF for a patient — omit from/to for all-time")
+    public ResponseEntity<byte[]> downloadPatientStatementPdf(
+            @PathVariable UUID patientId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        byte[] pdf = statementOfAccountPdfService.generate(TenantContext.getTenantIdAsObject(), patientId, from, to);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"statement-" + patientId + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .contentLength(pdf.length)
+                .body(pdf);
+    }
+
+    /**
+     * FIX: "no PDF is ever emailed" gap — manual send rather than
+     * automatic, since a statement isn't tied to any single triggering
+     * event (see ClinicStatementOfAccountPdfService.emailStatement for
+     * the full reasoning).
+     */
+    @PostMapping("/patients/{patientId}/statement/email")
+    @PreAuthorize("hasAuthority('CLINIC_BILLING_WRITE')")
+    @Operation(summary = "Email the statement of account to the patient — omit from/to for all-time")
+    public ResponseEntity<ApiResponse<Void>> emailPatientStatement(
+            @PathVariable UUID patientId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        statementOfAccountPdfService.emailStatement(TenantContext.getTenantIdAsObject(), patientId, from, to);
+        return ResponseEntity.ok(ApiResponse.success("Statement emailed", null));
+    }
+
+    // ── Outstanding / Payments / Revenue ──────────────────────────────────────
+    // These power BillingTab's three views. All three now backed by real
+    // data via ClinicPayment (clinic_payments — an existing table this
+    // module previously had no entity for).
 
     @GetMapping("/outstanding")
     @PreAuthorize("hasAuthority('CLINIC_BILLING_READ')")
-    @Operation(summary = "Outstanding balances per patient (derived from unpaid claims)")
+    @Operation(summary = "Outstanding balances per patient (derived from unpaid claims, net of recorded payments)")
     public ResponseEntity<ApiResponse<List<OutstandingBalanceResponse>>> getOutstanding() {
         return ResponseEntity.ok(ApiResponse.success("Success",
                 billingService.getOutstanding(TenantContext.getTenantIdAsObject())));
     }
 
+    /**
+     * FIX: "broken payment endpoint" — BillingTab's "Record payment" modal
+     * has posted here all along; this endpoint just never existed.
+     */
+    @PostMapping("/payments")
+    @PreAuthorize("hasAuthority('CLINIC_BILLING_WRITE')")
+    @Operation(summary = "Record a payment against a patient")
+    public ResponseEntity<ApiResponse<PaymentResponse>> recordPayment(
+            @jakarta.validation.Valid @RequestBody RecordPaymentRequest req) {
+        return ResponseEntity.status(201).body(ApiResponse.success("Payment recorded",
+                billingService.recordPayment(TenantContext.getTenantIdAsObject(), req)));
+    }
+
     @GetMapping("/payments")
     @PreAuthorize("hasAuthority('CLINIC_BILLING_READ')")
-    @Operation(summary = "Payment history — stub until payments table is built")
+    @Operation(summary = "Payment history for a period")
     public ResponseEntity<ApiResponse<List<PaymentResponse>>> getPayments(
             @RequestParam(required = false, defaultValue = "month") String period) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -104,7 +213,7 @@ public class ClinicBillingController {
 
     @GetMapping("/revenue")
     @PreAuthorize("hasAuthority('CLINIC_BILLING_READ')")
-    @Operation(summary = "Revenue breakdown by period — stub until aggregation is built")
+    @Operation(summary = "Revenue breakdown by period, bucketed for charting")
     public ResponseEntity<ApiResponse<List<RevenuePointResponse>>> getRevenue(
             @RequestParam(required = false, defaultValue = "month") String period) {
         return ResponseEntity.ok(ApiResponse.success("Success",

@@ -106,12 +106,23 @@ class InvoicingScheduler {
                 String clientName = resolveClientName(invoice);
                 String amount = "R " + String.format(java.util.Locale.US, "%,.2f",
                         invoice.getTotal().subtract(invoice.getAmountPaid()));
-                emailService.send(
+                // FIX: same "PDF and the email that should carry it exist
+                // independently" gap as ClinicBillingService's claim-status
+                // email — this fires an escalating collections email
+                // ("Payment reminder" through "Final notice", up to 5 times
+                // per invoice) telling the client to pay, without ever
+                // attaching what they're supposed to pay. invoicePdfService
+                // was already injected into this exact class for the
+                // recurring-invoice-generated email below — reused here.
+                byte[] pdfBytes = invoicePdfService.generateInvoicePdf(invoice.getId(), invoice.getTenantId());
+                emailService.sendWithAttachment(
                         clientEmail,
                         urgencyLabel + ": Invoice " + invoice.getInvoiceNumber() + " is overdue",
                         EmailTemplates.invoiceOverdueReminderEscalating(
                                 clientName, invoice.getInvoiceNumber(), amount, daysOverdue,
-                                "Your supplier", urgencyLabel)
+                                "Your supplier", urgencyLabel),
+                        invoice.getInvoiceNumber() + ".pdf",
+                        pdfBytes
                 );
             } else {
                 log.warn("Invoice={} overdue threshold={}d reached but no client email on file — reminder not sent",

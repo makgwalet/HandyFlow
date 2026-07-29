@@ -195,10 +195,25 @@ export default function BillingTab() {
                       </td>
                       <td style={{padding:"12px 16px",fontSize:13,color:GRAY}}>{b.claimCount}</td>
                       <td style={{padding:"12px 16px"}}>
-                        <button onClick={()=>{setPayForm(f=>({...f,patientId:b.patientId}));setShowPayment(true)}}
-                          style={{padding:"5px 12px",border:`1px solid ${TEAL}`,borderRadius:7,background:"#F0FDF4",color:TEAL,fontSize:12,fontWeight:600,cursor:"pointer"}}>
-                          Pay
-                        </button>
+                        <div style={{display:"flex",gap:6}}>
+                          <button onClick={()=>{setPayForm(f=>({...f,patientId:b.patientId}));setShowPayment(true)}}
+                            style={{padding:"5px 12px",border:`1px solid ${TEAL}`,borderRadius:7,background:"#F0FDF4",color:TEAL,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                            Pay
+                          </button>
+                          {/* FIX: "no patient statement of account" gap. */}
+                          <button onClick={async()=>{
+                            try {
+                              const res = await apiClient.get(`/api/v1/clinic/billing/patients/${b.patientId}/statement-pdf`, { responseType: "blob" } as any)
+                              const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }))
+                              const link = document.createElement("a")
+                              link.href = url; link.download = `statement-${b.patientId}.pdf`; link.click()
+                              setTimeout(() => URL.revokeObjectURL(url), 60_000)
+                            } catch (e) { console.error("Failed to download statement", e) }
+                          }}
+                            style={{display:"flex",alignItems:"center",gap:4,padding:"5px 12px",border:`1px solid ${BORDER}`,borderRadius:7,background:"#fff",color:"#1B3A6B",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                            <Download size={12}/> Statement
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -261,25 +276,48 @@ export default function BillingTab() {
               {/* Bar chart */}
               <div style={{border:`1px solid ${BORDER}`,borderRadius:12,padding:24,marginBottom:20}}>
                 <div style={{fontSize:13,fontWeight:700,color:"#0F172A",marginBottom:16}}>Revenue by period</div>
-                <div style={{display:"flex",gap:6,alignItems:"flex-end",height:140}}>
-                  {revenueList.map(r=>{
-                    const h = Math.max((r.grossBilled/maxBilled)*120, 4)
-                    const sh = Math.max((r.schemePaid/maxBilled)*120, 0)
-                    const ph = Math.max((r.patientPaid/maxBilled)*120, 0)
-                    return (
-                      <div key={r.period} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                        <div style={{fontSize:10,color:GREEN,fontWeight:600}}>{fmtR(r.grossBilled)}</div>
-                        <div style={{width:"100%",display:"flex",gap:2,alignItems:"flex-end",height:120}}>
-                          <div style={{flex:1,height:h,background:NAVY,borderRadius:"3px 3px 0 0",minHeight:2}}/>
-                          <div style={{flex:1,height:sh,background:TEAL,borderRadius:"3px 3px 0 0",minHeight:2}}/>
-                          <div style={{flex:1,height:ph,background:AMBER,borderRadius:"3px 3px 0 0",minHeight:2}}/>
+                {/*
+                  FIX: "revenue chart overlapping" — with up to 30 daily
+                  points (this codebase's getRevenue() buckets "month" as a
+                  trailing 30-day window, not 6-12 monthly points), the
+                  original flex:1/no-min-width columns got squeezed
+                  illegibly narrow, and every single bar printed its own
+                  amount + date + consult-count label with no thinning,
+                  guaranteeing overlap at this density. Fix: horizontal
+                  scroll + a real minimum bar width so bars stay legible at
+                  any count, the redundant per-bar amount label is dropped
+                  (the table below already shows exact figures per period),
+                  and the date/consult labels only render on a thinned-out
+                  subset of bars once there are more than ~10 points.
+                */}
+                <div style={{overflowX:"auto",paddingBottom:4}}>
+                  <div style={{display:"flex",gap:6,alignItems:"flex-end",height:140,minWidth:revenueList.length*38}}>
+                    {revenueList.map((r,i)=>{
+                      const h = Math.max((r.grossBilled/maxBilled)*120, 4)
+                      const sh = Math.max((r.schemePaid/maxBilled)*120, 0)
+                      const ph = Math.max((r.patientPaid/maxBilled)*120, 0)
+                      // Thin labels once there are more than ~10 bars, so text
+                      // never has less room than it needs to render legibly —
+                      // the bars themselves still render for every point.
+                      const labelEvery = revenueList.length > 20 ? 5 : revenueList.length > 10 ? 3 : 1
+                      const showLabel = i % labelEvery === 0 || i === revenueList.length - 1
+                      return (
+                        <div key={r.period} title={`${r.period} · ${fmtR(r.grossBilled)} · ${r.consultations} consults`}
+                          style={{flex:"0 0 32px",display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                          <div style={{width:"100%",display:"flex",gap:2,alignItems:"flex-end",height:120}}>
+                            <div style={{flex:1,height:h,background:NAVY,borderRadius:"3px 3px 0 0",minHeight:2}}/>
+                            <div style={{flex:1,height:sh,background:TEAL,borderRadius:"3px 3px 0 0",minHeight:2}}/>
+                            <div style={{flex:1,height:ph,background:AMBER,borderRadius:"3px 3px 0 0",minHeight:2}}/>
+                          </div>
+                          {showLabel && (
+                            <div style={{fontSize:9,color:GRAY,textAlign:"center" as const,whiteSpace:"nowrap"}}>{r.period}</div>
+                          )}
                         </div>
-                        <div style={{fontSize:10,color:GRAY,textAlign:"center" as const}}>{r.period}</div>
-                        <div style={{fontSize:10,color:GRAY}}>{r.consultations} consults</div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
+                <div style={{fontSize:10,color:GRAY,marginTop:4}}>Hover a bar for exact figures · full breakdown in the table below</div>
                 <div style={{display:"flex",gap:16,marginTop:12,justifyContent:"center"}}>
                   {[{color:NAVY,label:"Gross billed"},{color:TEAL,label:"Scheme paid"},{color:AMBER,label:"Patient paid"}].map(l=>(
                     <div key={l.label} style={{display:"flex",alignItems:"center",gap:4}}>

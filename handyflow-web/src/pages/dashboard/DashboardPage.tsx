@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Users, FileText, Package, Clock, Bell, Settings,
   ChevronDown, Search, ExternalLink, User, Lock,
-  CreditCard, LogOut, X, UserPlus, FilePlus, Plus,
+  CreditCard, LogOut, UserPlus, FilePlus, Plus,
   TrendingUp, ChevronRight, Building2, CheckCircle,
   AlertCircle, Shield, Fuel, HardHat, Car, Briefcase,
   BookOpen, Calculator, Calendar, HeartPulse, PartyPopper, FilePen, Wallet,
@@ -14,6 +14,7 @@ import {
 import { apiClient } from '../../api/client'
 import { useAuthStore } from '../../store/auth.store'
 import type { Subscription } from '../../types/billing.types'
+import { NotificationDrawer } from '../../components/layout/NotificationDrawer'
 
 interface AppTile {
   key: string
@@ -23,14 +24,6 @@ interface AppTile {
   bg: string
   iconColor: string
   route: string
-}
-
-interface Notification {
-  id: string
-  type: 'warning' | 'info' | 'success'
-  text: string
-  time: string
-  read: boolean
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -75,12 +68,6 @@ const MODULE_REGISTRY: Record<string, AppTile> = {
   // JWT has AP_MANAGE, AP_READ → ap
   ap:          { key: 'ap',          name: 'Accounts Payable', description: 'Supplier invoices & payments', icon: Receipt,      bg: '#ECFDF5', iconColor: '#059669', route: '/ap'           },
 }
-
-const MOCK_NOTIFICATIONS: Notification[] = [
-  { id: '1', type: 'warning', text: 'Pilot ends in 57 days — upgrade to keep access to all your data', time: 'Today, 08:00', read: false },
-  { id: '2', type: 'success', text: 'Quote QT-00001 was successfully converted to an invoice', time: 'Yesterday, 09:05', read: false },
-  { id: '3', type: 'info', text: 'New customer Acme Construction added to CRM', time: '2 days ago', read: true },
-]
 
 const QUICK_ACTIONS = [
   { label: 'Add customer',        sub: 'CRM',       icon: UserPlus, bg: '#DBEAFE', color: '#1D4ED8', route: '/customers' },
@@ -167,16 +154,26 @@ function AppTileCard({ app, onClick }: { app: AppTile; onClick: () => void }) {
 export function DashboardPage() {
   const navigate = useNavigate()
   const { user, logout } = useAuthStore()
-  const [notifOpen, setNotifOpen] = useState(false)
+  const [notifDrawerOpen, setNotifDrawerOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS)
-  const notifRef   = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
-  const unreadCount = notifications.filter(n => !n.read).length
+
+  // FIX: "fix notifications on the dashboard" — this page had its own,
+  // completely separate notification implementation (MOCK_NOTIFICATIONS,
+  // its own dropdown, its own click handler that just flipped local mock
+  // state and never navigated anywhere) — entirely disconnected from the
+  // real one in ModuleLayout. Now shares the exact same drawer component
+  // and the exact same unread-count query key, so there's one
+  // notification system in the app, not two.
+  const { data: unreadData } = useQuery<{ unreadCount: number }>({
+    queryKey: ['notifications-unread-count'],
+    queryFn: async () => (await apiClient.get('/api/v1/notifications/unread-count')).data,
+    refetchInterval: 60_000,
+  })
+  const unreadCount = unreadData?.unreadCount ?? 0
 
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (notifRef.current   && !notifRef.current.contains(e.target as Node))   setNotifOpen(false)
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false)
     }
     document.addEventListener('mousedown', handler)
@@ -263,57 +260,14 @@ export function DashboardPage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {/* Notifications */}
-          <div ref={notifRef} style={{ position: 'relative' }}>
-            <button onClick={() => { setNotifOpen(o => !o); setProfileOpen(false) }}
-              style={{ background: notifOpen ? 'rgba(255,255,255,0.12)' : 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.7)', padding: '8px 10px', borderRadius: 9, display: 'flex', alignItems: 'center', position: 'relative' }}>
-              <Bell size={20} />
-              {unreadCount > 0 && (
-                <span style={{ position: 'absolute', top: 4, right: 5, width: 17, height: 17, background: '#EF4444', borderRadius: '50%', fontSize: 10, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #1B3A6B', fontWeight: 700 }}>{unreadCount}</span>
-              )}
-            </button>
-            {notifOpen && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: 360, background: 'white', border: '1px solid #E2E8F0', borderRadius: 16, boxShadow: '0 12px 40px rgba(0,0,0,0.15)', zIndex: 200, overflow: 'hidden' }}>
-                <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontWeight: 700, fontSize: 15, color: '#0F172A' }}>Notifications</span>
-                    {unreadCount > 0 && <span style={{ background: '#EFF6FF', color: '#1D4ED8', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20 }}>{unreadCount} new</span>}
-                  </div>
-                  <button onClick={() => setNotifOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: 4, borderRadius: 6 }}><X size={16} /></button>
-                </div>
-                <div>
-                  {notifications.map(n => {
-                    const dotColors = { warning: '#F59E0B', success: '#10B981', info: '#3B82F6' }
-                    return (
-                      <div key={n.id} onClick={() => setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x))}
-                        style={{ display: 'flex', gap: 12, padding: '14px 20px', borderBottom: '1px solid #F8FAFC', background: n.read ? 'white' : '#F8FBFF', cursor: 'pointer', alignItems: 'flex-start' }}>
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: dotColors[n.type], flexShrink: 0, marginTop: 5, display: 'inline-block' }} />
-                        <div style={{ flex: 1 }}>
-                          <p style={{ fontSize: 13, color: '#1E293B', lineHeight: 1.5, margin: '0 0 3px' }}>{n.text}</p>
-                          <p style={{ fontSize: 11, color: '#94A3B8', margin: 0 }}>{n.time}</p>
-                        </div>
-                        {!n.read && <span style={{ width: 7, height: 7, background: '#3B82F6', borderRadius: '50%', flexShrink: 0, marginTop: 6 }} />}
-                      </div>
-                    )
-                  })}
-                </div>
-                <div style={{ padding: '14px 20px', borderTop: '1px solid #F1F5F9', background: '#FAFBFF' }}>
-                  <p style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 10px' }}>Quick actions</p>
-                  {QUICK_ACTIONS.map(qa => (
-                    <button key={qa.label} onClick={() => { setNotifOpen(false); navigate(qa.route) }}
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 9, border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: qa.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><qa.icon size={15} color={qa.color} /></div>
-                      <div>
-                        <p style={{ fontSize: 13, color: '#0F172A', margin: 0, fontWeight: 600 }}>{qa.label}</p>
-                        <p style={{ fontSize: 11, color: '#94A3B8', margin: 0 }}>{qa.sub}</p>
-                      </div>
-                      <ChevronRight size={14} color="#CBD5E1" style={{ marginLeft: 'auto' }} />
-                    </button>
-                  ))}
-                </div>
-              </div>
+          {/* Notifications — see the FIX note above the unreadCount query */}
+          <button onClick={() => setNotifDrawerOpen(true)}
+            style={{ background: notifDrawerOpen ? 'rgba(255,255,255,0.12)' : 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.7)', padding: '8px 10px', borderRadius: 9, display: 'flex', alignItems: 'center', position: 'relative' }}>
+            <Bell size={20} />
+            {unreadCount > 0 && (
+              <span style={{ position: 'absolute', top: 4, right: 5, width: 17, height: 17, background: '#EF4444', borderRadius: '50%', fontSize: 10, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #1B3A6B', fontWeight: 700 }}>{unreadCount > 99 ? '99+' : unreadCount}</span>
             )}
-          </div>
+          </button>
 
           <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.12)', margin: '0 4px' }} />
 
@@ -366,6 +320,8 @@ export function DashboardPage() {
           </div>
         </div>
       </header>
+
+      <NotificationDrawer open={notifDrawerOpen} onClose={() => setNotifDrawerOpen(false)} />
 
       {/* PAGE CONTENT */}
       <main style={{ maxWidth: 1100, margin: '0 auto', padding: '36px 32px' }}>

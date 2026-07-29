@@ -20,6 +20,7 @@ import za.co.handyflow.platform.fuel.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -43,6 +44,15 @@ public class FuelTankController {
                 fuelService.getTanks(TenantContext.getTenantIdAsObject())));
     }
 
+    @GetMapping("/tanks/utilization-forecast")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Days-until-empty forecast for every active tank, based on recent dispatch usage")
+    public ResponseEntity<ApiResponse<List<TankUtilizationForecastResponse>>> getUtilizationForecasts() {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(
+                fuelService.getUtilizationForecasts(TenantContext.getTenantIdAsObject())));
+    }
+
     @GetMapping("/tanks/{id}")
     @PreAuthorize("hasAuthority('USER_READ')")
     public ResponseEntity<ApiResponse<TankResponse>> getTank(@PathVariable UUID id) {
@@ -59,6 +69,15 @@ public class FuelTankController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Tank created",
                         fuelService.createTank(TenantContext.getTenantIdAsObject(), request)));
+    }
+
+    @GetMapping("/tanks/{id}/reorder-suggestion")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Pre-fill data for a 'Receive stock' reorder — suggested quantity and last supplier")
+    public ResponseEntity<ApiResponse<ReorderSuggestionResponse>> getReorderSuggestion(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(
+                fuelService.getReorderSuggestion(TenantContext.getTenantIdAsObject(), id)));
     }
 
     // ── Suppliers ─────────────────────────────────────────────────────────────
@@ -92,6 +111,23 @@ public class FuelTankController {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Supplier updated",
                 fuelService.updateSupplier(TenantContext.getTenantIdAsObject(), id, request)));
+    }
+
+    @GetMapping("/suppliers/{id}/statement")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Download a supplier statement/receiving report PDF — defaults to the current calendar month")
+    public ResponseEntity<byte[]> downloadSupplierStatement(
+            @PathVariable UUID id,
+            @RequestParam(required = false) Instant from,
+            @RequestParam(required = false) Instant to) {
+        featureGuard.requireModule("fuel");
+        byte[] pdf = fuelService.generateSupplierStatement(TenantContext.getTenantIdAsObject(), id, from, to);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"supplier-statement-" + id + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .contentLength(pdf.length)
+                .body(pdf);
     }
 
     // ── Receipts ──────────────────────────────────────────────────────────────
@@ -159,6 +195,39 @@ public class FuelTankController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Dip reading recorded",
                         fuelService.recordDipReading(TenantContext.getTenantIdAsObject(), id, request)));
+    }
+
+    @GetMapping("/tanks/{id}/reconciliation-report")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Download a dip-reading reconciliation report PDF for a tank — defaults to the last 90 days")
+    public ResponseEntity<byte[]> downloadReconciliationReport(
+            @PathVariable UUID id,
+            @RequestParam(required = false) Instant from,
+            @RequestParam(required = false) Instant to) {
+        featureGuard.requireModule("fuel");
+        byte[] pdf = fuelService.generateReconciliationReport(TenantContext.getTenantIdAsObject(), id, from, to);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"reconciliation-" + id + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .contentLength(pdf.length)
+                .body(pdf);
+    }
+
+    @GetMapping("/dispatches/usage-report")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(summary = "Download a fuel usage report PDF grouped by vehicle/recipient — defaults to the current calendar month")
+    public ResponseEntity<byte[]> downloadUsageReport(
+            @RequestParam(required = false) Instant from,
+            @RequestParam(required = false) Instant to) {
+        featureGuard.requireModule("fuel");
+        byte[] pdf = fuelService.generateUsageReport(TenantContext.getTenantIdAsObject(), from, to);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"fuel-usage-report.pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .contentLength(pdf.length)
+                .body(pdf);
     }
 
     // ── Deliveries ────────────────────────────────────────────────────────────

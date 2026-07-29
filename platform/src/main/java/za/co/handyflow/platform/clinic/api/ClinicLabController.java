@@ -3,17 +3,23 @@ package za.co.handyflow.platform.clinic.api;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import za.co.handyflow.platform.clinic.application.internal.ClinicLabService;
+import za.co.handyflow.platform.clinic.application.internal.ClinicLabSummaryPdfService;
 import za.co.handyflow.platform.clinic.domain.repository.ClinicPractitionerRepository;
 import za.co.handyflow.platform.clinic.dto.lab.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,6 +30,7 @@ import java.util.UUID;
 public class ClinicLabController {
 
     private final ClinicLabService          labService;
+    private final ClinicLabSummaryPdfService labSummaryPdfService;
     private final ClinicPractitionerRepository practitionerRepo; // FIX #2 — resolve reviewer
 
     @GetMapping("/results")
@@ -47,13 +54,45 @@ public class ClinicLabController {
     // FIX #3 — upload/interpret/review/file require CLINIC_LAB_WRITE, not generic CLINIC_WRITE.
     // A receptionist (CLINIC_WRITE only) should not be interpreting or signing off lab results.
 
-    @PostMapping("/results")
+    @PostMapping(value = "/results", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority('CLINIC_LAB_WRITE')")
-    @Operation(summary = "Upload a lab result")
+    @Operation(summary = "Upload a lab result PDF — the actual file, not just a filename")
     public ResponseEntity<ApiResponse<LabResultResponse>> uploadResult(
-            @RequestBody UploadLabResultRequest req) {
+            @RequestParam("file") MultipartFile file,
+            @RequestParam String source,
+            @RequestParam(required = false) String labReference,
+            @RequestParam(required = false) String patientNameRaw,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant collectedAt) {
         return ResponseEntity.status(201).body(ApiResponse.success("Lab result uploaded",
-                labService.uploadResult(TenantContext.getTenantIdAsObject(), req)));
+                labService.uploadResult(TenantContext.getTenantIdAsObject(), file, source,
+                        labReference, patientNameRaw, collectedAt)));
+    }
+
+    @GetMapping("/results/{id}/pdf")
+    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @Operation(summary = "Download the uploaded lab result PDF")
+    public ResponseEntity<byte[]> downloadResultPdf(@PathVariable UUID id) {
+        var file = labService.downloadResultPdf(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.fileName() + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(file.content());
+    }
+
+    /**
+     * FIX: "no lab result summary PDF" gap — distinct from the raw uploaded
+     * file above: this renders the parsed/interpreted data as a clean
+     * formatted document.
+     */
+    @GetMapping("/results/{id}/summary-pdf")
+    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @Operation(summary = "Download a formatted summary of the lab result (parsed markers + interpretation)")
+    public ResponseEntity<byte[]> downloadResultSummaryPdf(@PathVariable UUID id) {
+        byte[] pdf = labSummaryPdfService.generate(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"lab-summary-" + id + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     @PostMapping("/results/{id}/match-patient")
@@ -67,11 +106,28 @@ public class ClinicLabController {
 
     @PostMapping("/results/{id}/interpret")
     @PreAuthorize("hasAuthority('CLINIC_LAB_WRITE')")
-    @Operation(summary = "Save Claude-generated plain-language interpretation")
+    @Operation(summary = "Save a manually-written plain-language interpretation")
     public ResponseEntity<ApiResponse<LabResultResponse>> setInterpretation(
             @PathVariable UUID id, @RequestParam String interpretation) {
         return ResponseEntity.ok(ApiResponse.success("Interpretation saved",
                 labService.setInterpretation(TenantContext.getTenantIdAsObject(), id, interpretation)));
+    }
+
+    /**
+     * FIX: closes the "AI-assisted interpretation" loop — previously the
+     * frontend called the Anthropic API directly from the browser with no
+     * key attached at all, which could never have worked (and would leak
+     * the key publicly if it ever did have one). This calls Claude
+     * server-side instead, where the key actually lives.
+     */
+    @PostMapping("/results/{id}/interpret-ai")
+    @PreAuthorize("hasAuthority('CLINIC_LAB_WRITE')")
+    @Operation(summary = "Generate a Claude-based plain-language interpretation server-side and save it")
+    public ResponseEntity<ApiResponse<LabResultResponse>> interpretWithAi(
+            @PathVariable UUID id,
+            @RequestParam(required = false) String patientFullName) {
+        return ResponseEntity.ok(ApiResponse.success("Interpretation generated and saved",
+                labService.interpretWithAi(TenantContext.getTenantIdAsObject(), id, patientFullName)));
     }
 
     /**

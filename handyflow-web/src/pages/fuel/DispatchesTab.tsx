@@ -3,13 +3,14 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, Fuel, X, AlertCircle, AlertTriangle } from "lucide-react"
+import { Plus, Fuel, X, AlertCircle, AlertTriangle, List, BarChart3, Download } from "lucide-react"
 
 const unwrap     = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
 const unwrapList = (r: any): any[] => { const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : (d?.content ?? []) }
 const fmtDate    = (iso: string) => new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })
 const fmtTime    = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })
 const fmtR       = (n: any)     => n != null ? `R ${Number(n).toFixed(4)}` : "—"
+const fmtRTotal  = (n: any)     => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const EMPTY_FORM = { tankId: "", litresDispensed: "", pricePerLitre: "", recipientName: "", authorisedBy: "", odometerReading: "", hoursReading: "", notes: "" }
 
@@ -17,6 +18,26 @@ export default function DispatchesTab() {
   const qc = useQueryClient()
   const [showDispatch, setShowDispatch] = useState(false)
   const [filterMonth, setFilterMonth]   = useState(new Date().toISOString().slice(0, 7))
+  const [view, setView]                 = useState<"log" | "rollup">("log")
+
+  // FIX: "no monthly fuel-usage report PDF" gap — exports the currently
+  // selected month (same scope as the rollup table on screen) as a PDF via
+  // the same server-side grouping the rollup view uses, so the export
+  // matches what's visible rather than being computed twice.
+  const downloadUsageReport = async () => {
+    const [y, m] = filterMonth.split("-").map(Number)
+    const from = new Date(Date.UTC(y, m - 1, 1)).toISOString()
+    const to = new Date(Date.UTC(y, m, 1)).toISOString()
+    const r = await apiClient.get(`/api/v1/fuel/dispatches/usage-report?from=${from}&to=${to}`, { responseType: "blob" })
+    const url = window.URL.createObjectURL(new Blob([r.data]))
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `fuel-usage-report-${filterMonth}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  }
   const [error, setError]               = useState("")
   const [form, setForm]                 = useState(EMPTY_FORM)
 
@@ -41,6 +62,30 @@ export default function DispatchesTab() {
   const selectedTank = (tanks as any[]).find(t => t.id === form.tankId)
 
   const totalLitres = filtered.reduce((s, d) => s + Number(d.litresDispensed ?? 0), 0)
+
+  // FIX: "no dispatch-to-cost-center rollup" gap — vehicleId/assetId/customerId/
+  // recipientName are all already captured per dispatch, just never grouped into
+  // an answer to "how much fuel did X consume this month". Groups by
+  // recipientName since that's the one field guaranteed to be a readable label
+  // on every dispatch (vehicleId/assetId are foreign keys into Fleet/Earthmoving,
+  // which this module doesn't have names for) — same label already shown in the
+  // Recipient column of the log view below, so this reads as a summary of it
+  // rather than a second, differently-labeled view of the same data.
+  const rollupMap = new Map<string, { label: string; litres: number; cost: number; count: number; lastDispatchedAt: string; hasUnpriced: boolean }>()
+  filtered.forEach(d => {
+    const key = (d.recipientName || "").trim() || "Unassigned"
+    const litres = Number(d.litresDispensed ?? 0)
+    const priced = d.pricePerLitre != null
+    const cost = priced ? litres * Number(d.pricePerLitre) : 0
+    const existing = rollupMap.get(key) ?? { label: key, litres: 0, cost: 0, count: 0, lastDispatchedAt: d.dispatchedAt, hasUnpriced: false }
+    existing.litres += litres
+    existing.cost += cost
+    existing.count += 1
+    existing.hasUnpriced = existing.hasUnpriced || !priced
+    if (d.dispatchedAt > existing.lastDispatchedAt) existing.lastDispatchedAt = d.dispatchedAt
+    rollupMap.set(key, existing)
+  })
+  const rollup = Array.from(rollupMap.values()).sort((a, b) => b.litres - a.litres)
 
   const months: string[] = []
   for (let i = 0; i < 6; i++) {
@@ -85,12 +130,68 @@ export default function DispatchesTab() {
         </button>
       </div>
 
+      {/* Log / Rollup toggle */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", gap: 2, background: "#F1F5F9", borderRadius: 8, padding: 3, width: "fit-content" }}>
+          {([
+            { key: "log", label: "Log", icon: List },
+            { key: "rollup", label: "By Vehicle / Cost Center", icon: BarChart3 },
+          ] as const).map(v => (
+            <button key={v.key} onClick={() => setView(v.key)}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700,
+                background: view === v.key ? "#fff" : "transparent", color: view === v.key ? "#1B3A6B" : "#64748B",
+                boxShadow: view === v.key ? "0 1px 2px rgba(0,0,0,0.08)" : "none" }}>
+              <v.icon size={13} /> {v.label}
+            </button>
+          ))}
+        </div>
+        <button onClick={downloadUsageReport}
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 600, color: "#0D9488", cursor: "pointer" }}>
+          <Download size={13} /> Download usage report (PDF)
+        </button>
+      </div>
+
       {isLoading ? (
         <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading...</div>
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
           <Fuel size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
           <div style={{ fontWeight: 600, color: "#475569" }}>No dispatches for this period</div>
+        </div>
+      ) : view === "rollup" ? (
+        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+            <thead>
+              <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
+                {["Vehicle / Recipient","Dispatches","Total Litres","Total Cost","Last Dispatch"].map(h => (
+                  <th key={h} style={{ padding: "11px 14px", textAlign: "left", fontWeight: 700, fontSize: 11, color: "#64748B", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rollup.map((r, i) => (
+                <tr key={r.label} style={{ borderBottom: i < rollup.length - 1 ? "1px solid #F1F5F9" : "none", background: "#fff" }}>
+                  <td style={{ padding: "12px 14px", fontWeight: 600, color: r.label === "Unassigned" ? "#94A3B8" : "#0F172A" }}>{r.label}</td>
+                  <td style={{ padding: "12px 14px", color: "#475569" }}>{r.count}</td>
+                  <td style={{ padding: "12px 14px", fontWeight: 700, color: "#DC2626" }}>{r.litres.toLocaleString()} L</td>
+                  <td style={{ padding: "12px 14px", fontWeight: 700, color: "#0F172A" }}>
+                    {fmtRTotal(r.cost)}
+                    {r.hasUnpriced && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 400, color: "#94A3B8" }}>(partial — some dispatches unpriced)</span>}
+                  </td>
+                  <td style={{ padding: "12px 14px", color: "#64748B", fontSize: 12, whiteSpace: "nowrap" }}>{fmtDate(r.lastDispatchedAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{ background: "#F8FAFC", borderTop: "2px solid #E2E8F0" }}>
+                <td style={{ padding: "12px 14px", fontWeight: 700, color: "#0F172A" }}>Total</td>
+                <td style={{ padding: "12px 14px", fontWeight: 700, color: "#0F172A" }}>{filtered.length}</td>
+                <td style={{ padding: "12px 14px", fontWeight: 700, color: "#DC2626" }}>{totalLitres.toLocaleString()} L</td>
+                <td style={{ padding: "12px 14px", fontWeight: 700, color: "#0F172A" }}>{fmtRTotal(rollup.reduce((s, r) => s + r.cost, 0))}</td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
         </div>
       ) : (
         <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>

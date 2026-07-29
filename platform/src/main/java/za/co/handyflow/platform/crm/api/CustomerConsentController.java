@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.crm.application.internal.CustomerConsentService;
 import za.co.handyflow.platform.crm.domain.model.CustomerConsent;
@@ -56,8 +57,17 @@ public class CustomerConsentController {
      *   "retentionYears": 7
      * }
      */
+    /**
+     * FIX: confirmed via real testing — POST returned 403 Forbidden.
+     * CUSTOMER_WRITE doesn't exist as a granted authority anywhere in this
+     * system; CustomerController.java's entire convention is CREATE/READ/
+     * UPDATE/DELETE (confirmed: zero other CRM endpoints ever grant or
+     * check "WRITE"). This controller was the only place using it, across
+     * all three of its non-GET endpoints — same fix applied below on
+     * withdrawConsent and recordReview.
+     */
     @PostMapping("/{id}/consent")
-    @PreAuthorize("hasAuthority('CUSTOMER_WRITE')")
+    @PreAuthorize("hasAuthority('CUSTOMER_UPDATE')")
     @Operation(summary = "Record POPIA consent for a customer")
     public ResponseEntity<ApiResponse<Object>> recordConsent(
             @PathVariable UUID id,
@@ -81,7 +91,7 @@ public class CustomerConsentController {
      * Request body: { "reason": "Customer requested opt-out via email 2025-06-25" }
      */
     @DeleteMapping("/{id}/consent")
-    @PreAuthorize("hasAuthority('CUSTOMER_WRITE')")
+    @PreAuthorize("hasAuthority('CUSTOMER_UPDATE')")
     @Operation(summary = "Withdraw POPIA consent for a customer")
     public ResponseEntity<ApiResponse<Object>> withdrawConsent(
             @PathVariable UUID id,
@@ -92,17 +102,30 @@ public class CustomerConsentController {
         return ResponseEntity.ok(ApiResponse.success("Consent withdrawn", consent));
     }
 
-    /** POST /consent/{consentId}/review — mark a retention review as done */
+    /**
+     * POST /consent/{consentId}/review — mark a retention review as done.
+     *
+     * FIX: confirmed via real testing (on the sibling follow-ups endpoint
+     * that copied this exact pattern) — @RequestAttribute("userId") throws
+     * ServletRequestBindingException, since nothing in this runtime's
+     * filter chain actually populates that request attribute. Same
+     * SecurityContextHolder resolution PopiaExportController already uses
+     * successfully in this same class's sibling controller.
+     */
     @PostMapping("/consent/{consentId}/review")
-    @PreAuthorize("hasAuthority('CUSTOMER_WRITE')")
+    @PreAuthorize("hasAuthority('CUSTOMER_UPDATE')")
     @Operation(summary = "Record that a retention review was performed")
-    public ResponseEntity<ApiResponse<Void>> recordReview(
-            @PathVariable UUID consentId,
-            @RequestAttribute("userId") UUID userId
-    ) {
+    public ResponseEntity<ApiResponse<Void>> recordReview(@PathVariable UUID consentId) {
         var tenantId = TenantContext.getTenantIdAsObject();
-        consentService.recordReview(tenantId, consentId, userId);
+        consentService.recordReview(tenantId, consentId, currentUserId());
         return ResponseEntity.ok(ApiResponse.success("Review recorded", null));
+    }
+
+    private UUID currentUserId() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) return null;
+        try { return UUID.fromString(auth.getName()); }
+        catch (Exception e) { return null; }
     }
 
     // ── Request records ───────────────────────────────────────────────────────

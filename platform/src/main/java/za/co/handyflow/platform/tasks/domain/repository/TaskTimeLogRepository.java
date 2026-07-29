@@ -31,4 +31,12 @@ public interface TaskTimeLogRepository extends JpaRepository<TaskTimeLog, UUID> 
                         row -> (UUID) row[0],
                         row -> (BigDecimal) row[1]));
     }
+
+    /**
+     * Batch fetch — backs the timesheet CSV export. Replaces what would
+     * otherwise be one findByTaskIdOrderByLoggedDateDesc() call per task in
+     * the board (same N+1 shape the board-load fix elsewhere in this
+     * repository already eliminated for comment counts and hour sums).
+     */
+    List<TaskTimeLog> findByTaskIdInOrderByLoggedDateDesc(List<UUID> taskIds);
 }

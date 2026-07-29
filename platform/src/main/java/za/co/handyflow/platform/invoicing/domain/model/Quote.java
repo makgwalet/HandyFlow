@@ -66,6 +66,17 @@ public class Quote {
     @Column(name = "expiry_reminder_sent_at")
     private Instant expiryReminderSentAt;
 
+    // FIX: "no quote view-tracking" gap — sendQuote()/the public link
+    // existed, but nothing recorded when a client actually opened it.
+    @Column(name = "first_viewed_at")
+    private Instant firstViewedAt;
+
+    @Column(name = "last_viewed_at")
+    private Instant lastViewedAt;
+
+    @Column(name = "view_count", nullable = false)
+    private int viewCount = 0;
+
     @OneToMany(mappedBy = "quote", cascade = CascadeType.ALL,
             orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("sortOrder ASC")
@@ -118,6 +129,22 @@ public class Quote {
 
     public void markExpiryReminderSent() {
         this.expiryReminderSentAt = Instant.now();
+    }
+
+    /**
+     * Called from the public (unauthenticated) quote link on every open —
+     * see QuotePublicAccessService.getByToken(). firstViewedAt is set once
+     * and never overwritten; viewCount and lastViewedAt update on every
+     * subsequent open, so a sales team can tell "opened once and never
+     * came back" apart from "keeps coming back but hasn't decided."
+     */
+    public void recordView() {
+        Instant now = Instant.now();
+        if (this.firstViewedAt == null) {
+            this.firstViewedAt = now;
+        }
+        this.lastViewedAt = now;
+        this.viewCount++;
     }
 
     public void send() {

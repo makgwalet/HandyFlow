@@ -9,14 +9,18 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.tasks.application.internal.TasksService;
 import za.co.handyflow.platform.tasks.dto.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,6 +42,16 @@ public class TasksController {
                 tasksService.getSummary(
                         TenantContext.getTenantIdAsObject(),
                         TenantContext.getCurrentUserId())));
+    }
+
+    // ── Users (for assignee picker) ─────────────────────────────────────────────
+
+    @GetMapping("/assignable-users")
+    @PreAuthorize("hasAuthority('TASKS_READ')")
+    @Operation(summary = "Users that can be assigned tasks — backs the assignee picker")
+    public ResponseEntity<ApiResponse<List<UserOptionResponse>>> getAssignableUsers() {
+        return ResponseEntity.ok(ApiResponse.success(
+                tasksService.getAssignableUsers(TenantContext.getTenantIdAsObject())));
     }
 
     // ── Boards ────────────────────────────────────────────────────────────────
@@ -85,6 +99,32 @@ public class TasksController {
     public ResponseEntity<ApiResponse<Void>> archiveBoard(@PathVariable UUID id) {
         tasksService.archiveBoard(TenantContext.getTenantIdAsObject(), id);
         return ResponseEntity.ok(ApiResponse.success("Board archived", null));
+    }
+
+    // ── Export ────────────────────────────────────────────────────────────────
+
+    @GetMapping("/boards/{boardId}/export/pdf")
+    @PreAuthorize("hasAuthority('TASKS_READ')")
+    @Operation(summary = "Export a board's tasks as a PDF status report — grouped by column, with a summary strip")
+    public ResponseEntity<byte[]> exportBoardPdf(@PathVariable UUID boardId) {
+        byte[] pdf = tasksService.exportBoardPdf(TenantContext.getTenantIdAsObject(), boardId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"board-" + boardId + "-status-report.pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    @GetMapping("/boards/{boardId}/export/timesheet")
+    @PreAuthorize("hasAuthority('TASKS_READ')")
+    @Operation(summary = "Export a board's logged time as a CSV timesheet — one row per time-log entry")
+    public ResponseEntity<byte[]> exportBoardTimesheet(@PathVariable UUID boardId) {
+        String csv = tasksService.exportBoardTimesheetCsv(TenantContext.getTenantIdAsObject(), boardId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"board-" + boardId + "-timesheet.csv\"")
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .body(csv.getBytes(StandardCharsets.UTF_8));
     }
 
     // ── Columns ───────────────────────────────────────────────────────────────
@@ -205,7 +245,9 @@ public class TasksController {
             @PathVariable UUID id,
             @Valid @RequestBody UpdateTaskRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Task updated",
-                tasksService.updateTask(TenantContext.getTenantIdAsObject(), id, req)));
+                tasksService.updateTask(
+                        TenantContext.getTenantIdAsObject(), id, req,
+                        TenantContext.getCurrentUserId())));
     }
 
     /**
@@ -271,6 +313,107 @@ public class TasksController {
     public ResponseEntity<ApiResponse<List<TaskCommentResponse>>> getComments(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(
                 tasksService.getComments(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    // ── Attachments ───────────────────────────────────────────────────────────
+
+    @PostMapping(value = "/{id}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('TASKS_MANAGE')")
+    @Operation(summary = "Upload a file attachment to a task")
+    public ResponseEntity<ApiResponse<TaskAttachmentResponse>> uploadAttachment(
+            @PathVariable UUID id,
+            @RequestParam("file") MultipartFile file) {
+        UUID   userId = TenantContext.getCurrentUserId();
+        String name   = tasksService.resolveUserName(userId);
+        return ResponseEntity.status(201).body(ApiResponse.success("Attachment uploaded",
+                tasksService.addAttachment(
+                        TenantContext.getTenantIdAsObject(), id, file, userId, name)));
+    }
+
+    @GetMapping("/{id}/attachments")
+    @PreAuthorize("hasAuthority('TASKS_READ')")
+    @Operation(summary = "List all attachments on a task")
+    public ResponseEntity<ApiResponse<List<TaskAttachmentResponse>>> getAttachments(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                tasksService.getAttachments(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/{id}/attachments/{attachmentId}/download")
+    @PreAuthorize("hasAuthority('TASKS_READ')")
+    @Operation(summary = "Download a task attachment")
+    public ResponseEntity<byte[]> downloadAttachment(
+            @PathVariable UUID id,
+            @PathVariable UUID attachmentId) {
+        TasksService.DownloadedFile file = tasksService.downloadAttachment(
+                TenantContext.getTenantIdAsObject(), id, attachmentId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.fileName() + "\"")
+                .contentType(file.contentType() != null
+                        ? MediaType.parseMediaType(file.contentType())
+                        : MediaType.APPLICATION_OCTET_STREAM)
+                .body(file.content());
+    }
+
+    @DeleteMapping("/{id}/attachments/{attachmentId}")
+    @PreAuthorize("hasAuthority('TASKS_MANAGE')")
+    @Operation(summary = "Delete a task attachment")
+    public ResponseEntity<ApiResponse<Void>> deleteAttachment(
+            @PathVariable UUID id,
+            @PathVariable UUID attachmentId) {
+        tasksService.deleteAttachment(TenantContext.getTenantIdAsObject(), id, attachmentId);
+        return ResponseEntity.ok(ApiResponse.success("Attachment deleted", null));
+    }
+
+    // ── Checklist items ───────────────────────────────────────────────────────
+
+    @PostMapping("/{id}/checklist-items")
+    @PreAuthorize("hasAuthority('TASKS_MANAGE')")
+    @Operation(summary = "Add a checklist item to a task")
+    public ResponseEntity<ApiResponse<TaskChecklistItemResponse>> addChecklistItem(
+            @PathVariable UUID id,
+            @Valid @RequestBody AddChecklistItemRequest req) {
+        return ResponseEntity.status(201).body(ApiResponse.success("Checklist item added",
+                tasksService.addChecklistItem(TenantContext.getTenantIdAsObject(), id, req.text())));
+    }
+
+    @GetMapping("/{id}/checklist-items")
+    @PreAuthorize("hasAuthority('TASKS_READ')")
+    @Operation(summary = "List checklist items on a task")
+    public ResponseEntity<ApiResponse<List<TaskChecklistItemResponse>>> getChecklistItems(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                tasksService.getChecklistItems(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PatchMapping("/{id}/checklist-items/{itemId}/toggle")
+    @PreAuthorize("hasAuthority('TASKS_MANAGE')")
+    @Operation(summary = "Mark a checklist item complete or incomplete")
+    public ResponseEntity<ApiResponse<TaskChecklistItemResponse>> toggleChecklistItem(
+            @PathVariable UUID id,
+            @PathVariable UUID itemId,
+            @Valid @RequestBody ToggleChecklistItemRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Checklist item updated",
+                tasksService.toggleChecklistItem(TenantContext.getTenantIdAsObject(), id, itemId, req.completed())));
+    }
+
+    @PutMapping("/{id}/checklist-items/{itemId}")
+    @PreAuthorize("hasAuthority('TASKS_MANAGE')")
+    @Operation(summary = "Rename a checklist item")
+    public ResponseEntity<ApiResponse<TaskChecklistItemResponse>> updateChecklistItem(
+            @PathVariable UUID id,
+            @PathVariable UUID itemId,
+            @Valid @RequestBody UpdateChecklistItemRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Checklist item updated",
+                tasksService.updateChecklistItemText(TenantContext.getTenantIdAsObject(), id, itemId, req.text())));
+    }
+
+    @DeleteMapping("/{id}/checklist-items/{itemId}")
+    @PreAuthorize("hasAuthority('TASKS_MANAGE')")
+    @Operation(summary = "Delete a checklist item")
+    public ResponseEntity<ApiResponse<Void>> deleteChecklistItem(
+            @PathVariable UUID id,
+            @PathVariable UUID itemId) {
+        tasksService.deleteChecklistItem(TenantContext.getTenantIdAsObject(), id, itemId);
+        return ResponseEntity.ok(ApiResponse.success("Checklist item deleted", null));
     }
 
     // ── Time logging ──────────────────────────────────────────────────────────

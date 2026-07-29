@@ -43,14 +43,22 @@ public class Task {
     @Column(name = "completed_at") private Instant completedAt;
     @Column(name = "deleted_at")   private Instant deletedAt;
 
+    /**
+     * FIX (notifications): set the first time TASK_OVERDUE fires for this task,
+     * so the daily scheduler sweep doesn't re-notify every day a task stays
+     * overdue. Cleared whenever the due date changes (see update()) so a
+     * rescheduled task is eligible to alert again against its new date.
+     */
+    @Column(name = "overdue_alert_sent_at") private Instant overdueAlertSentAt;
+
     @Version private Long version;
 
     public static Task create(TenantId tenantId, UUID boardId, UUID columnId,
-                               String title, String description, String priority,
-                               UUID assigneeId, LocalDate dueDate,
-                               BigDecimal estimatedHours, int sortOrder,
-                               String linkedEntityType, UUID linkedEntityId,
-                               UUID createdBy) {
+                              String title, String description, String priority,
+                              UUID assigneeId, LocalDate dueDate,
+                              BigDecimal estimatedHours, int sortOrder,
+                              String linkedEntityType, UUID linkedEntityId,
+                              UUID createdBy) {
         Task t             = new Task();
         t.tenantId         = tenantId;
         t.boardId          = boardId;
@@ -85,14 +93,17 @@ public class Task {
     }
 
     public void update(String title, String description, String priority,
-                        UUID assigneeId, LocalDate dueDate,
-                        BigDecimal estimatedHours, String linkedEntityType,
-                        UUID linkedEntityId) {
+                       UUID assigneeId, LocalDate dueDate,
+                       BigDecimal estimatedHours, String linkedEntityType,
+                       UUID linkedEntityId) {
         if (title            != null) this.title            = title;
         if (description      != null) this.description      = description;
         if (priority         != null) this.priority         = priority;
         if (assigneeId       != null) this.assigneeId       = assigneeId;
-        if (dueDate          != null) this.dueDate          = dueDate;
+        if (dueDate          != null && !dueDate.equals(this.dueDate)) {
+            this.dueDate            = dueDate;
+            this.overdueAlertSentAt = null; // re-arm: new deadline, eligible to alert again
+        }
         if (estimatedHours   != null) this.estimatedHours   = estimatedHours;
         if (linkedEntityType != null) this.linkedEntityType = linkedEntityType;
         if (linkedEntityId   != null) this.linkedEntityId   = linkedEntityId;
@@ -124,5 +135,10 @@ public class Task {
                 && !"DONE".equals(status)
                 && !"CANCELLED".equals(status)
                 && LocalDate.now().isAfter(dueDate);
+    }
+
+    /** Marks the overdue alert as sent — mirrors Trip.markLongRunningAlertSent() in Fleet. */
+    public void markOverdueAlertSent() {
+        this.overdueAlertSentAt = Instant.now();
     }
 }

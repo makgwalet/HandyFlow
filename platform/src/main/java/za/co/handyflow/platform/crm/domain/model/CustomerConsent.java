@@ -84,6 +84,19 @@ public class CustomerConsent {
     @Column(name = "reviewed_by")
     private UUID reviewedBy;
 
+    /**
+     * FIX: "no consent-expiring-soon reminder" gap — the retention
+     * scheduler only fired after expiry; nothing warned proactively before
+     * it lapsed. Tracks whether the 30-days-before-expiry reminder has
+     * already gone out for this consent record, so
+     * CustomerRetentionScheduler.sendExpiryRemindersForTenant() fires
+     * exactly once per record — not every night for the entire 30-day
+     * window it's inside — same edge-triggered pattern used for low-stock
+     * and low-balance alerts elsewhere in this codebase.
+     */
+    @Column(name = "expiry_reminder_sent_at")
+    private Instant expiryReminderSentAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -132,6 +145,11 @@ public class CustomerConsent {
         this.lastReviewedAt = Instant.now();
         this.reviewedBy     = reviewedByUserId;
         this.updatedAt      = Instant.now();
+    }
+
+    public void markExpiryReminderSent() {
+        this.expiryReminderSentAt = Instant.now();
+        this.updatedAt            = Instant.now();
     }
 
     public boolean isActive()   { return withdrawnAt == null; }

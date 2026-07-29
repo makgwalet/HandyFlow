@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, Droplets, AlertTriangle, X, ChevronDown, ChevronUp, AlertCircle } from "lucide-react"
+import { Plus, Droplets, AlertTriangle, X, ChevronDown, ChevronUp, AlertCircle, Download } from "lucide-react"
 
 interface Tank {
   id: string; name: string; fuelType: string
@@ -49,6 +49,14 @@ export default function TanksTab() {
     queryFn: async () => unwrapList(await apiClient.get("/api/v1/fuel/tanks")),
   })
 
+  // FIX: "no tank capacity/utilization forecasting" gap — one batch call for
+  // every tank's "days until empty" forecast, not one call per tank card.
+  const { data: forecasts = [] } = useQuery<any[]>({
+    queryKey: ["tank-utilization-forecasts"],
+    queryFn: async () => unwrapList(await apiClient.get("/api/v1/fuel/tanks/utilization-forecast")),
+  })
+  const forecastByTank = Object.fromEntries(forecasts.map((f: any) => [f.tankId, f]))
+
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["fuel-suppliers"],
     queryFn: async () => unwrapList(await apiClient.get("/api/v1/fuel/suppliers")),
@@ -72,6 +80,51 @@ export default function TanksTab() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["tanks"] }); qc.invalidateQueries({ queryKey: ["receipts"] }); setShowReceive(null); setReceiveForm({ litresReceived: "", pricePerLitre: "", supplierId: "", deliveryNote: "", invoiceRef: "" }); setError("") },
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to receive fuel"),
   })
+
+  const [prefilled, setPrefilled] = useState(false)
+
+  // FIX: "no reorder-point automation" — the Receive button used to open a blank
+  // form every time. This fetches a suggestion (top-up-to-capacity quantity,
+  // plus the tank's last supplier and price) and pre-fills the form with it —
+  // still fully editable, just not a blank slate.
+  // FIX: "no dip-variance/reconciliation report PDF" gap — only the in-app
+  // dip history list existed before; this is the exportable document a
+  // depot manager can hand to ops/security when investigating a suspected
+  // theft or leak. Downloads via blob (not a raw href) so it goes through
+  // the same auth-aware apiClient as every other request.
+  const downloadReconciliationReport = async (tank: Tank) => {
+    const r = await apiClient.get(`/api/v1/fuel/tanks/${tank.id}/reconciliation-report`, { responseType: "blob" })
+    const url = window.URL.createObjectURL(new Blob([r.data]))
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `reconciliation-${tank.name.replace(/[^a-zA-Z0-9]+/g, "-")}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  }
+
+  const openReceive = async (tank: Tank) => {
+    setError("")
+    setPrefilled(false)
+    try {
+      const r = await apiClient.get(`/api/v1/fuel/tanks/${tank.id}/reorder-suggestion`)
+      const s = r.data?.data ?? r.data
+      setReceiveForm({
+        litresReceived: s?.suggestedLitres != null ? String(s.suggestedLitres) : "",
+        pricePerLitre: s?.lastPricePerLitre != null ? String(s.lastPricePerLitre) : "",
+        supplierId: s?.lastSupplierId ?? "",
+        deliveryNote: "",
+        invoiceRef: "",
+      })
+      setPrefilled(!!(s?.suggestedLitres || s?.lastSupplierId))
+    } catch {
+      // Suggestion is a convenience, not a requirement — fall back to a blank form
+      // rather than blocking the receive flow if the endpoint has a hiccup.
+      setReceiveForm({ litresReceived: "", pricePerLitre: "", supplierId: "", deliveryNote: "", invoiceRef: "" })
+    }
+    setShowReceive(tank)
+  }
 
   const recordDip = useMutation({
     mutationFn: ({ tankId, body }: { tankId: string; body: any }) =>
@@ -164,7 +217,7 @@ export default function TanksTab() {
                       )}
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <button onClick={() => { setShowReceive(tank); setError("") }}
+                      <button onClick={() => openReceive(tank)}
                         style={{ background: "#0D9488", color: "#fff", border: "none", borderRadius: 7, padding: "6px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                         + Receive
                       </button>
@@ -197,13 +250,33 @@ export default function TanksTab() {
                       <span>Available space: {(Number(tank.capacityLitres) - Number(tank.currentLitres)).toLocaleString()} L</span>
                       {tank.low && <span style={{ color: "#DC2626" }}>Below threshold</span>}
                     </div>
+                    {(() => {
+                      const f = forecastByTank[tank.id]
+                      if (!f) return null
+                      if (!f.hasSufficientData) {
+                        return <div style={{ fontSize: 11, color: "#CBD5E1", marginTop: 6 }}>Not enough recent dispatch activity to forecast usage</div>
+                      }
+                      const urgent = f.daysUntilEmpty != null && f.daysUntilEmpty <= 14
+                      return (
+                        <div style={{ fontSize: 11, color: urgent ? "#D97706" : "#64748B", marginTop: 6, fontWeight: urgent ? 700 : 400 }}>
+                          ~{f.daysUntilEmpty} day{f.daysUntilEmpty === 1 ? "" : "s"} until empty at current usage
+                          <span style={{ color: "#94A3B8", fontWeight: 400 }}> ({Number(f.avgDailyLitres).toFixed(0)} L/day avg, last {f.lookbackDays}d)</span>
+                        </div>
+                      )
+                    })()}
                   </div>
                 </div>
 
                 {/* Expanded — dip reading history */}
                 {isOpen && (
                   <div style={{ borderTop: "1px solid #F1F5F9", padding: "16px 20px", background: "#F8FAFC" }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 12 }}>Dip Reading History</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>Dip Reading History</div>
+                      <button onClick={() => downloadReconciliationReport(tank)}
+                        style={{ display: "flex", alignItems: "center", gap: 5, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 7, padding: "5px 10px", fontSize: 12, fontWeight: 600, color: "#0D9488", cursor: "pointer" }}>
+                        <Download size={12} /> Reconciliation report (PDF)
+                      </button>
+                    </div>
                     {dipHistory.isLoading ? (
                       <div style={{ fontSize: 13, color: "#94A3B8" }}>Loading...</div>
                     ) : dips.length === 0 ? (
@@ -274,6 +347,11 @@ export default function TanksTab() {
       {showReceive && (
         <Overlay onClose={() => { setShowReceive(null); setError("") }}>
           <MHead title={`Receive Fuel — ${showReceive.name}`} onClose={() => { setShowReceive(null); setError("") }} />
+          {prefilled && (
+            <div style={{ marginBottom: 14, padding: "10px 14px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, fontSize: 12, color: "#166534" }}>
+              Pre-filled to top up to capacity{receiveForm.supplierId ? ", using the last supplier for this tank" : ""} — feel free to adjust.
+            </div>
+          )}
           <div style={{ marginBottom: 14, padding: "10px 14px", background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 8, fontSize: 13, color: "#0369A1" }}>
             Available space: <strong>{(Number(showReceive.capacityLitres) - Number(showReceive.currentLitres)).toLocaleString()} L</strong>
           </div>

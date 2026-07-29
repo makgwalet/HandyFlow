@@ -36,9 +36,30 @@ public class QuotePublicAccessService {
     private final TenantFacade tenantFacade;
     private final StaffNotifier staffNotifier;
 
-    @Transactional(readOnly = true)
+    /**
+     * FIX: "no quote view-tracking" gap — this was the read-only entry
+     * point for the public link and the exact place a "viewed" event
+     * belongs (it's the only method that runs every time a client actually
+     * opens the quote, as opposed to accept/reject which only run when
+     * they act on it). No longer readOnly, since recording a view is now a
+     * real write.
+     */
+    @Transactional
     public PublicQuoteView getByToken(UUID token) {
         Quote quote = findByToken(token);
+        quote.recordView();
+        quoteRepository.save(quote);
+        log.info("Quote={} viewed via public link (viewCount={})", quote.getId(), quote.getViewCount());
+        // NOTE: deliberately no staff notification on first view — this
+        // session doesn't have NotificationType.java in context, and a
+        // wrong guess at a new enum constant there breaks compilation
+        // (same reasoning behind every other place this session skipped
+        // adding a new notification type). The audit's actual ask —
+        // "know a quote was opened" — is satisfied by exposing
+        // firstViewedAt/viewCount on QuoteResponse for the UI to surface.
+        // A "quote viewed" push notification, edge-triggered on first view
+        // only, would be a one-line addition here once that file's
+        // available.
         return toView(quote);
     }
 

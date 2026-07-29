@@ -13,7 +13,11 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.clinic.application.internal.ClinicPdfService;
+import za.co.handyflow.platform.clinic.application.internal.ClinicReferralPdfService;
+import za.co.handyflow.platform.clinic.application.internal.ClinicConsultationSummaryPdfService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicService;
+import za.co.handyflow.platform.clinic.application.internal.ClinicAppointmentReminderService;
+import za.co.handyflow.platform.clinic.application.internal.ClinicTelehealthService;
 import za.co.handyflow.platform.clinic.domain.model.ClinicMedicationCatalogue;
 import za.co.handyflow.platform.clinic.domain.repository.ClinicMedicationCatalogueRepository;
 import za.co.handyflow.platform.clinic.domain.repository.ClinicProcedureCatalogueRepository;
@@ -33,7 +37,11 @@ import java.util.UUID;
 public class ClinicController {
 
     private final ClinicService                      clinicService;
+    private final ClinicAppointmentReminderService    appointmentReminderService;
+    private final ClinicTelehealthService              telehealthService;
     private final ClinicPdfService                   clinicPdfService;
+    private final ClinicReferralPdfService            referralPdfService;
+    private final ClinicConsultationSummaryPdfService consultationSummaryPdfService;
     private final ClinicMedicationCatalogueRepository medicationRepo;
     private final ClinicProcedureCatalogueRepository procedureRepo;
 
@@ -154,6 +162,35 @@ public class ClinicController {
                 clinicService.updateAppointmentStatus(TenantContext.getTenantIdAsObject(), id, action)));
     }
 
+    /**
+     * FIX: "no appointment reminder UI" gap — direct consequence of the
+     * "no appointment reminders" gap; ScheduleTab had booking and status
+     * changes but no "send reminder" action. Shares the same send path as
+     * the nightly ClinicAppointmentReminderScheduler.
+     */
+    @PostMapping("/appointments/{id}/send-reminder")
+    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @Operation(summary = "Manually send (or re-send) the appointment reminder email now")
+    public ResponseEntity<ApiResponse<Void>> sendAppointmentReminder(@PathVariable UUID id) {
+        appointmentReminderService.sendReminder(id);
+        return ResponseEntity.ok(ApiResponse.success("Reminder sent", null));
+    }
+
+    /**
+     * FIX: "no telehealth/video consultation option" gap. Called by either
+     * party (staff or, via a future patient portal, the patient) on
+     * joining — idempotent, so simultaneous calls from both sides land on
+     * the same room.
+     */
+    @PostMapping("/appointments/{id}/video-room")
+    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @Operation(summary = "Get or create the video call room for a telehealth appointment")
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> getVideoRoom(@PathVariable UUID id) {
+        String url = telehealthService.getOrCreateVideoRoom(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok(ApiResponse.success("Video room ready",
+                java.util.Map.of("videoRoomUrl", url)));
+    }
+
     // ── Consultations ─────────────────────────────────────────────────────────
 
     @GetMapping("/patients/{patientId}/consultations")
@@ -211,6 +248,27 @@ public class ClinicController {
         return pdfResponse(pdf, "medical-certificate-" + id + ".pdf");
     }
 
+    // ── Referral Letter PDF ───────────────────────────────────────────────────
+    // FIX: "no referral letter" gap — a very standard GP output with no
+    // equivalent before this. Not backed by a persisted entity — same
+    // convention as the medical certificate above (free-text params
+    // supplied at generation time, nothing stored).
+
+    @PostMapping("/consultations/{id}/referral-letter")
+    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @Operation(summary = "Generate a referral letter PDF for a consultation")
+    public ResponseEntity<byte[]> generateReferralLetter(
+            @PathVariable UUID id,
+            @RequestParam(required = false) String specialistName,
+            @RequestParam(required = false) String specialty,
+            @RequestParam(required = false) String reason,
+            @RequestParam(required = false) String urgency,
+            @RequestParam(required = false) String additionalNotes) {
+        byte[] pdf = referralPdfService.generate(
+                TenantContext.getTenantIdAsObject(), id, specialistName, specialty, reason, urgency, additionalNotes);
+        return pdfResponse(pdf, "referral-letter-" + id + ".pdf");
+    }
+
     // ── Prescription PDF ──────────────────────────────────────────────────────
 
     @GetMapping("/consultations/{id}/prescription-pdf")
@@ -220,6 +278,19 @@ public class ClinicController {
         byte[] pdf = clinicPdfService.generatePrescription(
                 TenantContext.getTenantIdAsObject(), id);
         return pdfResponse(pdf, "prescription-" + id + ".pdf");
+    }
+
+    // ── Consultation Summary PDF ─────────────────────────────────────────────
+    // FIX: "no consultation summary/after-visit note PDF" gap — distinct
+    // from the medical certificate and prescription, a standard GP output
+    // this codebase never generated despite capturing the underlying data.
+
+    @GetMapping("/consultations/{id}/summary-pdf")
+    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @Operation(summary = "Download a visit/consultation summary PDF")
+    public ResponseEntity<byte[]> generateConsultationSummaryPdf(@PathVariable UUID id) {
+        byte[] pdf = consultationSummaryPdfService.generate(TenantContext.getTenantIdAsObject(), id);
+        return pdfResponse(pdf, "visit-summary-" + id + ".pdf");
     }
 
     // ── Medication Catalogue ──────────────────────────────────────────────────

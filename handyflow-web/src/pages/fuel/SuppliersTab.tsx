@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, Users, Phone, Mail, X, Pencil } from "lucide-react"
+import { Plus, Users, Phone, Mail, X, Pencil, Download } from "lucide-react"
 
 interface Supplier {
   id: string
@@ -49,6 +49,20 @@ export default function SuppliersTab() {
     },
     onError: (e: any) => setError(e.response?.data?.message || "Failed to update supplier"),
   })
+
+  // FIX: "no supplier statement/receiving report PDF" gap — exports "everything
+  // received from this supplier this month" as a PDF via the server-side report.
+  const downloadStatement = async (s: Supplier) => {
+    const r = await apiClient.get(`/api/v1/fuel/suppliers/${s.id}/statement`, { responseType: "blob" })
+    const url = window.URL.createObjectURL(new Blob([r.data]))
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `statement-${s.name.replace(/[^a-zA-Z0-9]+/g, "-")}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  }
 
   const openEdit = (s: Supplier) => {
     setEditing(s)
@@ -108,10 +122,16 @@ export default function SuppliersTab() {
                     )}
                   </div>
                 </div>
-                <button onClick={() => openEdit(s)}
-                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 7, fontSize: 12, color: "#1D4ED8", cursor: "pointer", flexShrink: 0 }}>
-                  <Pencil size={12} /> Edit
-                </button>
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => downloadStatement(s)}
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "#F0FDFA", border: "1px solid #99F6E4", borderRadius: 7, fontSize: 12, color: "#0D9488", cursor: "pointer" }}>
+                    <Download size={12} /> Statement
+                  </button>
+                  <button onClick={() => openEdit(s)}
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 7, fontSize: 12, color: "#1D4ED8", cursor: "pointer" }}>
+                    <Pencil size={12} /> Edit
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

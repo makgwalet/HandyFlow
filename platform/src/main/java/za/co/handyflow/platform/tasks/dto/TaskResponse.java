@@ -23,6 +23,8 @@ public record TaskResponse(
         String     linkedEntityType,
         UUID       linkedEntityId,
         int        commentCount,
+        int        checklistTotal,
+        int        checklistCompleted,
         List<TaskCommentResponse> comments,
         Instant    createdAt,
         Instant    updatedAt,

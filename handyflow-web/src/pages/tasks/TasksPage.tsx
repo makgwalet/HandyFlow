@@ -9,6 +9,7 @@ import {
   TrendingUp, AlertTriangle, Search, Filter, Tag,
   Link2, MoreHorizontal, Archive, Settings, Hash,
   Circle, CheckCircle2, GitBranch, RefreshCw,
+  Paperclip, Download, FileText, LayoutGrid, CalendarDays, GanttChart,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -16,6 +17,8 @@ interface Column { id: string; name: string; sortOrder: number; color: string | 
 interface Board  { id: string; name: string; description: string | null; color: string | null; isDefault: boolean; columns: Column[] }
 interface TaskComment { id: string; authorId: string; authorName: string; body: string; createdAt: string }
 interface TimeLog { id: string; userId: string; userName: string; hours: number; description: string | null; loggedDate: string }
+interface Attachment { id: string; fileName: string; contentType: string | null; sizeBytes: number; uploadedBy: string | null; uploadedByName: string; createdAt: string }
+interface ChecklistItem { id: string; text: string; completed: boolean; sortOrder: number; createdAt: string; completedAt: string | null }
 interface Task {
   id: string; boardId: string; columnId: string; columnName: string | null
   title: string; description: string | null
@@ -25,13 +28,14 @@ interface Task {
   estimatedHours: number | null; loggedHours: number | null
   sortOrder: number
   linkedEntityType: string | null; linkedEntityId: string | null
-  commentCount: number; comments: TaskComment[]
+  commentCount: number; checklistTotal: number; checklistCompleted: number; comments: TaskComment[]
   createdAt: string; updatedAt: string; completedAt: string | null
 }
 interface Summary {
   totalTasks: number; todoCount: number; inProgressCount: number
   inReviewCount: number; doneCount: number; overdueCount: number; myTasksCount: number
 }
+interface UserOption { id: string; name: string }
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const PRIORITY: Record<string, { label: string; color: string; bg: string; border: string; dot: string }> = {
@@ -55,6 +59,11 @@ const initials = (name: string | null) =>
   name ? name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : '?'
 const isOverdueDate = (dueDate: string | null, completed: string | null) =>
   dueDate && !completed ? new Date(dueDate) < new Date() : false
+const fmtFileSize = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 
 // ── UI Primitives ──────────────────────────────────────────────────────────
 const inp: React.CSSProperties = {
@@ -126,8 +135,8 @@ function ConfirmModal({ title, message, confirmLabel = 'Confirm', danger = false
 }
 
 // ── Task Detail Modal ──────────────────────────────────────────────────────
-function TaskDetailModal({ task, columns, onClose, onUpdate, onDelete, onComplete, onMove, onRefresh }: {
-  task: Task; columns: Column[]
+function TaskDetailModal({ task, columns, users, onClose, onUpdate, onDelete, onComplete, onMove, onRefresh }: {
+  task: Task; columns: Column[]; users: UserOption[]
   onClose: () => void
   onUpdate: (data: any) => void
   onDelete: () => void
@@ -136,7 +145,7 @@ function TaskDetailModal({ task, columns, onClose, onUpdate, onDelete, onComplet
   onRefresh: () => void
 }) {
   const qc = useQueryClient()
-  const [tab, setTab] = useState<'details' | 'comments' | 'time'>('details')
+  const [tab, setTab] = useState<'details' | 'comments' | 'time' | 'files'>('details')
   const [editTitle, setEditTitle] = useState(false)
   const [title, setTitle] = useState(task.title)
   const [editDesc, setEditDesc] = useState(false)
@@ -168,6 +177,90 @@ function TaskDetailModal({ task, columns, onClose, onUpdate, onDelete, onComplet
     onSuccess: () => {
       setHours(''); setHoursDesc('')
       qc.invalidateQueries({ queryKey: ['task-timelogs', task.id] })
+      onRefresh()
+    },
+  })
+
+  const { data: attachments = [] } = useQuery<Attachment[]>({
+    queryKey: ['task-attachments', task.id],
+    queryFn: async () => {
+      const r = await apiClient.get(`/api/v1/tasks/${task.id}/attachments`)
+      return r.data?.data ?? r.data ?? []
+    },
+    enabled: tab === 'files',
+  })
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadError, setUploadError] = useState('')
+
+  const uploadAttachment = useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      // FIX: apiClient defaults every request to Content-Type: application/json,
+      // which silently overrides FormData's own multipart boundary and makes the
+      // server reject the request entirely ("Content-Type 'application/json' is
+      // not supported"). Explicitly unsetting it here lets the browser generate
+      // the correct "multipart/form-data; boundary=..." header itself — axios
+      // only does this when the Content-Type header is absent, not when it's
+      // been set to something else by a default.
+      return apiClient.post(`/api/v1/tasks/${task.id}/attachments`, formData, {
+        headers: { 'Content-Type': undefined },
+      })
+    },
+    onSuccess: () => { setUploadError(''); qc.invalidateQueries({ queryKey: ['task-attachments', task.id] }) },
+    onError: (e: any) => setUploadError(e.response?.data?.message || 'Failed to upload file'),
+  })
+
+  const deleteAttachment = useMutation({
+    mutationFn: (attachmentId: string) => apiClient.delete(`/api/v1/tasks/${task.id}/attachments/${attachmentId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['task-attachments', task.id] }),
+  })
+
+  const downloadAttachment = async (a: Attachment) => {
+    const r = await apiClient.get(`/api/v1/tasks/${task.id}/attachments/${a.id}/download`, { responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([r.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = a.fileName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  }
+
+  const [newChecklistText, setNewChecklistText] = useState('')
+
+  const { data: checklistItems = [] } = useQuery<ChecklistItem[]>({
+    queryKey: ['task-checklist', task.id],
+    queryFn: async () => {
+      const r = await apiClient.get(`/api/v1/tasks/${task.id}/checklist-items`)
+      return r.data?.data ?? r.data ?? []
+    },
+  })
+
+  const addChecklistItem = useMutation({
+    mutationFn: (text: string) => apiClient.post(`/api/v1/tasks/${task.id}/checklist-items`, { text }),
+    onSuccess: () => {
+      setNewChecklistText('')
+      qc.invalidateQueries({ queryKey: ['task-checklist', task.id] })
+      onRefresh()
+    },
+  })
+
+  const toggleChecklistItem = useMutation({
+    mutationFn: ({ itemId, completed }: { itemId: string; completed: boolean }) =>
+      apiClient.patch(`/api/v1/tasks/${task.id}/checklist-items/${itemId}/toggle`, { completed }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['task-checklist', task.id] })
+      onRefresh()
+    },
+  })
+
+  const deleteChecklistItem = useMutation({
+    mutationFn: (itemId: string) => apiClient.delete(`/api/v1/tasks/${task.id}/checklist-items/${itemId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['task-checklist', task.id] })
       onRefresh()
     },
   })
@@ -248,9 +341,9 @@ function TaskDetailModal({ task, columns, onClose, onUpdate, onDelete, onComplet
 
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 0, marginTop: 6 }}>
-              {(['details', 'comments', 'time'] as const).map(t => (
+              {(['details', 'comments', 'time', 'files'] as const).map(t => (
                 <button key={t} onClick={() => setTab(t)} style={{ padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t ? '#1B3A6B' : '#9CA3AF', borderBottom: `2px solid ${tab === t ? '#1B3A6B' : 'transparent'}`, marginBottom: -1, transition: 'all 0.15s' }}>
-                  {t === 'comments' ? `Comments (${task.commentCount})` : t === 'time' ? `Time (${logged}h)` : 'Details'}
+                  {t === 'comments' ? `Comments (${task.commentCount})` : t === 'time' ? `Time (${logged}h)` : t === 'files' ? 'Files' : 'Details'}
                 </button>
               ))}
             </div>
@@ -280,6 +373,54 @@ function TaskDetailModal({ task, columns, onClose, onUpdate, onDelete, onComplet
                     </div>
                   )}
 
+                  {/* Checklist */}
+                  <div style={{ marginTop: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <label style={lbl}>Checklist</label>
+                      {checklistItems.length > 0 && (
+                        <span style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 700 }}>
+                          {checklistItems.filter(i => i.completed).length}/{checklistItems.length}
+                        </span>
+                      )}
+                    </div>
+                    {checklistItems.length > 0 && (
+                      <div style={{ marginBottom: 10 }}>
+                        <ProgressBar
+                          value={checklistItems.filter(i => i.completed).length}
+                          max={checklistItems.length}
+                          color={checklistItems.every(i => i.completed) ? '#10B981' : '#1B3A6B'} />
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+                      {checklistItems.map(item => (
+                        <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 6px', borderRadius: 7 }}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#F9FAFB'}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
+                          <input type="checkbox" checked={item.completed}
+                            onChange={e => toggleChecklistItem.mutate({ itemId: item.id, completed: e.target.checked })}
+                            style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#1B3A6B', flexShrink: 0 }} />
+                          <span style={{ flex: 1, fontSize: 13, color: item.completed ? '#9CA3AF' : '#374151', textDecoration: item.completed ? 'line-through' : 'none' }}>
+                            {item.text}
+                          </span>
+                          <button onClick={() => deleteChecklistItem.mutate(item.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#CBD5E1', padding: 2, display: 'flex', flexShrink: 0 }}>
+                            <X size={13} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input value={newChecklistText} onChange={e => setNewChecklistText(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && newChecklistText.trim()) addChecklistItem.mutate(newChecklistText.trim()) }}
+                        placeholder="Add checklist item..." style={{ ...inp, flex: 1, fontSize: 13 }} />
+                      <button onClick={() => newChecklistText.trim() && addChecklistItem.mutate(newChecklistText.trim())}
+                        disabled={!newChecklistText.trim() || addChecklistItem.isPending}
+                        style={{ ...btnSecondary, padding: '7px 12px', fontSize: 12, opacity: !newChecklistText.trim() ? 0.5 : 1 }}>
+                        <Plus size={13} />
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Time progress */}
                   {estimated > 0 && (
                     <div style={{ marginTop: 20, padding: '14px 16px', background: '#F8FAFC', borderRadius: 10, border: '1px solid #E2E8F0' }}>
@@ -306,8 +447,20 @@ function TaskDetailModal({ task, columns, onClose, onUpdate, onDelete, onComplet
 
                 {/* Right — metadata sidebar */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <div style={{ color: '#9CA3AF', marginTop: 4, flexShrink: 0 }}><User size={13} /></div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Assignee</div>
+                      <select
+                        value={task.assigneeId || ''}
+                        onChange={e => onUpdate({ assigneeId: e.target.value || null })}
+                        style={{ ...inp, fontSize: 13, fontWeight: 600, color: '#374151', padding: '5px 6px', background: '#fff', border: '1.5px solid #E5E7EB' }}>
+                        <option value="">Unassigned</option>
+                        {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
                   {[
-                    { icon: <User size={13} />,     label: 'Assignee',  value: task.assigneeName || 'Unassigned' },
                     { icon: <Calendar size={13} />, label: 'Due date',  value: fmtDateFull(task.dueDate), warn: !!overdueFlag },
                     { icon: <Flag size={13} />,     label: 'Priority',  value: task.priority },
                     { icon: <Hash size={13} />,     label: 'Column',    value: task.columnName || '—' },
@@ -431,6 +584,51 @@ function TaskDetailModal({ task, columns, onClose, onUpdate, onDelete, onComplet
                 )}
               </div>
             )}
+
+            {tab === 'files' && (
+              <div>
+                <input ref={fileInputRef} type="file" style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadAttachment.mutate(f); e.target.value = '' }} />
+                <button onClick={() => fileInputRef.current?.click()} disabled={uploadAttachment.isPending}
+                  style={{ ...btnPrimary, marginBottom: 16, opacity: uploadAttachment.isPending ? 0.6 : 1 }}>
+                  {uploadAttachment.isPending ? <><Loader2 size={13} /> Uploading...</> : <><Paperclip size={13} /> Upload file</>}
+                </button>
+                {uploadError && (
+                  <div style={{ fontSize: 12, color: '#EF4444', marginBottom: 12 }}>{uploadError}</div>
+                )}
+
+                {attachments.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: '#CBD5E1' }}>
+                    <Paperclip size={28} style={{ marginBottom: 8, opacity: 0.5 }} />
+                    <div style={{ fontSize: 13 }}>No files attached yet</div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {attachments.map(a => (
+                      <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: '#F8FAFC', borderRadius: 9, border: '1px solid #E2E8F0' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                          <FileText size={16} color="#64748B" style={{ flexShrink: 0 }} />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.fileName}</div>
+                            <div style={{ fontSize: 11, color: '#94A3B8' }}>{fmtFileSize(a.sizeBytes)} · {a.uploadedByName} · {fmtDate(a.createdAt)}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                          <button onClick={() => downloadAttachment(a)} title="Download"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', padding: 6, borderRadius: 6, display: 'flex' }}>
+                            <Download size={14} />
+                          </button>
+                          <button onClick={() => deleteAttachment.mutate(a.id)} title="Delete"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: 6, borderRadius: 6, display: 'flex' }}>
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -450,12 +648,12 @@ function TaskDetailModal({ task, columns, onClose, onUpdate, onDelete, onComplet
 }
 
 // ── Create Task Modal ──────────────────────────────────────────────────────
-function CreateTaskModal({ columns, boardId, defaultColumnId, onClose, onSaved }: {
-  columns: Column[]; boardId: string; defaultColumnId: string | null
+function CreateTaskModal({ columns, boardId, defaultColumnId, users, onClose, onSaved }: {
+  columns: Column[]; boardId: string; defaultColumnId: string | null; users: UserOption[]
   onClose: () => void; onSaved: () => void
 }) {
   const [form, setForm] = useState({
-    title: '', description: '', priority: 'NORMAL', assigneeName: '',
+    title: '', description: '', priority: 'NORMAL', assigneeId: '',
     dueDate: '', estimatedHours: '', columnId: defaultColumnId || columns[0]?.id || '',
     linkedEntityType: '', linkedEntityId: '',
   })
@@ -465,7 +663,7 @@ function CreateTaskModal({ columns, boardId, defaultColumnId, onClose, onSaved }
   const create = useMutation({
     mutationFn: () => apiClient.post(`/api/v1/tasks/boards/${boardId}/tasks`, {
       title: form.title, description: form.description || null, priority: form.priority,
-      assigneeName: form.assigneeName || null, dueDate: form.dueDate || null,
+      assigneeId: form.assigneeId || null, dueDate: form.dueDate || null,
       estimatedHours: form.estimatedHours ? parseFloat(form.estimatedHours) : null,
       columnId: form.columnId || null,
       linkedEntityType: form.linkedEntityType || null,
@@ -504,7 +702,10 @@ function CreateTaskModal({ columns, boardId, defaultColumnId, onClose, onSaved }
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={lbl}>Assignee</label>
-              <input value={form.assigneeName} onChange={e => f('assigneeName', e.target.value)} placeholder="Team member name" style={inp} />
+              <select value={form.assigneeId} onChange={e => f('assigneeId', e.target.value)} style={{ ...inp, background: '#fff' }}>
+                <option value="">Unassigned</option>
+                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
             </div>
             <div>
               <label style={lbl}>Due date</label>
@@ -607,10 +808,13 @@ function CreateBoardModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
 }
 
 // ── Task Card ──────────────────────────────────────────────────────────────
-function TaskCard({ task, columns, onMoveTask, onClick }: {
+function TaskCard({ task, columns, onMoveTask, onClick, isDragging, onDragStart, onDragEnd }: {
   task: Task; columns: Column[]
   onMoveTask: (taskId: string, columnId: string) => void
   onClick: () => void
+  isDragging: boolean
+  onDragStart: () => void
+  onDragEnd: () => void
 }) {
   const due     = task.dueDate ? new Date(task.dueDate) : null
   const overdue = due && due < new Date() && !task.completedAt
@@ -618,7 +822,10 @@ function TaskCard({ task, columns, onMoveTask, onClick }: {
 
   return (
     <div onClick={onClick}
-      style={{ background: '#fff', border: `1px solid ${overdue ? '#FCA5A5' : '#E5E7EB'}`, borderRadius: 10, padding: '13px 14px', cursor: 'pointer', transition: 'box-shadow 0.15s', borderLeft: `3px solid ${overdue ? '#EF4444' : (columns.find(c => c.id === task.columnId)?.color || '#E5E7EB')}` }}
+      draggable
+      onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', task.id); onDragStart() }}
+      onDragEnd={onDragEnd}
+      style={{ background: '#fff', border: `1px solid ${overdue ? '#FCA5A5' : '#E5E7EB'}`, borderRadius: 10, padding: '13px 14px', cursor: isDragging ? 'grabbing' : 'grab', opacity: isDragging ? 0.4 : 1, transition: 'box-shadow 0.15s, opacity 0.15s', borderLeft: `3px solid ${overdue ? '#EF4444' : (columns.find(c => c.id === task.columnId)?.color || '#E5E7EB')}` }}
       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.1)' }}
       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}>
 
@@ -645,6 +852,11 @@ function TaskCard({ task, columns, onMoveTask, onClick }: {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Badge priority={task.priority} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {task.checklistTotal > 0 && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: task.checklistCompleted === task.checklistTotal ? '#10B981' : '#9CA3AF', fontWeight: task.checklistCompleted === task.checklistTotal ? 700 : 400 }}>
+              <CheckSquare size={10} />{task.checklistCompleted}/{task.checklistTotal}
+            </span>
+          )}
           {task.commentCount > 0 && (
             <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#9CA3AF' }}>
               <MessageSquare size={10} />{task.commentCount}
@@ -685,6 +897,158 @@ function TaskCard({ task, columns, onMoveTask, onClick }: {
 }
 
 // ── Main TasksPage ─────────────────────────────────────────────────────────
+// ── Calendar View ─────────────────────────────────────────────────────────
+function CalendarView({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (task: Task) => void }) {
+  const [monthDate, setMonthDate] = useState(() => new Date())
+  const year  = monthDate.getFullYear()
+  const month = monthDate.getMonth()
+  const dateKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const todayKey = dateKey(new Date())
+
+  const firstOfMonth   = new Date(year, month, 1)
+  const startDay       = firstOfMonth.getDay()
+  const daysInMonth    = new Date(year, month + 1, 0).getDate()
+
+  const cells: { date: Date; inMonth: boolean }[] = []
+  for (let i = startDay; i > 0; i--) cells.push({ date: new Date(year, month, 1 - i), inMonth: false })
+  for (let d = 1; d <= daysInMonth; d++) cells.push({ date: new Date(year, month, d), inMonth: true })
+  while (cells.length % 7 !== 0) {
+    const next = new Date(cells[cells.length - 1].date)
+    next.setDate(next.getDate() + 1)
+    cells.push({ date: next, inMonth: false })
+  }
+
+  const tasksByDate = new Map<string, Task[]>()
+  tasks.forEach(t => {
+    if (!t.dueDate) return
+    const key = t.dueDate.slice(0, 10)
+    if (!tasksByDate.has(key)) tasksByDate.set(key, [])
+    tasksByDate.get(key)!.push(t)
+  })
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#111827' }}>
+          {monthDate.toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}
+        </h3>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={() => setMonthDate(new Date())} style={{ ...btnSecondary, padding: '6px 12px', fontSize: 12 }}>Today</button>
+          <button onClick={() => setMonthDate(new Date(year, month - 1, 1))}
+            style={{ background: '#F1F5F9', border: 'none', borderRadius: 8, padding: '6px 9px', cursor: 'pointer', display: 'flex' }}>
+            <ChevronLeft size={14} />
+          </button>
+          <button onClick={() => setMonthDate(new Date(year, month + 1, 1))}
+            style={{ background: '#F1F5F9', border: 'none', borderRadius: 8, padding: '6px 9px', cursor: 'pointer', display: 'flex' }}>
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: '#E5E7EB', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden' }}>
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+          <div key={d} style={{ background: '#F8FAFC', padding: '7px', fontSize: 11, fontWeight: 700, color: '#64748B', textAlign: 'center' }}>{d}</div>
+        ))}
+        {cells.map(({ date, inMonth }, i) => {
+          const key      = dateKey(date)
+          const dayTasks = tasksByDate.get(key) || []
+          const isToday  = key === todayKey
+          return (
+            <div key={i} style={{ background: '#fff', minHeight: 96, padding: 6, opacity: inMonth ? 1 : 0.4 }}>
+              <div style={{ marginBottom: 4 }}>
+                {isToday ? (
+                  <span style={{ background: '#1B3A6B', color: '#fff', borderRadius: '50%', width: 19, height: 19, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800 }}>{date.getDate()}</span>
+                ) : (
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#9CA3AF' }}>{date.getDate()}</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {dayTasks.slice(0, 3).map(t => (
+                  <div key={t.id} onClick={() => onTaskClick(t)} title={t.title}
+                    style={{ fontSize: 10, padding: '2px 5px', borderRadius: 4, background: t.overdue ? '#FEF2F2' : (PRIORITY[t.priority]?.bg || '#F1F5F9'), color: t.overdue ? '#DC2626' : (PRIORITY[t.priority]?.color || '#475569'), cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                    {t.title}
+                  </div>
+                ))}
+                {dayTasks.length > 3 && (
+                  <div style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 600 }}>+{dayTasks.length - 3} more</div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Timeline View ─────────────────────────────────────────────────────────
+// NOTE: tasks only carry a single dueDate, not a start date, so this renders
+// each task as a marker on its due date rather than a true start→end Gantt
+// bar. Adding a startDate field to Task would let this show real duration
+// bars instead — a reasonable follow-up if that level of detail is wanted.
+function TimelineView({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (task: Task) => void }) {
+  const dated = tasks.filter(t => !!t.dueDate).sort((a, b) => a.dueDate!.localeCompare(b.dueDate!))
+
+  if (dated.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px 0', color: '#CBD5E1' }}>
+        <GanttChart size={32} style={{ marginBottom: 10, opacity: 0.5 }} />
+        <div style={{ fontSize: 13 }}>No tasks with due dates to show on the timeline</div>
+      </div>
+    )
+  }
+
+  const DAY_MS   = 86400000
+  const dayWidth = 34
+  const today    = new Date(); today.setHours(0, 0, 0, 0)
+
+  const dueTimes = dated.map(t => new Date(t.dueDate! + 'T00:00:00').getTime())
+  const minTime = Math.min(today.getTime(), ...dueTimes) - DAY_MS
+  const maxTime = Math.max(today.getTime(), ...dueTimes) + DAY_MS
+  const totalDays = Math.max(1, Math.round((maxTime - minTime) / DAY_MS))
+  const xFor = (dueDate: string) => Math.round((new Date(dueDate + 'T00:00:00').getTime() - minTime) / DAY_MS) * dayWidth
+
+  const axisDates: Date[] = []
+  for (let i = 0; i <= totalDays; i++) axisDates.push(new Date(minTime + i * DAY_MS))
+
+  return (
+    <div style={{ border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'auto' }}>
+      <div style={{ minWidth: 220 + (totalDays + 1) * dayWidth }}>
+        {/* Date axis */}
+        <div style={{ display: 'flex', borderBottom: '1px solid #E5E7EB', background: '#F8FAFC', position: 'sticky' as const, top: 0, zIndex: 1 }}>
+          <div style={{ width: 220, flexShrink: 0, padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#64748B', borderRight: '1px solid #E5E7EB' }}>Task</div>
+          <div style={{ position: 'relative' as const, flex: 1, height: 32 }}>
+            {axisDates.map((d, i) => {
+              const isWeekend = d.getDay() === 0 || d.getDay() === 6
+              return (
+                <div key={i} style={{ position: 'absolute' as const, left: i * dayWidth, width: dayWidth, textAlign: 'center' as const, fontSize: 10, fontWeight: 600, color: isWeekend ? '#CBD5E1' : '#94A3B8', paddingTop: 8, borderLeft: '1px solid #F1F5F9', height: '100%' }}>
+                  {d.getDate()}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Rows */}
+        {dated.map(t => (
+          <div key={t.id} style={{ display: 'flex', borderBottom: '1px solid #F1F5F9' }}>
+            <div onClick={() => onTaskClick(t)} title={t.title}
+              style={{ width: 220, flexShrink: 0, padding: '9px 12px', fontSize: 12, fontWeight: 600, color: '#374151', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', borderRight: '1px solid #F1F5F9' }}>
+              {t.title}
+            </div>
+            <div style={{ position: 'relative' as const, flex: 1, height: 38 }}>
+              <div onClick={() => onTaskClick(t)} title={`${t.title} — ${fmtDate(t.dueDate)}`}
+                style={{ position: 'absolute' as const, left: xFor(t.dueDate!) + 3, top: 8, width: dayWidth - 6, height: 22, borderRadius: 6, cursor: 'pointer',
+                  background: t.overdue ? '#FEE2E2' : (PRIORITY[t.priority]?.bg || '#F1F5F9'),
+                  border: `1.5px solid ${t.overdue ? '#EF4444' : (PRIORITY[t.priority]?.border || '#E2E8F0')}` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function TasksPage() {
   const qc = useQueryClient()
   const [selectedBoard, setSelectedBoard] = useState<Board | null>(null)
@@ -698,6 +1062,9 @@ export function TasksPage() {
   const [filterPriority, setFilterPriority] = useState('ALL')
   const [filterAssignee, setFilterAssignee] = useState('ALL')
   const [filterOverdue, setFilterOverdue] = useState(false)
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
+  const [dragOverColId, setDragOverColId] = useState<string | null>(null)
+  const [view, setView] = useState<'kanban' | 'calendar' | 'timeline'>('kanban')
 
   const { data: boards = [], isLoading: boardsLoading } = useQuery<Board[]>({
     queryKey: ['task-boards'],
@@ -714,6 +1081,17 @@ export function TasksPage() {
       return r.data?.data ?? r.data
     },
     refetchInterval: 30_000,
+  })
+
+  // FIX: real users to assign tasks to — previously the create form captured a free-text
+  // name that never resolved to a real assigneeId, so "My Tasks" silently missed those tasks.
+  const { data: userOptions = [] } = useQuery<UserOption[]>({
+    queryKey: ['tasks-assignable-users'],
+    queryFn: async () => {
+      const r = await apiClient.get('/api/v1/tasks/assignable-users')
+      return r.data?.data ?? r.data ?? []
+    },
+    staleTime: 5 * 60_000,
   })
 
   const loadBoard = async (board: Board) => {
@@ -907,6 +1285,18 @@ export function TasksPage() {
               <div style={{ width: 10, height: 10, borderRadius: '50%', background: selectedBoard.color || '#1B3A6B' }} />
               <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#111827' }}>{selectedBoard.name}</h2>
               <span style={{ fontSize: 13, color: '#94A3B8' }}>{filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''}</span>
+              <div style={{ display: 'flex', gap: 2, background: '#F1F5F9', borderRadius: 8, padding: 3, marginLeft: 6 }}>
+                {([
+                  { key: 'kanban', label: 'Board', icon: <LayoutGrid size={13} /> },
+                  { key: 'calendar', label: 'Calendar', icon: <CalendarDays size={13} /> },
+                  { key: 'timeline', label: 'Timeline', icon: <GanttChart size={13} /> },
+                ] as const).map(v => (
+                  <button key={v.key} onClick={() => setView(v.key)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: view === v.key ? '#fff' : 'transparent', color: view === v.key ? '#1B3A6B' : '#64748B', boxShadow: view === v.key ? '0 1px 2px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.1s' }}>
+                    {v.icon} {v.label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {/* Search */}
@@ -946,18 +1336,32 @@ export function TasksPage() {
             </div>
           </div>
 
-          {/* Kanban board */}
+          {/* Kanban / Calendar / Timeline */}
           {loadingTasks ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 60, color: '#9CA3AF', gap: 10 }}>
               <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> Loading tasks...
             </div>
+          ) : view === 'calendar' ? (
+            <CalendarView tasks={filteredTasks} onTaskClick={openTask} />
+          ) : view === 'timeline' ? (
+            <TimelineView tasks={filteredTasks} onTaskClick={openTask} />
           ) : (
             <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 20, alignItems: 'flex-start' }}>
               {[...columns].sort((a, b) => a.sortOrder - b.sortOrder).map(col => {
                 const colTasks = filteredTasks.filter(t => t.columnId === col.id).sort((a, b) => a.sortOrder - b.sortOrder)
                 const doneCol  = col.isDoneColumn
+                const isDragOver = dragOverColId === col.id
                 return (
-                  <div key={col.id} style={{ minWidth: 292, maxWidth: 292, flexShrink: 0 }}>
+                  <div key={col.id} style={{ minWidth: 292, maxWidth: 292, flexShrink: 0 }}
+                    onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverColId !== col.id) setDragOverColId(col.id) }}
+                    onDragLeave={() => setDragOverColId(prev => (prev === col.id ? null : prev))}
+                    onDrop={e => {
+                      e.preventDefault()
+                      const taskId = e.dataTransfer.getData('text/plain') || draggedTaskId
+                      if (taskId) moveTask.mutate({ taskId, columnId: col.id })
+                      setDragOverColId(null)
+                      setDraggedTaskId(null)
+                    }}>
                     {/* Column header */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, padding: '0 2px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -973,11 +1377,14 @@ export function TasksPage() {
                     </div>
 
                     {/* Cards */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 9, minHeight: 80 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 9, minHeight: 80, padding: 6, margin: -6, borderRadius: 12, border: `1.5px dashed ${isDragOver ? '#1B3A6B' : 'transparent'}`, background: isDragOver ? '#EFF6FF' : 'transparent', transition: 'background 0.1s, border-color 0.1s' }}>
                       {colTasks.map(task => (
                         <TaskCard key={task.id} task={task} columns={columns}
                           onMoveTask={(taskId, columnId) => moveTask.mutate({ taskId, columnId })}
-                          onClick={() => openTask(task)} />
+                          onClick={() => openTask(task)}
+                          isDragging={draggedTaskId === task.id}
+                          onDragStart={() => setDraggedTaskId(task.id)}
+                          onDragEnd={() => { setDraggedTaskId(null); setDragOverColId(null) }} />
                       ))}
                       <div onClick={() => { setCreateCol(col.id); setShowCreateTask(true) }}
                         style={{ padding: '14px 0', textAlign: 'center', fontSize: 12, color: '#D1D5DB', border: '1.5px dashed #E5E7EB', borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s' }}
@@ -996,7 +1403,7 @@ export function TasksPage() {
 
       {/* Modals */}
       {showCreateTask && selectedBoard && (
-        <CreateTaskModal columns={columns} boardId={selectedBoard.id} defaultColumnId={createCol}
+        <CreateTaskModal columns={columns} boardId={selectedBoard.id} defaultColumnId={createCol} users={userOptions}
           onClose={() => { setShowCreateTask(false); setCreateCol(null) }}
           onSaved={() => { refreshTasks(); qc.invalidateQueries({ queryKey: ['tasks-summary'] }) }} />
       )}
@@ -1005,7 +1412,7 @@ export function TasksPage() {
           onSaved={() => qc.invalidateQueries({ queryKey: ['task-boards'] })} />
       )}
       {selectedTask && (
-        <TaskDetailModal task={selectedTask} columns={columns} onClose={() => setSelectedTask(null)}
+        <TaskDetailModal task={selectedTask} columns={columns} users={userOptions} onClose={() => setSelectedTask(null)}
           onUpdate={data => updateTask.mutate({ id: selectedTask.id, data })}
           onDelete={() => deleteTask.mutate(selectedTask.id)}
           onComplete={() => completeTask.mutate(selectedTask.id)}

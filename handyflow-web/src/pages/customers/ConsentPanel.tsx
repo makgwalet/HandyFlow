@@ -87,6 +87,20 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
     onError: (e: any) => setFormError(e?.response?.data?.message ?? 'Failed to withdraw consent'),
   })
 
+  // FIX: "no retention-review action button" — CustomerRetentionScheduler
+  // creates RETENTION_REVIEW_REQUIRED timeline entries every night, but
+  // nothing called the already-built POST /consent/{id}/review endpoint,
+  // so those flags just accumulated unactioned. No request body needed —
+  // the controller reads the reviewing user from @RequestAttribute
+  // ("userId"), populated server-side from the JWT, not something the
+  // client needs to send.
+  const reviewMutation = useMutation({
+    mutationFn: () =>
+      apiClient.post(`/api/v1/crm/customers/consent/${consent?.id}/review`),
+    onSuccess: () => invalidate(),
+    onError: (e: any) => setFormError(e?.response?.data?.message ?? 'Failed to record review'),
+  })
+
   const consent = data?.data
   const hasConsent   = !!consent && !consent.withdrawnAt
   const isWithdrawn  = !!consent && !!consent.withdrawnAt
@@ -186,6 +200,48 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
                   value={fmtDate(consent.retentionExpiresAt)}
                   warn={isExpired}
                 />
+              )}
+              {consent.lastReviewedAt && (
+                <ConsentDetail label="Last reviewed" value={fmtDate(consent.lastReviewedAt)} />
+              )}
+              {isExpired && !consent.lastReviewedAt && (
+                <div style={{
+                  marginTop: 8, padding: '8px 10px', background: '#FFF7ED',
+                  border: '1px solid #FED7AA', borderRadius: 8,
+                }}>
+                  <p style={{ fontSize: 11.5, color: '#9A3412', margin: '0 0 6px', lineHeight: 1.4 }}>
+                    Retention period has expired. Review whether this record still needs
+                    to be kept (e.g. an outstanding invoice) or should be deleted.
+                  </p>
+                  <button
+                    onClick={() => reviewMutation.mutate()}
+                    disabled={reviewMutation.isPending}
+                    style={actionBtn('#FFF7ED', '#C2410C', '#FED7AA')}>
+                    {reviewMutation.isPending ? 'Recording…' : 'Mark retention reviewed'}
+                  </button>
+                </div>
+              )}
+              {/* recordReview only sets lastReviewedAt — it doesn't touch
+                  retentionExpiresAt, so isExpired stays true even after
+                  review. Once reviewed at least once, this becomes an
+                  informational line rather than repeating the same urgent
+                  banner forever, which would look like nothing happened. */}
+              {isExpired && consent.lastReviewedAt && (
+                <div style={{
+                  marginTop: 8, padding: '8px 10px', background: '#F8FAFC',
+                  border: '1px solid #E2E8F0', borderRadius: 8,
+                }}>
+                  <p style={{ fontSize: 11.5, color: '#64748B', margin: '0 0 6px', lineHeight: 1.4 }}>
+                    Reviewed {fmtDate(consent.lastReviewedAt)} — retention is still past expiry.
+                    Extend it or withdraw consent if the data no longer needs to be kept.
+                  </p>
+                  <button
+                    onClick={() => reviewMutation.mutate()}
+                    disabled={reviewMutation.isPending}
+                    style={actionBtn('#F8FAFC', '#475569', '#E2E8F0')}>
+                    {reviewMutation.isPending ? 'Recording…' : 'Mark reviewed again'}
+                  </button>
+                </div>
               )}
               <button
                 onClick={() => { setShowWithdraw(true); setFormError('') }}

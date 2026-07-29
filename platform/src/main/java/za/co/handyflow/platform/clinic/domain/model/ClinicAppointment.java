@@ -28,6 +28,14 @@ public class ClinicAppointment {
     @Column(name = "updated_at") Instant updatedAt;
     @Column(name = "deleted_at") Instant deletedAt;
     @Column(name = "deleted_by") UUID    deletedBy;
+    // FIX: "no appointment reminders" gap — the single highest-value gap the
+    // audit flagged. Idempotency guard: once set, the reminder scheduler
+    // never re-sends for this appointment.
+    @Column(name = "reminder_sent_at") Instant reminderSentAt;
+    // FIX: "no telehealth/video consultation option" gap — set once a video
+    // room has been created for this appointment (see
+    // ClinicTelehealthService). Null for any in-person appointment.
+    @Column(name = "video_room_url") String videoRoomUrl;
     @Version long version;
 
     // ── Factory ───────────────────────────────────────────────────────────────
@@ -95,6 +103,18 @@ public class ClinicAppointment {
     public boolean isActive() {
         return !"CANCELLED".equals(this.status) && !"COMPLETED".equals(this.status)
                 && !"NO_SHOW".equals(this.status) && this.deletedAt == null;
+    }
+
+    /** Idempotency guard for the reminder scheduler — see reminderSentAt. */
+    public void markReminderSent() {
+        this.reminderSentAt = Instant.now();
+        this.updatedAt = Instant.now();
+    }
+
+    /** Called once, when a video room is first created for this appointment. */
+    public void assignVideoRoom(String url) {
+        this.videoRoomUrl = url;
+        this.updatedAt = Instant.now();
     }
 
     private void requireStatus(String expected) {

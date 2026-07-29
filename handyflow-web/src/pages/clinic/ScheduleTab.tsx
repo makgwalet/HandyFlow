@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import {
   ChevronLeft, ChevronRight, Plus, X, Calendar, Clock,
-  User, CheckCircle, PlayCircle, XCircle, AlertCircle,
+  User, CheckCircle, PlayCircle, XCircle, AlertCircle, Mail, Video,
 } from "lucide-react"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -15,6 +15,7 @@ interface Appointment {
   practitionerId: string; practitionerName: string
   scheduledAt: string; durationMinutes: number
   appointmentType: string; status: string; reason: string
+  videoRoomUrl?: string
 }
 interface Practitioner { id: string; fullName: string; specialty: string }
 interface Patient { id: string; fullName: string }
@@ -137,6 +138,26 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
       }
     },
     onError: (e:any) => setApiError(e.response?.data?.message ?? "Action failed"),
+  })
+
+  // FIX: "no appointment reminder UI" gap — ScheduleTab had booking and
+  // status changes but no "send reminder" action.
+  const [reminderSent, setReminderSent] = useState<string|null>(null)
+  const sendReminder = useMutation({
+    mutationFn: (id:string) => apiClient.post(`/api/v1/clinic/appointments/${id}/send-reminder`),
+    onSuccess: (_res, id) => { setReminderSent(id); setTimeout(()=>setReminderSent(null), 4000) },
+    onError: (e:any) => setApiError(e.response?.data?.message ?? "Failed to send reminder"),
+  })
+
+  // FIX: "no telehealth/video consultation option" gap.
+  const joinVideoCall = useMutation({
+    mutationFn: (id:string) => apiClient.post(`/api/v1/clinic/appointments/${id}/video-room`),
+    onSuccess: (res:any) => {
+      const url = res.data?.videoRoomUrl ?? res.videoRoomUrl
+      if (url) window.open(url, "_blank", "noopener,noreferrer")
+      qc.invalidateQueries({queryKey:["schedule-appts"]})
+    },
+    onError: (e:any) => setApiError(e.response?.data?.message ?? "Failed to start video call"),
   })
 
   const book = useMutation({
@@ -337,17 +358,33 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
               ))}
             </div>
             {apiError && <ErrBox msg={apiError}/>}
-            {actions.length > 0 && (
-              <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-                {actions.map(btn=>(
-                  <button key={btn.action} onClick={()=>doAction.mutate({id:selected.id,action:btn.action})}
-                    disabled={doAction.isPending}
-                    style={{padding:"8px 18px",border:"none",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",background:`${btn.color}18`,color:btn.color}}>
-                    {btn.label}
+            <div style={{display:"flex",gap:8,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}>
+              <div style={{display:"flex",gap:8}}>
+                {["SCHEDULED","CONFIRMED"].includes(selected.status) && (
+                  <button onClick={()=>sendReminder.mutate(selected.id)} disabled={sendReminder.isPending}
+                    style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",border:`1px solid ${BORDER}`,borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",background:"#fff",color:reminderSent===selected.id?GREEN:TEAL}}>
+                    {reminderSent===selected.id ? <><CheckCircle size={14}/> Reminder sent</> : <><Mail size={14}/> {sendReminder.isPending?"Sending...":"Send reminder"}</>}
                   </button>
-                ))}
+                )}
+                {selected.appointmentType==="TELEHEALTH" && ["SCHEDULED","CONFIRMED","IN_PROGRESS"].includes(selected.status) && (
+                  <button onClick={()=>joinVideoCall.mutate(selected.id)} disabled={joinVideoCall.isPending}
+                    style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",border:"none",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",background:PURPLE,color:"#fff"}}>
+                    <Video size={14}/> {joinVideoCall.isPending?"Starting...":"Join video call"}
+                  </button>
+                )}
               </div>
-            )}
+              {actions.length > 0 && (
+                <div style={{display:"flex",gap:8}}>
+                  {actions.map(btn=>(
+                    <button key={btn.action} onClick={()=>doAction.mutate({id:selected.id,action:btn.action})}
+                      disabled={doAction.isPending}
+                      style={{padding:"8px 18px",border:"none",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",background:`${btn.color}18`,color:btn.color}}>
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </Modal>
         )
       })()}
@@ -374,6 +411,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
               <div>
                 <label style={lbl}>Date & time *</label>
                 <input type="datetime-local" value={bookForm.scheduledAt}
+                  min={new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)}
                   onChange={e=>setBookForm(f=>({...f,scheduledAt:e.target.value}))} style={sinp}/>
               </div>
               <div>
@@ -384,7 +422,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
               <div>
                 <label style={lbl}>Type</label>
                 <select value={bookForm.appointmentType} onChange={e=>setBookForm(f=>({...f,appointmentType:e.target.value}))} style={sinp}>
-                  {["CONSULTATION","FOLLOW_UP","PROCEDURE","EMERGENCY","CHECKUP"].map(t=>(
+                  {["CONSULTATION","FOLLOW_UP","PROCEDURE","EMERGENCY","CHECKUP","TELEHEALTH"].map(t=>(
                     <option key={t} value={t}>{t.replace("_"," ")}</option>
                   ))}
                 </select>
@@ -406,6 +444,14 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
             onConfirm={()=>{
               if (!bookForm.patientId || !bookForm.scheduledAt) {
                 setApiError("Patient and date/time are required"); return
+              }
+              // FIX: browsers don't reliably block a past datetime-local
+              // value entered by typing/paste even with min= set — belt
+              // and braces client-side check. Real enforcement still
+              // belongs server-side (see ClinicService.createAppointment),
+              // this only improves the UX for the common case.
+              if (new Date(bookForm.scheduledAt).getTime() < Date.now()) {
+                setApiError("Cannot book an appointment in the past"); return
               }
               book.mutate({
                 patientId: bookForm.patientId,

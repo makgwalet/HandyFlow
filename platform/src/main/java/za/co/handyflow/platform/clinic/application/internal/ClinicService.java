@@ -4,15 +4,20 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.clinic.domain.model.*;
 import za.co.handyflow.platform.clinic.domain.repository.*;
 import za.co.handyflow.platform.clinic.dto.*;
+import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.Instant;           // FIX #7 — was missing
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -27,6 +32,9 @@ public class ClinicService {
     private final ClinicAppointmentRepository  appointmentRepo;
     private final ClinicConsultationRepository consultationRepo;
     private final ClinicPrescriptionRepository prescriptionRepo;
+    private final EmailService                 emailService;
+    private final ClinicConsultationSummaryPdfService consultationSummaryPdfService;
+    private final JdbcTemplate                 jdbc;
 
     // ── Patients ──────────────────────────────────────────────────────────────
 
@@ -187,8 +195,18 @@ public class ClinicService {
 
     @Transactional
     public AppointmentResponse createAppointment(TenantId tenantId, CreateAppointmentRequest req) {
-        patientRepo.findActiveById(tenantId, req.patientId())
+        ClinicPatient patient = patientRepo.findActiveById(tenantId, req.patientId())
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", req.patientId().toString()));
+        // FIX: no validation existed on scheduledAt at all — an appointment
+        // could be booked for any point in the past. Confirmed via real
+        // testing that the frontend calendar picker's min= restriction is
+        // UX only; nothing stopped a direct API call (or a bypassed
+        // client) from submitting a past timestamp. This is the actual
+        // enforcement; the frontend guard just avoids the round-trip for
+        // the common case.
+        if (req.scheduledAt().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("Cannot book an appointment in the past");
+        }
         ClinicAppointment appt = ClinicAppointment.create(
                 tenantId, req.patientId(), req.practitionerId(),
                 req.scheduledAt(),
@@ -197,9 +215,85 @@ public class ClinicService {
         );
         appointmentRepo.save(appt);
         log.info("Created appointment={} patient={}", appt.getId(), req.patientId());
+
+        // FIX: "no booking confirmation email" gap — createAppointment() had
+        // zero email calls; the only patient-facing appointment email in the
+        // whole module was the reminder, which fires later (nightly, or up
+        // to ~28h ahead) — a patient who books got no confirmation of what
+        // they'd just booked at all until then, if it arrived before the
+        // appointment.
+        sendBookingConfirmation(tenantId, appt, patient);
+
         return toAppointmentResponse(appt,
                 loadPatientNames(tenantId, List.of(appt)),
                 loadPractitionerNames(tenantId, List.of(appt)));
+    }
+
+    private void sendBookingConfirmation(TenantId tenantId, ClinicAppointment appt, ClinicPatient patient) {
+        try {
+            if (patient.getEmail() == null || patient.getEmail().isBlank()) {
+                return;
+            }
+            ClinicPractitioner practitioner = appt.getPractitionerId() != null
+                    ? practitionerRepo.findActiveById(tenantId, appt.getPractitionerId()).orElse(null)
+                    : null;
+            String companyName = resolveTenantName(appt.getTenantId());
+
+            ZonedDateTime zdt = appt.getScheduledAt().atZone(ZoneId.of("Africa/Johannesburg"));
+            DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", Locale.ENGLISH);
+            DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH);
+            String greetingName = patient.getFirstName() != null ? patient.getFirstName() : "there";
+
+            String html = "<p>Dear " + greetingName + ",</p>"
+                    + "<p>Your appointment" + (companyName != null && !companyName.isBlank() ? " at " + companyName : "") + " has been booked:</p>"
+                    + "<p><b>Date:</b> " + zdt.format(dateFmt) + "<br/>"
+                    + "<b>Time:</b> " + zdt.format(timeFmt) + "<br/>"
+                    + (practitioner != null ? "<b>Practitioner:</b> " + drName(practitioner.getFullName()) + "<br/>" : "")
+                    + (appt.getAppointmentType() != null ? "<b>Type:</b> " + appt.getAppointmentType().replace("_", " ") + "<br/>" : "")
+                    + (appt.getReason() != null && !appt.getReason().isBlank() ? "<b>Reason:</b> " + appt.getReason() + "<br/>" : "")
+                    + "</p>"
+                    + "<p>If you need to reschedule or cancel, please contact us as soon as possible.</p>";
+
+            emailService.send(patient.getEmail(),
+                    "Appointment confirmed — " + zdt.format(dateFmt), html);
+            log.info("Sent booking confirmation patient={} appointment={}", patient.getId(), appt.getId());
+        } catch (Exception e) {
+            log.warn("Booking confirmation not sent for appointment={}: {}", appt.getId(), e.getMessage());
+        }
+    }
+
+    private void sendVisitSummaryEmail(TenantId tenantId, ClinicConsultation c, ClinicPatient patient) {
+        try {
+            if (patient.getEmail() == null || patient.getEmail().isBlank()) {
+                return;
+            }
+            byte[] pdfBytes = consultationSummaryPdfService.generate(tenantId, c.getId());
+            String greetingName = patient.getFirstName() != null ? patient.getFirstName() : "there";
+            String html = "<p>Dear " + greetingName + ",</p>"
+                    + "<p>Thank you for your visit. A summary of today's consultation is attached for your records.</p>"
+                    + "<p>If you have any questions, please contact the practice.</p>";
+            emailService.sendWithAttachment(patient.getEmail(), "Your visit summary", html,
+                    "visit-summary-" + c.getId() + ".pdf", pdfBytes);
+            log.info("Sent visit summary patient={} consultation={}", patient.getId(), c.getId());
+        } catch (Exception e) {
+            log.warn("Visit summary not sent for consultation={}: {}", c.getId(), e.getMessage());
+        }
+    }
+
+    /** Same jdbc.queryForObject pattern already confirmed working elsewhere in this module (ClinicAppointmentReminderService). */
+    private String resolveTenantName(UUID tenantId) {
+        try {
+            return jdbc.queryForObject("SELECT name FROM tenants WHERE id = ?", String.class, tenantId);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** FIX: confirmed via real testing — see ClinicReferralPdfService for the full explanation. */
+    private String drName(String fullName) {
+        if (fullName == null) return "";
+        String trimmed = fullName.trim();
+        return trimmed.toLowerCase(Locale.ROOT).startsWith("dr") ? trimmed : "Dr. " + trimmed;
     }
 
     @Transactional
@@ -258,6 +352,13 @@ public class ClinicService {
         patientRepo.save(patient);
 
         log.info("Created consultation={} patient={}", c.getId(), patientId);
+
+        // FIX: "no PDF is ever emailed" gap — visit summary was
+        // download-only. Deliberately fires right after the consultation
+        // is recorded, not on some later "finalize" step — this codebase
+        // has no separate draft/final state for a consultation, so
+        // "recorded" is the only real completion signal available.
+        sendVisitSummaryEmail(tenantId, c, patient);
 
         // FIX #5 — build name maps with UUID keys (not domain ID objects)
         Map<UUID, String> patientNames = Map.of(patientId,

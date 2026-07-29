@@ -124,7 +124,7 @@ public class ClinicPdfService {
             if (practitioner != null) {
                 doc.add(sectionHeading("ATTENDING PRACTITIONER", bold));
                 Table practTable = twoColTable();
-                addRow(practTable, "Dr.", practitioner.getFirstName() + " " + practitioner.getLastName(), regular, bold);
+                addRow(practTable, "Practitioner", drName(practitioner.getFirstName() + " " + practitioner.getLastName()), regular, bold);
                 if (practitioner.getSpecialty() != null)
                     addRow(practTable, "Specialty", practitioner.getSpecialty(), regular, bold);
                 if (practitioner.getHpcsaNumber() != null)
@@ -271,7 +271,7 @@ public class ClinicPdfService {
             if (practitioner != null) {
                 doc.add(sectionHeading("PRESCRIBER", bold));
                 Table practTable = twoColTable();
-                addRow(practTable, "Name",         "Dr. " + practitioner.getFirstName() + " " + practitioner.getLastName(), regular, bold);
+                addRow(practTable, "Name",         drName(practitioner.getFirstName() + " " + practitioner.getLastName()), regular, bold);
                 if (practitioner.getHpcsaNumber() != null)
                     addRow(practTable, "HPCSA No.", practitioner.getHpcsaNumber(), regular, bold);
                 if (practitioner.getPracticeNumber() != null)
@@ -413,6 +413,22 @@ public class ClinicPdfService {
                 .add(new Paragraph(label).setFont(bold).setFontSize(9).setFontColor(GRAY)));
         t.addCell(new Cell().setBackgroundColor(bg).setBorder(Border.NO_BORDER).setPadding(7)
                 .add(new Paragraph(value).setFont(regular).setFontSize(10).setFontColor(TEXT)));
+    }
+
+    /**
+     * FIX: confirmed via real testing — a real prescription PDF showed
+     * "Name: Dr. Dr Sarah Mokoena." This practitioner's stored firstName
+     * already includes "Dr" (a pre-existing data inconsistency — other
+     * practitioners' names don't have it stored that way). Same fix
+     * already applied across six other Clinic PDFs this session
+     * (ClinicReferralPdfService, ClinicClaimSubmissionPdfService, etc.) —
+     * this file just hadn't been touched yet since only partial visibility
+     * into it was available until now.
+     */
+    private String drName(String fullName) {
+        if (fullName == null) return "";
+        String trimmed = fullName.trim();
+        return trimmed.toLowerCase(java.util.Locale.ROOT).startsWith("dr") ? trimmed : "Dr. " + trimmed;
     }
 
     private void footer(Document doc, TenantDetails tenant, PdfFont regular) {

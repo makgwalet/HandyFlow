@@ -46,4 +46,26 @@ public interface CustomerConsentRepository extends JpaRepository<CustomerConsent
             @Param("tenantId") TenantId tenantId,
             @Param("now")      Instant now
     );
+
+    /**
+     * FIX: "no consent-expiring-soon reminder" gap. Deliberately excludes
+     * anything already past retentionExpiresAt (that's findExpiredForTenant's
+     * job — a consent shouldn't be picked up by both jobs) and anything
+     * already reminded (expiryReminderSentAt IS NULL is the edge-trigger
+     * guard — see CustomerConsent.markExpiryReminderSent for why).
+     */
+    @Query("""
+            SELECT c FROM CustomerConsent c
+            WHERE c.tenantId              = :tenantId
+              AND c.withdrawnAt           IS NULL
+              AND c.retentionExpiresAt    IS NOT NULL
+              AND c.retentionExpiresAt    >= :now
+              AND c.retentionExpiresAt    <= :threshold
+              AND c.expiryReminderSentAt  IS NULL
+            """)
+    List<CustomerConsent> findExpiringSoonForTenant(
+            @Param("tenantId")   TenantId tenantId,
+            @Param("now")        Instant now,
+            @Param("threshold")  Instant threshold
+    );
 }

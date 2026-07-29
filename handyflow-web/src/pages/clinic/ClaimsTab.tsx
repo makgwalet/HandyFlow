@@ -6,6 +6,7 @@ import { apiClient } from "../../api/client"
 import {
   CreditCard, Plus, X, ChevronDown, ChevronUp, AlertCircle,
   CheckCircle, Clock, XCircle, RefreshCw, Send, FileText, Filter,
+  CheckSquare, Square, Download,
 } from "lucide-react"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -70,6 +71,7 @@ export default function ClaimsTab() {
   const [showReject, setShowReject]     = useState<string|null>(null)
   const [rejectReason, setRejectReason] = useState("")
   const [apiError, setApiError]         = useState("")
+  const [selected, setSelected]         = useState<Set<string>>(new Set())
 
   const { data: claims=[], isLoading } = useQuery<Claim[]>({
     queryKey: ["clinic-claims", statusFilter],
@@ -95,6 +97,41 @@ export default function ClaimsTab() {
     onSuccess: () => { qc.invalidateQueries({queryKey:["clinic-claims"]}); setShowReject(null); setRejectReason("") },
     onError: (e:any) => setApiError(e.response?.data?.message ?? "Action failed"),
   })
+
+  // FIX: "no batch claim submission" gap — was one-at-a-time only.
+  const [batchResult, setBatchResult] = useState<{submitted:number;failed:number}|null>(null)
+  const batchSubmit = useMutation({
+    mutationFn: (claimIds: string[]) =>
+      apiClient.post("/api/v1/clinic/billing/claims/batch-submit", { claimIds }),
+    onSuccess: (res:any) => {
+      qc.invalidateQueries({queryKey:["clinic-claims"]})
+      setSelected(new Set())
+      setBatchResult({ submitted: res.data?.submitted ?? 0, failed: res.data?.failed ?? 0 })
+      setTimeout(() => setBatchResult(null), 5000)
+    },
+    onError: (e:any) => setApiError(e.response?.data?.message ?? "Batch submit failed"),
+  })
+
+  const downloadPatientInvoice = async (claimId: string) => {
+    try {
+      const res = await apiClient.get(`/api/v1/clinic/billing/claims/${claimId}/patient-invoice-pdf`, { responseType: "blob" } as any)
+      const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }))
+      const link = document.createElement("a")
+      link.href = url; link.download = `patient-invoice-${claimId}.pdf`; link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (e) { console.error("Failed to download patient invoice", e) }
+  }
+
+  // FIX: "no claim submission form/EDI record" gap.
+  const downloadSubmissionRecord = async (claimId: string) => {
+    try {
+      const res = await apiClient.get(`/api/v1/clinic/billing/claims/${claimId}/submission-pdf`, { responseType: "blob" } as any)
+      const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }))
+      const link = document.createElement("a")
+      link.href = url; link.download = `claim-submission-${claimId}.pdf`; link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (e) { console.error("Failed to download claim submission record", e) }
+  }
 
   const displayedClaims = claims as Claim[]
 
@@ -139,11 +176,27 @@ export default function ClaimsTab() {
             )
           })}
         </div>
-        <button onClick={()=>{setShowCreate(true);setApiError("")}}
-          style={{display:"flex",alignItems:"center",gap:6,background:NAVY,color:"#fff",border:"none",borderRadius:9,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
-          <Plus size={14}/> New claim
-        </button>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          {selected.size > 0 && (
+            <button onClick={()=>batchSubmit.mutate(Array.from(selected))} disabled={batchSubmit.isPending}
+              style={{display:"flex",alignItems:"center",gap:6,background:AMBER,color:"#fff",border:"none",borderRadius:9,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+              <Send size={14}/> {batchSubmit.isPending ? "Submitting..." : `Submit batch (${selected.size})`}
+            </button>
+          )}
+          <button onClick={()=>{setShowCreate(true);setApiError("")}}
+            style={{display:"flex",alignItems:"center",gap:6,background:NAVY,color:"#fff",border:"none",borderRadius:9,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+            <Plus size={14}/> New claim
+          </button>
+        </div>
       </div>
+
+      {batchResult && (
+        <div style={{marginBottom:16,padding:"10px 16px",background:batchResult.failed>0?"#FFFBEB":"#F0FDF4",
+          border:`1px solid ${batchResult.failed>0?"#FDE68A":"#86EFAC"}`,borderRadius:8,fontSize:13,
+          color:batchResult.failed>0?AMBER:GREEN,display:"flex",alignItems:"center",gap:8}}>
+          <CheckCircle size={14}/> {batchResult.submitted} submitted{batchResult.failed>0?`, ${batchResult.failed} failed — check individual claims for details`:""}
+        </div>
+      )}
 
       {/* ── Claims list ─────────────────────────────────────────────────── */}
       {isLoading ? <div style={{textAlign:"center",padding:40,color:GRAY}}>Loading claims...</div>
@@ -168,6 +221,19 @@ export default function ClaimsTab() {
                 <div onClick={()=>setExpanded(isOpen?null:claim.id)}
                   style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 18px",cursor:"pointer",background:isOpen?LIGHT:"#fff"}}>
                   <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    {["DRAFT","REJECTED"].includes(claim.status) && (
+                      <button onClick={e=>{
+                        e.stopPropagation()
+                        setSelected(prev => {
+                          const next = new Set(prev)
+                          next.has(claim.id) ? next.delete(claim.id) : next.add(claim.id)
+                          return next
+                        })
+                      }}
+                        style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexShrink:0,color:selected.has(claim.id)?TEAL:GRAY}}>
+                        {selected.has(claim.id) ? <CheckSquare size={18}/> : <Square size={18}/>}
+                      </button>
+                    )}
                     <div style={{width:36,height:36,borderRadius:8,background:s.bg,border:`1px solid ${s.border}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                       <Icon size={16} color={s.color}/>
                     </div>
@@ -201,6 +267,22 @@ export default function ClaimsTab() {
                         <span style={{fontWeight:700}}>Rejection reason: </span>{claim.rejectionReason}
                       </div>
                     )}
+
+                    {/* FIX: patient invoice/receipt PDF — the self-pay/co-pay amount */}
+                    <div style={{marginBottom:14,display:"flex",gap:8,flexWrap:"wrap"}} onClick={e=>e.stopPropagation()}>
+                      {(claim.patientPortion ?? 0) > 0 && (
+                        <button onClick={()=>downloadPatientInvoice(claim.id)}
+                          style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:"#fff",color:NAVY,border:`1px solid ${BORDER}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                          <Download size={13}/> Patient invoice (R {claim.patientPortion.toLocaleString("en-ZA",{minimumFractionDigits:2})}) PDF
+                        </button>
+                      )}
+                      {claim.status !== "DRAFT" && (
+                        <button onClick={()=>downloadSubmissionRecord(claim.id)}
+                          style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:"#fff",color:NAVY,border:`1px solid ${BORDER}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                          <Download size={13}/> Submission record PDF
+                        </button>
+                      )}
+                    </div>
 
                     {/* Claim lines */}
                     {claim.lines && claim.lines.length > 0 && (

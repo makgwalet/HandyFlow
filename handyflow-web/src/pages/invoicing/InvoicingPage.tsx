@@ -6,7 +6,7 @@ import {
   Plus, FileText, Download, ChevronDown, ChevronUp,
   CheckCircle, Send, X, Receipt, FileCheck, Clock,
   AlertCircle, XCircle, Eye, RefreshCw, Pause, Play,
-  Trash2, Gauge, AlertTriangle, Timer,
+  Trash2, Gauge, AlertTriangle, Timer, FileMinus,
 } from 'lucide-react'
 import { apiClient } from '../../api/client'
 
@@ -17,6 +17,14 @@ type RecurringStatus = 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'COMPLETED'
 interface Quote {
   id: string; quoteNumber: string; title: string; status: QuoteStatus
   total: number; expiresAt: string | null; createdAt: string; customerId: string | null
+  firstViewedAt?: string | null; lastViewedAt?: string | null; viewCount?: number
+}
+
+interface CreditNote {
+  id: string; creditNoteNumber: string; invoiceId: string; invoiceNumber: string
+  reason: string; description: string | null
+  subtotal: number; vatTotal: number; total: number; currency: string
+  issuedAt: string; createdAt: string
 }
 
 interface Invoice {
@@ -37,6 +45,17 @@ interface RecurringSchedule {
   total: number; subtotal: number; vatTotal: number
   customerId: string | null; lineItems: any[]
   walkinClientName: string | null; createdAt: string
+  // Variable-hours contract fields — populated when variableHours is true,
+  // null/zero otherwise. Field names mirror RecurringScheduleService.toResponse().
+  variableHours: boolean
+  ratePerHour: number | null
+  minimumHoursPerCycle: number | null
+  hoursVatRate: number | null
+  contractStartDate: string | null
+  contractEndDate: string | null
+  contractedTotalHours: number | null
+  totalHoursBilled: number
+  remainingCycles: number
 }
 
 // ── Status configs ────────────────────────────────────────────────────────────
@@ -105,10 +124,16 @@ export function InvoicingPage() {
             </button>
           )}
           {activeTab === 'recurring' && (
-            <button onClick={() => navigate('/recurring/new')}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#0D9488', color: 'white', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-              <Plus size={15} /> New Schedule
-            </button>
+            <>
+              <button onClick={() => navigate('/recurring/variable-hours/new')}
+                style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'white', color: '#D97706', border: '1.5px solid #FDE68A', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                <Gauge size={15} /> Variable-Hours Contract
+              </button>
+              <button onClick={() => navigate('/recurring/new')}
+                style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#0D9488', color: 'white', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                <Plus size={15} /> New Schedule
+              </button>
+            </>
           )}
           {activeTab === 'invoices' && (
             <button onClick={() => navigate('/invoices/retainer/new')}
@@ -206,6 +231,21 @@ function QuotesTab() {
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: s.bg, color: s.color, fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 20 }}>
                         <Icon size={11} />{s.label}
                       </span>
+                      {/* FIX: "no quote view-tracking" gap — sendQuote()/the public link
+                          existed, but nothing showed whether the client had opened it. */}
+                      {q.status === 'SENT' && (
+                        q.firstViewedAt ? (
+                          <div title={`First viewed ${new Date(q.firstViewedAt).toLocaleString('en-ZA')} · opened ${q.viewCount ?? 1} time${(q.viewCount ?? 1) === 1 ? '' : 's'}`}
+                            style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 5, fontSize: 11, color: '#0D9488' }}>
+                            <Eye size={11} /> Viewed {new Date(q.firstViewedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}
+                            {(q.viewCount ?? 0) > 1 && ` · ${q.viewCount}×`}
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 5, fontSize: 11, color: '#94A3B8' }}>
+                            <Eye size={11} /> Not opened yet
+                          </div>
+                        )
+                      )}
                     </td>
                     <td style={{ padding: '14px 16px', fontSize: 14, fontWeight: 700, color: '#0F172A' }}>{fmtR(q.total)}</td>
                     <td style={{ padding: '14px 16px', fontSize: 13, color: '#64748B' }}>
@@ -236,6 +276,11 @@ function InvoicesTab() {
   const [hoursForm, setHoursForm] = useState({ hours: '', note: '' })
   const [payError, setPayError]   = useState('')
   const [hoursError, setHoursError] = useState('')
+  // FIX: "no credit note generation" gap — TenantSequenceService's own doc
+  // comment already anticipated a CREDIT_NOTE sequence.
+  const [creditNoteModal, setCreditNoteModal] = useState<Invoice | null>(null)
+  const [creditNoteForm, setCreditNoteForm] = useState({ reason: '', description: '', amount: '', vatRate: '15' })
+  const [creditNoteError, setCreditNoteError] = useState('')
 
   const { data: invoices = [], isLoading, isError } = useQuery<Invoice[]>({
     queryKey: ['invoices'],
@@ -300,6 +345,51 @@ function InvoicesTab() {
       URL.revokeObjectURL(url)
     } catch { alert('Failed to download PDF.') }
     finally { setDownloading(null) }
+  }
+
+  // Credit notes for the currently-expanded invoice — fetched on demand,
+  // not for every row, since only one row is ever expanded at a time.
+  const { data: creditNotes = [] } = useQuery<CreditNote[]>({
+    queryKey: ['credit-notes', expanded],
+    queryFn: async () => {
+      const res = await apiClient.get(`/api/v1/invoicing/invoices/${expanded}/credit-notes`)
+      return res.data?.data ?? res.data ?? []
+    },
+    enabled: !!expanded,
+  })
+
+  const createCreditNote = useMutation({
+    mutationFn: (body: { reason: string; description?: string; amount: number; vatRate: number }) =>
+      apiClient.post(`/api/v1/invoicing/invoices/${creditNoteModal!.id}/credit-notes`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['credit-notes', creditNoteModal?.id] })
+      setCreditNoteModal(null)
+      setCreditNoteForm({ reason: '', description: '', amount: '', vatRate: '15' })
+      setCreditNoteError('')
+    },
+    onError: (e: any) => setCreditNoteError(e.response?.data?.message ?? 'Failed to issue credit note'),
+  })
+
+  const downloadCreditNotePdf = async (cn: CreditNote) => {
+    try {
+      const res = await apiClient.get(`/api/v1/invoicing/credit-notes/${cn.id}/pdf`, { responseType: 'blob' } as any)
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+      const a = document.createElement('a'); a.href = url; a.download = `${cn.creditNoteNumber}.pdf`; a.click()
+      URL.revokeObjectURL(url)
+    } catch { alert('Failed to download credit note PDF.') }
+  }
+
+  // FIX: "no statement of account PDF" gap.
+  const [downloadingStatement, setDownloadingStatement] = useState<string | null>(null)
+  const downloadStatement = async (customerId: string) => {
+    setDownloadingStatement(customerId)
+    try {
+      const res = await apiClient.get(`/api/v1/invoicing/customers/${customerId}/statement`, { responseType: 'blob' } as any)
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+      const a = document.createElement('a'); a.href = url; a.download = `statement-${customerId}.pdf`; a.click()
+      URL.revokeObjectURL(url)
+    } catch { alert('Failed to download statement of account.') }
+    finally { setDownloadingStatement(null) }
   }
 
   let filtered = statusFilter === 'ALL' ? invoices : invoices.filter(i => i.status === statusFilter)
@@ -461,6 +551,10 @@ function InvoicesTab() {
                           )}
                           <ActionBtn icon={Download} label={downloading === inv.id ? '…' : 'PDF'} color="#64748B" bg="#F8FAFC" border="#E2E8F0"
                             onClick={() => downloadPdf(inv)} disabled={downloading === inv.id} />
+                          {inv.customerId && (
+                            <ActionBtn icon={FileText} label={downloadingStatement === inv.customerId ? '…' : 'Statement'} color="#0D9488" bg="#F0FDFA" border="#99F6E4"
+                              onClick={() => downloadStatement(inv.customerId!)} disabled={downloadingStatement === inv.customerId} />
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -489,6 +583,13 @@ function InvoicesTab() {
                                 {isOverage && (
                                   <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 7, background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#DC2626' }}>
                                     <AlertTriangle size={13} /> Consumed {((inv.hoursConsumed ?? 0) - inv.committedHours!).toFixed(2)}h over commitment — consider issuing a reconciliation invoice.
+                                  </div>
+                                )}
+                                {/* FIX: "no retainer low-balance warning" gap — mirrors the overage
+                                    banner above but for the 80-100% band, before the client runs out. */}
+                                {!isOverage && pctConsumed >= 80 && (
+                                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 7, background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#92400E' }}>
+                                    <AlertTriangle size={13} /> {pctConsumed.toFixed(0)}% of committed hours consumed — consider notifying the client before the retainer runs out.
                                   </div>
                                 )}
                               </div>
@@ -527,6 +628,40 @@ function InvoicesTab() {
                                   <span>Total</span><span>{fmtR(inv.total)}</span>
                                 </div>
                               </div>
+                            </div>
+
+                            {/* Credit notes */}
+                            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #E2E8F0' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.06em' }}>CREDIT NOTES</div>
+                                {inv.status !== 'DRAFT' && (
+                                  <button onClick={() => { setCreditNoteModal(inv); setCreditNoteError('') }}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', color: '#B43C32', border: '1px solid #F3D0CB', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                    <FileMinus size={13} /> Issue credit note
+                                  </button>
+                                )}
+                              </div>
+                              {creditNotes.length === 0 ? (
+                                <div style={{ fontSize: 12, color: '#94A3B8' }}>No credit notes issued against this invoice.</div>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                  {creditNotes.map(cn => (
+                                    <div key={cn.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FDF2F0', border: '1px solid #F3D0CB', borderRadius: 8, padding: '8px 12px' }}>
+                                      <div>
+                                        <span style={{ fontSize: 13, fontWeight: 600, color: '#0F172A' }}>{cn.creditNoteNumber}</span>
+                                        <span style={{ fontSize: 12, color: '#64748B', marginLeft: 8 }}>{cn.reason}</span>
+                                      </div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        <span style={{ fontSize: 13, fontWeight: 700, color: '#B43C32' }}>{fmtR(cn.total)}</span>
+                                        <button onClick={() => downloadCreditNotePdf(cn)}
+                                          style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: '#1B3A6B', cursor: 'pointer', fontSize: 12 }}>
+                                          <Download size={12} /> PDF
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -613,6 +748,58 @@ function InvoicesTab() {
             confirmColor="#7C3AED" />
         </Modal>
       )}
+
+      {/* Issue Credit Note modal */}
+      {creditNoteModal && (
+        <Modal title="Issue Credit Note"
+          subtitle={`${creditNoteModal.invoiceNumber} · ${fmtR(creditNoteModal.total)}`}
+          onClose={() => { setCreditNoteModal(null); setCreditNoteError('') }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Reason *</label>
+              <input type="text" value={creditNoteForm.reason}
+                onChange={e => setCreditNoteForm(f => ({ ...f, reason: e.target.value }))}
+                placeholder="e.g. Overcharged for materials" style={inp} autoFocus />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Amount (R, excl. VAT) *</label>
+                <input type="number" min="0.01" step="0.01" value={creditNoteForm.amount}
+                  onChange={e => setCreditNoteForm(f => ({ ...f, amount: e.target.value }))}
+                  placeholder="e.g. 500.00" style={inp} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>VAT rate (%)</label>
+                <input type="number" min="0" max="100" step="0.5" value={creditNoteForm.vatRate}
+                  onChange={e => setCreditNoteForm(f => ({ ...f, vatRate: e.target.value }))} style={inp} />
+              </div>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Description (optional)</label>
+              <input type="text" value={creditNoteForm.description}
+                onChange={e => setCreditNoteForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Additional detail for the client" style={inp} />
+            </div>
+            {creditNoteForm.amount && (
+              <div style={{ padding: '10px 12px', background: '#FDF2F0', border: '1px solid #F3D0CB', borderRadius: 8, fontSize: 13, color: '#B43C32' }}>
+                Total to credit: {fmtR(Number(creditNoteForm.amount) * (1 + Number(creditNoteForm.vatRate || 0) / 100))}
+              </div>
+            )}
+          </div>
+          {creditNoteError && <ErrorBanner msg={creditNoteError} />}
+          <ModalFooter
+            onCancel={() => { setCreditNoteModal(null); setCreditNoteError('') }}
+            onConfirm={() => createCreditNote.mutate({
+              reason: creditNoteForm.reason,
+              description: creditNoteForm.description || undefined,
+              amount: Number(creditNoteForm.amount),
+              vatRate: Number(creditNoteForm.vatRate || 15),
+            })}
+            confirmLabel={createCreditNote.isPending ? 'Issuing...' : 'Issue credit note'}
+            disabled={!creditNoteForm.reason || !creditNoteForm.amount || createCreditNote.isPending}
+            confirmColor="#B43C32" />
+        </Modal>
+      )}
     </div>
   )
 }
@@ -655,6 +842,28 @@ function RecurringTab() {
   const cancel = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/api/v1/invoicing/recurring-schedules/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['recurring-schedules'] }),
+  })
+
+  // FIX: "no log cycle hours UI" gap — the backend
+  // (logCycleHours/resolveBillableHours) was fully built with no way to
+  // reach it from the UI. Mirrors InvoicesTab's existing "Log hrs" pattern
+  // for retainers, but posts to the variable-hours-contract endpoint and
+  // also invalidates the invoices list, since this call generates a new
+  // issued invoice as a side effect.
+  const [cycleHoursModal, setCycleHoursModal] = useState<RecurringSchedule | null>(null)
+  const [cycleHoursForm, setCycleHoursForm] = useState({ actualHours: '', periodLabel: '', operatorNotes: '' })
+  const [cycleHoursError, setCycleHoursError] = useState('')
+
+  const logCycleHours = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: any }) =>
+      apiClient.post(`/api/v1/invoicing/recurring-schedules/${id}/log-cycle-hours`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['recurring-schedules'] })
+      qc.invalidateQueries({ queryKey: ['invoices'] })
+      setCycleHoursModal(null); setCycleHoursError('')
+      setCycleHoursForm({ actualHours: '', periodLabel: '', operatorNotes: '' })
+    },
+    onError: (e: any) => setCycleHoursError(e.response?.data?.message ?? 'Failed to log cycle hours.'),
   })
 
   const active    = schedules.filter(s => s.status === 'ACTIVE').length
@@ -761,6 +970,10 @@ function RecurringTab() {
                             <ActionBtn icon={Pause} label="Pause" color="#92400E" bg="#FEF3C7" border="#FCD34D"
                               onClick={() => pause.mutate(s.id)} disabled={pause.isPending} />
                           )}
+                          {s.variableHours && s.status === 'ACTIVE' && (
+                            <ActionBtn icon={Timer} label="Log hrs" color="#D97706" bg="#FFFBEB" border="#FDE68A"
+                              onClick={() => { setCycleHoursModal(s); setCycleHoursError(''); setCycleHoursForm({ actualHours: '', periodLabel: '', operatorNotes: '' }) }} />
+                          )}
                           {s.status === 'PAUSED' && (
                             <ActionBtn icon={Play} label="Resume" color="#166534" bg="#F0FDF4" border="#BBF7D0"
                               onClick={() => resume.mutate(s.id)} disabled={resume.isPending} />
@@ -783,39 +996,66 @@ function RecurringTab() {
                                 <CheckCircle size={13} /> Last invoice generated: {fmtDate(s.lastRunAt)}
                               </p>
                             )}
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#0F766E', letterSpacing: '0.06em', marginBottom: 10 }}>TEMPLATE LINE ITEMS</div>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                              <thead>
-                                <tr style={{ borderBottom: '1px solid #CCFBF1' }}>
-                                  {['Description', 'Qty', 'Unit Price', 'VAT %', 'Line Total'].map(h => (
-                                    <th key={h} style={{ textAlign: 'left', padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#0F766E', textTransform: 'uppercase' as const }}>{h}</th>
+
+                            {s.variableHours ? (
+                              <div style={{ background: 'white', border: '1px solid #FDE68A', borderRadius: 10, padding: '14px 18px' }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: '#D97706', letterSpacing: '0.06em', marginBottom: 10 }}>VARIABLE-HOURS CONTRACT</div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                                  {[
+                                    { label: 'Rate/hr',           value: fmtR(s.ratePerHour) + '/hr' },
+                                    { label: 'Minimum hrs/cycle', value: s.minimumHoursPerCycle != null ? `${s.minimumHoursPerCycle}h` : '—' },
+                                    { label: 'Total hours billed',value: `${s.totalHoursBilled ?? 0}h` },
+                                    { label: 'Contracted total',  value: s.contractedTotalHours != null ? `${s.contractedTotalHours}h` : 'Not set' },
+                                  ].map(m => (
+                                    <div key={m.label}>
+                                      <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 3 }}>{m.label}</div>
+                                      <div style={{ fontSize: 16, fontWeight: 700, color: '#0F172A' }}>{m.value}</div>
+                                    </div>
                                   ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {s.lineItems.map((li: any, i: number) => (
-                                  <tr key={i} style={{ borderBottom: i < s.lineItems.length - 1 ? '1px solid #F0FDFA' : 'none' }}>
-                                    <td style={{ padding: '8px 12px', color: '#374151' }}>{li.description}</td>
-                                    <td style={{ padding: '8px 12px', color: '#64748B' }}>{li.quantity}</td>
-                                    <td style={{ padding: '8px 12px', color: '#64748B' }}>{fmtR(li.unitPrice)}</td>
-                                    <td style={{ padding: '8px 12px', color: '#64748B' }}>{li.vatRate ?? 15}%</td>
-                                    <td style={{ padding: '8px 12px', fontWeight: 600, color: '#0F172A' }}>{fmtR(li.lineTotal)}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-                              <div style={{ minWidth: 240 }}>
-                                {[['Subtotal', fmtR(s.subtotal)], ['VAT', fmtR(s.vatTotal)]].map(([l, v]) => (
-                                  <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, color: '#64748B' }}>
-                                    <span>{l}</span><span>{v}</span>
-                                  </div>
-                                ))}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 0', fontSize: 15, fontWeight: 700, color: '#0F172A', borderTop: '1px solid #D1FAE5', marginTop: 4 }}>
-                                  <span>Per invoice</span><span>{fmtR(s.total)}</span>
+                                </div>
+                                <div style={{ marginTop: 10, fontSize: 12, color: '#92400E' }}>
+                                  {s.remainingCycles >= 0 ? `~${s.remainingCycles} cycle${s.remainingCycles === 1 ? '' : 's'} remaining on contract` : 'Open-ended contract (no end date)'}
+                                  {s.contractStartDate && ` · Started ${fmtDate(s.contractStartDate)}`}
+                                  {s.contractEndDate && ` · Ends ${fmtDate(s.contractEndDate)}`}
                                 </div>
                               </div>
-                            </div>
+                            ) : (
+                              <>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: '#0F766E', letterSpacing: '0.06em', marginBottom: 10 }}>TEMPLATE LINE ITEMS</div>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                  <thead>
+                                    <tr style={{ borderBottom: '1px solid #CCFBF1' }}>
+                                      {['Description', 'Qty', 'Unit Price', 'VAT %', 'Line Total'].map(h => (
+                                        <th key={h} style={{ textAlign: 'left', padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#0F766E', textTransform: 'uppercase' as const }}>{h}</th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {s.lineItems.map((li: any, i: number) => (
+                                      <tr key={i} style={{ borderBottom: i < s.lineItems.length - 1 ? '1px solid #F0FDFA' : 'none' }}>
+                                        <td style={{ padding: '8px 12px', color: '#374151' }}>{li.description}</td>
+                                        <td style={{ padding: '8px 12px', color: '#64748B' }}>{li.quantity}</td>
+                                        <td style={{ padding: '8px 12px', color: '#64748B' }}>{fmtR(li.unitPrice)}</td>
+                                        <td style={{ padding: '8px 12px', color: '#64748B' }}>{li.vatRate ?? 15}%</td>
+                                        <td style={{ padding: '8px 12px', fontWeight: 600, color: '#0F172A' }}>{fmtR(li.lineTotal)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                                  <div style={{ minWidth: 240 }}>
+                                    {[['Subtotal', fmtR(s.subtotal)], ['VAT', fmtR(s.vatTotal)]].map(([l, v]) => (
+                                      <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, color: '#64748B' }}>
+                                        <span>{l}</span><span>{v}</span>
+                                      </div>
+                                    ))}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 0', fontSize: 15, fontWeight: 700, color: '#0F172A', borderTop: '1px solid #D1FAE5', marginTop: 4 }}>
+                                      <span>Per invoice</span><span>{fmtR(s.total)}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -827,6 +1067,57 @@ function RecurringTab() {
           </table>
         )}
       </div>
+
+      {/* Log Cycle Hours modal */}
+      {cycleHoursModal && (
+        <Modal title="Log Cycle Hours"
+          subtitle={`${cycleHoursModal.title} · minimum ${cycleHoursModal.minimumHoursPerCycle ?? 0}h/cycle at ${fmtR(cycleHoursModal.ratePerHour)}/hr`}
+          onClose={() => { setCycleHoursModal(null); setCycleHoursError('') }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Actual hours worked *</label>
+              <input type="number" min="0" step="0.25" value={cycleHoursForm.actualHours}
+                onChange={e => setCycleHoursForm(f => ({ ...f, actualHours: e.target.value }))}
+                placeholder="e.g. 187.5" style={inp} autoFocus />
+              <p style={{ fontSize: 11, color: '#94A3B8', margin: '4px 0 0' }}>
+                Minimum billed regardless of hours worked: {cycleHoursModal.minimumHoursPerCycle ?? 0}h
+              </p>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Period label *</label>
+              <input type="text" value={cycleHoursForm.periodLabel}
+                onChange={e => setCycleHoursForm(f => ({ ...f, periodLabel: e.target.value }))}
+                placeholder="e.g. June 2026" style={inp} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Operator notes (optional)</label>
+              <input type="text" value={cycleHoursForm.operatorNotes}
+                onChange={e => setCycleHoursForm(f => ({ ...f, operatorNotes: e.target.value }))}
+                placeholder="e.g. Down 3 days for scheduled service" style={inp} />
+            </div>
+            {Number(cycleHoursForm.actualHours) > 0 && Number(cycleHoursForm.actualHours) < (cycleHoursModal.minimumHoursPerCycle ?? 0) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#92400E' }}>
+                <AlertTriangle size={14} color="#F59E0B" />
+                Below the {cycleHoursModal.minimumHoursPerCycle}h minimum — the invoice will bill the minimum, not the actual hours worked.
+              </div>
+            )}
+          </div>
+          {cycleHoursError && <ErrorBanner msg={cycleHoursError} />}
+          <ModalFooter
+            onCancel={() => { setCycleHoursModal(null); setCycleHoursError('') }}
+            onConfirm={() => logCycleHours.mutate({
+              id: cycleHoursModal.id,
+              body: {
+                actualHours: Number(cycleHoursForm.actualHours),
+                periodLabel: cycleHoursForm.periodLabel,
+                operatorNotes: cycleHoursForm.operatorNotes || undefined,
+              },
+            })}
+            confirmLabel={logCycleHours.isPending ? 'Saving...' : 'Log hours & generate invoice'}
+            disabled={!cycleHoursForm.actualHours || !cycleHoursForm.periodLabel || logCycleHours.isPending}
+            confirmColor="#D97706" />
+        </Modal>
+      )}
     </div>
   )
 }

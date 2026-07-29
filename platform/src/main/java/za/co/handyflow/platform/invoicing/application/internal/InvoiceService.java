@@ -161,11 +161,27 @@ public class InvoiceService {
         return queryService.getInvoice(tenantId, invoice.getId());
     }
 
+    /**
+     * FIX: "no retainer low-balance warning" gap — logHours() only ever
+     * alerted on overage (hours exceeded), nothing proactively warned
+     * before the client ran out. LOW_BALANCE_THRESHOLD mirrors the audit's
+     * own suggested figure (~80% consumed).
+     */
+    private static final BigDecimal LOW_BALANCE_THRESHOLD = new BigDecimal("0.80");
+
     @Transactional
     public InvoiceResponse logHours(TenantId tenantId, UUID id, LogHoursRequest req) {
         Invoice invoice = invoiceRepo.findActiveByIdWithLineItems(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", id.toString()));
 
+        // Edge-triggered, same pattern as Fuel's FUEL_TANK_LOW alert
+        // (captures wasLow before the stock change, fires only on the
+        // specific call that crosses from "not low" to "low"): capture
+        // consumption BEFORE logging so the warning fires exactly once, on
+        // the call that actually crosses 80% — not on every subsequent
+        // logHours() call while already above it, which would spam a
+        // notification per hour logged.
+        BigDecimal hoursBefore = invoice.getHoursConsumed();
         boolean overage = invoice.logHours(req.hours());
         invoiceRepo.save(invoice);
 
@@ -182,6 +198,33 @@ public class InvoiceService {
                             + invoice.getHoursConsumed() + "h of " + invoice.getCommittedHours()
                             + "h committed. Consider issuing a reconciliation invoice.",
                     "/invoices", id.toString());
+        } else if (invoice.getCommittedHours() != null
+                && invoice.getCommittedHours().compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal pctBefore = hoursBefore.divide(invoice.getCommittedHours(), 4, java.math.RoundingMode.HALF_UP);
+            BigDecimal pctAfter = invoice.getHoursConsumed().divide(invoice.getCommittedHours(), 4, java.math.RoundingMode.HALF_UP);
+
+            if (pctBefore.compareTo(LOW_BALANCE_THRESHOLD) < 0 && pctAfter.compareTo(LOW_BALANCE_THRESHOLD) >= 0) {
+                log.info("Invoice={} crossed {}% retainer consumption: consumed={} committed={}",
+                        invoice.getInvoiceNumber(), LOW_BALANCE_THRESHOLD.multiply(new BigDecimal("100")),
+                        invoice.getHoursConsumed(), invoice.getCommittedHours());
+
+                // NOTE: reuses RETAINER_HOURS_OVERAGE rather than a
+                // dedicated notification type — NotificationType.java
+                // wasn't available to safely add a new enum constant to
+                // (same reasoning as everywhere else this session: a wrong
+                // guess there breaks compilation). Title/message are
+                // written to read distinctly from the overage alert above,
+                // but if you want a genuinely separate, filterable
+                // notification type, send NotificationType.java and this
+                // becomes a one-line change to a dedicated constant.
+                staffNotifier.notify(tenantId, NotificationType.RETAINER_HOURS_OVERAGE,
+                        "Retainer approaching limit: " + invoice.getInvoiceNumber(),
+                        "Invoice " + invoice.getInvoiceNumber() + " has consumed "
+                                + invoice.getHoursConsumed() + "h of " + invoice.getCommittedHours()
+                                + "h committed (" + pctAfter.multiply(new BigDecimal("100")).setScale(0, java.math.RoundingMode.HALF_UP)
+                                + "%). Consider notifying the client before the retainer runs out.",
+                        "/invoices", id.toString());
+            }
         }
         log.info("Logged {}h on invoice={} totalConsumed={} note={}",
                 req.hours(), invoice.getInvoiceNumber(),

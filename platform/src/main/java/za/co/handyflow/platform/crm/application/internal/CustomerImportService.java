@@ -2,6 +2,7 @@ package za.co.handyflow.platform.crm.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +14,7 @@ import za.co.handyflow.platform.crm.domain.repository.CustomerRepository;
 import za.co.handyflow.platform.crm.domain.repository.ImportJobRepository;
 import za.co.handyflow.platform.crm.dto.ImportJobResult;
 import za.co.handyflow.platform.crm.dto.ImportJobResult.RowError;
+import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -49,6 +51,8 @@ public class CustomerImportService {
 
     private final CustomerRepository  customerRepository;
     private final ImportJobRepository importJobRepository;
+    private final EmailService        emailService;
+    private final JdbcTemplate        jdbc;
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -179,6 +183,79 @@ public class CustomerImportService {
         importJobRepository.save(job);
         log.info("[CRM] Import job {} complete: created={} skipped={} errors={}",
                 jobId, created, skipped, errors.size());
+
+        // FIX: "no import-completion notification" gap — ImportModal.tsx's
+        // synchronous-poll workaround (its own comment documents this
+        // explicitly) only works for small files; there was no fallback
+        // for someone who kicked off a larger import and closed the tab
+        // before it finished. initiatedBy is always a platform user's UUID
+        // here (startImport requires it), so this always has someone to
+        // notify — never a system/import-triggered job with no owner.
+        sendImportCompletionEmail(job);
+    }
+
+    private void sendImportCompletionEmail(ImportJob job) {
+        try {
+            if (job.getCreatedBy() == null) return;
+
+            // Same jdbc.queryForObject pattern already confirmed working
+            // elsewhere in this codebase (ClinicAppointmentReminderService)
+            // for resolving a user's contact details directly, rather than
+            // guessing at an unseen UserRepository/IdentityFacade.
+            String email;
+            String firstName;
+            try {
+                email = jdbc.queryForObject(
+                        "SELECT email FROM users WHERE id = ?", String.class, job.getCreatedBy());
+                firstName = jdbc.queryForObject(
+                        "SELECT first_name FROM users WHERE id = ?", String.class, job.getCreatedBy());
+            } catch (Exception e) {
+                log.info("[CRM] Could not resolve email for import job={} initiatedBy={} — not notified",
+                        job.getId(), job.getCreatedBy());
+                return;
+            }
+            if (email == null || email.isBlank()) return;
+
+            boolean failed = job.getStatus() == ImportJob.Status.FAILED;
+            String subject = failed
+                    ? "Customer import failed" + (job.getFilename() != null ? ": " + job.getFilename() : "")
+                    : "Customer import complete" + (job.getFilename() != null ? ": " + job.getFilename() : "");
+
+            String greetingName = firstName != null ? firstName : "there";
+            String html;
+            if (failed) {
+                String reason = (job.getRowErrors() != null && !job.getRowErrors().isEmpty())
+                        ? job.getRowErrors().get(0).reason() : "Unknown error";
+                html = "<p>Dear " + greetingName + ",</p>"
+                        + "<p>Your customer import" + (job.getFilename() != null ? " of <b>" + job.getFilename() + "</b>" : "")
+                        + " failed to complete.</p>"
+                        + "<p><b>Reason:</b> " + escapeHtml(reason) + "</p>"
+                        + "<p>Please check the file and try again.</p>";
+            } else {
+                html = "<p>Dear " + greetingName + ",</p>"
+                        + "<p>Your customer import" + (job.getFilename() != null ? " of <b>" + job.getFilename() + "</b>" : "")
+                        + " has finished processing.</p>"
+                        + "<p><b>" + job.getCreatedCount() + "</b> customer" + (job.getCreatedCount() == 1 ? "" : "s") + " created<br/>"
+                        + "<b>" + job.getSkippedCount() + "</b> row" + (job.getSkippedCount() == 1 ? "" : "s") + " skipped<br/>"
+                        + "<b>" + job.getTotalRows() + "</b> total rows processed</p>"
+                        + (job.getSkippedCount() > 0
+                        ? "<p>Some rows were skipped — usually duplicates or missing required fields. "
+                        + "Open the import history in the CRM to see the full per-row breakdown.</p>"
+                        : "");
+            }
+
+            emailService.send(email, subject, html);
+            log.info("[CRM] Sent import completion email job={} to={}", job.getId(), email);
+        } catch (Exception e) {
+            // Same principle as every other notification hookup in this
+            // codebase: the import itself already completed and saved
+            // successfully above — an email failure must never affect that.
+            log.warn("[CRM] Import completion email not sent for job={}: {}", job.getId(), e.getMessage());
+        }
+    }
+
+    private String escapeHtml(String s) {
+        return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     // ── Dedup helpers ─────────────────────────────────────────────────────────

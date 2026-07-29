@@ -86,4 +86,17 @@ public class ClinicLabResult {
         this.status         = "FILED";
         this.updatedAt      = Instant.now();
     }
+
+    /**
+     * FIX: "no lab result email" gap — notified existed as a real column
+     * but nothing in this codebase ever set it (confirmed in an earlier
+     * audit of this module). Called only after clinician review — never
+     * on upload — since sending an unreviewed result straight to a
+     * patient with no clinical context is a safety concern, not just a
+     * technical one.
+     */
+    public void markNotified() {
+        this.notified  = true;
+        this.updatedAt = Instant.now();
+    }
 }

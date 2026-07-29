@@ -16,6 +16,8 @@ import { ExportButton }       from './ExportButton'
 import { ImportModal }        from './ImportModal'
 import { Customer360Panel }   from './Customer360Panel'
 import { ConsentPanel }       from './ConsentPanel'
+import { FollowUpPanel }      from './FollowUpPanel'
+import { CommunicationPanel } from './CommunicationPanel'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Predefined tag catalogue
@@ -874,6 +876,30 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
     }
   }
 
+  // FIX: "the POPIA data-subject export isn't reachable from the UI" —
+  // PopiaExportController implements exactly what POPIA Section 23
+  // requires, but nothing in the UI called it; fulfilling a "what data do
+  // you hold on me" request meant someone calling the API directly.
+  // Deliberately NOT silent-fail like the profile PDF above — that one is
+  // enrichment a user can live without noticing; this is a compliance
+  // request a staff member is actively fulfilling for a customer, so a
+  // failure needs to be visible, not swallowed.
+  const [popiaError, setPopiaError] = useState<string | null>(null)
+  const downloadPopiaExport = async (id: string, name: string) => {
+    setPopiaError(null)
+    try {
+      const res      = await apiClient.get(`/api/v1/crm/customers/${id}/popia-export`, { responseType: 'blob' })
+      const filename = `popia-export-${name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.json`
+      const url      = URL.createObjectURL(new Blob([res.data], { type: 'application/json' }))
+      const link     = document.createElement('a')
+      link.href = url; link.download = filename
+      document.body.appendChild(link); link.click()
+      document.body.removeChild(link); URL.revokeObjectURL(url)
+    } catch (e: any) {
+      setPopiaError(e?.response?.data?.message ?? 'Failed to generate POPIA export')
+    }
+  }
+
   return (
     <Overlay onClose={onClose}>
       <div ref={trapRef} className={`${styles.modal} ${styles.modalWide}`} role="dialog" aria-modal="true" aria-label={c.name}>
@@ -940,7 +966,25 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
         {/* POPIA consent status — collapsible */}
         <ConsentPanel customerId={c.id} />
 
+        {/* Task/follow-up reminders */}
+        <FollowUpPanel customerId={c.id} />
+
+        {/* Email/call/meeting log */}
+        <CommunicationPanel customerId={c.id} />
+
         <p className={styles.updatedLine}>Last updated {formatDateTime(c.updatedAt)}</p>
+
+        {popiaError && (
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: 8,
+            background: '#FEF2F2', border: '1px solid #FECACA',
+            borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#DC2626',
+            marginBottom: 12,
+          }} role="alert">
+            <AlertCircle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
+            <span style={{ flex: 1, lineHeight: 1.4 }}>{popiaError}</span>
+          </div>
+        )}
 
         <div className={styles.modalFooter}>
           <button className={styles.btnGhostSm} onClick={onTimeline}>
@@ -951,6 +995,12 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
             onClick={() => downloadProfilePdf(c.id, c.name)}
             title="Download customer profile as PDF">
             <FileDown size={14} /> Profile PDF
+          </button>
+          <button
+            className={styles.btnGhostSm}
+            onClick={() => downloadPopiaExport(c.id, c.name)}
+            title="Download the full POPIA Section 23 data subject export">
+            <FileDown size={14} /> POPIA Export
           </button>
           <button className={styles.btnPrimary} onClick={onEdit}>
             <Pencil size={14} /> Edit Customer

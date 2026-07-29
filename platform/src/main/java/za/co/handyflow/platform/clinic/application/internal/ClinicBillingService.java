@@ -8,10 +8,16 @@ import za.co.handyflow.platform.clinic.domain.model.*;
 import za.co.handyflow.platform.clinic.domain.repository.ClinicMedicalAidRepository;
 import za.co.handyflow.platform.clinic.domain.repository.*;
 import za.co.handyflow.platform.clinic.dto.billing.*;
+import za.co.handyflow.platform.clinic.dto.billing.BatchSubmitClaimsResponse.BatchSubmitResult;
+import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -27,6 +33,9 @@ public class ClinicBillingService {
     private final ClinicPrescriptionRepository       prescriptionRepo;
     private final ClinicMedicationCatalogueRepository medicationRepo;
     private final ClinicMedicalAidRepository           medicalAidRepo;
+    private final EmailService                        emailService;
+    private final ClinicPatientInvoicePdfService       patientInvoicePdfService;
+    private final ClinicPaymentRepository              paymentRepo;
 
     // ── Create claim from consultation ────────────────────────────────────────
 
@@ -199,7 +208,8 @@ public class ClinicBillingService {
                                                  java.math.BigDecimal schemeAmount) {
         ClinicClaim claim = claimRepo.findActiveById(tenantId, claimId)
                 .orElseThrow(() -> new ResourceNotFoundException("Claim", claimId.toString()));
-        switch (action.toUpperCase()) {
+        String upperAction = action.toUpperCase();
+        switch (upperAction) {
             case "ACCEPT"  -> claim.markAccepted();
             case "REJECT"  -> claim.markRejected(reason);
             case "PAID" -> {
@@ -218,7 +228,107 @@ public class ClinicBillingService {
             default -> throw new IllegalArgumentException("Unknown action: " + action);
         }
         claimRepo.save(claim);
+
+        // FIX: "no claim status-change notification" gap — the patient
+        // previously found out about an accepted/rejected/paid/partial claim
+        // only if someone told them manually. Never let a notification
+        // failure surface as a failure of the status update itself.
+        notifyPatientOfStatusChange(tenantId, claim, upperAction);
+
         return toResponse(claim, tenantId);
+    }
+
+    private void notifyPatientOfStatusChange(TenantId tenantId, ClinicClaim claim, String action) {
+        try {
+            ClinicPatient patient = patientRepo.findActiveById(tenantId, claim.getPatientId()).orElse(null);
+            if (patient == null || patient.getEmail() == null || patient.getEmail().isBlank()) {
+                return;
+            }
+
+            String subject;
+            String bodyMessage;
+            switch (action) {
+                case "ACCEPT" -> {
+                    subject = "Your medical aid claim was accepted";
+                    bodyMessage = "Good news — your medical aid scheme has accepted this claim.";
+                }
+                case "REJECT" -> {
+                    subject = "Your medical aid claim was rejected";
+                    bodyMessage = "Unfortunately your medical aid scheme rejected this claim"
+                            + (claim.getRejectionReason() != null ? ": " + claim.getRejectionReason() : ".");
+                }
+                case "PAID" -> {
+                    subject = "Your medical aid claim was paid";
+                    bodyMessage = "Your medical aid scheme has paid this claim in full.";
+                }
+                case "PARTIAL" -> {
+                    subject = "Your medical aid claim was partially paid";
+                    bodyMessage = "Your medical aid scheme has partially paid this claim. "
+                            + "You may owe a balance — see the attached invoice for details, "
+                            + "or contact the practice.";
+                }
+                default -> { return; }
+            }
+
+            String greetingName = patient.getFirstName() != null ? patient.getFirstName() : "there";
+            String html = "<p>Dear " + greetingName + ",</p>"
+                    + "<p>" + bodyMessage + "</p>"
+                    + "<p>Claim amount: R " + String.format(java.util.Locale.US, "%,.2f", claim.getGrossAmount()) + "</p>"
+                    + "<p>If you have any questions, please contact the practice.</p>";
+
+            // FIX: this email previously said "please see your account for
+            // details" without providing any — ClinicPatientInvoicePdfService
+            // (the exact document showing that balance) was only reachable
+            // through its own separate download endpoint, never attached
+            // here. Only attach when there's an actual patient-portion
+            // balance to show — same gating ClaimsTab.tsx already uses for
+            // its own "Patient invoice" download button, so a fully
+            // scheme-covered claim doesn't get a redundant "R0.00 due" PDF.
+            if (claim.getPatientPortion() != null && claim.getPatientPortion().compareTo(BigDecimal.ZERO) > 0) {
+                try {
+                    byte[] pdfBytes = patientInvoicePdfService.generate(tenantId, claim.getId());
+                    emailService.sendWithAttachment(patient.getEmail(), subject, html,
+                            "patient-invoice-" + claim.getId() + ".pdf", pdfBytes);
+                } catch (Exception pdfEx) {
+                    log.warn("Patient invoice PDF not attached for claim={}, sending without it: {}",
+                            claim.getId(), pdfEx.getMessage());
+                    emailService.send(patient.getEmail(), subject, html);
+                }
+            } else {
+                emailService.send(patient.getEmail(), subject, html);
+            }
+
+            log.info("Claim status notification sent to patient={} claim={} action={}",
+                    patient.getId(), claim.getId(), action);
+        } catch (Exception e) {
+            log.warn("Claim status notification not sent for claim={}: {}", claim.getId(), e.getMessage());
+        }
+    }
+
+    /**
+     * FIX: "no batch claim submission" gap — ClaimsTab could only submit one
+     * claim at a time. Per-claim results, not all-or-nothing: one claim
+     * missing an ICD-10 code (submitClaim's own validation) shouldn't block
+     * the rest of the batch.
+     */
+    @Transactional
+    public BatchSubmitClaimsResponse batchSubmitClaims(TenantId tenantId, List<UUID> claimIds) {
+        List<BatchSubmitResult> results = new ArrayList<>();
+        int submitted = 0;
+        int failed = 0;
+        for (UUID claimId : claimIds) {
+            try {
+                submitClaim(tenantId, claimId, null);
+                results.add(new BatchSubmitResult(claimId, true, "Submitted"));
+                submitted++;
+            } catch (Exception e) {
+                results.add(new BatchSubmitResult(claimId, false, e.getMessage()));
+                failed++;
+            }
+        }
+        log.info("Batch claim submit: {} submitted, {} failed (of {} requested)",
+                submitted, failed, claimIds.size());
+        return new BatchSubmitClaimsResponse(submitted, failed, results);
     }
 
     // Backwards-compatible overload for callers that don't supply a scheme amount
@@ -228,31 +338,180 @@ public class ClinicBillingService {
         return updateClaimStatus(tenantId, claimId, action, reason, null);
     }
 
-    // ── Outstanding / Payments / Revenue stubs (FIX #6) ─────────────────────
-    // Real queries will be added when the payments table is implemented.
-    // Returning typed empty structures lets the frontend render without crashing.
+    // ── Outstanding / Payments / Revenue ──────────────────────────────────────
+    // FIX: was three hardcoded stubs — getOutstanding derived a wrong,
+    // incomplete answer (hardcoded "Patient" name, hardcoded totalPaid=0,
+    // "balance" actually holding schemePortion, only SUBMITTED claims
+    // counted); getPayments/getRevenue returned empty lists unconditionally.
+    // clinic_payments already existed as a table with no entity pointed at
+    // it — schema confirmed via \d before writing ClinicPayment, not
+    // guessed from the DTOs.
 
+    private static final DateTimeFormatter DAY_LABEL   = DateTimeFormatter.ofPattern("d MMM");
+    private static final DateTimeFormatter MONTH_LABEL = DateTimeFormatter.ofPattern("MMM yyyy");
+    private static final ZoneId SAST = ZoneId.of("Africa/Johannesburg");
+
+    @Transactional
+    public PaymentResponse recordPayment(TenantId tenantId, RecordPaymentRequest req) {
+        ClinicPayment payment = ClinicPayment.record(
+                tenantId, null, req.patientId(), req.method(), req.amount(),
+                req.reference(), req.notes(), null /* recordedBy — see note below */);
+        paymentRepo.save(payment);
+        log.info("Recorded payment patient={} amount={} method={}",
+                req.patientId(), req.amount(), payment.getPaymentMethod());
+
+        String patientName = patientRepo.findActiveById(tenantId, req.patientId())
+                .map(ClinicPatient::getFullName).orElse("Patient");
+        return new PaymentResponse(payment.getId(), payment.getPatientId(), patientName,
+                payment.getPaymentMethod(), payment.getAmount(), payment.getReference(),
+                payment.getRecordedAt(), payment.getNotes());
+        // NOTE: recordedBy (FK to users.id) is left null — resolving the
+        // authenticated user's UUID would need a UserRepository/lookup this
+        // service doesn't have visibility into. The column is nullable, so
+        // this is a valid (if incomplete) write, not a broken one; if you
+        // want "recorded by" attribution, that's the one piece still open.
+    }
+
+    /**
+     * FIX: previously only counted SUBMITTED claims, so a claim still in
+     * DRAFT (patient may already owe for that visit) never appeared —
+     * flagged explicitly in the audit. Now includes every non-REJECTED
+     * claim, and computes real totalPaid from ClinicPayment instead of a
+     * hardcoded zero.
+     */
     @Transactional(readOnly = true)
     public List<OutstandingBalanceResponse> getOutstanding(TenantId tenantId) {
-        // Compute from claims: patients with SUBMITTED or DRAFT claims have outstanding balances
-        return claimRepo.findByStatus(tenantId, "SUBMITTED").stream()
-                .map(c -> new OutstandingBalanceResponse(
-                        c.getPatientId(), "Patient", null,
-                        c.getGrossAmount(), BigDecimal.ZERO, c.getSchemePortion(),
-                        c.getCreatedAt(), 1))
+        List<ClinicClaim> claims = claimRepo.findAll(tenantId).stream()
+                .filter(c -> !"REJECTED".equals(c.getStatus()))
+                .toList();
+        if (claims.isEmpty()) return List.of();
+
+        Map<UUID, List<ClinicClaim>> byPatient = claims.stream()
+                .collect(Collectors.groupingBy(ClinicClaim::getPatientId));
+
+        Map<UUID, ClinicPatient> patients = patientRepo.findAllByIds(tenantId, byPatient.keySet()).stream()
+                .collect(Collectors.toMap(ClinicPatient::getId, p -> p));
+
+        Map<UUID, BigDecimal> paidByPatient = paymentRepo.findAllByTenant(tenantId).stream()
+                .filter(p -> p.getPatientId() != null)
+                .collect(Collectors.groupingBy(ClinicPayment::getPatientId,
+                        Collectors.reducing(BigDecimal.ZERO, ClinicPayment::getAmount, BigDecimal::add)));
+
+        return byPatient.entrySet().stream()
+                .map(entry -> {
+                    UUID patientId = entry.getKey();
+                    List<ClinicClaim> patientClaims = entry.getValue();
+                    BigDecimal totalBilled = patientClaims.stream()
+                            .map(ClinicClaim::getPatientPortion).reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal totalPaid = paidByPatient.getOrDefault(patientId, BigDecimal.ZERO);
+                    BigDecimal balance = totalBilled.subtract(totalPaid).max(BigDecimal.ZERO);
+                    Instant oldestUnpaid = patientClaims.stream()
+                            .map(ClinicClaim::getCreatedAt).min(Instant::compareTo).orElse(null);
+                    ClinicPatient p = patients.get(patientId);
+                    return new OutstandingBalanceResponse(
+                            patientId, p != null ? p.getFullName() : "Patient",
+                            p != null ? p.getPhone() : null,
+                            totalBilled, totalPaid, balance, oldestUnpaid, patientClaims.size());
+                })
+                .filter(r -> r.balance().compareTo(BigDecimal.ZERO) > 0)
+                .sorted(Comparator.comparing(OutstandingBalanceResponse::balance).reversed())
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<PaymentResponse> getPayments(TenantId tenantId, String period) {
-        // Stub — returns empty until ClinicPayment table is implemented
-        return List.of();
+        Instant[] range = resolvePeriodRange(period);
+        List<ClinicPayment> payments = paymentRepo.findByPeriod(tenantId, range[0], range[1]);
+        if (payments.isEmpty()) return List.of();
+
+        Set<UUID> patientIds = payments.stream()
+                .map(ClinicPayment::getPatientId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<UUID, String> patientNames = patientIds.isEmpty() ? Map.of()
+                : patientRepo.findAllByIds(tenantId, patientIds).stream()
+                .collect(Collectors.toMap(ClinicPatient::getId, ClinicPatient::getFullName));
+
+        return payments.stream()
+                .map(p -> new PaymentResponse(p.getId(), p.getPatientId(),
+                        p.getPatientId() != null ? patientNames.getOrDefault(p.getPatientId(), "Patient") : "Patient",
+                        p.getPaymentMethod(), p.getAmount(), p.getReference(), p.getRecordedAt(), p.getNotes()))
+                .toList();
     }
 
+    /**
+     * One point per bucket (day, for "week"/"month"; month, for "year") so
+     * the frontend can chart a trend, not just a single aggregate.
+     * <p>
+     * schemePaid is a best-available proxy, not an exact figure: ClinicClaim
+     * has no dedicated "scheme paid at" timestamp, so this uses updatedAt
+     * on claims currently PAID/PARTIAL, which assumes a claim isn't touched
+     * again after reaching a paid state. patientPaid is exact, sourced
+     * directly from ClinicPayment.recordedAt.
+     */
     @Transactional(readOnly = true)
     public List<RevenuePointResponse> getRevenue(TenantId tenantId, String period) {
-        // Stub — returns empty until revenue aggregation is implemented
-        return List.of();
+        LocalDate today = LocalDate.now(SAST);
+        record Bucket(String label, Instant from, Instant to) {}
+        List<Bucket> buckets = new ArrayList<>();
+
+        if ("year".equalsIgnoreCase(period)) {
+            LocalDate start = today.withDayOfMonth(1).minusMonths(11);
+            for (int i = 0; i < 12; i++) {
+                LocalDate monthStart = start.plusMonths(i);
+                buckets.add(new Bucket(monthStart.format(MONTH_LABEL),
+                        monthStart.atStartOfDay(SAST).toInstant(),
+                        monthStart.plusMonths(1).atStartOfDay(SAST).toInstant()));
+            }
+        } else {
+            int days = "week".equalsIgnoreCase(period) ? 7 : 30; // "month" and any other default to a trailing 30-day window
+            LocalDate start = today.minusDays(days - 1L);
+            for (int i = 0; i < days; i++) {
+                LocalDate day = start.plusDays(i);
+                buckets.add(new Bucket(day.format(DAY_LABEL),
+                        day.atStartOfDay(SAST).toInstant(), day.plusDays(1).atStartOfDay(SAST).toInstant()));
+            }
+        }
+
+        List<ClinicClaim> allClaims = claimRepo.findAll(tenantId);
+        List<ClinicPayment> allPayments = paymentRepo.findAllByTenant(tenantId);
+
+        return buckets.stream()
+                .map(b -> {
+                    List<ClinicClaim> claimsInBucket = allClaims.stream()
+                            .filter(c -> !c.getCreatedAt().isBefore(b.from()) && c.getCreatedAt().isBefore(b.to()))
+                            .toList();
+                    BigDecimal grossBilled = claimsInBucket.stream()
+                            .map(ClinicClaim::getGrossAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                    BigDecimal schemePaid = allClaims.stream()
+                            .filter(c -> "PAID".equals(c.getStatus()) || "PARTIAL".equals(c.getStatus()))
+                            .filter(c -> !c.getUpdatedAt().isBefore(b.from()) && c.getUpdatedAt().isBefore(b.to()))
+                            .map(ClinicClaim::getSchemePortion)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                    BigDecimal patientPaid = allPayments.stream()
+                            .filter(p -> !p.getRecordedAt().isBefore(b.from()) && p.getRecordedAt().isBefore(b.to()))
+                            .map(ClinicPayment::getAmount)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                    return new RevenuePointResponse(b.label(), claimsInBucket.size(), grossBilled, schemePaid, patientPaid);
+                })
+                .toList();
+    }
+
+    private Instant[] resolvePeriodRange(String period) {
+        LocalDate today = LocalDate.now(SAST);
+        LocalDate from;
+        if ("week".equalsIgnoreCase(period)) {
+            from = today.minusDays(6);
+        } else if ("year".equalsIgnoreCase(period)) {
+            from = today.withDayOfYear(1);
+        } else { // "month" and default
+            from = today.withDayOfMonth(1);
+        }
+        return new Instant[]{
+                from.atStartOfDay(SAST).toInstant(),
+                today.plusDays(1).atStartOfDay(SAST).toInstant()
+        };
     }
 
     // ── Mapper ────────────────────────────────────────────────────────────────

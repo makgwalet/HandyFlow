@@ -77,7 +77,7 @@ export default function FuelDashboard({ onNavigate }: { onNavigate: (t: any) => 
               {lowTanks.map((t: any) => `${t.name} (${Number(t.currentLitres).toLocaleString()} L — ${Number(t.fillPercentage).toFixed(0)}%)`).join(" · ")}
             </div>
           </div>
-          <button onClick={() => onNavigate("receipts")} style={{ marginLeft: "auto", padding: "6px 14px", background: "#DC2626", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
+          <button onClick={() => onNavigate("tanks")} style={{ marginLeft: "auto", padding: "6px 14px", background: "#DC2626", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
             Receive stock
           </button>
         </div>
@@ -184,7 +184,7 @@ export default function FuelDashboard({ onNavigate }: { onNavigate: (t: any) => 
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 10 }}>Quick actions</div>
             {[
-              { label: "Receive stock",    tab: "receipts",   color: "#0D9488" },
+              { label: "Receive stock",    tab: "tanks",      color: "#0D9488" },
               { label: "Dispatch fuel",    tab: "dispatches", color: "#1B3A6B" },
               { label: "Record dip",       tab: "tanks",      color: "#D97706" },
               { label: "Schedule delivery",tab: "deliveries", color: "#7C3AED" },

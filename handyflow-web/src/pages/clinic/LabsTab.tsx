@@ -6,6 +6,7 @@
 import { useState, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { useAuthStore } from "../../store/auth.store"
 import {
   FlaskConical, Upload, Download, Eye, CheckCircle, AlertCircle,
   Loader, ChevronDown, ChevronUp, Plus, X, FileText, Sparkles,
@@ -27,6 +28,11 @@ interface Consultation { id: string; chiefComplaint: string; consultedAt: string
 
 const TEAL="#0D9488"; const RED="#DC2626"; const GREEN="#166534"
 const AMBER="#D97706"; const GRAY="#64748B"; const NAVY="#1B3A6B"
+// FIX: PURPLE was referenced (AI-interpretation button) but never defined
+// anywhere in this file — a ReferenceError waiting to happen the first time
+// someone expands a lab result, since it never surfaced while upload was
+// broken and no result ever existed to expand.
+const PURPLE="#7C3AED"
 const BORDER="#E2E8F0"; const LIGHT="#F8FAFC"
 
 const fmtDT = (iso?: string) => iso
@@ -62,11 +68,13 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
   const [showUpload, setShowUpload]   = useState(false)
   const [expanded, setExpanded]       = useState<string|null>(null)
   const [interpreting, setInterpreting] = useState<string|null>(null)
+  const [interpretError, setInterpretError] = useState<Record<string,string>>({})
   const [showFile, setShowFile]       = useState<string|null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploadForm, setUploadForm]   = useState({
-    source:"MANUAL", labReference:"", pdfFilename:"", collectedAt:"", notes:""
+    source:"MANUAL", labReference:"", collectedAt:"", notes:""
   })
+  const [uploadFile, setUploadFile]   = useState<File|null>(null)
   const [uploading, setUploading]     = useState(false)
   const [uploadError, setUploadError] = useState("")
 
@@ -99,43 +107,25 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
   })
 
   // ── Claude interpretation ─────────────────────────────────────────────────
+  // FIX: this used to call https://api.anthropic.com/v1/messages directly
+  // from the browser — with no API key attached at all (confirmed: the
+  // request payload had no x-api-key header), so it could never have
+  // succeeded. Even with a key added client-side, that would leak the key
+  // to every browser loading this page. The call now goes through a
+  // server-side endpoint that holds the key securely.
 
   const interpretWithClaude = async (lab: LabResult) => {
     setInterpreting(lab.id)
+    setInterpretError(e => { const n = {...e}; delete n[lab.id]; return n })
     try {
-      const markers = parseMarkers(lab.parsedMarkersJson)
-      const markerText = markers.length > 0
-        ? markers.map(m => `${m.marker}: ${m.value}${m.unit?` ${m.unit}`:""} (ref: ${m.refRange||"N/A"}) ${m.flag||""}`).join("\n")
-        : `Lab result file: ${lab.pdfFilename || "uploaded PDF"}, Source: ${lab.source}`
-
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          messages: [{
-            role: "user",
-            content: `You are a clinical assistant helping a South African doctor understand lab results. 
-Write a clear, plain-language interpretation of these lab results for the doctor's review. 
-Highlight any abnormal values and their clinical significance. Be concise (3-5 sentences max).
-Do NOT give treatment recommendations — just interpret the findings.
-
-Patient: ${patient.fullName}
-Lab source: ${lab.source}
-${lab.collectedAt ? `Collected: ${fmtDT(lab.collectedAt)}` : ""}
-
-Results:
-${markerText}`
-          }]
-        })
+      await apiClient.post(`/api/v1/clinic/lab/results/${lab.id}/interpret-ai`, null, {
+        params: { patientFullName: patient.fullName },
       })
-      const data = await res.json()
-      const text = data.content?.[0]?.text ?? ""
-      if (text) {
-        await saveInterpretation.mutateAsync({id:lab.id, text})
-      }
-    } catch(e) { console.error("Interpretation failed", e) }
+      qc.invalidateQueries({queryKey:["pf-labs",patient.id]})
+    } catch(e: any) {
+      console.error("Interpretation failed", e)
+      setInterpretError(prev => ({ ...prev, [lab.id]: e.response?.data?.message ?? "Failed to generate interpretation" }))
+    }
     setInterpreting(null)
   }
 
@@ -200,11 +190,37 @@ ${markerText}`
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0,marginLeft:12}}>
                     {lab.pdfUrl && (
-                      <button onClick={e=>{e.stopPropagation();window.open(lab.pdfUrl,"_blank")}}
+                      <button onClick={async e=>{
+                        e.stopPropagation()
+                        // FIX: pdfUrl is now an opaque storage key, not a directly
+                        // openable URL — download the real bytes from the PDF
+                        // endpoint instead of window.open(lab.pdfUrl).
+                        try {
+                          const res = await apiClient.get(`/api/v1/clinic/lab/results/${lab.id}/pdf`, { responseType: "blob" } as any)
+                          const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }))
+                          window.open(url, "_blank")
+                          setTimeout(() => URL.revokeObjectURL(url), 60_000)
+                        } catch { /* silent — button just won't open anything */ }
+                      }}
                         style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px",background:LIGHT,color:NAVY,border:`1px solid ${BORDER}`,borderRadius:6,fontSize:12,cursor:"pointer"}}>
                         <Download size={11}/> PDF
                       </button>
                     )}
+                    {/* FIX: "no lab result summary PDF" gap — distinct from the raw
+                        uploaded file above: renders parsed markers + interpretation. */}
+                    <button onClick={async e=>{
+                      e.stopPropagation()
+                      try {
+                        const res = await apiClient.get(`/api/v1/clinic/lab/results/${lab.id}/summary-pdf`, { responseType: "blob" } as any)
+                        const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }))
+                        const link = document.createElement("a")
+                        link.href = url; link.download = `lab-summary-${lab.id}.pdf`; link.click()
+                        setTimeout(() => URL.revokeObjectURL(url), 60_000)
+                      } catch { /* silent — button just won't download anything */ }
+                    }}
+                      style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px",background:LIGHT,color:TEAL,border:`1px solid ${BORDER}`,borderRadius:6,fontSize:12,cursor:"pointer"}}>
+                      <Download size={11}/> Summary
+                    </button>
                     {isOpen ? <ChevronUp size={16} color={GRAY}/> : <ChevronDown size={16} color={GRAY}/>}
                   </div>
                 </div>
@@ -272,6 +288,10 @@ ${markerText}`
                       {lab.interpretation ? (
                         <div style={{padding:"12px 14px",background:"#F0FDF4",border:"1px solid #86EFAC",borderRadius:8,fontSize:13,color:"#0F172A",lineHeight:1.6}}>
                           <span style={{fontWeight:700,color:TEAL}}>Claude: </span>{lab.interpretation}
+                        </div>
+                      ) : interpretError[lab.id] ? (
+                        <div style={{padding:"10px 14px",background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,fontSize:12,color:RED,display:"flex",alignItems:"center",gap:6}}>
+                          <AlertCircle size={13}/>{interpretError[lab.id]}
                         </div>
                       ) : (
                         <div style={{padding:"10px 14px",background:LIGHT,border:`1px dashed ${BORDER}`,borderRadius:8,fontSize:12,color:GRAY}}>
@@ -378,11 +398,11 @@ ${markerText}`
                   <div style={{fontSize:13,color:GRAY}}>Click to select PDF</div>
                   <div style={{fontSize:11,color:"#94A3B8",marginTop:3}}>Ampath, Lancet, Pathcare reports · PDF only</div>
                   <input ref={fileRef} type="file" accept=".pdf" style={{display:"none"}}
-                    onChange={e=>{ const f=e.target.files?.[0]; if(f) setUploadForm(x=>({...x,pdfFilename:f.name})) }}/>
+                    onChange={e=>{ const f=e.target.files?.[0]; if(f) setUploadFile(f) }}/>
                 </div>
-                {uploadForm.pdfFilename && (
+                {uploadFile && (
                   <div style={{marginTop:6,fontSize:13,color:GREEN,display:"flex",alignItems:"center",gap:5}}>
-                    <CheckCircle size={13}/>{uploadForm.pdfFilename}
+                    <CheckCircle size={13}/>{uploadFile.name}
                   </div>
                 )}
               </div>
@@ -402,21 +422,45 @@ ${markerText}`
             <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}>
               <button onClick={()=>setShowUpload(false)} style={btnCancel}>Cancel</button>
               <button onClick={async()=>{
+                if (!uploadFile) { setUploadError("Please select a PDF file"); return }
                 setUploading(true); setUploadError("")
                 try {
-                  await apiClient.post("/api/v1/clinic/lab/results",{
-                    source: uploadForm.source,
-                    labReference: uploadForm.labReference||null,
-                    pdfFilename: uploadForm.pdfFilename||null,
-                    collectedAt: uploadForm.collectedAt ? new Date(uploadForm.collectedAt).toISOString() : null,
-                    patientNameRaw: patient.fullName,
+                  // FIX: "lab result upload doesn't actually upload anything" —
+                  // previously posted only the filename as JSON; the file itself
+                  // was never sent. Now sends the real bytes as
+                  // multipart/form-data via fetch (not apiClient/axios) — axios
+                  // doesn't reliably strip a Content-Type set as an instance
+                  // default via axios.create() just because a per-request
+                  // value is undefined, confirmed via real testing. fetch never
+                  // sets Content-Type here at all, so the browser adds the
+                  // correct "multipart/form-data; boundary=..." itself. The JWT
+                  // is attached manually since fetch bypasses apiClient's
+                  // request interceptor.
+                  const formData = new FormData()
+                  formData.append("file", uploadFile)
+                  formData.append("source", uploadForm.source)
+                  if (uploadForm.labReference) formData.append("labReference", uploadForm.labReference)
+                  if (uploadForm.collectedAt) formData.append("collectedAt", new Date(uploadForm.collectedAt).toISOString())
+                  formData.append("patientNameRaw", patient.fullName)
+
+                  const token = useAuthStore.getState().token
+                  const res = await fetch(`${apiClient.defaults.baseURL}/api/v1/clinic/lab/results`, {
+                    method: "POST",
+                    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+                    credentials: "include",
+                    body: formData,
                   })
-                  // Link to patient immediately
+                  const json = await res.json().catch(() => null)
+                  if (!res.ok || json?.success === false) {
+                    throw new Error(json?.message ?? `Upload failed (${res.status})`)
+                  }
+
                   qc.invalidateQueries({queryKey:["pf-labs",patient.id]})
                   setShowUpload(false)
-                  setUploadForm({source:"MANUAL",labReference:"",pdfFilename:"",collectedAt:"",notes:""})
+                  setUploadFile(null)
+                  setUploadForm({source:"MANUAL",labReference:"",collectedAt:"",notes:""})
                 } catch(e:any) {
-                  setUploadError(e.response?.data?.message??"Upload failed")
+                  setUploadError(e.message ?? "Upload failed")
                 } finally { setUploading(false) }
               }} disabled={uploading} style={btnPrimary}>
                 {uploading ? <><Loader size={13}/> Uploading...</> : "Upload result"}

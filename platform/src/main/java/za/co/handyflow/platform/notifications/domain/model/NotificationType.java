@@ -119,6 +119,8 @@ public enum NotificationType {
     FUEL_TANK_LOW(WARNING, Set.of(IN_APP, EMAIL)),
     FUEL_DELIVERY_COMPLETED(INFO, Set.of(IN_APP)),
     FUEL_NEGATIVE_VARIANCE(CRITICAL, Set.of(IN_APP, EMAIL, SMS)),
+    FUEL_DELIVERY_UPCOMING(INFO, Set.of(IN_APP, EMAIL)),
+    FUEL_DELIVERY_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
 
     // ── HR / Payroll ─────────────────────────────────────────────────────────
     PAY_RUN_PROCESSED(INFO, Set.of(IN_APP, EMAIL)),
@@ -185,7 +187,13 @@ public enum NotificationType {
     PO_RETURNED_FOR_REVISION(WARNING, Set.of(IN_APP, EMAIL)),
     SUPPLIER_INVOICE_DISPUTED(WARNING, Set.of(IN_APP, EMAIL)),
     SUPPLIER_INVOICE_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
-    LOW_STOCK_DIGEST(INFO, Set.of(IN_APP, EMAIL));
+    LOW_STOCK_DIGEST(INFO, Set.of(IN_APP, EMAIL)),
+
+    // ── Tasks ────────────────────────────────────────────────────────────────
+    TASK_ASSIGNED(INFO, Set.of(IN_APP, EMAIL)),
+    TASK_COMMENT_ADDED(INFO, Set.of(IN_APP)),
+    TASK_DUE_SOON(INFO, Set.of(IN_APP, EMAIL)),
+    TASK_OVERDUE(WARNING, Set.of(IN_APP, EMAIL));
 
     private final NotificationSeverity defaultSeverity;
     private final Set<NotificationChannel> defaultChannels;

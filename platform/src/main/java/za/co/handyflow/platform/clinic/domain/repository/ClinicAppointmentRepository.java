@@ -37,4 +37,21 @@ public interface ClinicAppointmentRepository extends JpaRepository<ClinicAppoint
 
     @Query("SELECT a FROM ClinicAppointment a WHERE a.tenantId = :#{#tenantId.value} AND a.scheduledAt >= :from AND a.scheduledAt < :to AND a.deletedAt IS NULL ORDER BY a.scheduledAt")
     List<ClinicAppointment> findByDateRange(TenantId tenantId, Instant from, Instant to);
+
+    /**
+     * FIX: "no appointment reminders" gap — cross-tenant by design, same
+     * pattern as QuoteRepository.findExpiredQuotes and
+     * RecurringScheduleRepository.findDueSchedules: this is a nightly batch
+     * job's query, not a tenant-scoped read, so no tenantId filter.
+     * Only SCHEDULED/CONFIRMED appointments in the future window that
+     * haven't already had a reminder sent.
+     */
+    @Query("""
+        SELECT a FROM ClinicAppointment a
+        WHERE a.status IN ('SCHEDULED', 'CONFIRMED')
+        AND a.reminderSentAt IS NULL
+        AND a.scheduledAt >= :from AND a.scheduledAt < :to
+        AND a.deletedAt IS NULL
+        """)
+    List<ClinicAppointment> findDueForReminder(Instant from, Instant to);
 }

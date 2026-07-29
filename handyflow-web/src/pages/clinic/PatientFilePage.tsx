@@ -3,14 +3,16 @@
 import { useState, useRef, useEffect } from "react"
 import ConsultationSession from "./ConsultationSession"
 import { LabsTabEnhanced } from "./LabsTab"
+import ConsentTab from "./ConsentTab"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { useAuthStore } from "../../store/auth.store"
 import {
   User, Calendar, Stethoscope, CreditCard, Pill, FlaskConical,
   FileText, Clock, Heart, AlertCircle, Phone, Mail, Plus, X,
   ChevronDown, ChevronUp, Activity, CheckCircle, PlayCircle,
   XCircle, Download, Mic, MicOff, Loader, Upload, Users, Link,
-  MoreVertical, Archive, UserX, UserCheck, ArrowRight,
+  MoreVertical, Archive, UserX, UserCheck, ArrowRight, ShieldCheck,
 } from "lucide-react"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -99,7 +101,7 @@ const downloadPdf = async (url:string, filename:string) => {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-type TabId = "overview"|"appointments"|"consultation"|"running-bill"|"rx"|"labs"|"documents"|"history"
+type TabId = "overview"|"appointments"|"consultation"|"running-bill"|"rx"|"labs"|"documents"|"history"|"consent"
 
 interface Props {
   patient: Patient; onClose: () => void; onNavigate: (tab:any)=>void; onOpenPatient?: (p:Patient)=>void
@@ -174,6 +176,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
     {id:"labs",         label:"Lab results",  icon:FlaskConical},
     {id:"documents",    label:"Documents",    icon:FileText},
     {id:"history",      label:"History",      icon:Clock},
+    {id:"consent",      label:"Consent",      icon:ShieldCheck},
   ]
 
   const acctCfg = ACCOUNT_CFG[patient.accountType]??ACCOUNT_CFG.INDIVIDUAL
@@ -364,6 +367,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
       {activeTab==="labs"         && <LabsTabEnhanced patient={patient}/>}
       {activeTab==="documents"    && <DocumentsTab patient={patient} consultations={consultations as Consultation[]}/>}
       {activeTab==="history"      && <HistoryTab appointments={appointments as Appointment[]} consultations={consultations as Consultation[]}/>}
+      {activeTab==="consent"      && <ConsentTab patient={patient}/>}
     </div>
   )
 }
@@ -1228,7 +1232,9 @@ function PrescriptionsTab({ patient, consultations }:
 function LabsTab({ patient }:{patient:Patient}) {
   const qc=useQueryClient()
   const [showUpload, setShowUpload]=useState(false)
-  const [uploadForm, setUploadForm]=useState({source:"MANUAL",labReference:"",pdfFilename:"",notes:""})
+  const [uploadForm, setUploadForm]=useState({source:"MANUAL",labReference:"",notes:""})
+  const [uploadFile, setUploadFile]=useState<File|null>(null)
+  const [uploadError, setUploadError]=useState("")
   const [uploading, setUploading]=useState(false)
   const fileRef=useRef<HTMLInputElement>(null)
 
@@ -1262,7 +1268,7 @@ function LabsTab({ patient }:{patient:Patient}) {
                   </div>
                   <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6, flexShrink:0, marginLeft:12 }}>
                     <span style={{ background:cfg.bg, color:cfg.color, padding:"2px 8px", borderRadius:20, fontSize:11, fontWeight:700 }}>{lab.status}</span>
-                    {lab.pdfUrl&&<button onClick={()=>downloadPdf(lab.pdfUrl,lab.pdfFilename||"result.pdf")} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:LIGHT, color:NAVY, border:`1px solid ${BORDER}`, borderRadius:6, fontSize:12, cursor:"pointer" }}><Download size={11}/> PDF</button>}
+                    {lab.pdfUrl&&<button onClick={()=>downloadPdf(`/api/v1/clinic/lab/results/${lab.id}/pdf`,lab.pdfFilename||"result.pdf")} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:LIGHT, color:NAVY, border:`1px solid ${BORDER}`, borderRadius:6, fontSize:12, cursor:"pointer" }}><Download size={11}/> PDF</button>}
                   </div>
                 </div>
               </div>
@@ -1281,16 +1287,55 @@ function LabsTab({ patient }:{patient:Patient}) {
                 <Upload size={24} color={GRAY} style={{ marginBottom:8 }}/>
                 <div style={{ fontSize:13, color:GRAY }}>Click to select PDF</div>
                 <div style={{ fontSize:11, color:"#94A3B8", marginTop:4 }}>PDF only · max 10MB</div>
-                <input ref={fileRef} type="file" accept=".pdf" style={{ display:"none" }} onChange={e=>{ const file=e.target.files?.[0]; if (file) setUploadForm(f=>({...f,pdfFilename:file.name})) }}/>
+                <input ref={fileRef} type="file" accept=".pdf" style={{ display:"none" }} onChange={e=>{ const file=e.target.files?.[0]; if (file) { setUploadFile(file); setUploadError("") } }}/>
               </div>
-              {uploadForm.pdfFilename&&<div style={{ marginTop:6, fontSize:13, color:GREEN, display:"flex", alignItems:"center", gap:6 }}><CheckCircle size={13}/> {uploadForm.pdfFilename}</div>}
+              {uploadFile&&<div style={{ marginTop:6, fontSize:13, color:GREEN, display:"flex", alignItems:"center", gap:6 }}><CheckCircle size={13}/> {uploadFile.name}</div>}
+              {uploadError&&<div style={{ marginTop:6, fontSize:13, color:RED, display:"flex", alignItems:"center", gap:6 }}><AlertCircle size={13}/> {uploadError}</div>}
             </div>
           </div>
           <ModalFooter onCancel={()=>setShowUpload(false)}
             onConfirm={async()=>{
+              if (!uploadFile) { setUploadError("Please select a PDF file"); return }
               setUploading(true)
-              try { await apiClient.post(`/api/v1/clinic/lab/results`,{source:uploadForm.source,labReference:uploadForm.labReference||null,pdfFilename:uploadForm.pdfFilename||null,patientNameRaw:patient.fullName}); qc.invalidateQueries({queryKey:["pf-labs",patient.id]}); setShowUpload(false) }
-              finally { setUploading(false) }
+              try {
+                // FIX: "lab result upload doesn't actually upload anything" —
+                // previously posted only the filename as JSON; the file itself
+                // was never sent. Now sends the real bytes as multipart/form-data.
+                //
+                // FIX 2: apiClient.post() with headers:{'Content-Type':undefined}
+                // was tried first, but axios doesn't reliably strip a
+                // Content-Type set as an instance default via axios.create()
+                // just because a per-request value is undefined — confirmed via
+                // real testing, the request still went out as
+                // 'application/json' and the server rejected it. Using the
+                // native fetch API instead sidesteps that entirely: since
+                // Content-Type is never set here at all, the browser adds the
+                // correct "multipart/form-data; boundary=..." itself. The JWT
+                // is attached manually since fetch doesn't go through
+                // apiClient's request interceptor.
+                const formData = new FormData()
+                formData.append("file", uploadFile)
+                formData.append("source", uploadForm.source)
+                if (uploadForm.labReference) formData.append("labReference", uploadForm.labReference)
+                formData.append("patientNameRaw", patient.fullName)
+
+                const token = useAuthStore.getState().token
+                const res = await fetch(`${apiClient.defaults.baseURL}/api/v1/clinic/lab/results`, {
+                  method: "POST",
+                  headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+                  credentials: "include",
+                  body: formData,
+                })
+                const json = await res.json().catch(() => null)
+                if (!res.ok || json?.success === false) {
+                  throw new Error(json?.message ?? `Upload failed (${res.status})`)
+                }
+
+                qc.invalidateQueries({queryKey:["pf-labs",patient.id]})
+                setShowUpload(false); setUploadFile(null); setUploadError("")
+              } catch (e: any) {
+                setUploadError(e.message ?? "Failed to upload lab result")
+              } finally { setUploading(false) }
             }}
             confirmLabel={uploading?"Uploading...":"Upload result"} loading={uploading}/>
         </Modal>

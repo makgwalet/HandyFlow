@@ -25,4 +25,16 @@ public interface ClinicConsultationRepository extends JpaRepository<ClinicConsul
     // FIX #8 — for the /billing/consultations?unbilled=true endpoint
     @Query("SELECT c FROM ClinicConsultation c WHERE c.tenantId = :#{#tenantId.value} AND c.deletedAt IS NULL AND c.billed = false ORDER BY c.consultedAt DESC")
     Page<ClinicConsultation> findAllUnbilled(TenantId tenantId, Pageable pageable);
+
+    /**
+     * FIX: "no recall/follow-up dashboard" gap — followUpDays was captured
+     * on every consultation but never surfaced anywhere. Returns every
+     * consultation that set a follow-up window; the service layer collapses
+     * this down to the most recent consultation per patient and filters to
+     * those actually due, since a patient's most recent visit is the one
+     * whose follow-up window matters (an earlier visit's follow-up is moot
+     * if they've already been seen again since).
+     */
+    @Query("SELECT c FROM ClinicConsultation c WHERE c.tenantId = :#{#tenantId.value} AND c.deletedAt IS NULL AND c.followUpDays IS NOT NULL ORDER BY c.consultedAt DESC")
+    List<ClinicConsultation> findAllWithFollowUp(TenantId tenantId);
 }

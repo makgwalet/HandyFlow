@@ -110,6 +110,19 @@ public class FuelDelivery {
     @Column(name = "on_behalf_of")
     private String onBehalfOf;
 
+    /**
+     * FIX (notifications): idempotency guards for the scheduled reminder/overdue
+     * sweeps — set the first time each fires so a delivery scheduled a week out
+     * doesn't get re-reminded on every daily sweep, and an overdue delivery
+     * doesn't re-alert every day it stays overdue. Mirrors
+     * Task.overdueAlertSentAt's role in the Tasks module's scheduler.
+     */
+    @Column(name = "reminder_sent_at")
+    private Instant reminderSentAt;
+
+    @Column(name = "overdue_alert_sent_at")
+    private Instant overdueAlertSentAt;
+
     public static FuelDelivery create(TenantId tenantId, UUID tankId, UUID customerId,
                                       Map<String, String> deliveryAddress,
                                       String fuelType, BigDecimal litresOrdered,
@@ -171,6 +184,16 @@ public class FuelDelivery {
     }
 
     public boolean isDeleted() { return deletedAt != null; }
+
+    /** Marks the upcoming-delivery reminder as sent. */
+    public void markReminderSent() {
+        this.reminderSentAt = Instant.now();
+    }
+
+    /** Marks the overdue alert as sent. */
+    public void markOverdueAlertSent() {
+        this.overdueAlertSentAt = Instant.now();
+    }
 
     @PreUpdate
     void onUpdate() { this.updatedAt = Instant.now(); }

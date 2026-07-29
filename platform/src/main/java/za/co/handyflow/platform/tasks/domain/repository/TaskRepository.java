@@ -68,4 +68,32 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
         AND t.status NOT IN ('DONE','CANCELLED') AND t.deletedAt IS NULL
         """)
     long countMyTasks(TenantId tenantId, UUID userId);
+
+    // ── Notification scheduler (cross-tenant sweeps) ────────────────────────
+
+    /**
+     * Assigned, undone tasks due on an exact target date — used by the
+     * TASK_DUE_SOON reminder sweep. Exact-day match (same idempotency style
+     * as Fleet's compliance alerts) means a task only fires once per
+     * configured lead time, without needing its own "reminder sent" flag.
+     */
+    @Query("""
+        SELECT t FROM Task t
+        WHERE t.dueDate = :targetDate AND t.assigneeId IS NOT NULL
+        AND t.status NOT IN ('DONE','CANCELLED') AND t.deletedAt IS NULL
+        """)
+    List<Task> findDueOnDateAcrossTenants(LocalDate targetDate);
+
+    /**
+     * Assigned, undone, overdue tasks that haven't been alerted yet — used by
+     * the TASK_OVERDUE sweep. overdueAlertSentAt is the idempotency guard so
+     * a task overdue for a week doesn't re-notify every single day.
+     */
+    @Query("""
+        SELECT t FROM Task t
+        WHERE t.dueDate < :today AND t.assigneeId IS NOT NULL
+        AND t.status NOT IN ('DONE','CANCELLED') AND t.deletedAt IS NULL
+        AND t.overdueAlertSentAt IS NULL
+        """)
+    List<Task> findOverdueNeedingAlertAcrossTenants(LocalDate today);
 }

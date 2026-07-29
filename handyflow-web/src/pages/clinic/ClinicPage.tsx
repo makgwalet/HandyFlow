@@ -1,6 +1,6 @@
 // src/pages/clinic/ClinicPage.tsx
 import { useState } from "react"
-import { Users, Calendar, FileText, Stethoscope, LayoutDashboard, CreditCard, BarChart2 } from "lucide-react"
+import { Users, Calendar, FileText, Stethoscope, LayoutDashboard, CreditCard, BarChart2, CalendarClock, ListPlus } from "lucide-react"
 import ClinicDashboard   from "./ClinicDashboard"
 import PatientsTab       from "./PatientsTab"
 import ScheduleTab       from "./ScheduleTab"
@@ -9,8 +9,10 @@ import PractitionersTab  from "./PractitionersTab"
 import ClaimsTab         from "./ClaimsTab"
 import BillingTab        from "./BillingTab"
 import PatientFilePage   from "./PatientFilePage"
+import RecallsTab        from "./RecallsTab"
+import WaitlistTab       from "./WaitlistTab"
 
-export type ClinicTab = "dashboard"|"patients"|"schedule"|"consultations"|"practitioners"|"claims"|"billing"
+export type ClinicTab = "dashboard"|"patients"|"schedule"|"consultations"|"practitioners"|"claims"|"billing"|"recalls"|"waitlist"
 
 interface Patient { id: string; firstName: string; lastName: string; fullName: string; [key: string]: any }
 
@@ -19,6 +21,8 @@ const TABS: { id: ClinicTab; label: string; icon: React.ElementType }[] = [
   { id:"patients",      label:"Patients",      icon:Users           },
   { id:"schedule",      label:"Schedule",      icon:Calendar        },
   { id:"consultations", label:"Consultations", icon:FileText        },
+  { id:"recalls",       label:"Recalls",       icon:CalendarClock   },
+  { id:"waitlist",      label:"Waitlist",      icon:ListPlus        },
   { id:"practitioners", label:"Practitioners", icon:Stethoscope     },
   { id:"claims",        label:"Claims",        icon:CreditCard      },
   { id:"billing",       label:"Billing",       icon:BarChart2       },
@@ -99,6 +103,8 @@ export function ClinicPage() {
               setTab("patients")
             }}/>}
             {tab==="consultations" && <ConsultationsTab/>}
+            {tab==="recalls"       && <RecallsTab/>}
+            {tab==="waitlist"      && <WaitlistTab/>}
             {tab==="practitioners" && <PractitionersTab/>}
             {tab==="claims"        && <ClaimsTab/>}
             {tab==="billing"       && <BillingTab/>}

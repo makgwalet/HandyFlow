@@ -36,6 +36,21 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
     @Query("SELECT COUNT(i) FROM Invoice i WHERE i.tenantId = :#{#tenantId.value} AND i.deletedAt IS NULL")
     long countAllByTenantId(TenantId tenantId);
 
+    /**
+     * FIX: "no statement of account PDF" gap — no existing query filtered
+     * invoices by customer at all. Deliberately no lineItems JOIN FETCH: a
+     * statement shows per-invoice totals, not line-item detail, so this
+     * avoids pulling data the statement never renders.
+     */
+    @Query("""
+        SELECT i FROM Invoice i
+        WHERE i.tenantId = :tenantId
+        AND i.customerId = :customerId
+        AND i.deletedAt IS NULL
+        ORDER BY i.createdAt DESC
+        """)
+    List<Invoice> findByCustomer(TenantId tenantId, UUID customerId);
+
     // WHY CAST(:tenantId AS uuid)?
     // Neither :tenantId::uuid (named param) nor ?1::uuid (positional param) work in
     // Hibernate 6 native queries — the :: suffix is parsed as part of the parameter label.

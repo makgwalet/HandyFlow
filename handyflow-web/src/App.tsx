@@ -71,6 +71,7 @@ import { SessionExpiryModal } from "./components/SessionExpiryModal"
 // already existed in shipped code, not a fresh URL design.
 import { CareersListPage } from "./pages/careers/CareersListPage"
 import { JobApplyPage }    from "./pages/careers/JobApplyPage"
+import { CreateVariableHoursContractPage } from "./pages/invoicing/CreateVariableHoursContractPage"
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -188,6 +189,7 @@ export default function App() {
             <Route path="/ap"                     element={<AccountsPayablePage />} />
             <Route path="/profile"                element={<ProfilePage />} />
             <Route path="/invoices/retainer/new"  element={<CreateRetainerPage />} />
+            <Route path="/recurring/variable-hours/new" element={<CreateVariableHoursContractPage />} />
             <Route path="/recurring/new"          element={<CreateRecurringSchedulePage />} />
             <Route path="/recurring"              element={<InvoicingPage />} />
             <Route path="/supply-chain"           element={<SupplyChainPage />} />

@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, X, FileText, ChevronDown, ChevronUp, Pill, AlertCircle, Activity } from "lucide-react"
+import { Plus, X, FileText, ChevronDown, ChevronUp, Pill, AlertCircle, Activity, Download } from "lucide-react"
 
 interface Consultation {
   id: string; patientId: string; patientName: string
@@ -34,6 +34,10 @@ export default function ConsultationsTab() {
   const [expanded, setExpanded]     = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [showRx, setShowRx]         = useState<string | null>(null)
+  const [showReferral, setShowReferral] = useState<string | null>(null)
+  const [referralForm, setReferralForm] = useState({ specialistName: "", specialty: "", reason: "", urgency: "ROUTINE", additionalNotes: "" })
+  const [referralError, setReferralError] = useState("")
+  const [generatingReferral, setGeneratingReferral] = useState(false)
   const [form, setForm]             = useState(EMPTY_FORM)
   const [apiError, setApiError]     = useState("")
   const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({})
@@ -169,6 +173,25 @@ export default function ConsultationsTab() {
                     <button onClick={e => { e.stopPropagation(); setShowRx(c.id); setApiError("") }}
                       style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "#F0FDF4", color: "#166534", border: "1px solid #86EFAC", borderRadius: 6, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
                       <Pill size={11} /> Rx
+                    </button>
+                    {/* FIX: "no referral letter" gap. */}
+                    <button onClick={e => { e.stopPropagation(); setShowReferral(c.id); setReferralError(""); setReferralForm({ specialistName: "", specialty: "", reason: "", urgency: "ROUTINE", additionalNotes: "" }) }}
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "#FEF2F2", color: "#B43C32", border: "1px solid #F3D0CB", borderRadius: 6, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+                      <FileText size={11} /> Refer
+                    </button>
+                    {/* FIX: "no consultation summary/after-visit note PDF" gap. */}
+                    <button onClick={async e => {
+                      e.stopPropagation()
+                      try {
+                        const res = await apiClient.get(`/api/v1/clinic/consultations/${c.id}/summary-pdf`, { responseType: "blob" } as any)
+                        const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }))
+                        const link = document.createElement("a")
+                        link.href = url; link.download = `visit-summary-${c.id}.pdf`; link.click()
+                        setTimeout(() => URL.revokeObjectURL(url), 60_000)
+                      } catch (err) { console.error("Failed to download visit summary", err) }
+                    }}
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "#F8FAFC", color: "#1B3A6B", border: "1px solid #E2E8F0", borderRadius: 6, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+                      <Download size={11} /> Summary
                     </button>
                     {c.followUpDays && (
                       <span style={{ fontSize: 11, color: "#D97706", background: "#FFFBEB", padding: "2px 8px", borderRadius: 20, border: "1px solid #FDE68A" }}>F/U {c.followUpDays}d</span>
@@ -310,6 +333,70 @@ export default function ConsultationsTab() {
                   {addPrescription.isPending ? "Adding..." : "Add Prescription"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Referral letter modal */}
+      {showReferral && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 560, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 8, background: "#FEF2F2", display: "flex", alignItems: "center", justifyContent: "center" }}><FileText size={16} color="#B43C32" /></div>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Referral Letter</h3>
+              </div>
+              <button onClick={() => { setShowReferral(null); setReferralError("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={lbl}>Specialist name</label>
+                <input value={referralForm.specialistName} onChange={e => setReferralForm(f => ({ ...f, specialistName: e.target.value }))} placeholder="Dr. Jane Smith" style={sinp} />
+              </div>
+              <div>
+                <label style={lbl}>Specialty</label>
+                <input value={referralForm.specialty} onChange={e => setReferralForm(f => ({ ...f, specialty: e.target.value }))} placeholder="Cardiology" style={sinp} />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={lbl}>Reason for referral</label>
+                <input value={referralForm.reason} onChange={e => setReferralForm(f => ({ ...f, reason: e.target.value }))} placeholder="Further investigation of..." style={sinp} />
+              </div>
+              <div>
+                <label style={lbl}>Urgency</label>
+                <select value={referralForm.urgency} onChange={e => setReferralForm(f => ({ ...f, urgency: e.target.value }))} style={sinp}>
+                  <option value="ROUTINE">Routine</option>
+                  <option value="SEMI_URGENT">Semi-urgent</option>
+                  <option value="URGENT">Urgent</option>
+                </select>
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={lbl}>Additional notes</label>
+                <input value={referralForm.additionalNotes} onChange={e => setReferralForm(f => ({ ...f, additionalNotes: e.target.value }))} placeholder="Optional" style={sinp} />
+              </div>
+            </div>
+
+            {referralError && <div style={{ marginTop: 14, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, fontSize: 13, color: "#DC2626" }}>{referralError}</div>}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
+              <button disabled={generatingReferral} onClick={async () => {
+                setGeneratingReferral(true); setReferralError("")
+                try {
+                  const res = await apiClient.post(`/api/v1/clinic/consultations/${showReferral}/referral-letter`, null, {
+                    params: referralForm, responseType: "blob",
+                  } as any)
+                  const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }))
+                  const link = document.createElement("a")
+                  link.href = url; link.download = `referral-letter-${showReferral}.pdf`; link.click()
+                  URL.revokeObjectURL(url)
+                  setShowReferral(null)
+                } catch (e: any) {
+                  setReferralError(e.response?.data?.message ?? "Failed to generate referral letter")
+                } finally { setGeneratingReferral(false) }
+              }} style={btnPrimary}>
+                {generatingReferral ? "Generating..." : "Generate PDF"}
+              </button>
             </div>
           </div>
         </div>

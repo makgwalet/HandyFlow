@@ -25,5 +25,10 @@ public record QuoteResponse(
         // Walk-in fields — null when customerId is set
         String walkinClientName,
         String walkinClientEmail,
-        String walkinClientPhone
+        String walkinClientPhone,
+
+        // FIX: "no quote view-tracking" gap
+        Instant firstViewedAt,
+        Instant lastViewedAt,
+        int viewCount
 ) {}
