@@ -1,8 +1,14 @@
 // src/pages/security/ArmouryTab.tsx
+//
+// CHANGE: added a "History" button per firearm, downloading the chain-of-
+// custody PDF (GET /armoury/{id}/history/pdf) built earlier this session --
+// the backend endpoint existed with no frontend button calling it at all.
+// Everything else in this file is unchanged from the original.
+
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Crosshair, Plus, ArrowRight, ArrowLeft, AlertTriangle, Clock } from "lucide-react"
+import { Crosshair, Plus, ArrowRight, ArrowLeft, AlertTriangle, Clock, FileText } from "lucide-react"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -34,6 +40,12 @@ const STATUS_CONFIG = {
 
 const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
 
+async function openPdfInNewTab(url: string) {
+  const res = await apiClient.get(url, { responseType: "blob" })
+  const blobUrl = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }))
+  window.open(blobUrl, "_blank")
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function ArmouryTab() {
@@ -44,6 +56,7 @@ export default function ArmouryTab() {
   const [issueForm, setIssueForm] = useState({ guardId: "", witnessedByGuardId: "", conditionNotes: "" })
   const [returnForm, setReturnForm] = useState({ witnessedByGuardId: "", conditionNotes: "" })
   const [apiError, setApiError] = useState("")
+  const [loadingHistoryId, setLoadingHistoryId] = useState<string | null>(null)
 
   const { data: firearms = [], isLoading } = useQuery<Firearm[]>({
     queryKey: ["armoury"],
@@ -79,6 +92,15 @@ export default function ArmouryTab() {
     mutationFn: ({ id, body }: any) => apiClient.post(`/api/v1/security/armoury/${id}/return`, body),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["armoury"] }); setView("list"); setSelected(null) },
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Return failed"),
+  })
+
+  const downloadHistory = useMutation({
+    mutationFn: async (id: string) => {
+      setLoadingHistoryId(id)
+      await openPdfInNewTab(`/api/v1/security/armoury/${id}/history/pdf`)
+    },
+    onSettled: () => setLoadingHistoryId(null),
+    onError: () => setApiError("Failed to generate chain-of-custody PDF"),
   })
 
   const expiring = firearms.filter(f => {
@@ -221,6 +243,12 @@ export default function ArmouryTab() {
                   </p>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => downloadHistory.mutate(f.id)}
+                    disabled={loadingHistoryId === f.id}
+                    title="Download chain-of-custody PDF"
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid #E2E8F0", background: "#F8FAFC", color: "#374151", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                    <FileText size={12} /> {loadingHistoryId === f.id ? "…" : "History"}
+                  </button>
                   {f.status === "IN_ARMOURY" && (
                     <button onClick={() => { setSelected(f); setIssueForm({ guardId: "", witnessedByGuardId: "", conditionNotes: "" }); setApiError(""); setView("issue") }}
                       style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid #1D4ED8", background: "#EFF6FF", color: "#1D4ED8", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>

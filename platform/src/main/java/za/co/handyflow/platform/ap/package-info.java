@@ -1,4 +1,4 @@
-@ApplicationModule(allowedDependencies = {"shared"})
+@ApplicationModule(allowedDependencies = {"shared", "notifications", "accounting"})
 package za.co.handyflow.platform.ap;
 
 import org.springframework.modulith.ApplicationModule;

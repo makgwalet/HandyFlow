@@ -8,6 +8,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.crm.application.internal.PopiaExportPdfService;
 import za.co.handyflow.platform.crm.application.internal.PopiaExportService;
 import za.co.handyflow.platform.shared.TenantContext;
 
@@ -35,8 +36,9 @@ import java.util.UUID;
 @Tag(name = "CRM - POPIA", description = "POPIA data subject access requests")
 public class PopiaExportController {
 
-    private final PopiaExportService popiaExportService;
-    private final FeatureGuard       featureGuard;
+    private final PopiaExportService    popiaExportService;
+    private final PopiaExportPdfService popiaExportPdfService;
+    private final FeatureGuard          featureGuard;
 
     @ModelAttribute
     public void requireCrmModule() {
@@ -71,6 +73,32 @@ public class PopiaExportController {
         response.setHeader("X-POPIA-Export", "true");
 
         popiaExportService.exportCustomerJson(tenantId, id, requestedBy, response.getWriter());
+    }
+
+    /**
+     * FIX: "no POPIA export as PDF" gap — same request, human-readable
+     * document instead of raw JSON. Deliberately calls PopiaExportPdfService
+     * directly rather than through PopiaExportService — see that service's
+     * own doc comment for why it doesn't share PopiaExportDto with the
+     * JSON export.
+     */
+    @GetMapping("/{id}/popia-export.pdf")
+    @PreAuthorize("hasAuthority('CUSTOMER_DELETE')")
+    @Operation(summary = "Generate POPIA data subject export as a human-readable PDF")
+    public void exportPopiaPdf(
+            @PathVariable UUID id,
+            HttpServletResponse response
+    ) throws IOException {
+        var tenantId    = TenantContext.getTenantIdAsObject();
+        var requestedBy = currentUserId();
+        var filename    = "popia-export-" + id + "-" + LocalDate.now() + ".pdf";
+
+        response.setContentType("application/pdf");
+        response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+        response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        response.setHeader("X-POPIA-Export", "true");
+
+        popiaExportPdfService.generatePdf(tenantId, id, requestedBy, response.getOutputStream());
     }
 
     private UUID currentUserId() {

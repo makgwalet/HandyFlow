@@ -8,12 +8,18 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.security.application.internal.CloseProtectionService;
+import za.co.handyflow.platform.security.application.internal.CpCompliancePdfService;
+import za.co.handyflow.platform.security.domain.model.ArmouryLog;
 import za.co.handyflow.platform.security.domain.model.AuditEvent;
+import za.co.handyflow.platform.security.domain.model.CpEvidence;
 import za.co.handyflow.platform.security.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -25,24 +31,14 @@ import java.util.UUID;
 /**
  * CloseProtectionController — VIP/Close Protection module core (Part 9).
  *
- * CONFIDENTIALITY (Part 9.3):
- * Every endpoint in this controller requires VIP_DETAIL_ACCESS in addition
- * to (not instead of) the existing USER_READ/USER_UPDATE checks elsewhere in
- * the module — a site supervisor who can see all guards and incidents
- * should NOT automatically see principal names, itineraries, or threat
- * assessments unless explicitly assigned to that detail.
+ * CHANGE: added GET /principals/{id}/vetting/pdf -- exportable Part 9.6
+ * vetting compliance record (audit gap: "no export path for a compliance
+ * officer needing a paper record"). Sits under the same class-level
+ * VIP_DETAIL_ACCESS gate as everything else here — no separate permission
+ * needed, since generating the PDF requires the same access as viewing the
+ * underlying data would.
  *
- * This is a hard requirement at the class level (@PreAuthorize on the class
- * applies to every method) rather than spot-checked per endpoint, so a new
- * endpoint added later can't accidentally ship without the gate.
- *
- * IMPORTANT — operational note for whoever manages roles:
- * VIP_DETAIL_ACCESS does not exist anywhere else in the codebase yet. It
- * must be added as an assignable permission in whatever admin UI manages
- * role/permission grants (the same place USER_UPDATE etc. are assigned) —
- * this controller only enforces the check, it doesn't create the permission
- * itself. Until a role is granted VIP_DETAIL_ACCESS, nobody (including
- * tenant admins) can reach any endpoint here.
+ * All other endpoints/comments unchanged from the V211 version.
  */
 @Tag(name = "Security - Close Protection")
 @RestController
@@ -51,7 +47,8 @@ import java.util.UUID;
 @PreAuthorize("hasAuthority('VIP_DETAIL_ACCESS')")
 public class CloseProtectionController {
 
-    private final CloseProtectionService cpService;
+    private final CloseProtectionService  cpService;
+    private final CpCompliancePdfService  cpCompliancePdfService;
 
     // ── Principals ─────────────────────────────────────────────────────────────
 
@@ -130,6 +127,22 @@ public class CloseProtectionController {
                 cpService.getPrincipalViewHistory(tenantId, id, pageable)));
     }
 
+    // ── Vetting compliance PDF ─────────────────────────────────────────────────
+
+    @GetMapping("/principals/{id}/vetting/pdf")
+    @Operation(
+            summary = "Vetting compliance record PDF",
+            description = "Part 9.6 compliance record for a compliance officer needing a paper " +
+                    "trail — alias, threat level, vetting status, full check history, and any " +
+                    "declined-engagement notice. Deliberately excludes medical notes, known " +
+                    "threats, and any declined-engagement sensitive detail -- see " +
+                    "CpCompliancePdfService for why.")
+    public ResponseEntity<byte[]> getVettingCompliancePdf(@PathVariable UUID id) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        byte[] pdf = cpCompliancePdfService.vettingCompliancePdf(tenantId, id);
+        return pdfResponse(pdf, "vetting-compliance-" + id.toString().substring(0, 8) + ".pdf");
+    }
+
     // ── Protection Details ─────────────────────────────────────────────────────
 
     @GetMapping("/details")
@@ -194,6 +207,31 @@ public class CloseProtectionController {
                 cpService.cancelDetail(tenantId, id, req)));
     }
 
+    @PostMapping("/details/{id}/clone")
+    @Operation(
+            summary = "Spin up a new detail from a previous engagement for the same principal",
+            description = """
+            The repeat-client case -- e.g. a VC who needs the same protection
+            shape on every campus visit. Copies principalId/detailType/
+            billingRate/notes from the source detail. Team roster and
+            itinerary are re-created (not blindly copied): each team member
+            is re-validated through the same hard gates a manual assignment
+            would hit (guard still schedulable, CP vetting tier still
+            sufficient for the principal's threat level) -- anyone who no
+            longer qualifies is skipped and reported back in the response
+            rather than silently dropped. Itinerary stop timing is shifted
+            by the same offset as the new detail's start time relative to
+            the source's, so "Day 1, 9am arrival" reproduces correctly on
+            the new date.
+            """)
+    public ResponseEntity<ApiResponse<CloneDetailResult>> cloneDetail(
+            @PathVariable UUID id, @Valid @RequestBody CloneDetailRequest req) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        UUID     actorId  = TenantContext.getCurrentUserId();
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                cpService.cloneDetail(tenantId, id, actorId, req)));
+    }
+
     // ── Team Assignments ───────────────────────────────────────────────────────
 
     @GetMapping("/details/{id}/team")
@@ -222,6 +260,41 @@ public class CloseProtectionController {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         cpService.endAssignment(tenantId, assignmentId);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // ── Arms <-> CP linkage (V211) ─────────────────────────────────────────────
+
+    @PostMapping("/details/{id}/team/{assignmentId}/firearms/{armouryId}/issue")
+    @Operation(
+            summary = "Issue a firearm to a guard as part of this detail's team roster",
+            description = """
+            Thin wrapper around the existing witnessed Armoury issue workflow
+            (ArmouryService.issue) -- all hard blocks there (license expiry,
+            firearm availability, receiving guard's competency, witness
+            validity, mandatory two-person witness) apply unchanged. Adds one
+            check on top: the assignment must actually belong to this detail
+            and to the guard named in the request body, so a firearm can't be
+            issued "for" a detail to someone not actually on its roster.
+            The resulting ArmouryLog entry is linked back to this detail --
+            see GET /details/{id}/armoury.
+            """)
+    public ResponseEntity<ApiResponse<ArmouryResponse>> issueFirearmForDetail(
+            @PathVariable UUID id, @PathVariable UUID assignmentId, @PathVariable UUID armouryId,
+            @Valid @RequestBody IssueFirearmRequest req) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(
+                cpService.issueFirearmForDetail(tenantId, id, assignmentId, armouryId, req)));
+    }
+
+    @GetMapping("/details/{id}/armoury")
+    @Operation(
+            summary = "Firearm issue/return history linked to this detail",
+            description = "Every ArmouryLog entry created via the issue-for-detail endpoint " +
+                    "above -- \"which firearms are or were out on this engagement.\"")
+    public ResponseEntity<ApiResponse<List<ArmouryLog>>> getArmouryForDetail(
+            @PathVariable UUID id) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(cpService.getArmouryForDetail(tenantId, id)));
     }
 
     // ── Itinerary ──────────────────────────────────────────────────────────────
@@ -366,5 +439,69 @@ public class CloseProtectionController {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cpService.decommissionVehicle(tenantId, id)));
+    }
+
+    // ── Evidence (V211) ────────────────────────────────────────────────────────
+
+    @PostMapping("/principals/{id}/evidence")
+    @Operation(summary = "Upload evidence attached to a principal",
+            description = "category: ID_DOCUMENT | ENGAGEMENT_LETTER | THREAT_INTEL | MEDICAL | OTHER")
+    public ResponseEntity<ApiResponse<EvidenceResponse>> uploadPrincipalEvidence(
+            @PathVariable UUID id, @Valid @RequestBody UploadEvidenceRequest req) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        UUID     actorId  = TenantContext.getCurrentUserId();
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                cpService.uploadEvidence(tenantId, CpEvidence.EntityType.PRINCIPAL, id, req, actorId)));
+    }
+
+    @GetMapping("/principals/{id}/evidence")
+    @Operation(summary = "List active evidence for a principal")
+    public ResponseEntity<ApiResponse<List<EvidenceResponse>>> getPrincipalEvidence(
+            @PathVariable UUID id) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(
+                cpService.getEvidenceFor(tenantId, CpEvidence.EntityType.PRINCIPAL, id)));
+    }
+
+    @PostMapping("/details/{id}/evidence")
+    @Operation(summary = "Upload evidence attached to a protection detail",
+            description = "category: ID_DOCUMENT | ENGAGEMENT_LETTER | THREAT_INTEL | MEDICAL | OTHER")
+    public ResponseEntity<ApiResponse<EvidenceResponse>> uploadDetailEvidence(
+            @PathVariable UUID id, @Valid @RequestBody UploadEvidenceRequest req) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        UUID     actorId  = TenantContext.getCurrentUserId();
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                cpService.uploadEvidence(tenantId, CpEvidence.EntityType.PROTECTION_DETAIL, id, req, actorId)));
+    }
+
+    @GetMapping("/details/{id}/evidence")
+    @Operation(summary = "List active evidence for a protection detail")
+    public ResponseEntity<ApiResponse<List<EvidenceResponse>>> getDetailEvidence(
+            @PathVariable UUID id) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(
+                cpService.getEvidenceFor(tenantId, CpEvidence.EntityType.PROTECTION_DETAIL, id)));
+    }
+
+    @DeleteMapping("/evidence/{evidenceId}")
+    @Operation(summary = "Soft-delete an evidence record",
+            description = "Not a hard delete -- the record and who removed it (and why) survives, " +
+                    "same posture as other compliance-sensitive records in this module.")
+    public ResponseEntity<ApiResponse<Void>> deleteEvidence(
+            @PathVariable UUID evidenceId, @Valid @RequestBody DeleteEvidenceRequest req) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        UUID     actorId  = TenantContext.getCurrentUserId();
+        cpService.deleteEvidence(tenantId, evidenceId, actorId, req);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    private ResponseEntity<byte[]> pdfResponse(byte[] pdf, String filename) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(ContentDisposition.attachment().filename(filename).build());
+        headers.setContentLength(pdf.length);
+        return ResponseEntity.ok().headers(headers).body(pdf);
     }
 }

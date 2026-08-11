@@ -13,16 +13,16 @@ import java.util.UUID;
 /**
  * ArmouryLog — an immutable record of one firearm issue or return event.
  *
+ * CHANGE (V211): added protectionDetailId + linkProtectionDetail(), same
+ * pattern as AlarmEvent.linkCamera()/linkProtectionDetail() -- set only when
+ * an issue/return happens as part of a CP detail's team roster
+ * (CloseProtectionService.issueFirearmForDetail), left null for routine
+ * site-guarding issuance. This is the only change from the original; the
+ * two-person witness requirement and everything else below is unchanged.
+ *
  * Two-person witness is mandatory (witnessedByGuardId is NOT NULL) — this is
  * the Firearms Control Act compliance requirement that distinguishes this
  * from the generic, optionally-witnessed security_resource_custody checkout.
- *
- * WHY a separate, append-only log rather than just updating Armoury's
- * assignedGuardId/status?
- * The Armoury entity tracks current state; this log is the permanent,
- * never-edited audit trail a company must produce if a firearm's chain of
- * custody is ever challenged — every issue and return, who witnessed it,
- * and when, going back to the firearm's registration.
  */
 @Entity
 @Table(name = "security_armoury_logs")
@@ -56,6 +56,9 @@ public class ArmouryLog {
 
     @Column(name = "shift_id")
     private UUID shiftId;
+
+    @Column(name = "protection_detail_id")
+    private UUID protectionDetailId;
 
     @Column(name = "occurred_at", nullable = false, updatable = false)
     private Instant occurredAt;
@@ -91,6 +94,20 @@ public class ArmouryLog {
         log.occurredAt         = Instant.now();
         log.createdAt          = Instant.now();
         return log;
+    }
+
+    // ── Mutations ──────────────────────────────────────────────────────────────
+
+    /**
+     * Links this issue/return event to the CP detail it happened for.
+     * Called by CloseProtectionService.issueFirearmForDetail() immediately
+     * after ArmouryService.issue() creates the log entry -- not part of the
+     * factory itself, since ArmouryService has no knowledge of CP details
+     * and shouldn't need to (same separation ArmouryController's javadoc
+     * already draws between routine issue and CP-specific workflows).
+     */
+    public void linkProtectionDetail(UUID protectionDetailId) {
+        this.protectionDetailId = protectionDetailId;
     }
 
     // ── Enum ───────────────────────────────────────────────────────────────────

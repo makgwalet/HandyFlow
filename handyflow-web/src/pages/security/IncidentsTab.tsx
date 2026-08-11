@@ -3,11 +3,20 @@
 //   - Add incident TYPE selector to create modal (now persisted to DB via fix #16)
 //   - Fix data unwrapping: IncidentService now returns proper Page<IncidentResponse>
 //   - Add acknowledgedAt/resolvedAt timestamps in incident card footer
+//   - NEW: "PDF" download button per incident, calling the branded single-
+//     incident PDF endpoint built this session (GET /incidents/{id}/pdf) --
+//     previously had no frontend button calling it at all.
+//   - NEW BUGFIX: the type badge above has been silently broken since it
+//     was written -- IncidentResponse never included `type` at all (bug #16
+//     was only ever fixed on the write side), so inc.type was always
+//     undefined and this badge never rendered. Fixed on the backend in the
+//     same pass as this file; no frontend change was needed for that part
+//     since the badge logic itself was already correct.
 
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, X, AlertTriangle, AlertCircle } from "lucide-react"
+import { Plus, X, AlertTriangle, AlertCircle, FileText } from "lucide-react"
 
 const SEV_CONFIG: Record<string, { color: string; bg: string; border: string }> = {
   CRITICAL: { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" },
@@ -35,6 +44,12 @@ const INCIDENT_TYPES = [
   { value: "OTHER",       label: "Other" },
 ]
 
+async function openPdfInNewTab(url: string) {
+  const res = await apiClient.get(url, { responseType: "blob" })
+  const blobUrl = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }))
+  window.open(blobUrl, "_blank")
+}
+
 export default function IncidentsTab() {
   const qc = useQueryClient()
   const [showCreate,   setShowCreate]   = useState(false)
@@ -46,6 +61,7 @@ export default function IncidentsTab() {
     latitude: "", longitude: "",
   })
   const [formError, setFormError] = useState("")
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
   const { data: incidents = [], isLoading } = useQuery<any[]>({
     queryKey: ["incidents", statusFilter, sevFilter],
@@ -79,6 +95,15 @@ export default function IncidentsTab() {
     mutationFn: (id: string) => apiClient.post(`/api/v1/security/incidents/${id}/resolve`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["incidents"] }),
     onError:   (e: any) => console.error("Resolve failed", e.response?.data?.message),
+  })
+
+  const downloadPdf = useMutation({
+    mutationFn: async (id: string) => {
+      setDownloadingId(id)
+      await openPdfInNewTab(`/api/v1/security/incidents/${id}/pdf`)
+    },
+    onSettled: () => setDownloadingId(null),
+    onError: () => console.error("Failed to generate incident PDF"),
   })
 
   const fmtDt = (iso: string) => new Date(iso).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
@@ -156,7 +181,7 @@ export default function IncidentsTab() {
                       <span style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{inc.title}</span>
                       <span style={{ fontSize: 10, fontWeight: 700, background: sev.bg, color: sev.color, padding: "2px 8px", borderRadius: 20, border: `1px solid ${sev.border}` }}>{inc.severity}</span>
                       <span style={{ fontSize: 11, fontWeight: 600, background: sts.bg, color: sts.color, padding: "2px 8px", borderRadius: 20 }}>{sts.label}</span>
-                      {/* Incident type badge — now properly stored */}
+                      {/* Incident type badge — was silently broken (see file header), now fixed backend-side */}
                       {inc.type && inc.type !== "GENERAL" && (
                         <span style={{ fontSize: 10, fontWeight: 600, background: "#F0FDF4", color: "#166534", padding: "2px 8px", borderRadius: 20, border: "1px solid #BBF7D0" }}>{inc.type}</span>
                       )}
@@ -176,6 +201,11 @@ export default function IncidentsTab() {
                     )}
                   </div>
                   <div style={{ display: "flex", gap: 8, flexShrink: 0, marginLeft: 12 }}>
+                    <button onClick={() => downloadPdf.mutate(inc.id)} disabled={downloadingId === inc.id}
+                      title="Download incident report PDF"
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: "#F8FAFC", color: "#374151", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      <FileText size={12} /> {downloadingId === inc.id ? "…" : "PDF"}
+                    </button>
                     {inc.status === "OPEN" && (
                       <button onClick={() => acknowledge.mutate(inc.id)} disabled={acknowledge.isPending}
                         style={{ padding: "7px 14px", background: "#FFFBEB", color: "#D97706", border: "1px solid #FDE68A", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>

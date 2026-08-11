@@ -9,11 +9,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.shared.TenantSequenceService;
 import za.co.handyflow.platform.supplychain.domain.enums.*;
 import za.co.handyflow.platform.supplychain.domain.model.*;
 import za.co.handyflow.platform.supplychain.domain.repository.*;
 import za.co.handyflow.platform.supplychain.dto.*;
-import za.co.handyflow.platform.projects.application.internal.SequenceService;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -39,7 +39,6 @@ public class ScmService {
     private final ScSupplierInvoiceAttachmentRepository attachmentRepo;
     private final ScPoLineRepository          poLineRepo;
     private final ScSupplierItemRepository    supplierItemRepo;
-    private final SequenceService             sequenceService;
     private final ScmNotificationService      notificationService;
     // NEW: backs generatePoPdf() below — same jdbc-based tenant-lookup
     // pattern already used in ScmNotificationService/SubscriptionController.
@@ -48,6 +47,8 @@ public class ScmService {
     // NEW: backs generateGrnPdf()/generateRemittanceAdvicePdf() below.
     private final ScGrnPdfGenerator           grnPdfGenerator;
     private final ScRemittanceAdvicePdfGenerator remittanceAdvicePdfGenerator;
+
+    private final TenantSequenceService       sequenceService;
 
     /** Tolerance for 3-way match: invoice may differ from PO by up to this fraction. */
     private static final BigDecimal MATCH_TOLERANCE = new BigDecimal("0.02"); // 2%
@@ -250,7 +251,7 @@ public class ScmService {
     /**
      * Creates a purchase order.
      *
-     * FIX C-1: PO number from SequenceService.next() — atomic PostgreSQL upsert.
+     * FIX C-1: PO number from TenantSequenceService.nextValue() — atomic PostgreSQL upsert.
      * FIX H-1: createdByName from TenantContext.getCurrentUserName() — not userId.toString().
      * FIX Guard: rejects orders against BLACKLISTED suppliers.
      *
@@ -270,8 +271,12 @@ public class ScmService {
                     HttpStatus.BAD_REQUEST, "SUPPLIER_NOT_ORDERABLE");
         }
 
-        // FIX C-1: atomic sequence — no race condition
-        int seq = sequenceService.next(tenantId.getValue(), "PO");
+        // FIX C-1: atomic sequence — no race condition.
+        // Delegates to shared.TenantSequenceService (see HandyFlow BOS
+        // Discovery doc, Section 27/28/29) rather than Projects' own
+        // SequenceService — avoids the supplychain -> projects boundary
+        // dependency entirely.
+        long seq = sequenceService.nextValue(tenantId, "PO");
         String orderNumber = "PO-" + String.format("%05d", seq);
 
         ScPurchaseOrder po = ScPurchaseOrder.create(tenantId.getValue(), orderNumber,
@@ -470,8 +475,9 @@ public class ScmService {
             throw new HandyFlowException("PO is not in a receivable state — current: " + po.getStatus(),
                     HttpStatus.BAD_REQUEST, "INVALID_STATE");
 
-        // FIX C-1: atomic sequence for GR number
-        int seq = sequenceService.next(tenantId.getValue(), "GR");
+        // FIX C-1: atomic sequence for GR number — see PO number generation
+        // above for why this goes through TenantSequenceService.
+        long seq = sequenceService.nextValue(tenantId, "GR");
         String receiptNumber = "GR-" + String.format("%05d", seq);
 
         ScGoodsReceipt gr = ScGoodsReceipt.create(tenantId.getValue(), receiptNumber, po.getId(),
@@ -578,15 +584,17 @@ public class ScmService {
     /**
      * Creates a supplier invoice and performs real 3-way matching.
      *
-     * FIX C-1: invoice number from SequenceService — atomic.
+     * FIX C-1: invoice number from TenantSequenceService — atomic.
      * FIX H-3: real 3-way match compares invoice amount to PO amount within tolerance.
      */
     @Transactional
     public ScSupplierInvoice createSupplierInvoice(TenantId tenantId, CreateSupplierInvoiceRequest req) {
         UUID tid = tenantId.getValue();
 
-        // FIX C-1: atomic sequence
-        int seq = sequenceService.next(tid, "SINV");
+        // FIX C-1: atomic sequence — via shared.TenantSequenceService, which
+        // takes the TenantId value object, not the raw UUID `tid` used
+        // elsewhere in this method for repository calls.
+        long seq = sequenceService.nextValue(tenantId, "SINV");
         String invoiceNumber = "SINV-" + String.format("%05d", seq);
 
         ScSupplierInvoice inv = ScSupplierInvoice.create(tid, invoiceNumber,

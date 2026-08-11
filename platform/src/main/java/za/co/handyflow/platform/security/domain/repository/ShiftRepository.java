@@ -138,4 +138,48 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
         ORDER BY s.startAt
         """)
     List<Shift> findByTenantInRange(TenantId tenantId, Instant from, Instant to);
+
+    // ── ADD THESE METHODS to the existing ShiftRepository interface ────────────
+// (Do not replace the file -- append inside the existing interface body.)
+//
+// These replace the old findScheduledStartingBefore/findActiveEndingBefore
+// call sites in NoShowAlertScheduler. The originals had no way to exclude
+// shifts already alerted on; these add the *_alert_sent_at IS NULL filter
+// so the scheduler only ever sees genuinely new breaches.
+
+    /** SCHEDULED shifts past the LATE grace threshold that haven't been LATE-alerted yet. */
+    @Query("""
+    SELECT s FROM Shift s
+    WHERE s.tenantId = :tenantId
+    AND s.status = 'SCHEDULED'
+    AND s.startAt < :lateThreshold
+    AND s.lateAlertSentAt IS NULL
+    AND s.deletedAt IS NULL
+    ORDER BY s.siteId, s.startAt
+    """)
+    List<Shift> findLateNotYetAlerted(TenantId tenantId, Instant lateThreshold);
+
+    /** SCHEDULED shifts past the NO_SHOW threshold that haven't been NO_SHOW-alerted yet. */
+    @Query("""
+    SELECT s FROM Shift s
+    WHERE s.tenantId = :tenantId
+    AND s.status = 'SCHEDULED'
+    AND s.startAt < :noShowThreshold
+    AND s.noShowAlertSentAt IS NULL
+    AND s.deletedAt IS NULL
+    ORDER BY s.siteId, s.startAt
+    """)
+    List<Shift> findNoShowNotYetAlerted(TenantId tenantId, Instant noShowThreshold);
+
+    /** ACTIVE shifts past their scheduled end + grace that haven't been OVERTIME-alerted yet. */
+    @Query("""
+    SELECT s FROM Shift s
+    WHERE s.tenantId = :tenantId
+    AND s.status = 'ACTIVE'
+    AND s.endAt < :overtimeThreshold
+    AND s.overtimeAlertSentAt IS NULL
+    AND s.deletedAt IS NULL
+    ORDER BY s.siteId, s.endAt
+    """)
+    List<Shift> findOvertimeNotYetAlerted(TenantId tenantId, Instant overtimeThreshold);
 }

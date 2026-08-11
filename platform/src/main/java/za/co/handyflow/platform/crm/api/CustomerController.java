@@ -268,4 +268,28 @@ public class CustomerController {
         var summary  = customer360Service.get360(tenantId, id);
         return ResponseEntity.ok(ApiResponse.success(summary));
     }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // LEAD PIPELINE STAGE
+    // ══════════════════════════════════════════════════════════════════════
+
+    /** FIX: "no lead/pipeline stage tracking" gap. */
+    @GetMapping("/{id}/stage")
+    @PreAuthorize("hasAuthority('CUSTOMER_READ')")
+    @Operation(summary = "Get a lead's current pipeline stage")
+    public ResponseEntity<ApiResponse<StageResponse>> getStage(@PathVariable UUID id) {
+        var tenantId = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(customerService.getStage(tenantId, id)));
+    }
+
+    @PatchMapping("/{id}/stage")
+    @PreAuthorize("hasAuthority('CUSTOMER_UPDATE')")
+    @Operation(summary = "Change a lead's pipeline stage — only valid for LEAD-type customers")
+    public ResponseEntity<ApiResponse<StageResponse>> changeStage(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateStageRequest request
+    ) {
+        var tenantId = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(customerService.changeStage(tenantId, id, request.stage())));
+    }
 }

@@ -181,6 +181,7 @@ public enum NotificationType {
     SHIFT_SWAP_APPROVED(INFO, Set.of(IN_APP, EMAIL)),
     WEBHOOK_SUBSCRIPTION_SUSPENDED(WARNING, Set.of(IN_APP, EMAIL)),
     PATROL_ROUND_MISSED(WARNING, Set.of(IN_APP, EMAIL)),
+    PRINCIPAL_VETTING_HIT(CRITICAL, Set.of(IN_APP, EMAIL)),
 
     // ── Supply Chain ─────────────────────────────────────────────────────────
     PO_APPROVED(INFO, Set.of(IN_APP, EMAIL)),

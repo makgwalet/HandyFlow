@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.hr.application.HrFacade;
 import za.co.handyflow.platform.recruiter.domain.model.*;
 import za.co.handyflow.platform.recruiter.domain.repository.*;
 import za.co.handyflow.platform.recruiter.dto.*;
@@ -50,7 +51,7 @@ public class RecruiterService {
     private final RecStageHistoryRepository historyRepo;
     private final EmailService              emailService;
     private final JdbcTemplate             jdbc;
-    private final HrService                hrService;
+    private final HrFacade hrFacade;
     private final NotificationService      notificationService;
     private final TenantAdminRecipients    tenantAdminRecipients;
     private final RecruiterPdfGenerator    recruiterPdfGenerator;
@@ -652,7 +653,7 @@ public class RecruiterService {
                 null, null,                                     // emergency contact — completed later in HR
                 "Converted from recruiter application " + applicationId
         );
-        EmployeeResponse created = hrService.createEmployee(tenantId, hrReq);
+        EmployeeResponse created = hrFacade.createEmployee(tenantId, hrReq);
         // UNVERIFIED: created.id() / created.employeeNumber() are inferred from
         // HrService.toEmployeeResponse()'s constructor call order
         // (new EmployeeResponse(e.getId(), e.getEmployeeNumber(), ...)), not

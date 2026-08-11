@@ -99,4 +99,56 @@ public class ShiftController {
         return ResponseEntity.ok(ApiResponse.success("Shift completed",
                 shiftService.completeShift(TenantContext.getTenantIdAsObject(), id)));
     }
+
+
+    // (Same USER_UPDATE gate as updateStatus()/deleteGuard() elsewhere -- these
+// are supervisor actions, not guard-facing.)
+
+    @PostMapping("/{id}/dismiss-no-show")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @Operation(
+            summary = "Dismiss a no-show/late alert for a shift",
+            description = "Record-keeping only -- does not change the shift's status. " +
+                    "Use when the absence is already being handled outside the system " +
+                    "(guard called in sick, replacement arranged manually).")
+    public ResponseEntity<ApiResponse<ShiftResponse>> dismissNoShow(
+            @PathVariable UUID id,
+            @Valid @RequestBody ShiftSupervisorActionRequest request) {
+        featureGuard.requireModule("security");
+        UUID supervisorId = TenantContext.getCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.success("No-show dismissed",
+                shiftService.dismissNoShow(TenantContext.getTenantIdAsObject(), id, supervisorId, request)));
+    }
+
+    @PostMapping("/{id}/close-overtime")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @Operation(
+            summary = "Force-close a shift running in unconfirmed overtime",
+            description = "Completes an ACTIVE shift without the guard clocking out. " +
+                    "Bypasses minimum checkpoint scan enforcement. Also force-closes " +
+                    "any open device session tied to this shift.")
+    public ResponseEntity<ApiResponse<ShiftResponse>> closeOvertime(
+            @PathVariable UUID id,
+            @Valid @RequestBody ShiftSupervisorActionRequest request) {
+        featureGuard.requireModule("security");
+        UUID supervisorId = TenantContext.getCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.success("Overtime shift closed",
+                shiftService.forceCloseOvertime(TenantContext.getTenantIdAsObject(), id, supervisorId, request)));
+    }
+
+    @PostMapping("/{id}/pull")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @Operation(
+            summary = "Pull a guard off site mid-shift",
+            description = "Supervisor-initiated interrupt of an ACTIVE shift -- client complaint, " +
+                    "guard unwell, redeployment, etc. Distinct from a normal end-of-shift " +
+                    "completion; a written reason is required and the action is fully audited.")
+    public ResponseEntity<ApiResponse<ShiftResponse>> pullFromSite(
+            @PathVariable UUID id,
+            @Valid @RequestBody ShiftSupervisorActionRequest request) {
+        featureGuard.requireModule("security");
+        UUID supervisorId = TenantContext.getCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.success("Guard pulled from site",
+                shiftService.pullFromSite(TenantContext.getTenantIdAsObject(), id, supervisorId, request)));
+    }
 }

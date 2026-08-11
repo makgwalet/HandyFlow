@@ -5,7 +5,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { MessageSquare, ChevronDown, ChevronUp, Plus, Trash2, AlertCircle, Phone, Mail, Users, MessageCircle, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
+import { MessageSquare, Plus, Trash2, AlertCircle, Phone, Mail, Users, MessageCircle, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
 import { apiClient } from '../../api/client'
 
 type CommType      = 'CALL' | 'EMAIL' | 'MEETING' | 'WHATSAPP' | 'SMS' | 'OTHER'
@@ -43,7 +43,6 @@ const nowForInput = () => {
 
 export function CommunicationPanel({ customerId }: { customerId: string }) {
   const qc = useQueryClient()
-  const [expanded, setExpanded] = useState(false)
   const [showAdd, setShowAdd]   = useState(false)
   const [type, setType]         = useState<CommType>('CALL')
   const [direction, setDirection] = useState<CommDirection>('OUTBOUND')
@@ -84,13 +83,10 @@ export function CommunicationPanel({ customerId }: { customerId: string }) {
 
   return (
     <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #F1F5F9' }}>
-      <button
-        onClick={() => setExpanded(e => !e)}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          width: '100%', background: 'none', border: 'none', cursor: 'pointer',
-          padding: 0, marginBottom: expanded ? 12 : 0,
-        }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 12,
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <MessageSquare size={13} color="#94A3B8" />
           <span style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -105,12 +101,10 @@ export function CommunicationPanel({ customerId }: { customerId: string }) {
             </span>
           )}
         </div>
-        {expanded ? <ChevronUp size={14} color="#94A3B8" /> : <ChevronDown size={14} color="#94A3B8" />}
-      </button>
+      </div>
 
-      {expanded && (
-        <div>
-          {isLoading && <p style={{ fontSize: 12, color: '#94A3B8', margin: 0 }}>Loading…</p>}
+      <div>
+        {isLoading && <p style={{ fontSize: 12, color: '#94A3B8', margin: 0 }}>Loading…</p>}
 
           {!isLoading && communications.length === 0 && !showAdd && (
             <p style={{ fontSize: 12, color: '#64748B', margin: '0 0 10px', lineHeight: 1.5 }}>
@@ -192,7 +186,6 @@ export function CommunicationPanel({ customerId }: { customerId: string }) {
             </div>
           )}
         </div>
-      )}
     </div>
   )
 }

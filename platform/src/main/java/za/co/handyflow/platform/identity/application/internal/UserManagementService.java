@@ -28,7 +28,12 @@ public class UserManagementService {
     private final PasswordEncoder          passwordEncoder;
     private final EmailService             emailService;
     private final JwtService               jwtService;
-    // NEW: backs user-count enforcement below.
+    /**
+     * Same accepted coupling as AuthService.subscriptionQueryFacade — see
+     * that field's Javadoc for the full explanation. Used here for
+     * getMaxUsers() during user invitation (seat-limit enforcement), which
+     * has the same "entitlement is part of auth" justification.
+     */
     private final za.co.handyflow.platform.billing.application.SubscriptionQueryFacade subscriptionQueryFacade;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 

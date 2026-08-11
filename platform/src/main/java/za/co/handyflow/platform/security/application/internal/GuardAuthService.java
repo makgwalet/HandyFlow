@@ -20,7 +20,6 @@ import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
@@ -30,26 +29,23 @@ import java.util.UUID;
 /**
  * GuardAuthService — handles guard authentication, enrollment, and token lifecycle.
  *
+ * CHANGE (V214): login() now resolves the guard via resolveGuardForLogin(),
+ * which accepts EITHER phone OR employeeCode as the identifier (previously
+ * phone was the only option). This is for the ~1000-guard-per-tenant case
+ * where most guards will never have a reliable registered phone number and
+ * need to log in with their tenant-issued employee code instead. See the
+ * V214 migration and GuardService.generateEmployeeCode() for why employee
+ * codes are globally unique (same "resolve identity before we know the
+ * tenant" requirement phone lookup already has).
+ *
  * Guard authentication is intentionally separate from the main user authentication
  * (email + password → tenant JWT) for three reasons:
  *
- * 1. Identity shape: guards identify by phone + PIN, not email + password.
- *    Mixing them into the same auth flow would require nullable email/password
- *    on User, or guards being User records — both are wrong architecturally.
- *
- * 2. Authority scope: guard JWTs contain only guard-level authorities
- *    (SECURITY_GUARD, SECURITY_SCAN) and are explicitly rejected by any
- *    endpoint that requires tenant-level authorities (USER_READ, etc.).
- *    This is enforced by the JWT claims: guard tokens carry `guardId` and
- *    `role: GUARD` rather than the `permissions` array that user JWTs carry.
- *
- * 3. Revocability: guard tokens are tracked in security_guard_tokens so
- *    supervisors can invalidate them immediately (stolen device, suspension).
- *    User tokens are not currently tracked (stateless JWTs) — adding tracking
- *    there is a separate concern.
+ * 1. Identity shape: guards identify by phone/employeeCode + PIN, not email + password.
+ * 2. Authority scope: guard JWTs contain only guard-level authorities.
+ * 3. Revocability: guard tokens are tracked in security_guard_tokens.
  *
  * Token lifetime: 13 hours (one 12-hour shift + 1 hour buffer for overlap).
- * In Phase 2 this becomes tied to the open device session duration.
  */
 @Slf4j
 @Service
@@ -68,30 +64,10 @@ public class GuardAuthService {
 
     // ── Guard Login ────────────────────────────────────────────────────────────
 
-    /**
-     * Authenticates a guard and issues a short-lived JWT.
-     *
-     * Flow:
-     *   1. Find guard by phone (across all tenants — phone is unique per person)
-     *   2. Check pin_hash is set (guard has been enrolled)
-     *   3. Check pin_locked_until (too many failures)
-     *   4. BCrypt verify PIN
-     *   5. Check guard status (only ACTIVE guards can log in)
-     *   6. Check pin_must_change (force PIN change before issuing session)
-     *   7. Issue JWT + persist token record
-     *
-     * WHY reject non-ACTIVE guards at login rather than just issuing a token?
-     * A SUSPENDED guard whose token was missed by the revoke-all job should not
-     * be able to refresh their session by logging in again.  The status check at
-     * login is the second line of defence after token revocation.
-     */
     @Transactional
     public GuardLoginResponse login(GuardLoginRequest req) {
-        // 1. Look up by phone
-        Guard guard = guardRepository.findActiveByPhone(req.phone())
-                .orElseThrow(() -> new HandyFlowException(
-                        "Invalid phone number or PIN",
-                        HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS"));
+        // 1. Look up by phone or employee code (V214)
+        Guard guard = resolveGuardForLogin(req);
 
         // 2. PIN enrolled?
         if (guard.getPinHash() == null) {
@@ -114,7 +90,7 @@ public class GuardAuthService {
             guardRepository.save(guard);
             String msg = locked
                     ? "Too many incorrect PINs. Account locked for " + LOCKOUT_MINUTES + " minutes."
-                    : "Invalid phone number or PIN";
+                    : invalidCredentialsMessage(req);
             throw new HandyFlowException(msg, HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS");
         }
 
@@ -128,9 +104,6 @@ public class GuardAuthService {
 
         // 6. PIN change required?
         if (guard.isPinMustChange()) {
-            // Issue a restricted 'must-change' token — the client app must redirect
-            // to the PIN change screen before any other guard action is allowed.
-            // The token carries mustChangePIN=true in its claims.
             guard.recordPinSuccess();
             guardRepository.save(guard);
             return buildLoginResponse(guard, req.deviceId(), true);
@@ -153,60 +126,63 @@ public class GuardAuthService {
         return buildLoginResponse(guard, req.deviceId(), false);
     }
 
+    /**
+     * Resolves the guard identity for login, trying phone first (backward
+     * compatible with every existing guard-app build) then falling back to
+     * employeeCode. Neither present is a 400, not a 401 -- that's a client
+     * bug (missing field), not a failed auth attempt.
+     */
+    private Guard resolveGuardForLogin(GuardLoginRequest req) {
+        if (req.phone() != null && !req.phone().isBlank()) {
+            return guardRepository.findActiveByPhone(req.phone())
+                    .orElseThrow(() -> new HandyFlowException(
+                            "Invalid phone number or PIN",
+                            HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS"));
+        }
+        if (req.employeeCode() != null && !req.employeeCode().isBlank()) {
+            return guardRepository.findActiveByEmployeeCode(req.employeeCode().trim().toUpperCase())
+                    .orElseThrow(() -> new HandyFlowException(
+                            "Invalid employee code or PIN",
+                            HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS"));
+        }
+        throw new HandyFlowException(
+                "Either phone or employeeCode is required to log in",
+                HttpStatus.BAD_REQUEST, "MISSING_IDENTIFIER");
+    }
+
+    private String invalidCredentialsMessage(GuardLoginRequest req) {
+        boolean usedCode = req.phone() == null || req.phone().isBlank();
+        return usedCode ? "Invalid employee code or PIN" : "Invalid phone number or PIN";
+    }
+
     // ── Guard Enrollment ───────────────────────────────────────────────────────
 
-    /**
-     * Enrolls a guard — sets their initial PIN (supervisor-set), stores the face
-     * embedding vector, and registers their device.
-     *
-     * WHY supervisor-initiated?
-     * A guard must never self-enroll.  The supervisor sets the PIN in person
-     * so that the first login is supervised — this prevents impersonation at
-     * enrollment time, which is the highest-risk moment in any auth lifecycle.
-     *
-     * Face embedding storage:
-     * The embedding is a float vector produced on-device by the Shield app.
-     * We store it as a Base64-encoded string here.  Phase 2 will add liveness
-     * verification logic; for now we just persist whatever the app sends.
-     * The raw capture images are NOT stored — only the mathematical embedding.
-     *
-     * Idempotent on re-enrollment:
-     * A supervisor can re-enroll a guard (new PIN + new face embedding) without
-     * deleting and recreating the guard record.  All previous tokens are revoked.
-     */
     @Transactional
     public GuardEnrollResponse enroll(UUID guardId, GuardEnrollRequest req,
                                       UUID supervisorId) {
         Guard guard = guardRepository.findByIdForAuth(guardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Guard", guardId.toString()));
 
-        // Set PIN (supervisor-supplied, already hashed by supervisor's client)
-        // WHY hash server-side? The supervisor's admin client sends the raw PIN
-        // (typed in on a trusted admin device), and we hash it here.  Never store plaintext.
         String pinHash = BCrypt.hashpw(req.pin(), BCrypt.gensalt(12));
 
         Instant pinExpiresAt = req.pinExpiryDays() != null
                 ? Instant.now().plus(req.pinExpiryDays(), ChronoUnit.DAYS)
-                : Instant.now().plus(90, ChronoUnit.DAYS);  // default 90-day policy
+                : Instant.now().plus(90, ChronoUnit.DAYS);
 
         guard.setPinHash(pinHash, pinExpiresAt);
 
-        // Store face embedding (Base64 encoded vector from Shield app)
         if (req.faceEmbeddingBase64() != null) {
             guard.setFaceEmbedding(req.faceEmbeddingBase64());
         }
 
-        // Register device
         if (req.deviceHardwareId() != null) {
             guard.setRegisteredDeviceId(req.deviceHardwareId());
         }
 
-        // pin_must_change = false on enrollment (supervisor set it in person)
         guard.clearPinMustChange();
 
         guardRepository.save(guard);
 
-        // Revoke any existing tokens (clean slate on re-enrollment)
         int revoked = tokenRepository.revokeAllForGuard(
                 guard.getId(), Instant.now(), "Re-enrollment by supervisor " + supervisorId);
 
@@ -222,10 +198,6 @@ public class GuardAuthService {
 
     // ── PIN Change (self-service, requires valid session) ─────────────────────
 
-    /**
-     * Called by a guard who knows their current PIN and wants to set a new one.
-     * Also called when pin_must_change = true (forced change after supervisor reset).
-     */
     @Transactional
     public void changePIN(UUID guardId, GuardChangePinRequest req) {
         Guard guard = guardRepository.findByIdForAuth(guardId)
@@ -236,7 +208,6 @@ public class GuardAuthService {
                     "Guard has not been enrolled", HttpStatus.BAD_REQUEST, "NOT_ENROLLED");
         }
 
-        // Verify current PIN
         if (!BCrypt.checkpw(req.currentPin(), guard.getPinHash())) {
             guard.recordPinFailure();
             guardRepository.save(guard);
@@ -244,7 +215,6 @@ public class GuardAuthService {
                     "Current PIN is incorrect", HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS");
         }
 
-        // PIN history check — prevent reuse of last 5 PINs
         if (guard.getPinHistory() != null) {
             String[] history = guard.getPinHistory().replaceAll("[\\[\\]\"]", "").split(",");
             for (String oldHash : history) {
@@ -256,7 +226,6 @@ public class GuardAuthService {
             }
         }
 
-        // Validate new PIN format (6 digits)
         if (!req.newPin().matches("\\d{6}")) {
             throw new HandyFlowException(
                     "PIN must be exactly 6 digits", HttpStatus.BAD_REQUEST, "INVALID_PIN_FORMAT");
@@ -271,7 +240,6 @@ public class GuardAuthService {
 
     // ── Token Revocation ───────────────────────────────────────────────────────
 
-    /** Revoke a specific token (logout). */
     @Transactional
     public void revokeToken(UUID jti) {
         tokenRepository.findById(jti).ifPresent(t -> {
@@ -280,7 +248,6 @@ public class GuardAuthService {
         });
     }
 
-    /** Revoke all tokens for a guard — called on suspension or device change. */
     @Transactional
     public int revokeAllTokens(UUID guardId, String reason) {
         int count = tokenRepository.revokeAllForGuard(guardId, Instant.now(), reason);
@@ -290,7 +257,6 @@ public class GuardAuthService {
 
     // ── Token Validation (for GuardJwtFilter) ─────────────────────────────────
 
-    /** Returns the active GuardToken for the given jti, or empty if revoked/expired. */
     @Transactional(readOnly = true)
     public java.util.Optional<GuardToken> validateToken(UUID jti) {
         return tokenRepository.findActive(jti);
@@ -300,27 +266,21 @@ public class GuardAuthService {
 
     private GuardLoginResponse buildLoginResponse(Guard guard, String deviceId,
                                                   boolean mustChangePIN) {
-        UUID    jti       = UUID.randomUUID();
         Instant expiresAt = Instant.now().plus(TOKEN_HOURS, ChronoUnit.HOURS);
 
-        // Persist token record (makes it revocable)
         GuardToken token = GuardToken.issue(
                 guard.getTenantId(), guard.getId(), deviceId, expiresAt);
-        // Override the auto-generated id with our jti so they match
-        // (GuardToken.id IS the jti — set via reflection-free workaround below)
         tokenRepository.save(token);
 
-        // Build JWT
         String jwt = Jwts.builder()
-                .setId(token.getId().toString())               // jti = token record id
-                .setSubject(guard.getId().toString())          // sub = guardId
+                .setId(token.getId().toString())
+                .setSubject(guard.getId().toString())
                 .claim("tenantId",    guard.getTenantId().getValue().toString())
                 .claim("role",        "GUARD")
                 .claim("firstName",   guard.getFirstName())
                 .claim("lastName",    guard.getLastName())
                 .claim("grade",       guard.getGrade())
                 .claim("mustChangePIN", mustChangePIN)
-                // Guard authorities — explicitly limited vs tenant user permissions
                 .claim("authorities", List.of("SECURITY_GUARD", "SECURITY_SCAN"))
                 .setIssuedAt(Date.from(Instant.now()))
                 .setExpiration(Date.from(expiresAt))

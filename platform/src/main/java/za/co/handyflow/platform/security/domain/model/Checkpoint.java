@@ -11,22 +11,18 @@ import java.util.UUID;
 /**
  * Checkpoint — a physical scan point within a Site.
  *
+ * CHANGE (V217): added qrSecret + regenerateQr(). Previously QR signing
+ * (CheckpointScanService.generateQrPayload/verifyQrHmac) used the parent
+ * Site's shared qrSecret -- meaning invalidating one compromised
+ * checkpoint's QR required rotating the secret for the ENTIRE site,
+ * forcing every other checkpoint to be reprinted too. Each checkpoint now
+ * has its own independent secret, same generation shape as
+ * Site.qrSecret, so regeneration only ever affects the one checkpoint.
+ *
  * Supports three verification methods:
  *   QR  — a unique UUID-based QR payload, printable and mountable on a wall.
  *   NFC — an NFC tag UID, typically a passive NTAG213/215 sticker.
  *   BLE — a Bluetooth Low Energy beacon identifier.
- *
- * WHY multiple methods per checkpoint?
- * Different site environments favour different hardware.  A server room with
- * no camera coverage and good phone signal uses QR.  A mine shaft with
- * interference uses NFC.  A large perimeter where guards walk past rather than
- * stop uses BLE (proximity detection without needing to physically tap).
- * A single checkpoint can have all three set — the scan service accepts
- * whichever the guard's device supports and routes accordingly.
- *
- * Only one of (qrCode, nfcTagUid, bleBeaconId) needs to be non-null for a
- * checkpoint to be scannable.  The current QR-only scanners in the field
- * continue working unchanged; NFC/BLE fields are additive.
  */
 @Entity
 @Table(name = "security_checkpoints")
@@ -52,25 +48,26 @@ public class Checkpoint {
     private String description;
 
     /**
-     * QR code payload — a UUID string, unique across the system.
-     * The guard app encodes this into a QR image; scanning returns this value.
+     * Legacy bare-UUID QR payload — matched directly (no signature) when a
+     * checkpoint hasn't been reprinted since V217. New prints always use the
+     * fully signed payload (see CheckpointScanService.generateQrPayload())
+     * regardless of whether the site currently enforces signature
+     * verification -- this column is purely a fallback for stickers that
+     * predate the signed-QR feature.
      */
     @Column(name = "qr_code", nullable = false, unique = true)
     private String qrCode;
 
     /**
-     * NFC tag UID — the hardware UID of the passive NFC sticker attached to
-     * this checkpoint.  Read by the NFC controller on the guard's phone.
-     * Null if NFC is not configured for this checkpoint.
+     * Per-checkpoint HMAC signing secret (V217). See class javadoc for why
+     * this replaced the old site-wide secret.
      */
+    @Column(name = "qr_secret", nullable = false, length = 64)
+    private String qrSecret;
+
     @Column(name = "nfc_tag_uid")
     private String nfcTagUid;
 
-    /**
-     * BLE beacon identifier — the UUID broadcast by the BLE beacon at this
-     * checkpoint.  The guard app detects this when within RSSI threshold.
-     * Null if BLE is not configured for this checkpoint.
-     */
     @Column(name = "ble_beacon_id")
     private String bleBeaconId;
 
@@ -96,12 +93,8 @@ public class Checkpoint {
         c.site        = site;
         c.name        = name.trim();
         c.description = description;
-        // WHY UUID as QR payload?
-        // - Globally unique: no two checkpoints share a code even across tenants.
-        // - Unguessable: a sequential ID could be incremented to probe other sites.
-        // - Contains no site/tenant info that could be reverse-engineered.
-        // Future: sign with site.qrSecret to add expiry and tamper-evidence (Phase 1).
         c.qrCode      = UUID.randomUUID().toString();
+        c.qrSecret    = UUID.randomUUID().toString().replace("-", "");
         c.sortOrder   = sortOrder;
         c.active      = true;
         c.createdAt   = Instant.now();
@@ -111,13 +104,23 @@ public class Checkpoint {
 
     // ── Domain methods ────────────────────────────────────────────────────────
 
-    /**
-     * Whether this checkpoint has at least one active scan method configured.
-     * Called by CheckpointScanService to give a useful error when a checkpoint
-     * exists in the DB but has no method set.
-     */
     public boolean hasScanMethod() {
         return qrCode != null || nfcTagUid != null || bleBeaconId != null;
+    }
+
+    /**
+     * Rotates both the legacy bare-UUID code and the signing secret in one
+     * action, so it correctly invalidates whichever physical sticker is
+     * currently mounted -- an old pre-V217 bare-UUID print, or a
+     * post-V217 signed print -- regardless of which one it happens to be.
+     * The checkpoint must be reprinted (GET .../qr-payload or the QR PDF
+     * endpoint) after calling this; scanning the old sticker will fail
+     * immediately once this is saved.
+     */
+    public void regenerateQr() {
+        this.qrCode    = UUID.randomUUID().toString();
+        this.qrSecret  = UUID.randomUUID().toString().replace("-", "");
+        this.updatedAt = Instant.now();
     }
 
     @PreUpdate

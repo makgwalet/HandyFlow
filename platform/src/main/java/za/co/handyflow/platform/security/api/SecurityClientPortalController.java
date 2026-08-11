@@ -4,11 +4,13 @@ package za.co.handyflow.platform.security.api;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.security.application.internal.ClientPortalService;
 import za.co.handyflow.platform.security.dto.ClientPortalResponse;
+import za.co.handyflow.platform.security.dto.SendPortalLinkRequest;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
@@ -16,23 +18,16 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * ClientPortalController — two groups of endpoints:
+ * ClientPortalController — two groups of endpoints, plus (CHANGE) a third:
  *
  * GROUP 1: Public (no auth) — /api/v1/portal/{token}
- *   The client accesses this URL directly from their browser.  The token IS the
- *   authentication.  This endpoint must be whitelisted in your SecurityConfig:
- *
- *     .requestMatchers("/api/v1/portal/**").permitAll()
- *
- *   WHY permitAll and not a custom token filter?
- *   The token is already cryptographically strong (UUID = 2^122 entropy).
- *   A custom Spring Security filter adds complexity with no security benefit
- *   at this scale.  The tenant can regenerate the token instantly if it's
- *   compromised.  If the tenant grows to where they need fine-grained portal
- *   access control (per-user, per-site), that's Phase 3 scope.
- *
- * GROUP 2: Authenticated (tenant only) — /api/v1/security/sites/{id}/portal
- *   Generates and disables portal tokens.  Requires USER_UPDATE authority.
+ * GROUP 2: Authenticated (tenant only) — /api/v1/security/sites/{id}/portal/*
+ *   Generates and disables portal tokens. Requires USER_UPDATE authority.
+ * GROUP 3 (NEW): POST /api/v1/security/sites/{id}/portal/send -- emails the
+ *   existing portal link to an arbitrary recipient (audit gap: "how do we
+ *   send it to the client?"). Sits here, next to generate/disable, rather
+ *   than on SiteController, since that's where the rest of the portal
+ *   lifecycle already lives.
  */
 @RestController
 @RequiredArgsConstructor
@@ -79,5 +74,29 @@ public class SecurityClientPortalController {
     public ResponseEntity<ApiResponse<Void>> disablePortal(@PathVariable UUID id) {
         portalService.disablePortal(id, TenantContext.getTenantIdAsObject());
         return ResponseEntity.ok(ApiResponse.success("Portal disabled", null));
+    }
+
+    // ── Send portal link (new) ──────────────────────────────────────────────────
+
+    @PostMapping("/api/v1/security/sites/{id}/portal/send")
+    @Operation(
+            summary = "Email the client portal link to a recipient",
+            description = """
+            Sends the site's existing portal link by email — requires the
+            portal to already be enabled (POST .../portal/generate first;
+            this endpoint does not implicitly create one). recipientEmail is
+            supplied per-send, not stored on the site (Site has no
+            contactEmail field). This endpoint only sends the portal link
+            itself; it does not attach a monthly report or invoice (those
+            live in the Reporting/Invoicing modules respectively) -- pairing
+            "send portal link" with "email this report" is a natural
+            follow-up once someone owns that cross-module flow.
+            """)
+    public ResponseEntity<ApiResponse<Void>> sendPortalLink(
+            @PathVariable UUID id,
+            @Valid @RequestBody SendPortalLinkRequest req) {
+        portalService.sendPortalLink(
+                id, TenantContext.getTenantIdAsObject(), req.recipientEmail(), req.customMessage());
+        return ResponseEntity.ok(ApiResponse.success("Portal link sent", null));
     }
 }

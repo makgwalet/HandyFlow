@@ -1,4 +1,4 @@
-package za.co.handyflow.platform.shared;
+package za.co.handyflow.platform.config;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -19,10 +19,22 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import za.co.handyflow.platform.admin.api.AdminJwtFilter;
+import za.co.handyflow.platform.security.infrastructure.ApiKeyAuthFilter;
 import za.co.handyflow.platform.security.infrastructure.GuardJwtFilter;
+import za.co.handyflow.platform.shared.JwtAuthFilter;
+import za.co.handyflow.platform.shared.PortalJwtFilter;
 
 import java.util.List;
 
+/**
+ * SecurityConfig — CHANGE: registered ApiKeyAuthFilter, closing the "API
+ * keys exist in the DB but won't authenticate anything" gap flagged in
+ * PublicApiController's own deployment note. No new permitAll() entry —
+ * see ApiKeyAuthFilter's class javadoc for why a valid API key doesn't
+ * need one (it's a real credential, authenticated by the filter itself,
+ * same posture as GuardJwtFilter for /api/v1/guard/**). Everything else
+ * below is unchanged from the original.
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity  // WHY? Enables @PreAuthorize on controller methods
@@ -35,6 +47,9 @@ public class SecurityConfig {
     // NEW: closes the "client portal" gap. No import needed —
     // PortalJwtFilter lives in this same shared package.
     private final PortalJwtFilter portalJwtFilter;
+    // NEW: closes the "API keys exist in the DB but won't authenticate"
+    // gap flagged in PublicApiController's own deployment note.
+    private final ApiKeyAuthFilter apiKeyAuthFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -95,6 +110,14 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 // NEW: closes the "client portal" gap.
                 .addFilterBefore(portalJwtFilter, UsernamePasswordAuthenticationFilter.class)
+                // NEW: closes the "API key auth filter not yet wired" gap.
+                // Dispatches on the "Authorization: ApiKey ..." header
+                // scheme (see ApiKeyAuthFilter.shouldNotFilter()), so
+                // registration order relative to the other filters here
+                // doesn't matter -- each one only acts on requests it
+                // actually recognizes, everything else passes through as
+                // a no-op.
+                .addFilterBefore(apiKeyAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 

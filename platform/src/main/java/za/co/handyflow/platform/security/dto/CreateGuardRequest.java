@@ -1,23 +1,27 @@
+// security/dto/CreateGuardRequest.java
 package za.co.handyflow.platform.security.dto;
 
-import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDate;
 
 /**
- * CreateGuardRequest — also used for updateGuard (reuse pattern consistent with Bookings).
+ * CreateGuardRequest — CHANGE: added emergencyContactName/emergencyContactPhone.
  *
- * Added psiraExpiryDate so the compliance tracking added in V102 can actually
- * be populated.  Without this field, the column exists but can never be set
- * through the API — the psiraExpiryDate compliance badge in GuardsTab would
- * never show a real date.
+ * NOTE: I do not have this file's previously-existing content -- reconstructed
+ * from GuardService's usage (req.firstName(), req.lastName(), req.psiraNumber(),
+ * req.idNumber(), req.phone(), req.grade(), req.notes(), req.psiraExpiryDate()).
+ * The two new fields are appended at the end. Diff against your actual file
+ * before applying -- same caveat as every other reconstructed DTO this
+ * session (PrincipalResponse, GuardResponse, SiteResponse, etc).
  */
 public record CreateGuardRequest(
-        @NotBlank String firstName,
-        @NotBlank String lastName,
-        String     psiraNumber,
-        String     idNumber,
-        String     phone,
-        String     grade,
-        String     notes,
-        LocalDate  psiraExpiryDate
+        String    firstName,
+        String    lastName,
+        String    psiraNumber,
+        String    idNumber,
+        String    phone,
+        String    grade,
+        String    notes,
+        LocalDate psiraExpiryDate,
+        String    emergencyContactName,
+        String    emergencyContactPhone
 ) {}

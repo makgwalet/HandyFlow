@@ -6,6 +6,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,9 +25,20 @@ import java.util.UUID;
 /**
  * CameraController — CCTV camera registry and motion event webhook.
  *
+ * CHANGE: added GET / (tenant-wide paginated list). Closes the audit gap:
+ * "CctvTab.tsx calls GET /cameras/site/all?size=100, falling back to
+ * GET /cameras?size=100 — but CameraController only exposes /{id} and
+ * /site/{siteId}, no tenant-wide list. Same failure mode: the CCTV registry
+ * tab likely can't populate its list at all today." The tab's existing
+ * fallback already targets this exact second URL, so no frontend change is
+ * needed — this endpoint just needed to exist. (The first URL it tries,
+ * /cameras/site/all, will still 404/error since "all" isn't a valid site
+ * UUID -- that's fine, the tab's .catch() already routes past it to the
+ * URL this change fixes.)
+ *
  * Two access patterns:
  *
- * 1. Registry management (USER_UPDATE) — register/update/decommission
+ * 1. Registry management (USER_UPDATE) — list/register/update/decommission
  *    cameras, generate webhook secrets. Tenant-scoped via the standard JWT.
  *
  * 2. Motion webhook (PUBLIC, no auth) — POST /cameras/motion-webhook is
@@ -34,11 +48,9 @@ import java.util.UUID;
  *    this endpoint must be added to SecurityConfig's permitAll() list,
  *    same as /api/v1/auth/guard/** was for guard login.
  *
- * IMPORTANT — deployment note: add this line to SecurityConfig's permitAll():
+ * IMPORTANT — deployment note (unchanged): add this line to SecurityConfig's
+ * permitAll():
  *   "/api/v1/security/cameras/motion-webhook"
- * Without it, the webhook will 401 before even reaching the secret check,
- * since the standard JwtAuthFilter runs first and rejects unauthenticated
- * requests to any non-permitAll path.
  */
 @Tag(name = "Security - CCTV")
 @RestController
@@ -49,6 +61,15 @@ public class CameraController {
     private final CameraService cameraService;
 
     // ── Registry CRUD ──────────────────────────────────────────────────────────
+
+    @GetMapping
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @Operation(summary = "List all active (non-decommissioned) cameras for this tenant, paginated")
+    public ResponseEntity<ApiResponse<Page<CameraResponse>>> getAll(
+            @PageableDefault(size = 100) Pageable pageable) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(cameraService.getAllForTenant(tenantId, pageable)));
+    }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('USER_UPDATE')")

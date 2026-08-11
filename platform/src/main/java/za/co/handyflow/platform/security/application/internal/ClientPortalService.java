@@ -4,6 +4,7 @@ package za.co.handyflow.platform.security.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -11,33 +12,46 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.security.domain.model.Site;
 import za.co.handyflow.platform.security.domain.repository.SiteRepository;
 import za.co.handyflow.platform.security.dto.ClientPortalResponse;
+import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.HandyFlowException;
 
-import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * ClientPortalService — serves the read-only client portal view.
+ * ClientPortalService — serves the read-only client portal view, plus
+ * (CHANGE) an on-demand "send the portal link" action.
  *
- * The portal gives the client a real-time view of their site's security
- * operations without requiring a HandyFlow account:
- *   - Site details and contract status
- *   - Shifts for the past 7 days and next 7 days
- *   - Open incidents (OPEN and ACKNOWLEDGED only — resolved are hidden for brevity)
- *   - Checkpoint scan count for the current week (proof-of-patrol metric)
+ * WHY recipientEmail supplied at send time, not stored on Site?
+ * Site has no contactEmail field (confirmed against the actual entity --
+ * only contactName/contactPhone exist). Rather than add one speculatively,
+ * this keeps the schema unchanged and takes the recipient as part of the
+ * send request -- matches "a trigger to send when requested" more directly
+ * than assuming a stored default recipient is what's wanted. A contactEmail
+ * field + "send to default contact" convenience is a natural follow-up if
+ * repeatedly retyping the same address becomes annoying in practice.
  *
- * WHY JDBC for this service?
- * The portal aggregates data across three tables (shifts, incidents, checkpoint_logs)
- * for one site.  Using JPA would require three separate query calls; JDBC lets us
- * build exactly the three queries we need with precise column selection.
+ * WHY EmailService.send() directly, not NotificationService?
+ * NotificationService/TenantAdminRecipients resolve INTERNAL tenant admins
+ * as recipients -- there's no path from that pipeline to an arbitrary
+ * external client email address. EmailService.send(to, subject, html) is
+ * the lower-level primitive documented elsewhere in this codebase as the
+ * established workaround for exactly this case (external recipient, no
+ * NotificationType needed).
  *
- * WHY show resolved incidents? We don't — only OPEN and ACKNOWLEDGED are shown.
- * The client seeing every resolved incident might cause alarm out of context.
- * The intent is operational transparency ("guards are on-site, no open issues")
- * not a full audit log.  Full history is available to the tenant in the main app.
+ * NOTE: I have not seen EmailService's actual interface/package directly --
+ * za.co.handyflow.platform.notifications.application.internal.EmailService
+ * is inferred by co-location with NotificationService, which lives in the
+ * same package. Verify the import path compiles; if EmailService lives
+ * elsewhere, that's a one-line fix.
+ *
+ * NOTE: portalBaseUrl is read from a new config property
+ * (app.frontend.base-url) that may not exist in your application.yml yet --
+ * without it, the emailed link falls back to a relative path, which won't
+ * work outside the app itself. Add the property (e.g.
+ * https://app.handyflow.co.za) before relying on this in production.
  */
 @Slf4j
 @Service
@@ -46,6 +60,10 @@ public class ClientPortalService {
 
     private final SiteRepository siteRepository;
     private final JdbcTemplate   jdbc;
+    private final EmailService emailService;
+
+    @Value("${app.frontend.base-url:}")
+    private String frontendBaseUrl;
 
     @Transactional(readOnly = true)
     public ClientPortalResponse getPortalData(String token) {
@@ -57,7 +75,6 @@ public class ClientPortalService {
         UUID siteId = site.getId();
         LocalDate today = LocalDate.now();
 
-        // ── Shifts: past 7 days + next 7 days ─────────────────────────────────
         List<Map<String, Object>> shifts = jdbc.queryForList("""
                 SELECT
                     s.id, s.status, s.start_at, s.end_at,
@@ -74,7 +91,6 @@ public class ClientPortalService {
                 LIMIT 50
                 """, siteId);
 
-        // ── Open incidents ─────────────────────────────────────────────────────
         List<Map<String, Object>> incidents = jdbc.queryForList("""
                 SELECT
                     i.id, i.title, i.severity, i.status, i.type,
@@ -86,7 +102,6 @@ public class ClientPortalService {
                 LIMIT 20
                 """, siteId);
 
-        // ── Proof-of-patrol: checkpoint scan count this week ──────────────────
         Integer weeklyScans = jdbc.queryForObject("""
                 SELECT COUNT(*)
                 FROM security_checkpoint_logs l
@@ -95,7 +110,6 @@ public class ClientPortalService {
                   AND l.scanned_at >= date_trunc('week', NOW())
                 """, Integer.class, siteId);
 
-        // ── Active guards right now ────────────────────────────────────────────
         Integer activeGuardsNow = jdbc.queryForObject("""
                 SELECT COUNT(*)
                 FROM security_shifts s
@@ -120,15 +134,6 @@ public class ClientPortalService {
         );
     }
 
-    /**
-     * Generates (or regenerates) a portal token for a site.
-     * Called by SiteController POST /sites/{id}/portal/generate
-     *
-     * WHY allow regeneration?
-     * If the client shares the URL or it's compromised, the tenant needs a way
-     * to invalidate the old token.  Regenerating creates a new UUID and the old
-     * URL immediately stops working.
-     */
     @Transactional
     public String generatePortalToken(UUID siteId, String label,
                                       za.co.handyflow.platform.shared.TenantId tenantId) {
@@ -141,7 +146,6 @@ public class ClientPortalService {
         return token;
     }
 
-    /** Disables the portal for a site by clearing the token. */
     @Transactional
     public void disablePortal(UUID siteId, za.co.handyflow.platform.shared.TenantId tenantId) {
         Site site = siteRepository.findActiveById(tenantId, siteId)
@@ -150,5 +154,66 @@ public class ClientPortalService {
         site.disablePortal();
         siteRepository.save(site);
         log.info("[Portal] Portal disabled site={} tenant={}", siteId, tenantId);
+    }
+
+    // ── Send portal link (new) ──────────────────────────────────────────────────
+
+    /**
+     * Emails the client portal link to an arbitrary recipient. Requires the
+     * portal to already be enabled (generate it first via
+     * POST /sites/{id}/portal/generate) -- this method does not implicitly
+     * generate one, since silently creating a new token as a side effect of
+     * "send" would be surprising if the caller expected to resend an
+     * existing, already-shared link.
+     */
+    @Transactional(readOnly = true)
+    public void sendPortalLink(UUID siteId, za.co.handyflow.platform.shared.TenantId tenantId,
+                               String recipientEmail, String customMessage) {
+        Site site = siteRepository.findActiveById(tenantId, siteId)
+                .orElseThrow(() -> new HandyFlowException(
+                        "Site not found", HttpStatus.NOT_FOUND, "SITE_NOT_FOUND"));
+
+        if (!site.isPortalEnabled() || site.getPortalToken() == null) {
+            throw new HandyFlowException(
+                    "This site has no active portal link yet — generate one first",
+                    HttpStatus.CONFLICT, "PORTAL_NOT_ENABLED");
+        }
+
+        String portalPath = "/portal/" + site.getPortalToken();
+        String portalUrl  = (frontendBaseUrl != null && !frontendBaseUrl.isBlank())
+                ? frontendBaseUrl.replaceAll("/$", "") + portalPath
+                : portalPath;
+
+        if (frontendBaseUrl == null || frontendBaseUrl.isBlank()) {
+            log.warn("[Portal] app.frontend.base-url is not configured — emailed link will be a "
+                    + "relative path ({}), which will not work outside the app. Set the property "
+                    + "before relying on this in production.", portalPath);
+        }
+
+        String subject = "Your security portal link — " + site.getName();
+        String html = buildEmailHtml(site, portalUrl, customMessage);
+
+        emailService.send(recipientEmail, subject, html);
+
+        log.info("[Portal] Link sent site={} tenant={} to={}",
+                siteId, tenantId.getValue(), recipientEmail);
+    }
+
+    private String buildEmailHtml(Site site, String portalUrl, String customMessage) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<p>Hello,</p>");
+        if (customMessage != null && !customMessage.isBlank()) {
+            sb.append("<p>").append(escapeHtml(customMessage)).append("</p>");
+        }
+        sb.append("<p>Here is your live security portal link for <strong>")
+                .append(escapeHtml(site.getName())).append("</strong>:</p>")
+                .append("<p><a href=\"").append(portalUrl).append("\">").append(portalUrl).append("</a></p>")
+                .append("<p>This link shows current guards on duty, recent shifts, open incidents, "
+                        + "and checkpoint scan activity for your site in real time.</p>");
+        return sb.toString();
+    }
+
+    private String escapeHtml(String s) {
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 }

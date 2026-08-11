@@ -32,22 +32,16 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * IncidentService — rewritten to fix bugs #2, #8, #12, #14, #16, #20.
+ * IncidentService — see original class javadoc for the bug-fix history
+ * (#2, #8, #12, #14, #16, #20).
  *
- * The original implementation loaded ALL incidents for the tenant into memory,
- * filtered in Java, then ran two extra SQL queries per incident to resolve
- * site name and guard name (N+1).  At even modest volumes (a few thousand
- * incidents per tenant after a year of operation) this was a guaranteed
- * full-table scan + heap explosion.
- *
- * Fix strategy (same as BookingsService.getBookings):
- * - Single JDBC query with LEFT JOIN to resolve site_name and guard full name.
- * - WHERE clause built dynamically for status/severity filters.
- * - COUNT query for pagination total (only runs once, not per row).
- * - ORDER BY in SQL (fixes bug #12 — sort was silently ignored before).
- * - Tenant validation of guardId/siteId on createIncident (fixes bug #14).
- * - incident.type now set from CreateIncidentRequest (fixes bug #16).
- * - acknowledgedBy/resolvedBy captured from the caller (fixes bug #20).
+ * CHANGE: added getIncidentDetail() (public) -- backs the new incident PDF
+ * endpoint (IncidentController.getIncidentPdf() -> IncidentPdfService).
+ * Delegates straight to the existing private getIncidentById() JDBC fetch,
+ * which already scopes by tenantId -- no new query needed, just a public
+ * entry point that previously didn't exist (this service only ever returned
+ * a single incident as a side effect of createIncident/acknowledge/resolve,
+ * never as a direct "fetch by id" read).
  */
 @Slf4j
 @Service
@@ -61,16 +55,6 @@ public class IncidentService {
 
     // ── Queries ───────────────────────────────────────────────────────────────
 
-    /**
-     * Returns a paginated, sorted list of incidents with site and guard names
-     * resolved in a single SQL query.
-     *
-     * WHY JdbcTemplate instead of a JPA @Query?
-     * Dynamic WHERE clauses (optional status, optional severity, pagination,
-     * sorting) are verbose and fragile with JPA.  JDBC gives us full SQL
-     * control, eliminates the ORM overhead on a list-only query, and avoids
-     * the N+1 pattern from the original fetchSiteName/fetchGuardName calls.
-     */
     @Transactional(readOnly = true)
     public Page<IncidentResponse> getIncidents(TenantId tenantId,
                                                String status,
@@ -81,7 +65,7 @@ public class IncidentService {
                     i.id, i.site_id, ss.name AS site_name,
                     i.shift_id, i.guard_id,
                     (g.first_name || ' ' || g.last_name) AS guard_name,
-                    i.title, i.description, i.severity, i.status,
+                    i.title, i.description, i.severity, i.status, i.type,
                     i.latitude, i.longitude,
                     i.acknowledged_at, i.resolved_at,
                     i.created_at, i.updated_at
@@ -104,9 +88,6 @@ public class IncidentService {
             params.add(severity.toUpperCase());
         }
 
-        // Sorting — respect pageable.getSort(); fall back to newest-first.
-        // WHY support sort here? Bug #12: the original in-memory impl silently
-        // ignored ?sort= params from the frontend/API consumers.
         String orderBy = " ORDER BY i.created_at DESC";
         if (pageable.getSort().isSorted()) {
             var order = pageable.getSort().iterator().next();
@@ -133,13 +114,21 @@ public class IncidentService {
         return new PageImpl<>(rows, pageable, total != null ? total : 0L);
     }
 
+    /**
+     * Single-incident fetch — added to back the incident PDF endpoint.
+     * Throws ResourceNotFoundException (via the underlying queryForObject's
+     * EmptyResultDataAccessException translation) if no matching incident
+     * exists for this tenant, same as every other findXxx in this codebase.
+     */
+    @Transactional(readOnly = true)
+    public IncidentResponse getIncidentDetail(TenantId tenantId, UUID id) {
+        return getIncidentById(tenantId, id);
+    }
+
     // ── Commands ──────────────────────────────────────────────────────────────
 
     @Transactional
     public IncidentResponse createIncident(TenantId tenantId, CreateIncidentRequest req) {
-        // Fix bug #14: validate that siteId and guardId belong to this tenant.
-        // Without this, a crafted request could link a site/guard from another
-        // tenant, corrupting cross-tenant reporting.
         siteRepo.findActiveById(tenantId, req.siteId())
                 .orElseThrow(() -> new ResourceNotFoundException("Site", req.siteId().toString()));
 
@@ -160,8 +149,6 @@ public class IncidentService {
                 req.longitude()
         );
 
-        // Fix bug #21: cross-check incident GPS against site location.
-        // Warn (don't reject) — mobile GPS can be inaccurate in buildings.
         if (req.latitude() != null && req.longitude() != null) {
             siteRepo.findActiveById(tenantId, req.siteId()).ifPresent(site -> {
                 if (site.getLatitude() != null && site.getLongitude() != null) {
@@ -176,12 +163,6 @@ public class IncidentService {
             });
         }
 
-        // Fix bug #16: type column was never set.
-        // CreateIncidentRequest now includes an optional type; default to GENERAL.
-        // We use JDBC directly to set the type column because Incident.java
-        // doesn't have a type field (it was designed after V12 introduced the column).
-        // A cleaner fix would add type to the Incident entity — do that in Phase 1
-        // when we refactor the entity model.  For Phase 0 we set it via JDBC after save.
         incidentRepo.save(incident);
 
         String incidentType = (req.type() != null && !req.type().isBlank())
@@ -205,9 +186,6 @@ public class IncidentService {
         incident.acknowledge();
         incidentRepo.save(incident);
 
-        // Fix bug #20: record WHO acknowledged, not just when.
-        // Done via JDBC because the Incident entity doesn't yet have acknowledgedBy field.
-        // Add it to Incident.java in Phase 1 alongside a proper audit event table.
         if (acknowledgedBy != null) {
             jdbc.update("UPDATE security_incidents SET acknowledged_by = ? WHERE id = ?",
                     acknowledgedBy, incidentId);
@@ -228,7 +206,6 @@ public class IncidentService {
         incident.resolve();
         incidentRepo.save(incident);
 
-        // Fix bug #20: record WHO resolved.
         if (resolvedBy != null) {
             jdbc.update("UPDATE security_incidents SET resolved_by = ? WHERE id = ?",
                     resolvedBy, incidentId);
@@ -251,7 +228,7 @@ public class IncidentService {
                     i.id, i.site_id, ss.name AS site_name,
                     i.shift_id, i.guard_id,
                     (g.first_name || ' ' || g.last_name) AS guard_name,
-                    i.title, i.description, i.severity, i.status,
+                    i.title, i.description, i.severity, i.status, i.type,
                     i.latitude, i.longitude,
                     i.acknowledged_at, i.resolved_at,
                     i.created_at, i.updated_at
@@ -275,14 +252,15 @@ public class IncidentService {
         return new IncidentResponse(
                 UUID.fromString(rs.getString("id")),
                 UUID.fromString(rs.getString("site_id")),
-                rs.getString("site_name"),           // from LEFT JOIN — no extra query
+                rs.getString("site_name"),
                 shiftIdStr != null ? UUID.fromString(shiftIdStr) : null,
                 guardIdStr != null ? UUID.fromString(guardIdStr) : null,
-                rs.getString("guard_name"),          // from LEFT JOIN — no extra query
+                rs.getString("guard_name"),
                 rs.getString("title"),
                 rs.getString("description"),
                 rs.getString("severity"),
                 rs.getString("status"),
+                rs.getString("type"),
                 rs.getBigDecimal("latitude"),
                 rs.getBigDecimal("longitude"),
                 ackedTs    != null ? ackedTs.toInstant()    : null,

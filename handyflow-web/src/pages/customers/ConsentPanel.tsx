@@ -5,7 +5,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Shield, ShieldOff, ShieldCheck, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
+import { Shield, ShieldOff, ShieldCheck, AlertCircle } from 'lucide-react'
 import { apiClient } from '../../api/client'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -52,7 +52,6 @@ const SOURCE_LABELS: Record<ConsentSource, string> = {
 
 export function ConsentPanel({ customerId }: { customerId: string }) {
   const qc                          = useQueryClient()
-  const [expanded, setExpanded]     = useState(false)
   const [showRecord, setShowRecord] = useState(false)
   const [showWithdraw, setShowWithdraw] = useState(false)
   const [withdrawReason, setWithdrawReason] = useState('')
@@ -130,14 +129,11 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
       marginTop: 16, paddingTop: 16,
       borderTop: '1px solid #F1F5F9',
     }}>
-      {/* Section header — always visible */}
-      <button
-        onClick={() => setExpanded(e => !e)}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          width: '100%', background: 'none', border: 'none', cursor: 'pointer',
-          padding: 0, marginBottom: expanded ? 12 : 0,
-        }}>
+      {/* Section header — no longer a toggle; this panel lives in its own tab now */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 12,
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {hasConsent
             ? <ShieldCheck size={13} color="#16A34A" />
@@ -171,15 +167,10 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
             </span>
           )}
         </div>
-        {expanded
-          ? <ChevronUp size={14} color="#94A3B8" />
-          : <ChevronDown size={14} color="#94A3B8" />
-        }
-      </button>
+      </div>
 
-      {/* Expanded content */}
-      {expanded && (
-        <div>
+      {/* Content — always rendered now (was behind {expanded && ...}) */}
+      <div>
           {isLoading && (
             <p style={{ fontSize: 12, color: '#94A3B8', margin: 0 }}>Loading…</p>
           )}
@@ -371,7 +362,6 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
             </div>
           )}
         </div>
-      )}
     </div>
   )
 }

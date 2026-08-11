@@ -10,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.crm.application.internal.CustomerFollowUpService;
+import za.co.handyflow.platform.crm.dto.CompleteFollowUpRequest;
 import za.co.handyflow.platform.crm.dto.CreateFollowUpRequest;
 import za.co.handyflow.platform.crm.dto.FollowUpResponse;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -48,12 +49,13 @@ public class CustomerFollowUpController {
 
     @PostMapping("/{id}/complete")
     @PreAuthorize("hasAuthority('CUSTOMER_UPDATE')")
-    @Operation(summary = "Mark a follow-up as done")
+    @Operation(summary = "Mark a follow-up done, recording its outcome — reschedules create a linked new follow-up")
     public ResponseEntity<ApiResponse<FollowUpResponse>> complete(
             @PathVariable UUID customerId,
-            @PathVariable UUID id) {
+            @PathVariable UUID id,
+            @Valid @RequestBody CompleteFollowUpRequest request) {
         var tenantId = TenantContext.getTenantIdAsObject();
-        return ResponseEntity.ok(ApiResponse.success(followUpService.complete(tenantId, id, currentUserId())));
+        return ResponseEntity.ok(ApiResponse.success(followUpService.complete(tenantId, id, request, currentUserId())));
     }
 
     @PostMapping("/{id}/reopen")

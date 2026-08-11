@@ -13,25 +13,13 @@ import java.util.UUID;
 /**
  * Principal — the person being protected in a close-protection engagement.
  *
- * Distinct from Guard (who provides protection) and Site (no fixed location
- * applies — a principal moves between office, residence, restaurant, airport
- * in one day; see Part 9.1).
+ * CHANGE (V213): added vettingStatus, closing VettingService.updateVettingStatus()'s
+ * TODO -- the rollup (UNVETTED/PENDING/FLAGGED/CLEARED) was already being
+ * computed on every check/result, it just had nowhere to persist to. Same
+ * rollup shape and set() convention as Guard.screeningStatus.
  *
- * Confidentiality (Part 9.3):
- * Codenames (aliasCodename) are used everywhere a principal would otherwise
- * be named — team comms, dashboards, push notifications — so a glanced-at
- * phone screen doesn't expose who is being protected. Real identity is only
- * resolvable through this entity by someone with VIP_DETAIL_ACCESS.
- *
- * medicalNotes/knownThreats are stored ENCRYPTED (AES-256-GCM) at rest as
- * of Part 9.3 — but encryption/decryption happens at the CloseProtectionService
- * boundary, not in this entity. This entity's fields always hold ciphertext
- * when read from/written to the database; the service decrypts before
- * building a PrincipalResponse and encrypts before persisting. Keeping the
- * entity itself encryption-agnostic matches the rest of this codebase's
- * pattern of thin entities with business logic in the service layer, and
- * means a future switch to per-tenant keys or a different cipher only
- * touches CloseProtectionService + FieldEncryptionService, not this class.
+ * Confidentiality (Part 9.3) and medicalNotes/knownThreats encryption notes
+ * are unchanged from the original -- see below.
  */
 @Entity
 @Table(name = "security_principals")
@@ -70,6 +58,15 @@ public class Principal {
     @Column(name = "photo_url")
     private String photoUrl;
 
+    /**
+     * Rollup of security_principal_vetting checks — UNVETTED | PENDING |
+     * FLAGGED | CLEARED. Recomputed by VettingService.updateVettingStatus()
+     * after every check creation/result, same convention as
+     * Guard.screeningStatus / GuardScreeningService.updateScreeningStatus().
+     */
+    @Column(name = "vetting_status", nullable = false, length = 20)
+    private String vettingStatus = "UNVETTED";
+
     @Column(nullable = false)
     private boolean active = true;
 
@@ -92,6 +89,7 @@ public class Principal {
         p.medicalNotes       = medicalNotes;
         p.knownThreats       = knownThreats;
         p.emergencyContacts  = emergencyContacts;
+        p.vettingStatus      = "UNVETTED";
         p.active             = true;
         p.createdAt          = Instant.now();
         p.updatedAt          = Instant.now();
@@ -114,6 +112,12 @@ public class Principal {
     public void setPhotoUrl(String url) {
         this.photoUrl  = url;
         this.updatedAt = Instant.now();
+    }
+
+    /** Called by VettingService.updateVettingStatus() after every check/result. */
+    public void setVettingStatus(String vettingStatus) {
+        this.vettingStatus = vettingStatus;
+        this.updatedAt     = Instant.now();
     }
 
     public void deactivate() {

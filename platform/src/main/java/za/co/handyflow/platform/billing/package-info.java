@@ -1,5 +1,5 @@
 // billing/package-info.java
-@ApplicationModule(allowedDependencies = {"shared", "identity"})
+@ApplicationModule(allowedDependencies = {"shared", "identity", "notifications"})
 package za.co.handyflow.platform.billing;
 
 import org.springframework.modulith.ApplicationModule;

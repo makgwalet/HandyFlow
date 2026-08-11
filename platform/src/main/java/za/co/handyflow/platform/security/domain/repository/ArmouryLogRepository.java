@@ -36,4 +36,17 @@ public interface ArmouryLogRepository extends JpaRepository<ArmouryLog, UUID> {
         LIMIT 1
         """)
     java.util.Optional<ArmouryLog> findMostRecent(UUID armouryId);
+
+    /**
+     * All issue/return events linked to a specific CP protection detail
+     * (V211) — backs GET /cp/details/{id}/armoury, showing exactly which
+     * firearms are (or were) out on a given engagement.
+     */
+    @Query("""
+        SELECT l FROM ArmouryLog l
+        WHERE l.tenantId = :tenantId
+        AND l.protectionDetailId = :protectionDetailId
+        ORDER BY l.occurredAt DESC
+        """)
+    List<ArmouryLog> findByProtectionDetail(TenantId tenantId, UUID protectionDetailId);
 }

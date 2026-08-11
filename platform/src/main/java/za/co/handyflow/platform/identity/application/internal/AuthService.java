@@ -25,6 +25,28 @@ public class AuthService {
 
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
+    /**
+     * ACCEPTED CROSS-MODULE COUPLING — DO NOT "FIX" WITHOUT RE-READING THIS.
+     * <p>
+     * identity depending on billing.SubscriptionQueryFacade here, combined
+     * with billing.BillingEventHandlers listening to identity's
+     * TenantCreatedEvent the other way, forms the one remaining cycle
+     * ArchitectureVerificationTest reports (see HandyFlow BOS Discovery doc,
+     * Section 31.3, decision Q19). This was evaluated and deliberately kept:
+     * unlike every other violation found during that audit, this one isn't
+     * a scheduler or filter reaching somewhere it didn't need to — knowing
+     * whether a tenant's subscription is active genuinely is part of
+     * answering "can this user log in," so the coupling reflects the real
+     * shape of the domain, not an accident.
+     * <p>
+     * If this ever needs to become a real zero-cycle boundary (e.g. identity
+     * needs to become independently deployable/swappable), the fix is:
+     * billing publishes its own subscription-change events in addition to
+     * consuming TenantCreatedEvent, and identity maintains a local
+     * read-model cache instead of calling out live here. That's a real
+     * feature addition (new events, a cache table, staleness handling to
+     * design), not a quick move — tracked as Q19-alt, not scheduled now.
+     */
     private final SubscriptionQueryFacade subscriptionQueryFacade;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;

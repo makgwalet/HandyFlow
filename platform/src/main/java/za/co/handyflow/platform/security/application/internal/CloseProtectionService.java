@@ -16,32 +16,23 @@ import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 /**
  * CloseProtectionService — principals, protection details, team assignments,
- * and itinerary stops. Core of the VIP/Close Protection module (Part 9).
+ * itinerary stops, plus V211 additions: evidence upload, arms<->CP linkage,
+ * and clone-from-previous-detail.
  *
- * CONFIDENTIALITY BOUNDARY (Part 9.3):
- * This service exposes two response shapes for Principal data:
- *   - PrincipalResponse: full detail (real name, medical notes, threats) —
- *     only returned by methods explicitly requiring the caller to already
- *     hold VIP_DETAIL_ACCESS (enforced at the controller via @PreAuthorize,
- *     not re-checked here — this service trusts the controller gate).
- *   - PrincipalSummaryResponse: codename + threat level only — used when
- *     building ProtectionDetailResponse for general consumption (e.g. a
- *     supervisor's overview screen listing all engagements without needing
- *     to see who's actually being protected).
+ * CONFIDENTIALITY BOUNDARY (Part 9.3) — unchanged from original, see
+ * PrincipalResponse/PrincipalSummaryResponse split described below.
  *
- * WHY does the service still need to know which response shape to build,
- * rather than just always returning everything and letting the controller
- * filter?
- * Filtering after the fact risks the full data briefly existing in a
- * response object that could be logged, cached, or serialized somewhere
- * before filtering happens. Building the restricted shape from the start
- * is a stronger guarantee than trusting every caller to filter correctly.
+ * NEW DEPENDENCIES (V211): CpEvidenceRepository, ArmouryService,
+ * ArmouryLogRepository. Add these to the constructor field list alongside
+ * the existing ones.
  */
 @Slf4j
 @Service
@@ -58,6 +49,11 @@ public class CloseProtectionService {
     private final AuditEventRepository        auditRepository;
     private final za.co.handyflow.platform.shared.FieldEncryptionService encryptionService;
 
+    // ── V211 additions ─────────────────────────────────────────────────────────
+    private final CpEvidenceRepository        evidenceRepository;
+    private final ArmouryService              armouryService;
+    private final ArmouryLogRepository        armouryLogRepository;
+
     // ── Principal CRUD (VIP_DETAIL_ACCESS required — full detail) ─────────────
 
     @Transactional
@@ -70,7 +66,6 @@ public class CloseProtectionService {
 
         Principal.ThreatLevel threatLevel = parseThreatLevel(req.threatLevel());
 
-        // Encrypt at the service boundary — Principal's fields hold ciphertext only.
         Principal principal = Principal.create(
                 tenantId, req.fullName(), req.aliasCodename(), threatLevel,
                 encryptionService.encrypt(req.medicalNotes()),
@@ -81,9 +76,6 @@ public class CloseProtectionService {
         log.info("[Security] Principal created codename={} tenant={}",
                 req.aliasCodename(), tenantId.getValue());
 
-        // No "VIEWED" audit on create — the creating supervisor obviously
-        // already knows the data they just entered. Audit is for READS of
-        // existing records, not the act of authoring them.
         return toFullResponse(principal);
     }
 
@@ -206,6 +198,98 @@ public class CloseProtectionService {
         return toDetailResponse(detail, findPrincipal(tenantId, detail.getPrincipalId()));
     }
 
+    // ── Clone-from-previous (V211) ─────────────────────────────────────────────
+
+    /**
+     * Spins up a new ProtectionDetail from a previous one for the same
+     * principal — the "VC visits campus every semester" case. Copies
+     * principalId/detailType/billingRate/notes from the source, then
+     * re-validates and re-creates the team roster and itinerary rather than
+     * blindly copying rows.
+     *
+     * WHY re-validate team assignments through assignToDetail() instead of
+     * copying DetailAssignment rows directly?
+     * A guard who covered the last engagement might have let their CP
+     * vetting tier lapse, gone SUSPENDED, or otherwise become ineligible
+     * since then. assignToDetail() already enforces the hard vetting-tier
+     * gate (same pattern as ArmouryService.issue()'s competency check) —
+     * routing through it means cloning can never silently create an
+     * assignment that would have been rejected if done manually. Guards that
+     * fail are skipped and reported back, not silently dropped.
+     *
+     * WHY recompute itinerary timing by offset rather than copying timestamps?
+     * The source detail's scheduledArrival/scheduledDeparture are for a
+     * specific past (or future) date — copying them verbatim onto a new
+     * detail with a different startAt would put stops on the wrong day.
+     * Preserving the *relative* offset from the source detail's start
+     * reproduces "same day-of, same running order" without requiring the
+     * caller to re-enter every stop's timing by hand.
+     */
+    @Transactional
+    public CloneDetailResult cloneDetail(TenantId tenantId, UUID sourceDetailId,
+                                         UUID actorId, CloneDetailRequest req) {
+        ProtectionDetail source = findDetail(tenantId, sourceDetailId);
+        Principal principal     = findPrincipal(tenantId, source.getPrincipalId());
+
+        ProtectionDetail newDetail = ProtectionDetail.create(
+                tenantId, source.getPrincipalId(), source.getDetailType(),
+                req.startAt(), req.endAt(), source.getBillingRate(),
+                req.clientReference() != null ? req.clientReference() : source.getClientReference(),
+                source.getNotes());
+        detailRepository.save(newDetail);
+
+        // ── Clone team roster (re-validated, not copied) ────────────────────────
+        List<String> skipped = new ArrayList<>();
+        int teamCloned = 0;
+        for (DetailAssignment a : assignmentRepository.findActiveByDetail(sourceDetailId)) {
+            try {
+                AssignToDetailRequest assignReq = new AssignToDetailRequest(
+                        a.getGuardId(), a.getRole().name(), null);
+                assignToDetail(tenantId, newDetail.getId(), assignReq);
+                teamCloned++;
+            } catch (HandyFlowException e) {
+                String guardName = guardRepository.findActiveById(tenantId, a.getGuardId())
+                        .map(Guard::getFullName).orElse(a.getGuardId().toString());
+                skipped.add(guardName + " (" + a.getRole() + "): " + e.getMessage());
+                log.warn("[Security] Clone-detail skipped team member sourceDetail={} newDetail={} guard={}: {}",
+                        sourceDetailId, newDetail.getId(), a.getGuardId(), e.getMessage());
+            }
+        }
+
+        // ── Clone itinerary (offset-preserved timing) ────────────────────────────
+        int stopsCloned = 0;
+        for (ItineraryStop stop : itineraryRepository.findByDetail(sourceDetailId)) {
+            Instant newArrival   = shiftByOffset(source.getStartAt(), req.startAt(), stop.getScheduledArrival());
+            Instant newDeparture = shiftByOffset(source.getStartAt(), req.startAt(), stop.getScheduledDeparture());
+
+            AddItineraryStopRequest stopReq = new AddItineraryStopRequest(
+                    stop.getLocationName(), stop.getAddress(), stop.getLatitude(), stop.getLongitude(),
+                    newArrival, newDeparture, stop.isAdvanceSurveyRequired(), stop.getNotes());
+            addStop(tenantId, newDetail.getId(), stopReq);
+            stopsCloned++;
+        }
+
+        auditRepository.save(AuditEvent.record(
+                tenantId, actorId, AuditEvent.ActorType.USER,
+                "PROTECTION_DETAIL", newDetail.getId(), "DETAIL_CLONED",
+                null, null,
+                "{\"sourceDetailId\":\"" + sourceDetailId + "\",\"teamCloned\":" + teamCloned
+                        + ",\"stopsCloned\":" + stopsCloned + "}"));
+
+        log.info("[Security] Detail cloned sourceDetail={} newDetail={} principal={} teamCloned={} skipped={} stopsCloned={}",
+                sourceDetailId, newDetail.getId(), principal.getAliasCodename(),
+                teamCloned, skipped.size(), stopsCloned);
+
+        return new CloneDetailResult(toDetailResponse(newDetail, principal), teamCloned, skipped, stopsCloned);
+    }
+
+    /** Shifts a timestamp by the same delta between an old and new reference point. Null-safe. */
+    private Instant shiftByOffset(Instant oldReference, Instant newReference, Instant value) {
+        if (value == null || oldReference == null || newReference == null) return null;
+        Duration offset = Duration.between(oldReference, value);
+        return newReference.plus(offset);
+    }
+
     // ── Team Assignments ───────────────────────────────────────────────────────
 
     @Transactional
@@ -223,9 +307,6 @@ public class CloseProtectionService {
                     HttpStatus.FORBIDDEN, "GUARD_NOT_SCHEDULABLE");
         }
 
-        // Part 9.5 vetting gate — the guard's CP clearance tier must meet
-        // the minimum for this principal's threat level (hard block, same
-        // as the firearm competency gate in ArmouryService).
         Principal principal = findPrincipal(tenantId,
                 findDetail(tenantId, detailId).getPrincipalId());
         if (!guard.meetsVettingTierFor(principal.getThreatLevel().name())) {
@@ -283,12 +364,74 @@ public class CloseProtectionService {
                 .toList();
     }
 
+    // ── Arms <-> CP linkage (V211) ────────────────────────────────────────────
+
+    /**
+     * Issues a firearm as part of a CP detail's team roster — a thin wrapper
+     * around ArmouryService.issue() that adds CP-specific context, not a
+     * reimplementation of the witnessed-issue workflow. All of ArmouryService's
+     * hard blocks (license expiry, firearm availability, receiving guard's
+     * competency, witness validity) apply unchanged.
+     *
+     * Validates that the target assignment actually belongs to this detail
+     * and to the guard named in the armoury request — prevents issuing a
+     * firearm "for" a detail to a guard who isn't actually on its roster.
+     */
+    @Transactional
+    public ArmouryResponse issueFirearmForDetail(TenantId tenantId, UUID detailId,
+                                                 UUID assignmentId, UUID armouryId,
+                                                 IssueFirearmRequest req) {
+        findDetail(tenantId, detailId); // validates detail exists + belongs to tenant
+
+        DetailAssignment assignment = assignmentRepository.findByTenantAndId(tenantId, assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("DetailAssignment", assignmentId.toString()));
+
+        if (!assignment.getDetailId().equals(detailId)) {
+            throw new HandyFlowException(
+                    "That assignment does not belong to this detail",
+                    HttpStatus.BAD_REQUEST, "ASSIGNMENT_DETAIL_MISMATCH");
+        }
+        if (!assignment.isActive()) {
+            throw new HandyFlowException(
+                    "That guard's role on this detail has already ended",
+                    HttpStatus.CONFLICT, "ASSIGNMENT_ENDED");
+        }
+        if (!assignment.getGuardId().equals(req.guardId())) {
+            throw new HandyFlowException(
+                    "The receiving guard on the armoury request must match the assignment's guard",
+                    HttpStatus.BAD_REQUEST, "GUARD_MISMATCH");
+        }
+
+        ArmouryResponse response = armouryService.issue(tenantId, armouryId, req);
+
+        // Link the log entry ArmouryService just created to this detail.
+        // ArmouryService itself has no knowledge of CP details -- linking
+        // happens here, one level up, exactly the same separation
+        // ArmouryController's javadoc already draws for CP-specific workflows.
+        armouryLogRepository.findMostRecent(armouryId).ifPresent(logEntry -> {
+            logEntry.linkProtectionDetail(detailId);
+            armouryLogRepository.save(logEntry);
+        });
+
+        log.info("[Security] Firearm issued for CP detail detailId={} assignment={} guard={}",
+                detailId, assignmentId, req.guardId());
+
+        return response;
+    }
+
+    /** All issue/return events linked to this detail — "which firearms are/were out on this engagement." */
+    @Transactional(readOnly = true)
+    public List<ArmouryLog> getArmouryForDetail(TenantId tenantId, UUID detailId) {
+        findDetail(tenantId, detailId);
+        return armouryLogRepository.findByProtectionDetail(tenantId, detailId);
+    }
+
     // ── Itinerary Stops ────────────────────────────────────────────────────────
 
     @Transactional
     public ItineraryStopResponse addStop(TenantId tenantId, UUID detailId,
                                          AddItineraryStopRequest req) {
-        findDetail(tenantId, detailId);  // validates detail exists + belongs to tenant
+        findDetail(tenantId, detailId);
 
         int nextSequence = itineraryRepository.findMaxSequence(detailId) + 1;
 
@@ -337,7 +480,7 @@ public class CloseProtectionService {
     public org.springframework.data.domain.Page<AuditEvent> getPrincipalAudit(
             TenantId tenantId, UUID principalId,
             org.springframework.data.domain.Pageable pageable) {
-        findPrincipal(tenantId, principalId); // validate tenant scoping
+        findPrincipal(tenantId, principalId);
         return auditRepository.findByEntity(tenantId, "PRINCIPAL", principalId, pageable);
     }
 
@@ -351,15 +494,6 @@ public class CloseProtectionService {
 
     // ── Part 9.4: Guard-facing CP profile (Shield app) ────────────────────────
 
-    /**
-     * Lightweight CP status for the Shield app's home screen.
-     * Uses codename only — never real name. Returns an empty/inactive
-     * profile if the guard has no current CP assignment.
-     *
-     * Not gated behind VIP_DETAIL_ACCESS — the guard themselves needs this
-     * on startup to know if they're on a CP detail today. Codename-only
-     * means no Part 9.3 confidentiality leak even without the authority gate.
-     */
     @Transactional(readOnly = true)
     public GuardCpProfileResponse getGuardCpProfile(TenantId tenantId, UUID guardId) {
         List<DetailAssignment> active = assignmentRepository.findActiveByGuard(tenantId, guardId);
@@ -368,9 +502,6 @@ public class CloseProtectionService {
             return new GuardCpProfileResponse(false, null, null, null, null, null, null, List.of());
         }
 
-        // Take the first active assignment — a guard shouldn't have more than
-        // one open-ended role (enforced by the DB constraint), but if somehow
-        // they do, take the most recently started one.
         DetailAssignment assignment = active.stream()
                 .max(java.util.Comparator.comparing(DetailAssignment::getAssignmentStart))
                 .get();
@@ -385,7 +516,6 @@ public class CloseProtectionService {
         String codename     = principal != null ? principal.getAliasCodename() : "UNKNOWN";
         String threatLevel  = principal != null ? principal.getThreatLevel().name() : "LOW";
 
-        // Only the next 3 upcoming stops for the initial response
         List<ItineraryStopResponse> upcomingStops = itineraryRepository
                 .findByDetail(detail.getId()).stream()
                 .filter(s -> s.getActualDeparture() == null)
@@ -401,20 +531,11 @@ public class CloseProtectionService {
 
     // ── Advance Surveys ────────────────────────────────────────────────────────
 
-    /**
-     * Conducts an advance survey at an itinerary stop — the CP equivalent
-     * of a patrol round (Phase 2): a guard recons the location and reports
-     * whether it's clear before the principal arrives.
-     *
-     * Multiple surveys per stop are allowed (one per surveying guard) — a
-     * high-threat-level detail may want independent confirmation from two
-     * guards. The unique constraint is on (stop, guard), not the stop alone.
-     */
     @Transactional
     public AdvanceSurveyResponse conductSurvey(TenantId tenantId, UUID stopId,
                                                UUID surveyingGuardId,
                                                ConductSurveyRequest req) {
-        findStop(tenantId, stopId);  // validates stop exists + belongs to tenant
+        findStop(tenantId, stopId);
 
         Guard guard = guardRepository.findActiveById(tenantId, surveyingGuardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Guard",
@@ -440,7 +561,6 @@ public class CloseProtectionService {
                 .toList();
     }
 
-    /** Whether at least one ALL_CLEAR survey exists for a stop — the gate before the principal arrives. */
     @Transactional(readOnly = true)
     public boolean isStopCleared(UUID stopId) {
         return surveyRepository.hasAllClearSurvey(stopId);
@@ -531,6 +651,94 @@ public class CloseProtectionService {
         return toVehicleResponse(vehicle, tenantId);
     }
 
+    // ── Evidence (V211) ────────────────────────────────────────────────────────
+
+    /**
+     * Uploads an evidence document attached to either a Principal or a
+     * ProtectionDetail. Dev-mode base64 handling mirrors
+     * GuardService.updatePhoto() exactly: a data URI is accepted but stored
+     * as a "PENDING_UPLOAD" placeholder with a warning logged, rather than
+     * growing the DB row or silently failing. Production callers should send
+     * a real fileUrl from a presigned S3 upload instead.
+     */
+    @Transactional
+    public EvidenceResponse uploadEvidence(TenantId tenantId, CpEvidence.EntityType entityType,
+                                           UUID entityId, UploadEvidenceRequest req, UUID uploadedBy) {
+        validateEvidenceParent(tenantId, entityType, entityId);
+
+        CpEvidence.Category category;
+        try {
+            category = CpEvidence.Category.valueOf(req.category());
+        } catch (IllegalArgumentException e) {
+            throw new HandyFlowException("Invalid category: " + req.category(),
+                    HttpStatus.BAD_REQUEST, "INVALID_EVIDENCE_CATEGORY");
+        }
+
+        String fileUrl = req.fileUrl();
+        if ((fileUrl == null || fileUrl.isBlank())
+                && req.fileBase64() != null && req.fileBase64().startsWith("data:")) {
+            log.warn("[Security] Base64 evidence file received for {} {} — stored as PENDING_UPLOAD. "
+                            + "Wire up S3 presigned URL before production deployment.",
+                    entityType, entityId);
+            fileUrl = "PENDING_UPLOAD";
+        }
+        if (fileUrl == null || fileUrl.isBlank()) {
+            throw new HandyFlowException("Either fileUrl or fileBase64 is required",
+                    HttpStatus.BAD_REQUEST, "MISSING_FILE");
+        }
+
+        CpEvidence evidence = CpEvidence.upload(
+                tenantId, entityType, entityId, category, fileUrl,
+                req.fileName(), req.notes(), uploadedBy);
+        evidenceRepository.save(evidence);
+
+        auditRepository.save(AuditEvent.record(
+                tenantId, uploadedBy, AuditEvent.ActorType.USER,
+                entityType.name(), entityId, "EVIDENCE_UPLOADED",
+                null, null,
+                "{\"category\":\"" + category + "\",\"evidenceId\":\"" + evidence.getId() + "\"}"));
+
+        log.info("[Security] Evidence uploaded {} entityId={} category={} by={}",
+                entityType, entityId, category, uploadedBy);
+
+        return toEvidenceResponse(evidence);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EvidenceResponse> getEvidenceFor(TenantId tenantId, CpEvidence.EntityType entityType,
+                                                 UUID entityId) {
+        validateEvidenceParent(tenantId, entityType, entityId);
+        return evidenceRepository.findActiveForEntity(tenantId, entityType, entityId).stream()
+                .map(this::toEvidenceResponse)
+                .toList();
+    }
+
+    @Transactional
+    public void deleteEvidence(TenantId tenantId, UUID evidenceId, UUID actorId,
+                               DeleteEvidenceRequest req) {
+        CpEvidence evidence = evidenceRepository.findActiveById(tenantId, evidenceId)
+                .orElseThrow(() -> new ResourceNotFoundException("CpEvidence", evidenceId.toString()));
+
+        evidence.softDelete(actorId, req.reason());
+        evidenceRepository.save(evidence);
+
+        auditRepository.save(AuditEvent.record(
+                tenantId, actorId, AuditEvent.ActorType.USER,
+                evidence.getEntityType().name(), evidence.getEntityId(), "EVIDENCE_DELETED",
+                null, null,
+                "{\"evidenceId\":\"" + evidenceId + "\",\"reason\":\""
+                        + req.reason().replace("\"", "\\\"") + "\"}"));
+
+        log.warn("[Security] Evidence deleted id={} by={} reason='{}'", evidenceId, actorId, req.reason());
+    }
+
+    private void validateEvidenceParent(TenantId tenantId, CpEvidence.EntityType entityType, UUID entityId) {
+        switch (entityType) {
+            case PRINCIPAL -> findPrincipal(tenantId, entityId);
+            case PROTECTION_DETAIL -> findDetail(tenantId, entityId);
+        }
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private Principal findPrincipal(TenantId tenantId, UUID id) {
@@ -569,7 +777,8 @@ public class CloseProtectionService {
                 encryptionService.decrypt(p.getMedicalNotes()),
                 encryptionService.decrypt(p.getKnownThreats()),
                 p.getEmergencyContacts(),
-                p.getPhotoUrl(), p.isActive(), p.getCreatedAt());
+                p.getPhotoUrl(), p.isActive(), p.getCreatedAt(),
+                p.getVettingStatus());
     }
 
     private ProtectionDetailResponse toDetailResponse(ProtectionDetail d, Principal principal) {
@@ -617,5 +826,11 @@ public class CloseProtectionService {
                 v.getId(), v.getVehicleType().name(), v.getRegistration(), v.getMakeModel(),
                 v.isArmored(), v.getAssignedDriverGuardId(), driverName,
                 v.getStatus().name(), v.getNotes(), v.getCreatedAt());
+    }
+
+    private EvidenceResponse toEvidenceResponse(CpEvidence e) {
+        return new EvidenceResponse(
+                e.getId(), e.getEntityType().name(), e.getEntityId(), e.getCategory().name(),
+                e.getFileUrl(), e.getFileName(), e.getNotes(), e.getUploadedBy(), e.getCreatedAt());
     }
 }

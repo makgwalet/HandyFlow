@@ -92,6 +92,16 @@ public class Customer {
     private CustomerStatus status = CustomerStatus.ACTIVE;
 
     /**
+     * FIX: "no lead/pipeline stage tracking" gap. Nullable — only
+     * meaningful for LEAD-type customers; a CUSTOMER (already converted)
+     * has no pipeline position. Defaults to NEW when a lead is created —
+     * see create() below.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pipeline_stage", length = 20)
+    private LeadStage pipelineStage;
+
+    /**
      * Tags stored in a join table (customer_tags).
      * We use ElementCollection rather than a full @Entity because
      * tags have no identity of their own — they're just strings
@@ -178,6 +188,7 @@ public class Customer {
         c.notes        = notes;
         c.customerType = customerType != null ? customerType : CustomerType.CUSTOMER;
         c.status       = CustomerStatus.ACTIVE;
+        c.pipelineStage = c.customerType == CustomerType.LEAD ? LeadStage.NEW : null;
         c.createdAt    = Instant.now();
         c.updatedAt    = c.createdAt;
 
@@ -266,6 +277,29 @@ public class Customer {
         this.status    = newStatus;
         this.updatedAt = Instant.now();
         addActivity(CustomerActivity.of(this, ActivityType.STATUS_CHANGED, payload, null, changedBy));
+    }
+
+    /**
+     * FIX: "no lead/pipeline stage tracking" gap. Only valid for
+     * LEAD-type customers — a CUSTOMER has no pipeline position, so this
+     * throws rather than silently accepting a stage change that wouldn't
+     * mean anything (same "enforce it, don't leave it a convention"
+     * reasoning IllegalStateException already gets used for elsewhere in
+     * this codebase, e.g. Clinic's "cannot log hours on a non-retainer
+     * invoice").
+     */
+    public void changeStage(LeadStage newStage, UUID changedBy) {
+        if (this.customerType != CustomerType.LEAD) {
+            throw new IllegalStateException("Cannot set a pipeline stage on a non-lead customer");
+        }
+        if (this.pipelineStage == newStage) return;
+        var payload = Map.of(
+                "from", this.pipelineStage != null ? this.pipelineStage.name() : "NONE",
+                "to", newStage.name()
+        );
+        this.pipelineStage = newStage;
+        this.updatedAt     = Instant.now();
+        addActivity(CustomerActivity.of(this, ActivityType.STAGE_CHANGED, payload, null, changedBy));
     }
 
     public void addTag(String tag, UUID addedBy) {

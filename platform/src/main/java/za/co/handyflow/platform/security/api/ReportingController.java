@@ -25,12 +25,13 @@ import java.util.UUID;
  * ReportingController — three monthly security reports, each available as
  * JSON (for the frontend dashboard) and PDF (for download/email to clients).
  *
- * month parameter format: YYYY-MM (e.g. 2026-06)
+ * CHANGE (V212): the three *Pdf() call sites now pass tenantId through to
+ * PdfReportService, which uses it to fetch TenantDetails and brand the PDF
+ * with the tenant's logo/company name instead of a hardcoded "HandyFlow
+ * Security" header. No endpoint signatures changed — tenantId was already
+ * being resolved in every method here, it just wasn't being forwarded.
  *
- * All reports require USER_UPDATE — these are management/compliance artifacts,
- * not guard-facing data. The site coverage report is also used by the client
- * portal (Phase 1), but the portal calls the dedicated SecurityClientPortalController
- * which handles its own auth; this controller is admin-only.
+ * month parameter format: YYYY-MM (e.g. 2026-06)
  */
 @Tag(name = "Security - Reports")
 @RestController
@@ -61,15 +62,16 @@ public class ReportingController {
     @GetMapping("/site-coverage/pdf")
     @Operation(
             summary = "Site coverage report (PDF download)",
-            description = "Same data as /site-coverage but rendered as a branded PDF. " +
-                    "Suitable for emailing to clients as a monthly SLA report.")
+            description = "Same data as /site-coverage but rendered as a branded PDF " +
+                    "(tenant logo + company name). Suitable for emailing to clients as a " +
+                    "monthly SLA report.")
     public ResponseEntity<byte[]> getSiteCoveragePdf(
             @RequestParam UUID siteId,
             @RequestParam String month) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         SiteCoverageReport report = reportingService.getSiteCoverageReport(
                 tenantId, siteId, parseMonth(month));
-        byte[] pdf = pdfReportService.siteCoveragePdf(report);
+        byte[] pdf = pdfReportService.siteCoveragePdf(report, tenantId);
         return pdfResponse(pdf,
                 "site-coverage-" + report.siteName().replaceAll("[^a-zA-Z0-9]", "-")
                         + "-" + month + ".pdf");
@@ -93,15 +95,16 @@ public class ReportingController {
     @GetMapping("/guard-attendance/pdf")
     @Operation(
             summary = "Guard attendance report (PDF download)",
-            description = "PDF version of the guard attendance report. Used for HR reviews " +
-                    "and as an input to the payroll export (Phase 4).")
+            description = "PDF version of the guard attendance report, branded with the " +
+                    "tenant's logo/company name. Used for HR reviews and as an input to the " +
+                    "payroll export (Phase 4).")
     public ResponseEntity<byte[]> getGuardAttendancePdf(
             @RequestParam UUID guardId,
             @RequestParam String month) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         GuardAttendanceReport report = reportingService.getGuardAttendanceReport(
                 tenantId, guardId, parseMonth(month));
-        byte[] pdf = pdfReportService.guardAttendancePdf(report);
+        byte[] pdf = pdfReportService.guardAttendancePdf(report, tenantId);
         return pdfResponse(pdf,
                 "guard-attendance-" + report.guardName().replaceAll("[^a-zA-Z0-9]", "-")
                         + "-" + month + ".pdf");
@@ -124,13 +127,13 @@ public class ReportingController {
     @GetMapping("/monthly-summary/pdf")
     @Operation(
             summary = "Company-wide monthly summary (PDF download)",
-            description = "PDF version of the monthly summary. " +
-                    "Suitable for board/management reporting.")
+            description = "PDF version of the monthly summary, branded with the tenant's " +
+                    "logo/company name. Suitable for board/management reporting.")
     public ResponseEntity<byte[]> getMonthlySummaryPdf(@RequestParam String month) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         MonthlySummaryReport report = reportingService.getMonthlySummaryReport(
                 tenantId, parseMonth(month));
-        byte[] pdf = pdfReportService.monthlySummaryPdf(report);
+        byte[] pdf = pdfReportService.monthlySummaryPdf(report, tenantId);
         return pdfResponse(pdf, "monthly-summary-" + month + ".pdf");
     }
 

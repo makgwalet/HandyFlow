@@ -1,23 +1,20 @@
+// security/dto/GuardLoginRequest.java
 package za.co.handyflow.platform.security.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
-
 /**
- * Guard login request — phone + PIN + optional device ID.
+ * GuardLoginRequest — CHANGE (V214): added employeeCode as an alternative
+ * identifier to phone. Exactly one of phone/employeeCode should be provided;
+ * GuardAuthService.resolveGuardForLogin() checks phone first, falls back to
+ * employeeCode, and rejects the request if neither is present.
  *
- * WHY phone not email?
- * Most security guards in SA don't use work email addresses.
- * Phone is the identity anchor they actually know and use.
- * The phone number is already stored on security_guards.phone
- * from the existing Guard entity.
+ * NOTE: I do not have this file's previously-existing content -- reconstructed
+ * from GuardAuthService's usage (req.phone(), req.pin(), req.deviceId()).
+ * Diff against your actual file before applying, same caveat as
+ * GuardResponse/PrincipalResponse this session.
  */
 public record GuardLoginRequest(
-        @NotBlank @Pattern(regexp = "\\+?[0-9 ]{10,15}", message = "Invalid phone number")
         String phone,
-
-        @NotBlank @Pattern(regexp = "\\d{4,8}", message = "PIN must be 4-8 digits")
+        String employeeCode,
         String pin,
-
-        String deviceId   // optional for Phase 1 — required in Phase 2 device binding
+        String deviceId
 ) {}

@@ -11,10 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.security.domain.model.Shift;
 import za.co.handyflow.platform.security.domain.model.ShiftStatus;
-import za.co.handyflow.platform.security.domain.repository.CheckpointLogRepository;
-import za.co.handyflow.platform.security.domain.repository.GuardRepository;
-import za.co.handyflow.platform.security.domain.repository.ShiftRepository;
-import za.co.handyflow.platform.security.domain.repository.SiteRepository;
+import za.co.handyflow.platform.security.domain.repository.*;
 import za.co.handyflow.platform.security.dto.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
@@ -52,6 +49,9 @@ public class ShiftService {
     private final GuardRepository         guardRepository;
     private final SiteRepository          siteRepository;
     private final CheckpointLogRepository logRepository;
+    private final AuditEventRepository     auditRepository;
+    private final DeviceSessionRepository  deviceSessionRepository;
+    private final ResourceCustodyRepository resourceCustodyRepository;
 
     // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -236,5 +236,125 @@ public class ShiftService {
                 s.getStartAt(), s.getEndAt(), s.getStatus().name(),
                 s.getNotes(), s.getCreatedAt()
         );
+    }
+
+
+// NOTE: closeOvertime() and pullFromSite() both reach into
+// DeviceSessionRepository directly to force-close any open device session
+// tied to the shift, using DeviceSession's existing forceClose() domain
+// method. I don't have DeviceSessionService.java's content, so I can't
+// confirm whether it already does something equivalent when its own
+// forceCloseSession() is called on the *session* directly (DeviceSessionController
+// exposes that as a separate supervisor action). If DeviceSessionService
+// ALSO completes the linked shift as a side effect of closing the session,
+// there is a double-completion risk here -- please confirm what
+// DeviceSessionService.forceCloseSession() actually does before shipping
+// this, or send me the file and I'll reconcile the two paths.
+
+    /**
+     * Dismisses a no-show/late alert without changing the shift's status --
+     * e.g. the guard called in sick and a replacement is being handled manually
+     * outside the system. Purely a record-keeping action.
+     */
+    @Transactional
+    public ShiftResponse dismissNoShow(TenantId tenantId, UUID id, UUID supervisorId,
+                                       ShiftSupervisorActionRequest req) {
+        Shift shift = findActive(tenantId, id);
+        shift.dismissNoShow(supervisorId, req.reason());
+        shiftRepository.save(shift);
+
+        writeAudit(tenantId, supervisorId, id, "NO_SHOW_DISMISSED", req.reason());
+
+        log.info("[Security] No-show dismissed shiftId={} by={} reason='{}'",
+                id, supervisorId, req.reason());
+        return toResponse(shift);
+    }
+
+    /**
+     * Force-closes an ACTIVE shift that has run into unconfirmed overtime.
+     * Bypasses minScanCount enforcement (the guard isn't available to satisfy
+     * it) -- this is explicitly NOT the same code path as ShiftService.completeShift().
+     * Also force-closes any open DeviceSession tied to this shift, since leaving
+     * that dangling would block the device for the next guard's clock-in.
+     */
+    @Transactional
+    public ShiftResponse forceCloseOvertime(TenantId tenantId, UUID id, UUID supervisorId,
+                                            ShiftSupervisorActionRequest req) {
+        Shift shift = findActive(tenantId, id);
+        shift.closeOvertime(supervisorId, req.reason());
+        shiftRepository.save(shift);
+
+        deviceSessionRepository.findByShiftId(id).ifPresent(session -> {
+            if (session.isOpen()) {
+                session.forceClose(supervisorId, "Auto-closed: shift overtime force-closed by supervisor");
+                deviceSessionRepository.save(session);
+            }
+        });
+
+        flagOpenResourceCustody(shift.getGuardId(), id, "overtime force-close");
+
+        writeAudit(tenantId, supervisorId, id, "OVERTIME_FORCE_CLOSED", req.reason());
+
+        log.info("[Security] Overtime force-closed shiftId={} by={} reason='{}'",
+                id, supervisorId, req.reason());
+        return toResponse(shift);
+    }
+
+    /**
+     * Supervisor pulls a guard off site mid-shift -- client complaint, guard
+     * unwell, redeployment, etc. Distinct from both completeShift() (guard-driven,
+     * end of shift) and forceCloseOvertime() (shift already overran) -- this can
+     * happen at any point during an ACTIVE shift, including right after it starts.
+     */
+    @Transactional
+    public ShiftResponse pullFromSite(TenantId tenantId, UUID id, UUID supervisorId,
+                                      ShiftSupervisorActionRequest req) {
+        Shift shift = findActive(tenantId, id);
+        shift.pullFromSite(supervisorId, req.reason());
+        shiftRepository.save(shift);
+
+        deviceSessionRepository.findByShiftId(id).ifPresent(session -> {
+            if (session.isOpen()) {
+                session.forceClose(supervisorId, "Auto-closed: guard pulled from site by supervisor");
+                deviceSessionRepository.save(session);
+            }
+        });
+
+        flagOpenResourceCustody(shift.getGuardId(), id, "pulled from site");
+
+        writeAudit(tenantId, supervisorId, id, "GUARD_PULLED_FROM_SITE", req.reason());
+
+        log.warn("[Security] Guard pulled from site shiftId={} guard={} by={} reason='{}'",
+                id, shift.getGuardId(), supervisorId, req.reason());
+        return toResponse(shift);
+    }
+
+// ── Helpers (new) ────────────────────────────────────────────────────────
+
+    /**
+     * Logs (does not auto-return) any resources still checked out by this guard
+     * when a shift is interrupted mid-way. Auto-returning a firearm without an
+     * actual physical return + witness would falsify the armoury chain of
+     * custody -- ArmouryService's witnessed-return requirement is a hard
+     * compliance rule that a supervisor UI action must not bypass. This just
+     * surfaces the gap loudly so a supervisor follows up.
+     */
+    private void flagOpenResourceCustody(UUID guardId, UUID shiftId, String context) {
+        var openItems = resourceCustodyRepository.findCheckedOutByGuard(guardId);
+        if (!openItems.isEmpty()) {
+            log.warn("[Security] {} still-checked-out resource(s) for guard={} at shift {} ({}) -- "
+                            + "these are NOT auto-returned and need manual reconciliation: {}",
+                    openItems.size(), guardId, shiftId, context,
+                    openItems.stream().map(r -> r.getResourceRef()).toList());
+        }
+    }
+
+    private void writeAudit(TenantId tenantId, UUID actorId, UUID shiftId, String action, String reason) {
+        auditRepository.save(za.co.handyflow.platform.security.domain.model.AuditEvent.record(
+                tenantId, actorId,
+                za.co.handyflow.platform.security.domain.model.AuditEvent.ActorType.USER,
+                "SHIFT", shiftId, action,
+                null, null,
+                "{\"reason\":\"" + reason.replace("\"", "\\\"") + "\"}"));
     }
 }

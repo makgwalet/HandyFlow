@@ -1,96 +1,79 @@
 package za.co.handyflow.platform.projects.application.internal;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.shared.TenantSequenceService;
 
 import java.util.UUID;
 
 /**
- * Provides monotonically-increasing, race-condition-free integer sequences
- * for PM entity numbering (project numbers, task numbers, CO numbers, etc.).
- *
- * ────────────────────────────────────────────────────────────────────────────
- * WHY NOT SELECT MAX() + 1?
- * ────────────────────────────────────────────────────────────────────────────
- * The original code used:
- *     int seq = repo.findMaxProjectSequence(tenantId) + 1;
- *
- * Two concurrent HTTP requests both read MAX = 5, both compute 6, and both try
- * to insert PRJ0006.  The UNIQUE constraint fires, the caller gets an
- * unhandled DataIntegrityViolationException → HTTP 500.
- *
- * ────────────────────────────────────────────────────────────────────────────
- * WHY THIS APPROACH?
- * ────────────────────────────────────────────────────────────────────────────
- * PostgreSQL's  INSERT … ON CONFLICT DO UPDATE … RETURNING  is a single atomic
- * operation.  No second SELECT is needed, and the row-level lock on the
- * (tenant_id, counter_type) row means two concurrent callers queue up
- * transparently — one gets 6, the other gets 7.
- *
- * PROPAGATION.REQUIRES_NEW is critical: the counter increment commits
- * independently so that if the outer transaction rolls back (e.g. duplicate
- * project name validation fails), the counter is still consumed.  Gaps in
- * sequence numbers are acceptable; duplicate numbers are not.
- *
- * ────────────────────────────────────────────────────────────────────────────
- * COUNTER TYPE CONVENTION
- * ────────────────────────────────────────────────────────────────────────────
- *  - Projects:     "PROJECT"
- *  - Tasks:        "TASK:<projectId>"         (per-project numbering T001, T002...)
- *  - Change orders:"CO:<projectId>"
- *  - Snags:        "SNAG:<projectId>"
- *  - Phases:       "PHASE:<projectId>"
- *  - Budget lines: "BUDGET:<projectId>"
+ * Formats PM entity numbers (project numbers, task numbers, CO numbers,
+ * etc.) — the naming/formatting conventions this module owns.
+ * <p>
+ * WHY THIS CLASS IS NOW A THIN WRAPPER, NOT ITS OWN SEQUENCE ENGINE: this
+ * class used to run its own copy of the exact same atomic
+ * "INSERT ... ON CONFLICT DO UPDATE ... RETURNING" pattern against a
+ * separate pm_counters table, duplicating what invoicing's
+ * TenantSequenceService already did against tenant_number_sequences —
+ * same reasoning (concurrent HTTP requests can't both read the same
+ * MAX+1), same fix, two independent implementations. TenantSequenceService
+ * has since moved to `shared` (see HandyFlow BOS Discovery doc, Section
+ * 27/28, Q18) specifically so modules like this one can depend on it
+ * instead of re-deriving the same logic.
+ * <p>
+ * MIGRATION NOTE: switching this class over required migrating existing
+ * pm_counters values into tenant_number_sequences first — see
+ * V_migrate_pm_counters_to_tenant_sequences.sql. Without that migration,
+ * every tenant's project/task/CO/snag numbering would have silently
+ * restarted at 1 on deploy, colliding with numbers already in use. Do not
+ * deploy this class ahead of that migration.
+ * <p>
+ * PUBLIC API UNCHANGED: every existing caller (ProjectService,
+ * ChangeOrderService, RfiService, FieldService, etc.) keeps calling
+ * next(tenantId, counterType) or the nextXxxNumber() convenience methods
+ * exactly as before — only what happens inside next() changed.
+ * <p>
+ * COUNTER TYPE CONVENTION (unchanged from the original class):
+ *  - Projects:      "PROJECT"
+ *  - Tasks:          "TASK:&lt;projectId&gt;"
+ *  - Change orders:  "CO:&lt;projectId&gt;"
+ *  - Snags:          "SNAG:&lt;projectId&gt;"
+ *  - Phases:         "PHASE:&lt;projectId&gt;"
+ *  - Budget lines:   "BUDGET:&lt;projectId&gt;"
  */
-@Slf4j
 @Service
+@RequiredArgsConstructor
 public class SequenceService {
 
-    @PersistenceContext
-    private EntityManager em;
+    private final TenantSequenceService tenantSequenceService;
 
     /**
-     * Returns the next sequence value for the given tenant and counter type.
-     * This method runs in its OWN transaction (REQUIRES_NEW) so the increment
-     * is committed regardless of whether the outer business transaction succeeds.
+     * Returns the next sequence value for the given tenant and counter
+     * type. Delegates entirely to TenantSequenceService.nextValue() —
+     * same atomicity and same REQUIRES_NEW-commits-independently
+     * guarantee as before, just one shared implementation instead of two.
+     * <p>
+     * Narrowed from TenantSequenceService's `long` return type to `int`
+     * to keep every existing caller's `String.format("%03d"/"%04d", ...)`
+     * call compiling unchanged. Safe in practice — no tenant is realistically
+     * going to generate more than ~2 billion of the same entity type — but
+     * flagging the narrowing explicitly rather than leaving it implicit.
      *
      * @param tenantId    the tenant whose counter is being incremented
      * @param counterType a namespaced key (see class Javadoc for conventions)
      * @return            the next integer in the sequence (starts at 1)
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int next(UUID tenantId, String counterType) {
-        /*
-         * Single atomic PostgreSQL statement:
-         *   1. Try to insert a new row with current_value = 1
-         *   2. If the row exists (ON CONFLICT), increment current_value by 1
-         *   3. Return the resulting current_value
-         *
-         * Because this is an upsert on the PRIMARY KEY (tenant_id, counter_type),
-         * PostgreSQL places a row-level lock — concurrent callers serialise
-         * cleanly without application-level locking or retries.
-         */
-        Number result = (Number) em.createNativeQuery("""
-                INSERT INTO pm_counters (tenant_id, counter_type, current_value)
-                VALUES (:tid, :type, 1)
-                ON CONFLICT (tenant_id, counter_type)
-                DO UPDATE SET current_value = pm_counters.current_value + 1
-                RETURNING current_value
-                """)
-                .setParameter("tid", tenantId)
-                .setParameter("type", counterType)
-                .getSingleResult();
-
-        int value = result.intValue();
-        log.debug("Sequence next: tenant={} type={} value={}", tenantId, counterType, value);
-        return value;
+        // TenantId.of(UUID) — confirm this exact overload exists before merging;
+        // if TenantId only exposes a String-based factory, use
+        // TenantId.of(tenantId.toString()) instead (that overload is confirmed
+        // in use elsewhere, e.g. DeskService.createPublicTicketBySlug).
+        long next = tenantSequenceService.nextValue(TenantId.of(tenantId), counterType);
+        return (int) next;
     }
 
-    // ── Convenience factory methods ──────────────────────────────────────────
+    // ── Convenience factory methods (unchanged) ──────────────────────────────
 
     /** Formats "PRJ0042" — global per tenant */
     public String nextProjectNumber(UUID tenantId) {

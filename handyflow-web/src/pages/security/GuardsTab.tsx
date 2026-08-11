@@ -1,11 +1,24 @@
 // src/pages/security/GuardsTab.tsx
-// Changes from original:
-//   - Guard interface: add psiraExpiryDate, statusChangedAt, statusNote
-//   - Photo: show avatar fallback when photoUrl is null OR "PENDING_UPLOAD"
-//   - PSiRA expiry: compliance badge (red if expired, amber if <30 days)
-//   - Guard detail view: show statusChangedAt + statusNote
-//   - Status filter: already correct
-//   - PATCH /guards/{id}/status: already wired correctly
+//
+// CHANGE (bug fix): GuardForm was previously defined AS A COMPONENT INSIDE
+// GuardsTab's function body (`const GuardForm = () => (...)`), then rendered
+// as `<GuardForm />`. Because that makes GuardForm a brand-new function
+// reference on every render of GuardsTab, React treats it as a completely
+// different component type each time -- so on EVERY keystroke in ANY field
+// (not just idNumber), the entire form subtree unmounted and remounted,
+// dropping focus unpredictably. This is the cursor-jump bug. It was most
+// visible on the ID field because that field triggers two state updates per
+// keystroke (setForm + setFieldErrors) and has a conditional validation
+// block that appears/disappears below it as you type, making the remount
+// more noticeable there than in a plain text field -- but the underlying
+// bug affected every field in the form equally.
+//
+// FIX: GuardFormFields is now a real top-level component (defined outside
+// GuardsTab, at module scope) with a stable identity across renders, so
+// React reconciles it normally instead of remounting it. Everything it
+// used to read from the parent's closure is now passed explicitly as props.
+//
+// All other behavior/logic is unchanged from the original file.
 
 import { useState, useRef, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -25,6 +38,12 @@ interface Guard {
   status: string; statusNote: string | null; statusChangedAt: string | null
   psiraExpiryDate: string | null
   notes: string | null; photoUrl: string | null; createdAt: string
+  employeeCode: string | null
+}
+
+interface GuardFormState {
+  firstName: string; lastName: string; psiraNumber: string; idNumber: string
+  phone: string; grade: string; notes: string; psiraExpiryDate: string
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -42,7 +61,7 @@ const GUARD_STATUSES = [
 ]
 
 const STATUS_MAP = Object.fromEntries(GUARD_STATUSES.map(s => [s.value, s]))
-const EMPTY_FORM = { firstName: "", lastName: "", psiraNumber: "", idNumber: "", phone: "", grade: "C", notes: "", psiraExpiryDate: "" }
+const EMPTY_FORM: GuardFormState = { firstName: "", lastName: "", psiraNumber: "", idNumber: "", phone: "", grade: "C", notes: "", psiraExpiryDate: "" }
 
 // ── SA ID Validator ────────────────────────────────────────────────────────────
 
@@ -81,9 +100,6 @@ function psiraExpiryStatus(dateStr: string | null): { label: string; color: stri
 // ── Photo component ────────────────────────────────────────────────────────────
 
 function GuardAvatar({ guard, size = 36 }: { guard: Guard; size?: number }) {
-  // WHY check for "PENDING_UPLOAD"?
-  // Dev-mode photo capture stores a placeholder instead of base64.
-  // The frontend must treat it the same as null and show the initials avatar.
   const hasPhoto = guard.photoUrl && guard.photoUrl !== "PENDING_UPLOAD"
   const unavail  = (guard.status ?? "ACTIVE") !== "ACTIVE"
   return hasPhoto ? (
@@ -102,167 +118,78 @@ function GuardAvatar({ guard, size = 36 }: { guard: Guard; size?: number }) {
   )
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
+// ── Shared small components (module scope -- fine, these don't hold state) ────
 
-export default function GuardsTab() {
-  const qc = useQueryClient()
-  const videoRef  = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+function ErrBanner({ msg }: { msg: string }) {
+  return (
+    <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}>
+      <AlertCircle size={14} />{msg}
+    </div>
+  )
+}
 
-  const [search,          setSearch]          = useState("")
-  const [showAdd,         setShowAdd]         = useState(false)
-  const [editing,         setEditing]         = useState<Guard | null>(null)
-  const [viewing,         setViewing]         = useState<Guard | null>(null)
-  const [deleting,        setDeleting]        = useState<Guard | null>(null)
-  const [changingStatus,  setChangingStatus]  = useState<Guard | null>(null)
-  const [form,            setForm]            = useState(EMPTY_FORM)
-  const [fieldErrors,     setFieldErrors]     = useState<Record<string, string>>({})
-  const [apiError,        setApiError]        = useState("")
-  const [photoMode,       setPhotoMode]       = useState<"none" | "camera">("none")
-  const [capturedPhoto,   setCapturedPhoto]   = useState<string | null>(null)
-  const [cameraStream,    setCameraStream]    = useState<MediaStream | null>(null)
-  const [fpStatus,        setFpStatus]        = useState<"idle" | "scanning" | "done">("idle")
-  const [statusFilter,    setStatusFilter]    = useState("ALL")
-  const [newStatus,       setNewStatus]       = useState("")
-  const [statusNote,      setStatusNote]      = useState("")
-
-  // ── Queries & mutations ────────────────────────────────────────────────────
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["guards", search],
-    queryFn: async () => {
-      const params = search ? `?search=${encodeURIComponent(search)}&size=100` : "?size=100"
-      const res = await apiClient.get(`/api/v1/security/guards${params}`)
-      const payload = res.data?.data ?? res.data
-      return (payload?.content ?? payload) as Guard[]
-    },
-  })
-  const guards = data ?? []
-
-  const createGuard = useMutation({
-    mutationFn: (body: any) => apiClient.post("/api/v1/security/guards", body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["guards"] }); closeAdd() },
-    onError:   (e: any) => {
-      const d = e.response?.data
-      if (d?.errors && typeof d.errors === "object") setFieldErrors(d.errors)
-      else setApiError(d?.message ?? "Failed to create guard")
-    },
-  })
-
-  const updateGuard = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: any }) => apiClient.put(`/api/v1/security/guards/${id}`, body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["guards"] }); closeEdit() },
-    onError:   (e: any) => setApiError(e.response?.data?.message ?? "Failed to update guard"),
-  })
-
-  const updateStatus = useMutation({
-    mutationFn: ({ id, status, note }: { id: string; status: string; note: string }) =>
-      apiClient.patch(`/api/v1/security/guards/${id}/status`, { status, note }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["guards"] })
-      setChangingStatus(null); setNewStatus(""); setStatusNote("")
-    },
-    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to update status"),
-  })
-
-  const deleteGuard = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/api/v1/security/guards/${id}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["guards"] }); setDeleting(null) },
-    onError:   (e: any) => setApiError(e.response?.data?.message ?? "Failed to remove guard"),
-  })
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
-  const closeAdd  = () => { setShowAdd(false);  setForm(EMPTY_FORM); setFieldErrors({}); setApiError(""); stopCamera(); setCapturedPhoto(null); setFpStatus("idle") }
-  const closeEdit = () => { setEditing(null);   setForm(EMPTY_FORM); setFieldErrors({}); setApiError(""); stopCamera(); setCapturedPhoto(null); setFpStatus("idle") }
-
-  const openEdit = (g: Guard) => {
-    setEditing(g)
-    setForm({ firstName: g.firstName, lastName: g.lastName,
-              psiraNumber: g.psiraNumber ?? "", idNumber: g.idNumber ?? "",
-              phone: g.phone ?? "", grade: g.grade, notes: g.notes ?? "",
-              psiraExpiryDate: g.psiraExpiryDate ?? "" })
-    // Don't pre-fill PENDING_UPLOAD — show the avatar
-    setCapturedPhoto(g.photoUrl && g.photoUrl !== "PENDING_UPLOAD" ? g.photoUrl : null)
-    setFieldErrors({}); setApiError("")
-  }
-
-  const handleSubmit = (isEdit: boolean) => {
-    const errs: Record<string, string> = {}
-    if (!form.firstName.trim()) errs.firstName = "First name is required"
-    if (!form.lastName.trim())  errs.lastName  = "Last name is required"
-    if (form.phone && !/^(\+|0)[\d\s\-]{7,}$/.test(form.phone)) errs.phone = "Phone must start with + or 0"
-    if (form.idNumber) { const r = validateSaId(form.idNumber); if (!r.valid) errs.idNumber = r.error! }
-    setFieldErrors(errs)
-    if (Object.keys(errs).length > 0) return
-    const body = { ...form, photoUrl: capturedPhoto ?? undefined, psiraExpiryDate: form.psiraExpiryDate || null }
-    if (isEdit && editing) updateGuard.mutate({ id: editing.id, body })
-    else createGuard.mutate(body)
-  }
-
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
-      setCameraStream(stream); setPhotoMode("camera")
-      setTimeout(() => { if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play() } }, 100)
-    } catch { setApiError("Camera access denied") }
-  }
-
-  const capturePhoto = () => {
-    if (!videoRef.current || !canvasRef.current) return
-    const c = canvasRef.current
-    c.width = videoRef.current.videoWidth; c.height = videoRef.current.videoHeight
-    c.getContext("2d")?.drawImage(videoRef.current, 0, 0)
-    setCapturedPhoto(c.toDataURL("image/jpeg", 0.8)); stopCamera()
-  }
-
-  const stopCamera = () => { cameraStream?.getTracks().forEach(t => t.stop()); setCameraStream(null); setPhotoMode("none") }
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return
-    const reader = new FileReader()
-    reader.onload = ev => setCapturedPhoto(ev.target?.result as string)
-    reader.readAsDataURL(file)
-  }
-
-  const filtered = statusFilter === "ALL" ? guards : guards.filter(g => (g.status ?? "ACTIVE") === statusFilter)
-
-  const fmtDate = (iso: string | null) => iso ? new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : null
-
-  const inpSt = (key: string): React.CSSProperties => ({
-    width: "100%", padding: "9px 12px", border: `1.5px solid ${fieldErrors[key] ? "#DC2626" : "#E2E8F0"}`,
-    borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const,
-    background: fieldErrors[key] ? "#FFF5F5" : "#fff", outline: "none",
-  })
-
-  const FErr = ({ name }: { name: string }) => fieldErrors[name] ? (
+function FieldError({ fieldErrors, name }: { fieldErrors: Record<string, string>; name: string }) {
+  return fieldErrors[name] ? (
     <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#DC2626", marginTop: 4 }}>
       <AlertCircle size={12} />{fieldErrors[name]}
     </div>
   ) : null
+}
 
-  const StatusBadge = ({ status }: { status?: string }) => {
-    const s = STATUS_MAP[status ?? "ACTIVE"] ?? STATUS_MAP.ACTIVE
-    const Icon = s.icon
-    return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: s.bg, color: s.color, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" as const }}><Icon size={10} />{s.label}</span>
+function inputStyle(fieldErrors: Record<string, string>, key: string): React.CSSProperties {
+  return {
+    width: "100%", padding: "9px 12px", border: `1.5px solid ${fieldErrors[key] ? "#DC2626" : "#E2E8F0"}`,
+    borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const,
+    background: fieldErrors[key] ? "#FFF5F5" : "#fff", outline: "none",
   }
+}
 
+// ── GuardFormFields — now a real top-level component (THE FIX) ────────────────
+//
+// Previously defined inside GuardsTab as `const GuardForm = () => (...)`.
+// Moved out here so it has a stable component identity across renders --
+// see the file-header comment for the full explanation of why that inline
+// definition caused the cursor-jump bug.
+
+interface GuardFormFieldsProps {
+  form: GuardFormState
+  setForm: React.Dispatch<React.SetStateAction<GuardFormState>>
+  fieldErrors: Record<string, string>
+  setFieldErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>
+  capturedPhoto: string | null
+  setCapturedPhoto: (v: string | null) => void
+  photoMode: "none" | "camera"
+  videoRef: React.RefObject<HTMLVideoElement>
+  canvasRef: React.RefObject<HTMLCanvasElement>
+  startCamera: () => void
+  capturePhoto: () => void
+  stopCamera: () => void
+  handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
+  fpStatus: "idle" | "scanning" | "done"
+  setFpStatus: (v: "idle" | "scanning" | "done") => void
+}
+
+function GuardFormFields({
+  form, setForm, fieldErrors, setFieldErrors,
+  capturedPhoto, setCapturedPhoto, photoMode,
+  videoRef, canvasRef, startCamera, capturePhoto, stopCamera,
+  handleFileUpload, fpStatus, setFpStatus,
+}: GuardFormFieldsProps) {
   const idFeedback = validateSaId(form.idNumber)
+  const inpSt = (key: string) => inputStyle(fieldErrors, key)
 
-  // ── Guard Form (shared for add + edit) ────────────────────────────────────
-
-  const GuardForm = () => (
+  return (
     <>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <div>
           <label style={lbl}>First Name *</label>
           <input value={form.firstName} onChange={e => { setForm(f => ({ ...f, firstName: e.target.value })); setFieldErrors(f => omit(f, "firstName")) }} placeholder="James" style={inpSt("firstName")} autoFocus />
-          <FErr name="firstName" />
+          <FieldError fieldErrors={fieldErrors} name="firstName" />
         </div>
         <div>
           <label style={lbl}>Last Name *</label>
           <input value={form.lastName} onChange={e => { setForm(f => ({ ...f, lastName: e.target.value })); setFieldErrors(f => omit(f, "lastName")) }} placeholder="Dlamini" style={inpSt("lastName")} />
-          <FErr name="lastName" />
+          <FieldError fieldErrors={fieldErrors} name="lastName" />
         </div>
         <div>
           <label style={lbl}>PSiRA Number</label>
@@ -273,7 +200,7 @@ export default function GuardsTab() {
           <input value={form.idNumber}
             onChange={e => { setForm(f => ({ ...f, idNumber: e.target.value.replace(/\D/g, "").slice(0, 13) })); setFieldErrors(f => omit(f, "idNumber")) }}
             placeholder="8501015026088" inputMode="numeric" style={inpSt("idNumber")} />
-          <FErr name="idNumber" />
+          <FieldError fieldErrors={fieldErrors} name="idNumber" />
           {form.idNumber.length === 13 && (
             idFeedback.valid ? (
               <div style={{ marginTop: 6, padding: "8px 10px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 7, fontSize: 12, color: "#166534", display: "flex", gap: 14 }}>
@@ -291,7 +218,7 @@ export default function GuardsTab() {
         <div>
           <label style={lbl}>Phone</label>
           <input value={form.phone} onChange={e => { setForm(f => ({ ...f, phone: e.target.value })); setFieldErrors(f => omit(f, "phone")) }} placeholder="+27 82 555 0101" style={inpSt("phone")} />
-          <FErr name="phone" />
+          <FieldError fieldErrors={fieldErrors} name="phone" />
         </div>
         <div>
           <label style={lbl}>PSiRA Grade</label>
@@ -365,6 +292,139 @@ export default function GuardsTab() {
       </div>
     </>
   )
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
+export default function GuardsTab() {
+  const qc = useQueryClient()
+  const videoRef  = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  const [search,          setSearch]          = useState("")
+  const [showAdd,         setShowAdd]         = useState(false)
+  const [editing,         setEditing]         = useState<Guard | null>(null)
+  const [viewing,         setViewing]         = useState<Guard | null>(null)
+  const [deleting,        setDeleting]        = useState<Guard | null>(null)
+  const [changingStatus,  setChangingStatus]  = useState<Guard | null>(null)
+  const [form,            setForm]            = useState<GuardFormState>(EMPTY_FORM)
+  const [fieldErrors,     setFieldErrors]     = useState<Record<string, string>>({})
+  const [apiError,        setApiError]        = useState("")
+  const [photoMode,       setPhotoMode]       = useState<"none" | "camera">("none")
+  const [capturedPhoto,   setCapturedPhoto]   = useState<string | null>(null)
+  const [cameraStream,    setCameraStream]    = useState<MediaStream | null>(null)
+  const [fpStatus,        setFpStatus]        = useState<"idle" | "scanning" | "done">("idle")
+  const [statusFilter,    setStatusFilter]    = useState("ALL")
+  const [newStatus,       setNewStatus]       = useState("")
+  const [statusNote,      setStatusNote]      = useState("")
+
+  // ── Queries & mutations ────────────────────────────────────────────────────
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["guards", search],
+    queryFn: async () => {
+      const params = search ? `?search=${encodeURIComponent(search)}&size=100` : "?size=100"
+      const res = await apiClient.get(`/api/v1/security/guards${params}`)
+      const payload = res.data?.data ?? res.data
+      return (payload?.content ?? payload) as Guard[]
+    },
+  })
+  const guards = data ?? []
+
+  const createGuard = useMutation({
+    mutationFn: (body: any) => apiClient.post("/api/v1/security/guards", body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["guards"] }); closeAdd() },
+    onError:   (e: any) => {
+      const d = e.response?.data
+      if (d?.errors && typeof d.errors === "object") setFieldErrors(d.errors)
+      else setApiError(d?.message ?? "Failed to create guard")
+    },
+  })
+
+  const updateGuard = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: any }) => apiClient.put(`/api/v1/security/guards/${id}`, body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["guards"] }); closeEdit() },
+    onError:   (e: any) => setApiError(e.response?.data?.message ?? "Failed to update guard"),
+  })
+
+  const updateStatus = useMutation({
+    mutationFn: ({ id, status, note }: { id: string; status: string; note: string }) =>
+      apiClient.patch(`/api/v1/security/guards/${id}/status`, { status, note }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["guards"] })
+      setChangingStatus(null); setNewStatus(""); setStatusNote("")
+    },
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to update status"),
+  })
+
+  const deleteGuard = useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/api/v1/security/guards/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["guards"] }); setDeleting(null) },
+    onError:   (e: any) => setApiError(e.response?.data?.message ?? "Failed to remove guard"),
+  })
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  const closeAdd  = () => { setShowAdd(false);  setForm(EMPTY_FORM); setFieldErrors({}); setApiError(""); stopCamera(); setCapturedPhoto(null); setFpStatus("idle") }
+  const closeEdit = () => { setEditing(null);   setForm(EMPTY_FORM); setFieldErrors({}); setApiError(""); stopCamera(); setCapturedPhoto(null); setFpStatus("idle") }
+
+  const openEdit = (g: Guard) => {
+    setEditing(g)
+    setForm({ firstName: g.firstName, lastName: g.lastName,
+              psiraNumber: g.psiraNumber ?? "", idNumber: g.idNumber ?? "",
+              phone: g.phone ?? "", grade: g.grade, notes: g.notes ?? "",
+              psiraExpiryDate: g.psiraExpiryDate ?? "" })
+    setCapturedPhoto(g.photoUrl && g.photoUrl !== "PENDING_UPLOAD" ? g.photoUrl : null)
+    setFieldErrors({}); setApiError("")
+  }
+
+  const handleSubmit = (isEdit: boolean) => {
+    const errs: Record<string, string> = {}
+    if (!form.firstName.trim()) errs.firstName = "First name is required"
+    if (!form.lastName.trim())  errs.lastName  = "Last name is required"
+    if (form.phone && !/^(\+|0)[\d\s\-]{7,}$/.test(form.phone)) errs.phone = "Phone must start with + or 0"
+    if (form.idNumber) { const r = validateSaId(form.idNumber); if (!r.valid) errs.idNumber = r.error! }
+    setFieldErrors(errs)
+    if (Object.keys(errs).length > 0) return
+    const body = { ...form, photoUrl: capturedPhoto ?? undefined, psiraExpiryDate: form.psiraExpiryDate || null }
+    if (isEdit && editing) updateGuard.mutate({ id: editing.id, body })
+    else createGuard.mutate(body)
+  }
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+      setCameraStream(stream); setPhotoMode("camera")
+      setTimeout(() => { if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play() } }, 100)
+    } catch { setApiError("Camera access denied") }
+  }
+
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return
+    const c = canvasRef.current
+    c.width = videoRef.current.videoWidth; c.height = videoRef.current.videoHeight
+    c.getContext("2d")?.drawImage(videoRef.current, 0, 0)
+    setCapturedPhoto(c.toDataURL("image/jpeg", 0.8)); stopCamera()
+  }
+
+  const stopCamera = () => { cameraStream?.getTracks().forEach(t => t.stop()); setCameraStream(null); setPhotoMode("none") }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => setCapturedPhoto(ev.target?.result as string)
+    reader.readAsDataURL(file)
+  }
+
+  const filtered = statusFilter === "ALL" ? guards : guards.filter(g => (g.status ?? "ACTIVE") === statusFilter)
+
+  const fmtDate = (iso: string | null) => iso ? new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : null
+
+  const StatusBadge = ({ status }: { status?: string }) => {
+    const s = STATUS_MAP[status ?? "ACTIVE"] ?? STATUS_MAP.ACTIVE
+    const Icon = s.icon
+    return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: s.bg, color: s.color, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" as const }}><Icon size={10} />{s.label}</span>
+  }
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -471,7 +531,10 @@ export default function GuardsTab() {
                         <GuardAvatar guard={g} size={36} />
                         <div>
                           <div style={{ fontWeight: 600, color: unavail ? "#94A3B8" : "#0F172A" }}>{g.fullName}</div>
-                          <div style={{ fontSize: 12, color: "#94A3B8" }}>ID: {g.idNumber || "—"}</div>
+                          <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                            ID: {g.idNumber || "—"}
+                            {g.employeeCode && <span style={{ marginLeft: 8, fontFamily: "monospace", color: "#7C3AED", fontWeight: 600 }}>{g.employeeCode}</span>}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -511,14 +574,30 @@ export default function GuardsTab() {
       {/* ── Add / Edit modals ─────────────────────────────────────────────── */}
       {showAdd && (
         <Modal title="Add New Guard" onClose={closeAdd} width={580}>
-          <GuardForm />
+          <GuardFormFields
+            form={form} setForm={setForm}
+            fieldErrors={fieldErrors} setFieldErrors={setFieldErrors}
+            capturedPhoto={capturedPhoto} setCapturedPhoto={setCapturedPhoto}
+            photoMode={photoMode} videoRef={videoRef} canvasRef={canvasRef}
+            startCamera={startCamera} capturePhoto={capturePhoto} stopCamera={stopCamera}
+            handleFileUpload={handleFileUpload}
+            fpStatus={fpStatus} setFpStatus={setFpStatus}
+          />
           {apiError && <ErrBanner msg={apiError} />}
           <Footer onCancel={closeAdd} onSubmit={() => handleSubmit(false)} loading={createGuard.isPending} label="Add Guard" />
         </Modal>
       )}
       {editing && (
         <Modal title={`Edit — ${editing.fullName}`} onClose={closeEdit} width={580}>
-          <GuardForm />
+          <GuardFormFields
+            form={form} setForm={setForm}
+            fieldErrors={fieldErrors} setFieldErrors={setFieldErrors}
+            capturedPhoto={capturedPhoto} setCapturedPhoto={setCapturedPhoto}
+            photoMode={photoMode} videoRef={videoRef} canvasRef={canvasRef}
+            startCamera={startCamera} capturePhoto={capturePhoto} stopCamera={stopCamera}
+            handleFileUpload={handleFileUpload}
+            fpStatus={fpStatus} setFpStatus={setFpStatus}
+          />
           {apiError && <ErrBanner msg={apiError} />}
           <Footer onCancel={closeEdit} onSubmit={() => handleSubmit(true)} loading={updateGuard.isPending} label="Save Changes" />
         </Modal>
@@ -543,6 +622,7 @@ export default function GuardsTab() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             {[
+              { label: "Employee Code", value: viewing.employeeCode || "—" },
               { label: "PSiRA Number", value: viewing.psiraNumber || "—" },
               { label: "SA ID Number", value: viewing.idNumber || "—" },
               { label: "Phone",        value: viewing.phone || "—" },
@@ -711,14 +791,6 @@ function Modal({ title, onClose, children, width = 540 }: { title: string; onClo
         )}
         {children}
       </div>
-    </div>
-  )
-}
-
-function ErrBanner({ msg }: { msg: string }) {
-  return (
-    <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}>
-      <AlertCircle size={14} />{msg}
     </div>
   )
 }

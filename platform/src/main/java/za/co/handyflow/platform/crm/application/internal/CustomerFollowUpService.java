@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.crm.domain.model.CustomerFollowUp;
 import za.co.handyflow.platform.crm.domain.repository.CustomerFollowUpRepository;
 import za.co.handyflow.platform.crm.domain.repository.CustomerRepository;
+import za.co.handyflow.platform.crm.dto.CompleteFollowUpRequest;
 import za.co.handyflow.platform.crm.dto.CreateFollowUpRequest;
 import za.co.handyflow.platform.crm.dto.FollowUpResponse;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
@@ -44,10 +45,33 @@ public class CustomerFollowUpService {
                 .toList();
     }
 
+    /**
+     * FIX: "what if follow-ups were unsuccessful, rescheduled and all" —
+     * completion now requires an outcome. RESCHEDULED specifically creates
+     * a brand new follow-up (same customer, same note, same assignee, the
+     * new due date) linked back via rescheduledFromId — a real chain of
+     * attempts, not one row silently reopened and re-dated. The original
+     * stays completed with outcome=RESCHEDULED; it's history, not undone.
+     */
     @Transactional
-    public FollowUpResponse complete(TenantId tenantId, UUID followUpId, UUID completedBy) {
+    public FollowUpResponse complete(TenantId tenantId, UUID followUpId,
+                                     CompleteFollowUpRequest req, UUID completedBy) {
         var followUp = findOrThrow(tenantId, followUpId);
-        followUp.complete(completedBy);
+        followUp.complete(req.outcome(), completedBy);
+
+        if (req.outcome() == CustomerFollowUp.Outcome.RESCHEDULED) {
+            if (req.rescheduleDate() == null) {
+                throw new IllegalArgumentException("A new due date is required when rescheduling");
+            }
+            var next = CustomerFollowUp.create(
+                    tenantId, followUp.getCustomerId(), req.rescheduleDate(),
+                    followUp.getNote(), followUp.getAssignedTo(), completedBy,
+                    followUp.getId());
+            followUpRepository.save(next);
+            log.info("[CRM] Follow-up rescheduled customer={} from={} to new due={} tenant={}",
+                    followUp.getCustomerId(), followUp.getId(), req.rescheduleDate(), tenantId);
+        }
+
         return toResponse(followUp);
     }
 
@@ -73,7 +97,9 @@ public class CustomerFollowUpService {
         return new FollowUpResponse(
                 f.getId(), f.getCustomerId(), f.getDueDate(), f.getNote(),
                 f.getAssignedTo(), f.isCompleted(), f.getCompletedAt(),
-                f.isOverdue(), f.getCreatedAt()
+                f.isOverdue(), f.getCreatedAt(),
+                f.getOutcome() != null ? f.getOutcome().name() : null,
+                f.getRescheduledFromId()
         );
     }
 }

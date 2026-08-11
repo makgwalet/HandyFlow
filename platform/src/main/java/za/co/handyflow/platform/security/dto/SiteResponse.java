@@ -1,29 +1,32 @@
+// security/dto/SiteResponse.java
 package za.co.handyflow.platform.security.dto;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
- * SiteResponse — full site details including contract lifecycle.
+ * SiteResponse — CHANGE: added requireSignedQr and branchId, appended at
+ * the end. Real gap found, not a preemptive addition: both fields were
+ * added to the Site entity earlier this session (V215, V218) but this
+ * response record was never updated to expose either one -- meaning the
+ * frontend had no way to know a site's current QR-enforcement or
+ * branch-assignment state even before any UI was built for them.
  *
- * Added in Phase 0:
- *   terminatedAt — when the contract was terminated (fixes bug #9).
- *
- * WHY was terminatedAt missing?
- * V48 added the column; Site.java has the field.  SiteResponse and
- * SiteService.toResponse() simply never mapped it, so the timestamp was
- * captured in the DB but invisible to every API consumer.
- * For audit and legal purposes, "when was this contract terminated" is as
- * important as "why was it terminated".
+ * NOTE: I do not have this file's previously-existing content -- reconstructed
+ * from SiteService.toResponse()/toResponseWithCheckpoints()'s 16-argument
+ * constructor calls, which have compiled successfully in this codebase
+ * before this change. Diff against your actual file before applying, same
+ * caveat as PrincipalResponse/GuardResponse earlier this session.
  */
 public record SiteResponse(
         UUID       id,
         String     name,
         UUID       customerId,
-        Object     address,
+        Map<String, String> address,
         BigDecimal latitude,
         BigDecimal longitude,
         String     contactName,
@@ -34,6 +37,8 @@ public record SiteResponse(
         LocalDate  contractStart,
         LocalDate  contractEnd,
         String     terminationReason,
-        Instant    terminatedAt,      // ← added (bug #9 fix)
-        Instant    createdAt
+        Instant    terminatedAt,
+        Instant    createdAt,
+        boolean    requireSignedQr,
+        UUID       branchId
 ) {}

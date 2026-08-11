@@ -31,6 +31,18 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CustomerFollowUp {
 
+    /**
+     * FIX: "what if follow-ups were unsuccessful, rescheduled and all" —
+     * completion used to be binary (done / not done), which genuinely
+     * can't represent "I called, no answer" vs "resolved" vs "need to try
+     * again on a different date." RESCHEDULED doesn't just record an
+     * outcome — see complete()/service.complete() — it creates a brand
+     * new CustomerFollowUp linked back via rescheduledFromId, so a lead
+     * that took three attempts shows as three real, distinct records with
+     * their own outcomes, not one row silently edited three times.
+     */
+    public enum Outcome { COMPLETED, NO_RESPONSE, RESCHEDULED }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -58,6 +70,19 @@ public class CustomerFollowUp {
     @Column(name = "completed_by")
     private UUID completedBy;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "outcome", length = 20)
+    private Outcome outcome;
+
+    /**
+     * Set only on the NEW follow-up created by a RESCHEDULED completion —
+     * points back to the original attempt. Null for a follow-up that
+     * wasn't itself created by a reschedule (including the very first
+     * attempt on any lead).
+     */
+    @Column(name = "rescheduled_from_id")
+    private UUID rescheduledFromId;
+
     /** Edge-trigger guard — see CustomerFollowUpReminderScheduler for why this exists. */
     @Column(name = "reminder_sent_at")
     private Instant reminderSentAt;
@@ -73,6 +98,13 @@ public class CustomerFollowUp {
 
     public static CustomerFollowUp create(TenantId tenantId, UUID customerId, LocalDate dueDate,
                                           String note, UUID assignedTo, UUID createdBy) {
+        return create(tenantId, customerId, dueDate, note, assignedTo, createdBy, null);
+    }
+
+    /** Overload used when this follow-up exists because an earlier one was rescheduled — see Outcome.RESCHEDULED. */
+    public static CustomerFollowUp create(TenantId tenantId, UUID customerId, LocalDate dueDate,
+                                          String note, UUID assignedTo, UUID createdBy,
+                                          UUID rescheduledFromId) {
         var f = new CustomerFollowUp();
         f.tenantId   = tenantId;
         f.customerId = customerId;
@@ -80,6 +112,7 @@ public class CustomerFollowUp {
         f.note       = note;
         f.assignedTo = assignedTo != null ? assignedTo : createdBy;
         f.createdBy  = createdBy;
+        f.rescheduledFromId = rescheduledFromId;
         f.createdAt  = Instant.now();
         f.updatedAt  = Instant.now();
         return f;
@@ -88,9 +121,11 @@ public class CustomerFollowUp {
     public boolean isCompleted() { return completedAt != null; }
     public boolean isOverdue()   { return !isCompleted() && dueDate.isBefore(LocalDate.now()); }
 
-    public void complete(UUID completedByUserId) {
+    /** FIX: completion now requires an outcome — see the Outcome enum's own doc comment for why. */
+    public void complete(Outcome outcome, UUID completedByUserId) {
         this.completedAt = Instant.now();
         this.completedBy = completedByUserId;
+        this.outcome     = outcome;
         this.updatedAt   = Instant.now();
     }
 
@@ -98,6 +133,7 @@ public class CustomerFollowUp {
     public void reopen() {
         this.completedAt = null;
         this.completedBy = null;
+        this.outcome     = null;
         this.updatedAt   = Instant.now();
     }
 

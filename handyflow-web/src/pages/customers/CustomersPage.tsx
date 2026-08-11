@@ -3,7 +3,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, Search, Trash2, Eye, Pencil, Mail, Phone, MapPin, Hash,
-  AlertTriangle, AlertCircle, Users, ChevronLeft, ChevronRight,
+  AlertTriangle, AlertCircle, Users, ChevronLeft, ChevronRight, ChevronDown,
   RotateCcw, Clock, Tag, X, FileText, CheckCircle2, Ban, TrendingDown, Check, Upload, FileDown,
 } from 'lucide-react'
 import { apiClient } from '../../api/client'
@@ -16,6 +16,7 @@ import { ExportButton }       from './ExportButton'
 import { ImportModal }        from './ImportModal'
 import { Customer360Panel }   from './Customer360Panel'
 import { ConsentPanel }       from './ConsentPanel'
+import { StageSelector }      from './StageSelector'
 import { FollowUpPanel }      from './FollowUpPanel'
 import { CommunicationPanel } from './CommunicationPanel'
 
@@ -861,6 +862,7 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
   const trapRef   = useFocusTrap(true)
   const statusCfg = STATUS_CONFIG[c.status]
   const typeCfg   = TYPE_CONFIG[c.customerType]
+  const [activeTab, setActiveTab] = useState<'overview' | 'followups' | 'communications' | 'consent'>('overview')
 
   const downloadProfilePdf = async (id: string, name: string) => {
     try {
@@ -885,12 +887,16 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
   // request a staff member is actively fulfilling for a customer, so a
   // failure needs to be visible, not swallowed.
   const [popiaError, setPopiaError] = useState<string | null>(null)
-  const downloadPopiaExport = async (id: string, name: string) => {
-    setPopiaError(null)
+  const [popiaMenuOpen, setPopiaMenuOpen] = useState(false)
+  const downloadPopiaExport = async (id: string, name: string, format: 'json' | 'pdf') => {
+    setPopiaError(null); setPopiaMenuOpen(false)
     try {
-      const res      = await apiClient.get(`/api/v1/crm/customers/${id}/popia-export`, { responseType: 'blob' })
-      const filename = `popia-export-${name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.json`
-      const url      = URL.createObjectURL(new Blob([res.data], { type: 'application/json' }))
+      const path = format === 'pdf' ? `/api/v1/crm/customers/${id}/popia-export.pdf` : `/api/v1/crm/customers/${id}/popia-export`
+      const res      = await apiClient.get(path, { responseType: 'blob' })
+      const slug      = name.replace(/[^a-z0-9]/gi, '-').toLowerCase()
+      const filename = `popia-export-${slug}-${new Date().toISOString().slice(0, 10)}.${format}`
+      const mime     = format === 'pdf' ? 'application/pdf' : 'application/json'
+      const url      = URL.createObjectURL(new Blob([res.data], { type: mime }))
       const link     = document.createElement('a')
       link.href = url; link.download = filename
       document.body.appendChild(link); link.click()
@@ -921,56 +927,85 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
           <button onClick={onClose} className={styles.closeBtn} aria-label="Close"><X size={20} /></button>
         </div>
 
-        <div className={styles.detailGrid}>
-          {c.email     && <Detail icon={Mail}     label="Email"      value={c.email} />}
-          {c.phone     && <Detail icon={Phone}    label="Phone"      value={c.phone} />}
-          {c.taxNumber && <Detail icon={Hash}     label="VAT Number" value={c.taxNumber} />}
-          {c.address && Object.values(c.address).some(Boolean) && (
-            <Detail icon={MapPin} label="Address" fullWidth
-              value={[c.address.street, c.address.suburb, c.address.city,
-                      c.address.province, c.address.postalCode].filter(Boolean).join(', ')}
-            />
-          )}
+        <StageSelector customerId={c.id} customerType={c.customerType} />
+
+        {/* FIX: "view modal is getting long" — Consent/Follow-ups/
+            Communications were all stacked inline (on top of the detail
+            grid, tags, notes, and Customer 360), making the modal an
+            ever-growing scroll. Activity Timeline already opened as its
+            own separate view (onTimeline, unchanged below) — this applies
+            that same decision consistently instead of leaving two
+            different patterns (a separate view vs. inline collapsible
+            panels) side by side. */}
+        <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid #E2E8F0', marginBottom: 16 }}>
+          {([
+            { key: 'overview', label: 'Overview' },
+            { key: 'followups', label: 'Follow-ups' },
+            { key: 'communications', label: 'Communications' },
+            { key: 'consent', label: 'Consent' },
+          ] as const).map(tab => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+              style={{
+                padding: '8px 4px', marginRight: 16, background: 'none', border: 'none',
+                borderBottom: activeTab === tab.key ? '2px solid #1D4ED8' : '2px solid transparent',
+                fontSize: 13, fontWeight: activeTab === tab.key ? 700 : 500,
+                color: activeTab === tab.key ? '#1D4ED8' : '#64748B',
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* Tags — same TagPicker used in the table row */}
-        <div className={styles.section}>
-          <div className={styles.sectionLabel}><Tag size={12} /> Tags</div>
-          <div className={styles.tagList}>
-            {c.tags.map(tag => {
-              const def = tagDef(tag)
-              return (
-                <span key={tag} className={styles.tag}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: def.color, flexShrink: 0, display: 'inline-block' }} />
-                  {def.label}
-                  <button className={styles.tagRemove} onClick={() => onRemoveTag(tag)} aria-label={`Remove ${def.label}`}>
-                    <X size={9} />
-                  </button>
-                </span>
-              )
-            })}
-            <TagPicker currentTags={c.tags} onAdd={onAddTag} onRemove={onRemoveTag} />
-          </div>
-        </div>
+        {activeTab === 'overview' && (
+          <>
+            <div className={styles.detailGrid}>
+              {c.email     && <Detail icon={Mail}     label="Email"      value={c.email} />}
+              {c.phone     && <Detail icon={Phone}    label="Phone"      value={c.phone} />}
+              {c.taxNumber && <Detail icon={Hash}     label="VAT Number" value={c.taxNumber} />}
+              {c.address && Object.values(c.address).some(Boolean) && (
+                <Detail icon={MapPin} label="Address" fullWidth
+                  value={[c.address.street, c.address.suburb, c.address.city,
+                          c.address.province, c.address.postalCode].filter(Boolean).join(', ')}
+                />
+              )}
+            </div>
 
-        {c.notes && (
-          <div className={styles.notesBox}>
-            <div className={styles.sectionLabel}><FileText size={12} /> Notes</div>
-            <p className={styles.notesText}>{c.notes}</p>
-          </div>
+            {/* Tags — same TagPicker used in the table row */}
+            <div className={styles.section}>
+              <div className={styles.sectionLabel}><Tag size={12} /> Tags</div>
+              <div className={styles.tagList}>
+                {c.tags.map(tag => {
+                  const def = tagDef(tag)
+                  return (
+                    <span key={tag} className={styles.tag}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: def.color, flexShrink: 0, display: 'inline-block' }} />
+                      {def.label}
+                      <button className={styles.tagRemove} onClick={() => onRemoveTag(tag)} aria-label={`Remove ${def.label}`}>
+                        <X size={9} />
+                      </button>
+                    </span>
+                  )
+                })}
+                <TagPicker currentTags={c.tags} onAdd={onAddTag} onRemove={onRemoveTag} />
+              </div>
+            </div>
+
+            {c.notes && (
+              <div className={styles.notesBox}>
+                <div className={styles.sectionLabel}><FileText size={12} /> Notes</div>
+                <p className={styles.notesText}>{c.notes}</p>
+              </div>
+            )}
+
+            {/* Customer 360 — linked bookings & invoice summary */}
+            <Customer360Panel customerId={c.id} />
+          </>
         )}
 
-        {/* Customer 360 — linked bookings & invoice summary */}
-        <Customer360Panel customerId={c.id} />
-
-        {/* POPIA consent status — collapsible */}
-        <ConsentPanel customerId={c.id} />
-
-        {/* Task/follow-up reminders */}
-        <FollowUpPanel customerId={c.id} />
-
-        {/* Email/call/meeting log */}
-        <CommunicationPanel customerId={c.id} />
+        {activeTab === 'followups' && <FollowUpPanel customerId={c.id} />}
+        {activeTab === 'communications' && <CommunicationPanel customerId={c.id} />}
+        {activeTab === 'consent' && <ConsentPanel customerId={c.id} />}
 
         <p className={styles.updatedLine}>Last updated {formatDateTime(c.updatedAt)}</p>
 
@@ -996,12 +1031,36 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
             title="Download customer profile as PDF">
             <FileDown size={14} /> Profile PDF
           </button>
-          <button
-            className={styles.btnGhostSm}
-            onClick={() => downloadPopiaExport(c.id, c.name)}
-            title="Download the full POPIA Section 23 data subject export">
-            <FileDown size={14} /> POPIA Export
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button
+              className={styles.btnGhostSm}
+              onClick={() => setPopiaMenuOpen(o => !o)}
+              title="Download the full POPIA Section 23 data subject export"
+              aria-haspopup="menu"
+              aria-expanded={popiaMenuOpen}>
+              <FileDown size={14} /> POPIA Export <ChevronDown size={12} />
+            </button>
+            {popiaMenuOpen && (
+              <div role="menu" style={{
+                position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
+                background: 'white', border: '1px solid #E2E8F0', borderRadius: 10,
+                boxShadow: '0 4px 16px rgba(0,0,0,.1)', minWidth: 160, zIndex: 200, overflow: 'hidden',
+              }}>
+                <button role="menuitem" onClick={() => downloadPopiaExport(c.id, c.name, 'pdf')}
+                  style={{ display: 'block', width: '100%', padding: '9px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#0F172A', borderBottom: '1px solid #F1F5F9' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#F8FAFC')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                  PDF (readable document)
+                </button>
+                <button role="menuitem" onClick={() => downloadPopiaExport(c.id, c.name, 'json')}
+                  style={{ display: 'block', width: '100%', padding: '9px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#0F172A' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#F8FAFC')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                  JSON (machine-readable)
+                </button>
+              </div>
+            )}
+          </div>
           <button className={styles.btnPrimary} onClick={onEdit}>
             <Pencil size={14} /> Edit Customer
           </button>

@@ -9,11 +9,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.security.domain.model.Checkpoint;
 import za.co.handyflow.platform.security.domain.model.CheckpointLog;
-import za.co.handyflow.platform.security.domain.model.Site;
 import za.co.handyflow.platform.security.domain.repository.CheckpointLogRepository;
 import za.co.handyflow.platform.security.domain.repository.CheckpointRepository;
 import za.co.handyflow.platform.security.domain.repository.ShiftRepository;
-import za.co.handyflow.platform.security.domain.repository.SiteRepository;
 import za.co.handyflow.platform.security.dto.ScanRequest;
 import za.co.handyflow.platform.security.dto.ScanResponse;
 import za.co.handyflow.platform.shared.HandyFlowException;
@@ -30,9 +28,16 @@ import java.util.UUID;
 /**
  * CheckpointScanService — fixes bugs #6, #7, #11, #13, #18.
  *
+ * CHANGE (V217): QR signing moved from a site-wide secret to a
+ * per-checkpoint secret (Checkpoint.qrSecret). generateQrPayload() and
+ * verifyQrHmac() both now read the secret directly off the Checkpoint
+ * entity instead of doing a separate Site lookup -- SiteRepository is no
+ * longer a dependency of this service at all as a result. See
+ * Checkpoint.java's class javadoc for the full rationale (per-checkpoint
+ * blast radius on regeneration, not per-site).
+ *
  * Bug #13: guardId resolved from authenticated session, NOT the request body.
- * Bug #7:  HMAC-SHA256 QR verification using site.qrSecret (ENFORCE_QR_HMAC flag
- *          is false until guard app ships signed QRs).
+ * Bug #7:  HMAC-SHA256 QR verification using checkpoint.qrSecret.
  * Bug #6:  scanType routing — NFC/BLE have dedicated lookup methods.
  * Bug #11: All checkpoint lookups include tenantId scoping.
  * Bug #18: 60s cooldown per checkpoint per shift.
@@ -42,14 +47,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CheckpointScanService {
 
-    static final int     SCAN_COOLDOWN_SECONDS = 60;
-    // Set to true once the guard app ships HMAC-signed QR payloads (Phase 1).
-    static final boolean ENFORCE_QR_HMAC       = false;
+    static final int SCAN_COOLDOWN_SECONDS = 60;
 
     private final CheckpointRepository    checkpointRepository;
     private final CheckpointLogRepository logRepository;
     private final ShiftRepository         shiftRepository;
-    private final SiteRepository          siteRepository;
 
     /**
      * @param authenticatedGuardId Resolved from HTTP session by the controller.
@@ -61,7 +63,8 @@ public class CheckpointScanService {
 
         Checkpoint checkpoint = resolveCheckpoint(tenantId, req, scanType);
 
-        if ("QR".equals(scanType) && ENFORCE_QR_HMAC) {
+        // Per-site enforcement (V215), not a global constant.
+        if ("QR".equals(scanType) && checkpoint.getSite().isRequireSignedQr()) {
             verifyQrHmac(checkpoint, req.qrCode());
         }
 
@@ -97,7 +100,7 @@ public class CheckpointScanService {
     /**
      * Wire format: "{checkpointId}:{siteId}:{Base64url(HMAC-SHA256(secret, payload))}"
      * The guard app generates QR images from this string; scanning returns this string.
-     * Phase 1: add timestamp segment for expiry window.
+     * secret is checkpoint.qrSecret (V217) — no separate Site lookup needed.
      */
     private void verifyQrHmac(Checkpoint checkpoint, String qrCode) {
         String[] parts = qrCode != null ? qrCode.split(":") : new String[0];
@@ -109,13 +112,9 @@ public class CheckpointScanService {
         String payload   = parts[0] + ":" + parts[1];
         String signature = parts[2];
 
-        String secret = siteRepository.findById(checkpoint.getSite().getId())
-                .map(Site::getQrSecret)
-                .orElseThrow(() -> new HandyFlowException(
-                        "Site configuration error", HttpStatus.INTERNAL_SERVER_ERROR, "SITE_NOT_FOUND"));
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(secret.getBytes(), "HmacSHA256"));
+            mac.init(new SecretKeySpec(checkpoint.getQrSecret().getBytes(), "HmacSHA256"));
             String expected = Base64.getUrlEncoder().withoutPadding()
                     .encodeToString(mac.doFinal(payload.getBytes()));
             if (!expected.equals(signature)) {
@@ -132,12 +131,20 @@ public class CheckpointScanService {
         }
     }
 
-    /** Generates a signed QR payload for a checkpoint. Called by Phase 1 QR generation endpoint. */
-    public String generateQrPayload(Checkpoint checkpoint, String siteSecret) {
+    /**
+     * Generates a signed QR payload for a checkpoint, using the
+     * checkpoint's own secret (V217). Called by
+     * SiteService.getCheckpointQrPayload() and CheckpointQrPdfService --
+     * every checkpoint QR printed from now on uses this signed format,
+     * regardless of whether the site currently enforces signature
+     * verification (Site.requireSignedQr). That means flipping enforcement
+     * on later never requires a reprint of anything printed after V217.
+     */
+    public String generateQrPayload(Checkpoint checkpoint) {
         try {
             String payload = checkpoint.getId() + ":" + checkpoint.getSite().getId();
             Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(siteSecret.getBytes(), "HmacSHA256"));
+            mac.init(new SecretKeySpec(checkpoint.getQrSecret().getBytes(), "HmacSHA256"));
             String sig = Base64.getUrlEncoder().withoutPadding()
                     .encodeToString(mac.doFinal(payload.getBytes()));
             return payload + ":" + sig;
@@ -153,7 +160,7 @@ public class CheckpointScanService {
             case "QR" -> {
                 if (req.qrCode() == null || req.qrCode().isBlank()) throw new HandyFlowException(
                         "QR code is required for QR scan type", HttpStatus.BAD_REQUEST, "MISSING_QR_CODE");
-                // HMAC format: "{checkpointId}:{siteId}:{sig}" — try ID lookup first
+                // Signed format: "{checkpointId}:{siteId}:{sig}" — try ID lookup first
                 String lookupCode = req.qrCode().contains(":")
                         ? req.qrCode().split(":")[0] : req.qrCode();
                 yield tryUuidLookup(tenantId, lookupCode)
@@ -201,7 +208,6 @@ public class CheckpointScanService {
                 .orElseThrow(() -> new HandyFlowException(
                         "Shift not found", HttpStatus.BAD_REQUEST, "INVALID_SHIFT"));
 
-        // Guard must own the shift — catches the ghost-guard fraud pattern
         if (!shift.getGuardId().equals(guardId)) {
             log.warn("[Security] Guard {} tried to scan on shift owned by guard {} — rejected",
                     guardId, shift.getGuardId());
@@ -230,10 +236,6 @@ public class CheckpointScanService {
 
     // ── Haversine (used by IncidentService for bug #21) ────────────────────────
 
-    /**
-     * Calculates the distance in metres between two GPS coordinates (Haversine formula).
-     * Accurate to ~0.5% for distances under 20km — sufficient for site proximity checks.
-     */
     public static double haversineMetres(BigDecimal lat1, BigDecimal lon1,
                                          BigDecimal lat2, BigDecimal lon2) {
         final double R = 6_371_000;

@@ -16,6 +16,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Site — CHANGE (V218): added branchId + assignBranch(). Fixes a real gap
+ * found while scoping branch-level enforcement work: Guard already had
+ * primaryBranchId mapped, but Site had no branch_id field at all, despite
+ * BranchService's own javadoc describing it as an existing column. Same
+ * mutator naming convention as Guard.setPrimaryBranch().
+ *
+ * NOTE: this field alone does NOT enforce branch-scoped visibility --
+ * that requires resolving the acting user's own branch scope (via
+ * security_branch_assignments, not yet available) and filtering queries
+ * by it, which is a separate, larger piece of work. This just fixes the
+ * data model gap so a site CAN be assigned a branch at all -- everything
+ * else below is unchanged from the original.
+ */
 @Entity
 @Table(name = "security_sites")
 @Getter
@@ -98,6 +112,14 @@ public class Site {
     @Column(name = "portal_label")
     private String portalLabel;
 
+    @Column(name = "require_signed_qr", nullable = false)
+    private boolean requireSignedQr = false;
+
+    // ── V218: branch assignment ────────────────────────────────────────────────
+
+    @Column(name = "branch_id")
+    private UUID branchId;
+
     @Version
     private Long version;
 
@@ -151,6 +173,21 @@ public class Site {
     }
 
     public boolean isDeleted() { return deletedAt != null; }
+
+    public void setRequireSignedQr(boolean requireSignedQr) {
+        this.requireSignedQr = requireSignedQr;
+        this.updatedAt       = Instant.now();
+    }
+
+    /**
+     * Assigns this site to a branch (or clears the assignment if branchId
+     * is null). Same convention as Guard.setPrimaryBranch(). Does NOT by
+     * itself change who can see this site -- see class javadoc.
+     */
+    public void assignBranch(UUID branchId) {
+        this.branchId  = branchId;
+        this.updatedAt = Instant.now();
+    }
 
     @PreUpdate
     void onUpdate() { this.updatedAt = Instant.now(); }

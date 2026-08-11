@@ -12,10 +12,14 @@ import za.co.handyflow.platform.crm.domain.model.*;
 import za.co.handyflow.platform.crm.domain.repository.CustomerActivityRepository;
 import za.co.handyflow.platform.crm.domain.repository.CustomerRepository;
 import za.co.handyflow.platform.crm.dto.*;
+import za.co.handyflow.platform.notifications.application.Recipient;
+import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
 import za.co.handyflow.platform.shared.ConflictException;
+import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -58,6 +62,8 @@ public class CustomerService {
     private final CustomerRepository            customerRepository;
     private final CustomerActivityRepository    activityRepository;
     private final CustomerNameSimilarityChecker similarityChecker;
+    private final EmailService                  emailService;
+    private final TenantAdminRecipients         tenantAdminRecipients;
 
     // ══════════════════════════════════════════════════════════════════════
     // READ operations
@@ -170,7 +176,96 @@ public class CustomerService {
         customerRepository.save(customer);
         log.info("[CRM] Customer created id={} name='{}' tenant={} by={}",
                 customer.getId(), customer.getName(), tenantId, currentUserId());
+
+        // FIX: "no new-lead notification" gap — a new LEAD previously
+        // appeared with no signal to anyone until someone happened to open
+        // the customer list. Deliberately scoped to tenant admins, not a
+        // per-lead "owner" — Customer has no assignment/ownership field at
+        // all (confirmed: name/email/phone/address/taxNumber/notes/
+        // customerType/status/tags, nothing resembling an owner), and
+        // inventing one just to make this notification feel complete would
+        // be scope creep into "lead pipeline stages," which the audit
+        // already lists as its own separate, larger item. This is real
+        // value now (someone finds out); proper owner-routing is a natural
+        // upgrade once ownership exists, not a redesign of this hook.
+        if (customer.getCustomerType() == CustomerType.LEAD) {
+            notifyNewLead(tenantId, customer);
+        }
+
         return toResponse(customer);
+    }
+
+    private void notifyNewLead(TenantId tenantId, Customer customer) {
+        try {
+            List<Recipient> admins = tenantAdminRecipients.resolveTenantAdmins(tenantId);
+            if (admins.isEmpty()) {
+                log.info("[CRM] New lead={} created but no admin recipients could be resolved for tenant={} — not notified",
+                        customer.getId(), tenantId);
+                return;
+            }
+
+            String subject = "New lead: " + customer.getName();
+            StringBuilder html = new StringBuilder()
+                    .append("<p>A new lead has been added to the CRM.</p>")
+                    .append("<p><b>Name:</b> ").append(escapeHtml(customer.getName())).append("<br/>");
+            if (customer.getEmail() != null && !customer.getEmail().isBlank()) {
+                html.append("<b>Email:</b> ").append(escapeHtml(customer.getEmail())).append("<br/>");
+            }
+            if (customer.getPhone() != null && !customer.getPhone().isBlank()) {
+                html.append("<b>Phone:</b> ").append(escapeHtml(customer.getPhone())).append("<br/>");
+            }
+            html.append("</p>")
+                    .append("<p>Open the CRM to follow up.</p>");
+
+            for (Recipient admin : admins) {
+                if (admin.email() == null || admin.email().isBlank()) continue;
+                try {
+                    emailService.send(admin.email(), subject, html.toString());
+                } catch (Exception e) {
+                    log.warn("[CRM] New-lead notification not sent to={} tenant={}: {}",
+                            admin.email(), tenantId, e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            // Same principle as every other notification hookup in this
+            // codebase: the customer is already saved above and must not
+            // be undone by an email failure.
+            log.warn("[CRM] New-lead notification failed for customer={} tenant={}: {}",
+                    customer.getId(), tenantId, e.getMessage());
+        }
+    }
+
+    private String escapeHtml(String s) {
+        return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    /**
+     * FIX: "no lead/pipeline stage tracking" gap. Separate small endpoint/DTO
+     * rather than folding into CustomerResponse — this session never had
+     * CustomerResponse.java's actual declaration, and guessing a new field
+     * into an unseen record's positional constructor is exactly the risk
+     * already avoided elsewhere this session (see PopiaExportPdfService's
+     * own doc comment for the same reasoning). This is fully self-contained.
+     */
+    @Transactional(readOnly = true)
+    public StageResponse getStage(TenantId tenantId, UUID id) {
+        var customer = requireActive(tenantId, id);
+        return toStageResponse(customer);
+    }
+
+    @Transactional
+    public StageResponse changeStage(TenantId tenantId, UUID id, LeadStage newStage) {
+        var customer = requireActive(tenantId, id);
+        customer.changeStage(newStage, currentUserId());
+        return toStageResponse(customer);
+    }
+
+    private StageResponse toStageResponse(Customer customer) {
+        return new StageResponse(
+                customer.getId(),
+                customer.getCustomerType().name(),
+                customer.getPipelineStage() != null ? customer.getPipelineStage().name() : null
+        );
     }
 
     @Transactional

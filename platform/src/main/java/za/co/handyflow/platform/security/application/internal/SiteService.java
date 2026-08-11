@@ -18,12 +18,20 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * SiteService — CHANGE (V217): getCheckpointQrPayload() updated for the new
+ * generateQrPayload(Checkpoint) signature (per-checkpoint secret, no more
+ * site-secret param). Added regenerateCheckpointQr() and
+ * getSiteCheckpointsForQrSheet() (backs the new QR-sheet PDF). See
+ * Checkpoint/CheckpointScanService javadoc for the full rationale.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SiteService {
 
-    private final SiteRepository siteRepository;
+    private final SiteRepository          siteRepository;
+    private final CheckpointScanService   checkpointScanService;
 
     // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -68,7 +76,6 @@ public class SiteService {
     public void deleteSite(TenantId tenantId, UUID id, UUID deletedBy) {
         Site site = siteRepository.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Site", id.toString()));
-        // Fix bug #19 pattern: pass actor ID, not null
         site.softDelete(deletedBy);
         siteRepository.save(site);
         log.info("[Security] Soft-deleted site={} by={} tenant={}", id, deletedBy, tenantId);
@@ -85,29 +92,99 @@ public class SiteService {
         return toResponse(site);
     }
 
-    // ── Mappers ───────────────────────────────────────────────────────────────
+    // ── QR signing / printing (V215, V217) ────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public QrPayloadResponse getCheckpointQrPayload(TenantId tenantId, UUID siteId, UUID checkpointId) {
+        Checkpoint checkpoint = findCheckpoint(tenantId, siteId, checkpointId);
+        String payload = checkpointScanService.generateQrPayload(checkpoint);
+        return new QrPayloadResponse(checkpoint.getId(), checkpoint.getName(), payload);
+    }
+
+    @Transactional
+    public void setQrEnforcement(TenantId tenantId, UUID siteId, boolean requireSignedQr) {
+        Site site = siteRepository.findActiveById(tenantId, siteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Site", siteId.toString()));
+        site.setRequireSignedQr(requireSignedQr);
+        siteRepository.save(site);
+        log.info("[Security] QR HMAC enforcement {} for site={} tenant={}",
+                requireSignedQr ? "ENABLED" : "disabled", siteId, tenantId.getValue());
+    }
 
     /**
-     * Maps a Site to SiteResponse.
-     *
-     * Fixes bug #9: terminatedAt was captured in Site.java (V48 migration added
-     * the column; Site.java has the field) but was never included in SiteResponse
-     * or the mapper.  Every API consumer was blind to WHEN a contract was terminated
-     * — only the reason was visible.  For audit and legal purposes, the timestamp
-     * is equally important.
+     * Rotates one checkpoint's QR (both the legacy bare-UUID code and the
+     * signing secret) without touching any other checkpoint at the site --
+     * see Checkpoint.regenerateQr()'s javadoc. Caller should immediately
+     * re-fetch/reprint via getCheckpointQrPayload() or the QR PDF endpoint;
+     * the old physical sticker stops working the moment this saves.
      */
+    @Transactional
+    public QrPayloadResponse regenerateCheckpointQr(TenantId tenantId, UUID siteId, UUID checkpointId) {
+        Checkpoint checkpoint = findCheckpoint(tenantId, siteId, checkpointId);
+        checkpoint.regenerateQr();
+        siteRepository.save(checkpoint.getSite());
+
+        log.warn("[Security] Checkpoint QR regenerated checkpointId={} siteId={} tenant={} "
+                        + "— old physical sticker for this checkpoint is now invalid",
+                checkpointId, siteId, tenantId.getValue());
+
+        String payload = checkpointScanService.generateQrPayload(checkpoint);
+        return new QrPayloadResponse(checkpoint.getId(), checkpoint.getName(), payload);
+    }
+
+    /** Backs the "print all checkpoints for this site" QR sheet PDF. */
+    @Transactional(readOnly = true)
+    public Site getSiteWithCheckpointsForPrinting(TenantId tenantId, UUID siteId) {
+        return siteRepository.findActiveByIdWithCheckpoints(tenantId, siteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Site", siteId.toString()));
+    }
+
+    // ── Branch assignment (V218) ──────────────────────────────────────────────
+
+    /**
+     * Assigns (or clears, if branchId is null) this site's branch. Does NOT
+     * itself change who can see the site -- query-level enforcement isn't
+     * wired yet (see Site.branchId's javadoc). This just lets an admin
+     * actually set the assignment, which previously wasn't possible at all
+     * since the field didn't exist on the entity.
+     */
+    @Transactional
+    public void assignBranch(TenantId tenantId, UUID siteId, UUID branchId) {
+        Site site = siteRepository.findActiveById(tenantId, siteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Site", siteId.toString()));
+        site.assignBranch(branchId);
+        siteRepository.save(site);
+        log.info("[Security] Site branch assignment changed site={} branch={} tenant={}",
+                siteId, branchId, tenantId.getValue());
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private Checkpoint findCheckpoint(TenantId tenantId, UUID siteId, UUID checkpointId) {
+        Site site = siteRepository.findActiveByIdWithCheckpoints(tenantId, siteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Site", siteId.toString()));
+        return site.getCheckpoints().stream()
+                .filter(c -> c.getId().equals(checkpointId) && c.isActive())
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Checkpoint", checkpointId.toString()));
+    }
+
+    // ── Mappers ───────────────────────────────────────────────────────────────
+
     private SiteResponse toResponse(Site s) {
         return new SiteResponse(
                 s.getId(), s.getName(), s.getCustomerId(),
                 s.getAddress(), s.getLatitude(), s.getLongitude(),
                 s.getContactName(), s.getContactPhone(), s.isActive(),
-                List.of(),  // no checkpoints in list view — saves N+1 lazy loads
+                List.of(),
                 s.getContractStatus() != null ? s.getContractStatus() : "ACTIVE",
                 s.getContractStart(),
                 s.getContractEnd(),
                 s.getTerminationReason(),
-                s.getTerminatedAt(),     // ← bug #9 fix: was missing from all previous toResponse calls
-                s.getCreatedAt()
+                s.getTerminatedAt(),
+                s.getCreatedAt(),
+                s.isRequireSignedQr(),
+                s.getBranchId()
         );
     }
 
@@ -128,8 +205,10 @@ public class SiteService {
                 s.getContractStart(),
                 s.getContractEnd(),
                 s.getTerminationReason(),
-                s.getTerminatedAt(),     // ← bug #9 fix
-                s.getCreatedAt()
+                s.getTerminatedAt(),
+                s.getCreatedAt(),
+                s.isRequireSignedQr(),
+                s.getBranchId()
         );
     }
 }

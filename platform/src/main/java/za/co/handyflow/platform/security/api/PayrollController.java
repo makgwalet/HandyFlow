@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.security.application.internal.SecurityGuardPayStatementPdfService;
 import za.co.handyflow.platform.security.application.internal.SecurityPayrollService;
 import za.co.handyflow.platform.security.domain.model.GradeRate;
 import za.co.handyflow.platform.security.domain.model.PayrollLineItem;
@@ -24,16 +25,23 @@ import java.util.UUID;
 /**
  * PayrollController — Phase 4 payroll export.
  *
+ * CHANGE: added GET /periods/{id}/guards/{guardId}/pdf -- a per-guard gross
+ * pay statement PDF (audit gap: "no payslip PDF for security payroll").
+ * DELIBERATELY not called a payslip and does NOT reuse HR's
+ * PayslipPdfGenerator -- see SecurityGuardPayStatementPdfService's class
+ * javadoc for why that reuse isn't safe (this module has no PAYE/UIF/tax
+ * computation, unlike HR's payslip model).
+ *
  * All endpoints require USER_UPDATE — payroll is a financial operation that
- * should not be accessible to read-only supervisors. A future enhancement
- * could add a PAYROLL_MANAGER authority that separates payroll approval
- * from general management operations.
+ * should not be accessible to read-only supervisors.
  *
  * Export flow for a typical pay run:
  *   1. POST /payroll/periods — create a DRAFT period for the pay window
  *   2. POST /payroll/periods/{id}/approve — compute and freeze line items
  *   3. GET /payroll/periods/{id}/export/csv — download for Sage/VIP Payroll
  *      OR GET /payroll/periods/{id}/export/json — for BI tools / API clients
+ *      OR GET /payroll/periods/{id}/guards/{guardId}/pdf — per-guard gross
+ *      pay statement, for handing to the guard directly
  *   4. POST /payroll/periods/{id}/mark-paid — record payment confirmation
  */
 @Tag(name = "Security - Payroll (Phase 4)")
@@ -43,7 +51,8 @@ import java.util.UUID;
 @PreAuthorize("hasAuthority('USER_UPDATE')")
 public class PayrollController {
 
-    private final SecurityPayrollService payrollService;
+    private final SecurityPayrollService              payrollService;
+    private final SecurityGuardPayStatementPdfService  payStatementPdfService;
 
     // ── Periods ────────────────────────────────────────────────────────────────
 
@@ -129,6 +138,24 @@ public class PayrollController {
         return ResponseEntity.ok(ApiResponse.success(payrollService.exportJson(tenantId, id)));
     }
 
+    // ── Guard pay statement PDF ────────────────────────────────────────────────
+
+    @GetMapping("/periods/{id}/guards/{guardId}/pdf")
+    @Operation(
+            summary = "Guard gross pay statement (PDF)",
+            description = "Per-guard PDF for one payroll period — shift-by-shift regular/overtime " +
+                    "hours, rate, and gross pay, branded with the tenant's logo/company name. " +
+                    "NOT a statutory payslip: no PAYE/UIF/tax is computed by this module (that " +
+                    "happens in your external payroll system after CSV export) — the PDF says so " +
+                    "explicitly. Works on periods that have been approved (have line items), even " +
+                    "if not yet exported/paid.")
+    public ResponseEntity<byte[]> getGuardPayStatementPdf(
+            @PathVariable UUID id, @PathVariable UUID guardId) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        byte[] pdf = payStatementPdfService.payStatementPdf(tenantId, id, guardId);
+        return pdfResponse(pdf, "pay-statement-" + guardId.toString().substring(0, 8) + "-" + id + ".pdf");
+    }
+
     // ── Grade rates ────────────────────────────────────────────────────────────
 
     @GetMapping("/grade-rates")
@@ -149,5 +176,15 @@ public class PayrollController {
         UUID actorId = TenantContext.getCurrentUserId();
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(payrollService.setGradeRate(tenantId, req, actorId)));
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    private ResponseEntity<byte[]> pdfResponse(byte[] pdf, String filename) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(ContentDisposition.attachment().filename(filename).build());
+        headers.setContentLength(pdf.length);
+        return ResponseEntity.ok().headers(headers).body(pdf);
     }
 }

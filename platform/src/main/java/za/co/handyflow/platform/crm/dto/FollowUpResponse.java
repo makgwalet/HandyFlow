@@ -13,5 +13,7 @@ public record FollowUpResponse(
         boolean    completed,
         Instant    completedAt,
         boolean    overdue,
-        Instant    createdAt
+        Instant    createdAt,
+        String     outcome,            // null until completed — COMPLETED / NO_RESPONSE / RESCHEDULED
+        UUID       rescheduledFromId   // set only if this record exists because an earlier one was rescheduled
 ) {}

@@ -1,3 +1,4 @@
+// security/dto/GuardResponse.java
 package za.co.handyflow.platform.security.dto;
 
 import java.time.Instant;
@@ -5,18 +6,13 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 /**
- * GuardResponse — full guard details returned by every guard endpoint.
+ * GuardResponse — CHANGE (V214): added employeeCode, appended at the end.
  *
- * Added in Phase 0:
- *   status          — operational status (ACTIVE/ON_LEAVE/SUSPENDED/etc.)
- *   statusNote      — reason for the last status change (e.g. "suspended pending hearing")
- *   statusChangedAt — when the status last changed
- *   psiraExpiryDate — PSiRA registration expiry for compliance alerting
- *
- * WHY NOT include photoUrl for base64?
- * In dev mode, guard.getPhotoUrl() returns "PENDING_UPLOAD" for base64 captures.
- * The frontend shows a fallback avatar when photoUrl is null or "PENDING_UPLOAD".
- * In production, this will be a CDN URL (S3-backed), which is safe to return.
+ * NOTE: I do not have this file's previously-existing content -- reconstructed
+ * from GuardService.toResponse()'s 16-argument constructor call, which has
+ * compiled successfully in this codebase before this change. Diff against
+ * your actual file before applying; if it differs, tell me what's actually
+ * in it (same situation PrincipalResponse was in earlier this session).
  */
 public record GuardResponse(
         UUID      id,
@@ -31,10 +27,11 @@ public record GuardResponse(
         boolean   active,
         String    notes,
         Instant   createdAt,
-
-        // Status workflow fields (V50)
         String    status,
         String    statusNote,
         Instant   statusChangedAt,
-        LocalDate psiraExpiryDate
+        LocalDate psiraExpiryDate,
+        String    employeeCode,
+        String    emergencyContactName,
+        String    emergencyContactPhone
 ) {}

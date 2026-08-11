@@ -3,6 +3,7 @@ package za.co.handyflow.platform.invoicing.application.internal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.shared.TenantSequenceService;
 
 @Component
 @RequiredArgsConstructor

@@ -23,6 +23,16 @@ public enum ActivityType {
     TAG_ADDED,
     TAG_REMOVED,
 
+    /**
+     * FIX: "no lead/pipeline stage tracking" gap. Same shape as
+     * STATUS_CHANGED (payload: {"from": "NEW", "to": "CONTACTED"}) —
+     * deliberately not its own dedicated entity/table the way Consent/
+     * FollowUp/Communication needed, since a stage change is structurally
+     * identical to a status change: a simple field transition on Customer,
+     * not a separate domain concept with its own lifecycle.
+     */
+    STAGE_CHANGED,
+
     // ── Notes ─────────────────────────────────────────────────────────────
     NOTE_ADDED,
 

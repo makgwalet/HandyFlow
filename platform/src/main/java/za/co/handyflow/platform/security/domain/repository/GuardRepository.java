@@ -14,13 +14,6 @@ import java.util.UUID;
 
 public interface GuardRepository extends JpaRepository<Guard, UUID> {
 
-    /**
-     * All non-deleted guards for the tenant, ordered by name.
-     * WHY include status-filtered guards (SUSPENDED, TERMINATED) in the
-     * full list?  Management needs to see all guards, not just schedulable
-     * ones.  The UI filters by status using the status filter pills.
-     * Scheduling endpoints apply isSchedulable() separately.
-     */
     @Query("""
         SELECT g FROM Guard g
         WHERE g.tenantId = :tenantId
@@ -48,24 +41,8 @@ public interface GuardRepository extends JpaRepository<Guard, UUID> {
         """)
     Page<Guard> searchActive(TenantId tenantId, String search, Pageable pageable);
 
-    /**
-     * PSiRA duplicate check on CREATE — any guard in this tenant with this
-     * PSiRA number (not deleted).
-     */
     boolean existsByTenantIdAndPsiraNumberAndDeletedAtIsNull(TenantId tenantId, String psiraNumber);
 
-    /**
-     * PSiRA duplicate check on UPDATE — any OTHER guard in this tenant with
-     * this PSiRA number.
-     *
-     * WHY exclude the guard being updated?
-     * Without this exclusion, updating any field on a guard who already has a
-     * PSiRA number would fail the duplicate check against themselves.
-     * The fix is to exclude the current guard's ID from the check.
-     *
-     * This is bug #3 from the production plan — the original code only checked
-     * on create, allowing a guard to be edited into a duplicate PSiRA number.
-     */
     @Query("""
         SELECT COUNT(g) > 0 FROM Guard g
         WHERE g.tenantId = :tenantId
@@ -75,10 +52,6 @@ public interface GuardRepository extends JpaRepository<Guard, UUID> {
         """)
     boolean existsByPsiraExcluding(TenantId tenantId, String psiraNumber, UUID excludeId);
 
-    /**
-     * Guards in ACTIVE status only — used by ShiftService when selecting
-     * available guards for scheduling.
-     */
     @Query("""
         SELECT g FROM Guard g
         WHERE g.tenantId = :tenantId
@@ -93,15 +66,9 @@ public interface GuardRepository extends JpaRepository<Guard, UUID> {
     /**
      * Look up a guard by phone number across all tenants — used by the
      * guard login endpoint where the guard identifies by phone, not email.
-     *
-     * WHY no tenant filter here?
-     * The guard provides their phone number (unique per real person) and a PIN.
-     * We look them up by phone first, then verify PIN, then scope all subsequent
-     * operations to their tenant.  If we filtered by tenant first we'd need the
-     * tenant to be known before login — a chicken-and-egg problem.
-     *
-     * SECURITY: phone numbers are not secret, so this query alone proves nothing.
-     * The PIN check in GuardAuthService is the actual authentication step.
+     * See class-level usage in GuardAuthService for the full rationale
+     * (no tenant filter needed since phone is globally unique, and the PIN
+     * check afterward is the actual authentication step).
      */
     @Query("""
         SELECT g FROM Guard g
@@ -110,6 +77,45 @@ public interface GuardRepository extends JpaRepository<Guard, UUID> {
         AND g.active = true
         """)
     Optional<Guard> findActiveByPhone(String phone);
+
+    /**
+     * Look up a guard by employee code across all tenants (V214) — same
+     * chicken-and-egg rationale as findActiveByPhone: the guard app doesn't
+     * know the tenant yet at the point of login, so employee codes are
+     * generated to be globally unique (GuardService.generateEmployeeCode)
+     * specifically so this lookup can work the same way phone lookup does.
+     */
+    @Query("""
+        SELECT g FROM Guard g
+        WHERE g.employeeCode = :employeeCode
+        AND g.deletedAt IS NULL
+        AND g.active = true
+        """)
+    Optional<Guard> findActiveByEmployeeCode(String employeeCode);
+
+    /**
+     * Global existence check used during employee-code generation to detect
+     * (rare) collisions between two tenants' independently-derived prefixes.
+     * Deliberately NOT scoped to active/non-deleted -- a code must never be
+     * reissued even to a different tenant once it's ever been assigned.
+     */
+    boolean existsByEmployeeCode(String employeeCode);
+
+    /**
+     * Branch-scoped list — ready for the future enforcement layer (not yet
+     * wired into any controller; see BranchController's ENFORCEMENT NOTE
+     * for what's still missing). Guard.primaryBranchId already existed
+     * before this addition, unlike Site.branchId which needed a V218
+     * migration first.
+     */
+    @Query("""
+        SELECT g FROM Guard g
+        WHERE g.tenantId = :tenantId
+        AND g.primaryBranchId = :branchId
+        AND g.deletedAt IS NULL
+        ORDER BY g.lastName, g.firstName
+        """)
+    Page<Guard> findAllActiveByBranch(TenantId tenantId, UUID branchId, Pageable pageable);
 
     /**
      * Find guard by ID for authentication purposes — includes all statuses

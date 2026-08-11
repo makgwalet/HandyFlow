@@ -8,10 +8,14 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.security.application.internal.ArmouryPdfService;
 import za.co.handyflow.platform.security.application.internal.ArmouryService;
 import za.co.handyflow.platform.security.domain.model.ArmouryLog;
 import za.co.handyflow.platform.security.dto.*;
@@ -25,13 +29,11 @@ import java.util.UUID;
 /**
  * ArmouryController — firearm register and the witnessed issue/return workflow.
  *
- * Everything except getById/getHistory/getIssuedToGuard requires USER_UPDATE —
- * registering firearms, updating licenses, and issuing/returning are all
- * supervisor-level actions. Issue/return could in principle be guard-facing
- * (called from the Shield app at shift start/end alongside resource custody
- * checkout), but is kept admin-gated for now since the witness-validation
- * logic needs a trusted caller — Phase 3.5 can move this behind GuardJwtFilter
- * once witness confirmation has its own PIN-based step in the app.
+ * CHANGE: added GET /{id}/history/pdf -- exportable chain-of-custody PDF,
+ * closing the audit gap flagged as "the immutable audit trail... but there's
+ * no exportable document version." Gated USER_READ, same level as the
+ * existing getById/getHistory/getIssuedToGuard endpoints -- it's a read of
+ * data already accessible via those, just rendered as a document.
  */
 @Tag(name = "Security - Armoury")
 @RestController
@@ -39,7 +41,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ArmouryController {
 
-    private final ArmouryService armouryService;
+    private final ArmouryService    armouryService;
+    private final ArmouryPdfService armouryPdfService;
 
     // ── Register CRUD ──────────────────────────────────────────────────────────
 
@@ -165,6 +168,21 @@ public class ArmouryController {
                 armouryService.getHistory(tenantId, id)));
     }
 
+    @GetMapping("/{id}/history/pdf")
+    @Operation(
+            summary = "Firearm chain-of-custody PDF",
+            description = "Exportable version of the immutable issue/return audit trail, " +
+                    "branded with the tenant's logo/company name — the kind of document a " +
+                    "SAPS Firearms Control Act audit would ask for.")
+    public ResponseEntity<byte[]> getHistoryPdf(@PathVariable UUID id) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        ArmouryResponse firearm = armouryService.getById(tenantId, id);
+        List<ArmouryLog> history = armouryService.getHistory(tenantId, id);
+        byte[] pdf = armouryPdfService.chainOfCustodyPdf(firearm, history, tenantId);
+        return pdfResponse(pdf, "chain-of-custody-" + firearm.firearmSerial()
+                .replaceAll("[^a-zA-Z0-9]", "-") + ".pdf");
+    }
+
     @GetMapping("/guard/{guardId}")
     @Operation(summary = "Firearms currently issued to a specific guard")
     public ResponseEntity<ApiResponse<List<ArmouryResponse>>> getIssuedToGuard(
@@ -188,5 +206,15 @@ public class ArmouryController {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         armouryService.setGuardCompetency(tenantId, guardId, req);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    private ResponseEntity<byte[]> pdfResponse(byte[] pdf, String filename) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(ContentDisposition.attachment().filename(filename).build());
+        headers.setContentLength(pdf.length);
+        return ResponseEntity.ok().headers(headers).body(pdf);
     }
 }

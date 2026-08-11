@@ -1,11 +1,10 @@
-package za.co.handyflow.platform.invoicing.application.internal;
+package za.co.handyflow.platform.shared;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import za.co.handyflow.platform.shared.TenantId;
 
 /**
  * Generates atomic, gap-tolerant, duplicate-proof sequence numbers scoped to

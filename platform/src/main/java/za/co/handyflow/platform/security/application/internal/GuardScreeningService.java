@@ -5,7 +5,6 @@ package za.co.handyflow.platform.security.application.internal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.security.domain.model.*;
@@ -15,12 +14,18 @@ import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
 /**
  * GuardScreeningService — manages guard screening records and the scheduling gate.
+ *
+ * CHANGE (V213): checkScreeningExpiry() has been REMOVED from this class and
+ * moved to its own GuardScreeningComplianceScheduler component, matching the
+ * PsiraComplianceScheduler/ArmouryComplianceScheduler pattern and routing
+ * through the real notification pipeline instead of log-only. This service
+ * now focuses purely on screening-record CRUD and the scheduling gate; see
+ * GuardScreeningComplianceScheduler for the expiry alert logic.
  *
  * Screening types: POLYGRAPH, CRIMINAL_RECORD_CHECK, REFERENCE_CHECK,
  *                  DRUG_TEST, PSYCHOMETRIC, CREDIT_CHECK, OTHER
@@ -31,17 +36,11 @@ import java.util.UUID;
  *   Currently this is an advisory check (log + warn), not a hard block — the
  *   operator can override.  A site-level "require_screening_clearance" flag
  *   (Phase 3) will make it a hard block for high-security sites.
- *
- * Expiry alerting (nightly at 06:30 — before PSiRA check at 07:00):
- *   Guards with next_due_at within 30 days are flagged in the compliance dashboard.
- *   Same pattern as PsiraComplianceScheduler.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class GuardScreeningService {
-
-    private static final int WARN_DAYS = 30;
 
     private final GuardScreeningRepository screeningRepository;
     private final GuardRepository          guardRepository;
@@ -168,36 +167,5 @@ public class GuardScreeningService {
             guard.setScreeningStatus(status);
             guardRepository.save(guard);
         });
-    }
-
-    // ── Expiry Alert Scheduler ─────────────────────────────────────────────────
-
-    /**
-     * Runs at 06:30 daily — before PSiRA check at 07:00 so both land in
-     * the supervisor's inbox in the same morning batch.
-     *
-     * Logs upcoming screening renewals.  Email delivery is log-only until
-     * per-tenant admin email is wired (same pattern as PsiraComplianceScheduler).
-     */
-    @Scheduled(cron = "0 30 6 * * *")
-    @Transactional(readOnly = true)
-    public void checkScreeningExpiry() {
-        LocalDate today    = LocalDate.now();
-        LocalDate warnDate = today.plusDays(WARN_DAYS);
-
-        List<UUID> tenantIds = siteRepository.findDistinctActiveTenantIds();
-
-        for (UUID tenantId : tenantIds) {
-            List<GuardScreeningRecord> dueSoon =
-                    screeningRepository.findDueSoon(TenantId.of(tenantId), warnDate);
-
-            if (!dueSoon.isEmpty()) {
-                log.info("[Security] {} screening(s) due within {} days for tenant={}",
-                        dueSoon.size(), WARN_DAYS, tenantId);
-                dueSoon.forEach(r -> log.info(
-                        "[Security]   guard={} type={} due={}",
-                        r.getGuardId(), r.getScreeningType(), r.getNextDueAt()));
-            }
-        }
     }
 }

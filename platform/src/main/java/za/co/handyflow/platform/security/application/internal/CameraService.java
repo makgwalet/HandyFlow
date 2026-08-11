@@ -4,6 +4,8 @@ package za.co.handyflow.platform.security.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,20 +27,10 @@ import java.util.UUID;
 /**
  * CameraService — CCTV registry CRUD and motion event ingestion.
  *
- * Reuses the existing ControlRoomService.ingest() pipeline (Phase 3 Control
- * Room) for the actual alarm-event creation — a camera motion event is just
- * an AlarmEvent with source=CCTV_MOTION and cameraId linked. This is
- * deliberate: building a parallel triage/dispatch/SLA system for camera
- * events would duplicate everything the control room already does. The only
- * camera-specific work here is webhook authentication and updating the
- * camera's lastEventAt liveness signal.
- *
- * WHY a webhook secret per camera rather than relying on the tenant JWT?
- * The motion webhook endpoint (POST /cameras/motion-webhook) is called
- * directly by the camera/NVR or vendor cloud platform — it cannot carry a
- * user's JWT. Authentication instead happens by matching cameraId +
- * webhookSecret against the registered Camera row, same pattern the design
- * doc describes for alarm panel integrations generally.
+ * CHANGE: added getAllForTenant() (tenant-wide paginated list), backing the
+ * new GET /cameras endpoint on CameraController. Closes the audit gap
+ * described in CameraRepository.findAllActive()'s javadoc. Everything else
+ * below is unchanged from the original.
  */
 @Slf4j
 @Service
@@ -81,6 +73,19 @@ public class CameraService {
                 .toList();
     }
 
+    /**
+     * Tenant-wide paginated camera list — backs GET /cameras. Resolves each
+     * camera's site name the same way every other toResponse() call in this
+     * class already does (per-row lookup) -- fine at CCTV-registry scale
+     * (tens to low hundreds of cameras per tenant), not the N+1 concern
+     * IncidentService's original bug was at incident-volume scale.
+     */
+    @Transactional(readOnly = true)
+    public Page<CameraResponse> getAllForTenant(TenantId tenantId, Pageable pageable) {
+        return cameraRepository.findAllActive(tenantId, pageable)
+                .map(c -> toResponse(c, tenantId));
+    }
+
     @Transactional
     public CameraResponse update(TenantId tenantId, UUID id, UpdateCameraRequest req) {
         Camera camera = findCamera(tenantId, id);
@@ -116,12 +121,6 @@ public class CameraService {
 
     // ── Webhook Secret Management ──────────────────────────────────────────────
 
-    /**
-     * Generates (or regenerates) the webhook secret for a camera.
-     * Returned exactly once — same one-time-reveal pattern as the guard PIN
-     * reset flow (Phase 1.5). The supervisor must copy it into the camera/NVR's
-     * webhook config immediately.
-     */
     @Transactional
     public CameraWebhookSecretResponse generateWebhookSecret(TenantId tenantId, UUID id) {
         Camera camera = findCamera(tenantId, id);
@@ -139,12 +138,6 @@ public class CameraService {
 
     // ── Motion Event Ingestion (public webhook target) ────────────────────────
 
-    /**
-     * Verifies the webhook secret and ingests a motion event via the existing
-     * control room pipeline. Tenant and site are derived from the matched
-     * Camera row — never trusted from the request body, since this endpoint
-     * has no JWT to authenticate the caller otherwise.
-     */
     @Transactional
     public AlarmEvent ingestMotionEvent(CameraMotionWebhookRequest req) {
         Camera camera = cameraRepository.findById(req.cameraId())

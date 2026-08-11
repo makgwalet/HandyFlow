@@ -1,11 +1,25 @@
 // src/pages/security/SitesTab.tsx
+//
+// CHANGE: added checkpoint QR print + regenerate actions (previously the
+// tab only ever showed a truncated, unprintable text fragment of the QR
+// code -- no way to actually get a scannable image, and no way to rotate
+// a compromised checkpoint's code without going around the API directly).
+//   - "Print" per checkpoint -> downloads/opens a single-checkpoint QR PDF.
+//   - "Print All" per site -> downloads/opens a whole-site QR sheet PDF
+//     (the realistic "print once, cut out each QR, mount at its
+//     checkpoint" workflow).
+//   - "Regenerate" per checkpoint -> rotates that checkpoint's code only
+//     (confirm() first, since it immediately invalidates whatever's
+//     currently mounted at that checkpoint), then invalidates the query
+//     cache so the (still-truncated) displayed code updates.
+// Everything else in this file is unchanged from the original.
 
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import {
   Plus, MapPin, QrCode, X, AlertCircle, ChevronDown, ChevronRight,
-  Trash2, Radio, Bluetooth, Edit2, AlertTriangle,
+  Trash2, Radio, Bluetooth, Edit2, AlertTriangle, Printer, RefreshCw,
 } from "lucide-react"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -24,7 +38,10 @@ interface Site {
   contractStatus: string; contractStart: string | null; contractEnd: string | null
   terminationReason: string | null; terminatedAt: string | null
   createdAt: string
+  requireSignedQr: boolean; branchId: string | null
 }
+
+interface Branch { id: string; name: string; region: string | null; active: boolean }
 
 const CONTRACT_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
   ACTIVE:         { color: "#166534", bg: "#DCFCE7",  label: "Active" },
@@ -38,6 +55,44 @@ const EMPTY_SITE_FORM = {
   latitude: "", longitude: "",
 }
 const EMPTY_CP_FORM = { name: "", description: "" }
+
+// ── PDF download helper ─────────────────────────────────────────────────────────
+// Opens the returned PDF blob in a new tab (print/save from there) rather
+// than forcing a direct download -- lets the admin preview before printing.
+
+async function openPdfInNewTab(url: string) {
+  const res = await apiClient.get(url, { responseType: "blob" })
+  const blobUrl = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }))
+  window.open(blobUrl, "_blank")
+}
+
+// ── Checkpoint QR thumbnail ──────────────────────────────────────────────────
+// Fetches the actual QR image (authenticated blob, same pattern as the PDF
+// downloads above) rather than a public/third-party QR-rendering service --
+// the payload is a security-sensitive signed token and should never leave
+// the app's own backend.
+
+function CheckpointQrThumbnail({ siteId, checkpointId }: { siteId: string; checkpointId: string }) {
+  const { data: imgUrl, isLoading, isError } = useQuery({
+    queryKey: ["checkpoint-qr-image", checkpointId],
+    queryFn: async () => {
+      const res = await apiClient.get(`/api/v1/security/sites/${siteId}/checkpoints/${checkpointId}/qr-image`, { responseType: "blob" })
+      return URL.createObjectURL(new Blob([res.data], { type: "image/png" }))
+    },
+    staleTime: Infinity, // only changes on regenerate -- that invalidates this query key directly
+  })
+
+  const boxStyle: React.CSSProperties = {
+    width: 96, height: 96, borderRadius: 8, border: "1px solid #E2E8F0",
+    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+    background: "#F8FAFC", alignSelf: "center",
+  }
+
+  if (isLoading) return <div style={boxStyle}><div style={{ width: 44, height: 44, background: "#E2E8F0", borderRadius: 4 }} /></div>
+  if (isError || !imgUrl) return <div style={boxStyle}><QrCode size={24} color="#CBD5E1" /></div>
+
+  return <img src={imgUrl} alt="Checkpoint QR code" style={{ ...boxStyle, objectFit: "contain", padding: 6 }} />
+}
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -57,6 +112,10 @@ export default function SitesTab() {
   const [portalToken,     setPortalToken]        = useState<string | null>(null)
   const [siteErrors,      setSiteErrors]       = useState<Record<string, string>>({})
   const [apiError,        setApiError]         = useState("")
+  const [printingCpId,    setPrintingCpId]     = useState<string | null>(null)
+  const [printingSiteId,  setPrintingSiteId]   = useState<string | null>(null)
+  const [regeneratingCpId, setRegeneratingCpId] = useState<string | null>(null)
+  const [regenerateConfirm, setRegenerateConfirm] = useState<{ siteId: string; checkpoint: Checkpoint } | null>(null)
 
   // ── Queries ────────────────────────────────────────────────────────────────
 
@@ -79,6 +138,14 @@ export default function SitesTab() {
       return (res.data?.data ?? res.data) as Site
     },
     enabled: !!expanded,
+  })
+
+  const { data: branches = [] } = useQuery({
+    queryKey: ["branches-list"],
+    queryFn: async () => {
+      const res = await apiClient.get("/api/v1/security/branches")
+      return (res.data?.data ?? res.data) as Branch[]
+    },
   })
 
   // ── Mutations ──────────────────────────────────────────────────────────────
@@ -131,6 +198,54 @@ export default function SitesTab() {
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to disable portal"),
   })
 
+  const printCheckpointQr = useMutation({
+    mutationFn: async ({ siteId, checkpointId }: { siteId: string; checkpointId: string }) => {
+      setPrintingCpId(checkpointId)
+      await openPdfInNewTab(`/api/v1/security/sites/${siteId}/checkpoints/${checkpointId}/qr-pdf`)
+    },
+    onSettled: () => setPrintingCpId(null),
+    onError: () => setApiError("Failed to generate QR PDF"),
+  })
+
+  const printSiteQrSheet = useMutation({
+    mutationFn: async (siteId: string) => {
+      setPrintingSiteId(siteId)
+      await openPdfInNewTab(`/api/v1/security/sites/${siteId}/checkpoints/qr-sheet`)
+    },
+    onSettled: () => setPrintingSiteId(null),
+    onError: () => setApiError("Failed to generate QR sheet PDF"),
+  })
+
+  const regenerateQr = useMutation({
+    mutationFn: async ({ siteId, checkpointId }: { siteId: string; checkpointId: string }) => {
+      setRegeneratingCpId(checkpointId)
+      await apiClient.post(`/api/v1/security/sites/${siteId}/checkpoints/${checkpointId}/qr-secret/regenerate`)
+    },
+    onSuccess: (_data, { siteId, checkpointId }) => {
+      invalidate()
+      qc.invalidateQueries({ queryKey: ["checkpoint-qr-image", checkpointId] })
+      // Immediately open the freshly-regenerated QR for reprinting -- the
+      // old physical sticker is already invalid the moment this succeeds.
+      openPdfInNewTab(`/api/v1/security/sites/${siteId}/checkpoints/${checkpointId}/qr-pdf`)
+    },
+    onSettled: () => setRegeneratingCpId(null),
+    onError: () => setApiError("Failed to regenerate QR code"),
+  })
+
+  const setSiteBranch = useMutation({
+    mutationFn: ({ siteId, branchId }: { siteId: string; branchId: string | null }) =>
+      apiClient.patch(`/api/v1/security/sites/${siteId}/branch`, { branchId }),
+    onSuccess: () => invalidate(),
+    onError: () => setApiError("Failed to update branch assignment"),
+  })
+
+  const setQrEnforcement = useMutation({
+    mutationFn: ({ siteId, requireSignedQr }: { siteId: string; requireSignedQr: boolean }) =>
+      apiClient.patch(`/api/v1/security/sites/${siteId}/qr-enforcement`, { requireSignedQr }),
+    onSuccess: () => invalidate(),
+    onError: () => setApiError("Failed to update QR enforcement"),
+  })
+
   // ── Validation ─────────────────────────────────────────────────────────────
 
   const validateSite = () => {
@@ -152,6 +267,16 @@ export default function SitesTab() {
       latitude:     siteForm.latitude ? parseFloat(siteForm.latitude) : null,
       longitude:    siteForm.longitude ? parseFloat(siteForm.longitude) : null,
     })
+  }
+
+  const handleRegenerateQr = (siteId: string, checkpoint: Checkpoint) => {
+    setRegenerateConfirm({ siteId, checkpoint })
+  }
+
+  const confirmRegenerateQr = () => {
+    if (!regenerateConfirm) return
+    regenerateQr.mutate({ siteId: regenerateConfirm.siteId, checkpointId: regenerateConfirm.checkpoint.id })
+    setRegenerateConfirm(null)
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -238,6 +363,14 @@ export default function SitesTab() {
                           style={{ background: "#F0FDF4", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "#166534", fontSize: 12, fontWeight: 600 }}>
                           Portal
                         </button>
+                        {(site.checkpoints?.length ?? 0) > 0 && (
+                          <button onClick={e => { e.stopPropagation(); printSiteQrSheet.mutate(site.id) }}
+                            disabled={printingSiteId === site.id}
+                            title="Print all checkpoint QR codes for this site"
+                            style={{ display: "flex", alignItems: "center", gap: 5, background: "#F5F3FF", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "#7C3AED", fontSize: 12, fontWeight: 600 }}>
+                            <Printer size={12} /> {printingSiteId === site.id ? "Preparing…" : "Print All"}
+                          </button>
+                        )}
                         <button onClick={e => { e.stopPropagation(); setShowTerminate(site); setTerminateReason(""); setApiError("") }}
                           title="Terminate contract"
                           style={{ background: "#FEF3C7", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "#D97706", fontSize: 12, fontWeight: 600 }}>
@@ -269,20 +402,36 @@ export default function SitesTab() {
                         No checkpoints yet. Click "+ Checkpoint" to add one.
                       </div>
                     ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 12 }}>
                         {detail.checkpoints.map((cp, i) => (
-                          <div key={cp.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 9 }}>
-                            <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 12, fontWeight: 700, color: "#1D4ED8" }}>
-                              {i + 1}
+                          <div key={cp.id} style={{ display: "flex", flexDirection: "column", gap: 10, padding: "14px 16px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10 }}>
+                            <div style={{ display: "flex", justifyContent: "center" }}>
+                              <CheckpointQrThumbnail siteId={site.id} checkpointId={cp.id} />
                             </div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontWeight: 600, fontSize: 14, color: "#0F172A" }}>{cp.name}</div>
-                              {cp.description && <div style={{ fontSize: 12, color: "#94A3B8" }}>{cp.description}</div>}
+
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                              <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 11, fontWeight: 700, color: "#1D4ED8" }}>
+                                {i + 1}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: 600, fontSize: 14, color: "#0F172A" }}>{cp.name}</div>
+                                {cp.description && <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>{cp.description}</div>}
+                              </div>
                             </div>
-                            {/* QR code display */}
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7 }}>
-                              <QrCode size={12} color="#64748B" />
-                              <span style={{ fontSize: 11, fontFamily: "monospace", color: "#64748B" }}>{cp.qrCode.slice(0, 12)}…</span>
+
+                            <div style={{ display: "flex", gap: 8, marginTop: "auto", paddingTop: 2 }}>
+                              <button onClick={() => printCheckpointQr.mutate({ siteId: site.id, checkpointId: cp.id })}
+                                disabled={printingCpId === cp.id}
+                                title="Print this checkpoint's QR code"
+                                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: "#EFF6FF", border: "none", borderRadius: 7, padding: "7px 10px", cursor: "pointer", color: "#1D4ED8", fontSize: 12, fontWeight: 600 }}>
+                                <Printer size={12} /> {printingCpId === cp.id ? "…" : "Print"}
+                              </button>
+                              <button onClick={() => handleRegenerateQr(site.id, cp)}
+                                disabled={regeneratingCpId === cp.id}
+                                title="Regenerate this checkpoint's QR code (e.g. compromised sticker)"
+                                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: "#FEF2F2", border: "none", borderRadius: 7, padding: "7px 10px", cursor: "pointer", color: "#DC2626", fontSize: 12, fontWeight: 600 }}>
+                                <RefreshCw size={12} /> {regeneratingCpId === cp.id ? "…" : "Regenerate"}
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -296,6 +445,47 @@ export default function SitesTab() {
                         {site.latitude?.toFixed(6)}, {site.longitude?.toFixed(6)}
                       </div>
                     )}
+
+                    {/* Site settings — branch assignment + QR enforcement */}
+                    {detail && (
+                      <div style={{ marginTop: 12, padding: "14px 16px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10, display: "flex", flexWrap: "wrap" as const, gap: 20 }}>
+                        <div style={{ flex: "1 1 220px" }}>
+                          <label style={{ ...lbl, marginBottom: 6 }}>Branch</label>
+                          <select
+                            value={detail.branchId ?? ""}
+                            onChange={e => setSiteBranch.mutate({ siteId: site.id, branchId: e.target.value || null })}
+                            disabled={setSiteBranch.isPending}
+                            style={{ ...inp, background: "#fff" }}>
+                            <option value="">— No branch assigned —</option>
+                            {branches.filter(b => b.active).map(b => (
+                              <option key={b.id} value={b.id}>{b.name}{b.region ? ` (${b.region})` : ""}</option>
+                            ))}
+                          </select>
+                          <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>
+                            Note: branch assignment doesn't yet restrict who can see this site — visibility scoping isn't wired up.
+                          </div>
+                        </div>
+
+                        <div style={{ flex: "1 1 220px" }}>
+                          <label style={{ ...lbl, marginBottom: 6 }}>QR Signature Enforcement</label>
+                          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: setQrEnforcement.isPending ? "wait" : "pointer" }}>
+                            <input
+                              type="checkbox"
+                              checked={detail.requireSignedQr}
+                              disabled={setQrEnforcement.isPending}
+                              onChange={e => setQrEnforcement.mutate({ siteId: site.id, requireSignedQr: e.target.checked })}
+                            />
+                            <span style={{ fontSize: 13, color: "#374151" }}>
+                              {detail.requireSignedQr ? "Enforced — unsigned QR scans are rejected" : "Not enforced — legacy unsigned codes still accepted"}
+                            </span>
+                          </label>
+                          <div style={{ fontSize: 11, color: "#D97706", marginTop: 4 }}>
+                            Only enable after reprinting every checkpoint's QR here (use "Print" or "Print All" above) — enabling first will break scanning at any checkpoint still using an old sticker.
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                   </div>
                 )}
               </div>
@@ -375,8 +565,9 @@ export default function SitesTab() {
 
           <div style={{ marginTop: 14, padding: "10px 14px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 8, fontSize: 12, color: "#166534", display: "flex", gap: 8 }}>
             <QrCode size={13} style={{ marginTop: 1, flexShrink: 0 }} />
-            A unique QR code is generated automatically. Print and mount it at the checkpoint location.
-            NFC tag and BLE beacon can be added later via the Guard App.
+            A unique QR code is generated automatically. Use "Print" on the checkpoint row after
+            saving to get a scannable, printable PDF. NFC tag and BLE beacon can be added later
+            via the Guard App.
           </div>
 
           {apiError && <ErrBanner msg={apiError} />}
@@ -493,6 +684,34 @@ export default function SitesTab() {
               <button onClick={() => deleteSite.mutate(showDelete.id)} disabled={deleteSite.isPending}
                 style={{ flex: 1, padding: "10px", border: "none", borderRadius: 9, background: "#DC2626", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {deleteSite.isPending ? "Deleting..." : "Yes, Delete"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Regenerate QR Confirmation Modal ──────────────────────────────── */}
+      {regenerateConfirm && (
+        <Modal title="" onClose={() => setRegenerateConfirm(null)} width={420}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#FEF2F2", border: "2px solid #FECACA", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+              <RefreshCw size={22} color="#DC2626" />
+            </div>
+            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Regenerate QR Code?</h3>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#0F172A", marginBottom: 12 }}>{regenerateConfirm.checkpoint.name}</div>
+            <div style={{ padding: "12px 14px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 9, marginBottom: 20, display: "flex", gap: 10, textAlign: "left" as const }}>
+              <AlertTriangle size={16} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
+              <div style={{ fontSize: 12.5, color: "#78350F", lineHeight: 1.6 }}>
+                The physical sticker currently mounted at this checkpoint will stop working immediately.
+                A fresh QR PDF will open automatically for reprinting.
+              </div>
+            </div>
+            {apiError && <ErrBanner msg={apiError} />}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setRegenerateConfirm(null)} style={{ flex: 1, padding: "10px", border: "1.5px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#374151" }}>Cancel</button>
+              <button onClick={confirmRegenerateQr} disabled={regenerateQr.isPending}
+                style={{ flex: 1, padding: "10px", border: "none", borderRadius: 9, background: "#DC2626", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                {regenerateQr.isPending ? "Regenerating..." : "Yes, Regenerate"}
               </button>
             </div>
           </div>

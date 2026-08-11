@@ -6,11 +6,15 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.security.application.internal.DeviceSessionService;
+import za.co.handyflow.platform.security.application.internal.GuardLocationService;
 import za.co.handyflow.platform.security.domain.model.DeviceSession;
 import za.co.handyflow.platform.security.domain.model.ResourceCustody;
 import za.co.handyflow.platform.security.dto.*;
@@ -23,30 +27,13 @@ import java.util.UUID;
 /**
  * DeviceSessionController — Phase 2 session lifecycle and resource custody.
  *
- * Two access patterns on this controller:
- *
- * 1. GUARD-FACING (called from the Shield app on the device itself):
- *      POST /sessions/open    — guard clocks in
- *      POST /sessions/{id}/close — guard clocks out
- *      POST /sessions/{id}/resources/checkout
- *      POST /sessions/{id}/resources/{custodyId}/return
- *
- *    These run under the guard JWT (SECURITY_GUARD authority) once the device
- *    has resolved its current session — but for Phase 2's bootstrap, the open/
- *    close calls happen BEFORE a guard-scoped JWT exists for that session, so
- *    they're reachable with the existing tenant-scoped JwtAuthFilter for now.
- *    Phase 2.5 will move session open/close behind GuardJwtFilter directly.
- *
- * 2. SUPERVISOR-FACING (admin web app):
- *      POST /sessions/{id}/force-close — unstick a forgotten clock-out
- *      GET  /sessions/current?deviceHardwareId=  — what's the kiosk currently showing
- *
- * WHY no guardId taken from the request body anywhere except openSession?
- * Once a session is open, every subsequent action (checkpoint scans, resource
- * checkout) resolves guardId via DeviceSessionService.resolveGuardId() —
- * never trusts a client claim. openSession is the one place a guardId is
- * accepted from the client, because that's the request that ESTABLISHES
- * identity (after PIN+face verification) — there's no session yet to resolve from.
+ * CHANGE: added POST /{sessionId}/location -- GPS ping ingestion (backend
+ * pass 1 of the real-GPS-map feature; see GuardLocationService for the full
+ * design rationale). Guard-facing, same access pattern as checkpoint scans
+ * and resource checkout: no explicit @PreAuthorize beyond the standard
+ * tenant-scoped JwtAuthFilter, matching every other guard-facing endpoint
+ * on this controller. guardId/shiftId/siteId are resolved server-side from
+ * the session, never trusted from the request body.
  */
 @Tag(name = "Security - Device Sessions")
 @RestController
@@ -54,7 +41,53 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DeviceSessionController {
 
-    private final DeviceSessionService sessionService;
+    private final DeviceSessionService  sessionService;
+    private final GuardLocationService  guardLocationService;
+
+    // ── Queries ────────────────────────────────────────────────────────────────
+
+    @GetMapping
+    @PreAuthorize("hasAuthority('USER_READ')")
+    @Operation(
+            summary = "List device sessions for this tenant — paginated, newest first",
+            description = "Used by the admin web app's Device Sessions tab to show active " +
+                    "(open) and recent (closed) sessions.")
+    public ResponseEntity<ApiResponse<Page<DeviceSessionResponse>>> getSessions(
+            @PageableDefault(size = 100) Pageable pageable) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(
+                sessionService.getSessions(tenantId, pageable)));
+    }
+
+    @GetMapping("/current")
+    @Operation(
+            summary = "Get the currently open session on a device",
+            description = "Used by the kiosk lock screen to determine whether to show " +
+                    "'Start Shift' or the active session's home screen on app launch.")
+    public ResponseEntity<ApiResponse<DeviceSession>> getCurrentSession(
+            @RequestParam String deviceHardwareId) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        return sessionService.getCurrentSession(deviceHardwareId, tenantId)
+                .map(s -> ResponseEntity.ok(ApiResponse.success(s)))
+                .orElseGet(() -> ResponseEntity.ok(ApiResponse.success((DeviceSession) null)));
+    }
+
+    @GetMapping("/resolve-guard")
+    @Operation(
+            summary = "Resolve the currently active guard on a device",
+            description = """
+            Phase 2 identity resolution endpoint — used internally by
+            CheckpointScanController and IncidentController to get the
+            authenticated guard server-side instead of trusting a JWT claim
+            or request body field. Returns empty if no session is open.
+            """)
+    public ResponseEntity<ApiResponse<UUID>> resolveGuardId(
+            @RequestParam String deviceHardwareId) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        return sessionService.resolveGuardId(deviceHardwareId, tenantId)
+                .map(id -> ResponseEntity.ok(ApiResponse.success(id)))
+                .orElseGet(() -> ResponseEntity.ok(ApiResponse.success((UUID) null)));
+    }
 
     // ── Session Lifecycle ──────────────────────────────────────────────────────
 
@@ -114,36 +147,26 @@ public class DeviceSessionController {
                 sessionService.forceCloseSession(tenantId, sessionId, supervisorId, reason)));
     }
 
-    // ── Queries ────────────────────────────────────────────────────────────────
+    // ── GPS location ping (new) ──────────────────────────────────────────────
 
-    @GetMapping("/current")
+    @PostMapping("/{sessionId}/location")
     @Operation(
-            summary = "Get the currently open session on a device",
-            description = "Used by the kiosk lock screen to determine whether to show " +
-                    "'Start Shift' or the active session's home screen on app launch.")
-    public ResponseEntity<ApiResponse<DeviceSession>> getCurrentSession(
-            @RequestParam String deviceHardwareId) {
-        TenantId tenantId = TenantContext.getTenantIdAsObject();
-        return sessionService.getCurrentSession(deviceHardwareId, tenantId)
-                .map(s -> ResponseEntity.ok(ApiResponse.success(s)))
-                .orElseGet(() -> ResponseEntity.ok(ApiResponse.success((DeviceSession) null)));
-    }
-
-    @GetMapping("/resolve-guard")
-    @Operation(
-            summary = "Resolve the currently active guard on a device",
+            summary = "Record a GPS ping for the guard on this open session",
             description = """
-            Phase 2 identity resolution endpoint — used internally by
-            CheckpointScanController and IncidentController to get the
-            authenticated guard server-side instead of trusting a JWT claim
-            or request body field. Returns empty if no session is open.
+            Called by the guard app roughly every 5 minutes while a session
+            is open (backend pass 1 of the real-GPS-map feature -- no read
+            endpoint for "current locations" exists yet). guardId, shiftId,
+            and siteId are all resolved server-side from the session/device,
+            never trusted from the request body, same posture as checkpoint
+            scanning. Fails with 400 SESSION_NOT_OPEN if the session is
+            closed or doesn't belong to this tenant.
             """)
-    public ResponseEntity<ApiResponse<UUID>> resolveGuardId(
-            @RequestParam String deviceHardwareId) {
+    public ResponseEntity<ApiResponse<Void>> recordLocationPing(
+            @PathVariable UUID sessionId,
+            @Valid @RequestBody RecordLocationPingRequest req) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
-        return sessionService.resolveGuardId(deviceHardwareId, tenantId)
-                .map(id -> ResponseEntity.ok(ApiResponse.success(id)))
-                .orElseGet(() -> ResponseEntity.ok(ApiResponse.success((UUID) null)));
+        guardLocationService.recordPing(tenantId, sessionId, req);
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     // ── Resource Custody ───────────────────────────────────────────────────────
