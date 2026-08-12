@@ -5,7 +5,7 @@ import { apiClient } from '../../api/client'
 import {
   ShoppingCart, Package, AlertTriangle, X, Minus, Plus,
   Search, RefreshCw, Printer, ChevronDown, Truck, Receipt,
-  CheckCircle, TrendingUp, RotateCcw, Scan,
+  CheckCircle, TrendingUp, RotateCcw, Scan, Settings,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -88,6 +88,13 @@ interface POItem {
   unitCost: number
   lineTotal: number
   fullyReceived: boolean
+}
+
+interface PosSettings {
+  cashVarianceToleranceAmount: number
+  cashVarianceTolerancePct: number
+  cashVarianceCriticalAmount: number
+  cashVarianceCriticalPct: number
 }
 
 type Tab = 'sell' | 'stock' | 'transactions' | 'orders'
@@ -407,6 +414,9 @@ export function PosPage() {
   const [showReceive,  setShowReceive] = useState<PurchaseOrder | null>(null)
   const [showRefund,   setShowRefund]  = useState<Transaction | null>(null)
   const [showReceipt,  setShowReceipt] = useState<Transaction | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
+  const [settingsForm, setSettingsForm] = useState<PosSettings | null>(null)
+  const [settingsSaved, setSettingsSaved] = useState(false)
 
   // NEW: was never called at all — the modal below used to build its own,
   // simpler receipt directly from the Transaction object already in memory,
@@ -450,6 +460,22 @@ export function PosPage() {
     queryKey: ['pos-stock'],
     queryFn: async () => unwrap(await apiClient.get('/api/v1/pos/stock?size=200')),
   })
+
+  const { data: posSettings, isLoading: settingsLoading } = useQuery<PosSettings>({
+    queryKey: ['pos-settings'],
+    queryFn: async () => {
+      const r = await apiClient.get('/api/v1/pos/settings')
+      return r.data?.data ?? r.data
+    },
+    enabled: showSettings,
+  })
+
+  // Settings are lazy-created server-side on first read (defaults), so this
+  // just mirrors whatever comes back into the editable form each time the
+  // query resolves — same shape as the localSession sync effect above.
+  useEffect(() => {
+    if (posSettings) setSettingsForm(posSettings)
+  }, [posSettings])
 
   const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ['pos-transactions'],
@@ -604,6 +630,19 @@ export function PosPage() {
     onError: (e: any) => setErrMsg(extractError(e)),
   })
 
+  const settingsMut = useMutation({
+    mutationFn: (body: PosSettings) => apiClient.put('/api/v1/pos/settings', body),
+    onSuccess: (r) => {
+      const updated = r.data?.data ?? r.data
+      setSettingsForm(updated)
+      qc.setQueryData(['pos-settings'], updated)
+      setErrMsg('')
+      setSettingsSaved(true)
+      setTimeout(() => setSettingsSaved(false), 2000)
+    },
+    onError: (e: any) => setErrMsg(extractError(e)),
+  })
+
   // ── Cart helpers ─────────────────────────────────────────────────────────────
 
   const addToCart = useCallback((item: StockItem) => {
@@ -733,9 +772,17 @@ export function PosPage() {
             Point of sale · Inventory · Purchase orders
           </p>
         </div>
-        <button onClick={invalidateAll} style={btnSecondary} title="Refresh all data">
-          <RefreshCw size={14} />
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={invalidateAll} style={btnSecondary} title="Refresh all data">
+            <RefreshCw size={14} />
+          </button>
+          <button
+            onClick={() => { setShowSettings(true); setErrMsg('') }}
+            style={btnSecondary}
+            title="POS settings">
+            <Settings size={14} />
+          </button>
+        </div>
       </div>
 
       {/* ── Stats ───────────────────────────────────────────────────────────── */}
@@ -1724,6 +1771,101 @@ export function PosPage() {
               <button onClick={() => setShowReceipt(null)} style={btnCancel}>Close</button>
               <button onClick={() => window.print()} style={btnPrimary()} disabled={!receiptData}>
                 <Printer size={13} /> Print
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POS settings modal */}
+      {showSettings && (
+        <div style={MODAL_BG}>
+          <div style={modalBox(460)}>
+            {modalHeader('POS Settings', () => setShowSettings(false))}
+            <p style={{ fontSize: 12, color: '#64748B', marginBottom: 16 }}>
+              A till closing over or under these amounts notifies admins.
+              Small variances are ignored as counting rounding.
+            </p>
+
+            {settingsLoading || !settingsForm ? (
+              <div style={{ textAlign: 'center', padding: 30, color: '#94A3B8' }}>
+                Loading…
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#374151', marginBottom: 8 }}>
+                  No alert if variance is within
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                  <div>
+                    <label style={lbl}>Flat amount (R)</label>
+                    <input
+                      type="number" step="0.01" min="0"
+                      value={settingsForm.cashVarianceToleranceAmount}
+                      onChange={e => setSettingsForm(f => f && {
+                        ...f, cashVarianceToleranceAmount: Number(e.target.value),
+                      })}
+                      style={inp}
+                    />
+                  </div>
+                  <div>
+                    <label style={lbl}>Or % of expected cash</label>
+                    <input
+                      type="number" step="0.001" min="0" max="1"
+                      value={settingsForm.cashVarianceTolerancePct}
+                      onChange={e => setSettingsForm(f => f && {
+                        ...f, cashVarianceTolerancePct: Number(e.target.value),
+                      })}
+                      style={inp}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#374151', marginBottom: 8 }}>
+                  Escalate to urgent beyond
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
+                  <div>
+                    <label style={lbl}>Flat amount (R)</label>
+                    <input
+                      type="number" step="0.01" min="0"
+                      value={settingsForm.cashVarianceCriticalAmount}
+                      onChange={e => setSettingsForm(f => f && {
+                        ...f, cashVarianceCriticalAmount: Number(e.target.value),
+                      })}
+                      style={inp}
+                    />
+                  </div>
+                  <div>
+                    <label style={lbl}>Or % of expected cash</label>
+                    <input
+                      type="number" step="0.001" min="0" max="1"
+                      value={settingsForm.cashVarianceCriticalPct}
+                      onChange={e => setSettingsForm(f => f && {
+                        ...f, cashVarianceCriticalPct: Number(e.target.value),
+                      })}
+                      style={inp}
+                    />
+                  </div>
+                </div>
+                <div style={{ fontSize: 10, color: '#94A3B8', marginBottom: 10 }}>
+                  Whichever is greater applies — e.g. R20 and 1% means a small
+                  till uses the flat R20 floor, a bigger till uses 1% instead.
+                </div>
+              </>
+            )}
+
+            <ErrMsg msg={errMsg} />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', marginTop: 12 }}>
+              {settingsSaved && (
+                <span style={{ fontSize: 12, color: '#166534', marginRight: 'auto' }}>Saved ✓</span>
+              )}
+              <button onClick={() => setShowSettings(false)} style={btnCancel}>Close</button>
+              <button
+                disabled={!settingsForm || settingsMut.isPending}
+                onClick={() => settingsForm && settingsMut.mutate(settingsForm)}
+                style={btnPrimary()}>
+                {settingsMut.isPending ? 'Saving…' : 'Save Settings'}
               </button>
             </div>
           </div>

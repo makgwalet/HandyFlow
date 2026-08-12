@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import za.co.handyflow.platform.accountant.domain.model.FeeNote;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -91,4 +92,17 @@ public interface FeeNoteRepository extends JpaRepository<FeeNote, UUID> {
           AND f.id = :id
     """)
     Optional<FeeNote> findByTenantIdAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
+
+    /**
+     * Outstanding balance for one client — SENT/PARTIAL/OVERDUE only,
+     * matching the same status set findOutstanding() already uses
+     * elsewhere in this module (excludes DRAFT and terminal states
+     * PAID/WRITTEN_OFF). Backs the portal home page's per-client
+     * "R X owing" summary.
+     */
+    @Query("""
+        SELECT COALESCE(SUM(f.total), 0) FROM AccountantFeeNote f
+        WHERE f.clientId = :clientId AND f.status IN ('SENT','PARTIAL','OVERDUE')
+    """)
+    BigDecimal sumOutstandingTotalByClient(@Param("clientId") UUID clientId);
 }

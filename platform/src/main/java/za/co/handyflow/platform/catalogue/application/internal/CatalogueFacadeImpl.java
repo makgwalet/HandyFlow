@@ -34,6 +34,13 @@ public class CatalogueFacadeImpl implements CatalogueFacade {
                 .map(this::toSummary);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<CatalogueItemSummary> findItemByBarcode(TenantId tenantId, String barcode) {
+        return itemRepository.findByTenantIdAndBarcode(tenantId.getValue(), barcode)
+                .map(this::toSummary);
+    }
+
     private CatalogueItemSummary toSummary(CatalogueItem item) {
         return new CatalogueItemSummary(
                 item.getId(),

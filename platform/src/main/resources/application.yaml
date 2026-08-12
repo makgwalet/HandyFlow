@@ -6,6 +6,10 @@ spring:
   application:
     name: handyflow-platform
 
+  modulith:
+    events:
+      republish-outstanding-events-on-restart: true
+
   datasource:
     url: jdbc:postgresql://localhost:5433/handyflow
     username: handyflow

@@ -3,7 +3,10 @@ import { portalApiClient } from './portal.client'
 import type {
   PortalRegisterRequest, PortalLoginRequest, PortalAuthResponse,
   PortalClientSummary, FeeNote, FicaDocument, UploadFicaDocumentRequest,
+  DocumentRequest,
+  TaxDeadline,
 } from '../types/portal.types'
+import type { apiClient } from './client'
 
 export const portalApi = {
   register: async (data: PortalRegisterRequest): Promise<PortalAuthResponse> => {
@@ -51,4 +54,16 @@ export const portalApi = {
     )
     return res.data
   },
+
+  getMyDocumentRequests: (clientId: string) =>
+      portalApiClient.get(`/accountant/portal/clients/${clientId}/document-requests`)
+        .then(res => res.data.data as DocumentRequest[]),
+ 
+  submitDocumentRequest: (clientId: string, requestId: string) =>
+      portalApiClient.post(`/accountant/portal/clients/${clientId}/document-requests/${requestId}/submit`)
+        .then(res => res.data.data as DocumentRequest),
+
+  getMyTaxDeadlines: (clientId: string) =>
+      portalApiClient.get(`/accountant/portal/clients/${clientId}/tax-deadlines`)
+        .then(res => res.data.data as TaxDeadline[]),
 }

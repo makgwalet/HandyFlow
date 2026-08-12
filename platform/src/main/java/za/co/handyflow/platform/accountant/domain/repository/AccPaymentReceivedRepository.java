@@ -30,4 +30,22 @@ public interface AccPaymentReceivedRepository extends JpaRepository<AccPaymentRe
      */
     @Query("SELECT COALESCE(SUM(p.amount), 0) FROM AccountantPaymentReceived p WHERE p.feeNoteId = :feeNoteId")
     BigDecimal sumByFeeNoteId(@Param("feeNoteId") UUID feeNoteId);
+
+    /**
+     * Sum of payments already received against this client's currently-
+     * outstanding fee notes (SENT/PARTIAL/OVERDUE) — subtracted from
+     * sumOutstandingTotalByClient() to get the real remaining balance.
+     * Deliberately scoped to outstanding notes only, not all payments
+     * ever received for this client — a payment against an already-PAID
+     * note is irrelevant to "what do they still owe right now".
+     */
+    @Query("""
+        SELECT COALESCE(SUM(p.amount), 0) FROM AccountantPaymentReceived p
+        WHERE p.clientId = :clientId
+        AND p.feeNoteId IN (
+            SELECT f.id FROM AccountantFeeNote f
+            WHERE f.clientId = :clientId AND f.status IN ('SENT','PARTIAL','OVERDUE')
+        )
+    """)
+    BigDecimal sumPaidAgainstOutstandingByClient(@Param("clientId") UUID clientId);
 }

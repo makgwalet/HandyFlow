@@ -1,0 +1,58 @@
+# Disposable / throwaway email provider domains.
+# Checked at registration to close the "unlimited free 60-day pilots via
+# scripted signups" abuse vector (HandyFlow BOS Discovery doc, Section 19.2).
+#
+# MAINTENANCE NOTE: this is a curated snapshot, not a live-updated feed —
+# new disposable-email services appear regularly and this list will drift
+# out of date. Options if this becomes a real problem in practice:
+#   1. Periodically refresh from a maintained open-source list (e.g. the
+#      disposable-email-domains project on GitHub has ~3000+ entries and
+#      is actively maintained — this file's format is directly compatible).
+#   2. For stronger coverage, a paid email-validation API (Kickbox,
+#      ZeroBounce, Mailgun's validation endpoint) catches new domains a
+#      static list can't, at the cost of a per-signup API call and a
+#      vendor dependency. Not necessary at current signup volume — a
+#      static list closes the obvious, high-volume abuse case cheaply.
+# One domain per line, lowercase, no comments after this header.
+mailinator.com
+guerrillamail.com
+guerrillamail.info
+guerrillamail.biz
+guerrillamail.de
+guerrillamail.net
+guerrillamail.org
+guerrillamailblock.com
+10minutemail.com
+10minutemail.net
+10minutemail.co.za
+temp-mail.org
+tempmail.com
+throwawaymail.com
+yopmail.com
+yopmail.fr
+yopmail.net
+trashmail.com
+trashmail.net
+getnada.com
+maildrop.cc
+mintemail.com
+mailnesia.com
+fakeinbox.com
+sharklasers.com
+spam4.me
+grr.la
+dispostable.com
+mytemp.email
+tempinbox.com
+emailondeck.com
+mohmal.com
+33mail.com
+mailcatch.com
+moakt.cc
+inboxbear.com
+tempr.email
+discard.email
+crazymailing.com
+burnermail.io
+tempail.com
+anonaddy.me

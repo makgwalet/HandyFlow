@@ -51,6 +51,26 @@ public interface PosTransactionRepository extends JpaRepository<PosTransaction, 
         """)
     long countSalesBetween(TenantId tenantId, Instant from, Instant to);
 
+    // NEW (HandyFlow BOS Discovery doc, Section 60/66): backs the fix for
+    // getZReport()'s hardcoded totalVat/totalDiscount zeros. Same filter
+    // shape as sumSalesBetween/countSalesBetween above — real sales only,
+    // not refunds. PosTransaction.vatAmount/discountAmount are inferred
+    // field names from PosService's txn.setTotals(subtotal, totalVat,
+    // totalDiscount, totalAmount) call and ReceiptResponse's use of
+    // txn.getVatAmount()/txn.getDiscountAmount() — not confirmed against
+    // the PosTransaction entity class itself, which wasn't available.
+    // Verify these two field names against the real entity before
+    // trusting this query compiles as-is.
+    @Query("""
+        SELECT COALESCE(SUM(t.vatAmount), 0), COALESCE(SUM(t.discountAmount), 0)
+        FROM PosTransaction t
+        WHERE t.tenantId = :tenantId
+        AND t.status = 'COMPLETED'
+        AND t.originalTransactionId IS NULL
+        AND t.createdAt BETWEEN :from AND :to
+        """)
+    Object[] sumVatAndDiscountBetween(TenantId tenantId, Instant from, Instant to);
+
     // ── Cash session queries ──────────────────────────────────────────────────
 
     /** All COMPLETED sales (not refunds) in a session — for expected-cash calculation */
@@ -79,11 +99,26 @@ public interface PosTransactionRepository extends JpaRepository<PosTransaction, 
         """)
     int countBySession(UUID sessionId);
 
-    // ── Refund queries ────────────────────────────────────────────────────────
+    // ── Refund queries ─────────────────────────────────────────────────────────
 
     /** Returns all REFUND transactions against an original sale */
     List<PosTransaction> findByOriginalTransactionIdAndTenantId(UUID originalTransactionId,
                                                                 TenantId tenantId);
+
+    // NEW (HandyFlow BOS Discovery doc, Section 60/66): backs the fix for
+    // getZReport()'s hardcoded totalRefunds/refundCount zeros. Deliberately
+    // the INVERSE filter of every "real sales" query above
+    // (originalTransactionId IS NOT NULL = this IS a refund, per
+    // PosTransaction.createRefund()'s own field-setting behavior).
+    @Query("""
+        SELECT COUNT(t), COALESCE(SUM(t.totalAmount), 0)
+        FROM PosTransaction t
+        WHERE t.tenantId = :tenantId
+        AND t.status = 'COMPLETED'
+        AND t.originalTransactionId IS NOT NULL
+        AND t.createdAt BETWEEN :from AND :to
+        """)
+    Object[] sumRefundsBetween(TenantId tenantId, Instant from, Instant to);
 
     // ── Z-Report payment method breakdown ────────────────────────────────────
 

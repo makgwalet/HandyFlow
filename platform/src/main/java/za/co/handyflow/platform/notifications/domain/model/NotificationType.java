@@ -126,6 +126,9 @@ public enum NotificationType {
     PAY_RUN_PROCESSED(INFO, Set.of(IN_APP, EMAIL)),
     PAYSLIP_AVAILABLE(INFO, Set.of(IN_APP, EMAIL)),
     EMP201_DUE(WARNING, Set.of(IN_APP, EMAIL)),
+    LEAVE_REQUEST_SUBMITTED(INFO, Set.of(IN_APP, EMAIL)),
+    LEAVE_REQUEST_APPROVED(INFO, Set.of(IN_APP, EMAIL)),
+    LEAVE_REQUEST_REJECTED(WARNING, Set.of(IN_APP, EMAIL)),
 
     // ── Invoicing ────────────────────────────────────────────────────────────
     QUOTE_SENT(INFO, Set.of(IN_APP)),

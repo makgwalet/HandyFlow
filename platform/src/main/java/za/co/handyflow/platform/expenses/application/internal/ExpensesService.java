@@ -10,11 +10,20 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.expenses.domain.model.ExpenseClaim;
 import za.co.handyflow.platform.expenses.domain.repository.ExpenseClaimRepository;
 import za.co.handyflow.platform.expenses.dto.*;
+import za.co.handyflow.platform.hr.dto.EmployeeResponse;
+import za.co.handyflow.platform.notifications.application.NotificationRequest;
+import za.co.handyflow.platform.notifications.application.Recipient;
+import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
+import za.co.handyflow.platform.notifications.application.UserRecipientResolver;
+import za.co.handyflow.platform.notifications.application.internal.NotificationService;
+import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -24,7 +33,11 @@ public class ExpensesService {
 
     private final ExpenseClaimRepository claimRepo;
     private final ClaimNumberGenerator   numberGen;
-    private final JdbcTemplate           jdbc;
+    private final za.co.handyflow.platform.hr.application.HrFacade hrFacade;
+    private final NotificationService notificationService;
+    private final TenantAdminRecipients tenantAdminRecipients;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final ExpenseAccountingPoster accountingPoster;
 
     @Transactional(readOnly = true)
     public Page<ExpenseClaimResponse> getClaims(TenantId tenantId, String status,
@@ -51,6 +64,7 @@ public class ExpensesService {
         claimRepo.save(claim);
         log.info("Expense claim {} submitted by={} amount={}",
                 number, req.employeeName(), req.amount());
+        notifySubmitted(tenantId, claim);
         return toResponse(claim);
     }
 
@@ -66,6 +80,11 @@ public class ExpensesService {
 
         log.info("Expense claim {} approved amount={}", claim.getClaimNumber(),
                 claim.getAmount());
+        notifyEmployee(tenantId, claim, NotificationType.EXPENSE_CLAIM_APPROVED,
+                "Expense claim approved: " + claim.getClaimNumber(),
+                "Your expense claim " + claim.getClaimNumber() + " for R"
+                        + claim.getAmount().stripTrailingZeros().toPlainString()
+                        + " has been approved and will be paid out.");
         return toResponse(claim);
     }
 
@@ -76,6 +95,10 @@ public class ExpensesService {
         claim.reject(approvedBy, reason);
         claimRepo.save(claim);
         log.info("Expense claim {} rejected reason={}", claim.getClaimNumber(), reason);
+        notifyEmployee(tenantId, claim, NotificationType.EXPENSE_CLAIM_REJECTED,
+                "Expense claim rejected: " + claim.getClaimNumber(),
+                "Your expense claim " + claim.getClaimNumber() + " was rejected. Reason: "
+                        + (reason != null && !reason.isBlank() ? reason : "No reason provided") + ".");
         return toResponse(claim);
     }
 
@@ -85,6 +108,11 @@ public class ExpensesService {
         claim.markReimbursed();
         claimRepo.save(claim);
         log.info("Expense claim {} reimbursed", claim.getClaimNumber());
+        notifyEmployee(tenantId, claim, NotificationType.EXPENSE_CLAIM_REIMBURSED,
+                "Expense claim reimbursed: " + claim.getClaimNumber(),
+                "Your expense claim " + claim.getClaimNumber() + " for R"
+                        + claim.getAmount().stripTrailingZeros().toPlainString()
+                        + " has been paid out.");
         return toResponse(claim);
     }
 
@@ -98,63 +126,18 @@ public class ExpensesService {
     // We use JDBC directly rather than calling across module boundaries.
     // This posts: DR Expenses account, CR Accounts Payable account.
     private void postToAccounting(TenantId tenantId, ExpenseClaim claim) {
-        try {
-            // Find or use default expense account (6000-series)
-            var expenseAccountRow = jdbc.queryForMap(
-                    "SELECT id FROM acc_accounts WHERE tenant_id = ? AND account_code LIKE '5%' AND account_subtype = 'STAFF_EXPENSES' AND active = true LIMIT 1",
-                    tenantId.getValue());
-            var payableAccountRow = jdbc.queryForMap(
-                    "SELECT id FROM acc_accounts WHERE tenant_id = ? AND account_code LIKE '2%' AND active = true LIMIT 1",
-                    tenantId.getValue());
-
-            UUID expenseAccountId = UUID.fromString(expenseAccountRow.get("id").toString());
-            UUID payableAccountId = UUID.fromString(payableAccountRow.get("id").toString());
-
-            // Create journal entry
-            UUID jeId = UUID.randomUUID();
-            String jeNumber = "JE-EXP-" + claim.getClaimNumber();
-            LocalDate today = LocalDate.now();
-
-            jdbc.update("""
-                INSERT INTO acc_journal_entries
-                (id, tenant_id, entry_number, entry_date, description, status, posted_at, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, 'POSTED', NOW(), NOW(), NOW())
-                """,
-                    jeId, tenantId.getValue(), jeNumber, today,
-                    "Expense claim: " + claim.getDescription() + " (" + claim.getClaimNumber() + ")");
-
-            // DR Expenses
-            jdbc.update("""
-                INSERT INTO acc_journal_lines
-                (id, journal_entry_id, account_id, description, debit_amount, credit_amount, created_at)
-                VALUES (?, ?, ?, ?, ?, 0, NOW())
-                """,
-                    UUID.randomUUID(), jeId, expenseAccountId,
-                    claim.getCategory() + " — " + claim.getEmployeeName(),
-                    claim.getAmount());
-
-            // CR Accounts Payable
-            jdbc.update("""
-                INSERT INTO acc_journal_lines
-                (id, journal_entry_id, account_id, description, debit_amount, credit_amount, created_at)
-                VALUES (?, ?, ?, ?, 0, ?, NOW())
-                """,
-                    UUID.randomUUID(), jeId, payableAccountId,
-                    "Payable to " + claim.getEmployeeName(),
-                    claim.getAmount());
-
-            claim.linkJournalEntry(jeId);
-            claimRepo.save(claim);
-            log.info("Posted expense journal entry {} for claim {}",
-                    jeNumber, claim.getClaimNumber());
-
-        } catch (Exception e) {
-            // WHY not throw? Approval should not fail just because accounting
-            // lookup fails — log the error and let the team fix manually.
-            log.error("Failed to post expense {} to accounting: {}",
-                    claim.getClaimNumber(), e.getMessage());
-        }
-    }
+                accountingPoster.postExpenseClaimJournal(
+                                tenantId, claim.getId(), claim.getClaimNumber(), claim.getDescription(),
+                                claim.getCategory(), claim.getEmployeeName(), claim.getAmount()
+                                ).ifPresentOrElse(
+                                jeId -> {
+                                        claim.linkJournalEntry(jeId);
+                                        claimRepo.save(claim);
+                                    },
+                                () -> log.warn("Accounting journal not posted for claim {} — approval proceeds without it",
+                                                claim.getClaimNumber())
+                                );
+            }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -170,5 +153,45 @@ public class ExpensesService {
                 c.getReceiptUrl(), c.getStatus(), c.getRejectionReason(),
                 c.getJournalEntryId(), c.getNotes(), c.getApprovedAt(),
                 c.getReimbursedAt(), c.getCreatedAt());
+    }
+
+    // NEW (Tier 1 gap analysis): no explicit approver field exists on
+    // ExpenseClaim, so submission notifications go to tenant admins —
+    // same fallback every other module in this codebase uses (Fuel,
+    // SCM, Fleet) when there's no single obvious "owner" of the event.
+    private void notifySubmitted(TenantId tenantId, ExpenseClaim claim) {
+        List<Recipient> recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
+        if (recipients.isEmpty()) return;
+        notificationService.send(NotificationRequest.builder()
+                .tenantId(tenantId)
+                .type(NotificationType.EXPENSE_CLAIM_SUBMITTED)
+                .title("Expense claim submitted: " + claim.getClaimNumber())
+                .message(claim.getEmployeeName() + " submitted a claim for R"
+                        + claim.getAmount().stripTrailingZeros().toPlainString()
+                        + " (" + claim.getCategory() + ") — needs approval.")
+                .actionUrl("/expenses/" + claim.getId())
+                .sourceModule("expenses")
+                .sourceEntityId(claim.getId().toString())
+                .recipients(recipients)
+                .build());
+    }
+
+    private void notifyEmployee(TenantId tenantId, ExpenseClaim claim, NotificationType type,
+                                String title, String message) {
+        if (claim.getEmployeeId() == null) return;
+               Optional<EmployeeResponse> employee = hrFacade.findEmployeeById(tenantId, claim.getEmployeeId());
+                if (employee.isEmpty() || employee.get().email() == null || employee.get().email().isBlank()) return;
+                Recipient recipient = Recipient.external(
+                                employee.get().fullName(), employee.get().email(), employee.get().phone());
+        notificationService.send(NotificationRequest.builder()
+                .tenantId(tenantId)
+                .type(type)
+                .title(title)
+                .message(message)
+                .actionUrl("/expenses/" + claim.getId())
+                .sourceModule("expenses")
+                .sourceEntityId(claim.getId().toString())
+                .recipient(recipient)
+                .build());
     }
 }

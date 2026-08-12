@@ -41,6 +41,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
+    private final RateLimitFilter rateLimitFilter;
     private final JwtAuthFilter jwtAuthFilter;
     private final AdminJwtFilter adminJwtFilter;
     private final GuardJwtFilter guardJwtFilter;
@@ -50,6 +51,8 @@ public class SecurityConfig {
     // NEW: closes the "API keys exist in the DB but won't authenticate"
     // gap flagged in PublicApiController's own deployment note.
     private final ApiKeyAuthFilter apiKeyAuthFilter;
+    private final IdempotencyKeyFilter idempotencyKeyFilter;
+
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -98,7 +101,8 @@ public class SecurityConfig {
                                 "/api/v1/auth/guard/**",   // guard login — no tenant JWT required
                                 "/api/v1/security/cameras/motion-webhook",   // camera webhook — auth via webhookSecret, not JWT
                                 "/webjars/**",           // ← SpringDoc needs this
-                                "/swagger-resources/**"  // ← SpringDoc needs this
+                                "/swagger-resources/**",  // ← SpringDoc needs this
+                                "/api/v1/payroll-bureau/portal/auth/**"
                         ).permitAll()
                         // Everything else requires authentication
                         .anyRequest().authenticated()
@@ -108,16 +112,14 @@ public class SecurityConfig {
                 .addFilterBefore(adminJwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(guardJwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                // NEW: closes the "client portal" gap.
                 .addFilterBefore(portalJwtFilter, UsernamePasswordAuthenticationFilter.class)
-                // NEW: closes the "API key auth filter not yet wired" gap.
-                // Dispatches on the "Authorization: ApiKey ..." header
-                // scheme (see ApiKeyAuthFilter.shouldNotFilter()), so
-                // registration order relative to the other filters here
-                // doesn't matter -- each one only acts on requests it
-                // actually recognizes, everything else passes through as
-                // a no-op.
                 .addFilterBefore(apiKeyAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(rateLimitFilter, AdminJwtFilter.class)   // CHANGED: anchored
+                // to a specific
+                // custom filter,
+                // not shared with
+                // the others
+                .addFilterAfter(idempotencyKeyFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 

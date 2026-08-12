@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import za.co.handyflow.platform.notifications.application.NotificationRequest;
 import za.co.handyflow.platform.notifications.application.Recipient;
+import za.co.handyflow.platform.notifications.application.UserRecipientResolver;
 import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.shared.*;
@@ -45,6 +46,7 @@ public class TasksService {
     private final NotificationService   notificationService;
     private final TasksBoardPdfGenerator boardPdfGenerator;
     private final FileStorageService    fileStorageService;
+    private final UserRecipientResolver userRecipientResolver;
 
     @Value("${tasks.attachments.max-size-mb:20}")
     private long maxAttachmentSizeMb = 20;
@@ -588,37 +590,26 @@ public class TasksService {
     // ── Notifications ────────────────────────────────────────────────────────
 
     /**
-     * Resolves a platform user into a notification Recipient (name/email/phone).
-     * Public so TasksNotificationScheduler can reuse it for the due-soon/overdue
-     * sweeps — it needs the same lookup this service does for in-request events,
-     * just for a batch of tasks instead of one.
-     * <p>
-     * ASSUMPTION: email/phone column names on `users` — verify against the real
-     * schema; if these differ, EMAIL/SMS delivery for task notifications will
-     * silently no-op per-recipient (EmailChannelSender/SmsChannelSender both
-     * skip-and-log rather than throw) while IN_APP still works fine.
-     */
-    @Transactional(readOnly = true)
-    public Recipient resolveRecipient(UUID userId) {
-        if (userId == null) return null;
-        try {
-            return jdbc.queryForObject(
-                    "SELECT id, first_name || ' ' || last_name AS name, email, phone FROM users WHERE id = ?",
-                    (rs, rowNum) -> Recipient.user(
-                            UUID.fromString(rs.getString("id")),
-                            rs.getString("name"),
-                            rs.getString("email"),
-                            rs.getString("phone")),
-                    userId);
-        } catch (Exception e) {
-            return null;
-        }
-    }
+     +     * FIX: previously ran its own jdbc query directly, annotated
+     +     * @Transactional(readOnly = true) — but called only via self-invocation
+     +     * from notifyAssignment()/notifyComment() below, where that annotation
+     +     * is silently ignored (Spring's proxy never sees a call through `this`).
+     +     * A failed lookup there would poison whatever transaction was already
+     +     * open on the calling create/update method — the exact failure mode
+     +     * that surfaced as a Postgres 25P02 in Expenses' approveClaim(). Also
+     +     * had no tenant_id scoping at all. Now delegates to a genuinely
+     +     * separate bean (UserRecipientResolver, REQUIRES_NEW, tenant-scoped)
+     +     * so a failure here is isolated and this class no longer runs the
+     +     * query itself.
+     +     */
+    public Recipient resolveRecipient(TenantId tenantId, UUID userId) {
+                return userRecipientResolver.resolveUser(tenantId, userId).orElse(null);
+            }
 
     /** Fires TASK_ASSIGNED — skipped if unassigned, or if the actor assigned it to themselves. */
     private void notifyAssignment(TenantId tenantId, Task task, UUID actorId) {
         if (task.getAssigneeId() == null || task.getAssigneeId().equals(actorId)) return;
-        Recipient recipient = resolveRecipient(task.getAssigneeId());
+        Recipient recipient = resolveRecipient(tenantId, task.getAssigneeId());
         if (recipient == null) return;
 
         notificationService.send(NotificationRequest.builder()
@@ -637,7 +628,7 @@ public class TasksService {
     /** Fires TASK_COMMENT_ADDED to the assignee — skipped if unassigned, or if they're the commenter. */
     private void notifyComment(TenantId tenantId, Task task, UUID authorId, String authorName) {
         if (task.getAssigneeId() == null || task.getAssigneeId().equals(authorId)) return;
-        Recipient recipient = resolveRecipient(task.getAssigneeId());
+        Recipient recipient = resolveRecipient(tenantId, task.getAssigneeId());
         if (recipient == null) return;
 
         notificationService.send(NotificationRequest.builder()

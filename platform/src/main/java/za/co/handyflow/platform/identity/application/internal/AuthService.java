@@ -53,9 +53,21 @@ public class AuthService {
     private final RoleService roleService;
     private final EmailService emailService;
     private final EmailVerificationService emailVerificationService;
+    private final DisposableEmailChecker disposableEmailChecker;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
+        // FIX: registration previously validated only email format, with
+        // no check against disposable/throwaway providers — a real abuse
+        // vector given the auto-granted 60-day free pilot below. Checked
+        // first, before any database uniqueness queries, so an obviously
+        // invalid signup fails as cheaply as possible.
+        if (disposableEmailChecker.isDisposable(request.email())) {
+            throw new IllegalArgumentException(
+                    "Please use a permanent email address to register — " +
+                            "disposable/temporary email providers are not accepted"
+            );
+        }
 
         if (tenantRepository.existsBySlug(request.slug())) {
             throw new IllegalArgumentException(

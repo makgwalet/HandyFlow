@@ -10,8 +10,8 @@ import za.co.handyflow.platform.accounting.domain.model.*;
 import za.co.handyflow.platform.accounting.domain.repository.*;
 import za.co.handyflow.platform.accounting.dto.*;
 import za.co.handyflow.platform.crm.CrmFacade;
+import za.co.handyflow.platform.invoicing.application.InvoicingFacade;
 import za.co.handyflow.platform.invoicing.domain.model.Invoice;
-import za.co.handyflow.platform.invoicing.domain.repository.InvoiceRepository;
 import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
@@ -39,7 +39,7 @@ public class AccountingService {
     private final AccVatPeriodRepository       vatPeriodRepo;
     private final ChartOfAccountsSeeder        coaSeeder;
     private final JournalNumberGenerator       numberGen;
-    private final InvoiceRepository            invoiceRepo;
+    private final InvoicingFacade               invoicingFacade;
     private final CrmFacade                     crmFacade;
     private final EmailService                  emailService;
 
@@ -668,11 +668,9 @@ public class AccountingService {
 
     @Transactional(readOnly = true)
     public Vat201Response getVat201(TenantId tenantId, LocalDate from, LocalDate to) {
-        List<Invoice> invoices = invoiceRepo.findAllForVat(tenantId.getValue().toString(), from, to);
-        BigDecimal outputVat  = invoices.stream().map(Invoice::getVatTotal)
-                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal totalSales = invoices.stream().map(Invoice::getSubtotal)
-                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        InvoicingFacade.VatSummary vatSummary = invoicingFacade.getVatSummary(tenantId, from, to);
+        BigDecimal outputVat  = vatSummary.totalOutputVat();
+        BigDecimal totalSales = vatSummary.totalSubtotal();
 
         Map<UUID, AccAccount> accounts = accountRepo.findAllActive(tenantId)
                 .stream().collect(Collectors.toMap(AccAccount::getId, a -> a));
@@ -686,7 +684,7 @@ public class AccountingService {
                 .map(l -> l.getDebitAmount().subtract(l.getCreditAmount()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return new Vat201Response(from, to, invoices.size(), totalSales, outputVat,
+        return new Vat201Response(from, to, vatSummary.invoiceCount(), totalSales, outputVat,
                 inputVat, outputVat.subtract(inputVat));
     }
 
@@ -694,19 +692,20 @@ public class AccountingService {
 
     @Transactional(readOnly = true)
     public AgingReportResponse getArAging(TenantId tenantId) {
-        List<Invoice> outstanding = invoiceRepo.findOutstandingForTenant(tenantId.getValue().toString());
+        List<InvoicingFacade.OutstandingInvoiceSummary> outstanding =
+                invoicingFacade.findOutstandingInvoices(tenantId);
         LocalDate today = LocalDate.now();
 
         BigDecimal current = BigDecimal.ZERO, days30 = BigDecimal.ZERO,
                 days60 = BigDecimal.ZERO, days90 = BigDecimal.ZERO, over90 = BigDecimal.ZERO;
         List<AgingReportResponse.AgingLine> lines = new ArrayList<>();
 
-        for (Invoice inv : outstanding) {
-            BigDecimal balance = inv.getTotal().subtract(
-                    inv.getAmountPaid() != null ? inv.getAmountPaid() : BigDecimal.ZERO);
+        for (InvoicingFacade.OutstandingInvoiceSummary inv : outstanding) {
+            BigDecimal balance = inv.total().subtract(
+                    inv.amountPaid() != null ? inv.amountPaid() : BigDecimal.ZERO);
             if (balance.compareTo(BigDecimal.ZERO) <= 0) continue;
 
-            LocalDate due = inv.getDueDate() != null ? inv.getDueDate() : today;
+            LocalDate due = inv.dueDate() != null ? inv.dueDate() : today;
             long daysOverdue = ChronoUnit.DAYS.between(due, today);
 
             String bucket;
@@ -716,15 +715,15 @@ public class AccountingService {
             else if (daysOverdue <= 90) { bucket = "61-90";   days90  = days90.add(balance);  }
             else                        { bucket = "90+";     over90  = over90.add(balance);  }
 
-            String customerName = inv.getCustomerId() != null
-                    ? crmFacade.findCustomerById(tenantId, inv.getCustomerId())
+            String customerName = inv.customerId() != null
+                    ? crmFacade.findCustomerById(tenantId, inv.customerId())
                     .map(c -> c.name())
-                    .orElse("Customer " + inv.getCustomerId().toString().substring(0, 8))
-                    : inv.getWalkinClientName();
+                    .orElse("Customer " + inv.customerId().toString().substring(0, 8))
+                    : inv.walkinClientName();
             lines.add(new AgingReportResponse.AgingLine(
-                    inv.getId(), inv.getInvoiceNumber(),
+                    inv.id(), inv.invoiceNumber(),
                     customerName,
-                    inv.getDueDate(), daysOverdue > 0 ? (int) daysOverdue : 0,
+                    inv.dueDate(), daysOverdue > 0 ? (int) daysOverdue : 0,
                     balance, bucket));
         }
 

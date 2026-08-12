@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.pos.application.internal.PosService;
+import za.co.handyflow.platform.pos.application.internal.PosSettingsService;
 import za.co.handyflow.platform.pos.domain.model.PosStockMovement;
 import za.co.handyflow.platform.pos.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -25,6 +26,7 @@ import java.util.UUID;
 public class PosController {
 
     private final PosService posService;
+    private final PosSettingsService posSettingsService;
 
     // ── Summary ───────────────────────────────────────────────────────────────
 
@@ -263,5 +265,24 @@ public class PosController {
         return ResponseEntity.ok(ApiResponse.success("Stock received",
                 posService.receiveStock(TenantContext.getTenantIdAsObject(), id, req,
                         TenantContext.getCurrentUserId())));
+    }
+
+    // ── Settings ──────────────────────────────────────────────────────────────
+
+    @GetMapping("/settings")
+    @PreAuthorize("hasAuthority('POS_READ')")
+    @Operation(summary = "Get POS settings — cash-up variance alert thresholds")
+    public ResponseEntity<ApiResponse<PosSettingsResponse>> getSettings() {
+        return ResponseEntity.ok(ApiResponse.success(
+                posSettingsService.getSettings(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PutMapping("/settings")
+    @PreAuthorize("hasAuthority('POS_MANAGE')")
+    @Operation(summary = "Update POS settings — cash-up variance alert thresholds")
+    public ResponseEntity<ApiResponse<PosSettingsResponse>> updateSettings(
+            @Valid @RequestBody UpdatePosSettingsRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Settings updated",
+                posSettingsService.updateSettings(TenantContext.getTenantIdAsObject(), req)));
     }
 }

@@ -70,4 +70,20 @@ public interface TaxDeadlineRepository extends JpaRepository<TaxDeadline, UUID> 
           AND d.adjustedDueDate = :targetDate
     """)
     List<TaxDeadline> findPendingReminder1(@Param("targetDate") LocalDate targetDate);
+
+
+    /**
+     * "Upcoming" = due within the given cutoff (dashboard uses today+30,
+     * same 30-day window the Deadlines tab's own badge count already
+     * uses client-side — moved server-side here so the home page and
+     * the detail page agree on what "upcoming" means, rather than two
+     * independently-chosen thresholds silently drifting apart over
+     * time).
+     */
+    @Query("""
+        SELECT COUNT(d) FROM AccountantTaxDeadline d
+        WHERE d.clientId = :clientId AND d.status != 'FILED'
+        AND d.adjustedDueDate <= :cutoff
+    """)
+    long countUpcomingByClient(@Param("clientId") UUID clientId, @Param("cutoff") LocalDate cutoff);
 }

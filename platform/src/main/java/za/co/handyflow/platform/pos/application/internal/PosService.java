@@ -10,6 +10,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.catalogue.CatalogueFacade;
+import za.co.handyflow.platform.catalogue.CatalogueItemSummary;
 import za.co.handyflow.platform.catalogue.domain.repository.CatalogueItemRepository;
 import za.co.handyflow.platform.pos.domain.model.*;
 import za.co.handyflow.platform.pos.domain.repository.*;
@@ -17,6 +19,12 @@ import za.co.handyflow.platform.pos.dto.*;
 import za.co.handyflow.platform.shared.BusinessException;
 import za.co.handyflow.platform.shared.NotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.notifications.application.NotificationRequest;
+import za.co.handyflow.platform.notifications.application.Recipient;
+import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
+import za.co.handyflow.platform.notifications.application.internal.NotificationService;
+import za.co.handyflow.platform.notifications.domain.model.NotificationType;
+import za.co.handyflow.platform.notifications.domain.model.NotificationSeverity;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -43,9 +51,12 @@ public class PosService {
     private final PosCashSessionRepository       cashSessionRepo;
     private final PosStockAdjustmentRepository   adjustmentRepo;
     private final PosStockAdjustmentItemRepository adjustmentItemRepo;
-    private final CatalogueItemRepository        catalogueItemRepo;
+    private final CatalogueFacade catalogueFacade;
     private final ObjectMapper                   objectMapper;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final NotificationService notificationService;
+    private final TenantAdminRecipients tenantAdminRecipients;
+    private final PosSettingsService posSettingsService;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Summary
@@ -121,6 +132,18 @@ public class PosService {
         session.close(userId, userName, req.closingFloat(), expectedCash,
                 totalSales, txCount, req.notes());
         cashSessionRepo.save(session);
+
+        // NEW (Tier 1 gap analysis): no existing "acceptable variance"
+        // threshold anywhere in this codebase — this fires on ANY non-zero
+        // variance rather than guessing a tolerance band. FLAGGING AS AN
+        // ASSUMPTION, not a verified business rule: worth checking with you
+        // whether a small tolerance (e.g. R10-R20 float-counting rounding)
+        // should suppress this instead of alerting on every single close.
+        if (session.getCashVariance().compareTo(BigDecimal.ZERO) != 0) {
+             notifyCashVariance(tenantId, session, userName);
+        }
+        evaluateCashVariance(tenantId, session, userName);
+
         log.info("[POS] Session {} closed. Variance: {}", session.getSessionNumber(), session.getCashVariance());
         return mapSession(session);
     }
@@ -256,6 +279,7 @@ public class PosService {
         // ── Apply stock deductions ─────────────────────────────────────────────
         for (StockDeduction d : deductions) {
             BigDecimal qtyBefore = d.stockItem().getQtyOnHand();
+            boolean wasLow = d.stockItem().isLowStock();
             d.stockItem().adjustQty(d.qty().negate());
             stockItemRepo.save(d.stockItem());
 
@@ -266,6 +290,14 @@ public class PosService {
                     "SALE", txn.getId(),
                     "POS Sale " + txnNum, userId);
             movementRepo.save(movement);
+
+            // NEW (Tier 1 gap analysis): edge-triggered — mirrors Fuel's
+                       // FUEL_TANK_LOW exactly. Fires only on the sale that crosses the
+                                // item from "not low" into "low", not on every sale while it
+                                        // stays low, and not on an item that started low.
+                                                if (!wasLow && d.stockItem().isLowStock()) {
+                                notifyLowStock(tenantId, d.stockItem());
+                            }
         }
 
         log.info("[POS] Sale {} completed. Total: {} {}", txnNum, totalAmount, req.paymentMethod());
@@ -526,7 +558,8 @@ public class PosService {
 
         // Use session open/close times as the date range
         Instant from = session.getOpenedAt();
-        Instant to   = session.isClosed() ? session.getClosedAt() : Instant.now();
+        Instant to   = session.isClosed() ?
+                session.getClosedAt() : Instant.now();
 
         // Payment method breakdown
         List<Object[]> pmRows = transactionRepo.sumByPaymentMethodBetween(tenantId, from, to);
@@ -550,9 +583,24 @@ public class PosService {
         BigDecimal grossSales   = transactionRepo.sumSalesBetween(tenantId, from, to);
         long       txCount      = transactionRepo.countSalesBetween(tenantId, from, to);
 
-        // Refunds
-        BigDecimal totalRefunds = BigDecimal.ZERO; // sum of REFUND transactions in session
-        long       refundCount  = 0;
+        // FIX (HandyFlow BOS Discovery doc, Section 60/66): was
+        // BigDecimal.ZERO hardcoded for totalVat/totalDiscount and
+        // BigDecimal.ZERO/0 hardcoded for totalRefunds/refundCount,
+        // despite PosTransaction already storing real per-transaction
+        // vatAmount/discountAmount (see setTotals() calls in
+        // processSale()/processRefund() above) — every VAT-registered
+        // tenant's end-of-day report was showing zero VAT/discount
+        // regardless of actual sales, and refunds never appeared at all.
+        // Backed by two new aggregate queries on PosTransactionRepository
+        // (sumVatAndDiscountBetween, sumRefundsBetween), same filter
+        // shape as sumByPaymentMethodBetween/topItemsBetween above.
+        Object[] vatAndDiscount = transactionRepo.sumVatAndDiscountBetween(tenantId, from, to);
+        BigDecimal totalVat      = (BigDecimal) vatAndDiscount[0];
+        BigDecimal totalDiscount = (BigDecimal) vatAndDiscount[1];
+
+        Object[] refundData     = transactionRepo.sumRefundsBetween(tenantId, from, to);
+        long       refundCount  = ((Number) refundData[0]).longValue();
+        BigDecimal totalRefunds = (BigDecimal) refundData[1];
 
         BigDecimal expectedCash = session.isClosed()
                 ? session.getExpectedCash()
@@ -564,9 +612,13 @@ public class PosService {
                 session.getOpenedByName(), session.getClosedByName(),
                 session.getOpenedAt(), session.getClosedAt(),
                 grossSales,
-                BigDecimal.ZERO,  // totalVat — computed from transactions if needed
-                BigDecimal.ZERO,  // totalDiscount
-                grossSales,       // netSales
+                totalVat,
+                totalDiscount,
+                // FIX: netSales was hardcoded to grossSales — same bug
+                // family as totalVat/totalDiscount/totalRefunds above,
+                // just less visible since the field name doesn't say
+                // "refunds". Now nets out real refunds for the period.
+                grossSales.subtract(totalRefunds),
                 (int) txCount,
                 (int) refundCount,
                 totalRefunds,
@@ -632,8 +684,8 @@ public class PosService {
     @Transactional(readOnly = true)
     public StockItemResponse lookupByBarcode(TenantId tenantId, String barcode) {
         // Find catalogue item by barcode, then find stock item
-        return catalogueItemRepo.findByTenantIdAndBarcode(tenantId.getValue(), barcode)
-                .flatMap(cat -> stockItemRepo.findByTenantIdAndCatalogueItemId(tenantId, cat.getId()))
+        return catalogueFacade.findItemByBarcode(tenantId, barcode)
+                .flatMap(item -> stockItemRepo.findByTenantIdAndCatalogueItemId(tenantId, item.id()))
                 .map(s -> mapStockItem(tenantId, s))
                 .orElseThrow(() -> new NotFoundException("No stock item found for barcode: " + barcode));
     }
@@ -830,6 +882,88 @@ public class PosService {
     // Private helpers
     // ═══════════════════════════════════════════════════════════════════════════
 
+    private void evaluateCashVariance(TenantId tenantId, PosCashSession session, String closedByName) {
+        if (session.getCashVariance().compareTo(BigDecimal.ZERO) == 0) return;
+
+        PosSettings settings = posSettingsService.getOrCreate(tenantId);
+        BigDecimal variance = session.getCashVariance().abs();
+        BigDecimal expected = session.getOpeningFloat().add(session.getExpectedCash());
+
+        BigDecimal pctFloor = expected.compareTo(BigDecimal.ZERO) > 0
+                ? expected.multiply(settings.getCashVarianceTolerancePct()) : BigDecimal.ZERO;
+        BigDecimal noAlertCeiling = settings.getCashVarianceToleranceAmount().max(pctFloor);
+        if (variance.compareTo(noAlertCeiling) <= 0) return; // within tolerance — till-counting noise
+
+        BigDecimal pctCritical = expected.compareTo(BigDecimal.ZERO) > 0
+                ? expected.multiply(settings.getCashVarianceCriticalPct()) : BigDecimal.ZERO;
+        BigDecimal criticalFloor = settings.getCashVarianceCriticalAmount().max(pctCritical);
+        NotificationSeverity severity = variance.compareTo(criticalFloor) > 0
+                ? NotificationSeverity.CRITICAL : NotificationSeverity.WARNING;
+
+        notifyCashVariance(tenantId, session, closedByName, severity);
+    }
+
+    private void notifyCashVariance(TenantId tenantId, PosCashSession session, String closedByName,
+                                    NotificationSeverity severity) {
+        List<Recipient> recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
+        if (recipients.isEmpty()) return;
+        BigDecimal variance = session.getCashVariance();
+        boolean isShort = variance.compareTo(BigDecimal.ZERO) < 0;
+        notificationService.send(NotificationRequest.builder()
+                .tenantId(tenantId)
+                .type(NotificationType.CASH_UP_VARIANCE)
+                .severity(severity)
+                .title((severity == NotificationSeverity.CRITICAL ? "Large cash-up variance: " : "Cash-up variance: ")
+                        + session.getSessionNumber())
+                .message(session.getSessionNumber() + " closed " + (isShort ? "short" : "over")
+                        + " by R" + variance.abs().stripTrailingZeros().toPlainString()
+                        + " (closed by " + closedByName + ").")
+                .actionUrl("/pos/cash-sessions/" + session.getId())
+                .sourceModule("pos")
+                .sourceEntityId(session.getId().toString())
+                .recipients(recipients)
+                .build());
+    }
+
+    private void notifyLowStock(TenantId tenantId, PosStockItem stockItem) {
+        List<Recipient> recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
+        if (recipients.isEmpty()) return;
+        String itemName = getCatalogueItemName(tenantId, stockItem.getCatalogueItemId());
+        notificationService.send(NotificationRequest.builder()
+                .tenantId(tenantId)
+                .type(NotificationType.STOCK_LOW)
+                .title("Low stock: " + itemName)
+                .message(itemName + " is now at "
+                        + stockItem.getQtyOnHand().stripTrailingZeros().toPlainString()
+                        + " on hand (reorder level: "
+                        + stockItem.getReorderLevel().stripTrailingZeros().toPlainString()
+                        + "). Consider raising a purchase order.")
+                .actionUrl("/pos/stock")
+                .sourceModule("pos")
+                .sourceEntityId(stockItem.getId().toString())
+                .recipients(recipients)
+                .build());
+    }
+
+    private void notifyCashVariance(TenantId tenantId, PosCashSession session, String closedByName) {
+        List<Recipient> recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
+        if (recipients.isEmpty()) return;
+        BigDecimal variance = session.getCashVariance();
+        boolean isShort = variance.compareTo(BigDecimal.ZERO) < 0;
+        notificationService.send(NotificationRequest.builder()
+                .tenantId(tenantId)
+                .type(NotificationType.CASH_UP_VARIANCE)
+                .title("Cash-up variance: " + session.getSessionNumber())
+                .message(session.getSessionNumber() + " closed " + (isShort ? "short" : "over")
+                        + " by R" + variance.abs().stripTrailingZeros().toPlainString()
+                        + " (closed by " + closedByName + ").")
+                .actionUrl("/pos/cash-sessions/" + session.getId())
+                .sourceModule("pos")
+                .sourceEntityId(session.getId().toString())
+                .recipients(recipients)
+                .build());
+    }
+
     // FIX: was calling isVatExempt() via reflection on CatalogueItem — confirmed
     // that method genuinely doesn't exist on the real entity (CatalogueItem.java
     // has no vatExempt field at all). Every call threw, every throw was silently
@@ -848,29 +982,31 @@ public class PosService {
     // works instead of finishing the one that doesn't.
     private BigDecimal resolveVatRate(TenantId tenantId, UUID catalogueItemId) {
         if (catalogueItemId == null) return VAT_RATE_STANDARD;
-        return catalogueItemRepo.findById(catalogueItemId)
-                .map(cat -> cat.getVatRate() != null ? cat.getVatRate() : VAT_RATE_STANDARD)
+        return catalogueFacade.findItemById(tenantId, catalogueItemId)
+                .map(item -> item.vatRate() != null ? item.vatRate() : VAT_RATE_STANDARD)
                 .orElse(VAT_RATE_STANDARD);
     }
 
     private String resolveItemName(TenantId tenantId, UUID catalogueItemId, String fallback) {
         if (catalogueItemId == null) return fallback != null ? fallback : "Custom Item";
-        return catalogueItemRepo.findById(catalogueItemId)
-                .map(cat -> {
-                    try { return (String) cat.getClass().getMethod("getName").invoke(cat); }
-                    catch (Exception e) { return fallback; }
-                })
+        return catalogueFacade.findItemById(tenantId, catalogueItemId)
+                .map(CatalogueItemSummary::name)
                 .orElse(fallback != null ? fallback : "Unknown Item");
     }
 
+    /**
+     * CatalogueItem has no sku field — confirmed against the real entity,
+     * not assumed. The reflection this replaced was calling a getSku()
+     * method that doesn't exist, so this method has always returned null
+     * for every call; the catch-and-return-null just hid that silently.
+     * Returning null directly here isn't a regression — it's the same
+     * observable behavior, now honest about why. If SKU support is
+     * genuinely wanted for POS, that's a real feature (add the field to
+     * CatalogueItem, expose it on CatalogueItemSummary, then this method
+     * gets a real implementation) — not something to fake here.
+     */
     private String resolveItemSku(TenantId tenantId, UUID catalogueItemId) {
-        if (catalogueItemId == null) return null;
-        return catalogueItemRepo.findById(catalogueItemId)
-                .map(cat -> {
-                    try { return (String) cat.getClass().getMethod("getSku").invoke(cat); }
-                    catch (Exception e) { return null; }
-                })
-                .orElse(null);
+        return null;
     }
 
     private String getCatalogueItemName(TenantId tenantId, UUID catalogueItemId) {
@@ -943,6 +1079,7 @@ public class PosService {
         if (txn.getDiscountAmount().compareTo(BigDecimal.ZERO) > 0) {
             sb.append("<tr><td>Discount</td><td align='right'>- R ").append(txn.getDiscountAmount()).append("</td></tr>");
         }
+
         // FIX: was hardcoded "VAT (15%)" — no longer accurate now that VAT is
         // resolved per catalogue item (see resolveVatRate()); a cart mixing
         // standard-rated and VAT-exempt items has a blended effective rate
@@ -1017,17 +1154,27 @@ public class PosService {
                 s.getOpenedAt(), s.getClosedAt());
     }
 
+    // FIX (found while assembling this file for the Z-report fix, not part
+    // of the original ask — HandyFlow BOS Discovery doc, Section 68): this
+    // previously chained TWO .map() calls where the first already produced
+    // the final BigDecimal (CatalogueItemSummary::defaultPrice), then the
+    // second tried to reflectively call getDefaultPrice() ON THAT
+    // BigDecimal — which has no such method, so it always threw and always
+    // fell through to BigDecimal.ZERO. Every stock item's selling price on
+    // this list has been showing R0.00 regardless of the real catalogue
+    // price. This looks like leftover reflection code from before the
+    // CatalogueFacade fix (see that class's own Javadoc) was applied — the
+    // correct line was added on top of it, but the broken original was
+    // never deleted. Removed the dead second .map() entirely; the first
+    // one was already correct and sufficient on its own.
     private StockItemResponse mapStockItem(TenantId tenantId, PosStockItem s) {
         String itemName = resolveItemName(tenantId, s.getCatalogueItemId(), "Unknown");
         String sku      = resolveItemSku(tenantId, s.getCatalogueItemId());
         String barcode  = null; // resolve from catalogue if needed
 
         // Selling price comes from catalogue default_price
-        BigDecimal sellingPrice = catalogueItemRepo.findById(s.getCatalogueItemId())
-                .map(cat -> {
-                    try { return (BigDecimal) cat.getClass().getMethod("getDefaultPrice").invoke(cat); }
-                    catch (Exception e) { return BigDecimal.ZERO; }
-                })
+        BigDecimal sellingPrice = catalogueFacade.findItemById(tenantId, s.getCatalogueItemId())
+                .map(CatalogueItemSummary::defaultPrice)
                 .orElse(BigDecimal.ZERO);
 
         return new StockItemResponse(
@@ -1037,47 +1184,6 @@ public class PosService {
                 s.getReorderLevel(), s.getReorderQty(),
                 s.getCostPrice(), sellingPrice,
                 s.getLocation(), s.isLowStock(), s.getUpdatedAt());
-    }
-
-    private TransactionResponse mapTransaction(PosTransaction t, List<PosTransactionItem> items) {
-        List<TransactionItemResponse> itemResponses = items.stream().map(i ->
-                new TransactionItemResponse(
-                        i.getId(), i.getCatalogueItemId(), i.getItemName(), i.getSku(),
-                        i.getQty(), i.getUnitPrice(), i.getVatRate(), i.getVatAmount(),
-                        i.getDiscountPct(), i.getDiscountAmount(), i.getLineTotal())
-        ).toList();
-
-        List<SplitPaymentLine> splitPayments = deserialiseSplitPayments(t.getSplitPaymentsJson());
-
-        return new TransactionResponse(
-                t.getId(), t.getTransactionNumber(),
-                t.getCustomerId(), t.getCustomerName(),
-                t.getSubtotal(), t.getVatAmount(), t.getDiscountAmount(), t.getTotalAmount(),
-                t.getPaymentMethod(), t.getAmountTendered(), t.getChangeGiven(),
-                t.getPaymentRef(), splitPayments,
-                t.getStatus(), t.getVoidedReason(),
-                t.getOriginalTransactionId(), t.getRefundReason(),
-                t.getCashSessionId(), null,
-                t.getServedBy(), t.getServedByName(),
-                itemResponses, t.getCreatedAt());
-    }
-
-    private PurchaseOrderResponse mapPurchaseOrder(PosPurchaseOrder po,
-                                                   List<PosPurchaseOrderItem> items) {
-        List<PurchaseOrderItemResponse> itemResponses = items.stream().map(i ->
-                new PurchaseOrderItemResponse(
-                        i.getId(), i.getCatalogueItemId(), i.getItemName(),
-                        i.getQtyOrdered(), i.getQtyReceived(),
-                        i.getUnitCost(), i.getVatRate(), i.getLineTotal(),
-                        i.isFullyReceived())
-        ).toList();
-        return new PurchaseOrderResponse(
-                po.getId(), po.getOrderNumber(),
-                po.getSupplierId(), po.getSupplierName(),
-                po.getStatus(), po.getOrderDate(),
-                po.getExpectedDate(), po.getReceivedDate(),
-                po.getSubtotal(), po.getVatAmount(), po.getTotalAmount(),
-                po.getNotes(), itemResponses, po.getCreatedAt());
     }
 
     private StockAdjustmentResponse mapAdjustment(TenantId tenantId,
@@ -1097,6 +1203,53 @@ public class PosService {
                 adj.getStatus(), lineResponses,
                 adj.getCreatedBy(), adj.getAppliedBy(),
                 adj.getCreatedAt(), adj.getAppliedAt());
+    }
+
+    // NEW: was missing entirely from the file assembled in Section 69 —
+    // called throughout (processSale, processRefund, getTransactions,
+    // getTransaction, voidTransaction) but never once appeared in any
+    // source retrieved that session. Added here from the real method body,
+    // not reconstructed.
+    private TransactionResponse mapTransaction(PosTransaction t, List<PosTransactionItem> items) {
+        List<TransactionItemResponse> itemResponses = items.stream().map(i ->
+                new TransactionItemResponse(
+                        i.getId(), i.getCatalogueItemId(), i.getItemName(), i.getSku(),
+                        i.getQty(), i.getUnitPrice(), i.getVatRate(), i.getVatAmount(),
+                        i.getDiscountPct(), i.getDiscountAmount(), i.getLineTotal())
+        ).toList();
+        List<SplitPaymentLine> splitPayments = deserialiseSplitPayments(t.getSplitPaymentsJson());
+        return new TransactionResponse(
+                t.getId(), t.getTransactionNumber(),
+                t.getCustomerId(), t.getCustomerName(),
+                t.getSubtotal(), t.getVatAmount(), t.getDiscountAmount(), t.getTotalAmount(),
+                t.getPaymentMethod(), t.getAmountTendered(), t.getChangeGiven(),
+                t.getPaymentRef(), splitPayments,
+                t.getStatus(), t.getVoidedReason(),
+                t.getOriginalTransactionId(), t.getRefundReason(),
+                t.getCashSessionId(), null,
+                t.getServedBy(), t.getServedByName(),
+                itemResponses, t.getCreatedAt());
+    }
+
+    // NEW: same situation as mapTransaction() above — called throughout
+    // (getPurchaseOrders, createPurchaseOrder, receiveStock) but was
+    // missing from the assembled file. Added from the real method body.
+    private PurchaseOrderResponse mapPurchaseOrder(PosPurchaseOrder po,
+                                                   List<PosPurchaseOrderItem> items) {
+        List<PurchaseOrderItemResponse> itemResponses = items.stream().map(i ->
+                new PurchaseOrderItemResponse(
+                        i.getId(), i.getCatalogueItemId(), i.getItemName(),
+                        i.getQtyOrdered(), i.getQtyReceived(),
+                        i.getUnitCost(), i.getVatRate(), i.getLineTotal(),
+                        i.isFullyReceived())
+        ).toList();
+        return new PurchaseOrderResponse(
+                po.getId(), po.getOrderNumber(),
+                po.getSupplierId(), po.getSupplierName(),
+                po.getStatus(), po.getOrderDate(),
+                po.getExpectedDate(), po.getReceivedDate(),
+                po.getSubtotal(), po.getVatAmount(), po.getTotalAmount(),
+                po.getNotes(), itemResponses, po.getCreatedAt());
     }
 
     // ── Inner record for stock deduction tracking ─────────────────────────────

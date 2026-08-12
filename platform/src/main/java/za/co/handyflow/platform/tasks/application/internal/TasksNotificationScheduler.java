@@ -57,7 +57,7 @@ public class TasksNotificationScheduler {
     }
 
     private boolean notifyDueSoon(Task task, int daysUntil) {
-        Recipient recipient = tasksService.resolveRecipient(task.getAssigneeId());
+        Recipient recipient = tasksService.resolveRecipient(task.getTenantId(), task.getAssigneeId());
         if (recipient == null) return false;
 
         notificationService.send(NotificationRequest.builder()
@@ -90,7 +90,7 @@ public class TasksNotificationScheduler {
             task.markOverdueAlertSent();
             taskRepo.save(task);
 
-            Recipient recipient = tasksService.resolveRecipient(task.getAssigneeId());
+            Recipient recipient = tasksService.resolveRecipient(task.getTenantId(), task.getAssigneeId());
             if (recipient == null) continue;
 
             long daysOverdue = LocalDate.now().toEpochDay() - task.getDueDate().toEpochDay();

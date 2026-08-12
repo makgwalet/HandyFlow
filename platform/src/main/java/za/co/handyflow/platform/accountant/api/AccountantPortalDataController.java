@@ -12,10 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.accountant.application.internal.AccountantPortalDataService;
-import za.co.handyflow.platform.accountant.dto.FeeNoteResponse;
-import za.co.handyflow.platform.accountant.dto.FicaDocumentResponse;
-import za.co.handyflow.platform.accountant.dto.PortalClientSummaryResponse;
-import za.co.handyflow.platform.accountant.dto.UploadFicaDocumentRequest;
+import za.co.handyflow.platform.accountant.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.HandyFlowException;
 
@@ -97,5 +94,29 @@ public class AccountantPortalDataController {
             throw new HandyFlowException("No portal session", HttpStatus.UNAUTHORIZED, "NO_SESSION");
         }
         return UUID.fromString(auth.getPrincipal().toString());
+    }
+
+    @GetMapping("/clients/{clientId}/document-requests")
+    @Operation(summary = "Document requests for a client the portal user has access to")
+    public ResponseEntity<ApiResponse<List<DocumentRequestResponse>>> getMyDocumentRequests(
+            @PathVariable UUID clientId) {
+        return ResponseEntity.ok(ApiResponse.success("Document requests",
+                portalDataService.getMyDocumentRequests(getPortalUserId(), clientId)));
+    }
+
+    @PostMapping("/clients/{clientId}/document-requests/{requestId}/submit")
+    @Operation(summary = "Mark a document request as submitted — signals staff to review, does not self-certify completion")
+    public ResponseEntity<ApiResponse<DocumentRequestResponse>> markMySubmission(
+            @PathVariable UUID clientId, @PathVariable UUID requestId) {
+        return ResponseEntity.ok(ApiResponse.success("Marked as submitted",
+                portalDataService.markMySubmission(getPortalUserId(), clientId, requestId)));
+    }
+
+    @GetMapping("/clients/{clientId}/tax-deadlines")
+    @Operation(summary = "Upcoming and past SARS deadlines for a client the portal user has access to")
+    public ResponseEntity<ApiResponse<List<PortalTaxDeadlineResponse>>> getMyTaxDeadlines(
+            @PathVariable UUID clientId) {
+        return ResponseEntity.ok(ApiResponse.success("Tax deadlines",
+                portalDataService.getMyTaxDeadlines(getPortalUserId(), clientId)));
     }
 }

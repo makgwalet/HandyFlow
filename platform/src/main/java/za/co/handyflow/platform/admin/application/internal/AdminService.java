@@ -312,6 +312,23 @@ public class AdminService {
                 """, moduleKey, tenantSlug);
         }
 
+        // FIX: tenant_modules alone was never enough — FeatureGuard's real
+        // enforcement path (EntitlementService.isModuleActive()) checks the
+        // tenant's Plan and module_subscriptions, neither of which this
+        // method ever touched. Confirmed via a live 403 tonight: a module
+        // could show ACTIVE/accessible here while blocking every real
+        // request. moduleKey lowercased to match ModuleSubscription.
+        // activate()'s own convention and FeatureGuard's lowercase callers.
+         jdbc.update("""
+            INSERT INTO module_subscriptions
+                (id, tenant_id, module_key, status, price_cents, activated_at, created_at, updated_at, version)
+            SELECT gen_random_uuid(), t.id, ?, 'ACTIVE',
+                   COALESCE((SELECT monthly_price * 100 FROM module_catalogue WHERE key = ?), 0),
+                   NOW(), NOW(), NOW(), 0
+            FROM tenants t WHERE t.slug = ?
+            ON CONFLICT (tenant_id, module_key) DO UPDATE SET status = 'ACTIVE', updated_at = NOW()
+            """, moduleKey.toLowerCase(), moduleKey, tenantSlug);
+
         audit(adminId, adminEmail, "FORCE_ACTIVATE_MODULE", "MODULE",
                 moduleKey, tenantSlug + "/" + moduleKey,
                 "{\"module\":\"" + moduleKey + "\"}", ipAddress);

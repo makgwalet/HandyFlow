@@ -19,9 +19,12 @@ export interface PortalAuthResponse {
 }
 
 export interface PortalClientSummary {
-  clientId: string
-  tradingName: string
-}
+      clientId: string
+      tradingName: string
+      outstandingBalance: number
+      openRequestCount: number
+      upcomingDeadlineCount: number
+    }
 
 export interface FeeNoteLine {
   id: string
@@ -72,3 +75,23 @@ export interface UploadFicaDocumentRequest {
   fileContentBase64: string
   expiryDate: string | null
 }
+
+export interface DocumentRequest {
+      id: string
+      description: string
+      items: string[]
+      status: "PENDING" | "PARTIAL" | "COMPLETE" | "CANCELLED"
+      dueDate: string | null
+      completedAt: string | null
+      createdAt: string
+    }
+
+export interface TaxDeadline {
+      id: string
+      deadlineType: string
+      friendlyLabel: string
+      dueDate: string
+      status: "PENDING" | "FILED" | "OVERDUE"
+      daysUntilDue: number
+      filedDate: string | null
+    }

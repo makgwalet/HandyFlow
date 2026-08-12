@@ -28,6 +28,7 @@ public class UserManagementService {
     private final PasswordEncoder          passwordEncoder;
     private final EmailService             emailService;
     private final JwtService               jwtService;
+    private final DisposableEmailChecker disposableEmailChecker;
     /**
      * Same accepted coupling as AuthService.subscriptionQueryFacade — see
      * that field's Javadoc for the full explanation. Used here for
@@ -107,6 +108,13 @@ public class UserManagementService {
     @Transactional
     public InvitationResponse inviteUser(TenantId tenantId, UUID invitedBy,
                                          InviteUserRequest req) {
+        if (disposableEmailChecker.isDisposable(req.email())) {
+            throw new IllegalArgumentException(
+                    "Please use a permanent email address to register — " +
+                            "disposable/temporary email providers are not accepted"
+            );
+        }
+
         String email = req.email().toLowerCase().trim();
 
         // FIX: previously no check existed here at all — confirmed via

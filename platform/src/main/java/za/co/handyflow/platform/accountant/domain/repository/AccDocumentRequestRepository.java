@@ -23,4 +23,11 @@ public interface AccDocumentRequestRepository extends JpaRepository<AccDocumentR
 
     @Query("SELECT r FROM AccountantDocumentRequest r WHERE r.tenantId = :tenantId AND r.id = :id")
     Optional<AccDocumentRequest> findByTenantIdAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
+
+    @Query("""
+        SELECT COUNT(r) FROM AccountantDocumentRequest r
+        WHERE r.tenantId = :tenantId AND r.clientId = :clientId
+        AND r.status IN ('PENDING','PARTIAL')
+    """)
+    long countOpenByTenantAndClient(@Param("tenantId") UUID tenantId, @Param("clientId") UUID clientId);
 }

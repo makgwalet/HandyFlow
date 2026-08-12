@@ -4,10 +4,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import za.co.handyflow.platform.hr.domain.model.HrEmployee;
-import za.co.handyflow.platform.hr.domain.model.HrTaxRebate;
-import za.co.handyflow.platform.hr.domain.model.HrTaxTable;
-import za.co.handyflow.platform.hr.domain.repository.HrTaxRebateRepository;
-import za.co.handyflow.platform.hr.domain.repository.HrTaxTableRepository;
+import za.co.handyflow.platform.shared.SarsTaxRebate;
+import za.co.handyflow.platform.shared.SarsTaxRebateRepository;
+import za.co.handyflow.platform.shared.SarsTaxTable;
+import za.co.handyflow.platform.shared.SarsTaxTableRepository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -19,8 +19,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PayrollEngine {
 
-    private final HrTaxTableRepository  taxTableRepo;
-    private final HrTaxRebateRepository taxRebateRepo;
+    private final SarsTaxTableRepository taxTableRepo;
+    private final SarsTaxRebateRepository taxRebateRepo;
 
     // UIF ceiling: R17,712/month (updated March 2024, Act 63 of 2001)
     private static final BigDecimal UIF_MONTHLY_CEILING = new BigDecimal("17712.00");
@@ -66,13 +66,13 @@ public class PayrollEngine {
                 .max(BigDecimal.ZERO);
 
         // ── Step 2: Tax bracket lookup ────────────────────────────────────────
-        List<HrTaxTable> brackets = taxTableRepo.findByTaxYear(taxYear);
+        List<SarsTaxTable> brackets = taxTableRepo.findByTaxYear(taxYear);
         if (brackets.isEmpty()) {
             log.warn("No tax tables found for year={} — zero PAYE applied", taxYear);
             return buildZeroResult(employee, taxYear);
         }
 
-        HrTaxTable bracket = brackets.stream()
+        SarsTaxTable bracket = brackets.stream()
                 .filter(b -> b.contains(taxableIncome))
                 .findFirst()
                 .orElse(brackets.get(brackets.size() - 1));
@@ -80,11 +80,11 @@ public class PayrollEngine {
         BigDecimal annualTaxBeforeRebates = bracket.calculateTax(taxableIncome);
 
         // ── Step 3: Primary rebate (all taxpayers) ────────────────────────────
-        List<HrTaxRebate> rebates = taxRebateRepo.findByTaxYear(taxYear);
+        List<SarsTaxRebate> rebates = taxRebateRepo.findByTaxYear(taxYear);
 
         BigDecimal primaryRebate = rebates.stream()
                 .filter(r -> "PRIMARY".equals(r.getRebateType()))
-                .map(HrTaxRebate::getAmount)
+                .map(SarsTaxRebate::getAmount)
                 .findFirst()
                 .orElse(new BigDecimal("17235.00")); // 2025/26 default
 
@@ -96,14 +96,14 @@ public class PayrollEngine {
             if (age >= 65) {
                 secondaryRebate = rebates.stream()
                         .filter(r -> "SECONDARY".equals(r.getRebateType()))
-                        .map(HrTaxRebate::getAmount)
+                        .map(SarsTaxRebate::getAmount)
                         .findFirst()
                         .orElse(new BigDecimal("9444.00")); // 2025/26 default
             }
             if (age >= 75) {
                 tertiaryRebate = rebates.stream()
                         .filter(r -> "TERTIARY".equals(r.getRebateType()))
-                        .map(HrTaxRebate::getAmount)
+                        .map(SarsTaxRebate::getAmount)
                         .findFirst()
                         .orElse(new BigDecimal("3145.00")); // 2025/26 default
             }

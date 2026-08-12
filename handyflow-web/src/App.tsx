@@ -50,10 +50,27 @@ import { CreateRecurringSchedulePage }  from "./pages/invoicing/CreateRecurringS
 import { CreateRetainerPage }           from "./pages/invoicing/CreateRetainerPage"
 import { SupplyChainPage }              from "./pages/supply-chain/SupplyChainPage"
 
+// ── Payroll Bureau module ─────────────────────────────────────────────────────
+// PayrollBureauPage is the staff-facing single-page shell (matches
+// ClinicPage/ProjectsPage pattern — client list + tabbed detail panel).
+// The four Portal pages below reuse usePortalAuthStore directly (not a
+// separate store) — shared.PortalUser/PortalJwtFilter on the backend are
+// genuinely portal-type-agnostic, confirmed against the real backend
+// code before reusing rather than duplicating the accountant portal's
+// auth store. portal-theme.ts/PortalShell.tsx are also reused directly
+// from accountant-portal/ rather than copied — one design system serving
+// both portals.
+import { PayrollBureauPage }                    from "./pages/payroll-bureau/PayrollBureauPage"
+import { PayrollBureauPortalLoginPage }         from "./pages/payroll-bureau-portal/PayrollBureauPortalLoginPage"
+import { PayrollBureauPortalAcceptInvitePage }  from "./pages/payroll-bureau-portal/PayrollBureauPortalAcceptInvitePage"
+import { PayrollBureauPortalHomePage }          from "./pages/payroll-bureau-portal/PayrollBureauPortalHomePage"
+import { PayrollBureauPortalClientDetailPage }  from "./pages/payroll-bureau-portal/PayrollBureauPortalClientDetailPage"
+
 // ── Projects module ────────────────────────────────────────────────────────────
 // ProjectsPage is the single-page shell (matches ClinicPage pattern)
 // ProjectDetailPage keeps its own route so deep links work (but stays inside ModuleLayout)
 // ClientPortalPage is public — outside ModuleLayout intentionally
+
 import { ProjectsPage }     from "./pages/projects/ProjectsPage"
 import { ProjectDetailPage } from "./pages/projects/ProjectDetailPage"
 import { ClientPortalPage }  from "./pages/projects/ClientPortalPage"
@@ -77,6 +94,7 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 })
 
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore(s => s.token)
   if (!token) return <Navigate to="/login" replace />
@@ -94,6 +112,22 @@ function PortalProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+// NEW: Payroll Bureau's own portal guard — deliberately a SEPARATE
+// component from PortalProtectedRoute even though both check the exact
+// same usePortalAuthStore (confirmed correct to share: the backend
+// login identity behind it is genuinely portal-type-agnostic). The only
+// thing that needs to differ between the two guards is WHERE an
+// unauthenticated visitor lands — a payroll bureau portal visitor
+// belongs on the payroll bureau's own login page, not the accountant
+// one, even though a session token from either portal would technically
+// authenticate against both APIs.
+function PayrollBureauPortalProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = usePortalAuthStore(s => s.token)
+  if (!token) return <Navigate to="/payroll-bureau/portal/login" replace />
+  return <>{children}</>
+}
+
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -106,7 +140,7 @@ export default function App() {
             safe to always render. */}
         <SessionExpiryModal />
         <Routes>
-          {/* Public routes */}
+{/* Public routes */}
           <Route path="/login"    element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
@@ -143,12 +177,24 @@ export default function App() {
           <Route path="/accountant/portal" element={<PortalProtectedRoute><PortalHomePage /></PortalProtectedRoute>} />
           <Route path="/accountant/portal/clients/:clientId" element={<PortalProtectedRoute><PortalClientDetailPage /></PortalProtectedRoute>} />
 
+          {/* NEW: Payroll Bureau client portal — same shape as the
+              accountant portal block above, deliberately matching its
+              /auth/accept-invite URL convention rather than the
+              module's first-draft "/accept-invite" (no /auth/) so the
+              two portals in this product don't have two different URL
+              shapes for the identical action. Path matches exactly what
+              PayrollBureauService.invitePortalUser's email link sends. */}
+          <Route path="/payroll-bureau/portal/login"              element={<PayrollBureauPortalLoginPage />} />
+          <Route path="/payroll-bureau/portal/auth/accept-invite" element={<PayrollBureauPortalAcceptInvitePage />} />
+          <Route path="/payroll-bureau/portal" element={<PayrollBureauPortalProtectedRoute><PayrollBureauPortalHomePage /></PayrollBureauPortalProtectedRoute>} />
+          <Route path="/payroll-bureau/portal/clients/:clientId" element={<PayrollBureauPortalProtectedRoute><PayrollBureauPortalClientDetailPage /></PayrollBureauPortalProtectedRoute>} />
+
           {/* Token-secured routes — also outside ModuleLayout */}
           <Route path="/sign/:token"                   element={<SigningPage />} />
           <Route path="/creative/approve/:token"       element={<CreativeApprovePage />} />
           <Route path="/unsubscribe/:token"            element={<UnsubscribePage />} />
 
-          {/* Recruiter public careers/apply — public, outside ModuleLayout,
+ {/* Recruiter public careers/apply — public, outside ModuleLayout,
               no login. NOTE: /careers/track/:token (the applicant portal
               already promised in offer-letter/interview emails via
               RecruiterService's hardcoded portalUrl) is NOT yet wired up —
@@ -169,7 +215,7 @@ export default function App() {
             <Route path="/fuel"        element={<FuelPage />} />
             <Route path="/earthmoving" element={<EarthMovingPage />} />
             <Route path="/property"    element={<PropertyPage />} />
-            <Route path="/fleet"       element={<FleetPage />} />
+ <Route path="/fleet"       element={<FleetPage />} />
             <Route path="/bookings"    element={<BookingsPage />} />
             <Route path="/accounting"  element={<AccountingPage />} />
             <Route path="/settings"    element={<SettingsPage />} />
@@ -187,13 +233,17 @@ export default function App() {
             <Route path="/pos"                    element={<PosPage />} />
             <Route path="/accountant"             element={<AccountantPage />} />
             <Route path="/ap"                     element={<AccountsPayablePage />} />
+            {/* NEW: Payroll Bureau staff page — single-page shell like
+                ClinicPage/ProjectsPage, so just one route (client list +
+                tabbed detail panel all live inside this one component). */}
+            <Route path="/payroll-bureau"         element={<PayrollBureauPage />} />
             <Route path="/profile"                element={<ProfilePage />} />
             <Route path="/invoices/retainer/new"  element={<CreateRetainerPage />} />
             <Route path="/recurring/variable-hours/new" element={<CreateVariableHoursContractPage />} />
             <Route path="/recurring/new"          element={<CreateRecurringSchedulePage />} />
             <Route path="/recurring"              element={<InvoicingPage />} />
             <Route path="/supply-chain"           element={<SupplyChainPage />} />
-            
+
             {/* ── Projects ── */}
             {/*
              * /projects        → ProjectsPage (dashboard + list, single-page shell like ClinicPage)

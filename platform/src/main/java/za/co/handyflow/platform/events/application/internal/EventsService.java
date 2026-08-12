@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.events.domain.model.*;
 import za.co.handyflow.platform.events.domain.repository.*;
 import za.co.handyflow.platform.events.dto.*;
+import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
 
 @Slf4j
 @Service
@@ -28,6 +30,8 @@ public class EventsService {
     private final EventVendorRepository     vendorRepo;
     private final EventCheckInRepository    checkInRepo;
     private final EventNumberGenerator      numberGen;
+    private final EventTicketPdfService ticketPdfService;
+    private final EmailService emailService;
 
     // ── Events ────────────────────────────────────────────────────────────────
 
@@ -158,8 +162,20 @@ public class EventsService {
         guestRepo.save(guest);
         log.info("Registered guest={} event={} ticket={}", req.fullName(), event.getEventNumber(), ticketNum);
 
+        // FIX: moved this computation up from after the email-send block
+        // (where it was previously declared) to here, BEFORE it's used —
+        // the earlier version called sendTicketEmail(..., tierNames.get(...))
+        // three lines before tierNames was ever declared, which Java
+        // doesn't allow (no forward references to local variables). Same
+        // map, computed once, now feeds both the email send below AND the
+        // final return — no duplicate query introduced.
         Map<UUID, String> tierNames = tierRepo.findByEvent(eventId).stream()
                 .collect(Collectors.toMap(EventTicketTier::getId, EventTicketTier::getName));
+
+        if (guest.getEmail() != null && !guest.getEmail().isBlank()) {
+            sendTicketEmail(event, guest, tierNames.get(guest.getTierId()));
+        }
+
         return toGuestResponseWithTierMap(guest, tierNames);
     }
 
@@ -277,6 +293,49 @@ public class EventsService {
         vendor.confirm();
         vendorRepo.save(vendor);
         return toVendorResponse(vendor);
+    }
+
+    private void sendTicketEmail(Event event, EventGuest guest, String tierName) {
+        try {
+            byte[] ticketPdf = ticketPdfService.generateTicket(event, guest, tierName);
+            // FIX: was 6 args including a trailing "application/pdf" —
+            // the real EmailService.sendWithAttachment signature is
+            // (String, String, String, String, byte[]), confirmed by the
+            // actual compiler error, not guessed.
+            emailService.sendWithAttachment(
+                    guest.getEmail(),
+                    "Your ticket for " + event.getTitle(),
+                    buildConfirmationHtml(event, guest),
+                    "ticket-" + guest.getTicketNumber() + ".pdf",
+                    ticketPdf);
+            log.info("[Events] Ticket email sent guest={} event={} ticket={}",
+                    guest.getFullName(), event.getEventNumber(), guest.getTicketNumber());
+        } catch (Exception e) {
+            // PDF generation or send failed — fall back to a plain
+            // confirmation with no attachment rather than leaving the
+            // guest with nothing at all. Same "never let a PDF problem
+            // silently swallow the whole notification" reasoning already
+            // established elsewhere in this codebase.
+            log.warn("[Events] Ticket PDF/email failed for guest={}, sending plain confirmation instead: {}",
+                    guest.getId(), e.getMessage());
+            try {
+                emailService.send(guest.getEmail(),
+                        "Your registration for " + event.getTitle(),
+                        buildConfirmationHtml(event, guest)
+                                + "<p>Your ticket number is <strong>" + guest.getTicketNumber()
+                                + "</strong> — please have this ready at the door if your PDF ticket didn't arrive.</p>");
+            } catch (Exception fallbackFailure) {
+                log.error("[Events] Fallback confirmation email also failed for guest={}: {}",
+                        guest.getId(), fallbackFailure.getMessage());
+            }
+        }
+    }
+
+    private String buildConfirmationHtml(Event event, EventGuest guest) {
+        return "<p>Hi " + guest.getFullName() + ",</p>"
+                + "<p>You're registered for <strong>" + event.getTitle() + "</strong>.</p>"
+                + "<p>Your ticket is attached as a PDF — please bring it (printed or on your "
+                + "phone) for QR check-in at the door.</p>";
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
