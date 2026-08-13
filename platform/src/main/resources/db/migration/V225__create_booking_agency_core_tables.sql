@@ -1,122 +1,55 @@
-package za.co.handyflow.platform.bookingagency.domain.model;
+-- Core domain: bookable resources, offerings, and actual bookings.
+-- Second migration for the Booking Agency module — run after
+-- V_create_booking_agency_tables.sql (practice shell + client
+-- portfolio).
 
-import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+CREATE TABLE booka_resources (
+    id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id             UUID NOT NULL,
+    client_id             UUID NOT NULL REFERENCES booka_agency_clients(id),
+    name                  VARCHAR(255) NOT NULL,
+    role_description      VARCHAR(255),
+    working_hours_start   TIME,
+    working_hours_end     TIME,
+    active                BOOLEAN NOT NULL DEFAULT true,
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_booka_resources_client ON booka_resources (client_id);
 
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.util.UUID;
+CREATE TABLE booka_offerings (
+    id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id          UUID NOT NULL,
+    client_id          UUID NOT NULL REFERENCES booka_agency_clients(id),
+    name               VARCHAR(255) NOT NULL,
+    duration_minutes   INTEGER NOT NULL,
+    buffer_minutes     INTEGER NOT NULL DEFAULT 0,
+    price              NUMERIC(10,2),
+    active             BOOLEAN NOT NULL DEFAULT true,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_booka_offerings_client ON booka_offerings (client_id);
 
-/**
- * An actual appointment booked on a client's behalf. Mirrors
- * bookings.Booking's role, scoped to an agency client rather than the
- * agency's own tenant.
- */
-@Entity
-@Table(name = "booka_bookings")
-@Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class BookAgencyBooking {
-
-    @Id
-    private UUID id = UUID.randomUUID();
-
-    @Column(name = "tenant_id", nullable = false)
-    private UUID tenantId;
-
-    @Column(name = "client_id", nullable = false)
-    private UUID clientId;
-
-    @Column(name = "resource_id", nullable = false)
-    private UUID resourceId;
-
-    @Column(name = "offering_id", nullable = false)
-    private UUID offeringId;
-
-    @Column(name = "booking_number", nullable = false)
-    private String bookingNumber;
-
-    @Column(name = "customer_name", nullable = false)
-    private String customerName;
-
-    @Column(name = "customer_phone")
-    private String customerPhone;
-
-    @Column(name = "customer_email")
-    private String customerEmail;
-
-    @Column(name = "start_datetime", nullable = false)
-    private LocalDateTime startDatetime;
-
-    @Column(name = "end_datetime", nullable = false)
-    private LocalDateTime endDatetime;
-
-    @Column(name = "status", nullable = false)
-    private String status = "CONFIRMED"; // CONFIRMED | CANCELLED | COMPLETED | NO_SHOW
-
-    @Column(name = "notes", columnDefinition = "TEXT")
-    private String notes;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
-
-    public static BookAgencyBooking create(UUID tenantId, UUID clientId, UUID resourceId, UUID offeringId,
-                                           String bookingNumber, String customerName, String customerPhone,
-                                           String customerEmail, LocalDateTime startDatetime, LocalDateTime endDatetime,
-                                           String notes) {
-        BookAgencyBooking b = new BookAgencyBooking();
-        b.tenantId = tenantId;
-        b.clientId = clientId;
-        b.resourceId = resourceId;
-        b.offeringId = offeringId;
-        b.bookingNumber = bookingNumber;
-        b.customerName = customerName;
-        b.customerPhone = customerPhone;
-        b.customerEmail = customerEmail;
-        b.startDatetime = startDatetime;
-        b.endDatetime = endDatetime;
-        b.status = "CONFIRMED";
-        b.notes = notes;
-        b.createdAt = Instant.now();
-        b.updatedAt = Instant.now();
-        return b;
-    }
-
-    public void cancel() {
-        if ("COMPLETED".equals(status)) {
-            throw new IllegalStateException("Cannot cancel a completed booking");
-        }
-        this.status = "CANCELLED";
-        this.updatedAt = Instant.now();
-    }
-
-    public void complete() {
-        if (!"CONFIRMED".equals(status)) {
-            throw new IllegalStateException("Only a CONFIRMED booking can be marked complete");
-        }
-        this.status = "COMPLETED";
-        this.updatedAt = Instant.now();
-    }
-
-    public void markNoShow() {
-        if (!"CONFIRMED".equals(status)) {
-            throw new IllegalStateException("Only a CONFIRMED booking can be marked no-show");
-        }
-        this.status = "NO_SHOW";
-        this.updatedAt = Instant.now();
-    }
-
-    public boolean isActive() {
-        return "CONFIRMED".equals(status);
-    }
-
-    /** Simple half-open interval overlap check — [start, end) vs [start, end). */
-    public boolean overlaps(LocalDateTime otherStart, LocalDateTime otherEnd) {
-        return this.startDatetime.isBefore(otherEnd) && otherStart.isBefore(this.endDatetime);
-    }
-}
+CREATE TABLE booka_bookings (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id        UUID NOT NULL,
+    client_id        UUID NOT NULL REFERENCES booka_agency_clients(id),
+    resource_id      UUID NOT NULL REFERENCES booka_resources(id),
+    offering_id      UUID NOT NULL REFERENCES booka_offerings(id),
+    booking_number   VARCHAR(30) NOT NULL,
+    customer_name    VARCHAR(255) NOT NULL,
+    customer_phone   VARCHAR(50),
+    customer_email   VARCHAR(255),
+    start_datetime   TIMESTAMP NOT NULL,
+    end_datetime     TIMESTAMP NOT NULL,
+    status           VARCHAR(20) NOT NULL DEFAULT 'CONFIRMED',
+    notes            TEXT,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_booka_bookings_resource_time ON booka_bookings (resource_id, start_datetime, end_datetime);
+CREATE INDEX idx_booka_bookings_client ON booka_bookings (client_id);
+-- The resource_id + time-range index above is the one this layer's
+-- conflict check actually depends on for reasonable performance —
+-- added deliberately, not an afterthought.

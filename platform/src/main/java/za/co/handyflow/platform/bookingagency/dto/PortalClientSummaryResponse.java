@@ -1,4 +1,5 @@
 package za.co.handyflow.platform.bookingagency.dto;
 
-public class PortalClientSummaryResponse {
-}
+import java.util.UUID;
+
+public record PortalClientSummaryResponse(UUID clientId, String tradingName) {}

@@ -1,4 +1,5 @@
 package za.co.handyflow.platform.recruitmentagency.dto;
 
-public class PortalAuthResponse {
-}
+import java.util.UUID;
+
+public record PortalAuthResponse(String token, UUID portalUserId, String email, String fullName) {}

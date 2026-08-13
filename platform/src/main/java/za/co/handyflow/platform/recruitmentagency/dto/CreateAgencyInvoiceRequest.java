@@ -1,4 +1,10 @@
 package za.co.handyflow.platform.recruitmentagency.dto;
 
-public class CreateAgencyInvoiceRequest {
-}
+import jakarta.validation.constraints.NotNull;
+import java.time.LocalDate;
+
+public record CreateAgencyInvoiceRequest(
+        @NotNull LocalDate invoiceDate,
+        @NotNull LocalDate dueDate,
+        boolean includeVat
+) {}

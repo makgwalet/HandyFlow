@@ -1,4 +1,5 @@
 package za.co.handyflow.platform.recruitmentagency.dto;
 
-public class FailGuaranteeRequest {
-}
+import jakarta.validation.constraints.NotBlank;
+
+public record FailGuaranteeRequest(@NotBlank String reason) {}

@@ -1,4 +1,5 @@
 package za.co.handyflow.platform.bookingagency.dto;
 
-public class PortalRegisterRequest {
-}
+import jakarta.validation.constraints.NotBlank;
+
+public record PortalRegisterRequest(@NotBlank String inviteToken, @NotBlank String password, @NotBlank String fullName) {}

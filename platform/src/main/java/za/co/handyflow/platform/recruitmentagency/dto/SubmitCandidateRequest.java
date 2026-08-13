@@ -1,4 +1,6 @@
 package za.co.handyflow.platform.recruitmentagency.dto;
 
-public class SubmitCandidateRequest {
-}
+import jakarta.validation.constraints.NotNull;
+import java.util.UUID;
+
+public record SubmitCandidateRequest(@NotNull UUID candidateId) {}
