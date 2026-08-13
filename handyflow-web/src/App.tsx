@@ -89,6 +89,12 @@ import { SessionExpiryModal } from "./components/SessionExpiryModal"
 import { CareersListPage } from "./pages/careers/CareersListPage"
 import { JobApplyPage }    from "./pages/careers/JobApplyPage"
 import { CreateVariableHoursContractPage } from "./pages/invoicing/CreateVariableHoursContractPage"
+import { BookingAgencyPage } from "./pages/booking-agency/BookingAgencyPage"
+import { RecruitmentAgencyPortalAcceptInvitePage } from "./pages/recruitment-agency-portal/RecruitmentAgencyPortalAcceptInvitePage"
+import { RecruitmentAgencyPortalClientDetailPage } from "./pages/recruitment-agency-portal/RecruitmentAgencyPortalClientDetailPage"
+import { RecruitmentAgencyPortalHomePage } from "./pages/recruitment-agency-portal/RecruitmentAgencyPortalHomePage"
+import { RecruitmentAgencyPortalLoginPage } from "./pages/recruitment-agency-portal/RecruitmentAgencyPortalLoginPage"
+import { RecruitmentAgencyPage } from "./pages/recruitment-agency/RecruitmentAgencyPage"
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -100,6 +106,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!token) return <Navigate to="/login" replace />
   return <>{children}</>
 }
+
+function RecruitmentAgencyPortalProtectedRoute({ children }: { children: React.ReactNode }) {
+      const token = usePortalAuthStore(s => s.token)
+      if (!token) return <Navigate to="/recruitment-agency/portal/login" replace />
+      return <>{children}</>
+    }
 
 // NEW: closes "not added to App.tsx, redirects to saas" — deliberately
 // checks usePortalAuthStore, not useAuthStore, and redirects to the
@@ -177,6 +189,11 @@ export default function App() {
           <Route path="/accountant/portal" element={<PortalProtectedRoute><PortalHomePage /></PortalProtectedRoute>} />
           <Route path="/accountant/portal/clients/:clientId" element={<PortalProtectedRoute><PortalClientDetailPage /></PortalProtectedRoute>} />
 
+          <Route path="/recruitment-agency/portal/login"              element={<RecruitmentAgencyPortalLoginPage />} />
+            <Route path="/recruitment-agency/portal/auth/accept-invite" element={<RecruitmentAgencyPortalAcceptInvitePage />} />
+            <Route path="/recruitment-agency/portal" element={<RecruitmentAgencyPortalProtectedRoute><RecruitmentAgencyPortalHomePage /></RecruitmentAgencyPortalProtectedRoute>} />
+            <Route path="/recruitment-agency/portal/clients/:clientId" element={<RecruitmentAgencyPortalProtectedRoute><RecruitmentAgencyPortalClientDetailPage /></RecruitmentAgencyPortalProtectedRoute>} />
+
           {/* NEW: Payroll Bureau client portal — same shape as the
               accountant portal block above, deliberately matching its
               /auth/accept-invite URL convention rather than the
@@ -233,6 +250,7 @@ export default function App() {
             <Route path="/pos"                    element={<PosPage />} />
             <Route path="/accountant"             element={<AccountantPage />} />
             <Route path="/ap"                     element={<AccountsPayablePage />} />
+            <Route path="/booking-agency"       element={<BookingAgencyPage />} />
             {/* NEW: Payroll Bureau staff page — single-page shell like
                 ClinicPage/ProjectsPage, so just one route (client list +
                 tabbed detail panel all live inside this one component). */}
@@ -243,6 +261,7 @@ export default function App() {
             <Route path="/recurring/new"          element={<CreateRecurringSchedulePage />} />
             <Route path="/recurring"              element={<InvoicingPage />} />
             <Route path="/supply-chain"           element={<SupplyChainPage />} />
+            <Route path="/recruitment-agency" element={<RecruitmentAgencyPage />} />
 
             {/* ── Projects ── */}
             {/*
