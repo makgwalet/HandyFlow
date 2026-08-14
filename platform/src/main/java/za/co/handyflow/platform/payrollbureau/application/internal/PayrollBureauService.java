@@ -2,6 +2,7 @@ package za.co.handyflow.platform.payrollbureau.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -48,6 +49,9 @@ public class PayrollBureauService {
     private final PayPaymentRepository paymentRepo;
     private final za.co.handyflow.platform.shared.EmailService emailService;
     private final PayPortalAccessGrantRepository portalGrantRepo;
+
+    @Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
 
     // ── Practice profile ─────────────────────────────────────────────────────
 
@@ -451,7 +455,7 @@ public class PayrollBureauService {
                 za.co.handyflow.platform.shared.EmailTemplates.portalInvite(
                         client.getTradingName(),
                         "Payroll Bureau", // consider pulling from PayBureauProfile.firmName instead of this literal
-                        "https://app.handyflow.co.za/payroll-bureau/portal/auth/accept-invite?token=" + grant.getInviteToken()
+                        frontendUrl + "/payroll-bureau/portal/auth/accept-invite?token=" + grant.getInviteToken()
                 ));
 
         log.info("Payroll bureau portal invite sent: {} -> client={}", email, payClientId);

@@ -37,7 +37,7 @@ public class BookingAgencyController {
     // ── Agency profile ───────────────────────────────────────────────────────
 
     @GetMapping("/profile")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAnyAuthority('BOOKINGAGENCY_READ','BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     @Operation(summary = "Get the agency's own practice profile")
     public ResponseEntity<ApiResponse<BookAgencyProfileResponse>> getProfile() {
         featureGuard.requireModule("bookingagency");
@@ -46,7 +46,7 @@ public class BookingAgencyController {
     }
 
     @PutMapping("/profile")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     @Operation(summary = "Create or update the agency's practice profile")
     public ResponseEntity<ApiResponse<BookAgencyProfileResponse>> upsertProfile(
             @Valid @RequestBody UpdateBookAgencyProfileRequest req) {
@@ -58,7 +58,7 @@ public class BookingAgencyController {
     // ── Client portfolio ──────────────────────────────────────────────────────
 
     @GetMapping("/clients")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAnyAuthority('BOOKINGAGENCY_READ','BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     @Operation(summary = "List active agency clients")
     public ResponseEntity<ApiResponse<Page<BookAgencyClientResponse>>> getClients(
             @PageableDefault(size = 50) Pageable pageable) {
@@ -68,7 +68,7 @@ public class BookingAgencyController {
     }
 
     @GetMapping("/clients/{id}")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAnyAuthority('BOOKINGAGENCY_READ','BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<BookAgencyClientResponse>> getClient(@PathVariable UUID id) {
         featureGuard.requireModule("bookingagency");
         return ResponseEntity.ok(ApiResponse.success(
@@ -76,7 +76,7 @@ public class BookingAgencyController {
     }
 
     @PostMapping("/clients")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAnyAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     @Operation(summary = "Onboard a new agency client")
     public ResponseEntity<ApiResponse<BookAgencyClientResponse>> createClient(
             @Valid @RequestBody CreateBookAgencyClientRequest req) {
@@ -86,7 +86,7 @@ public class BookingAgencyController {
     }
 
     @PutMapping("/clients/{id}")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<BookAgencyClientResponse>> updateClient(
             @PathVariable UUID id, @Valid @RequestBody CreateBookAgencyClientRequest req) {
         featureGuard.requireModule("bookingagency");
@@ -95,7 +95,7 @@ public class BookingAgencyController {
     }
 
     @PostMapping("/clients/{id}/deactivate")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<BookAgencyClientResponse>> deactivateClient(@PathVariable UUID id) {
         featureGuard.requireModule("bookingagency");
         return ResponseEntity.ok(ApiResponse.success("Client deactivated",
@@ -103,7 +103,7 @@ public class BookingAgencyController {
     }
 
     @PostMapping("/clients/{id}/reactivate")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<BookAgencyClientResponse>> reactivateClient(@PathVariable UUID id) {
         featureGuard.requireModule("bookingagency");
         return ResponseEntity.ok(ApiResponse.success("Client reactivated",
@@ -111,7 +111,7 @@ public class BookingAgencyController {
     }
 
     @DeleteMapping("/clients/{id}")
-    @PreAuthorize("hasAuthority('USER_DELETE')")
+    @PreAuthorize("hasAuthority('BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteClient(@PathVariable UUID id) {
         featureGuard.requireModule("bookingagency");
         agencyService.deleteClient(TenantContext.getTenantIdAsObject(), id);
@@ -119,7 +119,7 @@ public class BookingAgencyController {
     }
 
     @PostMapping("/clients/{id}/portal-invites")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAnyAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     @io.swagger.v3.oas.annotations.tags.Tag(name = "Booking Agency Client Portal")
     public ResponseEntity<ApiResponse<PortalAccessGrantResponse>> invitePortalUser(
             @PathVariable UUID id, @Valid @RequestBody InvitePortalUserRequest req) {
@@ -130,7 +130,7 @@ public class BookingAgencyController {
     }
 
     @GetMapping("/clients/{id}/portal-invites")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAnyAuthority('BOOKINGAGENCY_READ','BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     @io.swagger.v3.oas.annotations.tags.Tag(name = "Booking Agency Client Portal")
     public ResponseEntity<ApiResponse<List<PortalAccessGrantResponse>>> getPortalAccessGrants(@PathVariable UUID id) {
         featureGuard.requireModule("bookingagency");
@@ -139,7 +139,7 @@ public class BookingAgencyController {
     }
 
     @PostMapping("/clients/{clientId}/portal-invites/{grantId}/revoke")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     @io.swagger.v3.oas.annotations.tags.Tag(name = "Booking Agency Client Portal")
     public ResponseEntity<ApiResponse<PortalAccessGrantResponse>> revokePortalAccess(
             @PathVariable UUID clientId, @PathVariable UUID grantId) {

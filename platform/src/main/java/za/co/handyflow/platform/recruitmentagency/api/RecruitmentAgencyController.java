@@ -37,7 +37,7 @@ public class RecruitmentAgencyController {
     // ── Agency profile ───────────────────────────────────────────────────────
 
     @GetMapping("/profile")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_READ','RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
     @Operation(summary = "Get the agency's own practice profile")
     public ResponseEntity<ApiResponse<AgencyProfileResponse>> getProfile() {
         featureGuard.requireModule("recruitmentagency");
@@ -46,7 +46,7 @@ public class RecruitmentAgencyController {
     }
 
     @PutMapping("/profile")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
     @Operation(summary = "Create or update the agency's practice profile")
     public ResponseEntity<ApiResponse<AgencyProfileResponse>> upsertProfile(
             @Valid @RequestBody UpdateAgencyProfileRequest req) {
@@ -58,7 +58,7 @@ public class RecruitmentAgencyController {
     // ── Client portfolio ──────────────────────────────────────────────────────
 
     @GetMapping("/clients")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_READ','RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
     @Operation(summary = "List active agency clients")
     public ResponseEntity<ApiResponse<Page<AgencyClientResponse>>> getClients(
             @PageableDefault(size = 50) Pageable pageable) {
@@ -68,7 +68,7 @@ public class RecruitmentAgencyController {
     }
 
     @GetMapping("/clients/{id}")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_READ','RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<AgencyClientResponse>> getClient(@PathVariable UUID id) {
         featureGuard.requireModule("recruitmentagency");
         return ResponseEntity.ok(ApiResponse.success(
@@ -76,7 +76,7 @@ public class RecruitmentAgencyController {
     }
 
     @PostMapping("/clients")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
     @Operation(summary = "Onboard a new agency client")
     public ResponseEntity<ApiResponse<AgencyClientResponse>> createClient(
             @Valid @RequestBody CreateAgencyClientRequest req) {
@@ -86,7 +86,7 @@ public class RecruitmentAgencyController {
     }
 
     @PutMapping("/clients/{id}")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<AgencyClientResponse>> updateClient(
             @PathVariable UUID id, @Valid @RequestBody CreateAgencyClientRequest req) {
         featureGuard.requireModule("recruitmentagency");
@@ -95,7 +95,7 @@ public class RecruitmentAgencyController {
     }
 
     @PostMapping("/clients/{id}/deactivate")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<AgencyClientResponse>> deactivateClient(@PathVariable UUID id) {
         featureGuard.requireModule("recruitmentagency");
         return ResponseEntity.ok(ApiResponse.success("Client deactivated",
@@ -103,7 +103,7 @@ public class RecruitmentAgencyController {
     }
 
     @PostMapping("/clients/{id}/reactivate")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<AgencyClientResponse>> reactivateClient(@PathVariable UUID id) {
         featureGuard.requireModule("recruitmentagency");
         return ResponseEntity.ok(ApiResponse.success("Client reactivated",
@@ -111,7 +111,7 @@ public class RecruitmentAgencyController {
     }
 
     @DeleteMapping("/clients/{id}")
-    @PreAuthorize("hasAuthority('USER_DELETE')")
+    @PreAuthorize("hasAuthority('RECRUITMENTAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteClient(@PathVariable UUID id) {
         featureGuard.requireModule("recruitmentagency");
         agencyService.deleteClient(TenantContext.getTenantIdAsObject(), id);
@@ -120,7 +120,7 @@ public class RecruitmentAgencyController {
 
 
     @PostMapping("/requisitions")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<RequisitionResponse>> createRequisition(
             @Valid @RequestBody CreateRequisitionRequest req) {
         featureGuard.requireModule("recruitmentagency");
@@ -129,7 +129,7 @@ public class RecruitmentAgencyController {
     }
 
     @GetMapping("/clients/{clientId}/requisitions")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_READ','RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<List<RequisitionResponse>>> getRequisitionsForClient(
             @PathVariable UUID clientId) {
         featureGuard.requireModule("recruitmentagency");
@@ -138,7 +138,7 @@ public class RecruitmentAgencyController {
     }
 
     @GetMapping("/requisitions/{id}")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_READ','RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<RequisitionResponse>> getRequisition(@PathVariable UUID id) {
         featureGuard.requireModule("recruitmentagency");
         return ResponseEntity.ok(ApiResponse.success(
@@ -146,7 +146,7 @@ public class RecruitmentAgencyController {
     }
 
     @PostMapping("/requisitions/{id}/cancel")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<RequisitionResponse>> cancelRequisition(@PathVariable UUID id) {
         featureGuard.requireModule("recruitmentagency");
         return ResponseEntity.ok(ApiResponse.success("Requisition cancelled",
@@ -156,7 +156,7 @@ public class RecruitmentAgencyController {
     // ── Candidates ────────────────────────────────────────────────────────
 
     @PostMapping("/candidates")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<CandidateResponse>> createCandidate(
             @Valid @RequestBody CreateCandidateRequest req) {
         featureGuard.requireModule("recruitmentagency");
@@ -291,7 +291,7 @@ public class RecruitmentAgencyController {
     }
 
     @PostMapping("/clients/{id}/portal-invites")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
     @io.swagger.v3.oas.annotations.tags.Tag(name = "Recruitment Agency Client Portal")
     public ResponseEntity<ApiResponse<PortalAccessGrantResponse>> invitePortalUser(
             @PathVariable UUID id, @Valid @RequestBody InvitePortalUserRequest req) {
@@ -302,7 +302,7 @@ public class RecruitmentAgencyController {
     }
 
     @GetMapping("/clients/{id}/portal-invites")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_READ','RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
     @io.swagger.v3.oas.annotations.tags.Tag(name = "Recruitment Agency Client Portal")
     public ResponseEntity<ApiResponse<List<PortalAccessGrantResponse>>> getPortalAccessGrants(@PathVariable UUID id) {
         featureGuard.requireModule("recruitmentagency");
@@ -311,7 +311,7 @@ public class RecruitmentAgencyController {
     }
 
     @PostMapping("/clients/{clientId}/portal-invites/{grantId}/revoke")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
     @io.swagger.v3.oas.annotations.tags.Tag(name = "Recruitment Agency Client Portal")
     public ResponseEntity<ApiResponse<PortalAccessGrantResponse>> revokePortalAccess(
             @PathVariable UUID clientId, @PathVariable UUID grantId) {

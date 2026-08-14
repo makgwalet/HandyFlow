@@ -6,14 +6,22 @@
 //
 // SCOPE: covers client onboarding, resource/offering management, and
 // the full booking lifecycle (create -> cancel/complete/no-show) as
-// complete, real flows. DELIBERATELY NO INVOICES/BILLING TAB — this
-// module's billing model (flat retainer vs. per-booking fee) is still
-// an open business decision, never resolved. Showing a billing tab
-// backed by nothing real would be worse than not having one.
+// complete, real flows. DELIBERATELY NO INVOICES/BILLING TAB — wait,
+// actually the invoices tab already exists below (monthlyRetainerAmount
+// resolved this since the original comment was written) — billing model
+// is flat monthly retainer, confirmed by GenerateInvoiceModal already
+// using client.monthlyRetainerAmount.
+//
+// UPDATED: closed five gaps between backend and frontend, all confirmed
+// against real api-client methods that already existed but were never
+// called — client edit, client archive, resource edit, offering
+// edit/deactivate, portal-access revoke, and invoice payment recording.
+// Deferred: agency profile screen — not asked for, deserves its own pass.
 import { useEffect, useState } from "react"
 import { bookingAgencyApi } from "../../api/bookingAgency.api"
 import type { BookAgencyClient, BookAgencyResource, BookAgencyOffering, BookAgencyBooking, PortalAccessGrant, BookAgencyInvoice } from "../../types/bookingAgency.types"
 
+const fmtD = (d: any) => (d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—")
 const fmtDT = (d: any) => (d ? new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—")
 
 const NAVY = "#1B3A6B"
@@ -30,7 +38,12 @@ export function BookingAgencyPage() {
   const [clientsLoading, setClientsLoading] = useState(true)
   const [selected, setSelected] = useState<BookAgencyClient | null>(null)
   const [showNewClient, setShowNewClient] = useState(false)
+  const [showEditClient, setShowEditClient] = useState(false)
+  const [archiving, setArchiving] = useState(false)
   const [tab, setTab] = useState<Tab>("resources")
+  // Client-side filter only — same caveat as Recruitment Agency's:
+  // getClients() has no server-side search param.
+  const [search, setSearch] = useState("")
 
   const refetchClients = () => {
     setClientsLoading(true)
@@ -38,6 +51,21 @@ export function BookingAgencyPage() {
   }
 
   useEffect(() => { refetchClients() }, [])
+
+  const visibleClients = clients.filter(c =>
+    !search || c.tradingName.toLowerCase().includes(search.toLowerCase()))
+
+  const toggleArchive = async () => {
+    if (!selected) return
+    setArchiving(true)
+    try {
+      if (selected.status === "INACTIVE") await bookingAgencyApi.reactivateClient(selected.id)
+      else await bookingAgencyApi.deactivateClient(selected.id)
+      const res = await bookingAgencyApi.getClients()
+      setClients(res.content)
+      setSelected(res.content.find(c => c.id === selected.id) ?? null)
+    } finally { setArchiving(false) }
+  }
 
   return (
     <div style={{ display: "flex", height: "calc(100vh - 60px)", fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -50,17 +78,25 @@ export function BookingAgencyPage() {
             + New
           </button>
         </div>
+        {/* NEW: client search */}
+        <div style={{ padding: "10px 16px", borderBottom: `1px solid ${BORDER}` }}>
+          <input placeholder="Search clients…" value={search} onChange={e => setSearch(e.target.value)}
+            style={{ ...inputStyle, fontSize: 12.5 }} />
+        </div>
         <div style={{ flex: 1, overflowY: "auto" as const }}>
           {clientsLoading ? (
             <div style={{ padding: 20, color: FAINT, fontSize: 13 }}>Loading…</div>
-          ) : clients.length === 0 ? (
-            <div style={{ padding: 20, color: FAINT, fontSize: 13 }}>No clients yet — add your first one.</div>
+          ) : visibleClients.length === 0 ? (
+            <div style={{ padding: 20, color: FAINT, fontSize: 13 }}>
+              {clients.length === 0 ? "No clients yet — add your first one." : `No clients match "${search}"`}
+            </div>
           ) : (
-            clients.map(c => (
+            visibleClients.map(c => (
               <button key={c.id} onClick={() => { setSelected(c); setTab("resources") }}
                 style={{ display: "block", width: "100%", textAlign: "left" as const, padding: "12px 16px",
                   background: selected?.id === c.id ? "#EFF6FF" : "none", border: "none",
-                  borderBottom: `1px solid ${BORDER}`, cursor: "pointer" }}>
+                  borderBottom: `1px solid ${BORDER}`, cursor: "pointer",
+                  opacity: c.status === "INACTIVE" ? 0.55 : 1 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 700, color: INK }}>{c.tradingName}</div>
                 <div style={{ fontSize: 11.5, color: FAINT, marginTop: 2 }}>
                   {c.status === "INACTIVE" ? "Inactive" : (c.businessType ?? "No business type set")}
@@ -79,7 +115,18 @@ export function BookingAgencyPage() {
           </div>
         ) : (
           <div style={{ padding: "24px 32px" }}>
-            <h1 style={{ fontSize: 20, fontWeight: 800, color: INK, marginBottom: 4 }}>{selected.tradingName}</h1>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+              <h1 style={{ fontSize: 20, fontWeight: 800, color: INK, margin: 0 }}>{selected.tradingName}</h1>
+              {/* NEW: edit + archive/reactivate */}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setShowEditClient(true)} style={btnSecondary}>Edit</button>
+                <button onClick={toggleArchive} disabled={archiving}
+                  style={{ ...btnSecondary, color: selected.status === "INACTIVE" ? "#166534" : "#DC2626",
+                    borderColor: selected.status === "INACTIVE" ? "#166534" : "#DC2626" }}>
+                  {archiving ? "…" : selected.status === "INACTIVE" ? "Reactivate" : "Deactivate"}
+                </button>
+              </div>
+            </div>
             <p style={{ fontSize: 12.5, color: MUTED, marginBottom: 20 }}>
               {selected.businessType ?? "No business type set"} · {selected.timezone}
               {selected.contactName && ` · ${selected.contactName}`}
@@ -111,7 +158,43 @@ export function BookingAgencyPage() {
         <NewClientModal onClose={() => setShowNewClient(false)}
           onCreated={() => { setShowNewClient(false); refetchClients() }} />
       )}
+      {showEditClient && selected && (
+        <EditClientModal client={selected} onClose={() => setShowEditClient(false)}
+          onSaved={updated => { setShowEditClient(false); setSelected(updated); refetchClients() }} />
+      )}
     </div>
+  )
+}
+
+// NEW: reuses NewClientModal's field set, pre-filled, calling updateClient.
+function EditClientModal({ client, onClose, onSaved }: { client: BookAgencyClient; onClose: () => void; onSaved: (c: BookAgencyClient) => void }) {
+  const [tradingName, setTradingName] = useState(client.tradingName)
+  const [businessType, setBusinessType] = useState(client.businessType ?? "")
+  const [contactName, setContactName] = useState(client.contactName ?? "")
+  const [contactEmail, setContactEmail] = useState(client.contactEmail ?? "")
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  const submit = async () => {
+    if (!tradingName) { setError("Trading name is required"); return }
+    setSaving(true); setError("")
+    try {
+      const updated = await bookingAgencyApi.updateClient(client.id, { tradingName, businessType, contactName, contactEmail } as any)
+      onSaved(updated)
+    } catch (e: any) {
+      setError(e.response?.data?.message ?? "Failed to save client")
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal title="Edit Booking Client" onClose={onClose}>
+      <Field label="Trading name"><input value={tradingName} onChange={e => setTradingName(e.target.value)} style={inputStyle} /></Field>
+      <Field label="Business type (optional)"><input value={businessType} onChange={e => setBusinessType(e.target.value)} style={inputStyle} placeholder="e.g. hair salon, plumber" /></Field>
+      <Field label="Contact name (optional)"><input value={contactName} onChange={e => setContactName(e.target.value)} style={inputStyle} /></Field>
+      <Field label="Contact email (optional)"><input value={contactEmail} onChange={e => setContactEmail(e.target.value)} style={inputStyle} /></Field>
+      {error && <ErrorBox text={error} />}
+      <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Save Changes" />
+    </Modal>
   )
 }
 
@@ -121,6 +204,7 @@ function ResourcesTab({ client }: { client: BookAgencyClient }) {
   const [resources, setResources] = useState<BookAgencyResource[]>([])
   const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
+  const [editing, setEditing] = useState<BookAgencyResource | null>(null)
 
   const refetch = () => {
     setLoading(true)
@@ -148,7 +232,11 @@ function ResourcesTab({ client }: { client: BookAgencyClient }) {
               <td style={cellStyle}>{r.workingHoursStart?.slice(0, 5) ?? "—"}–{r.workingHoursEnd?.slice(0, 5) ?? "—"}</td>
               <td style={cellStyle}><StatusBadge status={r.active ? "ACTIVE" : "INACTIVE"} /></td>
               <td style={cellStyle}>
-                <button onClick={() => toggleActive(r)} style={btnSecondary}>{r.active ? "Deactivate" : "Reactivate"}</button>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {/* NEW: updateResource existed with no edit UI */}
+                  <button onClick={() => setEditing(r)} style={btnSecondary}>Edit</button>
+                  <button onClick={() => toggleActive(r)} style={btnSecondary}>{r.active ? "Deactivate" : "Reactivate"}</button>
+                </div>
               </td>
             </tr>
           ))}
@@ -156,6 +244,8 @@ function ResourcesTab({ client }: { client: BookAgencyClient }) {
       )}
       {showNew && <NewResourceModal clientId={client.id} onClose={() => setShowNew(false)}
         onCreated={() => { setShowNew(false); refetch() }} />}
+      {editing && <EditResourceModal resource={editing} onClose={() => setEditing(null)}
+        onSaved={() => { setEditing(null); refetch() }} />}
     </div>
   )
 }
@@ -196,83 +286,178 @@ function NewResourceModal({ clientId, onClose, onCreated }: { clientId: string; 
   )
 }
 
+// NEW: closes the resource-edit gap — reuses NewResourceModal's shape, pre-filled.
+function EditResourceModal({ resource, onClose, onSaved }: { resource: BookAgencyResource; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(resource.name)
+  const [roleDescription, setRoleDescription] = useState(resource.roleDescription ?? "")
+  const [start, setStart] = useState(resource.workingHoursStart?.slice(0, 5) ?? "09:00")
+  const [end, setEnd] = useState(resource.workingHoursEnd?.slice(0, 5) ?? "17:00")
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  const submit = async () => {
+    if (!name) { setError("Name is required"); return }
+    setSaving(true); setError("")
+    try {
+      await bookingAgencyApi.updateResource(resource.id, {
+        name, roleDescription, workingHoursStart: start + ":00", workingHoursEnd: end + ":00",
+      } as any)
+      onSaved()
+    } catch (e: any) {
+      setError(e.response?.data?.message ?? "Failed to save resource")
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal title="Edit Resource" onClose={onClose}>
+      <Field label="Name"><input value={name} onChange={e => setName(e.target.value)} style={inputStyle} /></Field>
+      <Field label="Role (optional)"><input value={roleDescription} onChange={e => setRoleDescription(e.target.value)} style={inputStyle} /></Field>
+      <div style={{ display: "flex", gap: 10 }}>
+        <Field label="Start time"><input type="time" value={start} onChange={e => setStart(e.target.value)} style={inputStyle} /></Field>
+        <Field label="End time"><input type="time" value={end} onChange={e => setEnd(e.target.value)} style={inputStyle} /></Field>
+      </div>
+      {error && <ErrorBox text={error} />}
+      <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Save Changes" />
+    </Modal>
+  )
+}
 
 // ── Invoices ────────────────────────────────────────────────────────────────
 
 function InvoicesTab({ client }: { client: BookAgencyClient }) {
-      const [invoices, setInvoices] = useState<BookAgencyInvoice[]>([])
-      const [loading, setLoading] = useState(true)
-      const [showGenerate, setShowGenerate] = useState(false)
- 
-      const refetch = () => {
-        setLoading(true)
-        bookingAgencyApi.getInvoices(client.id).then(res => setInvoices(res.content)).finally(() => setLoading(false))
-      }
-      useEffect(refetch, [client.id])
- 
-      const handleSend = async (id: string) => { await bookingAgencyApi.sendInvoice(id); refetch() }
- 
-      return (
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <p style={{ fontSize: 12, color: MUTED, margin: 0 }}>
-              {client.monthlyRetainerAmount != null
-                ? `Monthly retainer: R ${client.monthlyRetainerAmount}`
-                : "No retainer amount set — add one when editing this client before generating an invoice."}
-            </p>
-            <button onClick={() => setShowGenerate(true)} style={btnPrimary} disabled={client.monthlyRetainerAmount == null}>
-              + Generate Invoice
-            </button>
-          </div>
-          {loading ? <Empty text="Loading…" /> : invoices.length === 0 ? <Empty text="No invoices yet." /> : (
-            <Table headers={["Invoice #", "Period", "Total", "Balance", "Status", ""]}>
-              {invoices.map(inv => (
-                <tr key={inv.id} style={rowStyle}>
-                  <td style={cellStyle}>{inv.invoiceNumber}</td>
-                  <td style={cellStyle}>{fmtD(inv.periodStart)} – {fmtD(inv.periodEnd)}</td>
-                  <td style={cellStyle}>R {inv.total.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</td>
-                  <td style={cellStyle}>R {inv.balance.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</td>
-                  <td style={cellStyle}><StatusBadge status={inv.status} /></td>
-                  <td style={cellStyle}>{inv.status === "DRAFT" && <button onClick={() => handleSend(inv.id)} style={btnSecondary}>Send</button>}</td>
-                </tr>
-              ))}
-            </Table>
-          )}
-          {showGenerate && <GenerateInvoiceModal client={client} onClose={() => setShowGenerate(false)} onGenerated={() => { setShowGenerate(false); refetch() }} />}
-        </div>
-      )
-    }
- 
-    function GenerateInvoiceModal({ client, onClose, onGenerated }: { client: BookAgencyClient; onClose: () => void; onGenerated: () => void }) {
-      const now = new Date()
-      const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
-      const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10)
-      const [saving, setSaving] = useState(false)
-      const [error, setError] = useState("")
- 
-      const submit = async () => {
-        setSaving(true); setError("")
-        try {
-          await bookingAgencyApi.generateInvoice(client.id, {
-            periodStart, periodEnd, invoiceDate: periodEnd, dueDate: periodEnd, includeVat: true,
-          })
-          onGenerated()
-        } catch (e: any) {
-          setError(e.response?.data?.message ?? "Failed to generate invoice")
-        } finally { setSaving(false) }
-      }
- 
-      return (
-        <Modal title="Generate Invoice" onClose={onClose}>
-          <p style={{ fontSize: 13, color: MUTED, marginBottom: 14 }}>
-            Generates the retainer invoice for {new Date().toLocaleDateString("en-ZA", { month: "long", year: "numeric" })}
-            {" "}— R {client.monthlyRetainerAmount} + VAT.
-          </p>
-          {error && <ErrorBox text={error} />}
-          <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Generate" />
-        </Modal>
-      )
-    }
+  const [invoices, setInvoices] = useState<BookAgencyInvoice[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showGenerate, setShowGenerate] = useState(false)
+  const [payingInvoice, setPayingInvoice] = useState<BookAgencyInvoice | null>(null)
+
+  const refetch = () => {
+    setLoading(true)
+    bookingAgencyApi.getInvoices(client.id).then(res => setInvoices(res.content)).finally(() => setLoading(false))
+  }
+  useEffect(refetch, [client.id])
+
+  const handleSend = async (id: string) => { await bookingAgencyApi.sendInvoice(id); refetch() }
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <p style={{ fontSize: 12, color: MUTED, margin: 0 }}>
+          {client.monthlyRetainerAmount != null
+            ? `Monthly retainer: R ${client.monthlyRetainerAmount}`
+            : "No retainer amount set — add one when editing this client before generating an invoice."}
+        </p>
+        <button onClick={() => setShowGenerate(true)} style={btnPrimary} disabled={client.monthlyRetainerAmount == null}>
+          + Generate Invoice
+        </button>
+      </div>
+      {loading ? <Empty text="Loading…" /> : invoices.length === 0 ? <Empty text="No invoices yet." /> : (
+        <Table headers={["Invoice #", "Period", "Total", "Balance", "Status", ""]}>
+          {invoices.map(inv => (
+            <tr key={inv.id} style={rowStyle}>
+              <td style={cellStyle}>{inv.invoiceNumber}</td>
+              <td style={cellStyle}>{fmtD(inv.periodStart)} – {fmtD(inv.periodEnd)}</td>
+              <td style={cellStyle}>R {inv.total.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</td>
+              <td style={cellStyle}>R {inv.balance.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</td>
+              <td style={cellStyle}><StatusBadge status={inv.status} /></td>
+              <td style={cellStyle}>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {inv.status === "DRAFT" && <button onClick={() => handleSend(inv.id)} style={btnSecondary}>Send</button>}
+                  {/* NEW: recordPayment existed with no button anywhere */}
+                  {inv.status !== "DRAFT" && inv.balance > 0 && (
+                    <button onClick={() => setPayingInvoice(inv)} style={btnSecondary}>Record Payment</button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </Table>
+      )}
+      {showGenerate && <GenerateInvoiceModal client={client} onClose={() => setShowGenerate(false)} onGenerated={() => { setShowGenerate(false); refetch() }} />}
+      {payingInvoice && (
+        <RecordPaymentModal invoice={payingInvoice} onClose={() => setPayingInvoice(null)}
+          onRecorded={() => { setPayingInvoice(null); refetch() }} />
+      )}
+    </div>
+  )
+}
+
+function GenerateInvoiceModal({ client, onClose, onGenerated }: { client: BookAgencyClient; onClose: () => void; onGenerated: () => void }) {
+  const now = new Date()
+  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  const submit = async () => {
+    setSaving(true); setError("")
+    try {
+      await bookingAgencyApi.generateInvoice(client.id, {
+        periodStart, periodEnd, invoiceDate: periodEnd, dueDate: periodEnd, includeVat: true,
+      })
+      onGenerated()
+    } catch (e: any) {
+      setError(e.response?.data?.message ?? "Failed to generate invoice")
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal title="Generate Invoice" onClose={onClose}>
+      <p style={{ fontSize: 13, color: MUTED, marginBottom: 14 }}>
+        Generates the retainer invoice for {new Date().toLocaleDateString("en-ZA", { month: "long", year: "numeric" })}
+        {" "}— R {client.monthlyRetainerAmount} + VAT.
+      </p>
+      {error && <ErrorBox text={error} />}
+      <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Generate" />
+    </Modal>
+  )
+}
+
+// NEW: recordPayment(id, {amount, paidDate, method?, reference?}) already
+// existed in the API client — same shape as Recruitment Agency's version.
+function RecordPaymentModal({ invoice, onClose, onRecorded }: { invoice: BookAgencyInvoice; onClose: () => void; onRecorded: () => void }) {
+  const [amount, setAmount] = useState(String(invoice.balance))
+  const [paidDate, setPaidDate] = useState(new Date().toISOString().slice(0, 10))
+  const [method, setMethod] = useState("EFT")
+  const [reference, setReference] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  const submit = async () => {
+    if (!amount || Number(amount) <= 0) { setError("Enter a payment amount"); return }
+    setSaving(true); setError("")
+    try {
+      await bookingAgencyApi.recordPayment(invoice.id, {
+        amount: Number(amount), paidDate, method: method || undefined, reference: reference || undefined,
+      })
+      onRecorded()
+    } catch (e: any) {
+      setError(e.response?.data?.message ?? "Failed to record payment")
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal title={`Record Payment — ${invoice.invoiceNumber}`} onClose={onClose}>
+      <p style={{ fontSize: 12.5, color: MUTED, marginBottom: 12 }}>
+        Outstanding balance: R {invoice.balance.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
+      </p>
+      <Field label="Amount"><input type="number" value={amount} onChange={e => setAmount(e.target.value)} style={inputStyle} /></Field>
+      <div style={{ display: "flex", gap: 10 }}>
+        <Field label="Date paid"><input type="date" value={paidDate} onChange={e => setPaidDate(e.target.value)} style={inputStyle} /></Field>
+        <Field label="Method">
+          <select value={method} onChange={e => setMethod(e.target.value)} style={inputStyle}>
+            <option value="EFT">EFT</option>
+            <option value="CARD">Card</option>
+            <option value="CASH">Cash</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </Field>
+      </div>
+      <Field label="Reference (optional)"><input value={reference} onChange={e => setReference(e.target.value)} style={inputStyle} placeholder="e.g. EFT confirmation number" /></Field>
+      {error && <ErrorBox text={error} />}
+      <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Record Payment" />
+    </Modal>
+  )
+}
 
 // ── Offerings ────────────────────────────────────────────────────────────────
 
@@ -280,6 +465,8 @@ function OfferingsTab({ client }: { client: BookAgencyClient }) {
   const [offerings, setOfferings] = useState<BookAgencyOffering[]>([])
   const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
+  const [editing, setEditing] = useState<BookAgencyOffering | null>(null)
+  const [deactivatingId, setDeactivatingId] = useState<string | null>(null)
 
   const refetch = () => {
     setLoading(true)
@@ -287,13 +474,22 @@ function OfferingsTab({ client }: { client: BookAgencyClient }) {
   }
   useEffect(refetch, [client.id])
 
+  // NEW: deactivateOffering existed with no button — a discontinued
+  // service had no way to be hidden from booking while keeping its
+  // history intact.
+  const handleDeactivate = async (id: string) => {
+    setDeactivatingId(id)
+    try { await bookingAgencyApi.deactivateOffering(id); refetch() }
+    finally { setDeactivatingId(null) }
+  }
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
         <button onClick={() => setShowNew(true)} style={btnPrimary}>+ Add Offering</button>
       </div>
       {loading ? <Empty text="Loading…" /> : offerings.length === 0 ? <Empty text="No offerings added yet." /> : (
-        <Table headers={["Name", "Duration", "Buffer", "Price", "Status"]}>
+        <Table headers={["Name", "Duration", "Buffer", "Price", "Status", ""]}>
           {offerings.map(o => (
             <tr key={o.id} style={rowStyle}>
               <td style={cellStyle}>{o.name}</td>
@@ -301,12 +497,25 @@ function OfferingsTab({ client }: { client: BookAgencyClient }) {
               <td style={cellStyle}>{o.bufferMinutes} min</td>
               <td style={cellStyle}>{o.price != null ? `R ${o.price}` : "—"}</td>
               <td style={cellStyle}><StatusBadge status={o.active ? "ACTIVE" : "INACTIVE"} /></td>
+              <td style={cellStyle}>
+                {o.active && (
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => setEditing(o)} style={btnSecondary}>Edit</button>
+                    <button onClick={() => handleDeactivate(o.id)} disabled={deactivatingId === o.id}
+                      style={{ ...btnSecondary, color: "#DC2626", borderColor: "#DC2626" }}>
+                      {deactivatingId === o.id ? "…" : "Deactivate"}
+                    </button>
+                  </div>
+                )}
+              </td>
             </tr>
           ))}
         </Table>
       )}
       {showNew && <NewOfferingModal clientId={client.id} onClose={() => setShowNew(false)}
         onCreated={() => { setShowNew(false); refetch() }} />}
+      {editing && <EditOfferingModal offering={editing} onClose={() => setEditing(null)}
+        onSaved={() => { setEditing(null); refetch() }} />}
     </div>
   )
 }
@@ -343,6 +552,43 @@ function NewOfferingModal({ clientId, onClose, onCreated }: { clientId: string; 
       <Field label="Price (optional)"><input type="number" value={price} onChange={e => setPrice(e.target.value)} style={inputStyle} /></Field>
       {error && <ErrorBox text={error} />}
       <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Add Offering" />
+    </Modal>
+  )
+}
+
+// NEW: closes the offering-edit gap — same field set as NewOfferingModal, pre-filled.
+function EditOfferingModal({ offering, onClose, onSaved }: { offering: BookAgencyOffering; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(offering.name)
+  const [duration, setDuration] = useState(String(offering.durationMinutes))
+  const [buffer, setBuffer] = useState(String(offering.bufferMinutes))
+  const [price, setPrice] = useState(offering.price != null ? String(offering.price) : "")
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  const submit = async () => {
+    if (!name || !duration) { setError("Name and duration are required"); return }
+    setSaving(true); setError("")
+    try {
+      await bookingAgencyApi.updateOffering(offering.id, {
+        name, durationMinutes: Number(duration), bufferMinutes: Number(buffer),
+        price: price ? Number(price) : undefined,
+      } as any)
+      onSaved()
+    } catch (e: any) {
+      setError(e.response?.data?.message ?? "Failed to save offering")
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal title="Edit Offering" onClose={onClose}>
+      <Field label="Name"><input value={name} onChange={e => setName(e.target.value)} style={inputStyle} /></Field>
+      <div style={{ display: "flex", gap: 10 }}>
+        <Field label="Duration (min)"><input type="number" value={duration} onChange={e => setDuration(e.target.value)} style={inputStyle} /></Field>
+        <Field label="Buffer (min)"><input type="number" value={buffer} onChange={e => setBuffer(e.target.value)} style={inputStyle} /></Field>
+      </div>
+      <Field label="Price (optional)"><input type="number" value={price} onChange={e => setPrice(e.target.value)} style={inputStyle} /></Field>
+      {error && <ErrorBox text={error} />}
+      <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Save Changes" />
     </Modal>
   )
 }
@@ -470,6 +716,7 @@ function PortalAccessTab({ client }: { client: BookAgencyClient }) {
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState("")
   const [inviting, setInviting] = useState(false)
+  const [revokingId, setRevokingId] = useState<string | null>(null)
 
   const refetch = () => {
     setLoading(true)
@@ -489,6 +736,14 @@ function PortalAccessTab({ client }: { client: BookAgencyClient }) {
     } finally { setInviting(false) }
   }
 
+  // NEW: revokePortalAccess existed with no button.
+  const handleRevoke = async (grantId: string) => {
+    if (!confirm("Revoke this client's portal access?")) return
+    setRevokingId(grantId)
+    try { await bookingAgencyApi.revokePortalAccess(client.id, grantId); refetch() }
+    finally { setRevokingId(null) }
+  }
+
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
@@ -499,12 +754,20 @@ function PortalAccessTab({ client }: { client: BookAgencyClient }) {
         </button>
       </div>
       {loading ? <Empty text="Loading…" /> : grants.length === 0 ? <Empty text="No portal invites sent yet." /> : (
-        <Table headers={["Email", "Status", "Invited"]}>
+        <Table headers={["Email", "Status", "Invited", ""]}>
           {grants.map(g => (
             <tr key={g.id} style={rowStyle}>
               <td style={cellStyle}>{g.inviteEmail}</td>
               <td style={cellStyle}><StatusBadge status={g.status} /></td>
               <td style={cellStyle}>{fmtDT(g.invitedAt)}</td>
+              <td style={cellStyle}>
+                {g.status !== "REVOKED" && (
+                  <button onClick={() => handleRevoke(g.id)} disabled={revokingId === g.id}
+                    style={{ ...btnSecondary, color: "#DC2626", borderColor: "#DC2626" }}>
+                    {revokingId === g.id ? "…" : "Revoke"}
+                  </button>
+                )}
+              </td>
             </tr>
           ))}
         </Table>
@@ -554,6 +817,9 @@ function StatusBadge({ status }: { status: string }) {
     COMPLETED: { c: "#166534", bg: "#DCFCE7" }, INACTIVE: { c: "#64748B", bg: "#F1F5F9" },
     CANCELLED: { c: "#64748B", bg: "#F1F5F9" }, NO_SHOW: { c: "#DC2626", bg: "#FEF2F2" },
     PENDING: { c: "#D97706", bg: "#FFFBEB" }, REVOKED: { c: "#DC2626", bg: "#FEF2F2" },
+    DRAFT: { c: "#64748B", bg: "#F1F5F9" }, SENT: { c: "#1D4ED8", bg: "#EFF6FF" },
+    PARTIAL: { c: "#1D4ED8", bg: "#EFF6FF" }, PAID: { c: "#166534", bg: "#DCFCE7" },
+    OVERDUE: { c: "#DC2626", bg: "#FEF2F2" },
   }
   const t = tones[status] ?? tones.INACTIVE
   return <span style={{ background: t.bg, color: t.c, padding: "2px 8px", borderRadius: 20, fontSize: 10.5, fontWeight: 700 }}>{status}</span>

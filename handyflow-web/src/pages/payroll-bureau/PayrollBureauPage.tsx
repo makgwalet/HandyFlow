@@ -2,19 +2,16 @@
 //
 // Staff-facing single-page shell (same pattern App.tsx's own comments
 // describe for ClinicPage/ProjectsPage) — client list on the left,
-// selected client's detail (tabs) on the right. Lives inside
-// ModuleLayout via App.tsx's existing ProtectedRoute group, so it
-// inherits the staff nav bar automatically — nothing route-specific
-// needed beyond adding one <Route> entry.
+// selected client's detail (tabs) on the right.
 //
-// SCOPE: covers client onboarding, employee management, and the full
-// pay-run lifecycle (create → process → view payslips) as complete,
-// real flows. Deadlines/Fee Notes/Portal Access tabs are simpler —
-// list + the one or two actions each needs (generate, send, invite) —
-// not full editable forms for every field. That's a deliberate scope
-// line, not an oversight: those three are lower-frequency actions than
-// "onboard a client" and "run payroll", which is why this pass focused
-// there first.
+// UPDATED: closed the full gap list found in this session's audit.
+// Same-pattern gaps (backend existed, no button): client edit, client
+// archive, client search, portal-access revoke, record payment on fee
+// notes, mark-deadline-filed. Two more serious ones: FeeNotesTab's own
+// text told users to generate invoices "from the Pay Runs tab" — a
+// feature that never actually existed there; and employee documents
+// (uploadDocument/getEmployeeDocuments/downloadDocument) had zero UI
+// despite being fully wired on the backend. Both fixed below.
 import { useEffect, useState } from "react"
 import { payrollBureauApi } from "../../api/payrollBureau.api"
 import type { PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant } from "../../types/payrollBureau.types"
@@ -36,16 +33,34 @@ export function PayrollBureauPage() {
   const [clientsLoading, setClientsLoading] = useState(true)
   const [selected, setSelected] = useState<PayClient | null>(null)
   const [showNewClient, setShowNewClient] = useState(false)
+  const [showEditClient, setShowEditClient] = useState(false)
+  const [archiving, setArchiving] = useState(false)
   const [tab, setTab] = useState<Tab>("employees")
+  // Client-side filter only — same caveat as the other two agency
+  // modules: getClients() has no server-side search param.
+  const [search, setSearch] = useState("")
 
   const refetchClients = () => {
     setClientsLoading(true)
-    payrollBureauApi.getClients()
-     .then(res => setClients(res.content))
-     .catch(err => { console.error("Failed to load payroll clients:", err); setClients([]) })
-     .finally(() => setClientsLoading(false)) }
+    payrollBureauApi.getClients().then(res => setClients(res.content)).finally(() => setClientsLoading(false))
+  }
 
   useEffect(() => { refetchClients() }, [])
+
+  const visibleClients = clients.filter(c =>
+    !search || c.tradingName.toLowerCase().includes(search.toLowerCase()))
+
+  const toggleArchive = async () => {
+    if (!selected) return
+    setArchiving(true)
+    try {
+      if (selected.status === "OFFBOARDED") await payrollBureauApi.reactivateClient(selected.id)
+      else await payrollBureauApi.offboardClient(selected.id)
+      const res = await payrollBureauApi.getClients()
+      setClients(res.content)
+      setSelected(res.content.find(c => c.id === selected.id) ?? null)
+    } finally { setArchiving(false) }
+  }
 
   return (
     <div style={{ display: "flex", height: "calc(100vh - 60px)", fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -58,17 +73,25 @@ export function PayrollBureauPage() {
             + New
           </button>
         </div>
+        {/* NEW: client search */}
+        <div style={{ padding: "10px 16px", borderBottom: `1px solid ${BORDER}` }}>
+          <input placeholder="Search clients…" value={search} onChange={e => setSearch(e.target.value)}
+            style={{ ...inputStyle, fontSize: 12.5 }} />
+        </div>
         <div style={{ flex: 1, overflowY: "auto" as const }}>
           {clientsLoading ? (
             <div style={{ padding: 20, color: FAINT, fontSize: 13 }}>Loading…</div>
-          ) : clients.length === 0 ? (
-            <div style={{ padding: 20, color: FAINT, fontSize: 13 }}>No clients yet — add your first one.</div>
+          ) : visibleClients.length === 0 ? (
+            <div style={{ padding: 20, color: FAINT, fontSize: 13 }}>
+              {clients.length === 0 ? "No clients yet — add your first one." : `No clients match "${search}"`}
+            </div>
           ) : (
-            clients.map(c => (
+            visibleClients.map(c => (
               <button key={c.id} onClick={() => { setSelected(c); setTab("employees") }}
                 style={{ display: "block", width: "100%", textAlign: "left" as const, padding: "12px 16px",
                   background: selected?.id === c.id ? "#EFF6FF" : "none", border: "none",
-                  borderBottom: `1px solid ${BORDER}`, cursor: "pointer" }}>
+                  borderBottom: `1px solid ${BORDER}`, cursor: "pointer",
+                  opacity: c.status === "OFFBOARDED" ? 0.55 : 1 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 700, color: INK }}>{c.tradingName}</div>
                 <div style={{ fontSize: 11.5, color: FAINT, marginTop: 2 }}>
                   {c.status === "OFFBOARDED" ? "Offboarded" : `R${c.perEmployeeFee}/employee · ${c.payFrequency}`}
@@ -87,7 +110,18 @@ export function PayrollBureauPage() {
           </div>
         ) : (
           <div style={{ padding: "24px 32px" }}>
-            <h1 style={{ fontSize: 20, fontWeight: 800, color: INK, marginBottom: 4 }}>{selected.tradingName}</h1>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+              <h1 style={{ fontSize: 20, fontWeight: 800, color: INK, margin: 0 }}>{selected.tradingName}</h1>
+              {/* NEW: edit + offboard/reactivate */}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setShowEditClient(true)} style={btnSecondary}>Edit</button>
+                <button onClick={toggleArchive} disabled={archiving}
+                  style={{ ...btnSecondary, color: selected.status === "OFFBOARDED" ? "#166534" : "#DC2626",
+                    borderColor: selected.status === "OFFBOARDED" ? "#166534" : "#DC2626" }}>
+                  {archiving ? "…" : selected.status === "OFFBOARDED" ? "Reactivate" : "Offboard"}
+                </button>
+              </div>
+            </div>
             <p style={{ fontSize: 12.5, color: MUTED, marginBottom: 20 }}>
               PAYE {selected.payeReference ?? "—"} · UIF {selected.uifReference ?? "—"} · SDL {selected.sdlReference ?? "exempt"}
             </p>
@@ -118,7 +152,43 @@ export function PayrollBureauPage() {
         <NewClientModal onClose={() => setShowNewClient(false)}
           onCreated={() => { setShowNewClient(false); refetchClients() }} />
       )}
+      {showEditClient && selected && (
+        <EditClientModal client={selected} onClose={() => setShowEditClient(false)}
+          onSaved={updated => { setShowEditClient(false); setSelected(updated); refetchClients() }} />
+      )}
     </div>
+  )
+}
+
+// NEW: reuses NewClientModal's field set, pre-filled, calling updateClient.
+function EditClientModal({ client, onClose, onSaved }: { client: PayClient; onClose: () => void; onSaved: (c: PayClient) => void }) {
+  const [tradingName, setTradingName] = useState(client.tradingName)
+  const [payeReference, setPayeReference] = useState(client.payeReference ?? "")
+  const [uifReference, setUifReference] = useState(client.uifReference ?? "")
+  const [contactEmail, setContactEmail] = useState(client.contactEmail ?? "")
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  const submit = async () => {
+    if (!tradingName) { setError("Trading name is required"); return }
+    setSaving(true); setError("")
+    try {
+      const updated = await payrollBureauApi.updateClient(client.id, { tradingName, payeReference, uifReference, contactEmail } as any)
+      onSaved(updated)
+    } catch (e: any) {
+      setError(e.response?.data?.message ?? "Failed to save client")
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal title="Edit Payroll Client" onClose={onClose}>
+      <Field label="Trading name"><input value={tradingName} onChange={e => setTradingName(e.target.value)} style={inputStyle} /></Field>
+      <Field label="PAYE reference (optional)"><input value={payeReference} onChange={e => setPayeReference(e.target.value)} style={inputStyle} /></Field>
+      <Field label="UIF reference (optional)"><input value={uifReference} onChange={e => setUifReference(e.target.value)} style={inputStyle} /></Field>
+      <Field label="Contact email (optional)"><input value={contactEmail} onChange={e => setContactEmail(e.target.value)} style={inputStyle} /></Field>
+      {error && <ErrorBox text={error} />}
+      <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Save Changes" />
+    </Modal>
   )
 }
 
@@ -128,6 +198,7 @@ function EmployeesTab({ client }: { client: PayClient }) {
   const [employees, setEmployees] = useState<PayEmployee[]>([])
   const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
+  const [docsFor, setDocsFor] = useState<PayEmployee | null>(null)
 
   const refetch = () => {
     setLoading(true)
@@ -141,19 +212,24 @@ function EmployeesTab({ client }: { client: PayClient }) {
         <button onClick={() => setShowNew(true)} style={btnPrimary}>+ Add Employee</button>
       </div>
       {loading ? <Empty text="Loading…" /> : employees.length === 0 ? <Empty text="No employees added yet." /> : (
-        <Table headers={["Employee #", "Name", "Gross Salary", "Status"]}>
+        <Table headers={["Employee #", "Name", "Gross Salary", "Status", ""]}>
           {employees.map(e => (
             <tr key={e.id} style={rowStyle}>
               <td style={cellStyle}>{e.employeeNumber}</td>
               <td style={cellStyle}>{e.fullName}</td>
               <td style={cellStyle}>{fmtR(e.grossSalary)}</td>
               <td style={cellStyle}><StatusBadge status={e.status} /></td>
+              {/* NEW: employee documents — was fully backed with zero UI */}
+              <td style={cellStyle}>
+                <button onClick={() => setDocsFor(e)} style={btnSecondary}>Documents</button>
+              </td>
             </tr>
           ))}
         </Table>
       )}
       {showNew && <NewEmployeeModal clientId={client.id} onClose={() => setShowNew(false)}
         onCreated={() => { setShowNew(false); refetch() }} />}
+      {docsFor && <EmployeeDocumentsModal employee={docsFor} onClose={() => setDocsFor(null)} />}
     </div>
   )
 }
@@ -191,6 +267,98 @@ function NewEmployeeModal({ clientId, onClose, onCreated }: { clientId: string; 
   )
 }
 
+// NEW: closes the employee-documents gap entirely — list existing docs
+// (view/download, already-working backend methods) plus upload a new
+// one. UNVERIFIED: the docType select's options are a reasonable guess
+// at what a payroll bureau would file (ID, tax certificate, contract,
+// banking details) — check against the real allowed values if the
+// upload 400s on an unexpected docType string.
+function EmployeeDocumentsModal({ employee, onClose }: { employee: PayEmployee; onClose: () => void }) {
+  const [docs, setDocs] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [docType, setDocType] = useState("ID_DOCUMENT")
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState("")
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+
+  const refetch = () => {
+    setLoading(true)
+    payrollBureauApi.getEmployeeDocuments(employee.id).then(setDocs).finally(() => setLoading(false))
+  }
+  useEffect(refetch, [employee.id])
+
+  const handleUpload = async (file: File) => {
+    setUploading(true); setError("")
+    try {
+      await payrollBureauApi.uploadDocument(employee.id, file, docType)
+      refetch()
+    } catch (e: any) {
+      setError(e.response?.data?.message ?? "Failed to upload document")
+    } finally { setUploading(false) }
+  }
+
+  const handleDownload = async (documentId: string, fileName: string) => {
+    setDownloadingId(documentId)
+    try {
+      const blob = await payrollBureauApi.downloadDocument(documentId)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url; a.download = fileName
+      document.body.appendChild(a); a.click(); a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch {
+      alert("Failed to download document")
+    } finally { setDownloadingId(null) }
+  }
+
+  return (
+    <Modal title={`Documents — ${employee.fullName}`} onClose={onClose}>
+      {loading ? (
+        <div style={{ color: FAINT, fontSize: 13, padding: "12px 0" }}>Loading…</div>
+      ) : docs.length === 0 ? (
+        <div style={{ color: FAINT, fontSize: 13, padding: "12px 0" }}>No documents on file yet.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+          {docs.map((d: any) => (
+            <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "8px 10px", background: CANVAS, borderRadius: 6 }}>
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: INK }}>{d.fileName}</div>
+                <div style={{ fontSize: 11, color: FAINT }}>{d.docType?.replace(/_/g, " ")} · {fmtD(d.uploadedAt)}</div>
+              </div>
+              <button onClick={() => handleDownload(d.id, d.fileName)} disabled={downloadingId === d.id}
+                style={{ ...btnSecondary, padding: "4px 10px", fontSize: 11 }}>
+                {downloadingId === d.id ? "…" : "Download"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 14 }}>
+        <Field label="Document type">
+          <select value={docType} onChange={e => setDocType(e.target.value)} style={inputStyle}>
+            <option value="ID_DOCUMENT">ID document</option>
+            <option value="TAX_CERTIFICATE">Tax certificate</option>
+            <option value="EMPLOYMENT_CONTRACT">Employment contract</option>
+            <option value="BANKING_DETAILS">Banking details</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </Field>
+        {error && <ErrorBox text={error} />}
+        <label style={{ ...btnPrimary, display: "inline-block", opacity: uploading ? 0.6 : 1 }}>
+          {uploading ? "Uploading…" : "Upload File"}
+          <input type="file" style={{ display: "none" }} disabled={uploading}
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f) }} />
+        </label>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
+        <button onClick={onClose} style={btnSecondary}>Close</button>
+      </div>
+    </Modal>
+  )
+}
+
 // ── Pay Runs ─────────────────────────────────────────────────────────────────
 
 function PayRunsTab({ client }: { client: PayClient }) {
@@ -200,6 +368,7 @@ function PayRunsTab({ client }: { client: PayClient }) {
   const [expandedRun, setExpandedRun] = useState<string | null>(null)
   const [payslips, setPayslips] = useState<Payslip[]>([])
   const [processingId, setProcessingId] = useState<string | null>(null)
+  const [generatingFeeNoteFor, setGeneratingFeeNoteFor] = useState<PayRun | null>(null)
 
   const refetch = () => {
     setLoading(true)
@@ -250,6 +419,14 @@ function PayRunsTab({ client }: { client: PayClient }) {
                     <button onClick={e => { e.stopPropagation(); handleProcess(r.id) }} disabled={processingId === r.id}
                       style={btnPrimarySmall}>{processingId === r.id ? "Processing…" : "Process"}</button>
                   )}
+                  {/* NEW: this is the fix for FeeNotesTab's broken promise
+                      — "generate from the Pay Runs tab" now actually
+                      exists here, on a processed run. */}
+                  {r.status === "PROCESSED" && (
+                    <button onClick={e => { e.stopPropagation(); setGeneratingFeeNoteFor(r) }} style={btnPrimarySmall}>
+                      Generate Invoice
+                    </button>
+                  )}
                 </div>
               </div>
               {expandedRun === r.id && r.status === "PROCESSED" && (
@@ -273,7 +450,44 @@ function PayRunsTab({ client }: { client: PayClient }) {
       )}
       {showNew && <NewPayRunModal clientId={client.id} onClose={() => setShowNew(false)}
         onCreated={() => { setShowNew(false); refetch() }} />}
+      {generatingFeeNoteFor && (
+        <GenerateFeeNoteModal client={client} payRun={generatingFeeNoteFor}
+          onClose={() => setGeneratingFeeNoteFor(null)}
+          onGenerated={() => setGeneratingFeeNoteFor(null)} />
+      )}
     </div>
+  )
+}
+
+// NEW: the actual missing piece — generateFeeNote() existed in the API
+// client, called from nowhere. This is what FeeNotesTab's own text
+// always claimed existed.
+function GenerateFeeNoteModal({ client, payRun, onClose, onGenerated }: { client: PayClient; payRun: PayRun; onClose: () => void; onGenerated: () => void }) {
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  const submit = async () => {
+    setSaving(true); setError("")
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      const due = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
+      await payrollBureauApi.generateFeeNote(client.id, {
+        payRunId: payRun.id, invoiceDate: today, dueDate: due, includeVat: true,
+      })
+      onGenerated()
+    } catch (e: any) {
+      setError(e.response?.data?.message ?? "Failed to generate invoice")
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal title={`Generate Invoice — ${payRun.payRunNumber}`} onClose={onClose}>
+      <p style={{ fontSize: 13, color: MUTED, marginBottom: 14 }}>
+        Generates your bureau fee invoice for this processed pay run ({payRun.employeeCount} employees). See it in the Invoices tab once created.
+      </p>
+      {error && <ErrorBox text={error} />}
+      <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Generate" />
+    </Modal>
   )
 }
 
@@ -314,6 +528,7 @@ function DeadlinesTab({ client }: { client: PayClient }) {
   const [deadlines, setDeadlines] = useState<PayDeadline[]>([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [filingId, setFilingId] = useState<string | null>(null)
 
   const refetch = () => {
     setLoading(true)
@@ -329,6 +544,14 @@ function DeadlinesTab({ client }: { client: PayClient }) {
     } finally { setGenerating(false) }
   }
 
+  // NEW: markDeadlineFiled existed with no button — every deadline sat
+  // PENDING forever regardless of whether it was actually filed with SARS.
+  const handleMarkFiled = async (id: string) => {
+    setFilingId(id)
+    try { await payrollBureauApi.markDeadlineFiled(id); refetch() }
+    finally { setFilingId(null) }
+  }
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
@@ -337,13 +560,20 @@ function DeadlinesTab({ client }: { client: PayClient }) {
         </button>
       </div>
       {loading ? <Empty text="Loading…" /> : deadlines.length === 0 ? <Empty text="No deadlines generated yet." /> : (
-        <Table headers={["Type", "Period", "Due Date", "Status"]}>
+        <Table headers={["Type", "Period", "Due Date", "Status", ""]}>
           {deadlines.map(d => (
             <tr key={d.id} style={rowStyle}>
               <td style={cellStyle}>{d.deadlineType}</td>
               <td style={cellStyle}>{d.periodMonth ? `${d.periodYear}/${String(d.periodMonth).padStart(2, "0")}` : d.periodYear}</td>
               <td style={cellStyle}>{fmtD(d.adjustedDueDate)}</td>
               <td style={cellStyle}><StatusBadge status={d.status} /></td>
+              <td style={cellStyle}>
+                {d.status === "PENDING" && (
+                  <button onClick={() => handleMarkFiled(d.id)} disabled={filingId === d.id} style={btnSecondary}>
+                    {filingId === d.id ? "…" : "Mark Filed"}
+                  </button>
+                )}
+              </td>
             </tr>
           ))}
         </Table>
@@ -357,6 +587,7 @@ function DeadlinesTab({ client }: { client: PayClient }) {
 function FeeNotesTab({ client }: { client: PayClient }) {
   const [feeNotes, setFeeNotes] = useState<PayFeeNote[]>([])
   const [loading, setLoading] = useState(true)
+  const [payingNote, setPayingNote] = useState<PayFeeNote | null>(null)
 
   const refetch = () => {
     setLoading(true)
@@ -371,6 +602,8 @@ function FeeNotesTab({ client }: { client: PayClient }) {
 
   return (
     <div>
+      {/* FIX: this used to point at a feature that didn't exist. It now
+          does — see PayRunsTab's "Generate Invoice" button. */}
       <p style={{ fontSize: 12.5, color: MUTED, marginBottom: 12 }}>
         Generate invoices from the Pay Runs tab once a run is processed.
       </p>
@@ -384,13 +617,66 @@ function FeeNotesTab({ client }: { client: PayClient }) {
               <td style={cellStyle}>{fmtR(f.balance)}</td>
               <td style={cellStyle}><StatusBadge status={f.status} /></td>
               <td style={cellStyle}>
-                {f.status === "DRAFT" && <button onClick={() => handleSend(f.id)} style={btnSecondary}>Send</button>}
+                <div style={{ display: "flex", gap: 6 }}>
+                  {f.status === "DRAFT" && <button onClick={() => handleSend(f.id)} style={btnSecondary}>Send</button>}
+                  {/* NEW: recordPayment existed with no button */}
+                  {f.status !== "DRAFT" && f.balance > 0 && (
+                    <button onClick={() => setPayingNote(f)} style={btnSecondary}>Record Payment</button>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
         </Table>
       )}
+      {payingNote && (
+        <RecordPaymentModal feeNote={payingNote} onClose={() => setPayingNote(null)}
+          onRecorded={() => { setPayingNote(null); refetch() }} />
+      )}
     </div>
+  )
+}
+
+function RecordPaymentModal({ feeNote, onClose, onRecorded }: { feeNote: PayFeeNote; onClose: () => void; onRecorded: () => void }) {
+  const [amount, setAmount] = useState(String(feeNote.balance))
+  const [paidDate, setPaidDate] = useState(new Date().toISOString().slice(0, 10))
+  const [method, setMethod] = useState("EFT")
+  const [reference, setReference] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  const submit = async () => {
+    if (!amount || Number(amount) <= 0) { setError("Enter a payment amount"); return }
+    setSaving(true); setError("")
+    try {
+      await payrollBureauApi.recordPayment(feeNote.id, {
+        amount: Number(amount), paidDate, method: method || undefined, reference: reference || undefined,
+      })
+      onRecorded()
+    } catch (e: any) {
+      setError(e.response?.data?.message ?? "Failed to record payment")
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal title={`Record Payment — ${feeNote.invoiceNumber}`} onClose={onClose}>
+      <p style={{ fontSize: 12.5, color: MUTED, marginBottom: 12 }}>Outstanding balance: {fmtR(feeNote.balance)}</p>
+      <Field label="Amount"><input type="number" value={amount} onChange={e => setAmount(e.target.value)} style={inputStyle} /></Field>
+      <div style={{ display: "flex", gap: 10 }}>
+        <Field label="Date paid"><input type="date" value={paidDate} onChange={e => setPaidDate(e.target.value)} style={inputStyle} /></Field>
+        <Field label="Method">
+          <select value={method} onChange={e => setMethod(e.target.value)} style={inputStyle}>
+            <option value="EFT">EFT</option>
+            <option value="CARD">Card</option>
+            <option value="CASH">Cash</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </Field>
+      </div>
+      <Field label="Reference (optional)"><input value={reference} onChange={e => setReference(e.target.value)} style={inputStyle} /></Field>
+      {error && <ErrorBox text={error} />}
+      <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Record Payment" />
+    </Modal>
   )
 }
 
@@ -401,6 +687,7 @@ function PortalAccessTab({ client }: { client: PayClient }) {
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState("")
   const [inviting, setInviting] = useState(false)
+  const [revokingId, setRevokingId] = useState<string | null>(null)
 
   const refetch = () => {
     setLoading(true)
@@ -420,6 +707,14 @@ function PortalAccessTab({ client }: { client: PayClient }) {
     } finally { setInviting(false) }
   }
 
+  // NEW: revokePortalAccess existed with no button
+  const handleRevoke = async (grantId: string) => {
+    if (!confirm("Revoke this client's portal access?")) return
+    setRevokingId(grantId)
+    try { await payrollBureauApi.revokePortalAccess(client.id, grantId); refetch() }
+    finally { setRevokingId(null) }
+  }
+
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
@@ -430,12 +725,20 @@ function PortalAccessTab({ client }: { client: PayClient }) {
         </button>
       </div>
       {loading ? <Empty text="Loading…" /> : grants.length === 0 ? <Empty text="No portal invites sent yet." /> : (
-        <Table headers={["Email", "Status", "Invited"]}>
+        <Table headers={["Email", "Status", "Invited", ""]}>
           {grants.map(g => (
             <tr key={g.id} style={rowStyle}>
               <td style={cellStyle}>{g.inviteEmail}</td>
               <td style={cellStyle}><StatusBadge status={g.status} /></td>
               <td style={cellStyle}>{fmtD(g.invitedAt)}</td>
+              <td style={cellStyle}>
+                {g.status !== "REVOKED" && (
+                  <button onClick={() => handleRevoke(g.id)} disabled={revokingId === g.id}
+                    style={{ ...btnSecondary, color: "#DC2626", borderColor: "#DC2626" }}>
+                    {revokingId === g.id ? "…" : "Revoke"}
+                  </button>
+                )}
+              </td>
             </tr>
           ))}
         </Table>
@@ -497,7 +800,7 @@ function Table({ headers, children }: { headers: string[]; children: React.React
     <table style={{ width: "100%", borderCollapse: "collapse" as const, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
       <thead>
         <tr style={{ background: CANVAS }}>
-          {headers.map(h => <th key={h} style={{ textAlign: "left" as const, padding: "8px 12px", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase" as const, letterSpacing: "0.03em" }}>{h}</th>)}
+          {headers.map(h => <th key={h} style={{ textAlign: "left" as const, padding: "8px 12px", fontSize: 11, fontWeight: 600, color: MUTED, textTransform: "uppercase" as const, letterSpacing: "0.03em" }}>{h}</th>)}
         </tr>
       </thead>
       <tbody>{children}</tbody>
@@ -513,7 +816,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
       onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
+      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 420, maxHeight: "80vh", overflowY: "auto" as const, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
         onClick={e => e.stopPropagation()}>
         <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 800, color: INK }}>{title}</h3>
         {children}

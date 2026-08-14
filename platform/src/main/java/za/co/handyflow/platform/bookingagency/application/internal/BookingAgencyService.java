@@ -2,6 +2,7 @@ package za.co.handyflow.platform.bookingagency.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -41,6 +42,9 @@ public class BookingAgencyService {
     private final za.co.handyflow.platform.shared.TenantSequenceService sequenceService;
     private final BookAgencyInvoiceRepository invoiceRepo;
     private final BookAgencyPaymentRepository paymentRepo;
+
+    @Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
 
     // ── Agency profile ───────────────────────────────────────────────────────
 
@@ -137,7 +141,7 @@ public class BookingAgencyService {
         emailService.send(email, client.getTradingName() + " has invited you to their booking portal",
                 za.co.handyflow.platform.shared.EmailTemplates.portalInvite(
                         client.getTradingName(), "Booking Agency",
-                        "https://app.handyflow.co.za/booking-agency/portal/auth/accept-invite?token=" + grant.getInviteToken()));
+                        frontendUrl + "/booking-agency/portal/auth/accept-invite?token=" + grant.getInviteToken()));
 
         log.info("Booking agency portal invite sent: {} -> client={}", email, clientId);
         return toGrantResponse(grant);

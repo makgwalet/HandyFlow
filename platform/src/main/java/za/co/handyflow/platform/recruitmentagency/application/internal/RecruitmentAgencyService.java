@@ -2,6 +2,7 @@ package za.co.handyflow.platform.recruitmentagency.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -42,6 +43,9 @@ public class RecruitmentAgencyService {
     private final RecAgencyPaymentRepository paymentRepo;
     private final za.co.handyflow.platform.shared.EmailService emailService; // confirm not already present
     private final RecPortalAccessGrantRepository portalGrantRepo;
+
+    @Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
 
     // ── Agency profile ───────────────────────────────────────────────────────
 
@@ -480,7 +484,7 @@ public class RecruitmentAgencyService {
         emailService.send(email, client.getTradingName() + " has invited you to their recruitment portal",
                 za.co.handyflow.platform.shared.EmailTemplates.portalInvite(
                         client.getTradingName(), "Recruitment Agency",
-                        "https://app.handyflow.co.za/recruitment-agency/portal/auth/accept-invite?token=" + grant.getInviteToken()));
+                        frontendUrl + "/recruitment-agency/portal/auth/accept-invite?token=" + grant.getInviteToken()));
 
         log.info("Recruitment agency portal invite sent: {} -> client={}", email, clientId);
         return toGrantResponse(grant);

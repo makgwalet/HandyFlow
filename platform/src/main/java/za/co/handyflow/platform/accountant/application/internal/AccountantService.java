@@ -2,6 +2,7 @@ package za.co.handyflow.platform.accountant.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -60,6 +61,9 @@ public class AccountantService {
     // revokePortalAccess() — closes the "client portal" gap (staff-side
     // invite management layer).
     private final AccPortalAccessGrantRepository portalGrantRepo;
+
+    @Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
 
     // ── L2: Client portfolio ──────────────────────────────────────────────────
 
@@ -576,7 +580,7 @@ public class AccountantService {
         // Placeholder path — see EmailTemplates.portalInvite()'s own
         // comment for why this is a real link to a page that doesn't
         // exist yet, not omitted.
-        String acceptUrl = "https://handyflow.co.za/accountant/portal/auth/accept-invite?token=" + grant.getInviteToken();
+        String acceptUrl = frontendUrl + "/accountant/portal/auth/accept-invite?token=" + grant.getInviteToken();
 
         emailService.send(email,
                 "You've been invited to the " + firmName + " client portal",

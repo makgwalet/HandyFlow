@@ -14,17 +14,17 @@ interface PortalAuthResponse { token: string; portalUserId: string; email: strin
 // real PayrollBureauPortalDataController for the actual path names.
 export const payrollBureauPortalApi = {
   login: (body: { email: string; password: string }) =>
-    apiClient.post("/api/v1/payroll-bureau/portal/auth/login", body).then(res => res.data.data as PortalAuthResponse),
-
+    apiClient.post("/api/v1/payroll-bureau/portal/auth/login", body).then(res => res.data as PortalAuthResponse),
+  
   register: (body: { inviteToken: string; password: string; fullName: string }) =>
-    apiClient.post("/api/v1/payroll-bureau/portal/auth/register", body).then(res => res.data.data as PortalAuthResponse),
-
+    apiClient.post("/api/v1/payroll-bureau/portal/auth/register", body).then(res => res.data as PortalAuthResponse),
+  
   getMyClients: () =>
-    apiClient.get("/api/v1/payroll-bureau/portal/clients").then(res => res.data.data as PortalClientSummary[]),
-
+    apiClient.get("/api/v1/payroll-bureau/portal/clients").then(res => res.data as PortalClientSummary[]),
+  
   getMyFeeNotes: (clientId: string) =>
-    apiClient.get(`/api/v1/payroll-bureau/portal/clients/${clientId}/fee-notes`).then(res => res.data.data as PortalFeeNote[]),
-
+    apiClient.get(`/api/v1/payroll-bureau/portal/clients/${clientId}/fee-notes`).then(res => res.data as PortalFeeNote[]),
+  
   getMyDeadlines: (clientId: string) =>
-    apiClient.get(`/api/v1/payroll-bureau/portal/clients/${clientId}/deadlines`).then(res => res.data.data as PortalDeadline[]),
+    apiClient.get(`/api/v1/payroll-bureau/portal/clients/${clientId}/deadlines`).then(res => res.data as PortalDeadline[]),
 }
