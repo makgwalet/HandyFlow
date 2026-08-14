@@ -95,6 +95,10 @@ import { RecruitmentAgencyPortalClientDetailPage } from "./pages/recruitment-age
 import { RecruitmentAgencyPortalHomePage } from "./pages/recruitment-agency-portal/RecruitmentAgencyPortalHomePage"
 import { RecruitmentAgencyPortalLoginPage } from "./pages/recruitment-agency-portal/RecruitmentAgencyPortalLoginPage"
 import { RecruitmentAgencyPage } from "./pages/recruitment-agency/RecruitmentAgencyPage"
+import { BookingAgencyPortalAcceptInvitePage } from "./pages/booking-agency-portal/BookingAgencyPortalAcceptInvitePage"
+import { BookingAgencyPortalClientDetailPage } from "./pages/booking-agency-portal/BookingAgencyPortalClientDetailPage"
+import { BookingAgencyPortalHomePage } from "./pages/booking-agency-portal/BookingAgencyPortalHomePage"
+import { BookingAgencyPortalLoginPage } from "./pages/booking-agency-portal/BookingAgencyPortalLoginPage"
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -112,6 +116,12 @@ function RecruitmentAgencyPortalProtectedRoute({ children }: { children: React.R
       if (!token) return <Navigate to="/recruitment-agency/portal/login" replace />
       return <>{children}</>
     }
+
+function BookingAgencyPortalProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = usePortalAuthStore(s => s.token)
+  if (!token) return <Navigate to="/booking-agency/portal/login" replace />
+  return <>{children}</>
+}
 
 // NEW: closes "not added to App.tsx, redirects to saas" — deliberately
 // checks usePortalAuthStore, not useAuthStore, and redirects to the
@@ -205,6 +215,11 @@ export default function App() {
           <Route path="/payroll-bureau/portal/auth/accept-invite" element={<PayrollBureauPortalAcceptInvitePage />} />
           <Route path="/payroll-bureau/portal" element={<PayrollBureauPortalProtectedRoute><PayrollBureauPortalHomePage /></PayrollBureauPortalProtectedRoute>} />
           <Route path="/payroll-bureau/portal/clients/:clientId" element={<PayrollBureauPortalProtectedRoute><PayrollBureauPortalClientDetailPage /></PayrollBureauPortalProtectedRoute>} />
+
+          <Route path="/booking-agency/portal/login"              element={<BookingAgencyPortalLoginPage />} />
+          <Route path="/booking-agency/portal/auth/accept-invite" element={<BookingAgencyPortalAcceptInvitePage />} />
+          <Route path="/booking-agency/portal" element={<BookingAgencyPortalProtectedRoute><BookingAgencyPortalHomePage /></BookingAgencyPortalProtectedRoute>} />
+          <Route path="/booking-agency/portal/clients/:clientId" element={<BookingAgencyPortalProtectedRoute><BookingAgencyPortalClientDetailPage /></BookingAgencyPortalProtectedRoute>} />
 
           {/* Token-secured routes — also outside ModuleLayout */}
           <Route path="/sign/:token"                   element={<SigningPage />} />

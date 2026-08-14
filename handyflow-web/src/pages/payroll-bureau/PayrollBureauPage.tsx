@@ -171,6 +171,7 @@ function EditClientModal({ client, onClose, onSaved }: { client: PayClient; onCl
 
   const submit = async () => {
     if (!tradingName) { setError("Trading name is required"); return }
+    if (!contactEmail) { setError("Contact email is required — needed to send this client their invoices"); return }
     setSaving(true); setError("")
     try {
       const updated = await payrollBureauApi.updateClient(client.id, { tradingName, payeReference, uifReference, contactEmail } as any)
@@ -185,7 +186,7 @@ function EditClientModal({ client, onClose, onSaved }: { client: PayClient; onCl
       <Field label="Trading name"><input value={tradingName} onChange={e => setTradingName(e.target.value)} style={inputStyle} /></Field>
       <Field label="PAYE reference (optional)"><input value={payeReference} onChange={e => setPayeReference(e.target.value)} style={inputStyle} /></Field>
       <Field label="UIF reference (optional)"><input value={uifReference} onChange={e => setUifReference(e.target.value)} style={inputStyle} /></Field>
-      <Field label="Contact email (optional)"><input value={contactEmail} onChange={e => setContactEmail(e.target.value)} style={inputStyle} /></Field>
+      <Field label="Contact email"><input value={contactEmail} onChange={e => setContactEmail(e.target.value)} style={inputStyle} required /></Field>
       {error && <ErrorBox text={error} />}
       <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Save Changes" />
     </Modal>
@@ -759,7 +760,8 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
 
   const submit = async () => {
     if (!tradingName) { setError("Trading name is required"); return }
-    setSaving(true); setError("")
+    if (!contactEmail) { setError("Contact email is required — needed to send this client their invoices"); return }
+      setSaving(true); setError("")
     try {
       await payrollBureauApi.createClient({ tradingName, payeReference, uifReference, contactEmail } as any)
       onCreated()
@@ -773,7 +775,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
       <Field label="Trading name"><input value={tradingName} onChange={e => setTradingName(e.target.value)} style={inputStyle} /></Field>
       <Field label="PAYE reference (optional)"><input value={payeReference} onChange={e => setPayeReference(e.target.value)} style={inputStyle} /></Field>
       <Field label="UIF reference (optional)"><input value={uifReference} onChange={e => setUifReference(e.target.value)} style={inputStyle} /></Field>
-      <Field label="Contact email (optional)"><input value={contactEmail} onChange={e => setContactEmail(e.target.value)} style={inputStyle} /></Field>
+      <Field label="Contact email"><input value={contactEmail} onChange={e => setContactEmail(e.target.value)} style={inputStyle} required /></Field>
       {error && <ErrorBox text={error} />}
       <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Create Client" />
     </Modal>

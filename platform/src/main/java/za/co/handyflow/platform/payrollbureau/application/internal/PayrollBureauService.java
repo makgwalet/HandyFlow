@@ -169,6 +169,22 @@ public class PayrollBureauService {
     @Transactional
     public PayRunResponse createPayRun(TenantId tenantId, UUID payClientId, CreatePayRunRequest req) {
         requireClientOwnership(tenantId, payClientId);
+
+        // NEW: confirmed missing via real testing — four pay runs were
+        // created for the identical client + period with no guard, producing
+        // four duplicate PROCESSED runs and, downstream, four duplicate fee
+        // notes. Blocks any new run whose period overlaps an existing one
+        // for this client, DRAFT or PROCESSED — a second DRAFT for an
+        // already-covered period is just as wrong as a second PROCESSED one.
+        boolean overlaps = payRunRepo.findByClient(payClientId, Pageable.unpaged()).stream()
+                 .anyMatch(existing -> !existing.getPeriodEnd().isBefore(req.periodStart())
+                            && !existing.getPeriodStart().isAfter(req.periodEnd()));
+           if (overlaps) {
+              throw new HandyFlowException(
+                 "A pay run already exists covering this period", HttpStatus.CONFLICT, "PERIOD_OVERLAP");
+            }
+
+
         // SA tax year runs Mar-Feb — same rule as hr.PayrollService.createPayRun()
         int taxYear = req.periodStart().getMonthValue() >= 3
                 ? req.periodStart().getYear() : req.periodStart().getYear() - 1;
@@ -383,21 +399,30 @@ public class PayrollBureauService {
         PayClient client = clientRepo.findActiveById(tenantId.getValue(), feeNote.getPayClientId())
                 .orElseThrow(() -> new ResourceNotFoundException("PayClient", feeNote.getPayClientId().toString()));
 
+        // FIX: was `if (client.getContactEmail() != null) { ...email... }`
+        // — a client with no contact email would silently flip to SENT
+        // with no email ever firing and no error telling anyone that
+        // happened. Confirmed real via testing tonight. Now fails loudly
+        // instead, matching processPayRun()'s own
+        // HandyFlowException/BAD_REQUEST pattern elsewhere in this class.
+        if (client.getContactEmail() == null || client.getContactEmail().isBlank()) {
+                throw new HandyFlowException(
+                         "This client has no contact email on file — add one before sending invoices",
+                          HttpStatus.BAD_REQUEST, "MISSING_CONTACT_EMAIL");
+        }
+
         feeNote.markSent();
         feeNoteRepo.save(feeNote);
 
         if (client.getContactEmail() != null) {
-            // Reuses accountant's exact feeNote() email template — same
-            // shape of invoice email (invoice number, amount, due date),
-            // no reason to write a second version for a nearly-identical
-            // notification. If bureau-specific copy is ever wanted, that's
-            // a real, separate template to add — not a reason to skip
-            // reuse now.
+            // Reuses accountant's exact feeNote() email template — same shape of
+            // invoice email (invoice number, amount, due date). Guard clause
+            // above already guarantees contactEmail is non-blank here.
             emailService.send(client.getContactEmail(),
                     "Invoice " + feeNote.getInvoiceNumber(),
-                    za.co.handyflow.platform.shared.EmailTemplates.feeNote(
-                            client.getTradingName(), feeNote.getInvoiceNumber(),
-                            feeNote.getTotal().toPlainString(), feeNote.getDueDate().toString()));
+                        za.co.handyflow.platform.shared.EmailTemplates.feeNote(
+                        client.getTradingName(), feeNote.getInvoiceNumber(),
+                       feeNote.getTotal().toPlainString(), feeNote.getDueDate().toString()));
         }
         return toFeeNoteResponse(feeNote);
     }

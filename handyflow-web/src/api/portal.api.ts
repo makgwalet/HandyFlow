@@ -6,7 +6,6 @@ import type {
   DocumentRequest,
   TaxDeadline,
 } from '../types/portal.types'
-import type { apiClient } from './client'
 
 export const portalApi = {
   register: async (data: PortalRegisterRequest): Promise<PortalAuthResponse> => {
@@ -55,15 +54,28 @@ export const portalApi = {
     return res.data
   },
 
+  // FIX (both bugs on all three methods below):
+  // 1. Missing /api/v1 prefix — every other method in this file
+  //    correctly calls /api/v1/accountant/portal/..., these three
+  //    called /accountant/portal/... (no /api/v1). portalApiClient's
+  //    baseURL has no /api/v1 baked in, so this was a guaranteed 404.
+  // 2. Double-unwrap — .then(res => res.data.data as X). portal.client.ts's
+  //    own response interceptor already unwraps {success, message, data}
+  //    down to just `data` (confirmed directly in that file, same as
+  //    every other method here reading res.data once). Reading
+  //    res.data.data a second time on top of that is the identical
+  //    envelope bug found and fixed in payrollBureau.api.ts,
+  //    bookingAgency.api.ts, and recruitmentAgency.api.ts earlier this
+  //    session — same root cause, just a fourth, previously-unseen file.
   getMyDocumentRequests: (clientId: string) =>
-      portalApiClient.get(`/accountant/portal/clients/${clientId}/document-requests`)
-        .then(res => res.data.data as DocumentRequest[]),
- 
+      portalApiClient.get(`/api/v1/accountant/portal/clients/${clientId}/document-requests`)
+        .then(res => res.data as DocumentRequest[]),
+
   submitDocumentRequest: (clientId: string, requestId: string) =>
-      portalApiClient.post(`/accountant/portal/clients/${clientId}/document-requests/${requestId}/submit`)
-        .then(res => res.data.data as DocumentRequest),
+      portalApiClient.post(`/api/v1/accountant/portal/clients/${clientId}/document-requests/${requestId}/submit`)
+        .then(res => res.data as DocumentRequest),
 
   getMyTaxDeadlines: (clientId: string) =>
-      portalApiClient.get(`/accountant/portal/clients/${clientId}/tax-deadlines`)
-        .then(res => res.data.data as TaxDeadline[]),
+      portalApiClient.get(`/api/v1/accountant/portal/clients/${clientId}/tax-deadlines`)
+        .then(res => res.data as TaxDeadline[]),
 }

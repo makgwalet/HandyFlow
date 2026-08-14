@@ -1,5 +1,5 @@
 // src/api/payrollBureauPortal.api.ts
-import { apiClient } from "./client"
+import { payrollBureauPortalApiClient as apiClient} from "./payrollBureauPortal.client"
 import type { PortalClientSummary, PortalFeeNote, PortalDeadline } from "../types/payrollBureauPortal.types"
 
 interface PortalAuthResponse { token: string; portalUserId: string; email: string; fullName: string }
@@ -23,7 +23,7 @@ export const payrollBureauPortalApi = {
     apiClient.get("/api/v1/payroll-bureau/portal/clients").then(res => res.data as PortalClientSummary[]),
   
   getMyFeeNotes: (clientId: string) =>
-    apiClient.get(`/api/v1/payroll-bureau/portal/clients/${clientId}/fee-notes`).then(res => res.data as PortalFeeNote[]),
+    apiClient.get(`/api/v1/payroll-bureau/portal/clients/${clientId}/fee-notes`).then(res => (res.data as { content: PortalFeeNote[] }).content),
   
   getMyDeadlines: (clientId: string) =>
     apiClient.get(`/api/v1/payroll-bureau/portal/clients/${clientId}/deadlines`).then(res => res.data as PortalDeadline[]),

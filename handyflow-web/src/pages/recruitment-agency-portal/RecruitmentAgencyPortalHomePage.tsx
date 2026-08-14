@@ -13,7 +13,20 @@ export function RecruitmentAgencyPortalHomePage() {
   const [clients, setClients] = useState<PortalClientSummary[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { recruitmentAgencyPortalApi.getMyClients().then(setClients).finally(() => setLoading(false)) }, [])
+  useEffect(() => {
+     recruitmentAgencyPortalApi.getMyClients().then(res => {
+       // Same reasoning as Payroll Bureau's identical fix — skip the
+       // list screen entirely when there's only one client, since
+       // "You have access to 1 client" is access-control phrasing,
+       // not a landing page worth a click through.
+       if (res.length === 1) {
+         navigate(`/recruitment-agency/portal/clients/${res[0].clientId}`, { replace: true })
+         return
+       }
+       setClients(res)
+     }).finally(() => setLoading(false))
+   }, [navigate])
+
   const firstName = user?.fullName?.split(" ")[0]
 
   return (

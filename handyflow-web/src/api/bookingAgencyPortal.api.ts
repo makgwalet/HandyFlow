@@ -11,7 +11,7 @@
 // response interceptor already unwraps {success, message, data} down to
 // just `data` — every method below reads r.data directly, NOT r.data.data
 // (the bug found and fixed in payrollBureau.api.ts earlier).
-import { apiClient } from "./client"
+import { bookingAgencyPortalApiClient as  apiClient} from "./bookingAgencyPortal.client"
 import type { PortalClientSummary, PortalInvoice } from "../types/bookingAgencyPortal.types"
 
 interface PageResponse<T> { content: T[]; totalElements: number; totalPages: number; number: number }

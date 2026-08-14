@@ -13,7 +13,20 @@ export function PayrollBureauPortalHomePage() {
   const [clients, setClients] = useState<PortalClientSummary[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { payrollBureauPortalApi.getMyClients().then(setClients).finally(() => setLoading(false)) }, [])
+  useEffect(() => {
+     payrollBureauPortalApi.getMyClients().then(res => {
+       // Skip the list entirely when there's only one client to show —
+       // "You have access to 1 client" is access-control phrasing, not
+       // a landing page. Genuinely a full page of nothing but a link
+       // to the one place they'd click anyway.
+       if (res.length === 1) {
+         navigate(`/payroll-bureau/portal/clients/${res[0].clientId}`, { replace: true })
+         return
+       }
+       setClients(res)
+     }).finally(() => setLoading(false))
+   }, [navigate])
+   
   const firstName = user?.fullName?.split(" ")[0]
 
   return (

@@ -13,7 +13,16 @@ export function BookingAgencyPortalHomePage() {
   const [clients, setClients] = useState<PortalClientSummary[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { bookingAgencyPortalApi.getMyClients().then(setClients).finally(() => setLoading(false)) }, [])
+  useEffect(() => {
+     bookingAgencyPortalApi.getMyClients().then(res => {
+       if (res.length === 1) {
+         navigate(`/booking-agency/portal/clients/${res[0].clientId}`, { replace: true })
+         return
+       }
+       setClients(res)
+     }).finally(() => setLoading(false))
+   }, [navigate])
+
   const firstName = user?.fullName?.split(" ")[0]
 
   return (
