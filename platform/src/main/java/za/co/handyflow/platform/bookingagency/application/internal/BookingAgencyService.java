@@ -14,6 +14,8 @@ import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -37,6 +39,8 @@ public class BookingAgencyService {
     private final BookAgencyOfferingRepository offeringRepo;
     private final BookAgencyBookingRepository bookingRepo;
     private final za.co.handyflow.platform.shared.TenantSequenceService sequenceService;
+    private final BookAgencyInvoiceRepository invoiceRepo;
+    private final BookAgencyPaymentRepository paymentRepo;
 
     // ── Agency profile ───────────────────────────────────────────────────────
 
@@ -310,6 +314,99 @@ public class BookingAgencyService {
         return toBookingResponse(booking, resourceName, offeringName);
     }
 
+    /**
+     * Generates a retainer invoice for one billing period. Requires
+     * the client to have a monthlyRetainerAmount set — rejects with a
+     * clear error rather than silently invoicing zero, since that
+     * would be a real billing mistake, not a graceful default.
+     * Uniqueness enforced both here (clean 409) and at the database
+     * level (uq_booka_invoice_client_period) — same defense-in-depth
+     * pattern used for Recruitment Agency's one-invoice-per-placement
+     * rule.
+     */
+    @Transactional
+    public BookAgencyInvoiceResponse generateInvoice(TenantId tenantId, UUID clientId, GenerateRetainerInvoiceRequest req) {
+        BookAgencyClient client = findActiveClient(tenantId, clientId);
+
+        if (client.getMonthlyRetainerAmount() == null) {
+            throw new HandyFlowException(
+                    "This client has no monthly retainer amount set — add one before generating an invoice",
+                    HttpStatus.BAD_REQUEST, "NO_RETAINER_SET");
+        }
+        if (invoiceRepo.existsByClientIdAndPeriodStart(clientId, req.periodStart())) {
+            throw new HandyFlowException("This client has already been invoiced for this period",
+                    HttpStatus.CONFLICT, "ALREADY_INVOICED");
+        }
+
+        BigDecimal subtotal = client.getMonthlyRetainerAmount();
+        BigDecimal vatAmount = req.includeVat()
+                ? subtotal.multiply(new BigDecimal("0.15")).setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        String invoiceNumber = "BAI" + String.format("%05d",
+                sequenceService.nextValue(tenantId, "BOOKINGAGENCY_INVOICE:" + clientId));
+
+        String monthLabel = req.periodStart().getMonth().getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH)
+                + " " + req.periodStart().getYear();
+        String description = "Booking management retainer — " + monthLabel;
+
+        BookAgencyInvoice invoice = BookAgencyInvoice.create(tenantId.getValue(), clientId, invoiceNumber,
+                description, req.periodStart(), req.periodEnd(), req.invoiceDate(), req.dueDate(), subtotal, vatAmount);
+        invoiceRepo.save(invoice);
+
+        log.info("Generated booking agency retainer invoice={} client={} period={} amount={}",
+                invoiceNumber, clientId, monthLabel, invoice.getTotal());
+        return toInvoiceResponse(invoice);
+    }
+
+    @Transactional
+    public BookAgencyInvoiceResponse sendInvoice(TenantId tenantId, UUID invoiceId) {
+        BookAgencyInvoice invoice = invoiceRepo.findByTenantAndId(tenantId.getValue(), invoiceId)
+                .orElseThrow(() -> new ResourceNotFoundException("BookAgencyInvoice", invoiceId.toString()));
+        BookAgencyClient client = clientRepo.findActiveById(tenantId.getValue(), invoice.getClientId())
+                .orElseThrow(() -> new ResourceNotFoundException("BookAgencyClient", invoice.getClientId().toString()));
+
+        invoice.markSent();
+        invoiceRepo.save(invoice);
+
+        if (client.getContactEmail() != null) {
+            // Same reused feeNote()-shaped template as the sibling
+            // Payroll Bureau and Recruitment Agency billing layers —
+            // one template, three modules, no reason for a fourth
+            // near-identical version.
+            emailService.send(client.getContactEmail(),
+                    "Invoice " + invoice.getInvoiceNumber(),
+                    za.co.handyflow.platform.shared.EmailTemplates.feeNote(
+                            client.getTradingName(), invoice.getInvoiceNumber(),
+                            invoice.getTotal().toPlainString(), invoice.getDueDate().toString()));
+        }
+        return toInvoiceResponse(invoice);
+    }
+
+    @Transactional
+    public BookAgencyInvoiceResponse recordPayment(TenantId tenantId, UUID invoiceId,
+                                                   RecordBookAgencyPaymentRequest req, UUID userId, String userName) {
+        BookAgencyInvoice invoice = invoiceRepo.findByTenantAndId(tenantId.getValue(), invoiceId)
+                .orElseThrow(() -> new ResourceNotFoundException("BookAgencyInvoice", invoiceId.toString()));
+
+        BookAgencyPayment payment = BookAgencyPayment.create(tenantId.getValue(), invoiceId, req.amount(),
+                req.paidDate(), req.method(), req.reference(), userId, userName);
+        paymentRepo.save(payment);
+
+        invoice.recordPayment(req.amount());
+        invoiceRepo.save(invoice);
+
+        log.info("Recorded payment={} against booking agency invoice={} newStatus={}",
+                req.amount(), invoice.getInvoiceNumber(), invoice.getStatus());
+        return toInvoiceResponse(invoice);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<BookAgencyInvoiceResponse> getInvoices(TenantId tenantId, UUID clientId, Pageable pageable) {
+        findActiveClient(tenantId, clientId);
+        return invoiceRepo.findByClient(clientId, pageable).map(this::toInvoiceResponse);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private BookAgencyResource findResource(TenantId tenantId, UUID id) {
@@ -363,5 +460,12 @@ public class BookingAgencyService {
                 b.getResourceId(), resourceName, b.getOfferingId(), offeringName,
                 b.getCustomerName(), b.getCustomerPhone(), b.getCustomerEmail(),
                 b.getStartDatetime(), b.getEndDatetime(), b.getStatus(), b.getNotes(), b.getCreatedAt());
+    }
+
+    private BookAgencyInvoiceResponse toInvoiceResponse(BookAgencyInvoice inv) {
+        return new BookAgencyInvoiceResponse(inv.getId(), inv.getInvoiceNumber(), inv.getDescription(),
+                inv.getPeriodStart(), inv.getPeriodEnd(), inv.getInvoiceDate(), inv.getDueDate(),
+                inv.getSubtotal(), inv.getVatAmount(), inv.getTotal(), inv.getAmountPaid(), inv.balance(),
+                inv.getStatus(), inv.getSentAt(), inv.getPaidAt());
     }
 }

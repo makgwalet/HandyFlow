@@ -12,7 +12,7 @@
 // backed by nothing real would be worse than not having one.
 import { useEffect, useState } from "react"
 import { bookingAgencyApi } from "../../api/bookingAgency.api"
-import type { BookAgencyClient, BookAgencyResource, BookAgencyOffering, BookAgencyBooking, PortalAccessGrant } from "../../types/bookingAgency.types"
+import type { BookAgencyClient, BookAgencyResource, BookAgencyOffering, BookAgencyBooking, PortalAccessGrant, BookAgencyInvoice } from "../../types/bookingAgency.types"
 
 const fmtDT = (d: any) => (d ? new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—")
 
@@ -23,7 +23,7 @@ const INK = "#0F172A"
 const MUTED = "#64748B"
 const FAINT = "#94A3B8"
 
-type Tab = "resources" | "offerings" | "bookings" | "portal"
+type Tab = "resources" | "offerings" | "bookings" | "invoices" | "portal"
 
 export function BookingAgencyPage() {
   const [clients, setClients] = useState<BookAgencyClient[]>([])
@@ -88,7 +88,7 @@ export function BookingAgencyPage() {
             <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${BORDER}`, marginBottom: 20 }}>
               {([
                 ["resources", "Resources"], ["offerings", "Offerings"],
-                ["bookings", "Bookings"], ["portal", "Portal Access"],
+                ["bookings", "Bookings"], ["invoices", "Invoices"], ["portal", "Portal Access"],
               ] as [Tab, string][]).map(([id, label]) => (
                 <button key={id} onClick={() => setTab(id)} style={{
                   padding: "8px 14px", background: "none", border: "none",
@@ -101,6 +101,7 @@ export function BookingAgencyPage() {
             {tab === "resources" && <ResourcesTab client={selected} />}
             {tab === "offerings" && <OfferingsTab client={selected} />}
             {tab === "bookings" && <BookingsTab client={selected} />}
+            {tab === "invoices" && <InvoicesTab client={selected} />}
             {tab === "portal" && <PortalAccessTab client={selected} />}
           </div>
         )}
@@ -194,6 +195,84 @@ function NewResourceModal({ clientId, onClose, onCreated }: { clientId: string; 
     </Modal>
   )
 }
+
+
+// ── Invoices ────────────────────────────────────────────────────────────────
+
+function InvoicesTab({ client }: { client: BookAgencyClient }) {
+      const [invoices, setInvoices] = useState<BookAgencyInvoice[]>([])
+      const [loading, setLoading] = useState(true)
+      const [showGenerate, setShowGenerate] = useState(false)
+ 
+      const refetch = () => {
+        setLoading(true)
+        bookingAgencyApi.getInvoices(client.id).then(res => setInvoices(res.content)).finally(() => setLoading(false))
+      }
+      useEffect(refetch, [client.id])
+ 
+      const handleSend = async (id: string) => { await bookingAgencyApi.sendInvoice(id); refetch() }
+ 
+      return (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <p style={{ fontSize: 12, color: MUTED, margin: 0 }}>
+              {client.monthlyRetainerAmount != null
+                ? `Monthly retainer: R ${client.monthlyRetainerAmount}`
+                : "No retainer amount set — add one when editing this client before generating an invoice."}
+            </p>
+            <button onClick={() => setShowGenerate(true)} style={btnPrimary} disabled={client.monthlyRetainerAmount == null}>
+              + Generate Invoice
+            </button>
+          </div>
+          {loading ? <Empty text="Loading…" /> : invoices.length === 0 ? <Empty text="No invoices yet." /> : (
+            <Table headers={["Invoice #", "Period", "Total", "Balance", "Status", ""]}>
+              {invoices.map(inv => (
+                <tr key={inv.id} style={rowStyle}>
+                  <td style={cellStyle}>{inv.invoiceNumber}</td>
+                  <td style={cellStyle}>{fmtD(inv.periodStart)} – {fmtD(inv.periodEnd)}</td>
+                  <td style={cellStyle}>R {inv.total.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</td>
+                  <td style={cellStyle}>R {inv.balance.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</td>
+                  <td style={cellStyle}><StatusBadge status={inv.status} /></td>
+                  <td style={cellStyle}>{inv.status === "DRAFT" && <button onClick={() => handleSend(inv.id)} style={btnSecondary}>Send</button>}</td>
+                </tr>
+              ))}
+            </Table>
+          )}
+          {showGenerate && <GenerateInvoiceModal client={client} onClose={() => setShowGenerate(false)} onGenerated={() => { setShowGenerate(false); refetch() }} />}
+        </div>
+      )
+    }
+ 
+    function GenerateInvoiceModal({ client, onClose, onGenerated }: { client: BookAgencyClient; onClose: () => void; onGenerated: () => void }) {
+      const now = new Date()
+      const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+      const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10)
+      const [saving, setSaving] = useState(false)
+      const [error, setError] = useState("")
+ 
+      const submit = async () => {
+        setSaving(true); setError("")
+        try {
+          await bookingAgencyApi.generateInvoice(client.id, {
+            periodStart, periodEnd, invoiceDate: periodEnd, dueDate: periodEnd, includeVat: true,
+          })
+          onGenerated()
+        } catch (e: any) {
+          setError(e.response?.data?.message ?? "Failed to generate invoice")
+        } finally { setSaving(false) }
+      }
+ 
+      return (
+        <Modal title="Generate Invoice" onClose={onClose}>
+          <p style={{ fontSize: 13, color: MUTED, marginBottom: 14 }}>
+            Generates the retainer invoice for {new Date().toLocaleDateString("en-ZA", { month: "long", year: "numeric" })}
+            {" "}— R {client.monthlyRetainerAmount} + VAT.
+          </p>
+          {error && <ErrorBox text={error} />}
+          <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Generate" />
+        </Modal>
+      )
+    }
 
 // ── Offerings ────────────────────────────────────────────────────────────────
 

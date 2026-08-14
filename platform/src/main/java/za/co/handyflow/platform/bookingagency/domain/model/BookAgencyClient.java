@@ -70,6 +70,13 @@ public class BookAgencyClient {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    @Column(name = "monthly_retainer_amount", precision = 15, scale = 2)
+    private java.math.BigDecimal monthlyRetainerAmount;
+    // Nullable deliberately — a client onboarded before a rate is
+    // negotiated shouldn't block onboarding itself; billing generation
+    // will reject with a clear error if this is null when someone tries
+    // to invoice, rather than silently charging zero.
+
     @Version
     private Long version;
 
@@ -120,5 +127,10 @@ public class BookAgencyClient {
 
     public boolean isDeleted() {
         return deletedAt != null;
+    }
+
+    public void setMonthlyRetainerAmount(java.math.BigDecimal v) {
+        this.monthlyRetainerAmount = v;
+        this.updatedAt = Instant.now();
     }
 }

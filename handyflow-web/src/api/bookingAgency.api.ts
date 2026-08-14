@@ -7,6 +7,7 @@ import { apiClient } from "./client"
 import type {
   BookAgencyClient, BookAgencyResource, BookAgencyOffering, BookAgencyBooking, PortalAccessGrant,
 } from "../types/bookingAgency.types"
+import type { BookAgencyInvoice } from "../types/bookingAgency.types";
 
 interface PageResponse<T> { content: T[]; totalElements: number; totalPages: number; number: number }
 
@@ -60,4 +61,12 @@ export const bookingAgencyApi = {
     apiClient.post(`/api/v1/booking-agency/clients/${clientId}/portal-invites`, { email }).then(r => r.data.data as PortalAccessGrant),
   revokePortalAccess: (clientId: string, grantId: string) =>
     apiClient.post(`/api/v1/booking-agency/clients/${clientId}/portal-invites/${grantId}/revoke`).then(r => r.data.data as PortalAccessGrant),
+
+ generateInvoice: (clientId: string, body: { periodStart: string; periodEnd: string; invoiceDate: string; dueDate: string; includeVat: boolean }) =>
+      apiClient.post(`/api/v1/booking-agency/clients/${clientId}/invoices`, body).then(r => r.data.data as BookAgencyInvoice),
+  getInvoices: (clientId: string, page = 0) =>
+      apiClient.get(`/api/v1/booking-agency/clients/${clientId}/invoices?page=${page}`).then(r => r.data.data as PageResponse<BookAgencyInvoice>),
+  sendInvoice: (id: string) => apiClient.post(`/api/v1/booking-agency/invoices/${id}/send`).then(r => r.data.data as BookAgencyInvoice),
+  recordPayment: (id: string, body: { amount: number; paidDate: string; method?: string; reference?: string }) =>
+      apiClient.post(`/api/v1/booking-agency/invoices/${id}/payments`, body).then(r => r.data.data as BookAgencyInvoice),
 }

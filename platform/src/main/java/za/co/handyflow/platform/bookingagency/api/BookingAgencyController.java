@@ -271,4 +271,41 @@ public class BookingAgencyController {
         return ResponseEntity.ok(ApiResponse.success("Booking marked no-show",
                 agencyService.markNoShow(TenantContext.getTenantIdAsObject(), id)));
     }
+
+    @PostMapping("/clients/{clientId}/invoices")
+    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @Operation(summary = "Generate a retainer invoice for one billing period")
+    public ResponseEntity<ApiResponse<BookAgencyInvoiceResponse>> generateInvoice(
+            @PathVariable UUID clientId, @Valid @RequestBody GenerateRetainerInvoiceRequest req) {
+        featureGuard.requireModule("bookingagency");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Invoice generated",
+                agencyService.generateInvoice(TenantContext.getTenantIdAsObject(), clientId, req)));
+    }
+
+    @GetMapping("/clients/{clientId}/invoices")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    public ResponseEntity<ApiResponse<Page<BookAgencyInvoiceResponse>>> getInvoices(
+            @PathVariable UUID clientId, @PageableDefault(size = 24) Pageable pageable) {
+        featureGuard.requireModule("bookingagency");
+        return ResponseEntity.ok(ApiResponse.success(
+                agencyService.getInvoices(TenantContext.getTenantIdAsObject(), clientId, pageable)));
+    }
+
+    @PostMapping("/invoices/{id}/send")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    public ResponseEntity<ApiResponse<BookAgencyInvoiceResponse>> sendInvoice(@PathVariable UUID id) {
+        featureGuard.requireModule("bookingagency");
+        return ResponseEntity.ok(ApiResponse.success("Invoice sent",
+                agencyService.sendInvoice(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/invoices/{id}/payments")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    public ResponseEntity<ApiResponse<BookAgencyInvoiceResponse>> recordPayment(
+            @PathVariable UUID id, @Valid @RequestBody RecordBookAgencyPaymentRequest req) {
+        featureGuard.requireModule("bookingagency");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Payment recorded",
+                agencyService.recordPayment(TenantContext.getTenantIdAsObject(), id, req,
+                        TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
+    }
 }

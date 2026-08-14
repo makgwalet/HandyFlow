@@ -88,6 +88,7 @@ export function CreateVariableHoursContractPage() {
     if (!ratePerHour || rate <= 0) e.ratePerHour = 'Enter a valid rate per hour'
     if (!minimumHours || minHrs < 0) e.minimumHours = 'Enter a minimum hours value (0 if there is no take-or-pay minimum)'
     if (!contractStartDate)       e.contractStartDate = 'Contract start date is required'
+    if (!contractEndDate) e.contractEndDate = 'Contract end date is required'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -102,7 +103,7 @@ export function CreateVariableHoursContractPage() {
         minimumHoursPerCycle: minHrs,
         hoursVatRate: vat,
         contractStartDate: new Date(contractStartDate).toISOString(),
-        contractEndDate: contractEndDate ? new Date(contractEndDate).toISOString() : undefined,
+        contractEndDate: new Date(contractEndDate).toISOString(),
         contractedTotalHours: contractedTotalHours ? parseFloat(contractedTotalHours) : undefined,
       }
       if (clientType === 'existing') {
@@ -263,9 +264,12 @@ export function CreateVariableHoursContractPage() {
                   value={contractStartDate}
                   onChange={e => { setContractStartDate(e.target.value); setErrors(f => { const n = { ...f }; delete n.contractStartDate; return n }) }} />
               </Field>
-              <Field label="Contract end date (optional)" hint="Leave blank for an open-ended contract">
-                <input type="date" style={inp} value={contractEndDate} onChange={e => setContractEndDate(e.target.value)} />
-              </Field>
+              <Field label="Contract end date" required error={errors.contractEndDate}
+          hint="e.g. 12 months out for a typical mining contract">
+          <input type="date" style={errors.contractEndDate ? inpErr : inp}
+            value={contractEndDate}
+            onChange={e => { setContractEndDate(e.target.value); setErrors(f => { const n = { ...f }; delete n.contractEndDate; return n }) }} />
+        </Field>
             </div>
 
             {/* Live preview */}

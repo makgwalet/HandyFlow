@@ -1,11 +1,4 @@
 // src/pages/payroll-bureau-portal/PayrollBureauPortalLoginPage.tsx
-//
-// Structurally identical to accountant-portal/PortalLoginPage — same
-// backend contract shape (PortalAuthResponse: token, portalUserId,
-// email, fullName), same usePortalAuthStore (deliberately reused, not
-// duplicated — see this session's backend work confirming
-// shared.PortalUser/PortalJwtFilter are genuinely portal-type-agnostic).
-// Only the API call target and the page copy differ.
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { payrollBureauPortalApi } from "../../api/payrollBureauPortal.api"
@@ -22,17 +15,14 @@ export function PayrollBureauPortalLoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError("")
-    setLoading(true)
+    setError(""); setLoading(true)
     try {
       const res = await payrollBureauPortalApi.login({ email, password })
       setAuth(res.token, { portalUserId: res.portalUserId, email: res.email, fullName: res.fullName })
       navigate("/payroll-bureau/portal", { replace: true })
     } catch (err: any) {
       setError(err.response?.data?.message ?? "Invalid email or password")
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   return (
@@ -47,42 +37,23 @@ export function PayrollBureauPortalLoginPage() {
             margin: `0 auto ${space(4)}`, boxShadow: "0 4px 12px rgba(27, 58, 107, 0.25)" }}>
             <span style={{ color: "#fff", fontWeight: 800, fontSize: 20 }}>H</span>
           </div>
-          <h1 style={{ fontSize: 20, fontWeight: 800, color: color.ink, margin: 0, letterSpacing: "-0.02em" }}>
-            Payroll Portal
-          </h1>
-          <p style={{ fontSize: 13.5, color: color.muted, margin: `${space(1.5)} 0 0`, lineHeight: 1.5 }}>
-            Sign in to view your invoices and filing deadlines
-          </p>
+          <h1 style={{ fontSize: 20, fontWeight: 800, color: color.ink, margin: 0, letterSpacing: "-0.02em" }}>Payroll Bureau Portal</h1>
+          <p style={{ fontSize: 13.5, color: color.muted, margin: `${space(1.5)} 0 0`, lineHeight: 1.5 }}>Sign in to view your invoices and SARS deadlines</p>
         </div>
-
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: space(4) }}>
             <label style={labelStyle}>Email</label>
             <input type="email" required autoFocus value={email} onChange={e => setEmail(e.target.value)}
-              style={inputStyle} onFocus={e => (e.currentTarget.style.borderColor = color.navy)}
-              onBlur={e => (e.currentTarget.style.borderColor = color.border)} />
+              style={inputStyle} onFocus={e => (e.currentTarget.style.borderColor = color.navy)} onBlur={e => (e.currentTarget.style.borderColor = color.border)} />
           </div>
           <div style={{ marginBottom: space(5) }}>
             <label style={labelStyle}>Password</label>
             <input type="password" required value={password} onChange={e => setPassword(e.target.value)}
-              style={inputStyle} onFocus={e => (e.currentTarget.style.borderColor = color.navy)}
-              onBlur={e => (e.currentTarget.style.borderColor = color.border)} />
+              style={inputStyle} onFocus={e => (e.currentTarget.style.borderColor = color.navy)} onBlur={e => (e.currentTarget.style.borderColor = color.border)} />
           </div>
-
-          {error && (
-            <div style={{ marginBottom: space(4), padding: `${space(2.5)} ${space(3.5)}`, background: color.redBg,
-              border: "1px solid #FECACA", borderRadius: radius.sm, fontSize: 13, color: color.red, lineHeight: 1.4 }}>
-              {error}
-            </div>
-          )}
-
-          <button type="submit" disabled={loading} style={{
-            width: "100%", padding: `${space(3)} 0`, background: loading ? color.navyDark : color.navy,
-            color: "#fff", border: "none", borderRadius: radius.sm, fontSize: 14, fontWeight: 700,
-            cursor: loading ? "default" : "pointer", transition: "background 0.15s ease, transform 0.1s ease",
-            letterSpacing: "0.01em" }}
-            onMouseDown={e => (e.currentTarget.style.transform = "scale(0.98)")}
-            onMouseUp={e => (e.currentTarget.style.transform = "scale(1)")}>
+          {error && <div style={{ marginBottom: space(4), padding: `${space(2.5)} ${space(3.5)}`, background: color.redBg, border: "1px solid #FECACA", borderRadius: radius.sm, fontSize: 13, color: color.red, lineHeight: 1.4 }}>{error}</div>}
+          <button type="submit" disabled={loading} style={{ width: "100%", padding: `${space(3)} 0`, background: loading ? color.navyDark : color.navy,
+            color: "#fff", border: "none", borderRadius: radius.sm, fontSize: 14, fontWeight: 700, cursor: loading ? "default" : "pointer", letterSpacing: "0.01em" }}>
             {loading ? "Signing in…" : "Sign In"}
           </button>
         </form>
@@ -91,10 +62,5 @@ export function PayrollBureauPortalLoginPage() {
   )
 }
 
-const labelStyle: React.CSSProperties = {
-  display: "block", fontSize: 12.5, fontWeight: 600, color: color.slate, marginBottom: space(1.5), letterSpacing: "0.01em",
-}
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "11px 13px", border: `1.5px solid ${color.border}`, borderRadius: 8, fontSize: 14,
-  boxSizing: "border-box", fontFamily: type.family, color: color.ink, transition: "border-color 0.15s ease", outline: "none",
-}
+const labelStyle: React.CSSProperties = { display: "block", fontSize: 12.5, fontWeight: 600, color: color.slate, marginBottom: space(1.5) }
+const inputStyle: React.CSSProperties = { width: "100%", padding: "11px 13px", border: `1.5px solid ${color.border}`, borderRadius: 8, fontSize: 14, boxSizing: "border-box", fontFamily: type.family, color: color.ink, outline: "none" }

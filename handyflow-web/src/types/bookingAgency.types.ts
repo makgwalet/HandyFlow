@@ -12,6 +12,7 @@ export interface BookAgencyClient {
   status: "ACTIVE" | "INACTIVE"
   notes: string | null
   createdAt: string
+  monthlyRetainerAmount: number | null
 }
 
 export interface BookAgencyResource {
@@ -60,3 +61,21 @@ export interface PortalAccessGrant {
   acceptedAt: string | null
   revokedAt: string | null
 }
+
+export interface BookAgencyInvoice {
+      id: string
+      invoiceNumber: string
+      description: string
+      periodStart: string
+      periodEnd: string
+      invoiceDate: string
+      dueDate: string
+      subtotal: number
+      vatAmount: number
+      total: number
+      amountPaid: number
+      balance: number
+      status: "DRAFT" | "SENT" | "PARTIAL" | "PAID" | "OVERDUE"
+      sentAt: string | null
+      paidAt: string | null
+    }
