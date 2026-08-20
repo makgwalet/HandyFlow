@@ -19,5 +19,7 @@ public record PayClientResponse(
         LocalDate onboardedAt,
         String status,
         String notes,
+        String address,
+        boolean hasLogo,
         Instant createdAt
 ) {}

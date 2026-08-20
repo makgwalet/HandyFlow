@@ -51,15 +51,6 @@ import { CreateRetainerPage }           from "./pages/invoicing/CreateRetainerPa
 import { SupplyChainPage }              from "./pages/supply-chain/SupplyChainPage"
 
 // ── Payroll Bureau module ─────────────────────────────────────────────────────
-// PayrollBureauPage is the staff-facing single-page shell (matches
-// ClinicPage/ProjectsPage pattern — client list + tabbed detail panel).
-// The four Portal pages below reuse usePortalAuthStore directly (not a
-// separate store) — shared.PortalUser/PortalJwtFilter on the backend are
-// genuinely portal-type-agnostic, confirmed against the real backend
-// code before reusing rather than duplicating the accountant portal's
-// auth store. portal-theme.ts/PortalShell.tsx are also reused directly
-// from accountant-portal/ rather than copied — one design system serving
-// both portals.
 import { PayrollBureauPage }                    from "./pages/payroll-bureau/PayrollBureauPage"
 import { PayrollBureauPortalLoginPage }         from "./pages/payroll-bureau-portal/PayrollBureauPortalLoginPage"
 import { PayrollBureauPortalAcceptInvitePage }  from "./pages/payroll-bureau-portal/PayrollBureauPortalAcceptInvitePage"
@@ -67,10 +58,6 @@ import { PayrollBureauPortalHomePage }          from "./pages/payroll-bureau-por
 import { PayrollBureauPortalClientDetailPage }  from "./pages/payroll-bureau-portal/PayrollBureauPortalClientDetailPage"
 
 // ── Projects module ────────────────────────────────────────────────────────────
-// ProjectsPage is the single-page shell (matches ClinicPage pattern)
-// ProjectDetailPage keeps its own route so deep links work (but stays inside ModuleLayout)
-// ClientPortalPage is public — outside ModuleLayout intentionally
-
 import { ProjectsPage }     from "./pages/projects/ProjectsPage"
 import { ProjectDetailPage } from "./pages/projects/ProjectDetailPage"
 import { ClientPortalPage }  from "./pages/projects/ClientPortalPage"
@@ -80,12 +67,6 @@ import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage"
 import { VerifyEmailPage } from "./pages/auth/VerifyEmailPage"
 import { AccountLockedPage } from "./pages/auth/AccountLockedPage"
 import { SessionExpiryModal } from "./components/SessionExpiryModal"
-// Recruiter public careers/apply pages — no auth, no ModuleLayout, same
-// shape as ClientPortalPage. NOTE: the "View posting" link inside
-// RecruiterPage.tsx and the offer-letter/interview-scheduled emails
-// already hardcode this exact URL scheme (/careers/:tenantSlug and
-// /careers/:tenantSlug/:jobSlug) — these routes complete a contract that
-// already existed in shipped code, not a fresh URL design.
 import { CareersListPage } from "./pages/careers/CareersListPage"
 import { JobApplyPage }    from "./pages/careers/JobApplyPage"
 import { CreateVariableHoursContractPage } from "./pages/invoicing/CreateVariableHoursContractPage"
@@ -99,6 +80,20 @@ import { BookingAgencyPortalAcceptInvitePage } from "./pages/booking-agency-port
 import { BookingAgencyPortalClientDetailPage } from "./pages/booking-agency-portal/BookingAgencyPortalClientDetailPage"
 import { BookingAgencyPortalHomePage } from "./pages/booking-agency-portal/BookingAgencyPortalHomePage"
 import { BookingAgencyPortalLoginPage } from "./pages/booking-agency-portal/BookingAgencyPortalLoginPage"
+// NEW: the shared "needs attention" board — Stage 1 of the Financial
+// Control & Assurance plan. Cross-module, tenant-wide, not scoped to
+// any one module the way most routes below are — lives inside
+// ModuleLayout like every other staff page (needs the nav bar and
+// ProtectedRoute), but isn't itself a subscribable module.
+import { ControlExceptionsPage } from "./pages/control-exceptions/ControlExceptionsPage"
+// NEW: Stage 3 — external auditor portal. Same four-page shape as
+// every other portal (login, accept-invite, home, detail), but
+// tenant-scoped rather than client-scoped — see AuditorAccessGrant's
+// own Javadoc for why.
+import { AuditorPortalLoginPage } from "./pages/auditor-portal/AuditorPortalLoginPage"
+import { AuditorPortalAcceptInvitePage } from "./pages/auditor-portal/AuditorPortalAcceptInvitePage"
+import { AuditorPortalHomePage } from "./pages/auditor-portal/AuditorPortalHomePage"
+import { AuditorPortalTenantDetailPage } from "./pages/auditor-portal/AuditorPortalTenantDetailPage"
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -123,29 +118,25 @@ function BookingAgencyPortalProtectedRoute({ children }: { children: React.React
   return <>{children}</>
 }
 
-// NEW: closes "not added to App.tsx, redirects to saas" — deliberately
-// checks usePortalAuthStore, not useAuthStore, and redirects to the
-// portal's own login page, not the staff one. A portal session and a
-// staff session are genuinely separate; this guard must never
-// accidentally accept one for the other.
 function PortalProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = usePortalAuthStore(s => s.token)
   if (!token) return <Navigate to="/accountant/portal/login" replace />
   return <>{children}</>
 }
 
-// NEW: Payroll Bureau's own portal guard — deliberately a SEPARATE
-// component from PortalProtectedRoute even though both check the exact
-// same usePortalAuthStore (confirmed correct to share: the backend
-// login identity behind it is genuinely portal-type-agnostic). The only
-// thing that needs to differ between the two guards is WHERE an
-// unauthenticated visitor lands — a payroll bureau portal visitor
-// belongs on the payroll bureau's own login page, not the accountant
-// one, even though a session token from either portal would technically
-// authenticate against both APIs.
 function PayrollBureauPortalProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = usePortalAuthStore(s => s.token)
   if (!token) return <Navigate to="/payroll-bureau/portal/login" replace />
+  return <>{children}</>
+}
+
+// NEW: Stage 3. Uses the same shared usePortalAuthStore every other
+// portal uses — same pre-existing caveat as those: logging into two
+// different portal types in the same browser session would share one
+// token slot. Not a new risk introduced here, just inherited.
+function AuditorPortalProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = usePortalAuthStore(s => s.token)
+  if (!token) return <Navigate to="/auditor/portal/login" replace />
   return <>{children}</>
 }
 
@@ -154,12 +145,6 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        {/* NEW: mounted globally, outside Routes, so the warning can show
-            regardless of which page is currently active — the whole
-            point is catching a user sitting idle on any screen, not just
-            specific ones. The component itself checks isAuthenticated
-            internally and renders nothing when logged out, so this is
-            safe to always render. */}
         <SessionExpiryModal />
         <Routes>
 {/* Public routes */}
@@ -169,31 +154,11 @@ export default function App() {
           <Route path="/forgot-password"           element={<ForgotPasswordPage />} />
           <Route path="/reset-password"            element={<ResetPasswordPage />} />
           <Route path="/verify-email"              element={<VerifyEmailPage />} />
-          {/* NEW: was never wired into the router at all — confirmed via
-              real testing this meant BOTH LoginPage.tsx's own redirect
-              (added earlier when fixing subscriptionStatus) AND the
-              client.ts 402 interceptor were both redirecting to a route
-              that's never existed. Placed alongside the other
-              auth-adjacent pages, outside ProtectedRoute, since a
-              suspended tenant still holds a genuinely valid login token
-              — they're authenticated but blocked, not logged out, so
-              this needs to be reachable regardless of session state. */}
           <Route path="/account-locked"            element={<AccountLockedPage />} />
 
-          {/* Client portal — public, intentionally outside ModuleLayout (no nav bar) */}
           <Route path="/projects/portal/:token" element={<ClientPortalPage />} />
           <Route path="/portal/:token" element={<ClientPortalPage />} />
 
-          {/* NEW: Accountant client portal — closes "not added to
-              App.tsx, redirects to saas". Path matches exactly what the
-              invite email already sends (EmailTemplates.portalInvite),
-              built server-side before this frontend existed — not
-              changed to match a different frontend convention, since
-              changing it now would break live invite links already
-              sent. Genuinely outside ModuleLayout and outside the
-              staff ProtectedRoute — a portal user is not staff and
-              must never see the staff nav bar or be subject to staff
-              auth. */}
           <Route path="/accountant/portal/login"              element={<PortalLoginPage />} />
           <Route path="/accountant/portal/auth/accept-invite" element={<PortalAcceptInvitePage />} />
           <Route path="/accountant/portal" element={<PortalProtectedRoute><PortalHomePage /></PortalProtectedRoute>} />
@@ -204,13 +169,6 @@ export default function App() {
             <Route path="/recruitment-agency/portal" element={<RecruitmentAgencyPortalProtectedRoute><RecruitmentAgencyPortalHomePage /></RecruitmentAgencyPortalProtectedRoute>} />
             <Route path="/recruitment-agency/portal/clients/:clientId" element={<RecruitmentAgencyPortalProtectedRoute><RecruitmentAgencyPortalClientDetailPage /></RecruitmentAgencyPortalProtectedRoute>} />
 
-          {/* NEW: Payroll Bureau client portal — same shape as the
-              accountant portal block above, deliberately matching its
-              /auth/accept-invite URL convention rather than the
-              module's first-draft "/accept-invite" (no /auth/) so the
-              two portals in this product don't have two different URL
-              shapes for the identical action. Path matches exactly what
-              PayrollBureauService.invitePortalUser's email link sends. */}
           <Route path="/payroll-bureau/portal/login"              element={<PayrollBureauPortalLoginPage />} />
           <Route path="/payroll-bureau/portal/auth/accept-invite" element={<PayrollBureauPortalAcceptInvitePage />} />
           <Route path="/payroll-bureau/portal" element={<PayrollBureauPortalProtectedRoute><PayrollBureauPortalHomePage /></PayrollBureauPortalProtectedRoute>} />
@@ -221,16 +179,18 @@ export default function App() {
           <Route path="/booking-agency/portal" element={<BookingAgencyPortalProtectedRoute><BookingAgencyPortalHomePage /></BookingAgencyPortalProtectedRoute>} />
           <Route path="/booking-agency/portal/clients/:clientId" element={<BookingAgencyPortalProtectedRoute><BookingAgencyPortalClientDetailPage /></BookingAgencyPortalProtectedRoute>} />
 
-          {/* Token-secured routes — also outside ModuleLayout */}
+          {/* NEW: Stage 3 — external auditor portal. Tenant-scoped, not
+              client-scoped — routes reflect that: /tenants/:tenantId,
+              not /clients/:clientId. */}
+          <Route path="/auditor/portal/login"              element={<AuditorPortalLoginPage />} />
+          <Route path="/auditor/portal/auth/accept-invite" element={<AuditorPortalAcceptInvitePage />} />
+          <Route path="/auditor/portal" element={<AuditorPortalProtectedRoute><AuditorPortalHomePage /></AuditorPortalProtectedRoute>} />
+          <Route path="/auditor/portal/tenants/:tenantId" element={<AuditorPortalProtectedRoute><AuditorPortalTenantDetailPage /></AuditorPortalProtectedRoute>} />
+
           <Route path="/sign/:token"                   element={<SigningPage />} />
           <Route path="/creative/approve/:token"       element={<CreativeApprovePage />} />
           <Route path="/unsubscribe/:token"            element={<UnsubscribePage />} />
 
- {/* Recruiter public careers/apply — public, outside ModuleLayout,
-              no login. NOTE: /careers/track/:token (the applicant portal
-              already promised in offer-letter/interview emails via
-              RecruiterService's hardcoded portalUrl) is NOT yet wired up —
-              still a dead link until that page is built separately. */}
           <Route path="/careers/:tenantSlug"                element={<CareersListPage />} />
           <Route path="/careers/:tenantSlug/:jobSlug"       element={<JobApplyPage />} />
 
@@ -266,9 +226,6 @@ export default function App() {
             <Route path="/accountant"             element={<AccountantPage />} />
             <Route path="/ap"                     element={<AccountsPayablePage />} />
             <Route path="/booking-agency"       element={<BookingAgencyPage />} />
-            {/* NEW: Payroll Bureau staff page — single-page shell like
-                ClinicPage/ProjectsPage, so just one route (client list +
-                tabbed detail panel all live inside this one component). */}
             <Route path="/payroll-bureau"         element={<PayrollBureauPage />} />
             <Route path="/profile"                element={<ProfilePage />} />
             <Route path="/invoices/retainer/new"  element={<CreateRetainerPage />} />
@@ -277,16 +234,10 @@ export default function App() {
             <Route path="/recurring"              element={<InvoicingPage />} />
             <Route path="/supply-chain"           element={<SupplyChainPage />} />
             <Route path="/recruitment-agency" element={<RecruitmentAgencyPage />} />
+            {/* NEW: shared "needs attention" board — see import comment above. */}
+            <Route path="/control-exceptions"     element={<ControlExceptionsPage />} />
 
             {/* ── Projects ── */}
-            {/*
-             * /projects        → ProjectsPage (dashboard + list, single-page shell like ClinicPage)
-             * /projects/:id    → ProjectDetailPage (deep-linkable, stays inside ModuleLayout = nav bar stays)
-             *
-             * IMPORTANT: /projects/:id must come AFTER /projects in this group.
-             * React Router matches top-to-bottom so the exact /projects route won't
-             * accidentally swallow /:id.
-             */}
             <Route path="/projects"     element={<ProjectsPage />} />
             <Route path="/projects/:id" element={<ProjectDetailPage />} />
           </Route>

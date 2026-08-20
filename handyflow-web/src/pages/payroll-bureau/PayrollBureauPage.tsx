@@ -1,20 +1,18 @@
 // src/pages/payroll-bureau/PayrollBureauPage.tsx
 //
-// Staff-facing single-page shell (same pattern App.tsx's own comments
-// describe for ClinicPage/ProjectsPage) — client list on the left,
-// selected client's detail (tabs) on the right.
-//
-// UPDATED: closed the full gap list found in this session's audit.
-// Same-pattern gaps (backend existed, no button): client edit, client
-// archive, client search, portal-access revoke, record payment on fee
-// notes, mark-deadline-filed. Two more serious ones: FeeNotesTab's own
-// text told users to generate invoices "from the Pay Runs tab" — a
-// feature that never actually existed there; and employee documents
-// (uploadDocument/getEmployeeDocuments/downloadDocument) had zero UI
-// despite being fully wired on the backend. Both fixed below.
+// UPDATED: added Bureau Profile — the tenant's OWN practice identity
+// (firm name, registration, SDL number, contact details, logo URL),
+// distinct from any individual client. Uses PayBureauProfile's existing
+// getProfile()/upsertProfile() backend, which was already fully built
+// with zero UI before this change. Uses a plain logoUrl string field —
+// NOT the Evidence-backed upload system built for PayClient earlier —
+// two different, coexisting mechanisms, matching what's real rather
+// than silently unifying them.
 import { useEffect, useState } from "react"
 import { payrollBureauApi } from "../../api/payrollBureau.api"
 import type { PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant } from "../../types/payrollBureau.types"
+import { required, validateSaId, validateTaxNumber, validateEmail, validatePhone,
+  validatePositiveNumber, validateDayOfMonth, type FieldErrors } from "./validation"
 
 const fmtR = (n: any) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
 const fmtD = (d: any) => (d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—")
@@ -28,16 +26,121 @@ const FAINT = "#94A3B8"
 
 type Tab = "employees" | "payruns" | "deadlines" | "feenotes" | "portal"
 
+// Authenticated logo image — a plain <img src=...> can't work here, the
+// logo download endpoint requires a Bearer token and browsers send no
+// auth header on image requests. Fetches as a blob through the
+// authenticated API client instead, same pattern already proven for
+// payslip PDF downloads.
+function LogoImage({ clientId, maxHeight = 48, refreshKey }: { clientId: string; maxHeight?: number; refreshKey?: number }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let objectUrl: string | null = null
+    let cancelled = false
+    setFailed(false)
+    payrollBureauApi.downloadLogo(clientId)
+      .then(blob => {
+        if (cancelled) return
+        objectUrl = window.URL.createObjectURL(blob)
+        setUrl(objectUrl)
+      })
+      .catch(() => { if (!cancelled) setFailed(true) })
+    return () => { cancelled = true; if (objectUrl) window.URL.revokeObjectURL(objectUrl) }
+  }, [clientId, refreshKey])
+
+  if (failed || !url) return null
+  return <img src={url} alt="Client logo" style={{ maxHeight, maxWidth: 160, objectFit: "contain" as const }} />
+}
+
+// NEW: the bureau's own practice profile — tenant-wide, not per-client.
+// getProfile()/upsertProfile() already existed fully on the backend with
+// zero UI before this change.
+function BureauProfileModal({ onClose }: { onClose: () => void }) {
+  const [firmName, setFirmName] = useState("")
+  const [registrationNumber, setRegistrationNumber] = useState("")
+  const [sdlNumber, setSdlNumber] = useState("")
+  const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
+  const [physicalAddress, setPhysicalAddress] = useState("")
+  const [logoUrl, setLogoUrl] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    payrollBureauApi.getProfile()
+      .then((p: any) => {
+        setFirmName(p.firmName ?? "")
+        setRegistrationNumber(p.registrationNumber ?? "")
+        setSdlNumber(p.sdlNumber ?? "")
+        setEmail(p.email ?? "")
+        setPhone(p.phone ?? "")
+        setPhysicalAddress(p.physicalAddress ?? "")
+        setLogoUrl(p.logoUrl ?? "")
+      })
+      .catch(() => { /* no profile yet — start blank, matching upsertProfile()'s own create-on-first-save fallback */ })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const submit = async () => {
+    if (!firmName.trim()) { setError("Firm name is required"); return }
+    setSaving(true); setError("")
+    try {
+      await payrollBureauApi.upsertProfile({
+        firmName, registrationNumber: registrationNumber || undefined, sdlNumber: sdlNumber || undefined,
+        email: email || undefined, phone: phone || undefined,
+        physicalAddress: physicalAddress || undefined, logoUrl: logoUrl || undefined,
+      })
+      onClose()
+    } catch (e: any) {
+      setError(e.response?.data?.message ?? "Failed to save profile")
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal title="Bureau Profile" onClose={onClose}>
+      {loading ? (
+        <div style={{ color: FAINT, fontSize: 13, padding: "12px 0" }}>Loading…</div>
+      ) : (
+        <>
+          <Field label="Firm name *"><input value={firmName} onChange={e => setFirmName(e.target.value)} style={inputStyle} /></Field>
+          <Field label="Registration number (optional)"><input value={registrationNumber} onChange={e => setRegistrationNumber(e.target.value)} style={inputStyle} /></Field>
+          <Field label="SDL number (optional)"><input value={sdlNumber} onChange={e => setSdlNumber(e.target.value)} style={inputStyle} /></Field>
+          <div style={{ display: "flex", gap: 10 }}>
+            <Field label="Email"><input type="email" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} /></Field>
+            <Field label="Phone"><input value={phone} onChange={e => setPhone(e.target.value)} style={inputStyle} /></Field>
+          </div>
+          <Field label="Physical address (optional)">
+            <textarea value={physicalAddress} onChange={e => setPhysicalAddress(e.target.value)}
+              style={{ ...inputStyle, minHeight: 50, resize: "vertical" as const, fontFamily: "inherit" }} />
+          </Field>
+          <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 14, marginTop: 4 }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 8 }}>Logo</label>
+            {hasLogo && <div style={{ marginBottom: 8 }}><ProfileLogoImage refreshKey={logoRefreshKey} /></div>}
+            <label style={{ ...btnSecondary, display: "inline-block", opacity: uploadingLogo ? 0.6 : 1 }}>
+              {uploadingLogo ? "Uploading…" : hasLogo ? "Replace Logo" : "Upload Logo"}
+              <input type="file" accept="image/*" style={{ display: "none" }} disabled={uploadingLogo}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f) }} />
+            </label>
+          </div>
+          {error && <ErrorBox text={error} />}
+          <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Save Profile" />
+        </>
+      )}
+    </Modal>
+  )
+}
+
 export function PayrollBureauPage() {
   const [clients, setClients] = useState<PayClient[]>([])
   const [clientsLoading, setClientsLoading] = useState(true)
   const [selected, setSelected] = useState<PayClient | null>(null)
   const [showNewClient, setShowNewClient] = useState(false)
   const [showEditClient, setShowEditClient] = useState(false)
+  const [showBureauProfile, setShowBureauProfile] = useState(false)
   const [archiving, setArchiving] = useState(false)
   const [tab, setTab] = useState<Tab>("employees")
-  // Client-side filter only — same caveat as the other two agency
-  // modules: getClients() has no server-side search param.
   const [search, setSearch] = useState("")
 
   const refetchClients = () => {
@@ -64,16 +167,17 @@ export function PayrollBureauPage() {
 
   return (
     <div style={{ display: "flex", height: "calc(100vh - 60px)", fontFamily: "'Inter', system-ui, sans-serif" }}>
-      {/* Client list */}
       <div style={{ width: 300, borderRight: `1px solid ${BORDER}`, background: "#fff", display: "flex", flexDirection: "column" }}>
         <div style={{ padding: 16, borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 style={{ fontSize: 15, fontWeight: 800, color: INK, margin: 0 }}>Payroll Clients</h2>
-          <button onClick={() => setShowNewClient(true)}
-            style={{ padding: "5px 10px", background: NAVY, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-            + New
-          </button>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => setShowBureauProfile(true)} style={btnSecondary}>Bureau Profile</button>
+            <button onClick={() => setShowNewClient(true)}
+              style={{ padding: "5px 10px", background: NAVY, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              + New
+            </button>
+          </div>
         </div>
-        {/* NEW: client search */}
         <div style={{ padding: "10px 16px", borderBottom: `1px solid ${BORDER}` }}>
           <input placeholder="Search clients…" value={search} onChange={e => setSearch(e.target.value)}
             style={{ ...inputStyle, fontSize: 12.5 }} />
@@ -102,7 +206,6 @@ export function PayrollBureauPage() {
         </div>
       </div>
 
-      {/* Detail panel */}
       <div style={{ flex: 1, overflowY: "auto" as const, background: CANVAS }}>
         {!selected ? (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: FAINT, fontSize: 14 }}>
@@ -111,8 +214,10 @@ export function PayrollBureauPage() {
         ) : (
           <div style={{ padding: "24px 32px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
-              <h1 style={{ fontSize: 20, fontWeight: 800, color: INK, margin: 0 }}>{selected.tradingName}</h1>
-              {/* NEW: edit + offboard/reactivate */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                {(selected as any).hasLogo && <LogoImage clientId={selected.id} maxHeight={36} />}
+                <h1 style={{ fontSize: 20, fontWeight: 800, color: INK, margin: 0 }}>{selected.tradingName}</h1>
+              </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => setShowEditClient(true)} style={btnSecondary}>Edit</button>
                 <button onClick={toggleArchive} disabled={archiving}
@@ -122,9 +227,21 @@ export function PayrollBureauPage() {
                 </button>
               </div>
             </div>
-            <p style={{ fontSize: 12.5, color: MUTED, marginBottom: 20 }}>
+            <p style={{ fontSize: 12.5, color: MUTED, marginBottom: 4 }}>
               PAYE {selected.payeReference ?? "—"} · UIF {selected.uifReference ?? "—"} · SDL {selected.sdlReference ?? "exempt"}
             </p>
+            <p style={{ fontSize: 12.5, color: MUTED, marginBottom: 4 }}>
+              {(selected as any).contactName && `${(selected as any).contactName} · `}
+              {selected.contactEmail}
+              {(selected as any).contactPhone && ` · ${(selected as any).contactPhone}`}
+              {(selected as any).payDay && ` · Pays on day ${(selected as any).payDay} of the month`}
+            </p>
+            {(selected as any).address && (
+              <p style={{ fontSize: 12.5, color: MUTED, marginBottom: 20, whiteSpace: "pre-wrap" as const }}>
+                {(selected as any).address}
+              </p>
+            )}
+            {!(selected as any).address && <div style={{ marginBottom: 20 }} />}
 
             <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${BORDER}`, marginBottom: 20 }}>
               {([
@@ -156,38 +273,197 @@ export function PayrollBureauPage() {
         <EditClientModal client={selected} onClose={() => setShowEditClient(false)}
           onSaved={updated => { setShowEditClient(false); setSelected(updated); refetchClients() }} />
       )}
+      {showBureauProfile && (
+        <BureauProfileModal onClose={() => setShowBureauProfile(false)} />
+      )}
     </div>
   )
 }
 
-// NEW: reuses NewClientModal's field set, pre-filled, calling updateClient.
-function EditClientModal({ client, onClose, onSaved }: { client: PayClient; onClose: () => void; onSaved: (c: PayClient) => void }) {
-  const [tradingName, setTradingName] = useState(client.tradingName)
-  const [payeReference, setPayeReference] = useState(client.payeReference ?? "")
-  const [uifReference, setUifReference] = useState(client.uifReference ?? "")
-  const [contactEmail, setContactEmail] = useState(client.contactEmail ?? "")
+// ── Client form (shared state + fields between New/Edit) ─────────────────────
+
+function useClientFormState(initial?: Partial<PayClient> & {
+  registrationNumber?: string; sdlReference?: string; payFrequency?: string;
+  payDay?: number; contactName?: string; contactPhone?: string; notes?: string; address?: string
+}) {
+  const [tradingName, setTradingName] = useState(initial?.tradingName ?? "")
+  const [registrationNumber, setRegistrationNumber] = useState((initial as any)?.registrationNumber ?? "")
+  const [payeReference, setPayeReference] = useState((initial as any)?.payeReference ?? "")
+  const [uifReference, setUifReference] = useState((initial as any)?.uifReference ?? "")
+  const [sdlReference, setSdlReference] = useState((initial as any)?.sdlReference ?? "")
+  const [payFrequency, setPayFrequency] = useState((initial as any)?.payFrequency ?? "MONTHLY")
+  const [payDay, setPayDay] = useState((initial as any)?.payDay ? String((initial as any).payDay) : "")
+  const [contactName, setContactName] = useState((initial as any)?.contactName ?? "")
+  const [contactEmail, setContactEmail] = useState((initial as any)?.contactEmail ?? "")
+  const [contactPhone, setContactPhone] = useState((initial as any)?.contactPhone ?? "")
+  const [notes, setNotes] = useState((initial as any)?.notes ?? "")
+  const [address, setAddress] = useState((initial as any)?.address ?? "")
+  const [errors, setErrors] = useState<FieldErrors>({})
+
+  const validate = (): boolean => {
+    const e: FieldErrors = {}
+    const nameErr = required(tradingName, "Trading name"); if (nameErr) e.tradingName = nameErr
+    const emailErr = required(contactEmail, "Contact email") || validateEmail(contactEmail)
+    if (emailErr) e.contactEmail = emailErr
+    const phoneErr = validatePhone(contactPhone); if (phoneErr) e.contactPhone = phoneErr
+    const dayErr = validateDayOfMonth(payDay); if (dayErr) e.payDay = dayErr
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  const toPayload = () => ({
+    tradingName, registrationNumber: registrationNumber || undefined,
+    payeReference: payeReference || undefined, uifReference: uifReference || undefined,
+    sdlReference: sdlReference || undefined, payFrequency, payDay: payDay ? Number(payDay) : undefined,
+    contactName: contactName || undefined, contactEmail, contactPhone: contactPhone || undefined,
+    notes: notes || undefined, address: address || undefined,
+  })
+
+  return { tradingName, setTradingName, registrationNumber, setRegistrationNumber,
+    payeReference, setPayeReference, uifReference, setUifReference, sdlReference, setSdlReference,
+    payFrequency, setPayFrequency, payDay, setPayDay, contactName, setContactName,
+    contactEmail, setContactEmail, contactPhone, setContactPhone, notes, setNotes,
+    address, setAddress,
+    errors, validate, toPayload }
+}
+
+function ClientFormFields({ state }: { state: ReturnType<typeof useClientFormState> }) {
+  return (
+    <>
+      <Field label="Trading name *">
+        <input value={state.tradingName} onChange={e => state.setTradingName(e.target.value)}
+          style={{ ...inputStyle, ...(state.errors.tradingName ? errorInputStyle : {}) }} />
+        <FieldError text={state.errors.tradingName} />
+      </Field>
+      <Field label="Registration number (optional)">
+        <input value={state.registrationNumber} onChange={e => state.setRegistrationNumber(e.target.value)} style={inputStyle} />
+      </Field>
+      <div style={{ display: "flex", gap: 10 }}>
+        <Field label="PAYE reference (optional)"><input value={state.payeReference} onChange={e => state.setPayeReference(e.target.value)} style={inputStyle} /></Field>
+        <Field label="UIF reference (optional)"><input value={state.uifReference} onChange={e => state.setUifReference(e.target.value)} style={inputStyle} /></Field>
+      </div>
+      <Field label="SDL reference (optional — leave blank if exempt)">
+        <input value={state.sdlReference} onChange={e => state.setSdlReference(e.target.value)} style={inputStyle} />
+      </Field>
+      <div style={{ display: "flex", gap: 10 }}>
+        <Field label="Pay frequency">
+          <select value={state.payFrequency} onChange={e => state.setPayFrequency(e.target.value)} style={inputStyle}>
+            <option value="MONTHLY">Monthly</option>
+            <option value="FORTNIGHTLY">Fortnightly</option>
+            <option value="WEEKLY">Weekly</option>
+          </select>
+        </Field>
+        <Field label="Pay day (day of month)">
+          <input type="number" min={1} max={31} value={state.payDay} onChange={e => state.setPayDay(e.target.value)}
+            style={{ ...inputStyle, ...(state.errors.payDay ? errorInputStyle : {}) }} placeholder="e.g. 25" />
+          <FieldError text={state.errors.payDay} />
+        </Field>
+      </div>
+      <p style={{ fontSize: 11.5, fontWeight: 700, color: MUTED, marginTop: 4, marginBottom: 6, textTransform: "uppercase" as const, letterSpacing: "0.03em" }}>Contact Person</p>
+      <Field label="Contact name (optional)"><input value={state.contactName} onChange={e => state.setContactName(e.target.value)} style={inputStyle} /></Field>
+      <div style={{ display: "flex", gap: 10 }}>
+        <Field label="Contact email *">
+          <input value={state.contactEmail} onChange={e => state.setContactEmail(e.target.value)}
+            style={{ ...inputStyle, ...(state.errors.contactEmail ? errorInputStyle : {}) }} />
+          <FieldError text={state.errors.contactEmail} />
+        </Field>
+        <Field label="Contact phone (optional)">
+          <input value={state.contactPhone} onChange={e => state.setContactPhone(e.target.value)}
+            style={{ ...inputStyle, ...(state.errors.contactPhone ? errorInputStyle : {}) }} />
+          <FieldError text={state.errors.contactPhone} />
+        </Field>
+      </div>
+      <Field label="Notes (optional)">
+        <textarea value={state.notes} onChange={e => state.setNotes(e.target.value)}
+          style={{ ...inputStyle, minHeight: 60, resize: "vertical" as const, fontFamily: "inherit" }} />
+      </Field>
+      <Field label="Address (optional — appears on payslips)">
+        <textarea value={state.address} onChange={e => state.setAddress(e.target.value)}
+          style={{ ...inputStyle, minHeight: 50, resize: "vertical" as const, fontFamily: "inherit" }} />
+      </Field>
+    </>
+  )
+}
+
+function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const state = useClientFormState()
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState("")
+  const [submitError, setSubmitError] = useState("")
 
   const submit = async () => {
-    if (!tradingName) { setError("Trading name is required"); return }
-    if (!contactEmail) { setError("Contact email is required — needed to send this client their invoices"); return }
-    setSaving(true); setError("")
+    if (!state.validate()) return
+    setSaving(true); setSubmitError("")
     try {
-      const updated = await payrollBureauApi.updateClient(client.id, { tradingName, payeReference, uifReference, contactEmail } as any)
-      onSaved(updated)
+      await payrollBureauApi.createClient(state.toPayload() as any)
+      onCreated()
     } catch (e: any) {
-      setError(e.response?.data?.message ?? "Failed to save client")
+      setSubmitError(e.response?.data?.message ?? "Failed to create client")
     } finally { setSaving(false) }
   }
 
   return (
+    <Modal title="New Payroll Client" onClose={onClose}>
+      <ClientFormFields state={state} />
+      <p style={{ fontSize: 11.5, color: FAINT, marginTop: -4, marginBottom: 12 }}>
+        Logo can be added once the client is created — see Edit after saving.
+      </p>
+      {submitError && <ErrorBox text={submitError} />}
+      <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Create Client" />
+    </Modal>
+  )
+}
+
+function EditClientModal({ client, onClose, onSaved }: { client: PayClient; onClose: () => void; onSaved: (c: PayClient) => void }) {
+  const state = useClientFormState(client as any)
+  const [saving, setSaving] = useState(false)
+  const [submitError, setSubmitError] = useState("")
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [logoRefreshKey, setLogoRefreshKey] = useState(0)
+  const [hasLogo, setHasLogo] = useState((client as any).hasLogo)
+
+  const submit = async () => {
+    if (!state.validate()) return
+    setSaving(true); setSubmitError("")
+    try {
+      const updated = await payrollBureauApi.updateClient(client.id, state.toPayload() as any)
+      onSaved(updated)
+    } catch (e: any) {
+      setSubmitError(e.response?.data?.message ?? "Failed to save client")
+    } finally { setSaving(false) }
+  }
+
+  const handleLogoUpload = async (file: File) => {
+    setUploadingLogo(true)
+    try {
+      await payrollBureauApi.attachLogo(client.id, file)
+      setHasLogo(true)
+      setLogoRefreshKey(k => k + 1) // forces LogoImage to refetch rather than show a stale cached blob
+    } catch (e: any) {
+      alert(e.response?.data?.message ?? "Failed to upload logo")
+    } finally { setUploadingLogo(false) }
+  }
+
+  return (
     <Modal title="Edit Payroll Client" onClose={onClose}>
-      <Field label="Trading name"><input value={tradingName} onChange={e => setTradingName(e.target.value)} style={inputStyle} /></Field>
-      <Field label="PAYE reference (optional)"><input value={payeReference} onChange={e => setPayeReference(e.target.value)} style={inputStyle} /></Field>
-      <Field label="UIF reference (optional)"><input value={uifReference} onChange={e => setUifReference(e.target.value)} style={inputStyle} /></Field>
-      <Field label="Contact email"><input value={contactEmail} onChange={e => setContactEmail(e.target.value)} style={inputStyle} required /></Field>
-      {error && <ErrorBox text={error} />}
+      <ClientFormFields state={state} />
+
+      <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 14, marginTop: 4, marginBottom: 14 }}>
+        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 8 }}>
+          Logo (appears on payslips)
+        </label>
+        {hasLogo && (
+          <div style={{ marginBottom: 8 }}>
+            <LogoImage clientId={client.id} refreshKey={logoRefreshKey} />
+          </div>
+        )}
+        <label style={{ ...btnSecondary, display: "inline-block", opacity: uploadingLogo ? 0.6 : 1 }}>
+          {uploadingLogo ? "Uploading…" : hasLogo ? "Replace Logo" : "Upload Logo"}
+          <input type="file" accept="image/*" style={{ display: "none" }} disabled={uploadingLogo}
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f) }} />
+        </label>
+      </div>
+
+      {submitError && <ErrorBox text={submitError} />}
       <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Save Changes" />
     </Modal>
   )
@@ -199,6 +475,7 @@ function EmployeesTab({ client }: { client: PayClient }) {
   const [employees, setEmployees] = useState<PayEmployee[]>([])
   const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
+  const [editing, setEditing] = useState<PayEmployee | null>(null)
   const [docsFor, setDocsFor] = useState<PayEmployee | null>(null)
 
   const refetch = () => {
@@ -213,16 +490,19 @@ function EmployeesTab({ client }: { client: PayClient }) {
         <button onClick={() => setShowNew(true)} style={btnPrimary}>+ Add Employee</button>
       </div>
       {loading ? <Empty text="Loading…" /> : employees.length === 0 ? <Empty text="No employees added yet." /> : (
-        <Table headers={["Employee #", "Name", "Gross Salary", "Status", ""]}>
+        <Table headers={["Employee #", "Name", "Email", "Gross Salary", "Status", ""]}>
           {employees.map(e => (
             <tr key={e.id} style={rowStyle}>
               <td style={cellStyle}>{e.employeeNumber}</td>
               <td style={cellStyle}>{e.fullName}</td>
+              <td style={cellStyle}>{(e as any).email || <span style={{ color: FAINT }}>—</span>}</td>
               <td style={cellStyle}>{fmtR(e.grossSalary)}</td>
               <td style={cellStyle}><StatusBadge status={e.status} /></td>
-              {/* NEW: employee documents — was fully backed with zero UI */}
               <td style={cellStyle}>
-                <button onClick={() => setDocsFor(e)} style={btnSecondary}>Documents</button>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => setEditing(e)} style={btnSecondary}>Edit</button>
+                  <button onClick={() => setDocsFor(e)} style={btnSecondary}>Documents</button>
+                </div>
               </td>
             </tr>
           ))}
@@ -230,50 +510,174 @@ function EmployeesTab({ client }: { client: PayClient }) {
       )}
       {showNew && <NewEmployeeModal clientId={client.id} onClose={() => setShowNew(false)}
         onCreated={() => { setShowNew(false); refetch() }} />}
+      {editing && <EditEmployeeModal clientId={client.id} employee={editing} onClose={() => setEditing(null)}
+        onSaved={() => { setEditing(null); refetch() }} />}
       {docsFor && <EmployeeDocumentsModal employee={docsFor} onClose={() => setDocsFor(null)} />}
     </div>
   )
 }
 
+function useEmployeeFormState(initial?: Partial<PayEmployee> & { email?: string; taxNumber?: string; phone?: string }) {
+  const [firstName, setFirstName] = useState(initial?.firstName ?? "")
+  const [lastName, setLastName] = useState(initial?.lastName ?? "")
+  const [email, setEmail] = useState(initial?.email ?? "")
+  const [idNumber, setIdNumber] = useState((initial as any)?.idNumber ?? "")
+  const [taxNumber, setTaxNumber] = useState(initial?.taxNumber ?? "")
+  const [phone, setPhone] = useState(initial?.phone ?? "")
+  const [dateOfBirth, setDateOfBirth] = useState((initial as any)?.dateOfBirth ?? "")
+  const [grossSalary, setGrossSalary] = useState(initial?.grossSalary ? String(initial.grossSalary) : "")
+  const [travelAllowance, setTravelAllowance] = useState((initial as any)?.travelAllowance ? String((initial as any).travelAllowance) : "0")
+  const [pensionContribution, setPensionContribution] = useState((initial as any)?.pensionContribution ? String((initial as any).pensionContribution) : "0")
+  const [medicalAidContribution, setMedicalAidContribution] = useState((initial as any)?.medicalAidContribution ? String((initial as any).medicalAidContribution) : "0")
+  const [bankName, setBankName] = useState((initial as any)?.bankName ?? "")
+  const [bankAccountNumber, setBankAccountNumber] = useState((initial as any)?.bankAccountNumber ?? "")
+  const [bankBranchCode, setBankBranchCode] = useState((initial as any)?.bankBranchCode ?? "")
+  const [errors, setErrors] = useState<FieldErrors>({})
+
+  const validate = (): boolean => {
+    const e: FieldErrors = {}
+    const firstErr = required(firstName, "First name"); if (firstErr) e.firstName = firstErr
+    const lastErr = required(lastName, "Last name"); if (lastErr) e.lastName = lastErr
+    const salaryErr = validatePositiveNumber(grossSalary, "Gross salary"); if (salaryErr) e.grossSalary = salaryErr
+    const emailErr = validateEmail(email); if (emailErr) e.email = emailErr
+    const phoneErr = validatePhone(phone); if (phoneErr) e.phone = phoneErr
+    const idErr = validateSaId(idNumber); if (idErr) e.idNumber = idErr
+    const taxErr = validateTaxNumber(taxNumber); if (taxErr) e.taxNumber = taxErr
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  const toPayload = () => ({
+    firstName, lastName, email: email || undefined, idNumber: idNumber || undefined,
+    taxNumber: taxNumber || undefined, phone: phone || undefined,
+    dateOfBirth: dateOfBirth || undefined,
+    grossSalary: Number(grossSalary), travelAllowance: Number(travelAllowance || 0),
+    pensionContribution: Number(pensionContribution || 0), medicalAidContribution: Number(medicalAidContribution || 0),
+    bankName: bankName || undefined, bankAccountNumber: bankAccountNumber || undefined, bankBranchCode: bankBranchCode || undefined,
+  })
+
+  return { firstName, setFirstName, lastName, setLastName, email, setEmail, idNumber, setIdNumber,
+    taxNumber, setTaxNumber, phone, setPhone, dateOfBirth, setDateOfBirth,
+    grossSalary, setGrossSalary, travelAllowance, setTravelAllowance,
+    pensionContribution, setPensionContribution, medicalAidContribution, setMedicalAidContribution,
+    bankName, setBankName, bankAccountNumber, setBankAccountNumber, bankBranchCode, setBankBranchCode,
+    errors, validate, toPayload }
+}
+
+function EmployeeFormFields({ state }: { state: ReturnType<typeof useEmployeeFormState> }) {
+  return (
+    <>
+      <div style={{ display: "flex", gap: 10 }}>
+        <Field label="First name *">
+          <input value={state.firstName} onChange={e => state.setFirstName(e.target.value)}
+            style={{ ...inputStyle, ...(state.errors.firstName ? errorInputStyle : {}) }} />
+          <FieldError text={state.errors.firstName} />
+        </Field>
+        <Field label="Last name *">
+          <input value={state.lastName} onChange={e => state.setLastName(e.target.value)}
+            style={{ ...inputStyle, ...(state.errors.lastName ? errorInputStyle : {}) }} />
+          <FieldError text={state.errors.lastName} />
+        </Field>
+      </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <Field label="Email (optional — for digital payslips)">
+          <input type="email" value={state.email} onChange={e => state.setEmail(e.target.value)}
+            style={{ ...inputStyle, ...(state.errors.email ? errorInputStyle : {}) }} />
+          <FieldError text={state.errors.email} />
+        </Field>
+        <Field label="Phone (optional)">
+          <input value={state.phone} onChange={e => state.setPhone(e.target.value)}
+            style={{ ...inputStyle, ...(state.errors.phone ? errorInputStyle : {}) }} />
+          <FieldError text={state.errors.phone} />
+        </Field>
+      </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <Field label="ID number">
+          <input value={state.idNumber} onChange={e => state.setIdNumber(e.target.value)}
+            style={{ ...inputStyle, ...(state.errors.idNumber ? errorInputStyle : {}) }} placeholder="13 digits" />
+          <FieldError text={state.errors.idNumber} />
+        </Field>
+        <Field label="Tax number">
+          <input value={state.taxNumber} onChange={e => state.setTaxNumber(e.target.value)}
+            style={{ ...inputStyle, ...(state.errors.taxNumber ? errorInputStyle : {}) }} placeholder="10 digits" />
+          <FieldError text={state.errors.taxNumber} />
+        </Field>
+      </div>
+      <Field label="Date of birth"><input type="date" value={state.dateOfBirth} onChange={e => state.setDateOfBirth(e.target.value)} style={inputStyle} /></Field>
+      <div style={{ display: "flex", gap: 10 }}>
+        <Field label="Gross salary (monthly) *">
+          <input type="number" value={state.grossSalary} onChange={e => state.setGrossSalary(e.target.value)}
+            style={{ ...inputStyle, ...(state.errors.grossSalary ? errorInputStyle : {}) }} />
+          <FieldError text={state.errors.grossSalary} />
+        </Field>
+        <Field label="Travel allowance"><input type="number" value={state.travelAllowance} onChange={e => state.setTravelAllowance(e.target.value)} style={inputStyle} /></Field>
+      </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <Field label="Pension contribution"><input type="number" value={state.pensionContribution} onChange={e => state.setPensionContribution(e.target.value)} style={inputStyle} /></Field>
+        <Field label="Medical aid contribution"><input type="number" value={state.medicalAidContribution} onChange={e => state.setMedicalAidContribution(e.target.value)} style={inputStyle} /></Field>
+      </div>
+      <p style={{ fontSize: 11.5, fontWeight: 700, color: MUTED, marginTop: 4, marginBottom: 6, textTransform: "uppercase" as const, letterSpacing: "0.03em" }}>Banking Details</p>
+      <Field label="Bank name"><input value={state.bankName} onChange={e => state.setBankName(e.target.value)} style={inputStyle} /></Field>
+      <div style={{ display: "flex", gap: 10 }}>
+        <Field label="Account number"><input value={state.bankAccountNumber} onChange={e => state.setBankAccountNumber(e.target.value)} style={inputStyle} /></Field>
+        <Field label="Branch code"><input value={state.bankBranchCode} onChange={e => state.setBankBranchCode(e.target.value)} style={inputStyle} /></Field>
+      </div>
+    </>
+  )
+}
+
 function NewEmployeeModal({ clientId, onClose, onCreated }: { clientId: string; onClose: () => void; onCreated: () => void }) {
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [grossSalary, setGrossSalary] = useState("")
+  const state = useEmployeeFormState()
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState("")
+  const [submitError, setSubmitError] = useState("")
 
   const submit = async () => {
-    if (!firstName || !lastName || !grossSalary) { setError("First name, last name, and gross salary are required"); return }
-    setSaving(true); setError("")
+    if (!state.validate()) return
+    setSaving(true); setSubmitError("")
     try {
-      await payrollBureauApi.createEmployee(clientId, {
-        firstName, lastName, grossSalary: Number(grossSalary), startDate,
-      } as any)
+      await payrollBureauApi.createEmployee(clientId, { ...state.toPayload(), startDate } as any)
       onCreated()
     } catch (e: any) {
-      setError(e.response?.data?.message ?? "Failed to add employee")
+      setSubmitError(e.response?.data?.message ?? "Failed to add employee")
     } finally { setSaving(false) }
   }
 
   return (
     <Modal title="Add Employee" onClose={onClose}>
-      <Field label="First name"><input value={firstName} onChange={e => setFirstName(e.target.value)} style={inputStyle} /></Field>
-      <Field label="Last name"><input value={lastName} onChange={e => setLastName(e.target.value)} style={inputStyle} /></Field>
-      <Field label="Gross salary (monthly)"><input type="number" value={grossSalary} onChange={e => setGrossSalary(e.target.value)} style={inputStyle} /></Field>
+      <EmployeeFormFields state={state} />
       <Field label="Start date"><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inputStyle} /></Field>
-      {error && <ErrorBox text={error} />}
+      {submitError && <ErrorBox text={submitError} />}
       <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Add Employee" />
     </Modal>
   )
 }
 
-// NEW: closes the employee-documents gap entirely — list existing docs
-// (view/download, already-working backend methods) plus upload a new
-// one. UNVERIFIED: the docType select's options are a reasonable guess
-// at what a payroll bureau would file (ID, tax certificate, contract,
-// banking details) — check against the real allowed values if the
-// upload 400s on an unexpected docType string.
+function EditEmployeeModal({ clientId, employee, onClose, onSaved }: { clientId: string; employee: PayEmployee; onClose: () => void; onSaved: () => void }) {
+  const state = useEmployeeFormState(employee as any)
+  const [saving, setSaving] = useState(false)
+  const [submitError, setSubmitError] = useState("")
+
+  const submit = async () => {
+    if (!state.validate()) return
+    setSaving(true); setSubmitError("")
+    try {
+      await payrollBureauApi.updateEmployee(clientId, employee.id, state.toPayload() as any)
+      onSaved()
+    } catch (e: any) {
+      setSubmitError(e.response?.data?.message ?? "Failed to save employee")
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal title={`Edit Employee — ${employee.fullName}`} onClose={onClose}>
+      <EmployeeFormFields state={state} />
+      {submitError && <ErrorBox text={submitError} />}
+      <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Save Changes" />
+    </Modal>
+  )
+}
+
 function EmployeeDocumentsModal({ employee, onClose }: { employee: PayEmployee; onClose: () => void }) {
   const [docs, setDocs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -335,7 +739,6 @@ function EmployeeDocumentsModal({ employee, onClose }: { employee: PayEmployee; 
           ))}
         </div>
       )}
-
       <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 14 }}>
         <Field label="Document type">
           <select value={docType} onChange={e => setDocType(e.target.value)} style={inputStyle}>
@@ -370,6 +773,9 @@ function PayRunsTab({ client }: { client: PayClient }) {
   const [payslips, setPayslips] = useState<Payslip[]>([])
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [generatingFeeNoteFor, setGeneratingFeeNoteFor] = useState<PayRun | null>(null)
+  const [emailingRunId, setEmailingRunId] = useState<string | null>(null)
+  const [emailResult, setEmailResult] = useState<{ sent: number; skippedNoEmail: number; skippedEmployeeNames: string[] } | null>(null)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
   const refetch = () => {
     setLoading(true)
@@ -393,6 +799,30 @@ function PayRunsTab({ client }: { client: PayClient }) {
     if (run.status === "PROCESSED") {
       setPayslips(await payrollBureauApi.getPayslips(run.id))
     }
+  }
+
+  const handleEmailAll = async (runId: string) => {
+    setEmailingRunId(runId)
+    try {
+      const result = await payrollBureauApi.emailPayslips(runId)
+      setEmailResult(result)
+    } catch (e: any) {
+      alert(e.response?.data?.message ?? "Failed to send payslips")
+    } finally { setEmailingRunId(null) }
+  }
+
+  const handleDownloadPdf = async (runId: string, payslipId: string, employeeName: string) => {
+    setDownloadingId(payslipId)
+    try {
+      const blob = await payrollBureauApi.downloadPayslipPdf(runId, payslipId)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url; a.download = `Payslip - ${employeeName}.pdf`
+      document.body.appendChild(a); a.click(); a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch {
+      alert("Failed to download payslip")
+    } finally { setDownloadingId(null) }
   }
 
   return (
@@ -420,19 +850,20 @@ function PayRunsTab({ client }: { client: PayClient }) {
                     <button onClick={e => { e.stopPropagation(); handleProcess(r.id) }} disabled={processingId === r.id}
                       style={btnPrimarySmall}>{processingId === r.id ? "Processing…" : "Process"}</button>
                   )}
-                  {/* NEW: this is the fix for FeeNotesTab's broken promise
-                      — "generate from the Pay Runs tab" now actually
-                      exists here, on a processed run. */}
                   {r.status === "PROCESSED" && (
-                    <button onClick={e => { e.stopPropagation(); setGeneratingFeeNoteFor(r) }} style={btnPrimarySmall}>
-                      Generate Invoice
-                    </button>
+                    <>
+                      <button onClick={e => { e.stopPropagation(); handleEmailAll(r.id) }} disabled={emailingRunId === r.id}
+                        style={btnPrimarySmall}>{emailingRunId === r.id ? "Sending…" : "Email All Payslips"}</button>
+                      <button onClick={e => { e.stopPropagation(); setGeneratingFeeNoteFor(r) }} style={btnPrimarySmall}>
+                        Generate Invoice
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
               {expandedRun === r.id && r.status === "PROCESSED" && (
                 <div style={{ borderTop: `1px solid ${BORDER}`, padding: 12 }}>
-                  <Table headers={["Employee", "Gross", "PAYE", "UIF", "Net Pay"]}>
+                  <Table headers={["Employee", "Gross", "PAYE", "UIF", "Net Pay", ""]}>
                     {payslips.map(p => (
                       <tr key={p.id} style={rowStyle}>
                         <td style={cellStyle}>{p.employeeName}</td>
@@ -440,6 +871,12 @@ function PayRunsTab({ client }: { client: PayClient }) {
                         <td style={cellStyle}>{fmtR(p.payeAmount)}</td>
                         <td style={cellStyle}>{fmtR(p.uifEmployee)}</td>
                         <td style={cellStyle}><strong>{fmtR(p.netPay)}</strong></td>
+                        <td style={cellStyle}>
+                          <button onClick={() => handleDownloadPdf(r.id, p.id, p.employeeName)} disabled={downloadingId === p.id}
+                            style={{ ...btnSecondary, padding: "4px 10px", fontSize: 11 }}>
+                            {downloadingId === p.id ? "…" : "Download / Print"}
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </Table>
@@ -456,13 +893,27 @@ function PayRunsTab({ client }: { client: PayClient }) {
           onClose={() => setGeneratingFeeNoteFor(null)}
           onGenerated={() => setGeneratingFeeNoteFor(null)} />
       )}
+      {emailResult && (
+        <Modal title="Payslips Sent" onClose={() => setEmailResult(null)}>
+          <p style={{ fontSize: 13.5, color: INK, marginBottom: 10 }}>
+            <strong>{emailResult.sent}</strong> payslip{emailResult.sent !== 1 ? "s" : ""} emailed successfully.
+          </p>
+          {emailResult.skippedNoEmail > 0 && (
+            <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 6, padding: 12, fontSize: 12.5, color: "#92400E" }}>
+              <strong>{emailResult.skippedNoEmail}</strong> employee{emailResult.skippedNoEmail !== 1 ? "s have" : " has"} no email on file
+              and {emailResult.skippedNoEmail !== 1 ? "were" : "was"} skipped — use "Download / Print" for{" "}
+              {emailResult.skippedEmployeeNames.join(", ")}.
+            </div>
+          )}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
+            <button onClick={() => setEmailResult(null)} style={btnPrimary}>Close</button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
 
-// NEW: the actual missing piece — generateFeeNote() existed in the API
-// client, called from nowhere. This is what FeeNotesTab's own text
-// always claimed existed.
 function GenerateFeeNoteModal({ client, payRun, onClose, onGenerated }: { client: PayClient; payRun: PayRun; onClose: () => void; onGenerated: () => void }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
@@ -515,7 +966,7 @@ function NewPayRunModal({ clientId, onClose, onCreated }: { clientId: string; on
   return (
     <Modal title="New Pay Run" onClose={onClose}>
       <Field label="Period start"><input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} style={inputStyle} /></Field>
-      <Field label="Period end"><input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} style={inputStyle} /></Field>
+      <Field label="Period end"><input type="date" value={periodEnd} min={periodStart} onChange={e => setPeriodEnd(e.target.value)} style={inputStyle} /></Field>
       <Field label="Pay date"><input type="date" value={payDate} onChange={e => setPayDate(e.target.value)} style={inputStyle} /></Field>
       {error && <ErrorBox text={error} />}
       <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Create Pay Run" />
@@ -545,8 +996,6 @@ function DeadlinesTab({ client }: { client: PayClient }) {
     } finally { setGenerating(false) }
   }
 
-  // NEW: markDeadlineFiled existed with no button — every deadline sat
-  // PENDING forever regardless of whether it was actually filed with SARS.
   const handleMarkFiled = async (id: string) => {
     setFilingId(id)
     try { await payrollBureauApi.markDeadlineFiled(id); refetch() }
@@ -603,8 +1052,6 @@ function FeeNotesTab({ client }: { client: PayClient }) {
 
   return (
     <div>
-      {/* FIX: this used to point at a feature that didn't exist. It now
-          does — see PayRunsTab's "Generate Invoice" button. */}
       <p style={{ fontSize: 12.5, color: MUTED, marginBottom: 12 }}>
         Generate invoices from the Pay Runs tab once a run is processed.
       </p>
@@ -620,7 +1067,6 @@ function FeeNotesTab({ client }: { client: PayClient }) {
               <td style={cellStyle}>
                 <div style={{ display: "flex", gap: 6 }}>
                   {f.status === "DRAFT" && <button onClick={() => handleSend(f.id)} style={btnSecondary}>Send</button>}
-                  {/* NEW: recordPayment existed with no button */}
                   {f.status !== "DRAFT" && f.balance > 0 && (
                     <button onClick={() => setPayingNote(f)} style={btnSecondary}>Record Payment</button>
                   )}
@@ -708,7 +1154,6 @@ function PortalAccessTab({ client }: { client: PayClient }) {
     } finally { setInviting(false) }
   }
 
-  // NEW: revokePortalAccess existed with no button
   const handleRevoke = async (grantId: string) => {
     if (!confirm("Revoke this client's portal access?")) return
     setRevokingId(grantId)
@@ -748,40 +1193,6 @@ function PortalAccessTab({ client }: { client: PayClient }) {
   )
 }
 
-// ── New Client Modal ──────────────────────────────────────────────────────────
-
-function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [tradingName, setTradingName] = useState("")
-  const [payeReference, setPayeReference] = useState("")
-  const [uifReference, setUifReference] = useState("")
-  const [contactEmail, setContactEmail] = useState("")
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState("")
-
-  const submit = async () => {
-    if (!tradingName) { setError("Trading name is required"); return }
-    if (!contactEmail) { setError("Contact email is required — needed to send this client their invoices"); return }
-      setSaving(true); setError("")
-    try {
-      await payrollBureauApi.createClient({ tradingName, payeReference, uifReference, contactEmail } as any)
-      onCreated()
-    } catch (e: any) {
-      setError(e.response?.data?.message ?? "Failed to create client")
-    } finally { setSaving(false) }
-  }
-
-  return (
-    <Modal title="New Payroll Client" onClose={onClose}>
-      <Field label="Trading name"><input value={tradingName} onChange={e => setTradingName(e.target.value)} style={inputStyle} /></Field>
-      <Field label="PAYE reference (optional)"><input value={payeReference} onChange={e => setPayeReference(e.target.value)} style={inputStyle} /></Field>
-      <Field label="UIF reference (optional)"><input value={uifReference} onChange={e => setUifReference(e.target.value)} style={inputStyle} /></Field>
-      <Field label="Contact email"><input value={contactEmail} onChange={e => setContactEmail(e.target.value)} style={inputStyle} required /></Field>
-      {error && <ErrorBox text={error} />}
-      <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Create Client" />
-    </Modal>
-  )
-}
-
 // ── Shared small components ──────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
@@ -818,7 +1229,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
       onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 420, maxHeight: "80vh", overflowY: "auto" as const, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
+      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 460, maxHeight: "85vh", overflowY: "auto" as const, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
         onClick={e => e.stopPropagation()}>
         <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 800, color: INK }}>{title}</h3>
         {children}
@@ -829,11 +1240,16 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 12 }}>
+    <div style={{ marginBottom: 12, flex: 1 }}>
       <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 4 }}>{label}</label>
       {children}
     </div>
   )
+}
+
+function FieldError({ text }: { text?: string }) {
+  if (!text) return null
+  return <div style={{ fontSize: 11, color: "#DC2626", marginTop: 3 }}>{text}</div>
 }
 
 function ErrorBox({ text }: { text: string }) {
@@ -850,6 +1266,7 @@ function ModalActions({ onClose, onSubmit, saving, submitLabel }: { onClose: () 
 }
 
 const inputStyle: React.CSSProperties = { width: "100%", padding: "8px 10px", border: `1.5px solid ${BORDER}`, borderRadius: 6, fontSize: 13, boxSizing: "border-box" }
+const errorInputStyle: React.CSSProperties = { borderColor: "#DC2626" }
 const btnPrimary: React.CSSProperties = { padding: "7px 14px", background: NAVY, color: "#fff", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
 const btnPrimarySmall: React.CSSProperties = { ...btnPrimary, padding: "4px 10px", fontSize: 11.5 }
 const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "#fff", color: NAVY, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }

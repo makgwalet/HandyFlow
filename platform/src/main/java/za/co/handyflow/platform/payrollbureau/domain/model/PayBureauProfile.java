@@ -44,6 +44,9 @@ public class PayBureauProfile {
     @Column(name = "logo_url")
     private String logoUrl;
 
+    @Column(name = "logo_evidence_id") private java.util.UUID logoEvidenceId;
+    public java.util.UUID getLogoEvidenceId() { return this.logoEvidenceId; }
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -70,4 +73,6 @@ public class PayBureauProfile {
         this.logoUrl = logoUrl;
         this.updatedAt = Instant.now();
     }
+
+    public void setLogoEvidenceId(java.util.UUID id) { this.logoEvidenceId = id;}
 }

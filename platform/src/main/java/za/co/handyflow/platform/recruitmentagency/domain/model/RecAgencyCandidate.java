@@ -62,6 +62,18 @@ public class RecAgencyCandidate {
     @Column(name = "cv_storage_key")
     private String cvStorageKey; // opaque FileStorageService reference — see class Javadoc
 
+    // NEW: Gate 0 — Recruitment Agency as EvidenceFacade's second real
+    // consumer. Deliberately a SEPARATE column from cvStorageKey, not a
+    // replacement — EvidenceFacade.attach() intentionally doesn't
+    // expose its internal storageKey (correct encapsulation), so this
+    // stores the evidenceId instead and resolves through the facade,
+    // never touching FileStorageService directly for new uploads.
+    // Existing candidates (cv_storage_key already populated) keep
+    // working via the legacy path in downloadCv() below — this column
+    // stays null for them.
+    @Column(name = "cv_evidence_id")
+    private UUID cvEvidenceId;
+
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
@@ -95,6 +107,13 @@ public class RecAgencyCandidate {
     public void attachCv(String fileName, String storageKey) {
         this.cvFileName = fileName;
         this.cvStorageKey = storageKey;
+        this.updatedAt = Instant.now();
+    }
+
+    // NEW: the Evidence-backed path — see field Javadoc above.
+    public void attachCvEvidence(UUID evidenceId, String fileName) {
+        this.cvEvidenceId = evidenceId;
+        this.cvFileName = fileName;
         this.updatedAt = Instant.now();
     }
 

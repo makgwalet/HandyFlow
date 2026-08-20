@@ -23,6 +23,7 @@ public class AdminService {
     private final AdminAuditLogRepository    auditRepo;
     private final JdbcTemplate               jdbc;
     private final AdminNotificationService   notificationService;
+    private final AdminReportingService adminReportingService;
 
     // ── Dashboard ─────────────────────────────────────────────────────────────
 
@@ -85,15 +86,7 @@ public class AdminService {
             """);
 
         // MRR by module
-        List<Map<String, Object>> mrrByModule = jdbc.queryForList("""
-            SELECT mc.key, mc.name, mc.monthly_price,
-                   COUNT(tm.id) AS active_count,
-                   COUNT(tm.id) * mc.monthly_price AS module_mrr
-            FROM module_catalogue mc
-            LEFT JOIN tenant_modules tm ON tm.module_key = mc.key AND tm.status = 'ACTIVE'
-            GROUP BY mc.key, mc.name, mc.monthly_price
-            ORDER BY module_mrr DESC
-            """);
+        List<Map<String, Object>> mrrByModule = adminReportingService.getModuleMetrics();
 
         // Top 10 tenants by MRR
         List<Map<String, Object>> top10 = jdbc.queryForList("""

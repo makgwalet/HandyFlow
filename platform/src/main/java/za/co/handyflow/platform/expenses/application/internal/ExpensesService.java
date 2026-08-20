@@ -38,6 +38,7 @@ public class ExpensesService {
     private final TenantAdminRecipients tenantAdminRecipients;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private final ExpenseAccountingPoster accountingPoster;
+    private final za.co.handyflow.platform.evidence.application.EvidenceFacade evidenceFacade;
 
     @Transactional(readOnly = true)
     public Page<ExpenseClaimResponse> getClaims(TenantId tenantId, String status,
@@ -119,6 +120,31 @@ public class ExpensesService {
     @Transactional(readOnly = true)
     public BigDecimal getMonthlyTotal(TenantId tenantId, int month, int year) {
         return claimRepo.sumApprovedByMonth(tenantId, month, year);
+    }
+
+    // NEW: real receipt attachment — Stage 0 of the Financial Control &
+    // Assurance adoption plan. Deliberately a SEPARATE endpoint from
+    // submitClaim() rather than folding file upload into claim
+    // creation — submitClaim() stays JSON/@RequestBody exactly as it
+    // already works, matching the same "attach to an existing entity"
+    // shape already proven by Payroll Bureau's employee documents and
+    // Recruitment Agency's CV upload. receiptUrl (the old pasted-link
+    // field) is untouched — old claims keep working exactly as before;
+    // this is additive, not a migration of existing data.
+    @Transactional
+    public za.co.handyflow.platform.evidence.dto.EvidenceResponse attachReceipt(
+            TenantId tenantId, UUID claimId,
+            org.springframework.web.multipart.MultipartFile file,
+            UUID uploadedBy, String uploadedByName) {
+        ExpenseClaim claim = findByTenant(tenantId, claimId);
+        return evidenceFacade.attach(tenantId, file, "RECEIPT", "expenses",
+                "ExpenseClaim", claim.getId(), null, uploadedBy, uploadedByName);
+    }
+
+    @Transactional(readOnly = true)
+    public List<za.co.handyflow.platform.evidence.dto.EvidenceResponse> getReceipts(TenantId tenantId, UUID claimId) {
+        findByTenant(tenantId, claimId); // confirms the claim exists and belongs to this tenant before listing
+        return evidenceFacade.listFor(tenantId, "expenses", "ExpenseClaim", claimId);
     }
 
     // ── Accounting integration ────────────────────────────────────────────────

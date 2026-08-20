@@ -12,5 +12,6 @@ public record CreatePayClientRequest(
         Integer payDay,
         String contactName,
         String contactEmail,
+        String address,
         String contactPhone
 ) {}

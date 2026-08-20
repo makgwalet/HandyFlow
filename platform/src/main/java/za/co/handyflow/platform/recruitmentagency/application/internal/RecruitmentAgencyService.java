@@ -43,6 +43,7 @@ public class RecruitmentAgencyService {
     private final RecAgencyPaymentRepository paymentRepo;
     private final za.co.handyflow.platform.shared.EmailService emailService; // confirm not already present
     private final RecPortalAccessGrantRepository portalGrantRepo;
+    private final za.co.handyflow.platform.evidence.application.EvidenceFacade evidenceFacade;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -190,24 +191,22 @@ public class RecruitmentAgencyService {
      */
     @Transactional
     public CandidateResponse uploadCv(TenantId tenantId, UUID candidateId,
-                                      org.springframework.web.multipart.MultipartFile file) {
+                                      org.springframework.web.multipart.MultipartFile file,
+                                      UUID uploadedBy, String uploadedByName) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("A file is required");
         }
         RecAgencyCandidate candidate = candidateRepo.findByTenantAndId(tenantId.getValue(), candidateId)
                 .orElseThrow(() -> new ResourceNotFoundException("Candidate", candidateId.toString()));
 
-        String storageKey;
-        try {
-            storageKey = fileStorageService.store(
-                    "recruitmentagency-cvs/" + tenantId.getValue(),
-                    file.getOriginalFilename(), file.getContentType(), file.getBytes());
-        } catch (java.io.IOException e) {
-            log.error("Failed to store CV for candidate={}: {}", candidateId, e.getMessage(), e);
-            throw new RuntimeException("Failed to store CV", e);
-        }
-
-        candidate.attachCv(file.getOriginalFilename(), storageKey);
+        // NEW: Gate 0 — goes through EvidenceFacade now instead of
+        // calling FileStorageService directly. Same hashing/size-limit/
+        // storage behavior Expenses already proved end-to-end; this is
+        // the second real consumer, not a reimplementation.
+        za.co.handyflow.platform.evidence.dto.EvidenceResponse evidence = evidenceFacade.attach(
+                tenantId, file, "CV", "recruitmentagency", "Candidate", candidateId,
+               null, uploadedBy, uploadedByName);
+        candidate.attachCvEvidence(evidence.id(), evidence.fileName());
         candidateRepo.save(candidate);
         log.info("CV uploaded candidate={} tenant={}", candidateId, tenantId.getValue());
         return toCandidateResponse(candidate);
@@ -217,6 +216,18 @@ public class RecruitmentAgencyService {
     public byte[] downloadCv(TenantId tenantId, UUID candidateId) {
         RecAgencyCandidate candidate = candidateRepo.findByTenantAndId(tenantId.getValue(), candidateId)
                 .orElseThrow(() -> new ResourceNotFoundException("Candidate", candidateId.toString()));
+
+        // NEW: Evidence-backed CVs first — the path every new upload
+        // takes. Falls back to the legacy direct-FileStorageService
+        // path for candidates uploaded before this migration (real
+        // data, e.g. Bongani Zulu, confirmed uploaded this session) —
+        // same "legacy fallback, not a silent rewrite" shape already
+        // established by RecruiterService.getCvBytes()'s own base64
+        // fallback.
+        if (candidate.getCvEvidenceId() != null) {
+            return evidenceFacade.download(tenantId, candidate.getCvEvidenceId()).content();
+        }
+
         if (candidate.getCvStorageKey() == null) {
             throw new ResourceNotFoundException("CV", candidateId.toString());
         }
@@ -509,6 +520,29 @@ public class RecruitmentAgencyService {
         return toGrantResponse(grant);
     }
 
+    @Transactional
+    public RequisitionResponse updateRequisition(TenantId tenantId, UUID id, UpdateRequisitionRequest req) {
+        RecAgencyRequisition r = findRequisition(tenantId, id);
+        r.update(req.title(), req.description(), req.salaryMin(), req.salaryMax(),
+                req.location(), req.employmentType(), req.targetStartDate(), req.notes());
+        requisitionRepo.save(r);
+        String clientName = clientRepo.findActiveById(tenantId.getValue(), r.getClientId())
+                .map(RecAgencyClient::getTradingName).orElse("Unknown");
+        log.info("Requisition updated tenant={} requisition={}", tenantId.getValue(), r.getRequisitionNumber());
+        return toRequisitionResponse(r, clientName);
+    }
+
+    @Transactional
+    public RequisitionResponse reopenRequisition(TenantId tenantId, UUID id) {
+        RecAgencyRequisition r = findRequisition(tenantId, id);
+        r.reopen();
+        requisitionRepo.save(r);
+        String clientName = clientRepo.findActiveById(tenantId.getValue(), r.getClientId())
+                .map(RecAgencyClient::getTradingName).orElse("Unknown");
+        log.info("Requisition reopened tenant={} requisition={}", tenantId.getValue(), r.getRequisitionNumber());
+        return toRequisitionResponse(r, clientName);
+    }
+
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -564,7 +598,8 @@ public class RecruitmentAgencyService {
     private CandidateResponse toCandidateResponse(RecAgencyCandidate c) {
         return new CandidateResponse(c.getId(), c.getFullName(), c.getEmail(), c.getPhone(),
                 c.getCurrentTitle(), c.getCurrentEmployer(), c.getSkills(), c.getSource(),
-                c.getCvFileName(), c.getCvStorageKey() != null, c.getNotes(), c.getStatus(), c.getCreatedAt());
+                c.getCvFileName(), c.getCvStorageKey() != null || c.getCvEvidenceId() != null,
+                c.getNotes(), c.getStatus(), c.getCreatedAt());
     }
 
     private PlacementResponse toPlacementResponse(RecAgencyPlacement p, String requisitionTitle, String candidateName) {

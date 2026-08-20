@@ -1,0 +1,12 @@
+-- V232__add_candidate_cv_evidence_id.sql
+--
+-- Gate 0 test for the Financial Control & Assurance adoption plan's
+-- Evidence Layer — Recruitment Agency's CV upload as the second real
+-- consumer of EvidenceFacade.
+--
+-- ADDITIVE ONLY. cv_file_name and cv_storage_key are untouched — real
+-- candidates (Bongani Zulu, confirmed uploaded earlier this session)
+-- keep working exactly as before via the legacy fallback path in
+-- RecruitmentAgencyService.downloadCv(). This column is only populated
+-- by new CV uploads going forward.
+ALTER TABLE reca_candidates ADD COLUMN cv_evidence_id UUID;

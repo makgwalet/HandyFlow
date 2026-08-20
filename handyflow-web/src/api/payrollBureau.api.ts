@@ -36,6 +36,12 @@ export const payrollBureauApi = {
     apiClient.get(`/api/v1/payroll-bureau/clients/${clientId}/employees`).then(r => r.data as PayEmployee[]),
   createEmployee: (clientId: string, body: Partial<PayEmployee>) =>
     apiClient.post(`/api/v1/payroll-bureau/clients/${clientId}/employees`, body).then(r => r.data as PayEmployee),
+  updateEmployee: (clientId: string, employeeId: string, body: Partial<PayEmployee>) =>
+    apiClient.put(`/api/v1/payroll-bureau/clients/${clientId}/employees/${employeeId}`, body).then(r => r.data as PayEmployee),
+  emailPayslips: (payRunId: string) =>
+    apiClient.post(`/api/v1/payroll-bureau/pay-runs/${payRunId}/payslips/email`).then(r => r.data as { sent: number; skippedNoEmail: number; skippedEmployeeNames: string[] }),
+  downloadPayslipPdf: (payRunId: string, payslipId: string) =>
+    apiClient.get(`/api/v1/payroll-bureau/pay-runs/${payRunId}/payslips/${payslipId}/pdf`, { responseType: "blob" }).then(r => r.data as Blob),
 
   // Pay runs
   getPayRuns: (clientId: string, page = 0) =>
@@ -65,6 +71,23 @@ export const payrollBureauApi = {
   recordPayment: (feeNoteId: string, body: { amount: number; paidDate: string; method?: string; reference?: string }) =>
     apiClient.post(`/api/v1/payroll-bureau/fee-notes/${feeNoteId}/payments`, body).then(r => r.data as PayFeeNote),
 
+  attachProfileLogo: (file: File) => {
+   const form = new FormData(); form.append("file", file)
+    return apiClient.post(`/api/v1/{module}/profile/logo`, form,
+      { headers: { "Content-Type": "multipart/form-data" } }).then(r => r.data)
+  },
+  downloadProfileLogo: () =>
+    apiClient.get(`/api/v1/{module}/profile/logo`, { responseType: "blob" }).then(r => r.data as Blob),
+
+
+  attachLogo: (clientId: string, file: File) => {
+    const form = new FormData(); form.append("file", file)
+    return apiClient.post(`/api/v1/payroll-bureau/clients/${clientId}/logo`, form,
+      { headers: { "Content-Type": "multipart/form-data" } }).then(r => r.data as PayClient)
+  },
+  downloadLogo: (clientId: string) =>
+    apiClient.get(`/api/v1/payroll-bureau/clients/${clientId}/logo`, { responseType: "blob" }).then(r => r.data as Blob),
+  
   // Portal invites
   getPortalAccessGrants: (clientId: string) =>
     apiClient.get(`/api/v1/payroll-bureau/clients/${clientId}/portal-invites`).then(r => r.data as PortalAccessGrant[]),

@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.admin.application.internal.AdminReportingService;
 import za.co.handyflow.platform.admin.application.internal.AdminService;
 import za.co.handyflow.platform.admin.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -24,6 +25,7 @@ import java.util.UUID;
 public class AdminController {
 
     private final AdminService adminService;
+    private final AdminReportingService adminReportingService;
 
     // ── Dashboard ─────────────────────────────────────────────────────────────
 
@@ -125,7 +127,7 @@ public class AdminController {
     @GetMapping("/billing/mrr")
     @Operation(summary = "MRR breakdown by module — active count, trial count, revenue per module")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getMrrBreakdown() {
-        return ResponseEntity.ok(ApiResponse.success(adminService.getMrrBreakdown()));
+        return ResponseEntity.ok(ApiResponse.success(adminReportingService.getModuleMetrics()));
     }
 
     @GetMapping("/billing/overdue")

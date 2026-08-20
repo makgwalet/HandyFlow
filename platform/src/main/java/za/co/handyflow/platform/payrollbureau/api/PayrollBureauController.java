@@ -16,6 +16,8 @@ import za.co.handyflow.platform.payrollbureau.application.internal.PayrollBureau
 import za.co.handyflow.platform.payrollbureau.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -171,6 +173,37 @@ public class PayrollBureauController {
                 bureauService.getPayslips(TenantContext.getTenantIdAsObject(), payRunId)));
     }
 
+    @GetMapping("/pay-runs/{payRunId}/payslips/{payslipId}/pdf")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "Download/print a single payslip as PDF — works regardless of whether the employee has an email on file")
+    public ResponseEntity<byte[]> downloadPayslipPdf(@PathVariable UUID payRunId, @PathVariable UUID payslipId) {
+        featureGuard.requireModule("payrollbureau");
+        byte[] pdf = bureauService.generatePayslipPdf(TenantContext.getTenantIdAsObject(), payRunId, payslipId);
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"payslip.pdf\"")
+                .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    @PostMapping("/pay-runs/{payRunId}/payslips/email")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "Email every payslip in this run to employees who have an email on file")
+    public ResponseEntity<ApiResponse<PayrollBureauService.PayslipDeliveryResult>> emailPayslips(@PathVariable UUID payRunId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(
+                bureauService.emailPayslips(TenantContext.getTenantIdAsObject(), payRunId)));
+    }
+
+    @PutMapping("/clients/{clientId}/employees/{employeeId}")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<PayEmployeeResponse>> updateEmployee(
+            @PathVariable UUID clientId, @PathVariable UUID employeeId,
+            @Valid @RequestBody UpdatePayEmployeeRequest req) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success("Employee updated",
+                bureauService.updateEmployee(TenantContext.getTenantIdAsObject(), clientId, employeeId, req)));
+    }
+
     @PostMapping("/clients/{clientId}/deadlines/generate")
     @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
     @Operation(summary = "Generate EMP201/EMP501 deadlines for a client for a given year (idempotent)")
@@ -297,6 +330,41 @@ public class PayrollBureauController {
         return ResponseEntity.ok(ApiResponse.success("Portal access revoked",
                 bureauService.revokePortalAccess(TenantContext.getTenantIdAsObject(), clientId, grantId,
                         TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping(value = "/clients/{clientId}/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<PayClientResponse>> attachLogo(
+            @PathVariable UUID clientId, @RequestParam("file") MultipartFile file) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success("Logo uploaded",
+                bureauService.attachLogo(TenantContext.getTenantIdAsObject(), clientId, file,
+                        TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
+    }
+
+    @GetMapping("/clients/{clientId}/logo")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<byte[]> downloadLogo(@PathVariable UUID clientId) {
+        featureGuard.requireModule("payrollbureau");
+        var logo = bureauService.downloadLogo(TenantContext.getTenantIdAsObject(), clientId);
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(logo.contentType())).body(logo.content());
+    }
+
+    @PostMapping(value = "/profile/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<BureauProfileResponse>> attachProfileLogo(@RequestParam("file") MultipartFile file) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success("Logo uploaded",
+                bureauService.attachProfileLogo(TenantContext.getTenantIdAsObject(), file,
+                        TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
+    }
+
+    @GetMapping("/profile/logo")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<byte[]> downloadProfileLogo() {
+        featureGuard.requireModule("payrollbureau");
+        var logo = bureauService.downloadProfileLogo(TenantContext.getTenantIdAsObject());
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(logo.contentType())).body(logo.content());
     }
 
 }

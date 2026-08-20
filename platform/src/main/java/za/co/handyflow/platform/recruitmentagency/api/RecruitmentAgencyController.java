@@ -181,7 +181,8 @@ public class RecruitmentAgencyController {
             @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
         featureGuard.requireModule("recruitmentagency");
         return ResponseEntity.ok(ApiResponse.success("CV uploaded",
-                agencyService.uploadCv(TenantContext.getTenantIdAsObject(), id, file)));
+                agencyService.uploadCv(TenantContext.getTenantIdAsObject(), id, file,
+                    TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
     }
 
     @GetMapping("/candidates/{id}/cv")
@@ -319,5 +320,22 @@ public class RecruitmentAgencyController {
         return ResponseEntity.ok(ApiResponse.success("Portal access revoked",
                 agencyService.revokePortalAccess(TenantContext.getTenantIdAsObject(), clientId, grantId,
                         TenantContext.getCurrentUserId())));
+    }
+
+    @PutMapping("/requisitions/{id}")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
+    public ResponseEntity<ApiResponse<RequisitionResponse>> updateRequisition(
+            @PathVariable UUID id, @Valid @RequestBody UpdateRequisitionRequest req) {
+        featureGuard.requireModule("recruitmentagency");
+        return ResponseEntity.ok(ApiResponse.success("Requisition updated",
+                agencyService.updateRequisition(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @PostMapping("/requisitions/{id}/reopen")
+    @PreAuthorize("hasAnyAuthority('RECRUITMENTAGENCY_MANAGE','RECRUITMENTAGENCY_ADMIN')")
+    public ResponseEntity<ApiResponse<RequisitionResponse>> reopenRequisition(@PathVariable UUID id) {
+        featureGuard.requireModule("recruitmentagency");
+        return ResponseEntity.ok(ApiResponse.success("Requisition reopened",
+                agencyService.reopenRequisition(TenantContext.getTenantIdAsObject(), id)));
     }
 }

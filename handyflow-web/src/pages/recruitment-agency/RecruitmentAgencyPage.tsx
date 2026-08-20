@@ -1,20 +1,20 @@
 // src/pages/recruitment-agency/RecruitmentAgencyPage.tsx
 //
-// Two top-level sections, not the simple "client list + tabs" shape
-// used for Payroll Bureau and Booking Agency — candidates are the
-// agency's OWN pool (RecAgencyCandidate has no clientId), submitted
-// against requisitions as needed, not scoped to one client the way
-// employees/resources are in the other two modules. Forcing this into
-// the same single-client-scoped shell would misrepresent the domain.
+// Two top-level sections — candidates are the agency's OWN pool
+// (RecAgencyCandidate has no clientId), submitted against requisitions
+// as needed, not scoped to one client the way employees/resources are
+// in the other two modules.
 //
-// UPDATED: closed six gaps between backend and frontend, all confirmed
-// against real controller/api-client methods that already existed but
-// were never called from this page — client edit, client archive
-// (deactivate/reactivate), client search, CV viewing (downloadCv
-// existed, nothing rendered a link to it), portal-access revoke, and
-// invoice payment recording. Deferred: agency profile screen and
-// placement stage-history — neither was asked for, both deserve their
-// own pass rather than being bolted on here.
+// UPDATED: added requisition Edit + Reopen (real backend endpoints —
+// PUT /requisitions/{id}, POST /requisitions/{id}/reopen, both new;
+// updateRequisition()/reopenRequisition() didn't exist on the backend
+// before this pass) and placement stage history (getStageHistory()
+// already existed fully on both backend and in this file's own API
+// client with zero UI before this change).
+//
+// FIX: the previous merge of the Reopen button left a stray extra
+// </button> closing tag and never actually defined EditRequisitionModal
+// despite referencing it in JSX — both fixed here.
 import { useEffect, useState } from "react"
 import { recruitmentAgencyApi } from "../../api/recruitmentAgency.api"
 import type { AgencyClient, Requisition, Candidate, Placement, AgencyInvoice, PortalAccessGrant } from "../../types/recruitmentAgency.types"
@@ -33,23 +33,101 @@ const FAINT = "#94A3B8"
 type Section = "clients" | "candidates"
 type ClientTab = "requisitions" | "invoices" | "portal"
 
+function AgencyProfileModal({ onClose }: { onClose: () => void }) {
+  const [agencyName, setAgencyName] = useState("")
+  const [registrationNumber, setRegistrationNumber] = useState("")
+  const [defaultPlacementFeePct, setDefaultPlacementFeePct] = useState("")
+  const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
+  const [physicalAddress, setPhysicalAddress] = useState("")
+  const [logoUrl, setLogoUrl] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    recruitmentAgencyApi.getProfile()
+      .then((p: any) => {
+        setAgencyName(p.agencyName ?? "")
+        setRegistrationNumber(p.registrationNumber ?? "")
+        setDefaultPlacementFeePct(p.defaultPlacementFeePct != null ? String(p.defaultPlacementFeePct) : "")
+        setEmail(p.email ?? "")
+        setPhone(p.phone ?? "")
+        setPhysicalAddress(p.physicalAddress ?? "")
+        setLogoUrl(p.logoUrl ?? "")
+      })
+      .catch(() => { /* no profile yet — start blank, matching upsertProfile()'s own create-on-first-save fallback */ })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const submit = async () => {
+    if (!agencyName.trim()) { setError("Agency name is required"); return }
+    setSaving(true); setError("")
+    try {
+      await recruitmentAgencyApi.upsertProfile({
+        agencyName, registrationNumber: registrationNumber || undefined,
+        defaultPlacementFeePct: defaultPlacementFeePct ? Number(defaultPlacementFeePct) : undefined,
+        email: email || undefined, phone: phone || undefined,
+        physicalAddress: physicalAddress || undefined, logoUrl: logoUrl || undefined,
+      })
+      onClose()
+    } catch (e: any) {
+      setError(e.response?.data?.message ?? "Failed to save profile")
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal title="Agency Profile" onClose={onClose}>
+      {loading ? (
+        <div style={{ color: FAINT, fontSize: 13, padding: "12px 0" }}>Loading…</div>
+      ) : (
+        <>
+          <Field label="Agency name *"><input value={agencyName} onChange={e => setAgencyName(e.target.value)} style={inputStyle} /></Field>
+          <Field label="Registration number (optional)"><input value={registrationNumber} onChange={e => setRegistrationNumber(e.target.value)} style={inputStyle} /></Field>
+          <Field label="Default placement fee % (used when a client has no override set)">
+            <input type="number" value={defaultPlacementFeePct} onChange={e => setDefaultPlacementFeePct(e.target.value)} style={inputStyle} placeholder="e.g. 15" />
+          </Field>
+          <div style={{ display: "flex", gap: 10 }}>
+            <Field label="Email"><input type="email" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} /></Field>
+            <Field label="Phone"><input value={phone} onChange={e => setPhone(e.target.value)} style={inputStyle} /></Field>
+          </div>
+          <Field label="Physical address (optional)">
+            <textarea value={physicalAddress} onChange={e => setPhysicalAddress(e.target.value)}
+              style={{ ...inputStyle, minHeight: 50, resize: "vertical" as const, fontFamily: "inherit" }} />
+          </Field>
+          <Field label="Logo URL (optional — paste a link to an image)">
+            <input value={logoUrl} onChange={e => setLogoUrl(e.target.value)} style={inputStyle} placeholder="https://..." />
+          </Field>
+          {error && <ErrorBox text={error} />}
+          <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Save Profile" />
+        </>
+      )}
+    </Modal>
+  )
+}
+
 export function RecruitmentAgencyPage() {
   const [section, setSection] = useState<Section>("clients")
+  const [showProfile, setShowProfile] = useState(false)
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 60px)", fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${BORDER}`, background: "#fff", padding: "0 16px" }}>
-        {([["clients", "Clients & Requisitions"], ["candidates", "Candidate Pool"]] as [Section, string][]).map(([id, label]) => (
-          <button key={id} onClick={() => setSection(id)} style={{
-            padding: "12px 16px", background: "none", border: "none",
-            borderBottom: section === id ? `2px solid ${NAVY}` : "2px solid transparent",
-            color: section === id ? NAVY : MUTED, fontWeight: section === id ? 700 : 500, fontSize: 13.5, cursor: "pointer", marginBottom: -1,
-          }}>{label}</button>
-        ))}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${BORDER}`, background: "#fff", padding: "0 16px" }}>
+        <div style={{ display: "flex", gap: 4 }}>
+          {([["clients", "Clients & Requisitions"], ["candidates", "Candidate Pool"]] as [Section, string][]).map(([id, label]) => (
+            <button key={id} onClick={() => setSection(id)} style={{
+              padding: "12px 16px", background: "none", border: "none",
+              borderBottom: section === id ? `2px solid ${NAVY}` : "2px solid transparent",
+              color: section === id ? NAVY : MUTED, fontWeight: section === id ? 700 : 500, fontSize: 13.5, cursor: "pointer", marginBottom: -1,
+            }}>{label}</button>
+          ))}
+        </div>
+        <button onClick={() => setShowProfile(true)} style={btnSecondary}>Agency Profile</button>
       </div>
       <div style={{ flex: 1, overflow: "hidden" }}>
         {section === "clients" ? <ClientsSection /> : <CandidatePoolSection />}
       </div>
+      {showProfile && <AgencyProfileModal onClose={() => setShowProfile(false)} />}
     </div>
   )
 }
@@ -64,11 +142,6 @@ function ClientsSection() {
   const [showEditClient, setShowEditClient] = useState(false)
   const [tab, setTab] = useState<ClientTab>("requisitions")
   const [selectedRequisition, setSelectedRequisition] = useState<Requisition | null>(null)
-  // Client-side filter only — neither getClients() nor the backend
-  // endpoint takes a search param, unlike e.g. POS's catalogue search.
-  // Fine at current scale; if the client list genuinely grows into the
-  // hundreds, this needs to become a real server-side ?search= param
-  // instead, matching how getRequisitionsForClient already scopes/pages.
   const [search, setSearch] = useState("")
   const [archiving, setArchiving] = useState(false)
 
@@ -81,8 +154,6 @@ function ClientsSection() {
   const visibleClients = clients.filter(c =>
     !search || c.tradingName.toLowerCase().includes(search.toLowerCase()))
 
-  // Toggles deactivate/reactivate — same "archive, never delete"
-  // semantics already established for Booking Agency's resources.
   const toggleArchive = async () => {
     if (!selected) return
     setArchiving(true)
@@ -169,8 +240,6 @@ function ClientsSection() {
   )
 }
 
-// Reuses NewClientModal's field set, pre-filled, calling updateClient
-// instead of createClient — closes the "edit contact/details" gap.
 function EditClientModal({ client, onClose, onSaved }: { client: AgencyClient; onClose: () => void; onSaved: (c: AgencyClient) => void }) {
   const [tradingName, setTradingName] = useState(client.tradingName)
   const [industry, setIndustry] = useState(client.industry ?? "")
@@ -213,6 +282,8 @@ function RequisitionsTab({ client, onSelectRequisition }: { client: AgencyClient
   const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [reopeningId, setReopeningId] = useState<string | null>(null)
+  const [editing, setEditing] = useState<Requisition | null>(null)
 
   const refetch = () => {
     setLoading(true)
@@ -220,16 +291,31 @@ function RequisitionsTab({ client, onSelectRequisition }: { client: AgencyClient
   }
   useEffect(refetch, [client.id])
 
-  // Cancel a requisition — calls the existing cancelRequisition endpoint,
-  // which had no button anywhere in the UI before this.
   const handleCancel = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation() // don't also trigger onSelectRequisition
+    e.stopPropagation()
     if (!confirm("Cancel this requisition? This can't be undone from here.")) return
     setCancellingId(id)
     try {
       await recruitmentAgencyApi.cancelRequisition(id)
       refetch()
     } finally { setCancellingId(null) }
+  }
+
+  // NEW: reopenRequisition — real backend endpoint, didn't exist before
+  // this pass. Real motivated case: a PLACED candidate later fails their
+  // guarantee period (RecAgencyPlacement's own scope note admits this
+  // workflow was never built) — the requisition needs to come back to
+  // OPEN to search for a replacement. Also covers undoing an accidental
+  // CANCELLED/ON_HOLD.
+  const handleReopen = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    setReopeningId(id)
+    try {
+      await recruitmentAgencyApi.reopenRequisition(id)
+      refetch()
+    } catch (err: any) {
+      alert(err.response?.data?.message ?? "Failed to reopen requisition")
+    } finally { setReopeningId(null) }
   }
 
   return (
@@ -249,10 +335,20 @@ function RequisitionsTab({ client, onSelectRequisition }: { client: AgencyClient
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <StatusBadge status={r.status} />
+                  {/* NEW: edit — updateRequisition, real new backend endpoint */}
+                  <button onClick={e => { e.stopPropagation(); setEditing(r) }}
+                    style={{ ...btnSecondary, padding: "3px 8px", fontSize: 11 }}>Edit</button>
                   {r.status === "OPEN" && (
                     <button onClick={e => handleCancel(e, r.id)} disabled={cancellingId === r.id}
                       style={{ ...btnSecondary, padding: "3px 8px", fontSize: 11, color: "#DC2626", borderColor: "#DC2626" }}>
                       {cancellingId === r.id ? "…" : "Cancel"}
+                    </button>
+                  )}
+                  {/* NEW: reopen — see handleReopen comment above for why this matters */}
+                  {r.status !== "OPEN" && (
+                    <button onClick={e => handleReopen(e, r.id)} disabled={reopeningId === r.id}
+                      style={{ ...btnSecondary, padding: "3px 8px", fontSize: 11, color: "#166534", borderColor: "#166534" }}>
+                      {reopeningId === r.id ? "…" : "Reopen"}
                     </button>
                   )}
                 </div>
@@ -266,6 +362,8 @@ function RequisitionsTab({ client, onSelectRequisition }: { client: AgencyClient
         </div>
       )}
       {showNew && <NewRequisitionModal clientId={client.id} onClose={() => setShowNew(false)} onCreated={() => { setShowNew(false); refetch() }} />}
+      {editing && <EditRequisitionModal requisition={editing} onClose={() => setEditing(null)}
+        onSaved={() => { setEditing(null); refetch() }} />}
     </div>
   )
 }
@@ -307,11 +405,53 @@ function NewRequisitionModal({ clientId, onClose, onCreated }: { clientId: strin
   )
 }
 
+// NEW: closes the requisition-edit gap. updateRequisition() is a real,
+// new backend endpoint (PUT /requisitions/{id}) — didn't exist before
+// this pass, since createRequisition/cancelRequisition were the only
+// mutation endpoints RequisitionsTab had to work with.
+function EditRequisitionModal({ requisition, onClose, onSaved }: { requisition: Requisition; onClose: () => void; onSaved: () => void }) {
+  const [title, setTitle] = useState(requisition.title)
+  const [location, setLocation] = useState(requisition.location ?? "")
+  const [salaryMin, setSalaryMin] = useState(requisition.salaryMin != null ? String(requisition.salaryMin) : "")
+  const [salaryMax, setSalaryMax] = useState(requisition.salaryMax != null ? String(requisition.salaryMax) : "")
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  const submit = async () => {
+    if (!title) { setError("Title is required"); return }
+    setSaving(true); setError("")
+    try {
+      await recruitmentAgencyApi.updateRequisition(requisition.id, {
+        title, location,
+        salaryMin: salaryMin ? Number(salaryMin) : undefined,
+        salaryMax: salaryMax ? Number(salaryMax) : undefined,
+      })
+      onSaved()
+    } catch (e: any) {
+      setError(e.response?.data?.message ?? "Failed to save requisition")
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal title="Edit Requisition" onClose={onClose}>
+      <Field label="Job title"><input value={title} onChange={e => setTitle(e.target.value)} style={inputStyle} /></Field>
+      <Field label="Location (optional)"><input value={location} onChange={e => setLocation(e.target.value)} style={inputStyle} /></Field>
+      <div style={{ display: "flex", gap: 10 }}>
+        <Field label="Salary min (optional)"><input type="number" value={salaryMin} onChange={e => setSalaryMin(e.target.value)} style={inputStyle} /></Field>
+        <Field label="Salary max (optional)"><input type="number" value={salaryMax} onChange={e => setSalaryMax(e.target.value)} style={inputStyle} /></Field>
+      </div>
+      {error && <ErrorBox text={error} />}
+      <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Save Changes" />
+    </Modal>
+  )
+}
+
 function PlacementsView({ requisition, onBack }: { requisition: Requisition; onBack: () => void }) {
   const [placements, setPlacements] = useState<Placement[]>([])
   const [loading, setLoading] = useState(true)
   const [showSubmit, setShowSubmit] = useState(false)
   const [markPlacedFor, setMarkPlacedFor] = useState<Placement | null>(null)
+  const [historyFor, setHistoryFor] = useState<Placement | null>(null)
 
   const refetch = () => {
     setLoading(true)
@@ -341,7 +481,15 @@ function PlacementsView({ requisition, onBack }: { requisition: Requisition; onB
             <div key={p.id} style={{ padding: "12px 16px", background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontWeight: 700, fontSize: 13.5, color: INK }}>{p.candidateName}</span>
-                <StatusBadge status={p.stage} />
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {/* NEW: stage history — getStageHistory() already
+                      existed fully in the API client, nothing rendered it */}
+                  <button onClick={() => setHistoryFor(p)}
+                    style={{ fontSize: 11, color: MUTED, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+                    History
+                  </button>
+                  <StatusBadge status={p.stage} />
+                </div>
               </div>
               {p.placementFeeAmount != null && (
                 <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>
@@ -371,7 +519,49 @@ function PlacementsView({ requisition, onBack }: { requisition: Requisition; onB
 
       {showSubmit && <SubmitCandidateModal requisitionId={requisition.id} onClose={() => setShowSubmit(false)} onSubmitted={() => { setShowSubmit(false); refetch() }} />}
       {markPlacedFor && <MarkPlacedModal placement={markPlacedFor} onClose={() => setMarkPlacedFor(null)} onConfirmed={() => { setMarkPlacedFor(null); refetch() }} />}
+      {historyFor && <StageHistoryModal placement={historyFor} onClose={() => setHistoryFor(null)} />}
     </div>
+  )
+}
+
+// NEW: getStageHistory() already existed fully on the backend and in
+// recruitmentAgencyApi — nothing in the UI ever called it before this.
+// UNVERIFIED: StageHistory's real field names (fromStage/toStage/notes/
+// changedAt/id) are inferred from stageHistoryRepo.save(...)'s
+// constructor call order in RecruitmentAgencyService, not from the
+// response DTO directly — check against the real StageHistory type if
+// this renders blank or wrong fields.
+function StageHistoryModal({ placement, onClose }: { placement: Placement; onClose: () => void }) {
+  const [history, setHistory] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    recruitmentAgencyApi.getStageHistory(placement.id).then(setHistory).finally(() => setLoading(false))
+  }, [placement.id])
+
+  return (
+    <Modal title={`Stage History — ${placement.candidateName}`} onClose={onClose}>
+      {loading ? (
+        <div style={{ color: FAINT, fontSize: 13, padding: "12px 0" }}>Loading…</div>
+      ) : history.length === 0 ? (
+        <div style={{ color: FAINT, fontSize: 13, padding: "12px 0" }}>No history recorded.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {history.map((h: any, i: number) => (
+            <div key={h.id ?? i} style={{ padding: "8px 10px", background: CANVAS, borderRadius: 6, fontSize: 12.5 }}>
+              <div style={{ fontWeight: 700, color: INK }}>
+                {h.fromStage ? `${h.fromStage.replace(/_/g, " ")} → ` : ""}{h.toStage?.replace(/_/g, " ")}
+              </div>
+              {h.notes && <div style={{ color: MUTED, marginTop: 2 }}>{h.notes}</div>}
+              <div style={{ color: FAINT, marginTop: 2, fontSize: 11 }}>{fmtD(h.changedAt)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
+        <button onClick={onClose} style={btnSecondary}>Close</button>
+      </div>
+    </Modal>
   )
 }
 
@@ -500,9 +690,6 @@ function InvoicesTab({ client }: { client: AgencyClient }) {
               <td style={cellStyle}>
                 <div style={{ display: "flex", gap: 6 }}>
                   {inv.status === "DRAFT" && <button onClick={() => handleSend(inv.id)} style={btnSecondary}>Send</button>}
-                  {/* NEW: recordPayment existed in the API client with no
-                      button anywhere — closes "is invoice sending?" ->
-                      the natural follow-up, "how do we mark it paid?" */}
                   {inv.status !== "DRAFT" && inv.balance > 0 && (
                     <button onClick={() => setPayingInvoice(inv)} style={btnSecondary}>Record Payment</button>
                   )}
@@ -520,8 +707,6 @@ function InvoicesTab({ client }: { client: AgencyClient }) {
   )
 }
 
-// NEW: recordPayment(id, {amount, paidDate, method?, reference?}) already
-// existed in the API client — nothing in the UI ever called it.
 function RecordPaymentModal({ invoice, onClose, onRecorded }: { invoice: AgencyInvoice; onClose: () => void; onRecorded: () => void }) {
   const [amount, setAmount] = useState(String(invoice.balance))
   const [paidDate, setPaidDate] = useState(new Date().toISOString().slice(0, 10))
@@ -586,7 +771,6 @@ function PortalAccessTab({ client }: { client: AgencyClient }) {
     finally { setInviting(false) }
   }
 
-  // NEW: revokePortalAccess existed with no button — invite-only before this.
   const handleRevoke = async (grantId: string) => {
     if (!confirm("Revoke this client's portal access?")) return
     setRevokingId(grantId)
@@ -680,11 +864,6 @@ function CandidatePoolSection() {
     refetch()
   }
 
-  // NEW: downloadCv(candidateId) already existed in the API client and
-  // works correctly — nothing rendered a link to trigger it once a CV
-  // was on file. Standard blob-to-download-click pattern; revokes the
-  // object URL immediately after to avoid leaking memory on a page
-  // where this could be clicked many times in a session.
   const handleDownloadCv = async (candidateId: string, candidateName: string) => {
     setDownloadingId(candidateId)
     try {

@@ -21,7 +21,7 @@
  * the domain model differently than PayClient/PayFeeNote did — not
  * simply copied with names swapped.
  */
-@ApplicationModule(allowedDependencies = {"shared", "identity", "billing"})
+@ApplicationModule(allowedDependencies = {"shared", "identity", "billing", "evidence"})
 package za.co.handyflow.platform.recruitmentagency;
 
 import org.springframework.modulith.ApplicationModule;

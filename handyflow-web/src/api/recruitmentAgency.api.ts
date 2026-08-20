@@ -29,6 +29,10 @@ export const recruitmentAgencyApi = {
   createRequisition: (body: Partial<Requisition> & { clientId: string; title: string }) =>
     apiClient.post("/api/v1/recruitment-agency/requisitions", body).then(r => r.data as Requisition),
   cancelRequisition: (id: string) => apiClient.post(`/api/v1/recruitment-agency/requisitions/${id}/cancel`).then(r => r.data),
+  updateRequisition: (id: string, body: { title: string; description?: string; salaryMin?: number; salaryMax?: number; location?: string; employmentType?: string; targetStartDate?: string; notes?: string }) =>
+    apiClient.put(`/api/v1/recruitment-agency/requisitions/${id}`, body).then(r => r.data as Requisition),
+  reopenRequisition: (id: string) =>
+    apiClient.post(`/api/v1/recruitment-agency/requisitions/${id}/reopen`).then(r => r.data as Requisition),
 
   // Candidates — agency-wide pool, NOT client-scoped
   searchCandidates: (search: string, page = 0) =>

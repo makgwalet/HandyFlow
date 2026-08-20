@@ -1,22 +1,14 @@
 // src/pages/booking-agency/BookingAgencyPage.tsx
 //
 // Staff-facing single-page shell, same pattern as PayrollBureauPage.tsx
-// (client list + tabbed detail panel) — client list on the left,
-// selected client's detail (tabs) on the right.
+// (client list + tabbed detail panel).
 //
-// SCOPE: covers client onboarding, resource/offering management, and
-// the full booking lifecycle (create -> cancel/complete/no-show) as
-// complete, real flows. DELIBERATELY NO INVOICES/BILLING TAB — wait,
-// actually the invoices tab already exists below (monthlyRetainerAmount
-// resolved this since the original comment was written) — billing model
-// is flat monthly retainer, confirmed by GenerateInvoiceModal already
-// using client.monthlyRetainerAmount.
-//
-// UPDATED: closed five gaps between backend and frontend, all confirmed
-// against real api-client methods that already existed but were never
-// called — client edit, client archive, resource edit, offering
-// edit/deactivate, portal-access revoke, and invoice payment recording.
-// Deferred: agency profile screen — not asked for, deserves its own pass.
+// UPDATED: added Agency Profile — the tenant's own practice identity
+// (agencyName, registration, contact details, logo URL), distinct from
+// any individual client. getProfile()/upsertProfile() already existed
+// fully on the backend AND in this file's own API client with zero UI
+// before this change. Placed next to "+ New" in the sidebar header,
+// same position as Payroll Bureau's equivalent "Bureau Profile" button.
 import { useEffect, useState } from "react"
 import { bookingAgencyApi } from "../../api/bookingAgency.api"
 import type { BookAgencyClient, BookAgencyResource, BookAgencyOffering, BookAgencyBooking, PortalAccessGrant, BookAgencyInvoice } from "../../types/bookingAgency.types"
@@ -33,16 +25,88 @@ const FAINT = "#94A3B8"
 
 type Tab = "resources" | "offerings" | "bookings" | "invoices" | "portal"
 
+// NEW: the agency's own practice profile — tenant-wide, not per-client.
+// getProfile()/upsertProfile() already existed fully on the backend and
+// in bookingAgencyApi with zero UI before this change. No
+// defaultPlacementFeePct-equivalent field here — confirmed
+// BookAgencyProfile has no extra field beyond the shared six, unlike
+// Recruitment Agency's version.
+function AgencyProfileModal({ onClose }: { onClose: () => void }) {
+  const [agencyName, setAgencyName] = useState("")
+  const [registrationNumber, setRegistrationNumber] = useState("")
+  const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
+  const [physicalAddress, setPhysicalAddress] = useState("")
+  const [logoUrl, setLogoUrl] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    bookingAgencyApi.getProfile()
+      .then((p: any) => {
+        setAgencyName(p.agencyName ?? "")
+        setRegistrationNumber(p.registrationNumber ?? "")
+        setEmail(p.email ?? "")
+        setPhone(p.phone ?? "")
+        setPhysicalAddress(p.physicalAddress ?? "")
+        setLogoUrl(p.logoUrl ?? "")
+      })
+      .catch(() => { /* no profile yet — start blank, matching upsertProfile()'s own create-on-first-save fallback */ })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const submit = async () => {
+    if (!agencyName.trim()) { setError("Agency name is required"); return }
+    setSaving(true); setError("")
+    try {
+      await bookingAgencyApi.upsertProfile({
+        agencyName, registrationNumber: registrationNumber || undefined,
+        email: email || undefined, phone: phone || undefined,
+        physicalAddress: physicalAddress || undefined, logoUrl: logoUrl || undefined,
+      })
+      onClose()
+    } catch (e: any) {
+      setError(e.response?.data?.message ?? "Failed to save profile")
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal title="Agency Profile" onClose={onClose}>
+      {loading ? (
+        <div style={{ color: FAINT, fontSize: 13, padding: "12px 0" }}>Loading…</div>
+      ) : (
+        <>
+          <Field label="Agency name *"><input value={agencyName} onChange={e => setAgencyName(e.target.value)} style={inputStyle} /></Field>
+          <Field label="Registration number (optional)"><input value={registrationNumber} onChange={e => setRegistrationNumber(e.target.value)} style={inputStyle} /></Field>
+          <div style={{ display: "flex", gap: 10 }}>
+            <Field label="Email"><input type="email" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} /></Field>
+            <Field label="Phone"><input value={phone} onChange={e => setPhone(e.target.value)} style={inputStyle} /></Field>
+          </div>
+          <Field label="Physical address (optional)">
+            <textarea value={physicalAddress} onChange={e => setPhysicalAddress(e.target.value)}
+              style={{ ...inputStyle, minHeight: 50, resize: "vertical" as const, fontFamily: "inherit" }} />
+          </Field>
+          <Field label="Logo URL (optional — paste a link to an image)">
+            <input value={logoUrl} onChange={e => setLogoUrl(e.target.value)} style={inputStyle} placeholder="https://..." />
+          </Field>
+          {error && <ErrorBox text={error} />}
+          <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Save Profile" />
+        </>
+      )}
+    </Modal>
+  )
+}
+
 export function BookingAgencyPage() {
   const [clients, setClients] = useState<BookAgencyClient[]>([])
   const [clientsLoading, setClientsLoading] = useState(true)
   const [selected, setSelected] = useState<BookAgencyClient | null>(null)
   const [showNewClient, setShowNewClient] = useState(false)
   const [showEditClient, setShowEditClient] = useState(false)
+  const [showAgencyProfile, setShowAgencyProfile] = useState(false)
   const [archiving, setArchiving] = useState(false)
   const [tab, setTab] = useState<Tab>("resources")
-  // Client-side filter only — same caveat as Recruitment Agency's:
-  // getClients() has no server-side search param.
   const [search, setSearch] = useState("")
 
   const refetchClients = () => {
@@ -73,12 +137,14 @@ export function BookingAgencyPage() {
       <div style={{ width: 300, borderRight: `1px solid ${BORDER}`, background: "#fff", display: "flex", flexDirection: "column" }}>
         <div style={{ padding: 16, borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 style={{ fontSize: 15, fontWeight: 800, color: INK, margin: 0 }}>Booking Clients</h2>
-          <button onClick={() => setShowNewClient(true)}
-            style={{ padding: "5px 10px", background: NAVY, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-            + New
-          </button>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => setShowAgencyProfile(true)} style={btnSecondary}>Agency Profile</button>
+            <button onClick={() => setShowNewClient(true)}
+              style={{ padding: "5px 10px", background: NAVY, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              + New
+            </button>
+          </div>
         </div>
-        {/* NEW: client search */}
         <div style={{ padding: "10px 16px", borderBottom: `1px solid ${BORDER}` }}>
           <input placeholder="Search clients…" value={search} onChange={e => setSearch(e.target.value)}
             style={{ ...inputStyle, fontSize: 12.5 }} />
@@ -117,7 +183,6 @@ export function BookingAgencyPage() {
           <div style={{ padding: "24px 32px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
               <h1 style={{ fontSize: 20, fontWeight: 800, color: INK, margin: 0 }}>{selected.tradingName}</h1>
-              {/* NEW: edit + archive/reactivate */}
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => setShowEditClient(true)} style={btnSecondary}>Edit</button>
                 <button onClick={toggleArchive} disabled={archiving}
@@ -162,11 +227,13 @@ export function BookingAgencyPage() {
         <EditClientModal client={selected} onClose={() => setShowEditClient(false)}
           onSaved={updated => { setShowEditClient(false); setSelected(updated); refetchClients() }} />
       )}
+      {showAgencyProfile && (
+        <AgencyProfileModal onClose={() => setShowAgencyProfile(false)} />
+      )}
     </div>
   )
 }
 
-// NEW: reuses NewClientModal's field set, pre-filled, calling updateClient.
 function EditClientModal({ client, onClose, onSaved }: { client: BookAgencyClient; onClose: () => void; onSaved: (c: BookAgencyClient) => void }) {
   const [tradingName, setTradingName] = useState(client.tradingName)
   const [businessType, setBusinessType] = useState(client.businessType ?? "")
@@ -233,7 +300,6 @@ function ResourcesTab({ client }: { client: BookAgencyClient }) {
               <td style={cellStyle}><StatusBadge status={r.active ? "ACTIVE" : "INACTIVE"} /></td>
               <td style={cellStyle}>
                 <div style={{ display: "flex", gap: 6 }}>
-                  {/* NEW: updateResource existed with no edit UI */}
                   <button onClick={() => setEditing(r)} style={btnSecondary}>Edit</button>
                   <button onClick={() => toggleActive(r)} style={btnSecondary}>{r.active ? "Deactivate" : "Reactivate"}</button>
                 </div>
@@ -286,7 +352,6 @@ function NewResourceModal({ clientId, onClose, onCreated }: { clientId: string; 
   )
 }
 
-// NEW: closes the resource-edit gap — reuses NewResourceModal's shape, pre-filled.
 function EditResourceModal({ resource, onClose, onSaved }: { resource: BookAgencyResource; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(resource.name)
   const [roleDescription, setRoleDescription] = useState(resource.roleDescription ?? "")
@@ -362,7 +427,6 @@ function InvoicesTab({ client }: { client: BookAgencyClient }) {
               <td style={cellStyle}>
                 <div style={{ display: "flex", gap: 6 }}>
                   {inv.status === "DRAFT" && <button onClick={() => handleSend(inv.id)} style={btnSecondary}>Send</button>}
-                  {/* NEW: recordPayment existed with no button anywhere */}
                   {inv.status !== "DRAFT" && inv.balance > 0 && (
                     <button onClick={() => setPayingInvoice(inv)} style={btnSecondary}>Record Payment</button>
                   )}
@@ -412,8 +476,6 @@ function GenerateInvoiceModal({ client, onClose, onGenerated }: { client: BookAg
   )
 }
 
-// NEW: recordPayment(id, {amount, paidDate, method?, reference?}) already
-// existed in the API client — same shape as Recruitment Agency's version.
 function RecordPaymentModal({ invoice, onClose, onRecorded }: { invoice: BookAgencyInvoice; onClose: () => void; onRecorded: () => void }) {
   const [amount, setAmount] = useState(String(invoice.balance))
   const [paidDate, setPaidDate] = useState(new Date().toISOString().slice(0, 10))
@@ -474,9 +536,6 @@ function OfferingsTab({ client }: { client: BookAgencyClient }) {
   }
   useEffect(refetch, [client.id])
 
-  // NEW: deactivateOffering existed with no button — a discontinued
-  // service had no way to be hidden from booking while keeping its
-  // history intact.
   const handleDeactivate = async (id: string) => {
     setDeactivatingId(id)
     try { await bookingAgencyApi.deactivateOffering(id); refetch() }
@@ -556,7 +615,6 @@ function NewOfferingModal({ clientId, onClose, onCreated }: { clientId: string; 
   )
 }
 
-// NEW: closes the offering-edit gap — same field set as NewOfferingModal, pre-filled.
 function EditOfferingModal({ offering, onClose, onSaved }: { offering: BookAgencyOffering; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(offering.name)
   const [duration, setDuration] = useState(String(offering.durationMinutes))
@@ -677,8 +735,6 @@ function NewBookingModal({ client, onClose, onCreated }: { client: BookAgencyCli
       })
       onCreated()
     } catch (e: any) {
-      // SLOT_CONFLICT surfaces here with a clear message from the backend's
-      // own overlap check — shown as-is rather than a generic error.
       setError(e.response?.data?.message ?? "Failed to create booking")
     } finally { setSaving(false) }
   }
@@ -736,7 +792,6 @@ function PortalAccessTab({ client }: { client: BookAgencyClient }) {
     } finally { setInviting(false) }
   }
 
-  // NEW: revokePortalAccess existed with no button.
   const handleRevoke = async (grantId: string) => {
     if (!confirm("Revoke this client's portal access?")) return
     setRevokingId(grantId)

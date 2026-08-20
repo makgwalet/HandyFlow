@@ -74,6 +74,12 @@ public class PayClient {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    @Column(name = "address", columnDefinition = "TEXT")
+    private String address;
+
+    @Column(name = "logo_evidence_id")
+    private UUID logoEvidenceId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -128,6 +134,18 @@ public class PayClient {
         this.notes = notes;
         this.updatedAt = Instant.now();
     }
+
+    public void setLogoEvidenceId(java.util.UUID logoEvidenceId) {
+        this.logoEvidenceId = logoEvidenceId;
+        this.updatedAt = java.time.Instant.now();
+    }
+
+    public java.util.UUID getLogoEvidenceId() {
+        return this.logoEvidenceId;
+    }
+
+    public void setAddress(String address) { this.address = address; this.updatedAt = java.time.Instant.now(); }
+    public String getAddress() { return this.address; }
 
     public void offboard() {
         this.status = "OFFBOARDED";

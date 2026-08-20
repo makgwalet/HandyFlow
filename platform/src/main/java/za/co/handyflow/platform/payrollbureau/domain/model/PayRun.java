@@ -72,6 +72,9 @@ public class PayRun {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "payslips_auto_sent_at")
+    private java.time.Instant payslipsAutoSentAt;
+
     public static PayRun create(UUID tenantId, UUID payClientId, String payRunNumber,
                                 LocalDate periodStart, LocalDate periodEnd, LocalDate payDate, int taxYear) {
         PayRun r = new PayRun();
@@ -85,6 +88,12 @@ public class PayRun {
         r.status = "DRAFT";
         r.createdAt = Instant.now();
         return r;
+    }
+
+    public java.time.Instant getPayslipsAutoSentAt() { return this.payslipsAutoSentAt; }
+
+    public void markPayslipsAutoSent() {
+        this.payslipsAutoSentAt = java.time.Instant.now();
     }
 
     public void complete(BigDecimal totalGross, BigDecimal totalPaye, BigDecimal totalUif,

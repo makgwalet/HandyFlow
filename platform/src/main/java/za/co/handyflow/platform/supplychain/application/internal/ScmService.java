@@ -49,6 +49,7 @@ public class ScmService {
     private final ScRemittanceAdvicePdfGenerator remittanceAdvicePdfGenerator;
 
     private final TenantSequenceService       sequenceService;
+    private final za.co.handyflow.platform.controls.application.ControlExceptionFacade controlExceptionFacade;
 
     /** Tolerance for 3-way match: invoice may differ from PO by up to this fraction. */
     private static final BigDecimal MATCH_TOLERANCE = new BigDecimal("0.02"); // 2%
@@ -621,6 +622,16 @@ public class ScmService {
                     .orElse("Unknown supplier");
             notificationService.notifyInvoiceDisputed(tid, saved.getInvoiceNumber(),
                     supplierName, saved.getMatchNotes());
+
+            // NEW: Stage 1, Option C — SCM's own matchStatus stays exactly
+            // as it was, untouched, still the real source of truth for
+            // SCM's own screens. This is an ADDITIONAL parallel record for
+            // the shared cross-module "needs attention" board, raised at
+            // the same moment the existing notification already fires.
+            controlExceptionFacade.raise(tenantId, "supplychain", "THREE_WAY_MATCH_DISPUTE",
+                            "ScSupplierInvoice", saved.getId(), "WARNING",
+                           "Invoice " + saved.getInvoiceNumber() + " from " + supplierName
+                                   + " — " + saved.getMatchNotes());
         }
 
         return saved;
@@ -683,6 +694,8 @@ public class ScmService {
                 .orElseThrow(() -> new HandyFlowException("Invoice not found",
                         HttpStatus.NOT_FOUND, "NOT_FOUND"));
         inv.overrideDisputeAndApprove(approverId, approverName, reason);
+        controlExceptionFacade.resolveForEntity(tenantId, "ScSupplierInvoice", id,
+                  approverId, approverName, "Overridden: " + reason);
         log.info("[SCM] Invoice {} dispute overridden and approved by {}", inv.getInvoiceNumber(), approverName);
         return invoiceRepo.save(inv);
     }
@@ -700,6 +713,8 @@ public class ScmService {
                 .orElseThrow(() -> new HandyFlowException("Invoice not found",
                         HttpStatus.NOT_FOUND, "NOT_FOUND"));
         inv.cancel(reason);
+        controlExceptionFacade.resolveForEntity(tenantId, "ScSupplierInvoice", id,
+        null, "System", "Invoice cancelled: " + reason);
         log.info("[SCM] Invoice {} cancelled: {}", inv.getInvoiceNumber(), reason);
         return invoiceRepo.save(inv);
     }

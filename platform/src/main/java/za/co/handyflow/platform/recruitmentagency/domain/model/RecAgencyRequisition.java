@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -111,13 +112,12 @@ public class RecAgencyRequisition {
         this.updatedAt = Instant.now();
     }
 
-    public void reopen() {
-        this.status = "OPEN";
-        this.updatedAt = Instant.now();
-    }
 
     public void update(String title, String description, BigDecimal salaryMin, BigDecimal salaryMax,
-                       String location, String employmentType, java.time.LocalDate targetStartDate, String notes) {
+                       String location, String employmentType, LocalDate targetStartDate, String notes) {
+        if ("CANCELLED".equals(this.status)) {
+            throw new IllegalStateException("Cannot edit a cancelled requisition");
+        }
         this.title = title;
         this.description = description;
         this.salaryMin = salaryMin;
@@ -126,6 +126,19 @@ public class RecAgencyRequisition {
         this.employmentType = employmentType;
         this.targetStartDate = targetStartDate;
         this.notes = notes;
+        this.updatedAt = Instant.now();
+    }
+
+    // Real, motivated case: a PLACED candidate later fails their guarantee
+// period (RecAgencyPlacement's own scope note admits this workflow was
+// never built) — the requisition needs to come back to OPEN to search
+// for a replacement. Also covers undoing an accidental CANCELLED/ON_HOLD.
+    public void reopen() {
+        if ("OPEN".equals(this.status)) {
+            throw new IllegalStateException("This requisition is already open");
+        }
+        this.status = "OPEN";
+        this.filledAt = null;
         this.updatedAt = Instant.now();
     }
 }

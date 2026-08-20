@@ -16,8 +16,10 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import org.springframework.http.HttpStatus;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -49,6 +51,8 @@ public class PayrollBureauService {
     private final PayPaymentRepository paymentRepo;
     private final za.co.handyflow.platform.shared.EmailService emailService;
     private final PayPortalAccessGrantRepository portalGrantRepo;
+    private final PayBureauPayslipPdfGenerator payslipPdfGenerator;
+    private final za.co.handyflow.platform.evidence.application.EvidenceFacade evidenceFacade;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -90,6 +94,11 @@ public class PayrollBureauService {
         PayClient client = PayClient.create(tenantId.getValue(), req.tradingName(), req.registrationNumber(),
                 req.payeReference(), req.uifReference(), req.sdlReference(),
                 req.payFrequency(), req.payDay(), req.contactName(), req.contactEmail(), req.contactPhone());
+        // FIX: req.address() existed on the DTO but was never actually
+        // used anywhere — the address field would silently never save
+        // regardless of what the frontend sent. Caught while wiring the
+        // logo/address feature, not something separately reported.
+        client.setAddress(req.address());
         clientRepo.save(client);
         log.info("Payroll bureau client created tenant={} client={}", tenantId.getValue(), req.tradingName());
         return toClientResponse(client);
@@ -100,6 +109,9 @@ public class PayrollBureauService {
         PayClient client = findActiveClient(tenantId, id);
         client.update(req.tradingName(), req.contactName(), req.contactEmail(),
                 req.contactPhone(), req.payFrequency(), req.payDay(), null);
+        // Same fix as createClient() above — address() was captured by
+        // the DTO but never applied to the entity on update either.
+        client.setAddress(req.address());
         clientRepo.save(client);
         return toClientResponse(client);
     }
@@ -149,6 +161,9 @@ public class PayrollBureauService {
                 req.firstName(), req.lastName(), req.startDate(), req.grossSalary());
         emp.setIdNumber(req.idNumber());
         emp.setDateOfBirth(req.dateOfBirth());
+        emp.setEmail(req.email());
+        emp.setTaxNumber(req.taxNumber());
+        emp.setPhone(req.phone());
         emp.setTravelAllowance(req.travelAllowance() != null ? req.travelAllowance() : java.math.BigDecimal.ZERO);
         emp.setPensionContribution(req.pensionContribution() != null ? req.pensionContribution() : java.math.BigDecimal.ZERO);
         emp.setMedicalAidContribution(req.medicalAidContribution() != null ? req.medicalAidContribution() : java.math.BigDecimal.ZERO);
@@ -170,26 +185,31 @@ public class PayrollBureauService {
     public PayRunResponse createPayRun(TenantId tenantId, UUID payClientId, CreatePayRunRequest req) {
         requireClientOwnership(tenantId, payClientId);
 
-        // NEW: confirmed missing via real testing — four pay runs were
-        // created for the identical client + period with no guard, producing
-        // four duplicate PROCESSED runs and, downstream, four duplicate fee
-        // notes. Blocks any new run whose period overlaps an existing one
-        // for this client, DRAFT or PROCESSED — a second DRAFT for an
-        // already-covered period is just as wrong as a second PROCESSED one.
         boolean overlaps = payRunRepo.findByClient(payClientId, Pageable.unpaged()).stream()
-                 .anyMatch(existing -> !existing.getPeriodEnd().isBefore(req.periodStart())
-                            && !existing.getPeriodStart().isAfter(req.periodEnd()));
-           if (overlaps) {
-              throw new HandyFlowException(
-                 "A pay run already exists covering this period", HttpStatus.CONFLICT, "PERIOD_OVERLAP");
-            }
+                .anyMatch(existing -> !existing.getPeriodEnd().isBefore(req.periodStart())
+                        && !existing.getPeriodStart().isAfter(req.periodEnd()));
+        if (overlaps) {
+            throw new HandyFlowException(
+                    "A pay run already exists covering this period", HttpStatus.CONFLICT, "PERIOD_OVERLAP");
+        }
 
+        if (req.periodEnd().isBefore(req.periodStart())) {
+            throw new HandyFlowException(
+                    "Period end cannot be before period start", HttpStatus.BAD_REQUEST, "INVALID_PERIOD");
+        }
 
         // SA tax year runs Mar-Feb — same rule as hr.PayrollService.createPayRun()
         int taxYear = req.periodStart().getMonthValue() >= 3
                 ? req.periodStart().getYear() : req.periodStart().getYear() - 1;
         String number = "PR" + String.format("%05d",
                 sequenceService.nextValue(tenantId, "PAYROLLBUREAU_PAYRUN:" + payClientId));
+
+        if (employeeRepo.findActiveByClient(payClientId).isEmpty()) {
+            throw new HandyFlowException(
+                    "This client has no active employees — add at least one before creating a pay run",
+                    HttpStatus.BAD_REQUEST, "NO_EMPLOYEES");
+        }
+
         PayRun run = PayRun.create(tenantId.getValue(), payClientId, number,
                 req.periodStart(), req.periodEnd(), req.payDate(), taxYear);
         payRunRepo.save(run);
@@ -299,9 +319,6 @@ public class PayrollBureauService {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("A file is required");
         }
-        // Confirms the employee exists and belongs to this tenant before
-        // storing anything — same ownership-check-before-storage-write
-        // ordering as every other upload flow in this codebase.
         employeeRepo.findActiveById(tenantId.getValue(), payEmployeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("PayEmployee", payEmployeeId.toString()));
 
@@ -325,10 +342,6 @@ public class PayrollBureauService {
 
     @Transactional(readOnly = true)
     public List<PayEmployeeDocumentResponse> getDocuments(TenantId tenantId, UUID payEmployeeId) {
-        // Same tenant-ownership confirmation as uploadDocument() above —
-        // don't skip this just because it's a read, per the same
-        // discipline flagged as a gap (and needing completion) for
-        // getPayslips() back in Section 49.
         employeeRepo.findActiveById(tenantId.getValue(), payEmployeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("PayEmployee", payEmployeeId.toString()));
         return documentRepo.findByEmployee(payEmployeeId).stream().map(this::toDocumentResponse).toList();
@@ -349,14 +362,6 @@ public class PayrollBureauService {
         return new DownloadedDocument(content, doc.getFileName(), doc.getContentType());
     }
 
-    /**
-     * Generates an invoice FROM a processed pay run — deliberately
-     * requires PROCESSED status (not DRAFT), since billing for payroll
-     * that hasn't actually been calculated yet would let a fee note's
-     * employee count/amount diverge from what was really run. Same
-     * "don't bill ahead of the real event" discipline as
-     * accountant.TimeEntry.markBilled() only accepting UNBILLED entries.
-     */
     @Transactional
     public PayFeeNoteResponse generateFeeNote(TenantId tenantId, UUID payClientId, CreatePayFeeNoteRequest req) {
         PayClient client = findActiveClient(tenantId, payClientId);
@@ -399,31 +404,20 @@ public class PayrollBureauService {
         PayClient client = clientRepo.findActiveById(tenantId.getValue(), feeNote.getPayClientId())
                 .orElseThrow(() -> new ResourceNotFoundException("PayClient", feeNote.getPayClientId().toString()));
 
-        // FIX: was `if (client.getContactEmail() != null) { ...email... }`
-        // — a client with no contact email would silently flip to SENT
-        // with no email ever firing and no error telling anyone that
-        // happened. Confirmed real via testing tonight. Now fails loudly
-        // instead, matching processPayRun()'s own
-        // HandyFlowException/BAD_REQUEST pattern elsewhere in this class.
         if (client.getContactEmail() == null || client.getContactEmail().isBlank()) {
-                throw new HandyFlowException(
-                         "This client has no contact email on file — add one before sending invoices",
-                          HttpStatus.BAD_REQUEST, "MISSING_CONTACT_EMAIL");
+            throw new HandyFlowException(
+                    "This client has no contact email on file — add one before sending invoices",
+                    HttpStatus.BAD_REQUEST, "MISSING_CONTACT_EMAIL");
         }
 
         feeNote.markSent();
         feeNoteRepo.save(feeNote);
 
-        if (client.getContactEmail() != null) {
-            // Reuses accountant's exact feeNote() email template — same shape of
-            // invoice email (invoice number, amount, due date). Guard clause
-            // above already guarantees contactEmail is non-blank here.
-            emailService.send(client.getContactEmail(),
-                    "Invoice " + feeNote.getInvoiceNumber(),
-                        za.co.handyflow.platform.shared.EmailTemplates.feeNote(
+        emailService.send(client.getContactEmail(),
+                "Invoice " + feeNote.getInvoiceNumber(),
+                za.co.handyflow.platform.shared.EmailTemplates.feeNote(
                         client.getTradingName(), feeNote.getInvoiceNumber(),
-                       feeNote.getTotal().toPlainString(), feeNote.getDueDate().toString()));
-        }
+                        feeNote.getTotal().toPlainString(), feeNote.getDueDate().toString()));
         return toFeeNoteResponse(feeNote);
     }
 
@@ -458,10 +452,6 @@ public class PayrollBureauService {
                                                       String email, UUID invitedBy) {
         PayClient client = findActiveClient(tenantId, payClientId);
 
-        // Refuses a duplicate invite for the same email+client rather
-        // than silently creating a second grant or silently doing
-        // nothing — either would be confusing for staff to reason about
-        // later. Same check accountant.invitePortalUser() already does.
         boolean alreadyGranted = portalGrantRepo.findByTenantAndClient(tenantId.getValue(), payClientId).stream()
                 .anyMatch(g -> g.getInviteEmail().equalsIgnoreCase(email) && !"REVOKED".equals(g.getStatus()));
         if (alreadyGranted) {
@@ -473,13 +463,10 @@ public class PayrollBureauService {
         PayPortalAccessGrant grant = PayPortalAccessGrant.createInvite(tenantId.getValue(), payClientId, email, invitedBy);
         portalGrantRepo.save(grant);
 
-        // Reuses accountant's exact portalInvite() email template — same
-        // "you've been invited to a client portal" shape, no reason for
-        // a bureau-specific duplicate.
         emailService.send(email, client.getTradingName() + " has invited you to their payroll portal",
                 za.co.handyflow.platform.shared.EmailTemplates.portalInvite(
                         client.getTradingName(),
-                        "Payroll Bureau", // consider pulling from PayBureauProfile.firmName instead of this literal
+                        "Payroll Bureau",
                         frontendUrl + "/payroll-bureau/portal/auth/accept-invite?token=" + grant.getInviteToken()
                 ));
 
@@ -507,6 +494,144 @@ public class PayrollBureauService {
         return toGrantResponse(grant);
     }
 
+    @Transactional
+    public PayEmployeeResponse updateEmployee(TenantId tenantId, UUID payClientId, UUID employeeId,
+                                              UpdatePayEmployeeRequest req) {
+        requireClientOwnership(tenantId, payClientId);
+        PayEmployee emp = employeeRepo.findActiveById(tenantId.getValue(), employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("PayEmployee", employeeId.toString()));
+        if (!emp.getPayClientId().equals(payClientId)) {
+            throw new ResourceNotFoundException("PayEmployee", employeeId.toString());
+        }
+        emp.setIdNumber(req.idNumber());
+        emp.setTaxNumber(req.taxNumber());
+        emp.setDateOfBirth(req.dateOfBirth());
+        emp.setEmail(req.email());
+        emp.setPhone(req.phone());
+        emp.setGrossSalary(req.grossSalary());
+        emp.setTravelAllowance(req.travelAllowance() != null ? req.travelAllowance() : BigDecimal.ZERO);
+        emp.setPensionContribution(req.pensionContribution() != null ? req.pensionContribution() : BigDecimal.ZERO);
+        emp.setMedicalAidContribution(req.medicalAidContribution() != null ? req.medicalAidContribution() : BigDecimal.ZERO);
+        emp.setBankDetails(req.bankName(), req.bankAccountNumber(), req.bankBranchCode());
+        employeeRepo.save(emp);
+        log.info("Updated payroll bureau employee={} tenant={}", employeeId, tenantId.getValue());
+        return toEmployeeResponse(emp);
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] generatePayslipPdf(TenantId tenantId, UUID payRunId, UUID payslipId) {
+        PayRun run = payRunRepo.findByTenantAndId(tenantId.getValue(), payRunId)
+                .orElseThrow(() -> new ResourceNotFoundException("PayRun", payRunId.toString()));
+        PayClient client = findActiveClient(tenantId, run.getPayClientId());
+        Payslip payslip = payslipRepo.findById(payslipId)
+                .filter(p -> p.getPayRunId().equals(payRunId))
+                .orElseThrow(() -> new ResourceNotFoundException("Payslip", payslipId.toString()));
+        PayEmployee emp = employeeRepo.findActiveById(tenantId.getValue(), payslip.getPayEmployeeId())
+                .orElseThrow(() -> new ResourceNotFoundException("PayEmployee", payslip.getPayEmployeeId().toString()));
+        return payslipPdfGenerator.generate(payslip, emp, run, client, tryLoadLogoBytes(tenantId, client));
+    }
+
+    public record PayslipDeliveryResult(int sent, int skippedNoEmail, List<String> skippedEmployeeNames) {}
+
+    @Transactional(readOnly = true)
+    public PayslipDeliveryResult emailPayslips(TenantId tenantId, UUID payRunId) {
+        PayRun run = payRunRepo.findByTenantAndId(tenantId.getValue(), payRunId)
+                .orElseThrow(() -> new ResourceNotFoundException("PayRun", payRunId.toString()));
+        PayClient client = findActiveClient(tenantId, run.getPayClientId());
+        // FIX: logoBytes was referenced inside the loop below but never
+        // actually declared anywhere in this method — the exact
+        // "Cannot resolve symbol 'logoBytes'" compile error. Loaded once
+        // here, outside the loop, since it's the same file for every
+        // employee in this run — no reason to hit EvidenceFacade.download()
+        // once per employee for identical bytes.
+        byte[] logoBytes = tryLoadLogoBytes(tenantId, client);
+        List<Payslip> payslips = payslipRepo.findByPayRun(payRunId);
+
+        int sent = 0;
+        List<String> skipped = new ArrayList<>();
+        for (Payslip p : payslips) {
+            PayEmployee emp = employeeRepo.findActiveById(tenantId.getValue(), p.getPayEmployeeId()).orElse(null);
+            if (emp == null || emp.getEmail() == null || emp.getEmail().isBlank()) {
+                skipped.add(emp != null ? emp.getFirstName() + " " + emp.getLastName() : "Unknown");
+                continue;
+            }
+            byte[] pdf = payslipPdfGenerator.generate(p, emp, run, client, logoBytes);
+            String subject = "Payslip — " + run.getPayRunNumber();
+            String body = "Dear " + emp.getFirstName() + ",\n\nPlease find your payslip for "
+                    + run.getPeriodStart() + " to " + run.getPeriodEnd() + " attached.\n\n"
+                    + "Net pay: R " + p.getNetPay().setScale(2, java.math.RoundingMode.HALF_UP);
+            emailService.sendWithAttachment(emp.getEmail(), subject, body, "payslip.pdf", pdf);
+            sent++;
+        }
+        log.info("Payslip email delivery run={} sent={} skipped={}", payRunId, sent, skipped.size());
+        return new PayslipDeliveryResult(sent, skipped.size(), skipped);
+    }
+
+    // Third real EvidenceFacade consumer — same shape as Recruitment
+    // Agency's CV migration: store the evidenceId (never the raw
+    // storageKey), resolve through the facade, never touch
+    // FileStorageService directly.
+
+    @Transactional
+    public PayClientResponse attachLogo(TenantId tenantId, UUID clientId,
+                                        org.springframework.web.multipart.MultipartFile file,
+                                        UUID uploadedBy, String uploadedByName) {
+        PayClient client = findActiveClient(tenantId, clientId);
+        za.co.handyflow.platform.evidence.dto.EvidenceResponse evidence = evidenceFacade.attach(
+                tenantId, file, "LOGO", "payrollbureau", "PayClient", clientId, null, uploadedBy, uploadedByName);
+        client.setLogoEvidenceId(evidence.id());
+        clientRepo.save(client);
+        log.info("Logo attached client={} tenant={}", clientId, tenantId.getValue());
+        return toClientResponse(client);
+    }
+
+    @Transactional(readOnly = true)
+    public za.co.handyflow.platform.evidence.application.EvidenceFacade.DownloadedEvidence downloadLogo(
+            TenantId tenantId, UUID clientId) {
+        PayClient client = findActiveClient(tenantId, clientId);
+        if (client.getLogoEvidenceId() == null) {
+            throw new ResourceNotFoundException("Logo", clientId.toString());
+        }
+        return evidenceFacade.download(tenantId, client.getLogoEvidenceId());
+    }
+
+    @Transactional
+    public BureauProfileResponse attachProfileLogo(TenantId tenantId, org.springframework.web.multipart.MultipartFile file,
+                                                   UUID uploadedBy, String uploadedByName) {
+        PayBureauProfile profile = profileRepo.findByTenantId(tenantId.getValue())
+                .orElseThrow(() -> new ResourceNotFoundException("BureauProfile", tenantId.getValue().toString()));
+        za.co.handyflow.platform.evidence.dto.EvidenceResponse evidence = evidenceFacade.attach(
+                tenantId, file, "LOGO", "payrollbureau", "BureauProfile", profile.getId(), null, uploadedBy, uploadedByName);
+        profile.setLogoEvidenceId(evidence.id());
+        profileRepo.save(profile);
+        return toProfileResponse(profile);
+    }
+
+    @Transactional(readOnly = true)
+    public za.co.handyflow.platform.evidence.application.EvidenceFacade.DownloadedEvidence downloadProfileLogo(TenantId tenantId) {
+        PayBureauProfile profile = profileRepo.findByTenantId(tenantId.getValue())
+                .orElseThrow(() -> new ResourceNotFoundException("BureauProfile", tenantId.getValue().toString()));
+        if (profile.getLogoEvidenceId() == null) {
+            throw new ResourceNotFoundException("Logo", tenantId.getValue().toString());
+        }
+        return evidenceFacade.download(tenantId, profile.getLogoEvidenceId());
+    }
+
+    // Used internally by payslip generation — logo bytes only, no
+    // metadata, deliberately swallows failure. A missing/corrupt logo
+    // should never block a payslip from generating; the payslip is the
+    // thing that actually matters, the logo is cosmetic.
+    private byte[] tryLoadLogoBytes(TenantId tenantId, PayClient client) {
+        if (client.getLogoEvidenceId() == null) return null;
+        try {
+            return evidenceFacade.download(tenantId, client.getLogoEvidenceId()).content();
+        } catch (Exception e) {
+            log.warn("Failed to load logo for client={}, generating payslip without it: {}",
+                    client.getId(), e.getMessage());
+            return null;
+        }
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private PayClient findActiveClient(TenantId tenantId, UUID id) {
@@ -523,7 +648,8 @@ public class PayrollBureauService {
         return new PayClientResponse(c.getId(), c.getTradingName(), c.getRegistrationNumber(),
                 c.getPayeReference(), c.getUifReference(), c.getSdlReference(),
                 c.getPayFrequency(), c.getPayDay(), c.getContactName(), c.getContactEmail(),
-                c.getContactPhone(), c.getOnboardedAt(), c.getStatus(), c.getNotes(), c.getCreatedAt());
+                c.getContactPhone(), c.getOnboardedAt(), c.getStatus(), c.getNotes(),
+                c.getAddress(), c.getLogoEvidenceId() != null, c.getCreatedAt());
     }
 
     private void requireClientOwnership(TenantId tenantId, UUID payClientId) {
@@ -535,7 +661,8 @@ public class PayrollBureauService {
     //-- Mapper ------------------------------------
     private PayEmployeeResponse toEmployeeResponse(PayEmployee e) {
         return new PayEmployeeResponse(e.getId(), e.getEmployeeNumber(), e.getFirstName(), e.getLastName(),
-                e.getFullName(), e.getIdNumber(), e.getDateOfBirth(), e.getGrossSalary(), e.getTravelAllowance(),
+                e.getFullName(), e.getIdNumber(), e.getTaxNumber(), e.getDateOfBirth(), e.getEmail(), e.getPhone(),
+                e.getGrossSalary(), e.getTravelAllowance(),
                 e.getPensionContribution(), e.getMedicalAidContribution(), e.getBankName(),
                 e.getBankAccountNumber(), e.getBankBranchCode(), e.getStartDate(), e.getEndDate(),
                 e.getStatus(), e.getCreatedAt());

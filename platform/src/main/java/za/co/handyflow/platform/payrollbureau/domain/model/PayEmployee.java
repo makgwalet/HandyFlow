@@ -64,6 +64,15 @@ public class PayEmployee {
     @Column(name = "medical_aid_contribution", precision = 15, scale = 2)
     private BigDecimal medicalAidContribution = BigDecimal.ZERO;
 
+    @Column(name = "email")
+    private String email;
+
+    @Column(name = "tax_number")
+    private String taxNumber;
+
+    @Column(name = "phone")
+    private String phone;
+
     @Column(name = "bank_name")
     private String bankName;
 
@@ -126,6 +135,14 @@ public class PayEmployee {
         this.endDate = endDate;
         this.updatedAt = Instant.now();
     }
+
+    public void setEmail(String email) {
+          this.email = email;
+    }
+
+    public void setTaxNumber(String v) { this.taxNumber = v; this.updatedAt = Instant.now(); }
+
+    public void setPhone(String v) { this.phone = v; this.updatedAt = Instant.now(); }
 
     public void softDelete() {
         this.deletedAt = Instant.now();
