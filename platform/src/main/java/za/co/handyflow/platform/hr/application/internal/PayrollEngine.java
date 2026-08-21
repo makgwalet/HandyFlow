@@ -1,165 +1,75 @@
 package za.co.handyflow.platform.hr.application.internal;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import za.co.handyflow.platform.hr.domain.model.HrEmployee;
-import za.co.handyflow.platform.shared.SarsTaxRebate;
+import za.co.handyflow.platform.shared.SarsPayrollCalculator;
+import za.co.handyflow.platform.shared.SarsPayrollResult;
 import za.co.handyflow.platform.shared.SarsTaxRebateRepository;
-import za.co.handyflow.platform.shared.SarsTaxTable;
 import za.co.handyflow.platform.shared.SarsTaxTableRepository;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.LocalDate;
-import java.util.List;
 
+/**
+ * FIX: backlog 1.4 — "Duplicate PAYE/UIF/SDL statutory payroll calculation."
+ * <p>
+ * Was an independent PAYE/UIF/SDL implementation, confirmed
+ * formula-for-formula identical to payrollbureau.PayrollBureauEngine's own
+ * (see PayrollEngineParityTest, which already locked that in as a
+ * regression guard before this change). Now a thin adapter over
+ * {@link SarsPayrollCalculator} — see that class's own Javadoc for the
+ * full extraction rationale and the one genuine behaviour discrepancy
+ * found and resolved during the consolidation.
+ * <p>
+ * PUBLIC CONSTRUCTOR DELIBERATELY UNCHANGED — still takes the two repos
+ * directly, exactly as before, rather than a SarsPayrollCalculator.
+ * PayrollEngineParityTest constructs this class directly with
+ * {@code new PayrollEngine(taxTableRepo, taxRebateRepo)}; preserving that
+ * exact signature means this refactor requires zero test changes, and
+ * that same parity test now additionally proves the extraction didn't
+ * alter behaviour — both engines still produce identical output, because
+ * both are now backed by the same calculator.
+ */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class PayrollEngine {
 
-    private final SarsTaxTableRepository taxTableRepo;
-    private final SarsTaxRebateRepository taxRebateRepo;
+    private final SarsPayrollCalculator calculator;
 
-    // UIF ceiling: R17,712/month (updated March 2024, Act 63 of 2001)
-    private static final BigDecimal UIF_MONTHLY_CEILING = new BigDecimal("17712.00");
-    private static final BigDecimal UIF_RATE            = new BigDecimal("0.01");  // 1%
-    private static final BigDecimal SDL_RATE            = new BigDecimal("0.01");  // 1%
-    private static final BigDecimal SDL_THRESHOLD       = new BigDecimal("500000.00");
+    public PayrollEngine(SarsTaxTableRepository taxTableRepo, SarsTaxRebateRepository taxRebateRepo) {
+        this.calculator = new SarsPayrollCalculator(taxTableRepo, taxRebateRepo);
+    }
 
-    // FIX 3.4: SARS binding: only 20% of travel allowance is exempt from tax
-    // where no accurate records are kept (80% is taxable — ITA s.8(1)(b))
-    private static final BigDecimal TRAVEL_TAXABLE_FRACTION = new BigDecimal("0.80");
-
-    // FIX 3.6: Medical Tax Credit rates 2025/26 — not a deduction but a credit
-    // R364 per month for the taxpayer, R364 for first dependant, R246 for each additional
-    private static final BigDecimal MTC_PRIMARY     = new BigDecimal("364.00");
-    private static final BigDecimal MTC_FIRST_DEP   = new BigDecimal("364.00");
-    private static final BigDecimal MTC_ADDITIONAL  = new BigDecimal("246.00");
-
-    public PayrollResult calculate(HrEmployee employee, int taxYear,
-                                   BigDecimal annualPayroll) {
-        BigDecimal monthlySalary   = employee.getGrossSalary();
-        BigDecimal travelAllowance = nvl(employee.getTravelAllowance());
-        BigDecimal pension         = nvl(employee.getPensionContribution());
-        BigDecimal medicalAid      = nvl(employee.getMedicalAidContribution());
-
-        // ── Step 1: Annual taxable income ─────────────────────────────────────
-        BigDecimal annualGross   = monthlySalary.multiply(BigDecimal.valueOf(12));
-        // FIX: 80% of travel allowance is taxable, not 100%
-        BigDecimal annualTravel  = travelAllowance
-                .multiply(TRAVEL_TAXABLE_FRACTION)
-                .multiply(BigDecimal.valueOf(12));
-        BigDecimal annualPension = pension.multiply(BigDecimal.valueOf(12));
-
-        // Pension deduction: Section 11(k) — capped at 27.5% of income or R350,000
-        BigDecimal maxPensionDeduction = annualGross
-                .add(annualTravel)
-                .multiply(new BigDecimal("0.275"))
-                .min(new BigDecimal("350000.00"));
-        BigDecimal pensionDeduction = annualPension.min(maxPensionDeduction);
-
-        BigDecimal taxableIncome = annualGross
-                .add(annualTravel)
-                .subtract(pensionDeduction)
-                .max(BigDecimal.ZERO);
-
-        // ── Step 2: Tax bracket lookup ────────────────────────────────────────
-        List<SarsTaxTable> brackets = taxTableRepo.findByTaxYear(taxYear);
-        if (brackets.isEmpty()) {
-            log.warn("No tax tables found for year={} — zero PAYE applied", taxYear);
-            return buildZeroResult(employee, taxYear);
-        }
-
-        SarsTaxTable bracket = brackets.stream()
-                .filter(b -> b.contains(taxableIncome))
-                .findFirst()
-                .orElse(brackets.get(brackets.size() - 1));
-
-        BigDecimal annualTaxBeforeRebates = bracket.calculateTax(taxableIncome);
-
-        // ── Step 3: Primary rebate (all taxpayers) ────────────────────────────
-        List<SarsTaxRebate> rebates = taxRebateRepo.findByTaxYear(taxYear);
-
-        BigDecimal primaryRebate = rebates.stream()
-                .filter(r -> "PRIMARY".equals(r.getRebateType()))
-                .map(SarsTaxRebate::getAmount)
-                .findFirst()
-                .orElse(new BigDecimal("17235.00")); // 2025/26 default
-
-        // FIX 3.5: Secondary rebate (age 65+) and tertiary rebate (age 75+)
-        BigDecimal secondaryRebate  = BigDecimal.ZERO;
-        BigDecimal tertiaryRebate   = BigDecimal.ZERO;
-        if (employee.getDateOfBirth() != null) {
-            int age = LocalDate.now().getYear() - employee.getDateOfBirth().getYear();
-            if (age >= 65) {
-                secondaryRebate = rebates.stream()
-                        .filter(r -> "SECONDARY".equals(r.getRebateType()))
-                        .map(SarsTaxRebate::getAmount)
-                        .findFirst()
-                        .orElse(new BigDecimal("9444.00")); // 2025/26 default
-            }
-            if (age >= 75) {
-                tertiaryRebate = rebates.stream()
-                        .filter(r -> "TERTIARY".equals(r.getRebateType()))
-                        .map(SarsTaxRebate::getAmount)
-                        .findFirst()
-                        .orElse(new BigDecimal("3145.00")); // 2025/26 default
-            }
-        }
-
-        BigDecimal totalRebates = primaryRebate.add(secondaryRebate).add(tertiaryRebate);
-        BigDecimal annualTaxAfterRebates = annualTaxBeforeRebates
-                .subtract(totalRebates)
-                .max(BigDecimal.ZERO);
-
-        // FIX 3.6: Medical Tax Credit — CREDIT against tax, not deduction from income
-        // MTC = R364/month for taxpayer + R364 first dependant + R246 each additional
-        // Simplified: assume taxpayer only (no dependant data captured yet)
-        BigDecimal annualMtc = MTC_PRIMARY.multiply(BigDecimal.valueOf(12));
-        BigDecimal annualTaxAfterMtc = annualTaxAfterRebates
-                .subtract(annualMtc)
-                .max(BigDecimal.ZERO);
-
-        // ── Step 4: Monthly PAYE ──────────────────────────────────────────────
-        BigDecimal monthlyPaye = annualTaxAfterMtc
-                .divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
-
-        // ── Step 5: UIF ───────────────────────────────────────────────────────
-        BigDecimal uifBase     = monthlySalary.min(UIF_MONTHLY_CEILING);
-        BigDecimal uifEmployee = uifBase.multiply(UIF_RATE).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal uifEmployer = uifBase.multiply(UIF_RATE).setScale(2, RoundingMode.HALF_UP);
-
-        // ── Step 6: SDL ───────────────────────────────────────────────────────
-        BigDecimal sdlAmount = annualPayroll.compareTo(SDL_THRESHOLD) > 0
-                ? monthlySalary.multiply(SDL_RATE).setScale(2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
+    public PayrollResult calculate(HrEmployee employee, int taxYear, BigDecimal annualPayroll) {
+        SarsPayrollResult r = calculator.calculate(
+                employee.getGrossSalary(),
+                employee.getTravelAllowance(),
+                employee.getPensionContribution(),
+                employee.getMedicalAidContribution(),
+                employee.getDateOfBirth(),
+                taxYear,
+                annualPayroll
+        );
 
         log.debug("Payroll employee={} year={} taxable={} paye={} uif={} sdl={}",
-                employee.getId(), taxYear, taxableIncome, monthlyPaye, uifEmployee, sdlAmount);
+                employee.getId(), taxYear, r.taxableIncome(), r.payeAmount(), r.uifEmployee(), r.sdlAmount());
 
         return new PayrollResult(
-                monthlySalary, travelAllowance, medicalAid, pension,
-                monthlyPaye, uifEmployee, uifEmployer, sdlAmount,
-                taxableIncome, annualTaxBeforeRebates, primaryRebate,
-                secondaryRebate, tertiaryRebate, annualMtc, taxYear
+                r.grossSalary(), r.travelAllowance(), r.medicalAid(), r.pension(),
+                r.payeAmount(), r.uifEmployee(), r.uifEmployer(), r.sdlAmount(),
+                r.taxableIncome(), r.taxBeforeRebate(), r.primaryRebate(),
+                r.secondaryRebate(), r.tertiaryRebate(), r.medicalTaxCredit(), r.taxYear()
         );
     }
 
-    private static BigDecimal nvl(BigDecimal v) {
-        return v != null ? v : BigDecimal.ZERO;
-    }
-
-    private PayrollResult buildZeroResult(HrEmployee e, int taxYear) {
-        return new PayrollResult(
-                e.getGrossSalary(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, taxYear
-        );
-    }
-
+    /**
+     * UNCHANGED, field-for-field and method-for-method, from the
+     * pre-extraction version. Kept as hr's own local record (rather than
+     * replaced by SarsPayrollResult directly) purely so
+     * PayrollService/PayslipPdfGenerator — the real callers of
+     * {@code calculate()} — need zero changes: they still reference
+     * {@code PayrollEngine.PayrollResult} exactly as before.
+     */
     public record PayrollResult(
             BigDecimal grossSalary,
             BigDecimal travelAllowance,
@@ -172,9 +82,9 @@ public class PayrollEngine {
             BigDecimal taxableIncome,
             BigDecimal taxBeforeRebate,
             BigDecimal primaryRebate,
-            BigDecimal secondaryRebate,   // NEW — age 65+
-            BigDecimal tertiaryRebate,    // NEW — age 75+
-            BigDecimal medicalTaxCredit,  // NEW — replaces deduction approach
+            BigDecimal secondaryRebate,
+            BigDecimal tertiaryRebate,
+            BigDecimal medicalTaxCredit,
             int taxYear
     ) {
         public BigDecimal totalEarnings() {

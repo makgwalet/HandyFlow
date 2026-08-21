@@ -33,6 +33,25 @@ public enum ActivityType {
      */
     STAGE_CHANGED,
 
+    /**
+     * FIX: backlog 4.1 — "no lead ownership/assignment" gap. Same shape as
+     * STATUS_CHANGED/STAGE_CHANGED (payload: {"from": "<uuid-or-NONE>",
+     * "to": "<uuid-or-NONE>"}) — an owner reassignment is the same kind of
+     * simple field transition, not a new domain concept.
+     */
+    OWNER_CHANGED,
+
+    /**
+     * FIX: backlog 4.2 — "no deal value / expected close date" gap. Single
+     * event covering both fields together (payload carries both from/to
+     * pairs when either or both changed) rather than two separate types —
+     * a sales rep updating a forecast typically changes both the amount
+     * and the date in the same edit, and splitting them into
+     * DEAL_VALUE_CHANGED / CLOSE_DATE_CHANGED would just double the
+     * timeline noise for what's really one "updated my forecast" action.
+     */
+    DEAL_UPDATED,
+
     // ── Notes ─────────────────────────────────────────────────────────────
     NOTE_ADDED,
 

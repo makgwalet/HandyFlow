@@ -12,12 +12,16 @@ import za.co.handyflow.platform.crm.domain.model.*;
 import za.co.handyflow.platform.crm.domain.repository.CustomerActivityRepository;
 import za.co.handyflow.platform.crm.domain.repository.CustomerRepository;
 import za.co.handyflow.platform.crm.dto.*;
-import za.co.handyflow.platform.notifications.application.Recipient;
-import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
 import za.co.handyflow.platform.shared.ConflictException;
 import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.notifications.application.NotificationRequest;
+import za.co.handyflow.platform.notifications.application.Recipient;
+import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
+import za.co.handyflow.platform.notifications.application.UserRecipientResolver;
+import za.co.handyflow.platform.notifications.application.internal.NotificationService;
+import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 
 import java.util.List;
 import java.util.Map;
@@ -64,13 +68,27 @@ public class CustomerService {
     private final CustomerNameSimilarityChecker similarityChecker;
     private final EmailService                  emailService;
     private final TenantAdminRecipients         tenantAdminRecipients;
+    // NEW: backs the owner-first notification routing in notifyNewLead()
+    // and the mine=true filter's currentUserId() reuse (already existed).
+    private final NotificationService           notificationService;
+    private final UserRecipientResolver         userRecipientResolver;
 
     // ══════════════════════════════════════════════════════════════════════
     // READ operations
     // ══════════════════════════════════════════════════════════════════════
 
     @Transactional(readOnly = true)
-    public Page<CustomerResponse> getCustomers(TenantId tenantId, String search, Pageable pageable) {
+    public Page<CustomerResponse> getCustomers(TenantId tenantId, String search,
+                                               Boolean mine, Pageable pageable) {
+        // FIX: backlog 4.1 — "my leads" filter. Deliberately takes priority
+        // over search when both are somehow set (the controller only ever
+        // sends one or the other in practice, but this keeps the method's
+        // own behaviour unambiguous rather than silently picking one).
+        if (Boolean.TRUE.equals(mine)) {
+            return customerRepository
+                    .findAllActiveForOwnerOrUnassigned(tenantId, currentUserId(), pageable)
+                    .map(this::toResponse);
+        }
         var page = (search == null || search.isBlank())
                 ? customerRepository.findAllActive(tenantId, pageable)
                 : customerRepository.searchActive(tenantId, search.strip(), pageable);
@@ -82,6 +100,22 @@ public class CustomerService {
         return customerRepository.findActiveById(tenantId, id)
                 .map(this::toResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", id.toString()));
+    }
+
+
+    /**
+     * FIX: backlog 4.1 — "no lead ownership/assignment" gap. Unlike
+     * changeStage(), this is valid for any customer type, not just LEAD —
+     * see Customer.assignOwner()'s own Javadoc for why.
+     */
+    @Transactional
+    public CustomerResponse assignOwner(TenantId tenantId, UUID id, UUID newOwnerId) {
+        var customer = requireActive(tenantId, id);
+        customer.assignOwner(newOwnerId, currentUserId());
+        customerRepository.save(customer);
+        log.info("[CRM] Customer owner changed id={} tenant={} newOwner={} by={}",
+                id, tenantId, newOwnerId, currentUserId());
+        return toResponse(customer);
     }
 
     /**
@@ -195,41 +229,57 @@ public class CustomerService {
         return toResponse(customer);
     }
 
+    // FIX: backlog 4.1 — was tenant-admins-only because Customer had no
+    // ownership field at all when this was originally written (see the
+    // comment that used to sit above the createCustomer() call site, now
+    // obsolete and removed since ownership exists). Now routes to the
+    // owner first — same "specific person first, tenant admins as
+    // fallback" shape hr.HrService.notifyApprover() already established
+    // for leave-approval routing (manager if resolvable, else tenant
+    // admins) — reused here for consistency rather than inventing a
+    // second fallback pattern for the same kind of decision.
     private void notifyNewLead(TenantId tenantId, Customer customer) {
         try {
-            List<Recipient> admins = tenantAdminRecipients.resolveTenantAdmins(tenantId);
-            if (admins.isEmpty()) {
-                log.info("[CRM] New lead={} created but no admin recipients could be resolved for tenant={} — not notified",
+            List<Recipient> recipients;
+            if (customer.getOwnerId() != null) {
+                recipients = userRecipientResolver.resolveUser(tenantId, customer.getOwnerId())
+                        .map(List::of)
+                        .orElse(null);
+            } else {
+                recipients = null;
+            }
+            if (recipients == null || recipients.isEmpty()) {
+                recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
+            }
+            if (recipients.isEmpty()) {
+                log.info("[CRM] New lead={} created but no owner or admin recipients could be resolved for tenant={} — not notified",
                         customer.getId(), tenantId);
                 return;
             }
 
-            String subject = "New lead: " + customer.getName();
-            StringBuilder html = new StringBuilder()
-                    .append("<p>A new lead has been added to the CRM.</p>")
-                    .append("<p><b>Name:</b> ").append(escapeHtml(customer.getName())).append("<br/>");
+            String message = "A new lead has been added to the CRM: " + customer.getName();
             if (customer.getEmail() != null && !customer.getEmail().isBlank()) {
-                html.append("<b>Email:</b> ").append(escapeHtml(customer.getEmail())).append("<br/>");
+                message += " (" + customer.getEmail() + ")";
             }
             if (customer.getPhone() != null && !customer.getPhone().isBlank()) {
-                html.append("<b>Phone:</b> ").append(escapeHtml(customer.getPhone())).append("<br/>");
+                message += " — " + customer.getPhone();
             }
-            html.append("</p>")
-                    .append("<p>Open the CRM to follow up.</p>");
+            message += ". Open the CRM to follow up.";
 
-            for (Recipient admin : admins) {
-                if (admin.email() == null || admin.email().isBlank()) continue;
-                try {
-                    emailService.send(admin.email(), subject, html.toString());
-                } catch (Exception e) {
-                    log.warn("[CRM] New-lead notification not sent to={} tenant={}: {}",
-                            admin.email(), tenantId, e.getMessage());
-                }
-            }
+            notificationService.send(NotificationRequest.builder()
+                    .tenantId(tenantId)
+                    .type(NotificationType.NEW_LEAD_ASSIGNED)
+                    .title("New lead: " + customer.getName())
+                    .message(message)
+                    .actionUrl("/crm/customers/" + customer.getId())
+                    .sourceModule("crm")
+                    .sourceEntityId(customer.getId().toString())
+                    .recipients(recipients)
+                    .build());
         } catch (Exception e) {
             // Same principle as every other notification hookup in this
             // codebase: the customer is already saved above and must not
-            // be undone by an email failure.
+            // be undone by a notification failure.
             log.warn("[CRM] New-lead notification failed for customer={} tenant={}: {}",
                     customer.getId(), tenantId, e.getMessage());
         }
@@ -491,6 +541,7 @@ public class CustomerService {
                 c.getAddress(),
                 c.getTaxNumber(),
                 c.getNotes(),
+                c.getOwnerId(),
                 c.getCustomerType(),
                 c.getStatus(),
                 Set.copyOf(c.getTags()),

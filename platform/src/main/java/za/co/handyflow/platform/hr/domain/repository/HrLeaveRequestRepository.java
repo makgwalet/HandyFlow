@@ -22,7 +22,7 @@ public interface HrLeaveRequestRepository extends JpaRepository<HrLeaveRequest, 
     Page<HrLeaveRequest> findAllByTenant(TenantId tenantId, String status, Pageable pageable);
 
     @Query("SELECT r FROM HrLeaveRequest r WHERE r.employeeId = :employeeId ORDER BY r.createdAt DESC")
-    List<HrLeaveRequest> findByEmployee(UUID employeeId);
+    Page<HrLeaveRequest> findByEmployee(UUID employeeId, Pageable pageable);
 
     @Query("SELECT r FROM HrLeaveRequest r WHERE r.tenantId = :#{#tenantId.value} AND r.id = :id")
     Optional<HrLeaveRequest> findByTenantAndId(TenantId tenantId, UUID id);

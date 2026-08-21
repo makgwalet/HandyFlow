@@ -19,11 +19,17 @@ import java.util.UUID;
 /**
  * PopiaExportController — POPIA data subject access request endpoint.
  *
- * WHY CUSTOMER_DELETE authority?
- * The export reveals the full history of who accessed and modified the
- * customer record, including internal user IDs (performedBy).  That is
- * privileged information that read-only staff must not export.
- * Consider a dedicated POPIA_EXPORT authority in production.
+ * FIX: backlog 4.4 — "POPIA_EXPORT piggybacks on CUSTOMER_DELETE
+ * permission." This class's own prior comment flagged it directly:
+ * "Consider a dedicated POPIA_EXPORT authority in production." Anyone
+ * with delete rights could also export the full data-subject history —
+ * which reveals internal user IDs of who accessed/modified the record —
+ * an over-grant unrelated to what delete authority is actually meant to
+ * protect. Now a dedicated authority, seeded the same way the module
+ * system auto-generates permissions (see the V245 migration, which
+ * mirrors AdminLookupService.createModule()'s own INSERT+grant pattern)
+ * and granted to every role that already held CUSTOMER_DELETE, so no
+ * existing access is silently revoked by this narrowing.
  *
  * WHY GET and not POST?
  * The export is idempotent — calling it twice produces the same data
@@ -57,7 +63,7 @@ public class PopiaExportController {
      * timeline so there is a permanent, queryable record of the export.
      */
     @GetMapping("/{id}/popia-export")
-    @PreAuthorize("hasAuthority('CUSTOMER_DELETE')")
+    @PreAuthorize("hasAuthority('POPIA_EXPORT')")
     @Operation(summary = "Generate POPIA data subject export — full personal data + processing history")
     public void exportPopia(
             @PathVariable UUID id,
@@ -83,7 +89,7 @@ public class PopiaExportController {
      * JSON export.
      */
     @GetMapping("/{id}/popia-export.pdf")
-    @PreAuthorize("hasAuthority('CUSTOMER_DELETE')")
+    @PreAuthorize("hasAuthority('POPIA_EXPORT')")
     @Operation(summary = "Generate POPIA data subject export as a human-readable PDF")
     public void exportPopiaPdf(
             @PathVariable UUID id,

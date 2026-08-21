@@ -14,10 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import za.co.handyflow.platform.hr.application.internal.Emp201PdfGenerator;
-import za.co.handyflow.platform.hr.application.internal.HrService;
-import za.co.handyflow.platform.hr.application.internal.PayrollService;
-import za.co.handyflow.platform.hr.application.internal.PayslipPdfGenerator;
+import za.co.handyflow.platform.hr.application.internal.*;
 import za.co.handyflow.platform.hr.domain.model.*;
 import za.co.handyflow.platform.hr.domain.repository.*;
 import za.co.handyflow.platform.hr.dto.*;
@@ -46,6 +43,7 @@ public class HrController {
     private final HrEmp201Repository     emp201Repo;
     private final Emp201PdfGenerator     emp201PdfGenerator;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final HrEmployeePortalAuthService hrEmployeePortalAuthService;
 
     // ── Employees ─────────────────────────────────────────────────────────────
 
@@ -256,6 +254,20 @@ public class HrController {
                 .header("Content-Disposition", "attachment; filename=\"payslip-"
                         + emp.getEmployeeNumber() + "-" + run.getPayRunNumber() + ".pdf\"")
                 .body(pdf);
+    }
+
+    @PostMapping("/employees/{id}/portal-invite")
+    @PreAuthorize("hasAnyAuthority('HR_MANAGE','USER_UPDATE')")
+    @Operation(summary = "Invite an employee to the self-service portal — emails them a registration link")
+    public ResponseEntity<ApiResponse<Void>> invitePortalAccess(
+            @PathVariable UUID id,
+            @RequestBody(required = false) HrPortalInviteRequest req,
+            Principal principal) {
+        String inviteEmail = req != null ? req.inviteEmail() : null;
+        UUID invitedBy = resolveUserId(principal);
+        hrEmployeePortalAuthService.createInvite(
+                TenantContext.getTenantIdAsObject(), id, inviteEmail, invitedBy);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Portal invite sent", null));
     }
 
     @GetMapping("/emp201/{id}/pdf")

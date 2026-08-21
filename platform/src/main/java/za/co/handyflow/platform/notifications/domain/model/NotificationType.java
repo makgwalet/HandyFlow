@@ -34,6 +34,14 @@ import static za.co.handyflow.platform.notifications.domain.model.NotificationSe
  */
 public enum NotificationType {
 
+    // ── CRM ──────────────────────────────────────────────────────────────────
+    // FIX: backlog 4.1 — new-lead notifications previously used raw
+    // EmailService.send() directly from CustomerService, bypassing the
+    // notification pipeline entirely (no in-app bell entry, no per-user
+    // channel-preference opt-out). INFO, not WARNING — a new lead is a
+    // routine, positive event, not something requiring urgent attention.
+    NEW_LEAD_ASSIGNED(INFO, Set.of(IN_APP, EMAIL)),
+
     // ── Existing ─────────────────────────────────────────────────────────────
     INCIDENT_REPORTED(WARNING, Set.of(IN_APP, EMAIL)),
 

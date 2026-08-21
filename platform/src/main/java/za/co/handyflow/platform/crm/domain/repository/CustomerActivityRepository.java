@@ -40,19 +40,36 @@ public interface CustomerActivityRepository extends JpaRepository<CustomerActivi
                                           @Param("customerId") UUID customerId,
                                           Pageable pageable);
 
-         @Query("""
-             SELECT a FROM CustomerActivity a
-             WHERE a.customer.id = :customerId
-               AND a.tenantId = :#{#tenantId.value}
-             ORDER BY a.createdAt ASC
-             """)
-         List<CustomerActivity> findAllByCustomer(
-                 @Param("tenantId") TenantId tenantId,
-                 @Param("customerId") UUID customerId
-         );
-//
-// WHY ASC order for POPIA?
-// The processing history in a POPIA export should be chronological
-// (oldest event first) so it reads like a story — not reverse-chron
-// like the UI timeline.
+    @Query("""
+            SELECT a FROM CustomerActivity a
+            WHERE a.customer.id = :customerId
+              AND a.tenantId = :#{#tenantId.value}
+            ORDER BY a.createdAt ASC
+            """)
+    List<CustomerActivity> findAllByCustomer(
+            @Param("tenantId") TenantId tenantId,
+            @Param("customerId") UUID customerId
+    );
+    //
+    // WHY ASC order for POPIA?
+    // The processing history in a POPIA export should be chronological
+    // (oldest event first) so it reads like a story — not reverse-chron
+    // like the UI timeline.
+
+    /**
+     * FIX: backlog 4.3 — backs the funnel/conversion-rate report.
+     * Tenant-wide (not customer-scoped, unlike the two methods above) —
+     * the report needs every lead's stage history at once to compute
+     * aggregate conversion rates, not one customer's timeline. Ordered by
+     * customer then chronologically within each customer, matching
+     * exactly the grouping CrmReportingService needs to walk each lead's
+     * stage journey in order without a second in-memory sort.
+     */
+    @Query("""
+            SELECT a FROM CustomerActivity a
+            WHERE a.tenantId = :#{#tenantId.value}
+              AND a.activityType = za.co.handyflow.platform.crm.domain.model.ActivityType.STAGE_CHANGED
+            ORDER BY a.customer.id ASC, a.createdAt ASC
+            """)
+    List<CustomerActivity> findStageChangesByTenant(@Param("tenantId") TenantId tenantId);
 }

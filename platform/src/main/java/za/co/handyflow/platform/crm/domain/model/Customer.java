@@ -8,7 +8,9 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 
 /**
@@ -78,6 +80,21 @@ public class Customer {
     private String notes;
 
     /**
+     * FIX: backlog 4.1 — "no lead ownership/assignment" gap. Nullable —
+     * unowned is a valid, meaningful state (a lead nobody has claimed yet),
+     * not an error. Defaults to the creating user inside create() below;
+     * changed only via assignOwner(), which also records it on the
+     * timeline the same way every other field transition on this entity
+     * does (see changeStatus/changeStage for the identical shape).
+     * <p>
+     * No @ManyToOne to a User entity: Customer must not depend on the
+     * Identity module's domain model (see CrmFacade's own Javadoc on why
+     * cross-module references stay as raw UUIDs/DTOs, never entities).
+     */
+    @Column(name = "owner_id")
+    private UUID ownerId;
+
+    /**
      * WHY Enum stored as STRING?
      * If we store as ORDINAL (0,1,2) and someone reorders the enum,
      * all existing rows silently get the wrong meaning.
@@ -100,6 +117,23 @@ public class Customer {
     @Enumerated(EnumType.STRING)
     @Column(name = "pipeline_stage", length = 20)
     private LeadStage pipelineStage;
+
+    /**
+     * FIX: backlog 4.2 — "no deal value / expected close date" gap.
+     * Nullable, and deliberately not restricted to LEAD-type customers the
+     * way pipelineStage is: once a lead is WON and converts to a CUSTOMER,
+     * this value needs to survive the conversion for win-rate-by-value
+     * reporting (see backlog 4.3's own stated goal) — restricting edits to
+     * LEAD type the way changeStage() does would make that impossible.
+     * Same precision/scale convention as every other money column in this
+     * codebase (see AccPaymentReceived.amount).
+     */
+    @Column(name = "deal_value", precision = 15, scale = 2)
+    private BigDecimal dealValue;
+
+    /** FIX: backlog 4.2. See dealValue's Javadoc above — same reasoning applies. */
+    @Column(name = "expected_close_date")
+    private LocalDate expectedCloseDate;
 
     /**
      * Tags stored in a join table (customer_tags).
@@ -189,6 +223,15 @@ public class Customer {
         c.customerType = customerType != null ? customerType : CustomerType.CUSTOMER;
         c.status       = CustomerStatus.ACTIVE;
         c.pipelineStage = c.customerType == CustomerType.LEAD ? LeadStage.NEW : null;
+        // FIX: backlog 4.1 — default ownership to whoever created the
+        // record, same "the creator owns it until reassigned" convention
+        // this kind of field takes in every other CRM tool. Deliberately
+        // no new factory parameter: createdBy already carries exactly the
+        // right value, so reusing it here keeps every existing call site
+        // (including CustomerImportService's bulk-import path) working
+        // unchanged — imported rows are owned by whoever ran the import,
+        // which is the correct default, not "unowned."
+        c.ownerId      = createdBy;
         c.createdAt    = Instant.now();
         c.updatedAt    = c.createdAt;
 
@@ -300,6 +343,51 @@ public class Customer {
         this.pipelineStage = newStage;
         this.updatedAt     = Instant.now();
         addActivity(CustomerActivity.of(this, ActivityType.STAGE_CHANGED, payload, null, changedBy));
+    }
+
+    /**
+     * FIX: backlog 4.1 — "no lead ownership/assignment" gap. Applies to any
+     * customer (not restricted to LEAD type the way changeStage() is) —
+     * unlike a pipeline stage, "who's the account owner" is a meaningful
+     * question for a converted CUSTOMER too. newOwnerId == null is valid
+     * and means "unassign" (back to unowned, visible to everyone via the
+     * "my leads" OR-owner-IS-NULL filter).
+     */
+    public void assignOwner(UUID newOwnerId, UUID changedBy) {
+        if (Objects.equals(this.ownerId, newOwnerId)) return;
+        var payload = Map.of(
+                "from", this.ownerId != null ? this.ownerId.toString() : "NONE",
+                "to", newOwnerId != null ? newOwnerId.toString() : "NONE"
+        );
+        this.ownerId   = newOwnerId;
+        this.updatedAt = Instant.now();
+        addActivity(CustomerActivity.of(this, ActivityType.OWNER_CHANGED, payload, null, changedBy));
+    }
+
+    /**
+     * FIX: backlog 4.2 — "no deal value / expected close date" gap. Both
+     * parameters together, not two separate setters — see DEAL_UPDATED's
+     * own Javadoc for why. Either or both may be null (clearing a
+     * previously-set value is valid, not an error), so the no-op check is
+     * a straight equality on both fields rather than a null-guard.
+     */
+    public void updateDeal(BigDecimal newDealValue, LocalDate newExpectedCloseDate, UUID changedBy) {
+        if (Objects.equals(this.dealValue, newDealValue)
+                && Objects.equals(this.expectedCloseDate, newExpectedCloseDate)) {
+            return;
+        }
+        var payload = new HashMap<String, Object>();
+        payload.put("dealValue", Map.of(
+                "from", this.dealValue != null ? this.dealValue.toPlainString() : "NONE",
+                "to", newDealValue != null ? newDealValue.toPlainString() : "NONE"));
+        payload.put("expectedCloseDate", Map.of(
+                "from", this.expectedCloseDate != null ? this.expectedCloseDate.toString() : "NONE",
+                "to", newExpectedCloseDate != null ? newExpectedCloseDate.toString() : "NONE"));
+
+        this.dealValue         = newDealValue;
+        this.expectedCloseDate = newExpectedCloseDate;
+        this.updatedAt         = Instant.now();
+        addActivity(CustomerActivity.of(this, ActivityType.DEAL_UPDATED, payload, null, changedBy));
     }
 
     public void addTag(String tag, UUID addedBy) {

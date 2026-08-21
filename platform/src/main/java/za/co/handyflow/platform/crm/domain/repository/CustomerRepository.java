@@ -61,6 +61,52 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
     Optional<Customer> findActiveById(@Param("tenantId") TenantId tenantId,
                                       @Param("id") UUID id);
 
+
+    /**
+     * FIX: backlog 4.3 — backs the funnel/conversion-rate report.
+     * CrmReportingService needs every active lead's id and createdAt
+     * (createdAt doubles as each lead's implicit "entered NEW" timestamp
+     * — see that class's own Javadoc for why NEW itself is never a
+     * logged activity).
+     * <p>
+     * Filtering on customerType = LEAD is deliberately the only filter —
+     * confirmed directly against the complete Customer.java (read in
+     * full this session) that no method anywhere converts customerType
+     * from LEAD to CUSTOMER automatically; changeStage() only ever
+     * updates pipelineStage. That means a WON or LOST lead is still
+     * customerType=LEAD, so this query correctly keeps including them —
+     * they're exactly the leads whose full journey, including its
+     * terminal stage, the report needs to count. If a real
+     * lead-to-customer conversion method gets added later, this query's
+     * behavior (and the report's totals) would need revisiting.
+     */
+    @Query("""
+            SELECT c FROM Customer c
+            WHERE c.tenantId = :tenantId
+              AND c.deletedAt IS NULL
+              AND c.customerType = za.co.handyflow.platform.crm.domain.model.CustomerType.LEAD
+            """)
+    List<Customer> findAllActiveLeads(@Param("tenantId") TenantId tenantId);
+
+    /**
+     * FIX: backlog 4.1 — "no lead ownership/assignment" gap. Backs the
+     * "my leads" filter on the customer list endpoint: shows records this
+     * user owns, plus any that are still unowned — an unowned lead must
+     * stay visible to everyone, not disappear once ownership exists as a
+     * concept, or leads nobody has claimed yet would silently vanish from
+     * every filtered view.
+     */
+    @Query("""
+            SELECT c FROM Customer c
+            WHERE c.tenantId = :tenantId
+              AND c.deletedAt IS NULL
+              AND (c.ownerId = :ownerId OR c.ownerId IS NULL)
+            ORDER BY c.name ASC
+            """)
+    Page<Customer> findAllActiveForOwnerOrUnassigned(@Param("tenantId") TenantId tenantId,
+                                                     @Param("ownerId") UUID ownerId,
+                                                     Pageable pageable);
+
     /**
      * NEW: backs CrmFacade.findActiveCustomersWithEmail() — added for the
      * Marketing module's contact sync, which previously had no facade

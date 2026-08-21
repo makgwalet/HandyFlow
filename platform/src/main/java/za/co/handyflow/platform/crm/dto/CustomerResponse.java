@@ -41,6 +41,7 @@ public record CustomerResponse(
         Map<String, String> address,
         String taxNumber,
         String notes,
+        UUID ownerId,
         CustomerType customerType,
         CustomerStatus status,
         Set<String> tags,

@@ -2,6 +2,7 @@ package za.co.handyflow.platform.hr.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,10 @@ public class HrService {
     private final EmployeeNumberGenerator   numberGen;
     private final NotificationService notificationService;
     private final TenantAdminRecipients tenantAdminRecipients;
+    // FIX: backlog 3.3 — publishes EmployeeCreatedEvent so contracting can
+    // auto-draft a BCEA employment contract. See EmployeeCreatedEvent's own
+    // Javadoc for the full reasoning.
+    private final ApplicationEventPublisher eventPublisher;
 
     // ── Employees ─────────────────────────────────────────────────────────────
 

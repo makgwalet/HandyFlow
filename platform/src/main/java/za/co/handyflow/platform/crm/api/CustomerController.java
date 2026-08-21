@@ -89,15 +89,30 @@ public class CustomerController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('CUSTOMER_READ')")
-    @Operation(summary = "List active customers with optional search and pagination")
+    @Operation(summary = "List active customers with optional search, pagination, and ownership filter")
     public ResponseEntity<ApiResponse<Page<CustomerResponse>>> getCustomers(
             @Parameter(description = "Full-text search across name, email, phone, VAT number")
             @RequestParam(required = false) String search,
+            @Parameter(description = "If true, only customers owned by the current user, or unowned — the \"my leads\" filter")
+            @RequestParam(required = false) Boolean mine,
             @PageableDefault(size = 10, sort = "name") Pageable pageable
     ) {
         var tenantId  = TenantContext.getTenantIdAsObject();
-        var customers = customerService.getCustomers(tenantId, search, pageable);
+        var customers = customerService.getCustomers(tenantId, search, mine, pageable);
         return ResponseEntity.ok(ApiResponse.success(customers));
+    }
+
+    /** FIX: backlog 4.1 — "no lead ownership/assignment" gap. */
+    @PatchMapping("/{id}/owner")
+    @PreAuthorize("hasAuthority('CUSTOMER_UPDATE')")
+    @Operation(summary = "Reassign (or unassign, with a null ownerId) a customer's owner")
+    public ResponseEntity<ApiResponse<CustomerResponse>> assignOwner(
+            @PathVariable UUID id,
+            @RequestBody UpdateOwnerRequest request
+    ) {
+        var tenantId = TenantContext.getTenantIdAsObject();
+        var customer = customerService.assignOwner(tenantId, id, request.ownerId());
+        return ResponseEntity.ok(ApiResponse.success("Owner updated", customer));
     }
 
     @GetMapping("/{id}")
