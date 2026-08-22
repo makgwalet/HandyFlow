@@ -4,7 +4,9 @@ import za.co.handyflow.platform.crm.domain.model.ActivityType;
 import za.co.handyflow.platform.crm.domain.model.CustomerStatus;
 import za.co.handyflow.platform.crm.domain.model.CustomerType;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -42,6 +44,8 @@ public record CustomerResponse(
         String taxNumber,
         String notes,
         UUID ownerId,
+        BigDecimal dealValue,
+        LocalDate expectedCloseDate,
         CustomerType customerType,
         CustomerStatus status,
         Set<String> tags,

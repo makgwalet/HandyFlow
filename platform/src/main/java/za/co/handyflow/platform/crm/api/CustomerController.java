@@ -39,20 +39,6 @@ import java.util.UUID;
  * If you find yourself writing an if/else in a controller, ask yourself:
  * "should this be in the service instead?"
  *
- * WHAT'S NEW vs ORIGINAL:
- * ┌──────────────────────────────────┬─────────────────────────────────┐
- * │ Original                         │ Production version              │
- * ├──────────────────────────────────┼─────────────────────────────────┤
- * │ CRUD only                        │ CRUD + restore + timeline + tags│
- * │ No deleted customer view         │ GET /deleted list               │
- * │ No restore endpoint              │ POST /{id}/restore              │
- * │ No activity timeline             │ GET /{id}/activities            │
- * │ No tag management                │ POST/DELETE /{id}/tags/{tag}    │
- * │ No add-note endpoint             │ POST /{id}/notes                │
- * │ featureGuard called in each method│ AOP approach via @FeatureModule│
- * │ Identical create/update shapes   │ Separate DTOs with status field │
- * └──────────────────────────────────┴─────────────────────────────────┘
- *
  * WHY move featureGuard to a single class-level point?
  * Calling featureGuard.requireModule("crm") in every method is noise.
  * Use AOP or a HandlerInterceptor to apply it once per controller class.
@@ -102,19 +88,6 @@ public class CustomerController {
         return ResponseEntity.ok(ApiResponse.success(customers));
     }
 
-    /** FIX: backlog 4.1 — "no lead ownership/assignment" gap. */
-    @PatchMapping("/{id}/owner")
-    @PreAuthorize("hasAuthority('CUSTOMER_UPDATE')")
-    @Operation(summary = "Reassign (or unassign, with a null ownerId) a customer's owner")
-    public ResponseEntity<ApiResponse<CustomerResponse>> assignOwner(
-            @PathVariable UUID id,
-            @RequestBody UpdateOwnerRequest request
-    ) {
-        var tenantId = TenantContext.getTenantIdAsObject();
-        var customer = customerService.assignOwner(tenantId, id, request.ownerId());
-        return ResponseEntity.ok(ApiResponse.success("Owner updated", customer));
-    }
-
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('CUSTOMER_READ')")
     @Operation(summary = "Get a single active customer by ID")
@@ -125,7 +98,6 @@ public class CustomerController {
     }
 
     /**
-     * NEW: View soft-deleted customers.
      * WHY? Staff make mistakes.  Showing deleted customers allows
      * them to restore accidentally deleted records without a developer
      * having to run a SQL query.
@@ -183,7 +155,6 @@ public class CustomerController {
     }
 
     /**
-     * NEW: Restore a soft-deleted customer.
      * WHY POST and not PUT?
      * Restore is an action (a command), not an update to a resource.
      * POST /{id}/restore reads as "perform the restore action on customer {id}".
@@ -203,7 +174,7 @@ public class CustomerController {
     // ══════════════════════════════════════════════════════════════════════
 
     /**
-     * NEW: Paginated activity timeline for a customer.
+     * Paginated activity timeline for a customer.
      * Returns: created, updated, deleted, restored, bookings linked, invoices linked, notes.
      * WHY paginated? A customer used for 2 years could have 500+ events.
      */
@@ -220,7 +191,7 @@ public class CustomerController {
     }
 
     /**
-     * NEW: Add a manual timestamped note to a customer's timeline.
+     * Add a manual timestamped note to a customer's timeline.
      * Different from the freeform notes field — this records WHO said WHAT and WHEN.
      */
     @PostMapping("/{id}/notes")
@@ -241,7 +212,6 @@ public class CustomerController {
     // ══════════════════════════════════════════════════════════════════════
 
     /**
-     * NEW: Add a tag to a customer.
      * WHY PUT not POST? Adding a tag is idempotent — adding "vip" twice
      * results in the same state.  PUT communicates idempotency.
      */
@@ -282,6 +252,47 @@ public class CustomerController {
         var tenantId = TenantContext.getTenantIdAsObject();
         var summary  = customer360Service.get360(tenantId, id);
         return ResponseEntity.ok(ApiResponse.success(summary));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // LEAD OWNERSHIP / ASSIGNMENT
+    // ══════════════════════════════════════════════════════════════════════
+
+    /** FIX: backlog 4.1 — "no lead ownership/assignment" gap. */
+    @PatchMapping("/{id}/owner")
+    @PreAuthorize("hasAuthority('CUSTOMER_UPDATE')")
+    @Operation(summary = "Reassign (or unassign, with a null ownerId) a customer's owner")
+    public ResponseEntity<ApiResponse<CustomerResponse>> assignOwner(
+            @PathVariable UUID id,
+            @RequestBody UpdateOwnerRequest request
+    ) {
+        var tenantId = TenantContext.getTenantIdAsObject();
+        var customer = customerService.assignOwner(tenantId, id, request.ownerId());
+        return ResponseEntity.ok(ApiResponse.success("Owner updated", customer));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // DEAL VALUE / EXPECTED CLOSE DATE
+    // ══════════════════════════════════════════════════════════════════════
+
+    /**
+     * FIX: backlog 4.2 — "no deal value / expected close date" gap. This
+     * endpoint was designed and the domain layer (Customer.updateDeal(),
+     * CustomerResponse fields) was built, but the endpoint itself was
+     * never actually added — confirmed missing on inspection, added now.
+     * Same CUSTOMER_UPDATE authority as /owner and /stage above it — no
+     * finer-grained authority exists anywhere else in this controller.
+     */
+    @PatchMapping("/{id}/deal")
+    @PreAuthorize("hasAuthority('CUSTOMER_UPDATE')")
+    @Operation(summary = "Update a customer's deal value and/or expected close date")
+    public ResponseEntity<ApiResponse<CustomerResponse>> updateDeal(
+            @PathVariable UUID id,
+            @RequestBody UpdateDealRequest request
+    ) {
+        var tenantId = TenantContext.getTenantIdAsObject();
+        var customer = customerService.updateDeal(tenantId, id, request.dealValue(), request.expectedCloseDate());
+        return ResponseEntity.ok(ApiResponse.success("Deal info updated", customer));
     }
 
     // ══════════════════════════════════════════════════════════════════════

@@ -23,6 +23,8 @@ import za.co.handyflow.platform.notifications.application.UserRecipientResolver;
 import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -68,8 +70,6 @@ public class CustomerService {
     private final CustomerNameSimilarityChecker similarityChecker;
     private final EmailService                  emailService;
     private final TenantAdminRecipients         tenantAdminRecipients;
-    // NEW: backs the owner-first notification routing in notifyNewLead()
-    // and the mine=true filter's currentUserId() reuse (already existed).
     private final NotificationService           notificationService;
     private final UserRecipientResolver         userRecipientResolver;
 
@@ -102,22 +102,6 @@ public class CustomerService {
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", id.toString()));
     }
 
-
-    /**
-     * FIX: backlog 4.1 — "no lead ownership/assignment" gap. Unlike
-     * changeStage(), this is valid for any customer type, not just LEAD —
-     * see Customer.assignOwner()'s own Javadoc for why.
-     */
-    @Transactional
-    public CustomerResponse assignOwner(TenantId tenantId, UUID id, UUID newOwnerId) {
-        var customer = requireActive(tenantId, id);
-        customer.assignOwner(newOwnerId, currentUserId());
-        customerRepository.save(customer);
-        log.info("[CRM] Customer owner changed id={} tenant={} newOwner={} by={}",
-                id, tenantId, newOwnerId, currentUserId());
-        return toResponse(customer);
-    }
-
     /**
      * Returns soft-deleted customers for the "Deleted Customers" view.
      * WHY expose this? Accidental deletes happen.  Staff need a way to
@@ -144,6 +128,16 @@ public class CustomerService {
         }
         return activityRepository.findByCustomer(tenantId, customerId, pageable)
                 .map(this::toActivityResponse);
+    }
+
+    /**
+     * FIX: "no lead/pipeline stage tracking" gap. Separate small endpoint/DTO
+     * rather than folding into CustomerResponse.
+     */
+    @Transactional(readOnly = true)
+    public StageResponse getStage(TenantId tenantId, UUID id) {
+        var customer = requireActive(tenantId, id);
+        return toStageResponse(customer);
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -211,111 +205,16 @@ public class CustomerService {
         log.info("[CRM] Customer created id={} name='{}' tenant={} by={}",
                 customer.getId(), customer.getName(), tenantId, currentUserId());
 
-        // FIX: "no new-lead notification" gap — a new LEAD previously
-        // appeared with no signal to anyone until someone happened to open
-        // the customer list. Deliberately scoped to tenant admins, not a
-        // per-lead "owner" — Customer has no assignment/ownership field at
-        // all (confirmed: name/email/phone/address/taxNumber/notes/
-        // customerType/status/tags, nothing resembling an owner), and
-        // inventing one just to make this notification feel complete would
-        // be scope creep into "lead pipeline stages," which the audit
-        // already lists as its own separate, larger item. This is real
-        // value now (someone finds out); proper owner-routing is a natural
-        // upgrade once ownership exists, not a redesign of this hook.
+        // FIX: backlog 4.1 — this used to say "Customer has no
+        // assignment/ownership field at all... inventing one would be
+        // scope creep" — that's no longer true; ownership shipped in 4.1.
+        // notifyNewLead() now routes to the owner first (see its own
+        // Javadoc), tenant admins only as a fallback.
         if (customer.getCustomerType() == CustomerType.LEAD) {
             notifyNewLead(tenantId, customer);
         }
 
         return toResponse(customer);
-    }
-
-    // FIX: backlog 4.1 — was tenant-admins-only because Customer had no
-    // ownership field at all when this was originally written (see the
-    // comment that used to sit above the createCustomer() call site, now
-    // obsolete and removed since ownership exists). Now routes to the
-    // owner first — same "specific person first, tenant admins as
-    // fallback" shape hr.HrService.notifyApprover() already established
-    // for leave-approval routing (manager if resolvable, else tenant
-    // admins) — reused here for consistency rather than inventing a
-    // second fallback pattern for the same kind of decision.
-    private void notifyNewLead(TenantId tenantId, Customer customer) {
-        try {
-            List<Recipient> recipients;
-            if (customer.getOwnerId() != null) {
-                recipients = userRecipientResolver.resolveUser(tenantId, customer.getOwnerId())
-                        .map(List::of)
-                        .orElse(null);
-            } else {
-                recipients = null;
-            }
-            if (recipients == null || recipients.isEmpty()) {
-                recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
-            }
-            if (recipients.isEmpty()) {
-                log.info("[CRM] New lead={} created but no owner or admin recipients could be resolved for tenant={} — not notified",
-                        customer.getId(), tenantId);
-                return;
-            }
-
-            String message = "A new lead has been added to the CRM: " + customer.getName();
-            if (customer.getEmail() != null && !customer.getEmail().isBlank()) {
-                message += " (" + customer.getEmail() + ")";
-            }
-            if (customer.getPhone() != null && !customer.getPhone().isBlank()) {
-                message += " — " + customer.getPhone();
-            }
-            message += ". Open the CRM to follow up.";
-
-            notificationService.send(NotificationRequest.builder()
-                    .tenantId(tenantId)
-                    .type(NotificationType.NEW_LEAD_ASSIGNED)
-                    .title("New lead: " + customer.getName())
-                    .message(message)
-                    .actionUrl("/crm/customers/" + customer.getId())
-                    .sourceModule("crm")
-                    .sourceEntityId(customer.getId().toString())
-                    .recipients(recipients)
-                    .build());
-        } catch (Exception e) {
-            // Same principle as every other notification hookup in this
-            // codebase: the customer is already saved above and must not
-            // be undone by a notification failure.
-            log.warn("[CRM] New-lead notification failed for customer={} tenant={}: {}",
-                    customer.getId(), tenantId, e.getMessage());
-        }
-    }
-
-    private String escapeHtml(String s) {
-        return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-    }
-
-    /**
-     * FIX: "no lead/pipeline stage tracking" gap. Separate small endpoint/DTO
-     * rather than folding into CustomerResponse — this session never had
-     * CustomerResponse.java's actual declaration, and guessing a new field
-     * into an unseen record's positional constructor is exactly the risk
-     * already avoided elsewhere this session (see PopiaExportPdfService's
-     * own doc comment for the same reasoning). This is fully self-contained.
-     */
-    @Transactional(readOnly = true)
-    public StageResponse getStage(TenantId tenantId, UUID id) {
-        var customer = requireActive(tenantId, id);
-        return toStageResponse(customer);
-    }
-
-    @Transactional
-    public StageResponse changeStage(TenantId tenantId, UUID id, LeadStage newStage) {
-        var customer = requireActive(tenantId, id);
-        customer.changeStage(newStage, currentUserId());
-        return toStageResponse(customer);
-    }
-
-    private StageResponse toStageResponse(Customer customer) {
-        return new StageResponse(
-                customer.getId(),
-                customer.getCustomerType().name(),
-                customer.getPipelineStage() != null ? customer.getPipelineStage().name() : null
-        );
     }
 
     @Transactional
@@ -473,6 +372,45 @@ public class CustomerService {
         return toResponse(customer);
     }
 
+    /**
+     * FIX: backlog 4.1 — "no lead ownership/assignment" gap. Unlike
+     * changeStage(), this is valid for any customer type, not just LEAD —
+     * see Customer.assignOwner()'s own Javadoc for why.
+     */
+    @Transactional
+    public CustomerResponse assignOwner(TenantId tenantId, UUID id, UUID newOwnerId) {
+        var customer = requireActive(tenantId, id);
+        customer.assignOwner(newOwnerId, currentUserId());
+        customerRepository.save(customer);
+        log.info("[CRM] Customer owner changed id={} tenant={} newOwner={} by={}",
+                id, tenantId, newOwnerId, currentUserId());
+        return toResponse(customer);
+    }
+
+    /**
+     * FIX: backlog 4.2 — "no deal value / expected close date" gap. This
+     * service method was missing even though Customer.updateDeal() (the
+     * domain method) and the CustomerResponse fields both existed —
+     * confirmed on inspection and added now. Mirrors assignOwner()'s shape
+     * exactly.
+     */
+    @Transactional
+    public CustomerResponse updateDeal(TenantId tenantId, UUID id,
+                                       BigDecimal dealValue, LocalDate expectedCloseDate) {
+        var customer = requireActive(tenantId, id);
+        customer.updateDeal(dealValue, expectedCloseDate, currentUserId());
+        customerRepository.save(customer);
+        log.info("[CRM] Customer deal updated id={} tenant={} by={}", id, tenantId, currentUserId());
+        return toResponse(customer);
+    }
+
+    @Transactional
+    public StageResponse changeStage(TenantId tenantId, UUID id, LeadStage newStage) {
+        var customer = requireActive(tenantId, id);
+        customer.changeStage(newStage, currentUserId());
+        return toStageResponse(customer);
+    }
+
     // ══════════════════════════════════════════════════════════════════════
     // Private helpers
     // ══════════════════════════════════════════════════════════════════════
@@ -494,10 +432,6 @@ public class CustomerService {
      * a user principal.  Returning null is correct: the activity log will
      * show performedBy=null meaning "system".  We never silently lose the
      * user when one is present — the cast to UUID will catch that.
-     *
-     * ADAPT THIS:
-     * Replace the cast logic with however your app stores the user ID on
-     * the Principal (e.g. a custom UserPrincipal with getId(), or a JWT claim).
      */
     private UUID currentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -505,8 +439,6 @@ public class CustomerService {
             return null;
         }
         try {
-            // Adapt to your actual UserPrincipal type:
-            // return ((YourUserPrincipal) auth.getPrincipal()).getId();
             return UUID.fromString(auth.getName());
         } catch (Exception e) {
             log.warn("[CRM] Could not resolve userId from SecurityContext: {}", e.getMessage());
@@ -532,6 +464,11 @@ public class CustomerService {
         return map.isEmpty() ? null : map;
     }
 
+    /**
+     * FIX: backlog 4.2 — dealValue/expectedCloseDate were missing from
+     * this mapper even though both the entity field and the DTO field
+     * existed — confirmed on inspection and added now.
+     */
     private CustomerResponse toResponse(Customer c) {
         return new CustomerResponse(
                 c.getId(),
@@ -542,6 +479,8 @@ public class CustomerService {
                 c.getTaxNumber(),
                 c.getNotes(),
                 c.getOwnerId(),
+                c.getDealValue(),
+                c.getExpectedCloseDate(),
                 c.getCustomerType(),
                 c.getStatus(),
                 Set.copyOf(c.getTags()),
@@ -559,5 +498,71 @@ public class CustomerService {
                 a.getPerformedBy(),
                 a.getCreatedAt()
         );
+    }
+
+    private StageResponse toStageResponse(Customer customer) {
+        return new StageResponse(
+                customer.getId(),
+                customer.getCustomerType().name(),
+                customer.getPipelineStage() != null ? customer.getPipelineStage().name() : null
+        );
+    }
+
+    // FIX: backlog 4.1 — was tenant-admins-only because Customer had no
+    // ownership field at all when this was originally written. Now routes
+    // to the owner first — same "specific person first, tenant admins as
+    // fallback" shape hr.HrService.notifyApprover() already established
+    // for leave-approval routing (manager if resolvable, else tenant
+    // admins) — reused here for consistency rather than inventing a
+    // second fallback pattern for the same kind of decision.
+    private void notifyNewLead(TenantId tenantId, Customer customer) {
+        try {
+            List<Recipient> recipients;
+            if (customer.getOwnerId() != null) {
+                recipients = userRecipientResolver.resolveUser(tenantId, customer.getOwnerId())
+                        .map(List::of)
+                        .orElse(null);
+            } else {
+                recipients = null;
+            }
+            if (recipients == null || recipients.isEmpty()) {
+                recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
+            }
+            if (recipients.isEmpty()) {
+                log.info("[CRM] New lead={} created but no owner or admin recipients could be resolved for tenant={} — not notified",
+                        customer.getId(), tenantId);
+                return;
+            }
+
+            String message = "A new lead has been added to the CRM: " + customer.getName();
+            if (customer.getEmail() != null && !customer.getEmail().isBlank()) {
+                message += " (" + customer.getEmail() + ")";
+            }
+            if (customer.getPhone() != null && !customer.getPhone().isBlank()) {
+                message += " — " + customer.getPhone();
+            }
+            message += ". Open the CRM to follow up.";
+
+            notificationService.send(NotificationRequest.builder()
+                    .tenantId(tenantId)
+                    .type(NotificationType.NEW_LEAD_ASSIGNED)
+                    .title("New lead: " + customer.getName())
+                    .message(message)
+                    .actionUrl("/crm/customers/" + customer.getId())
+                    .sourceModule("crm")
+                    .sourceEntityId(customer.getId().toString())
+                    .recipients(recipients)
+                    .build());
+        } catch (Exception e) {
+            // Same principle as every other notification hookup in this
+            // codebase: the customer is already saved above and must not
+            // be undone by a notification failure.
+            log.warn("[CRM] New-lead notification failed for customer={} tenant={}: {}",
+                    customer.getId(), tenantId, e.getMessage());
+        }
+    }
+
+    private String escapeHtml(String s) {
+        return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 }

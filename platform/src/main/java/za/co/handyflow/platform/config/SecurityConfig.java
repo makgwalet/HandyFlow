@@ -34,6 +34,14 @@ import java.util.List;
  * need one (it's a real credential, authenticated by the filter itself,
  * same posture as GuardJwtFilter for /api/v1/guard/**). Everything else
  * below is unchanged from the original.
+ * <p>
+ * FIX: backlog 3.4 — added "/api/v1/hr/portal/auth/**" to permitAll().
+ * Without it, the entire employee self-service portal was unreachable:
+ * /auth/register and /auth/login both fell through to
+ * .anyRequest().authenticated() and rejected every request with 401/403
+ * before HrEmployeePortalAuthService ever ran, since there's no JWT to
+ * present at registration/login time by definition. Confirmed missing on
+ * two separate direct inspections before this fix.
  */
 @Configuration
 @EnableWebSecurity
@@ -102,7 +110,19 @@ public class SecurityConfig {
                                 "/api/v1/security/cameras/motion-webhook",   // camera webhook — auth via webhookSecret, not JWT
                                 "/webjars/**",           // ← SpringDoc needs this
                                 "/swagger-resources/**",  // ← SpringDoc needs this
-                                "/api/v1/payroll-bureau/portal/auth/**"
+                                "/api/v1/payroll-bureau/portal/auth/**",
+                                // FIX: backlog 3.4 — employee self-service
+                                // portal. Same convention as every other
+                                // portal in this list: only /auth/** is
+                                // public; everything else under
+                                // /api/v1/hr/portal/** falls through to
+                                // .anyRequest().authenticated(), satisfied
+                                // by portalJwtFilter (already registered
+                                // below, already generic — matches any
+                                // path containing "/portal/", confirmed
+                                // directly from that filter's own
+                                // shouldNotFilter()).
+                                "/api/v1/hr/portal/auth/**"
                         ).permitAll()
                         // Everything else requires authentication
                         .anyRequest().authenticated()

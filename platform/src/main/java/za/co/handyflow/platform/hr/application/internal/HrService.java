@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.hr.EmployeeCreatedEvent;
 import za.co.handyflow.platform.hr.domain.model.*;
 import za.co.handyflow.platform.hr.domain.repository.*;
 import za.co.handyflow.platform.hr.dto.*;
@@ -79,18 +80,32 @@ public class HrService {
         emp.setBankAccountNumber(req.bankAccountNumber());
         emp.setBankBranchCode(req.bankBranchCode());
         emp.setMedicalAidContribution(req.medicalAidContribution() != null
-                ? req.medicalAidContribution() : java.math.BigDecimal.ZERO);
+                ? req.medicalAidContribution() : BigDecimal.ZERO);
         emp.setPensionContribution(req.pensionContribution() != null
-                ? req.pensionContribution() : java.math.BigDecimal.ZERO);
+                ? req.pensionContribution() : BigDecimal.ZERO);
         emp.setTravelAllowance(req.travelAllowance() != null
-                ? req.travelAllowance() : java.math.BigDecimal.ZERO);
+                ? req.travelAllowance() : BigDecimal.ZERO);
         emp.setEmergencyContactName(req.emergencyContactName());
         emp.setEmergencyContactPhone(req.emergencyContactPhone());
         emp.setNotes(req.notes());
 
         employeeRepo.save(emp);
-        seedLeaveBalances(tenantId, emp.getId(), java.time.LocalDate.now().getYear());
+        seedLeaveBalances(tenantId, emp.getId(), LocalDate.now().getYear());
         log.info("Created employee={} {} tenant={}", number, emp.getFullName(), tenantId);
+
+        // FIX: backlog 3.3 — this was the one missing piece. The
+        // eventPublisher field, EmployeeCreatedEvent, and
+        // ContractingHrEventHandler were all already correctly in place;
+        // this publish call — the thing that actually fires the event —
+        // was the part that never got added, twice confirmed missing on
+        // direct inspection. Last statement before the return,
+        // deliberately: a failure anywhere earlier in employee creation
+        // must never result in an event firing for an employee that
+        // doesn't actually exist.
+        eventPublisher.publishEvent(EmployeeCreatedEvent.of(
+                tenantId, emp.getId(), emp.getFirstName(), emp.getLastName(),
+                emp.getIdNumber(), emp.getJobTitle(), emp.getStartDate(), emp.getGrossSalary()));
+
         return toEmployeeResponse(emp);
     }
 
@@ -104,9 +119,9 @@ public class HrService {
         emp.setDepartment(req.department());
         emp.setGrossSalary(req.grossSalary());
         emp.setPayFrequency(req.payFrequency());
-        emp.setTravelAllowance(req.travelAllowance() != null ? req.travelAllowance() : java.math.BigDecimal.ZERO);
-        emp.setMedicalAidContribution(req.medicalAidContribution() != null ? req.medicalAidContribution() : java.math.BigDecimal.ZERO);
-        emp.setPensionContribution(req.pensionContribution() != null ? req.pensionContribution() : java.math.BigDecimal.ZERO);
+        emp.setTravelAllowance(req.travelAllowance() != null ? req.travelAllowance() : BigDecimal.ZERO);
+        emp.setMedicalAidContribution(req.medicalAidContribution() != null ? req.medicalAidContribution() : BigDecimal.ZERO);
+        emp.setPensionContribution(req.pensionContribution() != null ? req.pensionContribution() : BigDecimal.ZERO);
         emp.setBankName(req.bankName());
         emp.setBankAccountNumber(req.bankAccountNumber());
         emp.setBankBranchCode(req.bankBranchCode());
@@ -219,11 +234,11 @@ public class HrService {
                     balanceRepo.save(bal);
                 });
         employeeRepo.findActiveById(tenantId, req.getEmployeeId()).ifPresent(emp ->
-                               notifyEmployeeLeaveDecision(tenantId, emp, req, NotificationType.LEAVE_REQUEST_REJECTED,
-                                                "Leave request rejected",
-                                               "Your " + req.getLeaveType().toLowerCase() + " leave request ("
-                                                               + req.getStartDate() + " to " + req.getEndDate() + ") was rejected."
-                                                                + (reason != null && !reason.isBlank() ? " Reason: " + reason : "")));
+                notifyEmployeeLeaveDecision(tenantId, emp, req, NotificationType.LEAVE_REQUEST_REJECTED,
+                        "Leave request rejected",
+                        "Your " + req.getLeaveType().toLowerCase() + " leave request ("
+                                + req.getStartDate() + " to " + req.getEndDate() + ") was rejected."
+                                + (reason != null && !reason.isBlank() ? " Reason: " + reason : "")));
         return toLeaveResponse(req, tenantId);
     }
 
@@ -312,10 +327,10 @@ public class HrService {
         }
     }
 
-    // NEW (Tier 1 gap analysis): HrEmployee.managerId is the approver if set
-    // and resolvable; otherwise falls back to tenant admins — same fallback
-    // shape as Expenses' notifySubmitted(), for the same reason (no
-    // guaranteed single owner of the event).
+    // HrEmployee.managerId is the approver if set and resolvable; otherwise
+    // falls back to tenant admins — same fallback shape as Expenses'
+    // notifySubmitted(), for the same reason (no guaranteed single owner
+    // of the event).
     private void notifyApprover(TenantId tenantId, HrEmployee emp, HrLeaveRequest request) {
         List<Recipient> recipients;
         if (emp.getManagerId() != null) {
