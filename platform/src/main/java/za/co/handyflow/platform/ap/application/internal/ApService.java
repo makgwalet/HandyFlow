@@ -7,6 +7,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.ap.domain.model.*;
@@ -25,6 +27,10 @@ import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.accounting.application.AccountingFacade;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
+// FIX: backlog 1.1 — AP's migration onto the shared approval engine.
+import za.co.handyflow.platform.approvals.application.ApprovalFacade;
+import za.co.handyflow.platform.approvals.dto.ApprovalRequestResponse;
+import za.co.handyflow.platform.approvals.dto.ApprovalStepResponse;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -44,6 +50,9 @@ public class ApService {
     private final AccountingFacade      accountingFacade;
     private final NotificationService   notificationService;
     private final TenantAdminRecipients tenantAdminRecipients;
+    // FIX: backlog 1.1 — the shared approval engine. See approveBill()'s
+    // own comment block below for the full migration rationale.
+    private final ApprovalFacade        approvalFacade;
 
     // ── Category → expense account code mapping ───────────────────────────────
     private static final Map<String, String> CATEGORY_ACCOUNT = Map.ofEntries(
@@ -66,9 +75,14 @@ public class ApService {
     // Input/Claimable.
     private static final String VAT_INPUT_ACCOUNT_CODE = "1300";
 
-    // Maker-checker: bills above this amount require a second approval
-    // from a DIFFERENT person before the journal actually posts. Below
-    // it, the existing single-step approve() flow is unchanged.
+    // NO LONGER READ DIRECTLY BY approveBill() — the threshold now lives
+    // as data on the platform-default ApprovalRule seeded by the
+    // approvals engine's own migration (V246), so it's tenant-editable
+    // instead of a fixed property. Left here, unused, deliberately not
+    // deleted: dropping a @Value-backed property is a more consequential
+    // change than leaving an unused field, and someone may still be
+    // relying on the ap.approval.second-approval-threshold config key
+    // existing even if nothing reads it anymore right now.
     @Value("${ap.approval.second-approval-threshold:10000}")
     private BigDecimal secondApprovalThreshold;
 
@@ -124,12 +138,13 @@ public class ApService {
         log.info("Created AP bill={} supplier={} amount={}", bill.getId(),
                 req.supplierName(), req.amount());
 
-        // Notify whoever can approve bills — previously nothing told
-        // anyone a new bill was waiting; it would only be noticed by
-        // manually checking the Draft list. Reusing TenantAdminRecipients
-        // (same tradeoff already made in the recruiter module: notifies
-        // all tenant admins, not specifically AP_MANAGE holders — there's
-        // no narrower "resolve everyone with permission X" port available).
+        // NOT changed by the approvals-engine migration: a bill isn't
+        // "submitted for approval" at creation time — it just sits in
+        // DRAFT until someone actually calls approveBill(), which is
+        // where submission-to-the-engine now happens (on that method's
+        // first call for this bill). See approveBill()'s own comment for
+        // why. This notification is unrelated to that — it's just "hey,
+        // a new bill exists, go look at it" and stays exactly as it was.
         notifyBillPendingApproval(tenantId, bill);
 
         return toBillResponse(bill, duplicateWarning);
@@ -171,60 +186,126 @@ public class ApService {
         return toBillResponse(findBill(tenantId, id));
     }
 
+    /**
+     * FIX: backlog 1.1 — migrated onto the shared approval engine. The
+     * threshold check, the SEQUENTIAL two-step dance, and the "must be a
+     * different person" rule all used to be hardcoded here; they're now
+     * data (ApprovalRule, seeded as AP's platform default by the
+     * approvals engine's own migration) evaluated by
+     * ApprovalEngineService instead. This method's own job shrinks to:
+     * submit-on-first-call (AP has no separate "submit for approval"
+     * step distinct from "the act of approving" — a bill just sits in
+     * DRAFT until someone calls this), act on whichever step is
+     * currently open, and react to the outcome.
+     * <p>
+     * completeApprovalAndPostJournal() is called directly here (not left
+     * purely to ApApprovalEventHandler's async listener) so the HTTP
+     * caller gets back a bill that's ALREADY APPROVED with a real
+     * journal reference in the same response — @ApplicationModuleListener
+     * runs after this transaction commits, which would otherwise mean
+     * the immediate response still shows the pre-approval status. The
+     * listener also calls the same method as a second, idempotent path
+     * (guarded — see that method) so approving via the new generic
+     * /api/v1/approvals/steps/{id}/approve endpoint instead of this one
+     * still posts the journal correctly.
+     */
     @Transactional
     public BillResponse approveBill(TenantId tenantId, UUID id, UUID approvedBy) {
         ApBill bill = findBill(tenantId, id);
 
-        boolean aboveThreshold = bill.getTotalAmount().compareTo(secondApprovalThreshold) > 0;
+        var existing = approvalFacade.getLatestRequestForEntity(tenantId, "ap", "BILL", id);
+        ApprovalRequestResponse approvalResult;
 
-        if (aboveThreshold && "SECOND_APPROVAL".equals(bill.getStatus())) {
-            // Second approval — must be a different person from whoever
-            // gave the first one, or the whole control is meaningless.
-            if (approvedBy != null && approvedBy.equals(bill.getFirstApprovedBy())) {
-                throw new HandyFlowException(
-                        "This bill already has your first approval — a different person must give the second approval",
-                        HttpStatus.BAD_REQUEST, "SAME_APPROVER");
+        if (existing.isPresent() && isOpen(existing.get())) {
+            ApprovalStepResponse pendingStep = firstPendingStep(existing.get())
+                    .orElseThrow(() -> new HandyFlowException(
+                            "This bill's approval request has no pending step — data inconsistency, needs manual review",
+                            HttpStatus.CONFLICT, "NO_PENDING_STEP"));
+            approvalResult = approvalFacade.actOnStep(tenantId, pendingStep.id(), approvedBy,
+                    currentUserAuthorities(), "APPROVE", null, null);
+        } else {
+            approvalResult = approvalFacade.submit(tenantId, "ap", "BILL", id, approvedBy,
+                    Map.of("totalAmount", bill.getTotalAmount()));
+            // submit() only creates the steps, it doesn't act on any of
+            // them — this very call is also the first approver's action,
+            // so act on step 1 immediately rather than requiring a
+            // second, separate click for what the user experienced as
+            // one "Approve" action.
+            if (isOpen(approvalResult)) {
+                ApprovalStepResponse firstStep = firstPendingStep(approvalResult)
+                        .orElseThrow(() -> new IllegalStateException("A freshly-submitted request has no pending step"));
+                approvalResult = approvalFacade.actOnStep(tenantId, firstStep.id(), approvedBy,
+                        currentUserAuthorities(), "APPROVE", null, null);
             }
-            String expenseAccount = CATEGORY_ACCOUNT.getOrDefault(bill.getCategory(), "5100");
-            UUID journalId = postApprovalJournal(tenantId, bill, expenseAccount);
-            bill.approve(journalId);
-            billRepo.save(bill);
-            log.info("Bill={} received second approval from={} journal={}", id, approvedBy, journalId);
-            return toBillResponse(bill);
         }
 
-        if (aboveThreshold) {
-            // First approval on a high-value bill — no journal yet.
-            // Deliberately does not fall through to postApprovalJournal();
-            // that only happens once a second, different person approves.
-            bill.requestSecondApproval(approvedBy);
-            billRepo.save(bill);
-            log.info("Bill={} (R {}) exceeds second-approval threshold (R {}) — first approval from={}, awaiting second",
-                    id, bill.getTotalAmount(), secondApprovalThreshold, approvedBy);
-            // Same notification used for a brand-new pending bill — the
-            // phrasing ("is waiting for approval") already reads correctly
-            // for "still needs one more approval" too, so this reuses it
-            // rather than adding a near-duplicate message for a narrower case.
+        if ("APPROVED".equals(approvalResult.status())) {
+            completeApprovalAndPostJournal(tenantId, id);
+        } else if ("REJECTED".equals(approvalResult.status())) {
+            // KNOWN GAP: ApBill has no REJECTED status/transition anywhere
+            // in its real state machine (DRAFT/SECOND_APPROVAL/APPROVED/
+            // OVERDUE/PAID/CANCELLED only) — there was never a "reject a
+            // bill" concept before this migration, only cancelBill() as a
+            // separate, unrelated action. Rather than invent a status
+            // transition ApBill's own domain model doesn't have, this is
+            // logged for manual follow-up. In practice this path is
+            // unreachable from THIS method today (nothing here ever
+            // passes "REJECT" as the decision) — it would only trigger if
+            // someone rejected via the generic engine endpoint instead,
+            // which AP's own UI doesn't currently expose a path to.
+            log.warn("Bill={} tenant={} was REJECTED via the approval engine — " +
+                    "ApBill has no REJECTED status to apply; needs manual follow-up", id, tenantId);
+        } else {
+            // Still IN_PROGRESS — this was the first of two approvals on
+            // a bill over threshold. Same notification already used for
+            // a brand-new pending bill; its phrasing already reads
+            // correctly for "still needs one more approval" too.
             notifyBillPendingApproval(tenantId, bill);
-            return toBillResponse(bill);
+            log.info("Bill={} received one approval from={}, still awaiting further approval(s) per its approval rule",
+                    id, approvedBy);
         }
 
-        // Below threshold — original single-step flow, unchanged. Post
-        // journal entry: debit expense account, debit VAT input (if any),
-        // credit AP (2010). If this throws — bad Chart of Accounts setup,
-        // DB error, whatever — the whole @Transactional method rolls
-        // back: bill stays un-approved, no partial journal rows survive.
-        // Previously postApprovalJournal() swallowed every exception and
-        // returned null, and the bill got marked APPROVED anyway with a
-        // null journal reference — a bill could be "approved" with zero
-        // accounting trail and nothing would ever tell you.
+        return toBillResponse(findBill(tenantId, id)); // reload — journal posting above may have changed status
+    }
+
+    /**
+     * FIX: backlog 1.1. Extracted from the old approveBill()'s inline
+     * "below threshold" and "second approval received" branches —
+     * unchanged logic, just now callable from two places (directly above,
+     * and from ApApprovalEventHandler for approvals completed via the
+     * generic engine endpoint). Idempotency guard makes both call sites
+     * safe together: whichever one runs first does the real work, the
+     * other becomes a no-op.
+     */
+    @Transactional
+    public void completeApprovalAndPostJournal(TenantId tenantId, UUID billId) {
+        ApBill bill = findBill(tenantId, billId);
+        if ("APPROVED".equals(bill.getStatus()) || "PAID".equals(bill.getStatus())
+                || "OVERDUE".equals(bill.getStatus())) {
+            return; // already completed by the other call path
+        }
         String expenseAccount = CATEGORY_ACCOUNT.getOrDefault(bill.getCategory(), "5100");
         UUID journalId = postApprovalJournal(tenantId, bill, expenseAccount);
-
         bill.approve(journalId);
         billRepo.save(bill);
-        log.info("Approved bill={} journal={}", id, journalId);
-        return toBillResponse(bill);
+        log.info("Approved bill={} journal={}", billId, journalId);
+    }
+
+    private boolean isOpen(ApprovalRequestResponse r) {
+        return "SUBMITTED".equals(r.status()) || "IN_PROGRESS".equals(r.status());
+    }
+
+    private Optional<ApprovalStepResponse> firstPendingStep(ApprovalRequestResponse r) {
+        return r.steps().stream()
+                .filter(s -> "PENDING".equals(s.status()))
+                .min(Comparator.comparingInt(ApprovalStepResponse::stepOrder));
+    }
+
+    /** Same SecurityContextHolder read as ApprovalController's own helper — this module has no other way to know the acting user's roles without depending on identity (see approvals.package-info.java). */
+    private List<String> currentUserAuthorities() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return List.of();
+        return auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList();
     }
 
     @Transactional
