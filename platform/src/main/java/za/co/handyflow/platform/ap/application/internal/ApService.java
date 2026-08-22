@@ -256,10 +256,45 @@ public class ApService {
             log.warn("Bill={} tenant={} was REJECTED via the approval engine — " +
                     "ApBill has no REJECTED status to apply; needs manual follow-up", id, tenantId);
         } else {
-            // Still IN_PROGRESS — this was the first of two approvals on
-            // a bill over threshold. Same notification already used for
-            // a brand-new pending bill; its phrasing already reads
-            // correctly for "still needs one more approval" too.
+            // Still IN_PROGRESS — first approval recorded, further
+            // approval(s) still pending per this bill's approval rule.
+            //
+            // FIX: restores what the OLD approveBill() did via
+            // bill.requestSecondApproval(approvedBy) — the status
+            // transition out of DRAFT, and firstApprovedBy/firstApprovedAt.
+            // This was silently dropped in the first pass of this
+            // migration and had two real consequences, not just one:
+            // (1) BillResponse.firstApprovedBy/firstApprovedAt — the
+            //     frontend's own comment says these exist to "disable the
+            //     Approve button for whoever already gave the first
+            //     approval" — would have gone permanently null.
+            // (2) updateBill()'s edit guard checks
+            //     "DRAFT".equals(bill.getStatus()) — a bill stuck in
+            //     DRAFT the whole time an approval is in flight would
+            //     still have been editable, letting someone change the
+            //     amount after the first approval already fired against
+            //     the old figure. A real correctness gap, not just a UI one.
+            //
+            // requestSecondApproval()'s own guard only accepts DRAFT/
+            // OVERDUE as the prior state, so this only fires on the FIRST
+            // step of an in-flight request — correct for AP's actual
+            // seeded rule (exactly two steps), but worth being honest
+            // about the limit: if a tenant ever configures a 3+-step rule
+            // for AP bills (possible now that rules are tenant-editable —
+            // see backlog 1.1 Q3), a bill already in SECOND_APPROVAL has
+            // no further ApBill status to move into for step 3 onward —
+            // ApBill's status enum has no room for "third of four
+            // approvals still pending." Guarding rather than letting that
+            // hit requestSecondApproval()'s own IllegalStateException.
+            if ("DRAFT".equals(bill.getStatus()) || "OVERDUE".equals(bill.getStatus())) {
+                bill.requestSecondApproval(approvedBy);
+                billRepo.save(bill);
+            } else {
+                log.info("Bill={} received another approval beyond the second — ApBill's status has no representation for this; status unchanged", id);
+            }
+            // Same notification already used for a brand-new pending
+            // bill; its phrasing already reads correctly for "still needs
+            // one more approval" too.
             notifyBillPendingApproval(tenantId, bill);
             log.info("Bill={} received one approval from={}, still awaiting further approval(s) per its approval rule",
                     id, approvedBy);
