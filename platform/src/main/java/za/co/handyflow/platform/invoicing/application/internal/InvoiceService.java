@@ -18,6 +18,9 @@ import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.EmailTemplates;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
+import org.springframework.context.ApplicationEventPublisher;
+import za.co.handyflow.platform.invoicing.InvoiceIssuedEvent;
+import za.co.handyflow.platform.invoicing.InvoicePaymentRecordedEvent;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -40,6 +43,11 @@ public class InvoiceService {
     private final EmailService emailService;
     private final StaffNotifier staffNotifier;
     private final ReceiptPdfService receiptPdfService;
+    // FIX: backlog 1.6 — publishes InvoiceIssuedEvent/InvoicePaymentRecordedEvent
+    // so accounting's own listener can post to the general ledger. See
+    // InvoiceIssuedEvent's own Javadoc for why this is an event, not a
+    // direct AccountingFacade call.
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public InvoiceResponse recordPayment(TenantId tenantId, UUID id,
@@ -99,6 +107,21 @@ public class InvoiceService {
                         + " recorded against invoice " + invoice.getInvoiceNumber() + ".",
                 "/invoices", id.toString());
 
+        // FIX: backlog 1.6 — was previously nothing here; a payment never
+        // reached the general ledger. bankAccountId is nullable —
+        // req.bankAccountId() may be null if the caller doesn't send it yet
+        // (RecordPaymentRequest's new field; existing frontend flows won't
+        // populate it immediately) — InvoicingAccountingEventHandler
+        // handles that case explicitly (logs clearly, does not post, does
+        // not guess a default account) rather than this method needing to
+        // know anything about that logic itself. Placed after the
+        // notification call so a notification failure above (already
+        // wrapped in its own try/catch) can never prevent the ledger event
+        // from firing.
+        eventPublisher.publishEvent(InvoicePaymentRecordedEvent.of(
+                tenantId, invoice.getId(), invoice.getInvoiceNumber(),
+                req.amountPaid(), req.bankAccountId()));
+
         return queryService.getInvoice(tenantId, id);
     }
 
@@ -111,6 +134,16 @@ public class InvoiceService {
         invoice.markIssued(dueDate);
         invoiceRepo.save(invoice);
         log.info("Issued invoice={} dueDate={}", invoice.getInvoiceNumber(), dueDate);
+
+        // FIX: backlog 1.6 — was previously nothing here; issuing an
+        // invoice never reached the general ledger. Last statement before
+        // the return, deliberately: a failure anywhere earlier in issuance
+        // must never result in an event firing for an invoice that isn't
+        // actually issued and persisted.
+        eventPublisher.publishEvent(InvoiceIssuedEvent.of(
+                tenantId, invoice.getId(), invoice.getInvoiceNumber(), invoice.getCustomerId(),
+                invoice.getSubtotal(), invoice.getVatTotal(), invoice.getTotal()));
+
         return queryService.getInvoice(tenantId, id);
     }
 

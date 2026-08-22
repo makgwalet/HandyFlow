@@ -91,6 +91,23 @@ public interface PosTransactionRepository extends JpaRepository<PosTransaction, 
         """)
     BigDecimal sumTotalSalesBySession(UUID sessionId);
 
+    /**
+     * FIX: backlog 1.6 — backs the batched GL posting at session close.
+     * Same "real sales only" filter as every other session-scoped query
+     * above (originalTransactionId IS NULL) — refunds are deliberately
+     * excluded here too, matching this whole first pass's scope (sales
+     * posting only; refund netting into the same batched entry is a
+     * flagged, explicit follow-up, not silently included or dropped).
+     */
+    @Query("""
+        SELECT COALESCE(SUM(t.vatAmount), 0) FROM PosTransaction t
+        WHERE t.cashSessionId = :sessionId
+        AND t.status = 'COMPLETED'
+        AND t.originalTransactionId IS NULL
+        """)
+    BigDecimal sumVatBySession(UUID sessionId);
+
+
     @Query("""
         SELECT COUNT(t) FROM PosTransaction t
         WHERE t.cashSessionId = :sessionId

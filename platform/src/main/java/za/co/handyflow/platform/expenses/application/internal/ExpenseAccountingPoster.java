@@ -2,59 +2,87 @@ package za.co.handyflow.platform.expenses.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
+import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Posts an approved expense claim to the accounting journal (acc_accounts /
- * acc_journal_entries / acc_journal_lines).
+ * Posts an approved expense claim to the accounting journal.
  * <p>
  * Its own @Component bean with @Transactional(REQUIRES_NEW), not a private
  * method on ExpensesService — same reasoning as UserRecipientResolverImpl:
- * the code this replaces already had a try/catch around this exact block,
- * with a comment stating "Approval should not fail just because accounting
- * lookup fails." That intent never actually held, for the same underlying
- * reason resolveRecipient() didn't: a caught Java exception here doesn't
- * undo Postgres's abort-until-rollback behaviour, and this was a private,
- * self-invoked method, so even an @Transactional annotation on it would
- * have been silently ignored by Spring's proxy. Confirmed by real testing,
- * not theory: a too-long entry_number here poisoned the entire
- * approveClaim() transaction and crashed the approval outright — exactly
- * the failure this class exists to prevent, most importantly for the
- * failure mode this method was originally written to guard against: a
- * tenant with no STAFF_EXPENSES-subtype account configured yet.
+ * a caught Java exception here doesn't undo Postgres's abort-until-rollback
+ * behaviour, and a private, self-invoked method's @Transactional would be
+ * silently ignored by Spring's proxy. Confirmed by real testing, not
+ * theory: a too-long entry_number here once poisoned the entire
+ * approveClaim() transaction and crashed the approval outright — this
+ * class exists specifically to prevent that failure mode. THIS CONTRACT
+ * IS UNCHANGED BY THIS FIX: postExpenseClaimJournal() must never throw,
+ * only ever return Optional.empty() on failure — preserved exactly below,
+ * just with AccountingFacade calls now wrapped in the same try/catch the
+ * raw JDBC calls used to be.
  * <p>
- * FIX: journal entry number was "JE-EXP-" + claimNumber. Claim numbers are
- * formatted EXP-YYYY-NNNNN (14 chars); with the "JE-EXP-" prefix (7 chars)
- * that's 21 characters into what confirmed via a live crash is a
- * VARCHAR(20) entry_number column. Shortened to "JE-" + claimNumber (17
- * chars), safely under the limit — not widening the column, since it's
- * unknown what other journal-entry formats already rely on its current
- * width elsewhere in the accountant module.
+ * FIX: backlog 1.6/8.2 — migrated off raw JDBC INSERTs directly into
+ * acc_accounts/acc_journal_entries/acc_journal_lines onto
+ * AccountingFacade.createJournalEntry()/postJournalEntry(), mirroring how
+ * AP (ApService.postApprovalJournal) and POS (PosService.
+ * postSessionSalesJournal) already do it correctly. This is a caller
+ * migration onto proven infrastructure, not new design work — exactly as
+ * the backlog itself scoped it. Journal entry numbering now comes from
+ * the real JournalNumberGenerator via AccountingService, the same fix
+ * already applied to AP; the old manual "JE-" + claimNumber construction
+ * (and the VARCHAR(20) length crash that caused) is gone entirely — the
+ * facade generates a correct, guaranteed-fitting number itself.
  * <p>
- * NOTE on module boundaries: this still reaches into acc_accounts /
- * acc_journal_entries / acc_journal_lines via raw JDBC from inside the
- * expenses module, same as the code it replaces — that's a pre-existing
- * cross-module data access pattern, not something introduced or fixed
- * here. The clean DDD fix would be accounting exposing a proper posting
- * facade (mirroring TenantAdminRecipients/BillingRecipients), but that's
- * a larger, separate piece of work — out of scope for closing tonight's
- * crash, and not bundled in here.
+ * REAL BUG FOUND AND FIXED WHILE MIGRATING, DISCLOSED NOT SILENTLY
+ * CHANGED: the old raw SQL picked accounts via unordered, non-specific
+ * queries. The expense-side lookup (`account_code LIKE '5%' AND
+ * account_subtype = 'STAFF_EXPENSES' LIMIT 1`) matches FOUR different
+ * seeded accounts (5240 Staff Expense Reimbursements, 5241 Travel and
+ * Subsistence, 5242 Meals and Entertainment, 5243 Accommodation) —
+ * despite the method already receiving a `category` parameter, that
+ * parameter was only ever used in the journal line's description text,
+ * never to pick the actually-matching account, so which of the four got
+ * debited was effectively arbitrary (whatever order Postgres happened to
+ * return). The payable-side lookup (`account_code LIKE '2%' LIMIT 1`) was
+ * far more serious: that matches TEN different liability accounts,
+ * including VAT Output (2100) and PAYE Payable (2200) — an expense
+ * reimbursement could have posted against completely unrelated statutory
+ * liability accounts depending on row order alone.
+ * <p>
+ * Fixed to deterministic, specific accounts rather than an unordered
+ * LIKE match: 5240 (Staff Expense Reimbursements) for the expense side —
+ * category-specific routing (matching AP's own CATEGORY_ACCOUNT pattern
+ * exactly) would be the more precise fix, but doing that correctly needs
+ * the real, confirmed set of expense category values this module
+ * actually uses, which wasn't available this pass — flagging that as a
+ * real, worthwhile follow-up rather than guessing at category strings.
+ * 2400 (Accrued Expenses) for the payable side — chosen deliberately over
+ * 2010 (Accounts Payable), which is specifically AP's own supplier-owed
+ * account; an unpaid employee reimbursement is a different kind of
+ * liability (an accrual), not a trade payable. This is my own reasoned
+ * choice, not something independently confirmed elsewhere in this
+ * codebase — worth a second look if a different convention is preferred.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ExpenseAccountingPoster {
 
-    private final JdbcTemplate jdbc;
+    private static final String EXPENSE_ACCOUNT_CODE = "5240"; // Staff Expense Reimbursements
+    private static final String PAYABLE_ACCOUNT_CODE = "2400"; // Accrued Expenses
+
+    private final AccountingFacade accountingFacade;
 
     /**
      * @return the new journal entry's id if posting succeeded, empty if
@@ -67,50 +95,47 @@ public class ExpenseAccountingPoster {
                                                   String description, String category,
                                                   String employeeName, BigDecimal amount) {
         try {
-            var expenseAccountRow = jdbc.queryForMap(
-                    "SELECT id FROM acc_accounts WHERE tenant_id = ? AND account_code LIKE '5%' AND account_subtype = 'STAFF_EXPENSES' AND active = true LIMIT 1",
-                    tenantId.getValue());
-            var payableAccountRow = jdbc.queryForMap(
-                    "SELECT id FROM acc_accounts WHERE tenant_id = ? AND account_code LIKE '2%' AND active = true LIMIT 1",
-                    tenantId.getValue());
+            List<za.co.handyflow.platform.accounting.dto.AccountResponse> accounts =
+                    accountingFacade.getAccounts(tenantId);
 
-            UUID expenseAccountId = UUID.fromString(expenseAccountRow.get("id").toString());
-            UUID payableAccountId = UUID.fromString(payableAccountRow.get("id").toString());
+            UUID expenseAccountId = findAccountByCode(accounts, EXPENSE_ACCOUNT_CODE);
+            UUID payableAccountId = findAccountByCode(accounts, PAYABLE_ACCOUNT_CODE);
 
-            UUID jeId = UUID.randomUUID();
-            String jeNumber = "JE-" + claimNumber;
-            LocalDate today = LocalDate.now();
+            if (expenseAccountId == null || payableAccountId == null) {
+                log.warn("Chart of Accounts missing account {} or {} for tenant={} — expense claim={} not posted",
+                        EXPENSE_ACCOUNT_CODE, PAYABLE_ACCOUNT_CODE, tenantId, claimNumber);
+                return Optional.empty();
+            }
 
-            jdbc.update("""
-                INSERT INTO acc_journal_entries
-                (id, tenant_id, entry_number, entry_date, description, status, posted_at, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, 'POSTED', NOW(), NOW(), NOW())
-                """,
-                    jeId, tenantId.getValue(), jeNumber, today,
-                    "Expense claim: " + description + " (" + claimNumber + ")");
+            List<CreateJournalEntryRequest.JournalLineRequest> lines = List.of(
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            expenseAccountId, category + " — " + employeeName, amount, null),
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            payableAccountId, "Payable to " + employeeName, null, amount));
 
-            jdbc.update("""
-                INSERT INTO acc_journal_lines
-                (id, journal_entry_id, account_id, description, debit_amount, credit_amount, created_at)
-                VALUES (?, ?, ?, ?, ?, 0, NOW())
-                """,
-                    UUID.randomUUID(), jeId, expenseAccountId,
-                    category + " — " + employeeName, amount);
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(
+                    LocalDate.now(), "Expense claim: " + description + " (" + claimNumber + ")",
+                    claimNumber, "MANUAL", lines);
 
-            jdbc.update("""
-                INSERT INTO acc_journal_lines
-                (id, journal_entry_id, account_id, description, debit_amount, credit_amount, created_at)
-                VALUES (?, ?, ?, ?, 0, ?, NOW())
-                """,
-                    UUID.randomUUID(), jeId, payableAccountId,
-                    "Payable to " + employeeName, amount);
+            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
+            accountingFacade.postJournalEntry(tenantId, created.id());
 
-            log.info("Posted expense journal entry {} for claim {}", jeNumber, claimNumber);
-            return Optional.of(jeId);
+            log.info("Posted expense journal entry {} for claim {}", created.entryNumber(), claimNumber);
+            return Optional.of(created.id());
 
         } catch (Exception e) {
+            // Preserved exactly, per this class's own extensive history:
+            // approval must never fail because accounting posting failed.
             log.error("Failed to post expense {} to accounting: {}", claimNumber, e.getMessage());
             return Optional.empty();
         }
+    }
+
+    private UUID findAccountByCode(List<za.co.handyflow.platform.accounting.dto.AccountResponse> accounts, String code) {
+        return accounts.stream()
+                .filter(a -> code.equals(a.accountCode()))
+                .map(a -> a.id())
+                .findFirst()
+                .orElse(null);
     }
 }

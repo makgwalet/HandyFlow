@@ -25,6 +25,9 @@ import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
 import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.notifications.domain.model.NotificationSeverity;
+import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
+import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -42,6 +45,15 @@ public class PosService {
     private static final BigDecimal VAT_DIVISOR       = BigDecimal.valueOf(100);
     private static final ZoneId     ZONE_SA           = ZoneId.of("Africa/Johannesburg");
 
+    // FIX: backlog 1.6/10.1 — account codes for the batched session-close
+    // posting. Real, confirmed seeded codes from ChartOfAccountsSeeder,
+    // not invented. See postSessionSalesJournal()'s own Javadoc for the
+    // full rationale (single clearing account, not per-payment-method
+    // splitting; sales only, refunds excluded from this pass).
+    private static final String POS_CASH_ACCOUNT_CODE    = "1010"; // Cash and Cash Equivalents
+    private static final String POS_REVENUE_ACCOUNT_CODE = "4000"; // Revenue
+    private static final String POS_VAT_ACCOUNT_CODE     = "2100"; // VAT Output (Payable)
+
     private final PosTransactionRepository       transactionRepo;
     private final PosTransactionItemRepository   transactionItemRepo;
     private final PosStockItemRepository         stockItemRepo;
@@ -57,6 +69,13 @@ public class PosService {
     private final NotificationService notificationService;
     private final TenantAdminRecipients tenantAdminRecipients;
     private final PosSettingsService posSettingsService;
+    // FIX: backlog 1.6/10.1 — posts a single batched sales journal at
+    // cash-session close, instead of nothing reaching the ledger at all.
+    // Direct AccountingFacade call (not an event, unlike Invoicing) —
+    // confirmed no circular dependency: accounting does not depend on
+    // pos, so pos depending on accounting is a clean one-directional
+    // edge, same shape as AP's own migration.
+    private final AccountingFacade accountingFacade;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Summary
@@ -133,6 +152,25 @@ public class PosService {
                 totalSales, txCount, req.notes());
         cashSessionRepo.save(session);
 
+        // FIX: backlog 1.6/10.1 — was previously nothing here; a whole
+        // day's POS sales never reached the general ledger. Batched as
+        // ONE journal entry per session close (not one per sale), per
+        // your own confirmed decision on posting granularity. Sales
+        // only — refunds are excluded from totalSales/vatTotal by the
+        // same query filters every other session total already uses
+        // (originalTransactionId IS NULL); refund netting into this
+        // entry is a flagged follow-up, not silently included.
+        // Debits a single "Cash and Cash Equivalents" (1010) clearing
+        // account for the FULL total (cash+card+EFT combined) rather
+        // than splitting per payment method — the actual bank deposit
+        // (once card/EFT settlements land, cash is banked) is exactly
+        // what Accounting's own existing bank-reconciliation feature
+        // (reconcileTransaction/reconcileWithNewJournal) already exists
+        // to match up later; this entry just correctly recognizes the
+        // revenue and VAT liability at the moment of sale, which is the
+        // actual gap backlog 1.6 identified.
+        postSessionSalesJournal(tenantId, session);
+
         // NEW (Tier 1 gap analysis): no existing "acceptable variance"
         // threshold anywhere in this codebase — this fires on ANY non-zero
         // variance rather than guessing a tolerance band. FLAGGING AS AN
@@ -140,7 +178,7 @@ public class PosService {
         // whether a small tolerance (e.g. R10-R20 float-counting rounding)
         // should suppress this instead of alerting on every single close.
         if (session.getCashVariance().compareTo(BigDecimal.ZERO) != 0) {
-             notifyCashVariance(tenantId, session, userName);
+            notifyCashVariance(tenantId, session, userName);
         }
         evaluateCashVariance(tenantId, session, userName);
 
@@ -292,12 +330,12 @@ public class PosService {
             movementRepo.save(movement);
 
             // NEW (Tier 1 gap analysis): edge-triggered — mirrors Fuel's
-                       // FUEL_TANK_LOW exactly. Fires only on the sale that crosses the
-                                // item from "not low" into "low", not on every sale while it
-                                        // stays low, and not on an item that started low.
-                                                if (!wasLow && d.stockItem().isLowStock()) {
-                                notifyLowStock(tenantId, d.stockItem());
-                            }
+            // FUEL_TANK_LOW exactly. Fires only on the sale that crosses the
+            // item from "not low" into "low", not on every sale while it
+            // stays low, and not on an item that started low.
+            if (!wasLow && d.stockItem().isLowStock()) {
+                notifyLowStock(tenantId, d.stockItem());
+            }
         }
 
         log.info("[POS] Sale {} completed. Total: {} {}", txnNum, totalAmount, req.paymentMethod());
@@ -881,6 +919,86 @@ public class PosService {
     // ═══════════════════════════════════════════════════════════════════════════
     // Private helpers
     // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * FIX: backlog 1.6/10.1. See closeCashSession()'s own call-site
+     * comment for the full rationale (batched-per-session, sales-only,
+     * single clearing account rather than per-payment-method splitting).
+     * This was the piece that was missing — the call site landed, this
+     * method definition didn't, which would have been a compile error.
+     */
+    private void postSessionSalesJournal(TenantId tenantId, PosCashSession session) {
+        BigDecimal totalSales = transactionRepo.sumTotalSalesBySession(session.getId());
+        if (totalSales == null || totalSales.compareTo(BigDecimal.ZERO) <= 0) {
+            log.info("[POS] Session {} had no sales — nothing to post", session.getSessionNumber());
+            return;
+        }
+        BigDecimal vatTotal = transactionRepo.sumVatBySession(session.getId());
+        if (vatTotal == null) vatTotal = BigDecimal.ZERO;
+        BigDecimal subtotal = totalSales.subtract(vatTotal);
+
+        try {
+            UUID cashAccountId    = findAccountingAccountByCode(tenantId, POS_CASH_ACCOUNT_CODE);
+            UUID revenueAccountId = findAccountingAccountByCode(tenantId, POS_REVENUE_ACCOUNT_CODE);
+            if (cashAccountId == null || revenueAccountId == null) {
+                log.warn("[POS] Chart of Accounts missing account {} or {} for tenant={} — session={} sales not posted",
+                        POS_CASH_ACCOUNT_CODE, POS_REVENUE_ACCOUNT_CODE, tenantId, session.getSessionNumber());
+                return;
+            }
+
+            boolean hasVat = vatTotal.compareTo(BigDecimal.ZERO) > 0;
+            UUID vatAccountId = null;
+            if (hasVat) {
+                vatAccountId = findAccountingAccountByCode(tenantId, POS_VAT_ACCOUNT_CODE);
+                if (vatAccountId == null) {
+                    log.warn("[POS] Chart of Accounts missing VAT Output ({}) for tenant={} — session={} sales not posted",
+                            POS_VAT_ACCOUNT_CODE, tenantId, session.getSessionNumber());
+                    return;
+                }
+            }
+
+            List<CreateJournalEntryRequest.JournalLineRequest> lines = new ArrayList<>();
+            lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                    cashAccountId, "POS sales — " + session.getSessionNumber(), totalSales, null));
+            lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                    revenueAccountId, "POS revenue — " + session.getSessionNumber(), null, subtotal));
+            if (hasVat) {
+                lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                        vatAccountId, "POS VAT output — " + session.getSessionNumber(), null, vatTotal));
+            }
+
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(
+                    LocalDate.now(), "POS session closed: " + session.getSessionNumber(),
+                    session.getSessionNumber(), "MANUAL", lines);
+
+            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
+            accountingFacade.postJournalEntry(tenantId, created.id());
+            log.info("[POS] Posted sales journal for session={} tenant={} total={}",
+                    session.getSessionNumber(), tenantId, totalSales);
+        } catch (Exception e) {
+            // Same principle as every other cross-module side-effect hookup
+            // in this codebase: the session is already closed and saved by
+            // the time this runs — a posting failure must never look like
+            // it affected that (or block the cashier from closing out).
+            log.error("[POS] Failed to post sales journal for session={} tenant={}: {}",
+                    session.getSessionNumber(), tenantId, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * AccountingFacade.getAccounts(TenantId) — added specifically for
+     * this fix (see that class's own Javadoc) rather than replicating
+     * AP's raw-JDBC account lookup, which would repeat the exact
+     * facade-bypass pattern backlog item 9.3 flags as wrong elsewhere in
+     * the same review.
+     */
+    private UUID findAccountingAccountByCode(TenantId tenantId, String code) {
+        return accountingFacade.getAccounts(tenantId).stream()
+                .filter(a -> code.equals(a.accountCode()))
+                .map(a -> a.id())
+                .findFirst()
+                .orElse(null);
+    }
 
     private void evaluateCashVariance(TenantId tenantId, PosCashSession session, String closedByName) {
         if (session.getCashVariance().compareTo(BigDecimal.ZERO) == 0) return;

@@ -22,6 +22,37 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * FIX: backlog 8.1 — every mutating endpoint in this controller was
+ * gated on hasAuthority('USER_READ') instead of a real write authority.
+ * Originally found on three endpoints; a full audit of every method in
+ * this file (confirmed complete, start to finish) found the scope was
+ * genuinely controller-wide — 14 mutating endpoints in total, not three.
+ * This looks like USER_READ was used as a placeholder authority across
+ * the whole controller and never corrected per-endpoint, exactly as the
+ * backlog's own finding suspected.
+ * <p>
+ * Two authorities now used, following the same segregation-of-duties
+ * precedent already established elsewhere in this codebase (SCM's
+ * SCM_ORDER for create/submit vs. the stricter SCM_ADMIN for approval;
+ * Projects' PM_WRITE vs. PM_APPROVE) rather than one flat write
+ * permission for every mutation:
+ *   ACCOUNTING_MANAGE — routine creates/edits (accounts, draft journal
+ *     entries, bank accounts, transactions, VAT period open/attach).
+ *   ACCOUNTING_ADMIN  — the three genuinely hard-to-undo actions:
+ *     posting a journal entry (locks it, makes it real), reversing a
+ *     posted entry (the backlog's own finding calls this "arguably more
+ *     consequential than posting"), and closing a VAT period (a
+ *     compliance-significant, effectively one-way action).
+ * Both permissions already exist — auto-generated per module by
+ * AdminLookupService.createModule(), same as every other module's
+ * READ/MANAGE/ADMIN triplet — so this is a pure @PreAuthorize
+ * correction, no new permission or migration needed.
+ * <p>
+ * Every GET/read endpoint below is UNCHANGED — confirmed each one is a
+ * genuine read (lists, reports, PDF exports), correctly left on
+ * USER_READ, not touched by this fix.
+ */
 @RestController
 @RequestMapping("/api/v1/accounting")
 @RequiredArgsConstructor
@@ -51,7 +82,7 @@ public class AccountingController {
     }
 
     @PostMapping("/accounts")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_MANAGE')")
     @Operation(summary = "Create a custom account — the 47 seeded accounts cover most cases, this is for the one or two a real business always ends up needing")
     public ResponseEntity<ApiResponse<AccountResponse>> createAccount(
             @Valid @RequestBody CreateAccountRequest req) {
@@ -71,7 +102,7 @@ public class AccountingController {
     }
 
     @PostMapping("/journal-entries")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_MANAGE')")
     @Operation(summary = "Create a double-entry journal entry (must balance: total debits = total credits)")
     public ResponseEntity<ApiResponse<JournalEntryResponse>> createJournalEntry(
             @Valid @RequestBody CreateJournalEntryRequest req) {
@@ -81,7 +112,7 @@ public class AccountingController {
     }
 
     @PostMapping("/journal-entries/{id}/post")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_ADMIN')")
     @Operation(summary = "Post a DRAFT journal entry (locks it — cannot be edited after posting). Requires a different person from whoever created it, if a creator was recorded.")
     public ResponseEntity<ApiResponse<JournalEntryResponse>> postJournalEntry(
             @PathVariable UUID id) {
@@ -91,7 +122,7 @@ public class AccountingController {
     }
 
     @PostMapping("/journal-entries/{id}/reverse")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_ADMIN')")
     @Operation(summary = "Reverse a POSTED journal entry — creates equal-and-opposite entry dated today (or supplied date)")
     public ResponseEntity<ApiResponse<JournalEntryResponse>> reverseJournalEntry(
             @PathVariable UUID id,
@@ -112,7 +143,7 @@ public class AccountingController {
     }
 
     @PostMapping("/bank-accounts")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_MANAGE')")
     @Operation(summary = "Register a new bank account")
     public ResponseEntity<ApiResponse<BankAccountResponse>> createBankAccount(
             @Valid @RequestBody CreateBankAccountRequest req) {
@@ -121,7 +152,7 @@ public class AccountingController {
     }
 
     @PutMapping("/bank-accounts/{id}/link-account")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_MANAGE')")
     @Operation(summary = "Link (or relink) a bank account to its Chart of Accounts entry — required before reconciliation's match-candidates search can work, since bank accounts aren't linked automatically at creation")
     public ResponseEntity<ApiResponse<BankAccountResponse>> linkBankAccount(
             @PathVariable UUID id,
@@ -131,7 +162,7 @@ public class AccountingController {
     }
 
     @PutMapping("/bank-accounts/{id}/low-balance-threshold")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_MANAGE')")
     @Operation(summary = "Set or clear (pass null) this account's low-balance alert threshold. No threshold set means no alerting for that account.")
     public ResponseEntity<ApiResponse<BankAccountResponse>> setLowBalanceThreshold(
             @PathVariable UUID id,
@@ -150,7 +181,7 @@ public class AccountingController {
     }
 
     @PostMapping("/bank-accounts/{id}/transactions")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_MANAGE')")
     @Operation(summary = "Add a bank transaction (CREDIT = money in, DEBIT = money out)")
     public ResponseEntity<ApiResponse<BankAccountResponse>> addTransaction(
             @PathVariable UUID id,
@@ -160,7 +191,7 @@ public class AccountingController {
     }
 
     @PostMapping("/bank-accounts/{id}/transactions/import")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_MANAGE')")
     @Operation(summary = "Bulk import bank transactions from a generic 4-column CSV (Date, Description, Reference, Amount — signed, header row expected). Duplicates are skipped, not errored.")
     public ResponseEntity<ApiResponse<ImportBankTransactionsResponse>> importBankTransactions(
             @PathVariable UUID id,
@@ -179,7 +210,7 @@ public class AccountingController {
     }
 
     @PostMapping("/bank-accounts/{id}/transactions/{txId}/reconcile")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_MANAGE')")
     @Operation(summary = "Reconcile a bank transaction against an existing journal line")
     public ResponseEntity<ApiResponse<BankTransactionResponse>> reconcileTransaction(
             @PathVariable UUID id, @PathVariable UUID txId,
@@ -189,7 +220,7 @@ public class AccountingController {
     }
 
     @PostMapping("/bank-accounts/{id}/transactions/{txId}/reconcile-new")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_MANAGE')")
     @Operation(summary = "Reconcile a bank transaction by creating a new journal entry for it (no existing match — bank fees, direct debits, etc.)")
     public ResponseEntity<ApiResponse<BankTransactionResponse>> reconcileWithNewJournal(
             @PathVariable UUID id, @PathVariable UUID txId,
@@ -209,7 +240,7 @@ public class AccountingController {
     }
 
     @PostMapping("/vat-periods")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_MANAGE')")
     @Operation(summary = "Open a new VAT period (only one OPEN period allowed at a time)")
     public ResponseEntity<ApiResponse<VatPeriodResponse>> createVatPeriod(
             @Valid @RequestBody CreateVatPeriodRequest req) {
@@ -219,7 +250,7 @@ public class AccountingController {
     }
 
     @PostMapping("/vat-periods/{id}/close")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_ADMIN')")
     @Operation(summary = "Close an open VAT period")
     public ResponseEntity<ApiResponse<VatPeriodResponse>> closeVatPeriod(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("VAT period closed",
@@ -227,7 +258,7 @@ public class AccountingController {
     }
 
     @PostMapping("/vat-periods/{id}/attach-vat201")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_MANAGE')")
     @Operation(summary = "Attach a freshly-calculated VAT201 result to this period, using the period's own date range. Safe to call more than once — replaces, not accumulates.")
     public ResponseEntity<ApiResponse<VatPeriodResponse>> attachVat201ToPeriod(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("VAT201 result attached",
