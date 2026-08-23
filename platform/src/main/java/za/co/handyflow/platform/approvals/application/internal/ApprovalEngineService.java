@@ -2,7 +2,6 @@ package za.co.handyflow.platform.approvals.application.internal;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -10,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.approvals.ApprovalCompletedEvent;
+import za.co.handyflow.platform.approvals.ApprovalStepActedEvent;
 import za.co.handyflow.platform.approvals.application.ApprovalFacade;
 import za.co.handyflow.platform.approvals.domain.model.ApprovalDelegation;
 import za.co.handyflow.platform.approvals.domain.model.ApprovalRequest;
@@ -56,6 +56,14 @@ import java.util.*;
  *              materialized as a step. This is backlog 1.1 Q2's
  *              branching-routing mechanism (see the addendum).
  * </pre>
+ * <p>
+ * FIX: backlog 1.1 (Creative migration) — added submitAdHoc()/
+ * actOnPublicStep()/getStepByToken(). See ApprovalFacade's own Javadoc
+ * on each for the rationale. The internal actOnStep() and the new
+ * actOnPublicStep() now both delegate to one shared performAction()
+ * method rather than duplicating the PENDING/ordering/outcome-resolution
+ * logic — the only real difference between the two paths is how the
+ * acting identity is established (a logged-in user's JWT vs. a token).
  */
 @Slf4j
 @Service
@@ -146,7 +154,36 @@ public class ApprovalEngineService implements ApprovalFacade {
     @Transactional
     public ApprovalRequestResponse submit(TenantId tenantId, String module, String entityType,
                                           UUID entityId, UUID submittedBy, Map<String, Object> metadata) {
-        return doSubmit(tenantId, module, entityType, entityId, submittedBy, metadata, null);
+        MatchedRule matched = matchRule(tenantId.getValue(), module, entityType, metadata);
+        if (matched == null) {
+            return autoApprove(tenantId, module, entityType, entityId, submittedBy, metadata, null, null);
+        }
+        List<ChainEntry> survivors = matched.chain.stream()
+                .filter(entry -> entry.condition == null || evaluateConditions(entry.condition, metadata))
+                .toList();
+        if (survivors.isEmpty()) {
+            return autoApprove(tenantId, module, entityType, entityId, submittedBy, metadata, matched.rule.getId(), null);
+        }
+        return materializeAndSave(tenantId, module, entityType, entityId, submittedBy, metadata,
+                matched.rule.getId(), matched.rule.getApprovalMode(), survivors, null);
+    }
+
+    @Override
+    @Transactional
+    public ApprovalRequestResponse submitAdHoc(TenantId tenantId, String module, String entityType,
+                                               UUID entityId, UUID submittedBy,
+                                               ApprovalRule.ApprovalMode mode,
+                                               List<ChainEntryInput> approverChain,
+                                               Map<String, Object> metadata) {
+        if (approverChain == null || approverChain.isEmpty()) {
+            return autoApprove(tenantId, module, entityType, entityId, submittedBy, metadata, null, null);
+        }
+        List<ChainEntry> chain = approverChain.stream()
+                .map(c -> new ChainEntry(ApprovalStep.ApproverType.valueOf(c.type()), c.value(), c.name(),
+                        c.excludeActorOfPreviousStep(), null))
+                .toList();
+        return materializeAndSave(tenantId, module, entityType, entityId, submittedBy, metadata,
+                null, mode, chain, null);
     }
 
     @Override
@@ -161,61 +198,57 @@ public class ApprovalEngineService implements ApprovalFacade {
         }
         original.markResubmitted();
         requestRepo.save(original);
-        return doSubmit(tenantId, original.getModule(), original.getEntityType(), original.getEntityId(),
-                submittedBy, metadata, original.getId());
+
+        // Resubmission re-evaluates rules fresh — same as a normal submit(),
+        // just linked back to the original via resubmittedFromId.
+        MatchedRule matched = matchRule(tenantId.getValue(), original.getModule(), original.getEntityType(), metadata);
+        if (matched == null) {
+            return autoApprove(tenantId, original.getModule(), original.getEntityType(), original.getEntityId(),
+                    submittedBy, metadata, null, original.getId());
+        }
+        List<ChainEntry> survivors = matched.chain.stream()
+                .filter(entry -> entry.condition == null || evaluateConditions(entry.condition, metadata))
+                .toList();
+        if (survivors.isEmpty()) {
+            return autoApprove(tenantId, original.getModule(), original.getEntityType(), original.getEntityId(),
+                    submittedBy, metadata, matched.rule.getId(), original.getId());
+        }
+        return materializeAndSave(tenantId, original.getModule(), original.getEntityType(), original.getEntityId(),
+                submittedBy, metadata, matched.rule.getId(), matched.rule.getApprovalMode(), survivors, original.getId());
     }
 
-    private ApprovalRequestResponse doSubmit(TenantId tenantId, String module, String entityType,
-                                             UUID entityId, UUID submittedBy, Map<String, Object> metadata,
-                                             UUID resubmittedFromId) {
-        String metadataJson = writeJson(metadata);
-        MatchedRule matched = matchRule(tenantId.getValue(), module, entityType, metadata);
-
-        if (matched == null) {
-            // No rule anywhere for this module+entityType — nothing gates
-            // it. Auto-approved immediately, not left pending forever.
-            ApprovalRequest req = ApprovalRequest.submit(tenantId, module, entityType, entityId,
-                    null, null, submittedBy, metadataJson, resubmittedFromId);
-            req.complete(ApprovalRequest.Status.APPROVED);
-            requestRepo.save(req);
-            publishCompletion(req, "APPROVED");
-            log.info("[Approvals] No rule for module={} entityType={} tenant={} — auto-approved", module, entityType, tenantId);
-            return toRequestResponse(req, List.of());
-        }
-
-        List<ChainEntry> survivors = new ArrayList<>();
-        for (ChainEntry entry : matched.chain) {
-            if (entry.condition == null || evaluateConditions(entry.condition, metadata)) {
-                survivors.add(entry);
-            }
-        }
-
+    private ApprovalRequestResponse autoApprove(TenantId tenantId, String module, String entityType, UUID entityId,
+                                                UUID submittedBy, Map<String, Object> metadata, UUID ruleId,
+                                                UUID resubmittedFromId) {
         ApprovalRequest req = ApprovalRequest.submit(tenantId, module, entityType, entityId,
-                matched.rule.getId(), matched.rule.getApprovalMode(), submittedBy, metadataJson, resubmittedFromId);
+                ruleId, null, submittedBy, writeJson(metadata), resubmittedFromId);
+        req.complete(ApprovalRequest.Status.APPROVED);
+        requestRepo.save(req);
+        publishCompletion(req, "APPROVED");
+        log.info("[Approvals] No gate for module={} entityType={} tenant={} — auto-approved", module, entityType, tenantId);
+        return toRequestResponse(req, List.of());
+    }
 
-        if (survivors.isEmpty()) {
-            req.complete(ApprovalRequest.Status.APPROVED);
-            requestRepo.save(req);
-            publishCompletion(req, "APPROVED");
-            log.info("[Approvals] Rule matched but every chain entry's own condition excluded it — auto-approved. request={}", req.getId());
-            return toRequestResponse(req, List.of());
-        }
-
+    private ApprovalRequestResponse materializeAndSave(TenantId tenantId, String module, String entityType,
+                                                       UUID entityId, UUID submittedBy, Map<String, Object> metadata,
+                                                       UUID ruleId, ApprovalRule.ApprovalMode mode,
+                                                       List<ChainEntry> survivors, UUID resubmittedFromId) {
+        ApprovalRequest req = ApprovalRequest.submit(tenantId, module, entityType, entityId,
+                ruleId, mode, submittedBy, writeJson(metadata), resubmittedFromId);
         req.markInProgress();
         requestRepo.save(req);
 
         List<ApprovalStep> steps = new ArrayList<>();
         int order = 1;
         for (ChainEntry entry : survivors) {
-            int stepOrder = matched.rule.getApprovalMode() == ApprovalRule.ApprovalMode.SEQUENTIAL ? order++ : 1;
-            ApprovalStep step = ApprovalStep.create(req.getId(), stepOrder, entry.type,
-                    entry.value, entry.name, entry.excludeActorOfPreviousStep);
-            steps.add(step);
+            int stepOrder = mode == ApprovalRule.ApprovalMode.SEQUENTIAL ? order++ : 1;
+            steps.add(ApprovalStep.create(req.getId(), stepOrder, entry.type, entry.value, entry.name,
+                    entry.excludeActorOfPreviousStep));
         }
         stepRepo.saveAll(steps);
 
         log.info("[Approvals] Submitted request={} module={} entityType={} entityId={} rule={} steps={}",
-                req.getId(), module, entityType, entityId, matched.rule.getId(), steps.size());
+                req.getId(), module, entityType, entityId, ruleId, steps.size());
         return toRequestResponse(req, steps.stream().map(this::toStepResponse).toList());
     }
 
@@ -226,22 +259,56 @@ public class ApprovalEngineService implements ApprovalFacade {
                                              String decision, String comment, String actorIp) {
         ApprovalStep step = stepRepo.findById(stepId)
                 .orElseThrow(() -> new ResourceNotFoundException("ApprovalStep", stepId.toString()));
-        if (step.getStatus() != ApprovalStep.Status.PENDING) {
-            throw new HandyFlowException("This approval step has already been actioned",
-                    HttpStatus.BAD_REQUEST, "STEP_NOT_PENDING");
-        }
-
         ApprovalRequest request = requestRepo.findById(step.getApprovalRequestId())
                 .orElseThrow(() -> new ResourceNotFoundException("ApprovalRequest", step.getApprovalRequestId().toString()));
         if (!request.getTenantId().getValue().equals(tenantId.getValue())) {
             throw new ResourceNotFoundException("ApprovalStep", stepId.toString());
         }
+        requireAuthorizedActor(tenantId, step, actingUserId, actingUserAuthorities, request.getModule());
+        return performAction(request, step, actingUserId, comment, actorIp, decision);
+    }
+
+    @Override
+    @Transactional
+    public ApprovalRequestResponse actOnPublicStep(String publicToken, String decision,
+                                                   String comment, String actorIp) {
+        ApprovalStep step = stepRepo.findByPublicToken(publicToken)
+                .orElseThrow(() -> new HandyFlowException("Invalid or expired approval link",
+                        HttpStatus.BAD_REQUEST, "INVALID_TOKEN"));
+        if (step.getApproverType() != ApprovalStep.ApproverType.EXTERNAL_CONTACT) {
+            throw new HandyFlowException("This step type is not actionable through a public link",
+                    HttpStatus.BAD_REQUEST, "UNSUPPORTED_STEP_TYPE");
+        }
+        if (!step.isTokenValid()) {
+            throw new HandyFlowException(
+                    step.getStatus() != ApprovalStep.Status.PENDING
+                            ? "This approval link has already been used"
+                            : "This approval link has expired",
+                    HttpStatus.BAD_REQUEST, "TOKEN_EXPIRED");
+        }
+        ApprovalRequest request = requestRepo.findById(step.getApprovalRequestId())
+                .orElseThrow(() -> new ResourceNotFoundException("ApprovalRequest", step.getApprovalRequestId().toString()));
+        return performAction(request, step, null, comment, actorIp, decision);
+    }
+
+    /**
+     * Shared by actOnStep() and actOnPublicStep() — the only real
+     * difference between the two paths is how the acting identity was
+     * established (checked by the caller before this runs); everything
+     * about PENDING/ordering/exclude-previous-actor/outcome-resolution
+     * is identical regardless of who or what is acting.
+     */
+    private ApprovalRequestResponse performAction(ApprovalRequest request, ApprovalStep step,
+                                                  UUID actingUserId, String comment, String actorIp,
+                                                  String decision) {
+        if (step.getStatus() != ApprovalStep.Status.PENDING) {
+            throw new HandyFlowException("This approval step has already been actioned",
+                    HttpStatus.BAD_REQUEST, "STEP_NOT_PENDING");
+        }
         if (request.isTerminal()) {
             throw new HandyFlowException("This approval request has already reached a final outcome",
                     HttpStatus.BAD_REQUEST, "REQUEST_ALREADY_TERMINAL");
         }
-
-        requireAuthorizedActor(tenantId, step, actingUserId, actingUserAuthorities, request.getModule());
 
         List<ApprovalStep> allSteps = stepRepo.findByApprovalRequest(request.getId());
 
@@ -277,6 +344,15 @@ public class ApprovalEngineService implements ApprovalFacade {
         }
         stepRepo.save(step);
 
+        // FIX: backlog 1.1 (Creative migration) — fires for every step
+        // action, not just when the whole request completes. See
+        // ApprovalStepActedEvent's own Javadoc for why this exists
+        // (Creative's SEQUENTIAL mode needs to know when to email the
+        // next approver, which ApprovalCompletedEvent alone can't tell it).
+        eventPublisher.publishEvent(ApprovalStepActedEvent.of(
+                request.getTenantId(), request.getModule(), request.getEntityType(), request.getEntityId(),
+                request.getId(), step.getId(), step.getStepOrder(), approve ? "APPROVED" : "REJECTED"));
+
         allSteps = stepRepo.findByApprovalRequest(request.getId()); // reload post-action
         resolveRequestOutcome(request, allSteps);
         requestRepo.save(request);
@@ -301,7 +377,6 @@ public class ApprovalEngineService implements ApprovalFacade {
                     request.complete(ApprovalRequest.Status.APPROVED);
                     publishCompletion(request, "APPROVED");
                 }
-                // else: still IN_PROGRESS, nothing to do
             }
             case PARALLEL_ANY_ONE -> {
                 if (anyApproved) {
@@ -362,6 +437,15 @@ public class ApprovalEngineService implements ApprovalFacade {
     public List<ApprovalStepResponse> getMyPendingSteps(TenantId tenantId, UUID userId, List<String> authorities) {
         return stepRepo.findPendingForApprover(userId.toString(), authorities == null ? List.of() : authorities)
                 .stream().map(this::toStepResponse).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ApprovalRequestResponse> getRequestByStepToken(String publicToken) {
+        return stepRepo.findByPublicToken(publicToken)
+                .flatMap(step -> requestRepo.findById(step.getApprovalRequestId()))
+                .map(r -> toRequestResponse(r, stepRepo.findByApprovalRequest(r.getId())
+                        .stream().map(this::toStepResponse).toList()));
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -476,14 +560,16 @@ public class ApprovalEngineService implements ApprovalFacade {
 
     private ApprovalRequestResponse toRequestResponse(ApprovalRequest r, List<ApprovalStepResponse> steps) {
         return new ApprovalRequestResponse(r.getId(), r.getModule(), r.getEntityType(), r.getEntityId(),
-                r.getStatus().name(), r.getSubmittedBy(), r.getSubmittedAt(), r.getCompletedAt(),
+                r.getStatus().name(), r.getApprovalMode() != null ? r.getApprovalMode().name() : null,
+                r.getSubmittedBy(), r.getSubmittedAt(), r.getCompletedAt(),
                 r.getResubmittedFromId(), steps);
     }
 
     private ApprovalStepResponse toStepResponse(ApprovalStep s) {
         return new ApprovalStepResponse(s.getId(), s.getApprovalRequestId(), s.getStepOrder(),
                 s.getApproverType().name(), s.getApproverValue(), s.getApproverName(),
-                s.getStatus().name(), s.getActedBy(), s.getActedAt(), s.getComment());
+                s.getStatus().name(), s.getActedBy(), s.getActedAt(), s.getComment(),
+                s.getPublicToken());
     }
 
     private ApprovalRuleResponse toRuleResponse(ApprovalRule r) {

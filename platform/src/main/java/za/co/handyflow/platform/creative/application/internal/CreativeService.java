@@ -8,19 +8,52 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.approvals.application.ApprovalFacade;
+import za.co.handyflow.platform.approvals.domain.model.ApprovalRule;
+import za.co.handyflow.platform.approvals.dto.ApprovalRequestResponse;
+import za.co.handyflow.platform.approvals.dto.ApprovalStepResponse;
+import za.co.handyflow.platform.approvals.dto.ChainEntryInput;
 import za.co.handyflow.platform.creative.domain.model.*;
 import za.co.handyflow.platform.creative.domain.repository.*;
 import za.co.handyflow.platform.creative.dto.*;
 import za.co.handyflow.platform.shared.*;
 
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * FIX: backlog 1.1 — full migration of proof approval onto the shared
+ * approval engine. Full cutover, per your own explicit call — not run
+ * in parallel with the old CreProof/CreProofApprover token logic.
+ * <p>
+ * WHAT ACTUALLY CHANGED: sendProofToClient()/resolveToken()/
+ * approveProofByToken()/rejectProofByToken()/getProofByToken()/
+ * notifyNextApprover()/sendUnapprovedReminder() — every place that used
+ * to read or write CreProof.approvalToken/tokenExpiresAt or query
+ * CreProofApprover for live approval state now goes through
+ * ApprovalFacade instead. SINGLE and multi-stakeholder (SEQUENTIAL/
+ * PARALLEL) are now ONE code path, not two — SINGLE just degenerates to
+ * a one-step SEQUENTIAL request.
+ * <p>
+ * WHAT DELIBERATELY DIDN'T CHANGE: configureApprovers() still writes to
+ * CreProofApprover — that table is now purely a pre-send STAGING area
+ * (what a staff member has configured before actually sending), not the
+ * live approval-state store anymore. sendProofToClient() reads this
+ * config at send time and hands it to the engine, which becomes the
+ * real source of truth for everything that happens after send. This
+ * hybrid means configureApprovers()/its own validation, and every job/
+ * deliverable/comment method having nothing to do with approval, needed
+ * zero changes — smaller, safer diff than replacing CreProofApprover
+ * everywhere it's touched.
+ * <p>
+ * CreProof.approvalToken/tokenExpiresAt columns are left in place,
+ * unused by new sends going forward (same "don't retroactively drop
+ * columns" caution as every migration this session).
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -33,6 +66,11 @@ public class CreativeService {
     private final CreDeliverableRepository  deliverableRepo;
     private final EmailService              emailService;
     private final JdbcTemplate              jdbc;
+    // FIX: backlog 1.1 — the shared approval engine.
+    private final ApprovalFacade            approvalFacade;
+
+    private static final String APPROVALS_MODULE = "creative";
+    private static final String APPROVALS_ENTITY_TYPE = "PROOF";
 
     // ── Jobs ──────────────────────────────────────────────────────────────────
 
@@ -146,6 +184,9 @@ public class CreativeService {
      * Idempotent: re-calling this replaces the previous approver list
      * entirely, so staff can freely adjust the list before actually
      * sending.
+     * <p>
+     * UNCHANGED by the backlog 1.1 migration — see this class's own
+     * Javadoc for why CreProofApprover stays as pre-send staging data.
      */
     @Transactional
     public ProofResponse configureApprovers(TenantId tenantId, UUID jobId, UUID proofId,
@@ -183,6 +224,14 @@ public class CreativeService {
         return toProofResponse(proof, true);
     }
 
+    /**
+     * FIX: backlog 1.1 — full redesign. SINGLE and multi-stakeholder are
+     * now one path: SINGLE is simply a one-entry SEQUENTIAL chain, which
+     * degenerates to identical observable behaviour (one email, one
+     * link, done). Reads CreProofApprover only as pre-send config (see
+     * class Javadoc); the engine becomes the source of truth for
+     * everything from this point forward.
+     */
     @Transactional
     public ProofResponse sendProofToClient(TenantId tenantId, UUID jobId,
                                            UUID proofId, SendProofRequest req) {
@@ -196,59 +245,66 @@ public class CreativeService {
                     HttpStatus.BAD_REQUEST, "PROOF_NOT_PENDING");
         }
 
+        List<ChainEntryInput> chain;
+        ApprovalRule.ApprovalMode mode;
+        String allEmailsForRecord;
+
         if ("SINGLE".equals(proof.getApprovalMode())) {
-            // Unchanged existing behaviour — single approver, single token
-            // on the proof itself.
-            String tenantName  = fetchTenantName(tenantId);
-            String approvalUrl = "https://app.handyflow.co.za/creative/approve/" + proof.getApprovalToken();
-            String subject     = tenantName + " — Please review and approve your proof";
-            String html        = buildApprovalEmail(tenantName, proof, approvalUrl, req.message());
-            try {
-                emailService.send(req.email(), subject, html);
-                proof.markSent(req.email());
-                proofRepo.save(proof);
-                log.info("Sent proof={} to {}", proofId, req.email());
-            } catch (Exception e) {
-                log.error("Failed to send proof email: {}", e.getMessage());
+            mode = ApprovalRule.ApprovalMode.SEQUENTIAL;
+            chain = List.of(new ChainEntryInput("EXTERNAL_CONTACT", req.email(), null, false));
+            allEmailsForRecord = req.email();
+        } else {
+            List<CreProofApprover> configured = approverRepo.findByProofIdOrderByApprovalOrderAsc(proofId);
+            if (configured.isEmpty()) {
                 throw new HandyFlowException(
-                        "Failed to send email: " + e.getMessage(),
-                        HttpStatus.INTERNAL_SERVER_ERROR, "EMAIL_FAILED");
+                        "This proof is set to " + proof.getApprovalMode() + " approval but has no approvers " +
+                                "configured — add approvers before sending.",
+                        HttpStatus.BAD_REQUEST, "NO_APPROVERS_CONFIGURED");
             }
-            return toProofResponse(proof, true);
+            // "PARALLEL" in this module's own vocabulary always meant
+            // "every approver must approve" (the old allApproved check) —
+            // that's PARALLEL_ALL in the engine's vocabulary, not
+            // PARALLEL_ANY_ONE.
+            mode = "SEQUENTIAL".equals(proof.getApprovalMode())
+                    ? ApprovalRule.ApprovalMode.SEQUENTIAL
+                    : ApprovalRule.ApprovalMode.PARALLEL_ALL;
+            chain = configured.stream()
+                    .map(a -> new ChainEntryInput("EXTERNAL_CONTACT", a.getApproverEmail(), a.getApproverName(), false))
+                    .toList();
+            allEmailsForRecord = configured.stream()
+                    .map(CreProofApprover::getApproverEmail)
+                    .collect(Collectors.joining(", "));
         }
 
-        // Multi-stakeholder — SEQUENTIAL or PARALLEL
-        List<CreProofApprover> approvers = approverRepo.findByProofIdOrderByApprovalOrderAsc(proofId);
-        if (approvers.isEmpty()) {
-            throw new HandyFlowException(
-                    "This proof is set to " + proof.getApprovalMode() + " approval but has no approvers " +
-                            "configured — add approvers before sending.",
-                    HttpStatus.BAD_REQUEST, "NO_APPROVERS_CONFIGURED");
-        }
+        ApprovalRequestResponse approvalReq = approvalFacade.submitAdHoc(
+                tenantId, APPROVALS_MODULE, APPROVALS_ENTITY_TYPE, proofId, null, mode, chain, Map.of());
 
-        // SEQUENTIAL: only notify the first approver — the rest are
-        // notified one at a time as each prior approver signs off, in
-        // approveProofByToken(). PARALLEL: notify everyone at once.
-        List<CreProofApprover> toNotify = "PARALLEL".equals(proof.getApprovalMode())
-                ? approvers
-                : approvers.subList(0, 1);
+        proof.linkApprovalRequest(approvalReq.id());
 
         String tenantName = fetchTenantName(tenantId);
+
+        // SEQUENTIAL: only step 1 is emailed now — later steps are emailed
+        // one at a time as each prior one is actioned, in
+        // notifyNextApprover(). PARALLEL_ALL: every step is emailed at
+        // once — matches the old "every approver gets sentAt set at once,
+        // when the proof is sent" behaviour exactly.
+        List<ApprovalStepResponse> stepsToEmailNow = mode == ApprovalRule.ApprovalMode.SEQUENTIAL
+                ? approvalReq.steps().stream().filter(s -> s.stepOrder() == 1).toList()
+                : approvalReq.steps();
+
         int sent = 0;
-        for (CreProofApprover approver : toNotify) {
+        for (ApprovalStepResponse step : stepsToEmailNow) {
             try {
-                sendApproverEmail(tenantName, proof, approver, req.message());
-                approver.markSent();
-                approverRepo.save(approver);
+                sendApprovalStepEmail(tenantName, proof, step, mode, req.message());
                 sent++;
             } catch (Exception e) {
-                // FIX: one failed email must not block the others (PARALLEL
-                // mode sends to several people at once) or corrupt state —
-                // this approver's sentAt simply stays null, visibly showing
-                // it wasn't actually delivered, rather than the whole send
-                // failing or falsely claiming success for everyone.
-                log.error("Failed to send approval email to approver={} for proof={}: {}",
-                        approver.getApproverEmail(), proofId, e.getMessage(), e);
+                // Same "one failed email must not block the others, or
+                // corrupt state" reasoning the original PARALLEL send loop
+                // already had — a step this failed on is simply not
+                // reachable by its intended approver yet; nothing else
+                // about the request's state is affected.
+                log.error("Failed to send approval email to step={} ({}) for proof={}: {}",
+                        step.id(), step.approverValue(), proofId, e.getMessage(), e);
             }
         }
 
@@ -258,15 +314,33 @@ public class CreativeService {
                     HttpStatus.INTERNAL_SERVER_ERROR, "EMAIL_FAILED");
         }
 
-        String allEmails = approvers.stream().map(CreProofApprover::getApproverEmail)
-                .collect(Collectors.joining(", "));
-        proof.markSent(allEmails);
+        proof.markSent(allEmailsForRecord);
         proofRepo.save(proof);
 
-        log.info("Sent proof={} for {} approval — {} of {} approver(s) notified",
-                proofId, proof.getApprovalMode(), sent, toNotify.size());
+        log.info("Sent proof={} for {} approval — {} of {} step(s) notified",
+                proofId, proof.getApprovalMode(), sent, stepsToEmailNow.size());
 
         return toProofResponse(proof, true);
+    }
+
+    /**
+     * FIX: backlog 1.1 — dispatches to the right email, using
+     * buildApprovalEmail() for the SINGLE-mode/first-of-one case
+     * (unchanged content from before) and the modified
+     * buildApproverEmail() (now taking primitives, not a CreProofApprover
+     * entity — see that method's own comment) for every other case.
+     */
+    private void sendApprovalStepEmail(String tenantName, CreProof proof, ApprovalStepResponse step,
+                                       ApprovalRule.ApprovalMode mode, String customMessage) {
+        String approvalUrl = "https://app.handyflow.co.za/creative/approve/" + step.publicToken();
+        if ("SINGLE".equals(proof.getApprovalMode())) {
+            String subject = tenantName + " — Please review and approve your proof";
+            String html = buildApprovalEmail(tenantName, proof, approvalUrl, customMessage);
+            emailService.send(step.approverValue(), subject, html);
+        } else {
+            sendApproverEmail(tenantName, proof, step.approverName(), step.approverValue(),
+                    step.stepOrder(), mode, approvalUrl, customMessage);
+        }
     }
 
     @Transactional
@@ -288,7 +362,6 @@ public class CreativeService {
     public PublicProofResponse getProofByToken(String token) {
         TokenResolution res = resolveToken(token);
         CreProof proof = res.proof();
-        CreProofApprover approver = res.approver();
 
         CreJob job = jobRepo.findById(proof.getJobId())
                 .orElseThrow(() -> new HandyFlowException("Job not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
@@ -314,15 +387,18 @@ public class CreativeService {
             }
         }
 
-        // NEW: multi-stakeholder context — who am I, and where does
-        // everyone else in the chain stand. Empty/null for SINGLE mode.
-        String myApproverName = approver != null ? approver.getApproverName() : null;
-        List<PublicProofResponse.ApproverSummary> others = approver != null
-                ? approverRepo.findByProofIdOrderByApprovalOrderAsc(proof.getId()).stream()
-                .map(a -> new PublicProofResponse.ApproverSummary(
-                        a.getApproverName(), a.getApprovalOrder(), a.getStatus()))
-                .toList()
-                : List.of();
+        // FIX: backlog 1.1 — multi-stakeholder context now comes from the
+        // engine's own request/steps, not CreProofApprover. Empty/null
+        // for a request with only one step (SINGLE-equivalent).
+        String myApproverName = null;
+        List<PublicProofResponse.ApproverSummary> others = List.of();
+        if (res.request() != null && res.request().steps().size() > 1) {
+            myApproverName = res.step().approverName();
+            others = res.request().steps().stream()
+                    .map(s -> new PublicProofResponse.ApproverSummary(
+                            s.approverName(), s.stepOrder(), s.status()))
+                    .toList();
+        }
 
         return new PublicProofResponse(
                 proof.getId(), job.getTitle(), job.getClientName(), tenantName,
@@ -333,48 +409,49 @@ public class CreativeService {
                 proof.getApprovalMode(), myApproverName, others);
     }
 
+    /**
+     * FIX: backlog 1.1 — replaced entirely. actOnPublicStep() now owns
+     * PENDING/ordering/outcome-resolution (identical logic to the
+     * internal actOnStep() path — see ApprovalEngineService's own
+     * performAction()); this method's job shrinks to recording the
+     * result onto CreProof's own fields (still read directly by the
+     * approval-certificate PDF and ProofResponse.approvedByName) and
+     * driving the same notify-next-approver / complete-the-job behaviour
+     * as before.
+     */
     @Transactional
     public void approveProofByToken(String token, ApproveProofRequest req, String clientIp) {
         TokenResolution res = resolveToken(token);
         CreProof proof = res.proof();
-        CreProofApprover approver = res.approver();
 
-        if (approver == null) {
-            // SINGLE mode — unchanged existing behaviour.
-            proof.approve(req.clientName(), req.clientEmail(), clientIp);
+        ApprovalRequestResponse updated = approvalFacade.actOnPublicStep(token, "APPROVE", null, clientIp);
+        ApprovalStepResponse myStep = updated.steps().stream()
+                .filter(s -> token.equals(s.publicToken())).findFirst()
+                .orElseThrow(() -> new IllegalStateException("Acted-on step vanished from its own request response"));
+
+        String approverName  = "SINGLE".equals(proof.getApprovalMode()) ? req.clientName()  : myStep.approverName();
+        String approverEmail = "SINGLE".equals(proof.getApprovalMode()) ? req.clientEmail() : myStep.approverValue();
+
+        if ("APPROVED".equals(updated.status())) {
+            proof.approve(approverName, approverEmail, clientIp);
             proofRepo.save(proof);
             completeApproval(proof);
-            log.info("Proof={} approved by client={} ip={}", proof.getId(), req.clientName(), clientIp);
-            return;
+            log.info("Proof={} fully approved via engine, completing approver={}", proof.getId(), approverName);
+        } else {
+            // Still IN_PROGRESS — SEQUENTIAL only (PARALLEL_ALL has
+            // nothing further to notify; every step was already emailed
+            // when the proof was sent).
+            ApprovalRule.ApprovalMode mode = updated.approvalMode() != null
+                    ? ApprovalRule.ApprovalMode.valueOf(updated.approvalMode()) : null;
+            if (mode == ApprovalRule.ApprovalMode.SEQUENTIAL) {
+                updated.steps().stream()
+                        .filter(s -> s.stepOrder() == myStep.stepOrder() + 1)
+                        .findFirst()
+                        .ifPresent(next -> notifyNextApprover(proof, next, mode));
+            }
+            log.info("Proof={} approver={} approved ip={} — request still in progress",
+                    proof.getId(), approverName, clientIp);
         }
-
-        // Multi-stakeholder
-        approver.approve(clientIp);
-        approverRepo.save(approver);
-        log.info("Proof={} approver={} approved ip={}", proof.getId(), approver.getApproverName(), clientIp);
-
-        List<CreProofApprover> all = approverRepo.findByProofIdOrderByApprovalOrderAsc(proof.getId());
-        boolean allApproved = all.stream().allMatch(CreProofApprover::isApproved);
-
-        if (allApproved) {
-            // Whole proof is now approved — record the completing approver
-            // on the proof's own single-approver-shaped fields too, since
-            // other parts of the system (the approval certificate PDF,
-            // ProofResponse.approvedByName) still read those directly
-            // rather than the approver list.
-            proof.approve(approver.getApproverName(), approver.getApproverEmail(), clientIp);
-            proofRepo.save(proof);
-            completeApproval(proof);
-        } else if ("SEQUENTIAL".equals(proof.getApprovalMode())) {
-            all.stream()
-                    .filter(a -> a.getApprovalOrder() > approver.getApprovalOrder() && a.isPending())
-                    .min(Comparator.comparingInt(CreProofApprover::getApprovalOrder))
-                    .ifPresent(next -> jobRepo.findById(proof.getJobId())
-                            .ifPresent(job -> notifyNextApprover(job, proof, next)));
-        }
-        // PARALLEL, not all approved yet: nothing further to do — the
-        // others were already notified when the proof was sent, and are
-        // just waiting on their own review.
     }
 
     private void completeApproval(CreProof proof) {
@@ -385,43 +462,44 @@ public class CreativeService {
         });
     }
 
-    // FIX: takes the already-loaded CreJob rather than trying to construct
-    // a TenantId from proof.getTenantId() (a raw UUID) — CreProof stores
-    // tenantId as a plain UUID, not the TenantId value object CreJob uses,
-    // and there's no confirmed TenantId.of(UUID) factory available to
-    // safely bridge the two. job.getTenantId() is already the right type,
-    // proven by every other fetchTenantName() call in this class.
-    private void notifyNextApprover(CreJob job, CreProof proof, CreProofApprover next) {
-        next.markSent();
-        approverRepo.save(next);
+    /**
+     * FIX: backlog 1.1 — signature changed from
+     * (CreJob, CreProof, CreProofApprover) to (CreProof, ApprovalStepResponse,
+     * ApprovalRule.ApprovalMode) — the entity this used to take no longer
+     * exists in the live-approval-state sense (see class Javadoc).
+     * job.getTenantId()'s original role (resolving tenantName safely,
+     * since CreProof stores tenantId as a raw UUID) is replaced by loading
+     * the job fresh here — same safety, one fewer parameter to thread through.
+     */
+    private void notifyNextApprover(CreProof proof, ApprovalStepResponse next, ApprovalRule.ApprovalMode mode) {
         try {
+            CreJob job = jobRepo.findById(proof.getJobId()).orElse(null);
+            if (job == null) return;
             String tenantName = fetchTenantName(job.getTenantId());
-            sendApproverEmail(tenantName, proof, next, null);
+            String approvalUrl = "https://app.handyflow.co.za/creative/approve/" + next.publicToken();
+            sendApproverEmail(tenantName, proof, next.approverName(), next.approverValue(),
+                    next.stepOrder(), mode, approvalUrl, null);
         } catch (Exception e) {
             log.error("Failed to notify next approver={} for proof={}: {}",
-                    next.getApproverEmail(), proof.getId(), e.getMessage(), e);
+                    next.approverValue(), proof.getId(), e.getMessage(), e);
         }
     }
 
+    /**
+     * FIX: backlog 1.1 — replaced entirely, same shape as approveProofByToken().
+     */
     @Transactional
     public void rejectProofByToken(String token, RejectProofRequest req) {
         TokenResolution res = resolveToken(token);
         CreProof proof = res.proof();
-        CreProofApprover approver = res.approver();
+        String rejectorName = res.step() != null && res.step().approverName() != null
+                ? res.step().approverName() : "Client";
 
-        String rejectorName = approver != null ? approver.getApproverName() : "Client";
-
-        if (approver != null) {
-            approver.reject(req.reason());
-            approverRepo.save(approver);
-            // DELIBERATE DESIGN CHOICE: any single approver rejecting stops
-            // the whole chain immediately — remaining approvers (sequential:
-            // not yet notified; parallel: still pending) are never asked to
-            // review a proof that's already going back for changes. Matches
-            // how a real internal review chain works: one "no" from any
-            // required reviewer sends it back; it doesn't poll everyone
-            // else first.
-        }
+        // Same DELIBERATE DESIGN CHOICE as before this migration: any
+        // single approver rejecting stops the whole chain immediately —
+        // resolveRequestOutcome() inside the engine already enforces this
+        // for SEQUENTIAL/PARALLEL_ALL (any reject = whole request rejected).
+        approvalFacade.actOnPublicStep(token, "REJECT", req.reason(), null);
 
         proof.reject(req.reason());
         proofRepo.save(proof);
@@ -433,10 +511,6 @@ public class CreativeService {
         jobRepo.findById(proof.getJobId()).ifPresent(job -> {
             job.requestRevision();
             jobRepo.save(job);
-
-            // FIX: the public controller's success message for this action
-            // literally says "Your designer has been notified" — but nothing
-            // here ever notified anyone.
             try {
                 notifyTeam(job, "Changes requested: " + job.getTitle(),
                         buildRejectionNotificationEmail(job.getTitle(), proof.getVersionNumber(), req.reason()));
@@ -515,14 +589,6 @@ public class CreativeService {
     }
 
     // ── Proof file access (for staff preview / version comparison) ──────────
-    // NEW: previously the staff-facing UI had no way to actually view a
-    // proof's file at all — ProofResponse deliberately excludes fileUrl
-    // (reasonable, avoids putting a base64 blob in every list response), but
-    // that meant there was no dedicated way to fetch it on demand either.
-    // Staff had to copy the public approval link and open it themselves to
-    // see what a proof actually looked like. This is also the prerequisite
-    // for side-by-side version comparison — you can't compare two versions
-    // you can't see.
 
     public record ProofFile(byte[] content, String contentType, String fileName) {}
 
@@ -561,64 +627,55 @@ public class CreativeService {
                 .orElseThrow(() -> new ResourceNotFoundException("Job", id.toString()));
     }
 
-    /** Carries whichever token actually matched — approver is null for SINGLE-mode proofs. */
-    private record TokenResolution(CreProof proof, CreProofApprover approver) {}
+    /**
+     * FIX: backlog 1.1 — replaces the old (CreProof, CreProofApprover)
+     * shape. step is null only when the resolved request had exactly one
+     * step and that step's own identity isn't separately meaningful — in
+     * practice this never actually happens (step is always populated,
+     * since every request has at least one step), kept nullable only to
+     * mirror how "approver == null meant SINGLE mode" worked before,
+     * without over-claiming a distinction the engine doesn't actually make.
+     */
+    private record TokenResolution(CreProof proof, ApprovalStepResponse step, ApprovalRequestResponse request) {}
 
+    /**
+     * FIX: backlog 1.1 — replaced entirely. Genuinely simpler than
+     * before: no more "try the proof's own token, then try an
+     * approver's" two-step lookup — every approval, SINGLE or
+     * multi-stakeholder, is step-based now, so there's exactly one
+     * lookup path. SEQUENTIAL ordering enforcement ("not your turn yet")
+     * moved into the engine's own performAction() — see
+     * ApprovalEngineService — so it isn't duplicated here anymore either.
+     */
     private TokenResolution resolveToken(String token) {
-        // Try the proof's own token first — this is the entire lookup for
-        // SINGLE mode, and stays completely unchanged from before.
-        Optional<CreProof> singleProof = proofRepo.findByApprovalToken(token);
-        if (singleProof.isPresent()) {
-            CreProof proof = singleProof.get();
-            if (!proof.isTokenValid()) {
-                throw new HandyFlowException(
-                        proof.isApproved()
-                                ? "This proof has already been approved."
-                                : "This approval link has expired. Ask your designer to resend it.",
-                        HttpStatus.BAD_REQUEST, "TOKEN_EXPIRED");
-            }
-            return new TokenResolution(proof, null);
-        }
-
-        // Not a proof-level token — try an approver-level one.
-        CreProofApprover approver = approverRepo.findByApprovalToken(token)
+        ApprovalRequestResponse request = approvalFacade.getRequestByStepToken(token)
                 .orElseThrow(() -> new HandyFlowException(
                         "Invalid or expired approval link", HttpStatus.BAD_REQUEST, "INVALID_TOKEN"));
-        CreProof proof = proofRepo.findById(approver.getProofId())
-                .orElseThrow(() -> new HandyFlowException("Proof not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
+        ApprovalStepResponse step = request.steps().stream()
+                .filter(s -> token.equals(s.publicToken()))
+                .findFirst()
+                .orElseThrow(() -> new HandyFlowException(
+                        "Invalid or expired approval link", HttpStatus.BAD_REQUEST, "INVALID_TOKEN"));
 
-        if (approver.isRejected() || proof.isRejected()) {
+        if ("REJECTED".equals(step.status()) || "REJECTED".equals(request.status())) {
             throw new HandyFlowException(
                     "This proof has been rejected — no further action is needed.",
                     HttpStatus.BAD_REQUEST, "TOKEN_EXPIRED");
         }
-        if (approver.isApproved()) {
+        if ("APPROVED".equals(step.status())) {
             throw new HandyFlowException(
                     "You have already approved this proof.", HttpStatus.BAD_REQUEST, "TOKEN_EXPIRED");
         }
-        if (!approver.isTokenValid()) {
+        if (!"PENDING".equals(step.status())) {
             throw new HandyFlowException(
-                    "This approval link has expired.", HttpStatus.BAD_REQUEST, "TOKEN_EXPIRED");
+                    "This approval link has expired. Ask your designer to resend it.",
+                    HttpStatus.BAD_REQUEST, "TOKEN_EXPIRED");
         }
 
-        // FIX: enforces sequential ordering at the system level, not just
-        // by relying on "we only ever emailed the current approver". A
-        // later approver's token is genuinely valid and unused — if it
-        // were guessed or reused before it's actually their turn, this
-        // stops the chain being approved out of order rather than trusting
-        // "nobody would have it yet" as the only protection.
-        if ("SEQUENTIAL".equals(proof.getApprovalMode())) {
-            List<CreProofApprover> all = approverRepo.findByProofIdOrderByApprovalOrderAsc(proof.getId());
-            boolean earlierStillPending = all.stream()
-                    .anyMatch(a -> a.getApprovalOrder() < approver.getApprovalOrder() && a.isPending());
-            if (earlierStillPending) {
-                throw new HandyFlowException(
-                        "It's not your turn yet — an earlier approver still needs to review this proof first.",
-                        HttpStatus.BAD_REQUEST, "NOT_YOUR_TURN");
-            }
-        }
+        CreProof proof = proofRepo.findById(request.entityId())
+                .orElseThrow(() -> new HandyFlowException("Proof not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
 
-        return new TokenResolution(proof, approver);
+        return new TokenResolution(proof, step, request);
     }
 
     /**
@@ -726,6 +783,14 @@ public class CreativeService {
     // in this class (buildApprovalEmail, notifyTeam, etc.) rather than
     // splitting it across two classes.
 
+    /**
+     * FIX: backlog 1.1 — was building its reminder link from
+     * proof.getApprovalToken(), which no longer gets populated by
+     * sendProofToClient() under the new flow and would have sent a
+     * genuinely broken link. Now resolves the CURRENT pending step (the
+     * one actually awaiting action right now) via the engine and links
+     * to that step's real token instead.
+     */
     @Transactional
     public void sendUnapprovedReminder(UUID proofId) {
         CreProof proof = proofRepo.findById(proofId).orElse(null);
@@ -742,9 +807,22 @@ public class CreativeService {
             log.warn("Proof={} needs an unapproved reminder but has no sentToEmail on record", proofId);
             return;
         }
+
+        Optional<ApprovalRequestResponse> current = proof.getApprovalRequestId() != null
+                ? approvalFacade.getLatestRequestForEntity(job.getTenantId(), APPROVALS_MODULE, APPROVALS_ENTITY_TYPE, proofId)
+                : Optional.empty();
+        Optional<ApprovalStepResponse> pendingStep = current
+                .flatMap(r -> r.steps().stream().filter(s -> "PENDING".equals(s.status())).findFirst());
+
+        if (pendingStep.isEmpty()) {
+            log.warn("Proof={} needs an unapproved reminder but has no current pending approval step — " +
+                    "cannot build a working link", proofId);
+            return;
+        }
+
         try {
             String tenantName  = fetchTenantName(job.getTenantId());
-            String approvalUrl = "https://app.handyflow.co.za/creative/approve/" + proof.getApprovalToken();
+            String approvalUrl = "https://app.handyflow.co.za/creative/approve/" + pendingStep.get().publicToken();
             emailService.send(proof.getSentToEmail(),
                     tenantName + " — Reminder: your proof is awaiting review",
                     buildUnapprovedReminderEmail(tenantName, job.getTitle(), proof.getVersionNumber(), approvalUrl));
@@ -926,27 +1004,32 @@ public class CreativeService {
                 approvalUrl, approvalUrl, approvalUrl, tenantName);
     }
 
-    // NEW: the multi-stakeholder equivalent of the block above — addressed
-    // to a named approver rather than a generic "Hi,", and mentions their
-    // position in the chain for SEQUENTIAL proofs so it's clear this is
-    // specifically their turn, not a general notification.
-    private void sendApproverEmail(String tenantName, CreProof proof,
-                                   CreProofApprover approver, String customMessage) {
-        String approvalUrl = "https://app.handyflow.co.za/creative/approve/" + approver.getApprovalToken();
-        String subject = "SEQUENTIAL".equals(proof.getApprovalMode())
+    /**
+     * FIX: backlog 1.1 — signature changed from taking a whole
+     * CreProofApprover entity to taking (approverName, approverEmail,
+     * stepOrder, mode) directly — that entity is no longer the live
+     * approval-state record (see class Javadoc), an ApprovalStepResponse
+     * is. Content and behaviour are otherwise byte-for-byte identical to
+     * the original: same subject-line logic (SEQUENTIAL gets "it's your
+     * turn" phrasing), same template.
+     */
+    private void sendApproverEmail(String tenantName, CreProof proof, String approverName, String approverEmail,
+                                   int stepOrder, ApprovalRule.ApprovalMode mode, String approvalUrl,
+                                   String customMessage) {
+        String subject = mode == ApprovalRule.ApprovalMode.SEQUENTIAL
                 ? tenantName + " — It's your turn to review a proof"
                 : tenantName + " — Please review and approve your proof";
-        String html = buildApproverEmail(tenantName, proof, approver, approvalUrl, customMessage);
-        emailService.send(approver.getApproverEmail(), subject, html);
+        String html = buildApproverEmail(tenantName, proof, approverName, stepOrder, mode, approvalUrl, customMessage);
+        emailService.send(approverEmail, subject, html);
     }
 
-    private String buildApproverEmail(String tenantName, CreProof proof, CreProofApprover approver,
-                                      String approvalUrl, String customMessage) {
+    private String buildApproverEmail(String tenantName, CreProof proof, String approverName, int stepOrder,
+                                      ApprovalRule.ApprovalMode mode, String approvalUrl, String customMessage) {
         String msg = customMessage != null && !customMessage.isBlank()
                 ? "<p style=\"background:#FFFBEB;border-left:3px solid #D97706;padding:12px 16px;border-radius:0 8px 8px 0;\">"
                 + customMessage + "</p>" : "";
-        String chainNote = "SEQUENTIAL".equals(proof.getApprovalMode())
-                ? "<p style=\"color:#64748B;font-size:13px;\">You are approver " + approver.getApprovalOrder()
+        String chainNote = mode == ApprovalRule.ApprovalMode.SEQUENTIAL
+                ? "<p style=\"color:#64748B;font-size:13px;\">You are approver " + stepOrder
                 + " in this review chain — the proof is ready for you now.</p>"
                 : "<p style=\"color:#64748B;font-size:13px;\">This proof needs sign-off from multiple reviewers; "
                 + "your review can happen independently of the others.</p>";
@@ -981,7 +1064,7 @@ public class CreativeService {
                 </div>
               </div>
             </body></html>
-            """.formatted(tenantName, approver.getApproverName(), proof.getVersionNumber(),
+            """.formatted(tenantName, approverName, proof.getVersionNumber(),
                 chainNote, msg, approvalUrl, tenantName);
     }
 

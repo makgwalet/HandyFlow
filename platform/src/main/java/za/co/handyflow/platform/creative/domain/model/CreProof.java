@@ -63,6 +63,15 @@ public class CreProof {
     @Column(name = "uploaded_by") private UUID    uploadedBy;
     @Column(name = "created_at")  private Instant createdAt;
 
+    // FIX: backlog 1.1 — links this proof to its ApprovalRequest in the
+    // approvals module. Nullable: proofs sent before this migration (or
+    // any created and never sent) simply have no linked request.
+    // approvalToken/tokenExpiresAt above are deliberately left in place,
+    // untouched, unused by new sends going forward — see
+    // CreativeService's own class Javadoc for the full migration
+    // rationale (a full cutover, not a parallel-run).
+    @Column(name = "approval_request_id") private UUID approvalRequestId;
+
     public static CreProof create(UUID jobId, UUID tenantId, int versionNumber,
                                   String title, String fileUrl, String fileName,
                                   String fileType, String thumbnailUrl,
@@ -132,6 +141,16 @@ public class CreProof {
 
     public void supersede() {
         this.status = "SUPERSEDED";
+    }
+
+    /**
+     * FIX: backlog 1.1 — records this proof's link to its ApprovalRequest
+     * in the approvals module, so later lookups (resolveToken()'s
+     * companion facade calls, sendUnapprovedReminder()) can find the
+     * live approval state without CreProof needing to duplicate any of it.
+     */
+    public void linkApprovalRequest(UUID approvalRequestId) {
+        this.approvalRequestId = approvalRequestId;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

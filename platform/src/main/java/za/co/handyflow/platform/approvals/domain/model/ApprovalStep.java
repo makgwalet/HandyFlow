@@ -5,7 +5,9 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.UUID;
 
 /**
@@ -29,26 +31,21 @@ import java.util.UUID;
  *                         never queries identity directly (see package-info)
  *   MANAGER_OF_SUBMITTER — resolution requires module-specific data (e.g.
  *                         HrEmployee.managerId) this module has no access to.
- *                         NOT resolved by this module in this pass — a
- *                         calling module that needs this must pre-resolve
- *                         the manager itself and submit a USER-type step
- *                         instead. Defined here for schema completeness,
- *                         not yet exercised by any real caller (AP's own
- *                         migration uses ROLE, not this).
+ *                         NOT resolved by this module — a calling module
+ *                         that needs this must pre-resolve the manager
+ *                         itself and submit a USER-type step instead.
  *   EXTERNAL_CONTACT     — approverValue is an email address, approverName
  *                         is a display name; authenticated via publicToken,
- *                         not a logged-in user. Schema-ready from day one
- *                         (backlog 1.1 Q1 — Creative's real approvers are
- *                         always external clients), but the public
- *                         token-action path itself is NOT implemented in
- *                         this AP-first pass — see ApprovalEngineService's
- *                         own note on this.
+ *                         not a logged-in user. FIX: backlog 1.1 (Creative
+ *                         migration) — this is now a real, exercised type,
+ *                         not just schema-ready. See
+ *                         ApprovalEngineService.submitAdHoc()/
+ *                         actOnPublicStep() for the actual public flow.
  * <p>
  * Delegation (ApprovalDelegation) is only ever checked for USER-type
- * steps in this pass — a ROLE-type step has no single intended person to
- * delegate away from, and AP's own migration (this session's actual
- * scope) uses ROLE exclusively, so delegation resolution for ROLE-type
- * steps is intentionally left for whenever a real USER-type caller needs it.
+ * steps — a ROLE-type step has no single intended person to delegate
+ * away from, and EXTERNAL_CONTACT steps have no platform user identity
+ * to delegate at all.
  */
 @Entity
 @Table(name = "approval_steps")
@@ -91,6 +88,8 @@ public class ApprovalStep {
     public enum ApproverType { USER, ROLE, MANAGER_OF_SUBMITTER, EXTERNAL_CONTACT }
     public enum Status { PENDING, APPROVED, REJECTED, SKIPPED, DELEGATED }
 
+    private static final SecureRandom RANDOM = new SecureRandom();
+
     public static ApprovalStep create(UUID approvalRequestId, int stepOrder, ApproverType type,
                                       String approverValue, String approverName,
                                       boolean excludeActorOfPreviousStep) {
@@ -103,7 +102,25 @@ public class ApprovalStep {
         s.excludeActorOfPreviousStep = excludeActorOfPreviousStep;
         s.status = Status.PENDING;
         s.createdAt = Instant.now();
+        // FIX: backlog 1.1 — always generate a token/expiry regardless of
+        // approver type. Harmless and unused for USER/ROLE steps; needed
+        // for EXTERNAL_CONTACT. Simpler than conditionally generating it,
+        // and a token existing on a USER/ROLE step is never reachable —
+        // actOnPublicStep() only ever gets called with a token an
+        // EXTERNAL_CONTACT step's own creator (Creative) actually sent out.
+        s.publicToken = generateToken();
+        s.tokenExpiresAt = Instant.now().plusSeconds(72 * 3600); // 72 hours, matches Creative's own prior convention
         return s;
+    }
+
+    private static String generateToken() {
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    public boolean isTokenValid() {
+        return status == Status.PENDING && tokenExpiresAt != null && Instant.now().isBefore(tokenExpiresAt);
     }
 
     public void approve(UUID actedBy, String comment, String actorIp) {
