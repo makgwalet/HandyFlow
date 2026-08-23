@@ -2,7 +2,8 @@
         allowedDependencies = {
                 "shared",
                 "identity",
-                "billing"
+                "billing",
+                "approvals"
         }
 )
 package za.co.handyflow.platform.supplychain;

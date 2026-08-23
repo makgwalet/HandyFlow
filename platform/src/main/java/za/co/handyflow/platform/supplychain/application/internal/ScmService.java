@@ -5,8 +5,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.approvals.application.ApprovalFacade;
+import za.co.handyflow.platform.approvals.dto.ApprovalRequestResponse;
+import za.co.handyflow.platform.approvals.dto.ApprovalStepResponse;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.shared.TenantSequenceService;
@@ -50,6 +55,11 @@ public class ScmService {
 
     private final TenantSequenceService       sequenceService;
     private final za.co.handyflow.platform.controls.application.ControlExceptionFacade controlExceptionFacade;
+
+    private final ApprovalFacade approvalFacade;
+
+    private static final String PO_APPROVALS_MODULE = "supplychain";
+    private static final String PO_APPROVALS_ENTITY_TYPE = "PURCHASE_ORDER";
 
     /** Tolerance for 3-way match: invoice may differ from PO by up to this fraction. */
     private static final BigDecimal MATCH_TOLERANCE = new BigDecimal("0.02"); // 2%
@@ -296,13 +306,51 @@ public class ScmService {
             throw new HandyFlowException("Cannot submit a PO with no lines",
                     HttpStatus.BAD_REQUEST, "NO_LINES");
         po.submit();
-        return poRepo.save(po);
+        ScPurchaseOrder saved = poRepo.save(po);
+        // FIX: backlog 1.1 — was previously nothing here; a submitted PO
+        // never actually reached any approval gate the engine can see.
+        approvalFacade.submit(tenantId, PO_APPROVALS_MODULE, PO_APPROVALS_ENTITY_TYPE, id, null, Map.of());
+        return saved;
     }
 
+    /**
+     * FIX: backlog 1.1 — migrated onto the shared approval engine. Same
+     * shape as ChangeOrderService.approveChangeOrder() (genuinely
+     * single-step: no threshold, no maker-checker) — see that class's
+     * own Javadoc for the full rationale. po.approve(...) and everything
+     * after it is completely unchanged; only gated behind the engine
+     * confirming APPROVED first.
+     */
     @Transactional
     public ScPurchaseOrder approvePurchaseOrder(TenantId tenantId, UUID id,
                                                 UUID approverId, String approverName) {
         ScPurchaseOrder po = getPurchaseOrder(tenantId, id);
+
+        var existing = approvalFacade.getLatestRequestForEntity(tenantId, PO_APPROVALS_MODULE, PO_APPROVALS_ENTITY_TYPE, id);
+        ApprovalRequestResponse result;
+        if (existing.isPresent() && isPoApprovalOpen(existing.get())) {
+            ApprovalStepResponse pendingStep = firstPoPendingStep(existing.get())
+                    .orElseThrow(() -> new HandyFlowException(
+                            "This PO's approval request has no pending step — data inconsistency, needs manual review",
+                            HttpStatus.CONFLICT, "NO_PENDING_STEP"));
+            result = approvalFacade.actOnStep(tenantId, pendingStep.id(), approverId,
+                    currentUserAuthorities(), "APPROVE", null, null);
+        } else {
+            result = approvalFacade.submit(tenantId, PO_APPROVALS_MODULE, PO_APPROVALS_ENTITY_TYPE, id, approverId, Map.of());
+            if (isPoApprovalOpen(result)) {
+                ApprovalStepResponse firstStep = firstPoPendingStep(result)
+                        .orElseThrow(() -> new IllegalStateException("A freshly-submitted request has no pending step"));
+                result = approvalFacade.actOnStep(tenantId, firstStep.id(), approverId,
+                        currentUserAuthorities(), "APPROVE", null, null);
+            }
+        }
+
+        if (!"APPROVED".equals(result.status())) {
+            throw new HandyFlowException(
+                    "Approval did not complete — status: " + result.status(),
+                    HttpStatus.BAD_REQUEST, "APPROVAL_NOT_COMPLETE");
+        }
+
         po.approve(approverId, approverName);
         log.info("[SCM] PO {} approved by {}", po.getOrderNumber(), approverName);
         ScPurchaseOrder saved = poRepo.save(po);
@@ -314,6 +362,14 @@ public class ScmService {
     @Transactional
     public ScPurchaseOrder rejectPurchaseOrder(TenantId tenantId, UUID id, String reason) {
         ScPurchaseOrder po = getPurchaseOrder(tenantId, id);
+
+        var existing = approvalFacade.getLatestRequestForEntity(tenantId, PO_APPROVALS_MODULE, PO_APPROVALS_ENTITY_TYPE, id);
+        if (existing.isPresent() && isPoApprovalOpen(existing.get())) {
+            firstPoPendingStep(existing.get()).ifPresent(step ->
+                    approvalFacade.actOnStep(tenantId, step.id(), currentPoUserId(),
+                            currentUserAuthorities(), "REJECT", reason, null));
+        }
+
         po.reject(reason);
         ScPurchaseOrder saved = poRepo.save(po);
         // FIX (Tier 1 gap analysis): notifyPoRejected existed but was never
@@ -321,7 +377,6 @@ public class ScmService {
         notificationService.notifyPoRejected(tenantId.getValue(), po.getOrderNumber(), reason);
         return saved;
     }
-
     @Transactional
     public ScPurchaseOrder markSent(TenantId tenantId, UUID id) {
         ScPurchaseOrder po = getPurchaseOrder(tenantId, id);
@@ -818,6 +873,29 @@ public class ScmService {
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    private boolean isPoApprovalOpen(ApprovalRequestResponse r) {
+        return "SUBMITTED".equals(r.status()) || "IN_PROGRESS".equals(r.status());
+    }
+
+    private java.util.Optional<ApprovalStepResponse> firstPoPendingStep(ApprovalRequestResponse r) {
+        return r.steps().stream()
+                .filter(s -> "PENDING".equals(s.status()))
+                .min(Comparator.comparingInt(ApprovalStepResponse::stepOrder));
+    }
+
+    /** Same SecurityContextHolder pattern established in ApService/PosService/ChangeOrderService for this exact purpose. */
+    private List<String> currentUserAuthorities() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return List.of();
+        return auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList();
+    }
+
+    private UUID currentPoUserId() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return null;
+        try { return UUID.fromString(auth.getName()); } catch (Exception e) { return null; }
+    }
 
     private void recalculatePoTotals(ScPurchaseOrder po) {
         List<ScPoLine> lines = poLineRepo.findByPurchaseOrderId(po.getId());
