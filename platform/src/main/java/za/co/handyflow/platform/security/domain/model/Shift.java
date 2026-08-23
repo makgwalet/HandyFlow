@@ -11,31 +11,24 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Shift — CHANGES FROM ORIGINAL:
- *
- * Added three supervisor-interrupt domain methods (dismissNoShow, closeOvertime,
- * pullFromSite) plus their tracking columns, and three alert-dedup mark methods
- * used by the rewritten NoShowAlertScheduler. See V210 migration for column
- * rationale.
- *
- * NOTE: pullFromSite() transitions status to ShiftStatus.PULLED, a new enum
- * constant that does not exist yet in ShiftStatus.java (not available at the
- * time this file was written — I inferred SCHEDULED/ACTIVE/COMPLETED/MISSED/
- * CANCELLED from usage elsewhere). Add PULLED to that enum before this compiles:
- *
- *     public enum ShiftStatus {
- *         SCHEDULED, ACTIVE, COMPLETED, MISSED, CANCELLED, PULLED
- *     }
- *
+ * Shift.
+ * <p>
  * WHY a distinct PULLED status rather than reusing COMPLETED?
  * A normally-completed shift implies the guard worked the full assignment and
  * (if minScanCount > 0) met patrol requirements. A pulled shift is a supervisor
  * interrupt -- reporting, payroll, and attendance-rate calculations need to be
- * able to tell the difference (e.g. ReportingService's completion-rate math
- * currently treats anything not COMPLETED/CANCELLED as effectively missed,
- * which is wrong for a pull -- the guard DID show up and work part of the
- * shift). Downstream reporting changes to account for PULLED are a follow-up,
- * flagged here rather than silently baked into a reused status.
+ * able to tell the difference (the guard DID show up and work part of the
+ * shift, unlike a genuine no-show).
+ * <p>
+ * FIX: backlog 7.1/7.3 — ReportingService's completion-rate/guard-hours math
+ * previously treated anything not COMPLETED/CANCELLED as effectively missed,
+ * silently excluding PULLED entirely (not just miscounting it). Fixed in
+ * ReportingService directly — PULLED shifts now credit their partial hours
+ * worked (startAt through pulledAt) toward guard-hours/coverage, and appear
+ * in their own reporting bucket rather than being folded into completed or
+ * missed. See ReportingService's own Javadoc for the full fix. This class
+ * itself needed no changes for that fix — pulledAt already existed and was
+ * already the right data to use.
  */
 @Entity
 @Table(name = "security_shifts")
@@ -253,7 +246,7 @@ public class Shift {
         if (reason == null || reason.isBlank()) {
             throw new IllegalArgumentException("A reason is required to pull a guard from site");
         }
-        this.status     = ShiftStatus.PULLED; // requires new enum constant -- see class javadoc
+        this.status     = ShiftStatus.PULLED;
         this.pulledAt   = Instant.now();
         this.pulledBy   = pulledBy;
         this.pullReason = reason;

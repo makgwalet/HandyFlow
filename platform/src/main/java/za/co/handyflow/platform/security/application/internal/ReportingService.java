@@ -12,6 +12,7 @@ import za.co.handyflow.platform.security.dto.*;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
@@ -45,6 +46,31 @@ import java.util.stream.Collectors;
  * performance becomes an issue as data grows, the natural next step is a
  * materialised view or a dedicated reporting replica — not a rewrite, just
  * a change to where the data comes from.
+ *
+ * FIX: backlog 7.1/7.2. Shift.java's own class Javadoc, written when
+ * PULLED was introduced, explicitly flagged that this service's
+ * completion-rate math treated anything not COMPLETED/CANCELLED as
+ * effectively missed — wrong for a pull, and confirmed worse in practice
+ * than that comment anticipated: PULLED shifts were silently excluded
+ * from every count AND every hours total across all three reports, not
+ * merely miscounted. Per your confirmed decision (a pulled shift counts
+ * its partial hours worked toward coverage/guard-hours credit), fixed
+ * via one centralized hoursWorked() helper below rather than patching
+ * each of the ~15 individual filter/sum call sites separately — this
+ * also directly satisfies 7.2 (a real enum switch, not string equality,
+ * is exactly what would have forced a compile-time decision when PULLED
+ * was originally added, which is the whole point of that finding).
+ * <p>
+ * PULLED is a genuine fourth bucket in every report/breakdown below, not
+ * folded into completedShifts or missedShifts — a supervisor pull isn't
+ * a lesser completion or a disguised miss, it's its own outcome. Each
+ * report's own pre-existing "how many shifts count toward the rate
+ * denominator" convention is extended to include pulled consistently,
+ * not homogenized across reports — Site Coverage already included
+ * `scheduled` in its denominator, Guard Attendance didn't, Monthly
+ * Summary's denominator was always literally every shift; each keeps
+ * its own shape, just correctly including pulled now everywhere
+ * completed/missed/cancelled already were.
  */
 @Slf4j
 @Service
@@ -57,6 +83,30 @@ public class ReportingService {
     private final SiteRepository            siteRepository;
     private final GuardRepository           guardRepository;
     private final PatrolRoundRepository     patrolRoundRepository;
+
+    /**
+     * FIX: backlog 7.1/7.2 — the single place hours-credit is decided per
+     * shift status, replacing the old "only COMPLETED counts" filter
+     * that silently zeroed out PULLED everywhere it appeared.
+     * <p>
+     * PULLED uses startAt (the shift's scheduled start) through pulledAt
+     * (the real, recorded moment the supervisor pulled the guard) as the
+     * worked-hours window. FLAGGED ASSUMPTION, not verified fact: Shift
+     * has no separate actualStartAt/clockedInAt field distinct from the
+     * scheduled startAt, so this assumes the guard began working at the
+     * scheduled start time. If a more precise "actually clocked in"
+     * timestamp exists elsewhere (e.g. DeviceSessionService) and should
+     * be used instead, that's a real follow-up — not guessed at here.
+     */
+    private double hoursWorked(Shift s) {
+        return switch (s.getStatus()) {
+            case COMPLETED -> Duration.between(s.getStartAt(), s.getEndAt()).toMinutes() / 60.0;
+            case PULLED -> s.getPulledAt() != null
+                    ? Math.max(0, Duration.between(s.getStartAt(), s.getPulledAt()).toMinutes()) / 60.0
+                    : 0.0;
+            case SCHEDULED, ACTIVE, MISSED, CANCELLED -> 0.0;
+        };
+    }
 
     // ── 1. Site Coverage Report ────────────────────────────────────────────────
 
@@ -74,16 +124,17 @@ public class ReportingService {
         long scanCount = checkpointLogRepository.countBySiteInRange(tenantId, siteId, from, to);
 
         // Shift breakdowns
-        long scheduled  = shifts.stream().filter(s -> s.getStatus().name().equals("SCHEDULED")).count();
-        long active     = shifts.stream().filter(s -> s.getStatus().name().equals("ACTIVE")).count();
-        long completed  = shifts.stream().filter(s -> s.getStatus().name().equals("COMPLETED")).count();
-        long missed     = shifts.stream().filter(s -> s.getStatus().name().equals("MISSED")).count();
-        long cancelled  = shifts.stream().filter(s -> s.getStatus().name().equals("CANCELLED")).count();
+        long scheduled  = shifts.stream().filter(s -> s.getStatus() == ShiftStatus.SCHEDULED).count();
+        long active     = shifts.stream().filter(s -> s.getStatus() == ShiftStatus.ACTIVE).count();
+        long completed  = shifts.stream().filter(s -> s.getStatus() == ShiftStatus.COMPLETED).count();
+        long missed     = shifts.stream().filter(s -> s.getStatus() == ShiftStatus.MISSED).count();
+        long cancelled  = shifts.stream().filter(s -> s.getStatus() == ShiftStatus.CANCELLED).count();
+        long pulled     = shifts.stream().filter(s -> s.getStatus() == ShiftStatus.PULLED).count();
 
-        // Total guard-hours = sum of (endAt - startAt) for COMPLETED shifts
+        // Total guard-hours — now includes PULLED shifts' partial hours
+        // worked, via hoursWorked() above.
         double totalHours = shifts.stream()
-                .filter(s -> s.getStatus().name().equals("COMPLETED"))
-                .mapToDouble(s -> java.time.Duration.between(s.getStartAt(), s.getEndAt()).toMinutes() / 60.0)
+                .mapToDouble(this::hoursWorked)
                 .sum();
 
         // Patrol rounds summary
@@ -102,15 +153,21 @@ public class ReportingService {
                         i -> i.getSeverity() != null ? i.getSeverity() : "UNKNOWN",
                         Collectors.counting()));
 
-        // Completion rate %
-        long totalScheduleable = scheduled + completed + missed;
+        // Completion rate % — denominator extended to include pulled
+        // (a real scheduleable outcome, same as completed/missed),
+        // keeping the exact same "totalScheduleable" shape this report
+        // already used. pulled is deliberately NOT added to the
+        // numerator — a pull is a genuinely distinct outcome from a
+        // normal completion, not a lesser version of one, even though
+        // it now correctly contributes hours above.
+        long totalScheduleable = scheduled + completed + missed + pulled;
         double completionRate = totalScheduleable > 0
                 ? (completed * 100.0 / totalScheduleable) : 0.0;
 
         return new SiteCoverageReport(
                 siteId, site.getName(), month.toString(),
-                (int)(scheduled + active + completed + missed + cancelled),
-                (int) completed, (int) missed, (int) cancelled,
+                (int) (scheduled + active + completed + missed + cancelled + pulled),
+                (int) completed, (int) missed, (int) cancelled, (int) pulled,
                 Math.round(totalHours * 10) / 10.0,
                 Math.round(completionRate * 10) / 10.0,
                 (int) roundsExpected, (int) roundsCompleted, (int) roundsMissed,
@@ -133,13 +190,13 @@ public class ReportingService {
         List<Incident> incidents = incidentRepository.findByGuardInRange(tenantId, guardId, from, to);
         long scanCount = checkpointLogRepository.countByGuardInRange(tenantId, guardId, from, to);
 
-        long completed = shifts.stream().filter(s -> s.getStatus().name().equals("COMPLETED")).count();
-        long missed    = shifts.stream().filter(s -> s.getStatus().name().equals("MISSED")).count();
-        long cancelled = shifts.stream().filter(s -> s.getStatus().name().equals("CANCELLED")).count();
+        long completed = shifts.stream().filter(s -> s.getStatus() == ShiftStatus.COMPLETED).count();
+        long missed    = shifts.stream().filter(s -> s.getStatus() == ShiftStatus.MISSED).count();
+        long cancelled = shifts.stream().filter(s -> s.getStatus() == ShiftStatus.CANCELLED).count();
+        long pulled    = shifts.stream().filter(s -> s.getStatus() == ShiftStatus.PULLED).count();
 
         double totalHours = shifts.stream()
-                .filter(s -> s.getStatus().name().equals("COMPLETED"))
-                .mapToDouble(s -> java.time.Duration.between(s.getStartAt(), s.getEndAt()).toMinutes() / 60.0)
+                .mapToDouble(this::hoursWorked)
                 .sum();
 
         // Per-site breakdown
@@ -150,27 +207,31 @@ public class ReportingService {
                     String siteName = siteRepository.findActiveById(tenantId, entry.getKey())
                             .map(Site::getName).orElse("Unknown site");
                     long sCompleted = entry.getValue().stream()
-                            .filter(s -> s.getStatus().name().equals("COMPLETED")).count();
+                            .filter(s -> s.getStatus() == ShiftStatus.COMPLETED).count();
                     long sMissed = entry.getValue().stream()
-                            .filter(s -> s.getStatus().name().equals("MISSED")).count();
+                            .filter(s -> s.getStatus() == ShiftStatus.MISSED).count();
+                    long sPulled = entry.getValue().stream()
+                            .filter(s -> s.getStatus() == ShiftStatus.PULLED).count();
                     double sHours = entry.getValue().stream()
-                            .filter(s -> s.getStatus().name().equals("COMPLETED"))
-                            .mapToDouble(s -> java.time.Duration.between(s.getStartAt(), s.getEndAt()).toMinutes() / 60.0)
+                            .mapToDouble(this::hoursWorked)
                             .sum();
                     return new GuardAttendanceReport.SiteAttendance(
                             entry.getKey(), siteName, entry.getValue().size(),
-                            (int) sCompleted, (int) sMissed,
+                            (int) sCompleted, (int) sMissed, (int) sPulled,
                             Math.round(sHours * 10) / 10.0);
                 })
                 .sorted(Comparator.comparing(GuardAttendanceReport.SiteAttendance::siteName))
                 .toList();
 
-        long total = completed + missed + cancelled;
+        // Denominator extended to include pulled — same shape this
+        // report already used (completed + missed + cancelled), just
+        // correctly including pulled alongside them now.
+        long total = completed + missed + cancelled + pulled;
         double attendanceRate = total > 0 ? (completed * 100.0 / total) : 0.0;
 
         return new GuardAttendanceReport(
                 guardId, guard.getFullName(), month.toString(),
-                shifts.size(), (int) completed, (int) missed, (int) cancelled,
+                shifts.size(), (int) completed, (int) missed, (int) cancelled, (int) pulled,
                 Math.round(totalHours * 10) / 10.0,
                 Math.round(attendanceRate * 10) / 10.0,
                 (int) scanCount, incidents.size(), siteBreakdown);
@@ -186,15 +247,20 @@ public class ReportingService {
         List<Shift>    allShifts    = shiftRepository.findByTenantInRange(tenantId, from, to);
         List<Incident> allIncidents = incidentRepository.findByTenantInRange(tenantId, from, to);
 
-        long totalShifts    = allShifts.size();
-        long completedShifts = allShifts.stream().filter(s -> s.getStatus().name().equals("COMPLETED")).count();
-        long missedShifts   = allShifts.stream().filter(s -> s.getStatus().name().equals("MISSED")).count();
+        long totalShifts     = allShifts.size();
+        long completedShifts = allShifts.stream().filter(s -> s.getStatus() == ShiftStatus.COMPLETED).count();
+        long missedShifts    = allShifts.stream().filter(s -> s.getStatus() == ShiftStatus.MISSED).count();
+        long pulledShifts    = allShifts.stream().filter(s -> s.getStatus() == ShiftStatus.PULLED).count();
 
         double totalHours = allShifts.stream()
-                .filter(s -> s.getStatus().name().equals("COMPLETED"))
-                .mapToDouble(s -> java.time.Duration.between(s.getStartAt(), s.getEndAt()).toMinutes() / 60.0)
+                .mapToDouble(this::hoursWorked)
                 .sum();
 
+        // NOTE: this denominator was always literally every shift
+        // (totalShifts = allShifts.size(), unfiltered) — PULLED shifts
+        // were already correctly included in the rate's denominator here
+        // even before this fix; only the hours total and the missing
+        // pulledShifts count were the actual gaps at this report level.
         double overallCompletionRate = totalShifts > 0
                 ? (completedShifts * 100.0 / totalShifts) : 0.0;
 
@@ -211,20 +277,24 @@ public class ReportingService {
                     String siteName = siteRepository.findActiveById(tenantId, siteId)
                             .map(Site::getName).orElse("Unknown site");
                     long sCompleted = entry.getValue().stream()
-                            .filter(s -> s.getStatus().name().equals("COMPLETED")).count();
+                            .filter(s -> s.getStatus() == ShiftStatus.COMPLETED).count();
                     long sMissed = entry.getValue().stream()
-                            .filter(s -> s.getStatus().name().equals("MISSED")).count();
+                            .filter(s -> s.getStatus() == ShiftStatus.MISSED).count();
+                    long sPulled = entry.getValue().stream()
+                            .filter(s -> s.getStatus() == ShiftStatus.PULLED).count();
                     double sHours = entry.getValue().stream()
-                            .filter(s -> s.getStatus().name().equals("COMPLETED"))
-                            .mapToDouble(s -> java.time.Duration.between(s.getStartAt(), s.getEndAt()).toMinutes() / 60.0)
+                            .mapToDouble(this::hoursWorked)
                             .sum();
                     int sIncidents = incidentsBySite.getOrDefault(siteId, List.of()).size();
+                    // Same note as overallCompletionRate above — this
+                    // denominator (entry.getValue().size()) was always
+                    // every shift at this site, pulled included.
                     double sCoverageRate = entry.getValue().size() > 0
                             ? (sCompleted * 100.0 / entry.getValue().size()) : 0.0;
 
                     return new MonthlySummaryReport.SiteSummary(
                             siteId, siteName, entry.getValue().size(),
-                            (int) sCompleted, (int) sMissed,
+                            (int) sCompleted, (int) sMissed, (int) sPulled,
                             Math.round(sHours * 10) / 10.0,
                             Math.round(sCoverageRate * 10) / 10.0,
                             sIncidents);
@@ -247,7 +317,7 @@ public class ReportingService {
 
         return new MonthlySummaryReport(
                 tenantId.getValue(), month.toString(),
-                (int) totalShifts, (int) completedShifts, (int) missedShifts,
+                (int) totalShifts, (int) completedShifts, (int) missedShifts, (int) pulledShifts,
                 Math.round(totalHours * 10) / 10.0,
                 Math.round(overallCompletionRate * 10) / 10.0,
                 allIncidents.size(), incidentsBySeverity,
