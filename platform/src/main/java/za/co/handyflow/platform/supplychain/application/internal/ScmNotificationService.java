@@ -10,7 +10,10 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.notifications.application.Recipient;
+import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
 import za.co.handyflow.platform.shared.EmailService;
+import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.supplychain.domain.repository.ScInventoryRepository;
 import za.co.handyflow.platform.supplychain.domain.repository.ScSupplierInvoiceRepository;
 import za.co.handyflow.platform.supplychain.domain.repository.ScSupplierRepository;
@@ -66,6 +69,10 @@ public class ScmNotificationService {
     private final ScInventoryRepository       inventoryRepo;
     // NEW: needed for the BBBEE-expiry scheduled check below.
     private final ScSupplierRepository supplierRepo;
+
+    // FIX: backlog 9.3 — replaces findAdminEmail()'s raw native SQL
+    // query against the tenants table.
+    private final TenantAdminRecipients tenantAdminRecipients;
 
     @PersistenceContext
     private EntityManager em;
@@ -274,10 +281,21 @@ public class ScmNotificationService {
             log.debug("[SCM] Notifications disabled — skipping: {}", subject);
             return;
         }
-        findAdminEmail(tenantId).ifPresentOrElse(
-                email -> emailService.send(email, subject, htmlBody),
-                ()    -> log.info("[SCM] No admin email for tenant={} — skipping: {}", tenantId, subject)
-        );
+        // FIX: backlog 9.3 — was findAdminEmail(), a raw native SQL
+        // query directly against the tenants table (LIMIT 1 — only ever
+        // reached ONE admin), bypassing TenantAdminRecipients, the
+        // established pattern confirmed correct in CRM/HR/Fuel/POS. Now
+        // notifies every resolved tenant admin, matching that pattern
+        // fully rather than keeping the "only one admin" limitation.
+        List<Recipient> admins = tenantAdminRecipients.resolveTenantAdmins(TenantId.of(tenantId));
+        if (admins.isEmpty()) {
+            log.info("[SCM] No admin recipients for tenant={} — skipping: {}", tenantId, subject);
+            return;
+        }
+        for (Recipient admin : admins) {
+            if (admin.email() == null || admin.email().isBlank()) continue;
+            emailService.send(admin.email(), subject, htmlBody);
+        }
     }
 
     private Optional<String> findAdminEmail(UUID tenantId) {

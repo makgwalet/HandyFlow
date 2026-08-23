@@ -3,7 +3,8 @@
                 "shared",
                 "identity",
                 "billing",
-                "approvals"
+                "approvals",
+                "notifications"
         }
 )
 package za.co.handyflow.platform.supplychain;

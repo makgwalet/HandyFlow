@@ -8,8 +8,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import za.co.handyflow.platform.notifications.application.Recipient;
+import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
 import za.co.handyflow.platform.shared.EmailService;
+import za.co.handyflow.platform.shared.TenantId;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,6 +37,10 @@ import java.util.UUID;
 public class PmNotificationService {
 
     private final EmailService emailService;
+
+    // FIX: backlog 9.3 — replaces findAdminEmail()'s raw native SQL
+    // query against the tenants table.
+    private final TenantAdminRecipients tenantAdminRecipients;
 
     @PersistenceContext
     private EntityManager em;
@@ -119,10 +127,18 @@ public class PmNotificationService {
             log.debug("[PM] Notifications disabled — skipping: {}", subject);
             return;
         }
-        findAdminEmail(tenantId).ifPresentOrElse(
-                email -> emailService.send(email, subject, htmlBody),
-                ()    -> log.info("[PM] No admin email for tenant={} — skipping: {}", tenantId, subject)
-        );
+        // FIX: backlog 9.3 — same fix as ScmNotificationService's
+        // identical bug (see that file's own comment for the full
+        // rationale) — was findAdminEmail(), raw native SQL, LIMIT 1.
+        List<Recipient> admins = tenantAdminRecipients.resolveTenantAdmins(TenantId.of(tenantId));
+        if (admins.isEmpty()) {
+            log.info("[PM] No admin recipients for tenant={} — skipping: {}", tenantId, subject);
+            return;
+        }
+        for (Recipient admin : admins) {
+            if (admin.email() == null || admin.email().isBlank()) continue;
+            emailService.send(admin.email(), subject, htmlBody);
+        }
     }
 
     // ─── Tenant email lookup ──────────────────────────────────────────────────

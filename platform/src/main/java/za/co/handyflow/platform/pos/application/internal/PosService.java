@@ -171,15 +171,17 @@ public class PosService {
         // actual gap backlog 1.6 identified.
         postSessionSalesJournal(tenantId, session);
 
-        // NEW (Tier 1 gap analysis): no existing "acceptable variance"
-        // threshold anywhere in this codebase — this fires on ANY non-zero
-        // variance rather than guessing a tolerance band. FLAGGING AS AN
-        // ASSUMPTION, not a verified business rule: worth checking with you
-        // whether a small tolerance (e.g. R10-R20 float-counting rounding)
-        // should suppress this instead of alerting on every single close.
-        if (session.getCashVariance().compareTo(BigDecimal.ZERO) != 0) {
-            notifyCashVariance(tenantId, session, userName);
-        }
+        // FIX: backlog 10.2 — was calling BOTH an old unconditional
+        // notification (fired on ANY nonzero variance, from before the
+        // tolerance system existed) AND evaluateCashVariance() (the
+        // real, tolerance-aware implementation, correctly using
+        // PosSettings' configurable percentage/amount floor and
+        // CRITICAL-tier escalation). Running both meant: any variance
+        // WITHIN tolerance still notified anyway (the tolerance
+        // suppression never actually worked), and any variance OUTSIDE
+        // tolerance notified TWICE. This was leftover code from before
+        // the real fix landed, never deleted — not a design gap needing
+        // a decision, just dead/duplicate code removal.
         evaluateCashVariance(tenantId, session, userName);
 
         log.info("[POS] Session {} closed. Variance: {}", session.getSessionNumber(), session.getCashVariance());
@@ -1063,24 +1065,12 @@ public class PosService {
                 .build());
     }
 
-    private void notifyCashVariance(TenantId tenantId, PosCashSession session, String closedByName) {
-        List<Recipient> recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
-        if (recipients.isEmpty()) return;
-        BigDecimal variance = session.getCashVariance();
-        boolean isShort = variance.compareTo(BigDecimal.ZERO) < 0;
-        notificationService.send(NotificationRequest.builder()
-                .tenantId(tenantId)
-                .type(NotificationType.CASH_UP_VARIANCE)
-                .title("Cash-up variance: " + session.getSessionNumber())
-                .message(session.getSessionNumber() + " closed " + (isShort ? "short" : "over")
-                        + " by R" + variance.abs().stripTrailingZeros().toPlainString()
-                        + " (closed by " + closedByName + ").")
-                .actionUrl("/pos/cash-sessions/" + session.getId())
-                .sourceModule("pos")
-                .sourceEntityId(session.getId().toString())
-                .recipients(recipients)
-                .build());
-    }
+    // FIX: backlog 10.2 — the old 3-arg notifyCashVariance(tenantId,
+    // session, closedByName) overload (no severity, unconditional) was
+    // removed entirely along with its only call site in
+    // closeCashSession() — see that method's own comment. Only the
+    // 4-arg, tolerance-aware version below remains, called exclusively
+    // from evaluateCashVariance().
 
     // FIX: was calling isVatExempt() via reflection on CatalogueItem — confirmed
     // that method genuinely doesn't exist on the real entity (CatalogueItem.java
