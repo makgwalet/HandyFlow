@@ -46,6 +46,15 @@ public class FuelFillup {
     @Column(name = "receipt_ref", length = 100)
     private String receiptRef;
 
+    // FIX: backlog 5.1 — nullable, unique. NULL for every fillup logged
+    // manually (unchanged, existing behaviour). Populated only for
+    // fillups created from a Fuel-module tank dispatch — see
+    // createFromFuelDispatch() below. The DB-level UNIQUE constraint is
+    // what makes FleetFuelDispatchEventHandler idempotent against
+    // duplicate event delivery.
+    @Column(name = "source_fuel_dispatch_id", unique = true)
+    private UUID sourceFuelDispatchId;
+
     @Column(name = "full_tank", nullable = false)
     private boolean fullTank = true;
 
@@ -70,6 +79,37 @@ public class FuelFillup {
         f.receiptRef       = receiptRef;
         f.fullTank         = fullTank;
         f.createdAt        = Instant.now();
+        return f;
+    }
+
+    /**
+     * FIX: backlog 5.1 — creates a FuelFillup from a Fuel-module tank
+     * dispatch rather than a manual log entry. fullTank defaults to
+     * false — a company tank dispatch to a vehicle isn't necessarily a
+     * "filled to full" event the way a manual station fill-up is, and
+     * false is the safer default for anything that treats fullTank
+     * specially in consumption calculations. station is a fixed,
+     * descriptive label rather than null, so the fleet fuel log UI
+     * shows something meaningful instead of a blank field.
+     */
+    public static FuelFillup createFromFuelDispatch(TenantId tenantId, UUID vehicleId,
+                                                    UUID sourceFuelDispatchId,
+                                                    Instant dispatchedAt, BigDecimal litres,
+                                                    BigDecimal pricePerLitre, BigDecimal totalCost,
+                                                    Integer odometerAtFillup) {
+        FuelFillup f            = new FuelFillup();
+        f.id                    = UUID.randomUUID();
+        f.tenantId              = tenantId.getValue();
+        f.vehicleId             = vehicleId;
+        f.sourceFuelDispatchId  = sourceFuelDispatchId;
+        f.filledAt              = dispatchedAt.atZone(java.time.ZoneOffset.UTC).toLocalDate();
+        f.litres                = litres;
+        f.pricePerLitre         = pricePerLitre;
+        f.totalCost             = totalCost;
+        f.odometerAtFillup      = odometerAtFillup;
+        f.station               = "Internal tank dispatch";
+        f.fullTank              = false;
+        f.createdAt             = Instant.now();
         return f;
     }
 }

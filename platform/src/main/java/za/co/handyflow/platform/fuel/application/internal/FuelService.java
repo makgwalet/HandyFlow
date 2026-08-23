@@ -5,11 +5,13 @@ package za.co.handyflow.platform.fuel.application.internal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.fuel.FuelDispatchedToVehicleEvent;
 import za.co.handyflow.platform.fuel.domain.model.*;
 import za.co.handyflow.platform.fuel.domain.repository.*;
 import za.co.handyflow.platform.fuel.dto.*;
@@ -49,6 +51,10 @@ public class FuelService {
     private final FuelUsageReportPdfGenerator usageReportPdfGenerator;
     private final FuelSupplierStatementPdfGenerator supplierStatementPdfGenerator;
     private final JdbcTemplate jdbc;
+    // FIX: backlog 5.1 — publishes FuelDispatchedToVehicleEvent so
+    // fleet's own listener can reconcile this into cost-per-km. See
+    // that event's own Javadoc for the full rationale.
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${fuel.forecast.lookback-days:30}")
     private int forecastLookbackDays = 30;
@@ -306,6 +312,17 @@ public class FuelService {
                 req.dispatchedAt(), req.odometerReading(), req.hoursReading(),
                 req.authorisedBy(), req.notes(), levelBefore, levelAfter);
         dispatchRepository.save(dispatch);
+
+        // FIX: backlog 5.1 — only when the dispatch actually went to a
+        // vehicle. Dispatches to assets (req.assetId()) or external
+        // customers (req.customerId()) have nothing to do with Fleet's
+        // cost-per-km and correctly publish nothing.
+        if (req.vehicleId() != null) {
+            eventPublisher.publishEvent(FuelDispatchedToVehicleEvent.of(
+                    tenantId, dispatch.getId(), req.vehicleId(),
+                    req.litresDispensed(), req.pricePerLitre(),
+                    req.dispatchedAt(), req.odometerReading()));
+        }
 
         if (!wasLow && tank.isLow()) {
             notifyLowStock(tenantId, tank);

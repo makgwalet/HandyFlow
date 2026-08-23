@@ -287,7 +287,7 @@ public class FleetService {
         return toFuelResponse(fillup);
     }
 
-    private void notifyServiceDue(TenantId tenantId, Vehicle vehicle) {
+    void notifyServiceDue(TenantId tenantId, Vehicle vehicle) {
         List<Recipient> recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
         if (recipients.isEmpty()) return;
 
