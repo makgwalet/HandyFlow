@@ -150,7 +150,7 @@ public class BookingAgencyController {
     }
 
     @PostMapping("/resources")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<ResourceResponse>> createResource(
             @Valid @RequestBody CreateResourceRequest req) {
         featureGuard.requireModule("bookingagency");
@@ -159,7 +159,7 @@ public class BookingAgencyController {
     }
 
     @GetMapping("/clients/{clientId}/resources")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGAGENCY_READ','BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<List<ResourceResponse>>> getResourcesForClient(@PathVariable UUID clientId) {
         featureGuard.requireModule("bookingagency");
         return ResponseEntity.ok(ApiResponse.success(
@@ -167,7 +167,7 @@ public class BookingAgencyController {
     }
 
     @PutMapping("/resources/{id}")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<ResourceResponse>> updateResource(
             @PathVariable UUID id, @Valid @RequestBody CreateResourceRequest req) {
         featureGuard.requireModule("bookingagency");
@@ -176,7 +176,7 @@ public class BookingAgencyController {
     }
 
     @PostMapping("/resources/{id}/deactivate")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<ResourceResponse>> deactivateResource(@PathVariable UUID id) {
         featureGuard.requireModule("bookingagency");
         return ResponseEntity.ok(ApiResponse.success("Resource deactivated",
@@ -184,7 +184,7 @@ public class BookingAgencyController {
     }
 
     @PostMapping("/resources/{id}/reactivate")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<ResourceResponse>> reactivateResource(@PathVariable UUID id) {
         featureGuard.requireModule("bookingagency");
         return ResponseEntity.ok(ApiResponse.success("Resource reactivated",
@@ -194,7 +194,7 @@ public class BookingAgencyController {
     // ── Offerings ─────────────────────────────────────────────────────────
 
     @PostMapping("/offerings")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<OfferingResponse>> createOffering(
             @Valid @RequestBody CreateOfferingRequest req) {
         featureGuard.requireModule("bookingagency");
@@ -203,7 +203,7 @@ public class BookingAgencyController {
     }
 
     @GetMapping("/clients/{clientId}/offerings")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGAGENCY_READ','BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<List<OfferingResponse>>> getOfferingsForClient(@PathVariable UUID clientId) {
         featureGuard.requireModule("bookingagency");
         return ResponseEntity.ok(ApiResponse.success(
@@ -211,7 +211,7 @@ public class BookingAgencyController {
     }
 
     @PutMapping("/offerings/{id}")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<OfferingResponse>> updateOffering(
             @PathVariable UUID id, @Valid @RequestBody CreateOfferingRequest req) {
         featureGuard.requireModule("bookingagency");
@@ -220,7 +220,7 @@ public class BookingAgencyController {
     }
 
     @PostMapping("/offerings/{id}/deactivate")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<OfferingResponse>> deactivateOffering(@PathVariable UUID id) {
         featureGuard.requireModule("bookingagency");
         return ResponseEntity.ok(ApiResponse.success("Offering deactivated",
@@ -230,7 +230,7 @@ public class BookingAgencyController {
     // ── Bookings ──────────────────────────────────────────────────────────
 
     @PostMapping("/clients/{clientId}/bookings")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     @Operation(summary = "Create a booking — checks for overlap on the resource before confirming")
     public ResponseEntity<ApiResponse<BookingResponse>> createBooking(
             @PathVariable UUID clientId, @Valid @RequestBody CreateBookingRequest req) {
@@ -240,7 +240,7 @@ public class BookingAgencyController {
     }
 
     @GetMapping("/clients/{clientId}/bookings")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGAGENCY_READ','BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<Page<BookingResponse>>> getBookingsForClient(
             @PathVariable UUID clientId, @PageableDefault(size = 50) Pageable pageable) {
         featureGuard.requireModule("bookingagency");
@@ -249,7 +249,7 @@ public class BookingAgencyController {
     }
 
     @PostMapping("/bookings/{id}/cancel")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<BookingResponse>> cancelBooking(@PathVariable UUID id) {
         featureGuard.requireModule("bookingagency");
         return ResponseEntity.ok(ApiResponse.success("Booking cancelled",
@@ -273,7 +273,7 @@ public class BookingAgencyController {
     }
 
     @PostMapping("/clients/{clientId}/invoices")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     @Operation(summary = "Generate a retainer invoice for one billing period")
     public ResponseEntity<ApiResponse<BookAgencyInvoiceResponse>> generateInvoice(
             @PathVariable UUID clientId, @Valid @RequestBody GenerateRetainerInvoiceRequest req) {
@@ -283,7 +283,7 @@ public class BookingAgencyController {
     }
 
     @GetMapping("/clients/{clientId}/invoices")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGAGENCY_READ','BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<Page<BookAgencyInvoiceResponse>>> getInvoices(
             @PathVariable UUID clientId, @PageableDefault(size = 24) Pageable pageable) {
         featureGuard.requireModule("bookingagency");
@@ -292,7 +292,7 @@ public class BookingAgencyController {
     }
 
     @PostMapping("/invoices/{id}/send")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<BookAgencyInvoiceResponse>> sendInvoice(@PathVariable UUID id) {
         featureGuard.requireModule("bookingagency");
         return ResponseEntity.ok(ApiResponse.success("Invoice sent",
@@ -300,7 +300,7 @@ public class BookingAgencyController {
     }
 
     @PostMapping("/invoices/{id}/payments")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('BOOKINGAGENCY_MANAGE','BOOKINGAGENCY_ADMIN')")
     public ResponseEntity<ApiResponse<BookAgencyInvoiceResponse>> recordPayment(
             @PathVariable UUID id, @Valid @RequestBody RecordBookAgencyPaymentRequest req) {
         featureGuard.requireModule("bookingagency");

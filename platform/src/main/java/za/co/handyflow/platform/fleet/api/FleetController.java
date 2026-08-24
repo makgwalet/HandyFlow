@@ -27,6 +27,25 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * FIX: backlog 1.7/12.1 — every endpoint in this controller and
+ * DriverController was gated on generic USER_READ/USER_CREATE/
+ * USER_UPDATE/USER_DELETE, same bug class as Fuel (5.2, fixed) and
+ * Accounting (8.1, fixed) — notably including this exact module, whose
+ * own cost-per-km calculation is what 5.1's Fuel reconciliation work
+ * wired directly into, yet was never itself corrected.
+ * <p>
+ * Three tiers, matching 8.1's segregation-of-duties precedent exactly:
+ * FLEET_READ for reads, FLEET_MANAGE for routine creates/updates,
+ * FLEET_ADMIN for delete specifically (the one genuinely hard-to-undo
+ * action here — deleting a vehicle or driver record, as opposed to
+ * Fuel's flatter two-tier fix, which had no delete endpoints to
+ * consider at all). No new permission migration needed —
+ * FLEET_READ/FLEET_MANAGE/FLEET_ADMIN already exist, auto-generated and
+ * auto-granted to every tenant's ADMIN role by the same
+ * AdminLookupService.createModule() mechanism confirmed for every other
+ * module's triplet.
+ */
 @RestController
 @RequestMapping("/api/v1/fleet")
 @RequiredArgsConstructor
@@ -41,7 +60,7 @@ public class FleetController {
     // ── Vehicles ──────────────────────────────────────────────────────────────
 
     @GetMapping("/vehicles")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('FLEET_READ')")
     public ResponseEntity<ApiResponse<Page<VehicleResponse>>> getVehicles(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String vehicleType,
@@ -52,7 +71,7 @@ public class FleetController {
     }
 
     @GetMapping("/vehicles/{id}")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('FLEET_READ')")
     public ResponseEntity<ApiResponse<VehicleResponse>> getVehicle(@PathVariable UUID id) {
         featureGuard.requireModule("fleet");
         return ResponseEntity.ok(ApiResponse.success(
@@ -60,7 +79,7 @@ public class FleetController {
     }
 
     @PostMapping("/vehicles")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('FLEET_MANAGE')")
     public ResponseEntity<ApiResponse<VehicleResponse>> createVehicle(
             @Valid @RequestBody CreateVehicleRequest request) {
         featureGuard.requireModule("fleet");
@@ -70,7 +89,7 @@ public class FleetController {
     }
 
     @PatchMapping("/vehicles/{id}/status")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('FLEET_MANAGE')")
     @Operation(summary = "Update vehicle status: AVAILABLE, ON_TRIP, MAINTENANCE, BREAKDOWN, RETIRED")
     public ResponseEntity<ApiResponse<VehicleResponse>> updateStatus(
             @PathVariable UUID id,
@@ -81,7 +100,7 @@ public class FleetController {
     }
 
     @DeleteMapping("/vehicles/{id}")
-    @PreAuthorize("hasAuthority('USER_DELETE')")
+    @PreAuthorize("hasAuthority('FLEET_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteVehicle(@PathVariable UUID id) {
         featureGuard.requireModule("fleet");
         fleetService.deleteVehicle(TenantContext.getTenantIdAsObject(), id, UserContext.getCurrentUserId());
@@ -89,7 +108,7 @@ public class FleetController {
     }
 
     @PatchMapping("/vehicles/{id}/driver")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('FLEET_MANAGE')")
     @Operation(summary = "Assign or unassign a driver to a vehicle (pass driverId=null to unassign)")
     public ResponseEntity<ApiResponse<VehicleResponse>> assignDriver(
             @PathVariable UUID id, @RequestBody AssignDriverRequest request) {
@@ -101,7 +120,7 @@ public class FleetController {
     // ── Services ──────────────────────────────────────────────────────────────
 
     @GetMapping("/vehicles/{id}/services")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('FLEET_READ')")
     public ResponseEntity<ApiResponse<Page<ServiceResponse>>> getServices(
             @PathVariable UUID id,
             @PageableDefault(size = 50) Pageable pageable) {
@@ -111,7 +130,7 @@ public class FleetController {
     }
 
     @PostMapping("/vehicles/{id}/services")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('FLEET_MANAGE')")
     public ResponseEntity<ApiResponse<ServiceResponse>> recordService(
             @PathVariable UUID id,
             @Valid @RequestBody CreateServiceRequest request) {
@@ -124,7 +143,7 @@ public class FleetController {
     // ── Trips ─────────────────────────────────────────────────────────────────
 
     @GetMapping("/trips")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('FLEET_READ')")
     @Operation(summary = "Get all trips across all vehicles (for logbook view)")
     public ResponseEntity<ApiResponse<Page<TripResponse>>> getAllTrips(
             @RequestParam(required = false) String status,
@@ -135,7 +154,7 @@ public class FleetController {
     }
 
     @GetMapping("/vehicles/{id}/trips")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('FLEET_READ')")
     public ResponseEntity<ApiResponse<Page<TripResponse>>> getVehicleTrips(
             @PathVariable UUID id,
             @PageableDefault(size = 50) Pageable pageable) {
@@ -145,7 +164,7 @@ public class FleetController {
     }
 
     @PostMapping("/vehicles/{id}/trips/start")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('FLEET_MANAGE')")
     @Operation(summary = "Start a trip on a vehicle — sets status to ON_TRIP")
     public ResponseEntity<ApiResponse<TripResponse>> startTrip(
             @PathVariable UUID id,
@@ -157,7 +176,7 @@ public class FleetController {
     }
 
     @PostMapping("/vehicles/{id}/trips/end")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('FLEET_MANAGE')")
     @Operation(summary = "End the active trip on a vehicle — returns to AVAILABLE")
     public ResponseEntity<ApiResponse<TripResponse>> endTrip(
             @PathVariable UUID id,
@@ -170,7 +189,7 @@ public class FleetController {
     // ── SARS Logbook Export ──────────────────────────────────────────────────
 
     @GetMapping(value = "/vehicles/{id}/logbook.pdf", produces = MediaType.APPLICATION_PDF_VALUE)
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('FLEET_READ')")
     @Operation(summary = "Download a SARS travel logbook PDF for a vehicle (defaults to current SA tax year)")
     public ResponseEntity<byte[]> downloadLogbookPdf(
             @PathVariable UUID id,
@@ -184,9 +203,13 @@ public class FleetController {
                 .body(pdf);
     }
 
+    // FIX: this endpoint was entirely missing from the original 1.7 fix —
+    // confirmed present in the real codebase (logbookService.generateExcel())
+    // while tracking down the PDF method-name compile error above. Same
+    // gap: was on generic USER_READ, corrected to FLEET_READ here.
     @GetMapping(value = "/vehicles/{id}/logbook.xlsx",
             produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('FLEET_READ')")
     @Operation(summary = "Download a SARS travel logbook Excel workbook for a vehicle (defaults to current SA tax year)")
     public ResponseEntity<byte[]> downloadLogbookExcel(
             @PathVariable UUID id,
@@ -200,12 +223,10 @@ public class FleetController {
                 .body(excel);
     }
 
-    // ── Cost-per-km ───────────────────────────────────────────────────────────
-    // All-time totals — see FleetCostService's Javadoc for why this isn't
-    // date-ranged (yet).
+    // ── Cost ──────────────────────────────────────────────────────────────────
 
     @GetMapping("/vehicles/{id}/cost-summary")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('FLEET_READ')")
     @Operation(summary = "Cost-per-km breakdown for one vehicle (service + fuel cost over total km driven)")
     public ResponseEntity<ApiResponse<VehicleCostSummaryResponse>> getVehicleCostSummary(@PathVariable UUID id) {
         featureGuard.requireModule("fleet");
@@ -214,7 +235,7 @@ public class FleetController {
     }
 
     @GetMapping("/cost-summary")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('FLEET_READ')")
     @Operation(summary = "Cost-per-km breakdown for every vehicle in the fleet, sorted most expensive first")
     public ResponseEntity<ApiResponse<List<VehicleCostSummaryResponse>>> getFleetCostSummary() {
         featureGuard.requireModule("fleet");
@@ -225,7 +246,7 @@ public class FleetController {
     // ── Fuel fill-ups ─────────────────────────────────────────────────────────
 
     @GetMapping("/vehicles/{id}/fuel")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('FLEET_READ')")
     @Operation(summary = "Get fuel fill-up log for a vehicle")
     public ResponseEntity<ApiResponse<Page<FuelFillupResponse>>> getFuelLog(
             @PathVariable UUID id,
@@ -236,7 +257,7 @@ public class FleetController {
     }
 
     @PostMapping("/vehicles/{id}/fuel")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('FLEET_MANAGE')")
     @Operation(summary = "Log a fuel fill-up (separate from trips)")
     public ResponseEntity<ApiResponse<FuelFillupResponse>> logFuel(
             @PathVariable UUID id,

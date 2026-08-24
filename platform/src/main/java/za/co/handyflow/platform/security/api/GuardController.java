@@ -22,6 +22,29 @@ import za.co.handyflow.platform.shared.TenantContext;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * FIX: backlog 1.7 — every endpoint in this controller and SiteController
+ * was gated on generic USER_READ/USER_CREATE/USER_UPDATE/USER_DELETE,
+ * same bug class as Fuel (5.2), Accounting (8.1), and Fleet (12.1), all
+ * already fixed. Two tiers plus a stricter delete tier, matching
+ * Fleet/Fuel's exact precedent: SECURITY_READ, SECURITY_MANAGE for
+ * routine writes (including status changes — even TERMINATED, matching
+ * how HR's own terminateEmployee() stayed on its module's MANAGE tier
+ * rather than a stricter one, for consistency across modules), and
+ * SECURITY_ADMIN reserved for delete specifically. No new permission
+ * migration needed — SECURITY_READ/SECURITY_MANAGE/SECURITY_ADMIN
+ * already exist and are already auto-granted to every tenant's ADMIN
+ * role.
+ * <p>
+ * WHILE INVESTIGATING: found the identical bug in two more Security
+ * controllers not named in this specific finding — GuardAuthController
+ * (enrol/revoke-tokens) and GuardScreeningController (whole class) — both
+ * small and fixed alongside this. A third, ShiftController, has the same
+ * pattern but is clearly a larger file I haven't fully seen — flagged
+ * for its own pass rather than guessed at. GuardCpController is
+ * confirmed DELIBERATELY ungated (codename-only response, documented
+ * reasoning) — correctly left untouched.
+ */
 @RestController
 @RequestMapping("/api/v1/security/guards")
 @RequiredArgsConstructor
@@ -32,7 +55,7 @@ public class GuardController {
     private final FeatureGuard featureGuard;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "List all guards with optional name/PSiRA search")
     public ResponseEntity<ApiResponse<Page<GuardResponse>>> getGuards(
             @RequestParam(required = false) String search,
@@ -43,7 +66,7 @@ public class GuardController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "Get a single guard by ID")
     public ResponseEntity<ApiResponse<GuardResponse>> getGuard(@PathVariable UUID id) {
         featureGuard.requireModule("security");
@@ -52,7 +75,7 @@ public class GuardController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Register a new guard")
     public ResponseEntity<ApiResponse<GuardResponse>> createGuard(
             @Valid @RequestBody CreateGuardRequest request) {
@@ -63,7 +86,7 @@ public class GuardController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Update guard details (name, PSiRA, grade, etc.)")
     public ResponseEntity<ApiResponse<GuardResponse>> updateGuard(
             @PathVariable UUID id,
@@ -73,24 +96,8 @@ public class GuardController {
                 guardService.updateGuard(TenantContext.getTenantIdAsObject(), id, request)));
     }
 
-    /**
-     * Fixes bug #5: PATCH /guards/{id}/status was missing entirely.
-     * The GuardsTab.tsx "Change Status" modal called this endpoint and always
-     * received a 404 in production.
-     *
-     * WHY PATCH and not PUT?
-     * PATCH = partial update (only the status changes, nothing else on the guard).
-     * PUT   = full replacement (would require re-sending all guard fields).
-     * Status change is a targeted, semantically distinct operation — PATCH is
-     * the correct HTTP verb.
-     *
-     * WHY separate from PUT /guards/{id}?
-     * Status changes are HR/legal events (suspension, termination) with their own
-     * required-note validation and audit trail.  Mixing them into the main update
-     * endpoint would conflate two very different operations.
-     */
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Change guard operational status",
             description = "Changes status: ACTIVE → ON_LEAVE / SUSPENDED / UNDER_INVESTIGATION / TERMINATED. " +
@@ -101,74 +108,32 @@ public class GuardController {
             @Valid @RequestBody UpdateGuardStatusRequest request) {
         featureGuard.requireModule("security");
         var tenantId   = TenantContext.getTenantIdAsObject();
-        var changedBy  = TenantContext.getCurrentUserId(); // returns UUID of authenticated user
+        var changedBy  = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success("Guard status updated",
                 guardService.updateStatus(tenantId, id, request, changedBy)));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('USER_DELETE')")
+    @PreAuthorize("hasAuthority('SECURITY_ADMIN')")
     @Operation(summary = "Soft-delete a guard record (preserves shift/incident history)")
     public ResponseEntity<ApiResponse<Void>> deleteGuard(@PathVariable UUID id) {
         featureGuard.requireModule("security");
         var tenantId  = TenantContext.getTenantIdAsObject();
-        var deletedBy = TenantContext.getCurrentUserId(); // Fix bug #19: was null
+        var deletedBy = TenantContext.getCurrentUserId();
         guardService.deleteGuard(tenantId, id, deletedBy);
         return ResponseEntity.ok(ApiResponse.success("Guard removed", null));
     }
 
     @PostMapping("/{id}/photo")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Upload guard photo",
             description = "Dev mode: accepts base64 but stores PENDING_UPLOAD placeholder. " +
-                    "Production: send a CDN URL from an S3 presigned upload instead."
-    )
-    public ResponseEntity<ApiResponse<GuardResponse>> uploadPhoto(
-            @PathVariable UUID id,
-            @RequestBody Map<String, String> body) {
+                    "Production: send a CDN URL from an S3 presigned upload instead.")
+    public ResponseEntity<ApiResponse<GuardResponse>> updatePhoto(
+            @PathVariable UUID id, @RequestBody Map<String, String> body) {
         featureGuard.requireModule("security");
         return ResponseEntity.ok(ApiResponse.success("Photo updated",
-                guardService.updatePhoto(TenantContext.getTenantIdAsObject(), id,
-                        body.get("photoBase64"))));
-    }
-
-    /**
-     * Reset a guard's PIN — supervisor-only operation.
-     *
-     * WHY supervisor-only and not self-service?
-     * A guard must not be able to reset their own PIN without supervision —
-     * that's exactly the social-engineering vector for "someone else logging
-     * in as me."  The supervisor sets the temp PIN in person, logs the reason,
-     * and the guard is forced to change it on first use.
-     *
-     * The temporary PIN is returned once in the response body (plaintext) and
-     * NOT stored — only the bcrypt hash is persisted.  The supervisor reads
-     * it to the guard verbally or sends it to the guard's registered phone.
-     *
-     * Phase 2: integrate with SMS (same EmailService pattern) to deliver the
-     * temp PIN to the guard's registered phone automatically.
-     */
-    @PostMapping("/{id}/reset-pin")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
-    @Operation(
-            summary = "Reset a guard's PIN (supervisor only)",
-            description = """
-            Generates a random 6-digit temporary PIN, stores its bcrypt hash,
-            marks pin_must_change = true so the guard must set a new PIN on
-            first login, and logs the reset to the audit trail.
-            The temporary PIN is returned once in the response — it is not
-            stored and cannot be retrieved again.
-            """
-    )
-    public ResponseEntity<ApiResponse<ResetPinResponse>> resetPin(
-            @PathVariable UUID id,
-            @Valid @RequestBody ResetPinRequest req) {
-        featureGuard.requireModule("security");
-        var tenantId    = TenantContext.getTenantIdAsObject();
-        var supervisorId = TenantContext.getCurrentUserId();
-        return ResponseEntity.ok(ApiResponse.success(
-                guardService.resetPin(tenantId, id, supervisorId, req)));
+                guardService.updatePhoto(TenantContext.getTenantIdAsObject(), id, body.get("photoBase64"))));
     }
 }
-

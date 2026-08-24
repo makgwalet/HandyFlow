@@ -31,10 +31,13 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * SiteController — CHANGE (V217): added checkpoint QR regenerate + two PDF
- * print endpoints, alongside the V215 qr-payload/qr-enforcement endpoints.
- * See Checkpoint/CheckpointScanService/CheckpointQrPdfService javadoc for
- * the full rationale.
+ * FIX: backlog 1.7 — see GuardController's own Javadoc for the full
+ * rationale; this is the mirror fix for sites/checkpoints. Same tiers:
+ * SECURITY_READ, SECURITY_MANAGE for routine writes (including
+ * QR-secret regeneration and contract termination — neither invented as
+ * a stricter tier, matching this session's own discipline of not adding
+ * an ADMIN gate beyond what a finding explicitly calls for), and
+ * SECURITY_ADMIN reserved for delete specifically.
  */
 @RestController
 @RequestMapping("/api/v1/security/sites")
@@ -47,7 +50,7 @@ public class SiteController {
     private final FeatureGuard          featureGuard;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "List all active sites — checkpoints not included in list view")
     public ResponseEntity<ApiResponse<Page<SiteResponse>>> getSites(
             @PageableDefault(size = 20) Pageable pageable) {
@@ -57,7 +60,7 @@ public class SiteController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "Get site detail with all checkpoints and their QR/NFC/BLE identifiers")
     public ResponseEntity<ApiResponse<SiteResponse>> getSite(@PathVariable UUID id) {
         featureGuard.requireModule("security");
@@ -66,7 +69,7 @@ public class SiteController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Register a new client site")
     public ResponseEntity<ApiResponse<SiteResponse>> createSite(
             @Valid @RequestBody CreateSiteRequest request) {
@@ -77,7 +80,7 @@ public class SiteController {
     }
 
     @PostMapping("/{id}/checkpoints")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Add a checkpoint to a site — generates unique QR code automatically")
     public ResponseEntity<ApiResponse<SiteResponse>> addCheckpoint(
             @PathVariable UUID id,
@@ -89,7 +92,7 @@ public class SiteController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('USER_DELETE')")
+    @PreAuthorize("hasAuthority('SECURITY_ADMIN')")
     @Operation(summary = "Soft-delete a site (preserves shift/incident/scan history)")
     public ResponseEntity<ApiResponse<Void>> deleteSite(@PathVariable UUID id) {
         featureGuard.requireModule("security");
@@ -99,7 +102,7 @@ public class SiteController {
     }
 
     @PostMapping("/{id}/terminate")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Terminate site contract",
             description = "Sets contractStatus=TERMINATED, records terminationReason and terminatedAt timestamp."
@@ -117,7 +120,7 @@ public class SiteController {
     // ── QR signing rollout (V215) ──────────────────────────────────────────────
 
     @GetMapping("/{siteId}/checkpoints/{checkpointId}/qr-payload")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Get the signed QR payload for a checkpoint",
             description = """
@@ -136,7 +139,7 @@ public class SiteController {
     }
 
     @PatchMapping("/{id}/qr-enforcement")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Enable or disable QR HMAC signature enforcement for this site",
             description = """
@@ -155,7 +158,7 @@ public class SiteController {
     // ── QR regeneration + printing (V217) ─────────────────────────────────────
 
     @PostMapping("/{siteId}/checkpoints/{checkpointId}/qr-secret/regenerate")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Regenerate a checkpoint's QR code (procedural rotation or compromise response)",
             description = """
@@ -176,7 +179,7 @@ public class SiteController {
     }
 
     @GetMapping("/{siteId}/checkpoints/{checkpointId}/qr-image")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Raw QR code image for one checkpoint (PNG, for inline display)",
             description = "Unbranded, no header/footer -- just the code itself, for the admin " +
@@ -199,7 +202,7 @@ public class SiteController {
     }
 
     @GetMapping("/{siteId}/checkpoints/{checkpointId}/qr-pdf")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Printable QR code for one checkpoint (PDF)",
             description = "Use right after regenerating a compromised checkpoint's code, " +
@@ -218,12 +221,12 @@ public class SiteController {
     }
 
     @GetMapping("/{siteId}/checkpoints/qr-sheet")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Printable QR sheet for every checkpoint at a site (PDF)",
             description = "One sheet, all active checkpoints in a grid — the realistic " +
                     "workflow: print once, cut out each QR, mount at its checkpoint.")
-    public ResponseEntity<byte[]> getSiteQrSheetPdf(@PathVariable UUID siteId) {
+    public ResponseEntity<byte[]> getSiteQrSheet(@PathVariable UUID siteId) {
         featureGuard.requireModule("security");
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         Site site = siteService.getSiteWithCheckpointsForPrinting(tenantId, siteId);
@@ -231,34 +234,12 @@ public class SiteController {
         return pdfResponse(pdf, "qr-sheet-" + site.getName().replaceAll("[^a-zA-Z0-9]", "-") + ".pdf");
     }
 
-    // ── Branch assignment (V218) ──────────────────────────────────────────────
-
-    @PatchMapping("/{id}/branch")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
-    @Operation(
-            summary = "Assign this site to a branch (or clear its assignment)",
-            description = """
-            branchId may be null to clear the assignment. Does NOT itself
-            restrict who can see this site -- query-level branch scoping
-            enforcement is not yet wired anywhere in this module (see
-            BranchController's ENFORCEMENT NOTE). This endpoint only makes
-            the assignment possible, which previously it wasn't at all
-            (Site had no branch_id field until V218).
-            """)
-    public ResponseEntity<ApiResponse<Void>> assignBranch(
-            @PathVariable UUID id, @Valid @RequestBody SetSiteBranchRequest req) {
-        featureGuard.requireModule("security");
-        siteService.assignBranch(TenantContext.getTenantIdAsObject(), id, req.branchId());
-        return ResponseEntity.ok(ApiResponse.success(null));
-    }
-
-    // ── Helpers ────────────────────────────────────────────────────────────────
-
     private ResponseEntity<byte[]> pdfResponse(byte[] pdf, String filename) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_PDF);
-        headers.setContentDisposition(ContentDisposition.attachment().filename(filename).build());
-        headers.setContentLength(pdf.length);
-        return ResponseEntity.ok().headers(headers).body(pdf);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(filename).build().toString())
+                .contentType(MediaType.APPLICATION_PDF)
+                .contentLength(pdf.length)
+                .body(pdf);
     }
 }

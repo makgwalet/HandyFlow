@@ -119,7 +119,7 @@ public class GuardAuthController {
     // ── 3. SUPERVISOR — Admin web app endpoints ────────────────────────────────
 
     @PostMapping("/api/v1/security/guards/{id}/enrol")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Enroll a guard — supervisor sets PIN, face embedding, and device",
             description = """
@@ -148,7 +148,7 @@ public class GuardAuthController {
     }
 
     @PostMapping("/api/v1/security/guards/{id}/revoke-tokens")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Revoke all active sessions for a guard",
             description = """

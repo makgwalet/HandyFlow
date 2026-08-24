@@ -22,6 +22,12 @@ import za.co.handyflow.platform.shared.UserContext;
 
 import java.util.UUID;
 
+/**
+ * FIX: backlog 1.7/12.1 — see FleetController's own Javadoc for the
+ * full rationale; this is the mirror fix for Driver records. Same
+ * three-tier split: FLEET_READ, FLEET_MANAGE, and FLEET_ADMIN
+ * specifically for delete.
+ */
 @RestController
 @RequestMapping("/api/v1/fleet/drivers")
 @RequiredArgsConstructor
@@ -32,7 +38,7 @@ public class DriverController {
     private final FeatureGuard featureGuard;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('FLEET_READ')")
     public ResponseEntity<ApiResponse<Page<DriverResponse>>> getDrivers(@PageableDefault(size = 50) Pageable pageable) {
         featureGuard.requireModule("fleet");
         return ResponseEntity.ok(ApiResponse.success(
@@ -40,7 +46,7 @@ public class DriverController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('FLEET_READ')")
     public ResponseEntity<ApiResponse<DriverResponse>> getDriver(@PathVariable UUID id) {
         featureGuard.requireModule("fleet");
         return ResponseEntity.ok(ApiResponse.success(
@@ -48,7 +54,7 @@ public class DriverController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('FLEET_MANAGE')")
     @Operation(summary = "Register a new driver, with optional licence/PrDP compliance dates")
     public ResponseEntity<ApiResponse<DriverResponse>> createDriver(@Valid @RequestBody CreateDriverRequest request) {
         featureGuard.requireModule("fleet");
@@ -58,7 +64,7 @@ public class DriverController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('FLEET_MANAGE')")
     @Operation(summary = "Update a driver's details and compliance dates")
     public ResponseEntity<ApiResponse<DriverResponse>> updateDriver(
             @PathVariable UUID id, @Valid @RequestBody UpdateDriverRequest request) {
@@ -68,7 +74,7 @@ public class DriverController {
     }
 
     @PostMapping("/{id}/deactivate")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('FLEET_MANAGE')")
     public ResponseEntity<ApiResponse<DriverResponse>> deactivateDriver(@PathVariable UUID id) {
         featureGuard.requireModule("fleet");
         return ResponseEntity.ok(ApiResponse.success("Driver deactivated",
@@ -76,7 +82,7 @@ public class DriverController {
     }
 
     @PostMapping("/{id}/reactivate")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('FLEET_MANAGE')")
     public ResponseEntity<ApiResponse<DriverResponse>> reactivateDriver(@PathVariable UUID id) {
         featureGuard.requireModule("fleet");
         return ResponseEntity.ok(ApiResponse.success("Driver reactivated",
@@ -84,7 +90,7 @@ public class DriverController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('USER_DELETE')")
+    @PreAuthorize("hasAuthority('FLEET_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteDriver(@PathVariable UUID id) {
         featureGuard.requireModule("fleet");
         driverService.deleteDriver(TenantContext.getTenantIdAsObject(), id, UserContext.getCurrentUserId());
