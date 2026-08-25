@@ -21,6 +21,13 @@ import za.co.handyflow.platform.shared.TenantContext;
 
 import java.util.UUID;
 
+/**
+ * FIX: backlog 1.7 — the third Security sibling flagged during
+ * GuardController's own fix, now closed out. Same tiers as
+ * GuardController/SiteController: SECURITY_READ, SECURITY_MANAGE for
+ * every write here (no delete endpoint in this controller, so no
+ * SECURITY_ADMIN tier applies). No new permission migration needed.
+ */
 @RestController
 @RequestMapping("/api/v1/security/shifts")
 @RequiredArgsConstructor
@@ -31,7 +38,7 @@ public class ShiftController {
     private final FeatureGuard featureGuard;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "List shifts — paginated, sorted by startAt DESC")
     public ResponseEntity<ApiResponse<Page<ShiftResponse>>> getShifts(
             @PageableDefault(size = 20) Pageable pageable) {
@@ -41,7 +48,7 @@ public class ShiftController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Schedule a shift",
             description = "Validates: guard is ACTIVE and schedulable, site belongs to this tenant, " +
@@ -64,7 +71,7 @@ public class ShiftController {
      * Guard, site, and startAt cannot be changed — cancel and recreate instead.
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Update a shift (notes and/or extend end time)",
             description = "Only notes and endAt can be updated. " +
@@ -79,7 +86,7 @@ public class ShiftController {
     }
 
     @PostMapping("/{id}/start")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Guard starts shift — SCHEDULED → ACTIVE")
     public ResponseEntity<ApiResponse<ShiftResponse>> startShift(@PathVariable UUID id) {
         featureGuard.requireModule("security");
@@ -88,7 +95,7 @@ public class ShiftController {
     }
 
     @PostMapping("/{id}/complete")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Guard completes shift — ACTIVE → COMPLETED",
             description = "Enforces minimum checkpoint scan count if configured on this shift " +
@@ -100,12 +107,11 @@ public class ShiftController {
                 shiftService.completeShift(TenantContext.getTenantIdAsObject(), id)));
     }
 
-
-    // (Same USER_UPDATE gate as updateStatus()/deleteGuard() elsewhere -- these
-// are supervisor actions, not guard-facing.)
+    // (Same SECURITY_MANAGE gate as updateStatus()/deleteGuard() elsewhere -- these
+    // are supervisor actions, not guard-facing.)
 
     @PostMapping("/{id}/dismiss-no-show")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Dismiss a no-show/late alert for a shift",
             description = "Record-keeping only -- does not change the shift's status. " +
@@ -121,7 +127,7 @@ public class ShiftController {
     }
 
     @PostMapping("/{id}/close-overtime")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Force-close a shift running in unconfirmed overtime",
             description = "Completes an ACTIVE shift without the guard clocking out. " +
@@ -137,7 +143,7 @@ public class ShiftController {
     }
 
     @PostMapping("/{id}/pull")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Pull a guard off site mid-shift",
             description = "Supervisor-initiated interrupt of an ACTIVE shift -- client complaint, " +

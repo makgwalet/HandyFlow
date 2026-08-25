@@ -107,6 +107,6 @@ public class RecruitmentAgencyPortalDataService {
         return new AgencyInvoiceResponse(inv.getId(), inv.getInvoiceNumber(), inv.getDescription(),
                 inv.getInvoiceDate(), inv.getDueDate(), inv.getSubtotal(), inv.getVatAmount(),
                 inv.getTotal(), inv.getAmountPaid(), inv.balance(), inv.getStatus(),
-                inv.getSentAt(), inv.getPaidAt());
+                inv.getSentAt(), inv.getPaidAt(), inv.getPlacementId());
     }
 }

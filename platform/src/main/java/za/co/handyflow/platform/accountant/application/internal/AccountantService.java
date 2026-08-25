@@ -12,6 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.accountant.domain.model.*;
 import za.co.handyflow.platform.accountant.domain.repository.*;
 import za.co.handyflow.platform.accountant.dto.*;
+import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
+import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
@@ -40,30 +43,22 @@ public class AccountantService {
     private final FeeNoteNumberGenerator   feeNoteNumberGen;
     private final AccountantProfileRepository profileRepo;
     private final EmailService             emailService;
-    // NEW: backs recordPayment()/getPayments() — closes the #1 must-fix
-    // gap from the audit ("billing has no money-in loop").
     private final AccPaymentReceivedRepository paymentRepo;
-    // NEW: backs generateFeeNotePdf() — closes the "quick win" gap from
-    // the audit ("data model already has everything needed").
     private final AccFeeNotePdfGenerator   feeNotePdfGenerator;
-    // NEW: backs the FICA document upload/list/download/verify/delete
-    // methods below — closes the audit's "document/attachment storage
-    // on client records" gap.
     private final AccFicaDocumentRepository ficaDocRepo;
-    // NEW: back getTrialBalance() and the account-name fix in
-    // toJournalResponse() — closes both gaps unlocked by finding
-    // acc_periods/acc_coa_accounts already existed with no
-    // application-layer code.
     private final AccPeriodRepository       periodRepo;
     private final AccCoaAccountRepository   coaAccountRepo;
     private final AccJournalLineRepository  journalLineRepo;
-    // NEW: backs invitePortalUser()/getPortalAccessGrants()/
-    // revokePortalAccess() — closes the "client portal" gap (staff-side
-    // invite management layer).
     private final AccPortalAccessGrantRepository portalGrantRepo;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
+
+    private final AccountingFacade accountingFacade;
+
+    private static final String AR_ACCOUNT_CODE      = "1100";
+    private static final String REVENUE_ACCOUNT_CODE = "4000";
+    private static final String VAT_ACCOUNT_CODE      = "2100";
 
     // ── L2: Client portfolio ──────────────────────────────────────────────────
 
@@ -89,12 +84,6 @@ public class AccountantService {
         clientRepo.save(client);
         log.info("Created acc_client={} entity={} tenant={}", client.getTradingName(), client.getEntityType(), tenantId);
 
-        // NEW: closes the "clientOnboardingWelcome() never called" gap.
-        // Deliberately opt-in (req.sendWelcomeEmail()) — see
-        // CreateClientRequest's own comment for why a firm bulk-entering
-        // an existing book of clients should never accidentally spam
-        // long-standing clients with a "welcome, your file has just
-        // been set up" email.
         if (req.sendWelcomeEmail()) {
             if (client.getContactEmail() != null && !client.getContactEmail().isBlank()) {
                 String firmName = profileRepo.findByTenantId(tenantId)
@@ -116,7 +105,6 @@ public class AccountantService {
     @Transactional
     public ClientResponse updateClient(TenantId tenantId, UUID clientId, UpdateClientRequest req) {
         AccClient client = findActive(tenantId, clientId);
-        // apply non-null fields via domain methods
         if (req.riskRating() != null) client.updateRisk(req.riskRating());
         clientRepo.save(client);
         return toClientResponse(client, tenantId);
@@ -125,7 +113,6 @@ public class AccountantService {
     @Transactional
     public void deleteClient(TenantId tenantId, UUID clientId) {
         AccClient client = findActive(tenantId, clientId);
-        // Guard: cannot delete client with outstanding invoices
         BigDecimal outstanding = feeNoteRepo.findOutstanding(tenantId.getValue()).stream()
                 .filter(f -> f.getClientId().equals(clientId))
                 .map(FeeNote::getTotal)
@@ -154,17 +141,11 @@ public class AccountantService {
 
     // ── L4: SARS tax calendar ─────────────────────────────────────────────────
 
-    /**
-     * Auto-generates all SARS deadlines for a client for a given year.
-     * Uses DeadlineEngine which applies business-day adjustment logic
-     * (EMP201 due 7th; VAT201 due 25th; ITR14 due 12m after year-end etc.)
-     */
     @Transactional
     public List<TaxDeadlineResponse> generateDeadlines(TenantId tenantId, UUID clientId, int year) {
         AccClient client = findActive(tenantId, clientId);
         List<TaxDeadline> generated = deadlineEngine.generateForClient(client, year);
         generated.forEach(d -> {
-            // Skip if already exists (idempotent re-generation)
             boolean exists = deadlineRepo.findByClient(clientId).stream()
                     .anyMatch(existing -> existing.getDeadlineType().equals(d.getDeadlineType())
                             && existing.getPeriodYear() == d.getPeriodYear()
@@ -178,23 +159,6 @@ public class AccountantService {
                 .toList();
     }
 
-    /**
-     * NEW: closes the accountant module audit's "bulk deadline
-     * generation" quick-win gap — generateDeadlines() was per-client
-     * only; a practice with 100 clients had to click through each one
-     * individually at year-start.
-     * <p>
-     * Reuses generateDeadlines()'s own per-client logic exactly,
-     * including its existing idempotency check (safe to re-run without
-     * creating duplicates or hitting the unique constraint on
-     * acc_tax_deadlines), just looped across every active client for
-     * the tenant. Per-client failures are caught and isolated — one
-     * client's DeadlineEngine issue must never abort the whole batch
-     * for every other client, so this returns a summary (succeeded
-     * count + which clients failed and why) rather than either
-     * silently swallowing failures or letting one bad client kill the
-     * entire run.
-     */
     @Transactional
     public BulkDeadlineGenerationResponse generateDeadlinesForAllClients(TenantId tenantId, int year) {
         List<AccClient> clients = clientRepo.findAllActive(tenantId, Pageable.unpaged()).getContent();
@@ -232,18 +196,6 @@ public class AccountantService {
     }
 
     @Transactional
-    // FIX: was deadlineRepo.findById(deadlineId) — no tenant check at
-    // all, and the clientId parameter was accepted but never actually
-    // used to verify the deadline belonged to that client either. Same
-    // bug pattern already fixed twice elsewhere in this module (fee
-    // notes, journals), never applied here until now.
-    // <p>
-    // Deliberately reuses findByClient() and findActive() — both
-    // already confirmed to exist and compile — rather than adding a
-    // new method to TaxDeadlineRepository.java, whose real source was
-    // never actually shown this session. Blindly rewriting a file
-    // whose current content isn't known would risk overwriting or
-    // conflicting with methods this service has no visibility into.
     public TaxDeadlineResponse fileFiling(TenantId tenantId, UUID clientId, UUID deadlineId,
                                           FileDeadlineRequest req) {
         findActive(tenantId, clientId);
@@ -264,7 +216,6 @@ public class AccountantService {
                                          CreateJournalRequest req, UUID preparedBy) {
         findActive(tenantId, clientId);
 
-        // Validate balanced before saving
         BigDecimal debits  = req.lines().stream()
                 .map(l -> l.debit()  != null ? l.debit()  : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal credits = req.lines().stream()
@@ -274,14 +225,6 @@ public class AccountantService {
                     String.format("Journal is not balanced: debits R%s ≠ credits R%s", debits, credits),
                     HttpStatus.BAD_REQUEST, "JOURNAL_UNBALANCED");
 
-        // FIX: was "// TODO: validate period not locked (check
-        // acc_periods.status)" plus req.periodId() passed straight
-        // through with no resolution at all — there was no way for any
-        // caller to obtain a valid periodId, since no period-creation
-        // or period-listing endpoint existed anywhere. Periods now
-        // resolve-or-create from year/month, and the pre-existing TODO
-        // is genuinely checkable now that a real AccPeriod is in hand,
-        // not just a raw UUID passed through blind.
         AccPeriod period = periodRepo.findByClientAndYearMonth(clientId, req.periodYear(), req.periodMonth())
                 .orElseGet(() -> periodRepo.save(
                         AccPeriod.create(tenantId.getValue(), clientId, req.periodYear(), req.periodMonth())));
@@ -311,15 +254,8 @@ public class AccountantService {
 
     @Transactional
     public JournalResponse approveJournal(TenantId tenantId, UUID clientId, UUID journalId, UUID reviewer) {
-        // FIX: was journalRepo.findById(journalId) — no tenant check at
-        // all. Same gap already fixed on FeeNoteRepository/sendFeeNote();
-        // see AccJournalRepository.findByTenantIdAndId()'s own comment.
         AccJournal journal = journalRepo.findByTenantIdAndId(tenantId.getValue(), journalId)
                 .orElseThrow(() -> new ResourceNotFoundException("Journal", journalId.toString()));
-        // NEW: clientId was already a parameter here but never actually
-        // checked against anything — verifies this journal genuinely
-        // belongs to the client the caller thinks it does, not just any
-        // journal in the same tenant.
         if (!journal.getClientId().equals(clientId)) {
             throw new ResourceNotFoundException("Journal", journalId.toString());
         }
@@ -342,16 +278,6 @@ public class AccountantService {
         return toJournalResponse(journal);
     }
 
-    /**
-     * NEW: closes the #2 must-fix gap from the accountant module audit —
-     * "journals are write-only... invisible to the user once posted".
-     * AccJournalRepository.findByClient() already existed and was never
-     * called by anything before this. Tenant isolation is enforced by
-     * verifying the client itself belongs to the caller's tenant first
-     * (findActive() below) — journals are only ever reached through a
-     * specific client, so this is sufficient without a separate
-     * tenant-scoped journal query for the list case.
-     */
     @Transactional(readOnly = true)
     public Page<JournalResponse> getClientJournals(TenantId tenantId, UUID clientId, Pageable pageable) {
         clientRepo.findActiveById(tenantId, clientId)
@@ -359,25 +285,6 @@ public class AccountantService {
         return journalRepo.findByClient(clientId, pageable).map(this::toJournalResponse);
     }
 
-    /**
-     * NEW: closes the "trial balance" gap — unlocked by finding
-     * acc_periods and acc_coa_accounts already existed with no
-     * application-layer code. See AccJournalLineRepository's own class
-     * Javadoc for why the aggregation queries it uses are native SQL,
-     * not JPQL.
-     * <p>
-     * Includes every ACTIVE account for the client regardless of
-     * whether it has any balance — a trial balance's job is to be a
-     * complete picture (a R0.00 line still confirms an account was
-     * reconciled to zero, not silently omitted), not just the accounts
-     * that happen to have activity.
-     * <p>
-     * totalDebits/totalCredits are the sum of positive and negative
-     * CLOSING balances respectively (the textbook meaning of "trial
-     * balance" — proving the books balance), not period movement.
-     * Per-account period movement is still visible in each line's own
-     * periodDebits/periodCredits.
-     */
     @Transactional(readOnly = true)
     public TrialBalanceResponse getTrialBalance(TenantId tenantId, UUID clientId, int periodYear, int periodMonth) {
         clientRepo.findActiveById(tenantId, clientId)
@@ -390,9 +297,6 @@ public class AccountantService {
                         .collect(java.util.stream.Collectors.toMap(
                                 AccJournalLineRepository.AccountBalanceRow::getAccountId, r -> r));
 
-        // Only queried if a period record actually exists for this
-        // year/month — if none does, there can be no journals pointing
-        // at it, so period movement is simply zero for every account.
         Map<UUID, AccJournalLineRepository.AccountBalanceRow> current = periodRepo
                 .findByClientAndYearMonth(clientId, periodYear, periodMonth)
                 .map(p -> journalLineRepo.sumByAccountForPeriod(clientId, p.getId()).stream()
@@ -425,14 +329,7 @@ public class AccountantService {
     }
 
     // ── Chart of Accounts ────────────────────────────────────────────────────
-    // NEW: closes the "minimal COA-seeding capability" gap — trial
-    // balance needed something real to compute against, and there was
-    // no way to create chart-of-accounts entries at all until now.
-    //
-    // A small, SA-oriented starter chart spanning all five required
-    // account types (ASSET/LIABILITY/EQUITY/INCOME/EXPENSE), enough to
-    // post real journal entries against — not a complete, firm-specific
-    // chart. A real practice would still customize this per client.
+
     private record StandardAccount(String code, String name, String type,
                                    String subType, boolean vatApplicable, String vatType) {}
 
@@ -467,13 +364,6 @@ public class AccountantService {
         return toCoaAccountResponse(acc);
     }
 
-    /**
-     * Only seeds a client that has no chart of accounts entries at
-     * all — deliberately refuses on a non-empty chart rather than
-     * silently duplicating or skipping, since either behavior could
-     * hide a real mistake (re-seeding a client that already has a real,
-     * customized chart).
-     */
     @Transactional
     public List<CoaAccountResponse> seedStandardChartOfAccounts(TenantId tenantId, UUID clientId) {
         findActive(tenantId, clientId);
@@ -498,39 +388,19 @@ public class AccountantService {
     }
 
     // ── Client detail ────────────────────────────────────────────────────────
-    // NEW: closes the "unified client detail page" gap.
 
-    /**
-     * Full fee note history for a client — every status, not just
-     * outstanding. GET /fee-notes/outstanding is portfolio-wide and
-     * excludes DRAFT/PAID/WRITTEN_OFF; this is the client-scoped
-     * equivalent with nothing filtered out. FeeNoteRepository.
-     * findByClient() already existed, unused, before this.
-     */
     @Transactional(readOnly = true)
     public Page<FeeNoteResponse> getClientFeeNotes(TenantId tenantId, UUID clientId, Pageable pageable) {
         findActive(tenantId, clientId);
         return feeNoteRepo.findByClient(clientId, pageable).map(this::toFeeNoteResponse);
     }
 
-    /**
-     * Full time entry history for a client — every status (UNBILLED,
-     * BILLED, NON_BILLABLE, WRITTEN_OFF), not just unbilled WIP.
-     * GET /clients/{id}/time/unbilled only ever returns UNBILLED
-     * entries; this is the complete history. TimeEntryRepository.
-     * findByClient() already existed, unused, before this.
-     */
     @Transactional(readOnly = true)
     public Page<TimeEntryResponse> getClientTimeEntries(TenantId tenantId, UUID clientId, Pageable pageable) {
         findActive(tenantId, clientId);
         return timeEntryRepo.findByClient(clientId, pageable).map(this::toTimeEntryResponse);
     }
 
-    /**
-     * The actual "unified client detail" aggregate — see
-     * ClientDetailResponse's own class Javadoc for why each list is
-     * capped to 10 rather than fully paginated here.
-     */
     @Transactional(readOnly = true)
     public ClientDetailResponse getClientDetail(TenantId tenantId, UUID clientId) {
         AccClient client = findActive(tenantId, clientId);
@@ -549,22 +419,12 @@ public class AccountantService {
     }
 
     // ── Client portal — staff-side invite management ────────────────────────
-    // NEW: closes the "client portal" gap. Login/session mechanics
-    // (PortalAuthService, PortalJwtFilter) are a separate, later layer —
-    // this is only the staff-authenticated side: invite a client contact,
-    // see who's been invited, revoke access. None of this touches JWTs
-    // at all; it's the same @PreAuthorize/TenantContext pattern already
-    // used everywhere else in this controller.
 
     @Transactional
     public PortalAccessGrantResponse invitePortalUser(TenantId tenantId, UUID clientId,
                                                       String email, UUID invitedBy) {
         AccClient client = findActive(tenantId, clientId);
 
-        // Refuses a duplicate invite for the same email+client rather
-        // than silently creating a second grant or silently doing
-        // nothing — either would be confusing for staff to reason
-        // about later.
         boolean alreadyGranted = portalGrantRepo.findByTenantAndClient(tenantId.getValue(), clientId).stream()
                 .anyMatch(g -> g.getInviteEmail().equalsIgnoreCase(email) && !"REVOKED".equals(g.getStatus()));
         if (alreadyGranted) {
@@ -577,9 +437,6 @@ public class AccountantService {
 
         AccountantProfile profile = profileRepo.findByTenantId(tenantId).orElse(null);
         String firmName = profile != null ? profile.getFirmName() : "your accountant";
-        // Placeholder path — see EmailTemplates.portalInvite()'s own
-        // comment for why this is a real link to a page that doesn't
-        // exist yet, not omitted.
         String acceptUrl = frontendUrl + "/accountant/portal/auth/accept-invite?token=" + grant.getInviteToken();
 
         emailService.send(email,
@@ -621,17 +478,6 @@ public class AccountantService {
     // ── L6: Time tracking & billing ───────────────────────────────────────────
 
     @Transactional
-    // FIX: was req.practitionerId() — trusting a client-supplied value.
-    // Found while scoping the "staff-level time report" gap: the
-    // frontend form never actually sent this field at all (confirmed
-    // directly against TimeTab.tsx — no practitioner field exists in
-    // its form state), meaning practitioner_id has almost certainly
-    // been NULL for every entry ever logged. Also a real correctness
-    // issue independent of that: taking practitioner identity from
-    // request data at all means, in principle, any staff member could
-    // claim time belongs to someone else. Now derived from the
-    // authenticated session instead, matching how uploaded_by/
-    // recorded_by already work elsewhere in this module.
     public TimeEntryResponse logTime(TenantId tenantId, CreateTimeEntryRequest req,
                                      UUID practitionerId, String practitionerName) {
         findActive(tenantId, req.clientId());
@@ -642,14 +488,6 @@ public class AccountantService {
         return toTimeEntryResponse(entry);
     }
 
-    /**
-     * NEW: closes the accountant module audit's "staff-level time
-     * report" gap — the actual report, not just the query it's built
-     * on. A NULL practitionerId group (entries logged before this
-     * session's fix to logTime() actually captured identity) is
-     * labeled "Unassigned" rather than hidden — an honest reflection
-     * of real historical data, not papered over.
-     */
     @Transactional(readOnly = true)
     public List<StaffTimeSummaryResponse> getStaffTimeSummary(TenantId tenantId, LocalDate from, LocalDate to) {
         return timeEntryRepo.findStaffSummary(tenantId.getValue(), from, to).stream()
@@ -666,13 +504,6 @@ public class AccountantService {
                 .map(this::toTimeEntryResponse).toList();
     }
 
-    /**
-     * NEW: closes the accountant module audit's "time entry edit/delete"
-     * gap — a wrong hour/rate entry previously couldn't be corrected
-     * once logged. See TimeEntry.isEditable()'s own comment for why
-     * BILLED entries are excluded — the actual business rule lives on
-     * the entity, not here.
-     */
     @Transactional
     public TimeEntryResponse updateTimeEntry(TenantId tenantId, UUID entryId, UpdateTimeEntryRequest req) {
         TimeEntry entry = findOwnTimeEntry(tenantId, entryId);
@@ -726,7 +557,6 @@ public class AccountantService {
         FeeNote feeNote = FeeNote.create(tenantId.getValue(), req.clientId(), invoiceNumber,
                 req.invoiceDate(), req.dueDate(), subtotal, vatAmount);
 
-        // Build line items from time entries
         int order = 0;
         for (TimeEntry e : entries) {
             FeeNoteLine line = buildFeeNoteLine(feeNote.getId(), e, req.includeVat(), order++);
@@ -736,15 +566,15 @@ public class AccountantService {
         }
 
         feeNoteRepo.save(feeNote);
+
+        postFeeNoteRevenueJournal(tenantId, feeNote, subtotal, vatAmount);
+
         log.info("Generated fee note={} client={} amount={}", invoiceNumber, req.clientId(), feeNote.getTotal());
         return toFeeNoteResponse(feeNote);
     }
 
     @Transactional
     public FeeNoteResponse sendFeeNote(TenantId tenantId, UUID feeNoteId) {
-        // FIX: was feeNoteRepo.findById(feeNoteId) — no tenant check at
-        // all. See FeeNoteRepository.findByTenantIdAndId()'s own comment
-        // for the full reasoning.
         FeeNote feeNote = feeNoteRepo.findByTenantIdAndId(tenantId.getValue(), feeNoteId)
                 .orElseThrow(() -> new ResourceNotFoundException("FeeNote", feeNoteId.toString()));
         AccClient client = clientRepo.findById(feeNote.getClientId())
@@ -767,11 +597,6 @@ public class AccountantService {
         return toFeeNoteResponse(feeNote);
     }
 
-    /**
-     * NEW: closes the #1 must-fix gap from the accountant module audit —
-     * "billing has no money-in loop". Once sent, a fee note previously
-     * had no path to ever being marked paid.
-     */
     @Transactional
     public FeeNoteResponse recordPayment(TenantId tenantId, UUID feeNoteId, RecordPaymentRequest req,
                                          UUID recordedBy, String recordedByName) {
@@ -787,12 +612,12 @@ public class AccountantService {
         feeNote.applyPayment(totalPaid);
         feeNoteRepo.save(feeNote);
 
+        // FIX: backlog 1.6 — was previously nothing here.
+        postPaymentJournal(tenantId, feeNote, req.amount(), req.bankAccountId());
+
         log.info("Recorded payment R{} against fee note={} client={} — status now {}",
                 req.amount(), feeNote.getInvoiceNumber(), feeNote.getClientId(), feeNote.getStatus());
 
-        // NEW: closes gap #2 from the audit ("no invoice paid confirmation
-        // to the client"). Only sent once actually fully PAID, not on a
-        // partial payment.
         if ("PAID".equals(feeNote.getStatus())) {
             AccClient client = clientRepo.findById(feeNote.getClientId()).orElse(null);
             if (client != null && client.getContactEmail() != null) {
@@ -816,16 +641,6 @@ public class AccountantService {
                 .map(this::toPaymentResponse).toList();
     }
 
-    /**
-     * NEW: generates the Fee Note PDF — flagged in the module audit as a
-     * quick win. Deliberately does not require a practice profile to
-     * exist beyond what generateFeeNote()/sendFeeNote() already assume —
-     * if AccountantProfile is genuinely absent (a tenant that's never
-     * completed practice setup), this throws the same
-     * ResourceNotFoundException pattern used everywhere else in this
-     * service, rather than silently generating a document with a blank
-     * firm name.
-     */
     @Transactional(readOnly = true)
     public byte[] generateFeeNotePdf(TenantId tenantId, UUID feeNoteId) {
         FeeNote feeNote = feeNoteRepo.findByTenantIdAndId(tenantId.getValue(), feeNoteId)
@@ -839,26 +654,9 @@ public class AccountantService {
     }
 
     // ── FICA / KYC documents ────────────────────────────────────────────────
-    // NEW: closes the accountant module audit's "document/attachment
-    // storage on client records" gap. Every new client (ClientsTab) has
-    // a FICA-completed checkbox but no way to attach the actual
-    // documents proving it. Maps to acc_fica_documents — see
-    // AccFicaDocument's own class Javadoc for why this table already
-    // existed unused, and why storage_key is left alone rather than
-    // repurposed.
 
-    // Creative's equivalent upload path (base64-in-DB, same reasoning
-    // as SCM's supplier invoice attachments — no S3 in this
-    // environment) has no size check anywhere at all. Matching SCM's
-    // own fix for that gap rather than repeating it here.
     private static final long MAX_FICA_DOC_BYTES = 10L * 1024 * 1024;
 
-    // NEW: confirmed via a real upload (a .tsx source file accepted as
-    // a "Trust Deed") that nothing restricted file types at all. A real
-    // FICA/KYC document should be a scanned/photographed document, not
-    // arbitrary file content — this is a data-quality guard, not a
-    // security boundary (the file is only ever stored as a base64 blob
-    // and never executed server-side either way).
     private static final java.util.Set<String> ALLOWED_FICA_DOC_TYPES = java.util.Set.of(
             "application/pdf", "image/jpeg", "image/jpg", "image/png",
             "application/msword",
@@ -896,8 +694,6 @@ public class AccountantService {
     @Transactional(readOnly = true)
     public List<FicaDocumentResponse> getFicaDocuments(TenantId tenantId, UUID clientId) {
         findActive(tenantId, clientId);
-        // Uses the projection query — never fetches file_content_base64
-        // for a list call. See FicaDocSummaryProjection's own comment.
         return ficaDocRepo.findSummariesByClient(tenantId.getValue(), clientId).stream()
                 .map(p -> new FicaDocumentResponse(p.getId(), p.getDocType(), p.getFileName(),
                         p.getContentType(), p.getFileSizeBytes(), p.isVerified(), p.getVerifiedAt(),
@@ -1023,10 +819,6 @@ public class AccountantService {
                 c.isClientDeadlineRemindersEnabled());
     }
 
-    /**
-     * NEW: closes the audit's "client-facing deadline reminder emails"
-     * gap — the toggle behind the per-client opt-out.
-     */
     @Transactional
     public ClientResponse setClientDeadlineRemindersEnabled(TenantId tenantId, UUID clientId, boolean enabled) {
         AccClient client = findActive(tenantId, clientId);
@@ -1037,7 +829,6 @@ public class AccountantService {
 
     private TaxDeadlineResponse toDeadlineResponse(TaxDeadline d) {
         int days = (int) ChronoUnit.DAYS.between(LocalDate.now(), d.getAdjustedDueDate());
-        // Fetch client name — intentionally simple (no join; called from portfolio view)
         String clientName = clientRepo.findById(d.getClientId())
                 .map(AccClient::getTradingName).orElse("Unknown");
         return new TaxDeadlineResponse(
@@ -1048,10 +839,6 @@ public class AccountantService {
     }
 
     private JournalResponse toJournalResponse(AccJournal j) {
-        // FIX: was hardcoded null/null with a "resolve via COA service
-        // if needed" comment. Bulk lookup by the distinct account IDs
-        // actually used on this journal's lines — one query per
-        // journal, not one query per line.
         List<UUID> accountIds = j.getLines().stream().map(AccJournalLine::getAccountId).distinct().toList();
         Map<UUID, AccCoaAccount> accountsById = accountIds.isEmpty() ? Map.of()
                 : coaAccountRepo.findByIdIn(accountIds).stream()
@@ -1081,9 +868,6 @@ public class AccountantService {
     }
 
     private FeeNoteResponse toFeeNoteResponse(FeeNote f) {
-        // FIX: was hardcoded BigDecimal.ZERO with a "// TODO: sum from
-        // acc_payments_received" comment — now genuinely computed from
-        // real payment records.
         BigDecimal paid = paymentRepo.sumByFeeNoteId(f.getId());
         BigDecimal balance = f.getTotal().subtract(paid);
         int daysOverdue = f.getDueDate().isBefore(LocalDate.now()) && !"PAID".equals(f.getStatus())
@@ -1108,13 +892,116 @@ public class AccountantService {
         return FeeNoteLine.forTimeEntry(feeNoteId, e, includeVat, order);
     }
 
+    private void postFeeNoteRevenueJournal(TenantId tenantId, FeeNote feeNote,
+                                           java.math.BigDecimal subtotal, java.math.BigDecimal vatAmount) {
+        try {
+            java.util.UUID arAccountId = findAccountByCode(tenantId, AR_ACCOUNT_CODE);
+            java.util.UUID revenueAccountId = findAccountByCode(tenantId, REVENUE_ACCOUNT_CODE);
+            if (arAccountId == null || revenueAccountId == null) {
+                log.warn("Chart of Accounts missing account {} or {} for tenant={} — feeNote={} revenue not posted",
+                        AR_ACCOUNT_CODE, REVENUE_ACCOUNT_CODE, tenantId, feeNote.getId());
+                return;
+            }
+            boolean hasVat = vatAmount != null && vatAmount.compareTo(java.math.BigDecimal.ZERO) > 0;
+            java.util.UUID vatAccountId = null;
+            if (hasVat) {
+                vatAccountId = findAccountByCode(tenantId, VAT_ACCOUNT_CODE);
+                if (vatAccountId == null) {
+                    log.warn("Chart of Accounts missing VAT Output ({}) for tenant={} — feeNote={} revenue not posted",
+                            VAT_ACCOUNT_CODE, tenantId, feeNote.getId());
+                    return;
+                }
+            }
+
+            java.util.List<CreateJournalEntryRequest.JournalLineRequest> lines = new java.util.ArrayList<>();
+            lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                    arAccountId, "Accountant fee — " + feeNote.getInvoiceNumber(), feeNote.getTotal(), null));
+            lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                    revenueAccountId, "Fee revenue — " + feeNote.getInvoiceNumber(), null, subtotal));
+            if (hasVat) {
+                lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                        vatAccountId, "VAT output — " + feeNote.getInvoiceNumber(), null, vatAmount));
+            }
+
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(
+                    java.time.LocalDate.now(), "Accountant fee note: " + feeNote.getInvoiceNumber(),
+                    feeNote.getInvoiceNumber(), "MANUAL", lines);
+
+            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
+            accountingFacade.postJournalEntry(tenantId, created.id());
+            log.info("Posted revenue journal for fee note={} tenant={}", feeNote.getInvoiceNumber(), tenantId);
+        } catch (Exception e) {
+            log.error("Failed to post revenue journal for feeNote={} tenant={}: {}",
+                    feeNote.getId(), tenantId, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * FIX: backlog 1.6. Same "bankAccountId absent → log and skip,
+     * never guess" treatment already applied everywhere else this
+     * session. Was missing entirely — recordPayment() had no path to
+     * the general ledger at all before this.
+     */
+    private void postPaymentJournal(TenantId tenantId, FeeNote feeNote, BigDecimal amount, UUID bankAccountId) {
+        try {
+            if (bankAccountId == null) {
+                log.warn("Payment recorded for feeNote={} tenant={} with no bankAccountId — " +
+                                "cannot post a directed payment journal without knowing which account received the funds.",
+                        feeNote.getInvoiceNumber(), tenantId);
+                return;
+            }
+            java.util.Optional<UUID> bankGl = accountingFacade.resolveBankAccountGL(tenantId, bankAccountId);
+            if (bankGl.isEmpty()) {
+                log.warn("Bank account={} for tenant={} not found or not linked — payment for feeNote={} not posted",
+                        bankAccountId, tenantId, feeNote.getInvoiceNumber());
+                return;
+            }
+            UUID arAccountId = findAccountByCode(tenantId, AR_ACCOUNT_CODE);
+            if (arAccountId == null) {
+                log.warn("Chart of Accounts missing AR ({}) for tenant={} — payment not posted", AR_ACCOUNT_CODE, tenantId);
+                return;
+            }
+
+            List<CreateJournalEntryRequest.JournalLineRequest> lines = List.of(
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            bankGl.get(), "Payment received — " + feeNote.getInvoiceNumber(), amount, null),
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            arAccountId, "Payment received — " + feeNote.getInvoiceNumber(), null, amount));
+
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(
+                    LocalDate.now(), "Payment received: " + feeNote.getInvoiceNumber(),
+                    feeNote.getInvoiceNumber(), "PAYMENT", lines);
+
+            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
+            accountingFacade.postJournalEntry(tenantId, created.id());
+            log.info("Posted payment journal for feeNote={} tenant={}", feeNote.getInvoiceNumber(), tenantId);
+        } catch (Exception e) {
+            log.error("Failed to post payment journal for feeNote={} tenant={}: {}",
+                    feeNote.getId(), tenantId, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * FIX: backlog 1.6 — was referenced by postFeeNoteRevenueJournal()
+     * (already present from an earlier pass) but never actually
+     * defined anywhere in this file — a live "cannot resolve method"
+     * compile error until this was added.
+     */
+    private UUID findAccountByCode(TenantId tenantId, String code) {
+        return accountingFacade.getAccounts(tenantId).stream()
+                .filter(a -> code.equals(a.accountCode()))
+                .map(a -> a.id())
+                .findFirst()
+                .orElse(null);
+    }
+
     // ── Practice profile ──────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public ProfileResponse getProfile(TenantId tenantId) {
         return profileRepo.findByTenantId(tenantId)
                 .map(this::toProfileResponse)
-                .orElse(null);   // null = no profile yet; frontend shows setup prompt
+                .orElse(null);
     }
 
     @Transactional

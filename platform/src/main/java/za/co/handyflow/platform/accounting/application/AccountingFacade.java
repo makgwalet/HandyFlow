@@ -82,4 +82,19 @@ public class AccountingFacade {
     public List<AccountResponse> getAccounts(TenantId tenantId) {
         return accountingService.getAccounts(tenantId);
     }
+
+    /**
+     * FIX: backlog 1.6 (Clinic payment posting) — resolves a bank
+     * account's linked GL account id. Added rather than have Clinic (or
+     * any future caller) reach into accounting's own
+     * AccBankAccountRepository directly, which would repeat the exact
+     * facade-bypass pattern this whole 1.6 effort exists to fix.
+     * Mirrors exactly how InvoicingAccountingEventHandler already
+     * resolves this internally (AccBankAccountRepository.findActiveById()
+     * .getAccountId()) — this just exposes that same resolution as a
+     * proper facade method for callers outside the accounting module.
+     */
+    public java.util.Optional<UUID> resolveBankAccountGL(TenantId tenantId, UUID bankAccountId) {
+        return accountingService.resolveBankAccountGL(tenantId, bankAccountId);
+    }
 }

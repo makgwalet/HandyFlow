@@ -26,7 +26,7 @@
  * the billing layer, when built, will need it resolved rather than
  * guessed.
  */
-@ApplicationModule(allowedDependencies = {"shared", "identity", "billing"})
+@ApplicationModule(allowedDependencies = {"shared", "identity", "billing", "accounting"})
 package za.co.handyflow.platform.bookingagency;
 
 import org.springframework.modulith.ApplicationModule;

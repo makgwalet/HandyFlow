@@ -215,6 +215,12 @@ public class AccountingService {
         return postJournalEntry(tenantId, id);
     }
 
+    @Transactional(readOnly = true)
+    public java.util.Optional<java.util.UUID> resolveBankAccountGL(TenantId tenantId, java.util.UUID bankAccountId) {
+        return bankAccountRepo.findActiveById(tenantId, bankAccountId)
+                .map(AccBankAccount::getAccountId);
+    }
+
     @Transactional
     public JournalEntryResponse reverseJournalEntry(TenantId tenantId, UUID id,
                                                     LocalDate reversalDate) {

@@ -8,6 +8,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
+import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.bookingagency.domain.model.*;
 import za.co.handyflow.platform.bookingagency.domain.repository.*;
 import za.co.handyflow.platform.bookingagency.dto.*;
@@ -18,7 +21,9 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -26,6 +31,12 @@ import java.util.UUID;
  * Bookable resources, the slot/booking engine, and billing are separate,
  * later services — see this module's own package-info.java for the
  * full planned layer list and the open billing-model question.
+ * <p>
+ * FIX: backlog 1.6 — generateInvoice()/recordPayment() now post to the
+ * general ledger via AccountingFacade. Same proven pattern already
+ * applied to Invoicing/Clinic: revenue recognized at invoice
+ * generation, payment posted with a bankAccountId-optional gate (logs
+ * and skips rather than guessing a default account when absent).
  */
 @Slf4j
 @Service
@@ -42,9 +53,16 @@ public class BookingAgencyService {
     private final za.co.handyflow.platform.shared.TenantSequenceService sequenceService;
     private final BookAgencyInvoiceRepository invoiceRepo;
     private final BookAgencyPaymentRepository paymentRepo;
+    // FIX: backlog 1.6 — the shared AccountingFacade. Direct call, no
+    // event indirection — confirmed no circular dependency.
+    private final AccountingFacade accountingFacade;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
+
+    private static final String AR_ACCOUNT_CODE      = "1100";
+    private static final String REVENUE_ACCOUNT_CODE = "4000";
+    private static final String VAT_ACCOUNT_CODE      = "2100";
 
     // ── Agency profile ───────────────────────────────────────────────────────
 
@@ -358,9 +376,65 @@ public class BookingAgencyService {
                 description, req.periodStart(), req.periodEnd(), req.invoiceDate(), req.dueDate(), subtotal, vatAmount);
         invoiceRepo.save(invoice);
 
+        // FIX: backlog 1.6 — was previously nothing here; a whole
+        // retainer invoice's worth of revenue never reached the general
+        // ledger.
+        postInvoiceRevenueJournal(tenantId, invoice, subtotal, vatAmount);
+
         log.info("Generated booking agency retainer invoice={} client={} period={} amount={}",
                 invoiceNumber, clientId, monthLabel, invoice.getTotal());
         return toInvoiceResponse(invoice);
+    }
+
+    /**
+     * FIX: backlog 1.6. See generateInvoice()'s own call-site comment.
+     */
+    private void postInvoiceRevenueJournal(TenantId tenantId, BookAgencyInvoice invoice,
+                                           BigDecimal subtotal, BigDecimal vatAmount) {
+        try {
+            UUID arAccountId = findAccountByCode(tenantId, AR_ACCOUNT_CODE);
+            UUID revenueAccountId = findAccountByCode(tenantId, REVENUE_ACCOUNT_CODE);
+            if (arAccountId == null || revenueAccountId == null) {
+                log.warn("Chart of Accounts missing account {} or {} for tenant={} — invoice={} revenue not posted",
+                        AR_ACCOUNT_CODE, REVENUE_ACCOUNT_CODE, tenantId, invoice.getId());
+                return;
+            }
+
+            boolean hasVat = vatAmount != null && vatAmount.compareTo(BigDecimal.ZERO) > 0;
+            UUID vatAccountId = null;
+            if (hasVat) {
+                vatAccountId = findAccountByCode(tenantId, VAT_ACCOUNT_CODE);
+                if (vatAccountId == null) {
+                    log.warn("Chart of Accounts missing VAT Output ({}) for tenant={} — invoice={} revenue not posted",
+                            VAT_ACCOUNT_CODE, tenantId, invoice.getId());
+                    return;
+                }
+            }
+
+            List<CreateJournalEntryRequest.JournalLineRequest> lines = new ArrayList<>();
+            lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                    arAccountId, "Booking agency invoice — " + invoice.getInvoiceNumber(),
+                    invoice.getTotal(), null));
+            lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                    revenueAccountId, "Retainer revenue — " + invoice.getInvoiceNumber(),
+                    null, subtotal));
+            if (hasVat) {
+                lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                        vatAccountId, "VAT output — " + invoice.getInvoiceNumber(), null, vatAmount));
+            }
+
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(
+                    java.time.LocalDate.now(), "Booking agency invoice: " + invoice.getInvoiceNumber(),
+                    invoice.getInvoiceNumber(), "MANUAL", lines);
+
+            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
+            accountingFacade.postJournalEntry(tenantId, created.id());
+            log.info("Posted revenue journal for booking agency invoice={} tenant={}",
+                    invoice.getInvoiceNumber(), tenantId);
+        } catch (Exception e) {
+            log.error("Failed to post revenue journal for invoice={} tenant={}: {}",
+                    invoice.getId(), tenantId, e.getMessage(), e);
+        }
     }
 
     @Transactional
@@ -400,15 +474,73 @@ public class BookingAgencyService {
         invoice.recordPayment(req.amount());
         invoiceRepo.save(invoice);
 
+        // FIX: backlog 1.6 — was previously nothing here.
+        postPaymentJournal(tenantId, invoice, req.amount(), req.bankAccountId());
+
         log.info("Recorded payment={} against booking agency invoice={} newStatus={}",
                 req.amount(), invoice.getInvoiceNumber(), invoice.getStatus());
         return toInvoiceResponse(invoice);
+    }
+
+    /**
+     * FIX: backlog 1.6. Same "bankAccountId absent → log and skip,
+     * never guess" treatment already applied everywhere else this
+     * session.
+     */
+    private void postPaymentJournal(TenantId tenantId, BookAgencyInvoice invoice,
+                                    BigDecimal amount, UUID bankAccountId) {
+        try {
+            if (bankAccountId == null) {
+                log.warn("Payment recorded for invoice={} tenant={} with no bankAccountId — " +
+                                "cannot post a directed payment journal without knowing which account received the funds.",
+                        invoice.getInvoiceNumber(), tenantId);
+                return;
+            }
+            Optional<UUID> bankGl = accountingFacade.resolveBankAccountGL(tenantId, bankAccountId);
+            if (bankGl.isEmpty()) {
+                log.warn("Bank account={} for tenant={} not found or not linked — payment for invoice={} not posted",
+                        bankAccountId, tenantId, invoice.getInvoiceNumber());
+                return;
+            }
+            UUID arAccountId = findAccountByCode(tenantId, AR_ACCOUNT_CODE);
+            if (arAccountId == null) {
+                log.warn("Chart of Accounts missing AR ({}) for tenant={} — payment not posted", AR_ACCOUNT_CODE, tenantId);
+                return;
+            }
+
+            List<CreateJournalEntryRequest.JournalLineRequest> lines = List.of(
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            bankGl.get(), "Payment received — " + invoice.getInvoiceNumber(), amount, null),
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            arAccountId, "Payment received — " + invoice.getInvoiceNumber(), null, amount));
+
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(
+                    java.time.LocalDate.now(), "Payment received: " + invoice.getInvoiceNumber(),
+                    invoice.getInvoiceNumber(), "PAYMENT", lines);
+
+            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
+            accountingFacade.postJournalEntry(tenantId, created.id());
+            log.info("Posted payment journal for invoice={} tenant={}", invoice.getInvoiceNumber(), tenantId);
+        } catch (Exception e) {
+            log.error("Failed to post payment journal for invoice={} tenant={}: {}",
+                    invoice.getId(), tenantId, e.getMessage(), e);
+        }
     }
 
     @Transactional(readOnly = true)
     public Page<BookAgencyInvoiceResponse> getInvoices(TenantId tenantId, UUID clientId, Pageable pageable) {
         findActiveClient(tenantId, clientId);
         return invoiceRepo.findByClient(clientId, pageable).map(this::toInvoiceResponse);
+    }
+
+    // ── GL helper ─────────────────────────────────────────────────────────────
+
+    private UUID findAccountByCode(TenantId tenantId, String code) {
+        return accountingFacade.getAccounts(tenantId).stream()
+                .filter(a -> code.equals(a.accountCode()))
+                .map(a -> a.id())
+                .findFirst()
+                .orElse(null);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

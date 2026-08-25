@@ -7,6 +7,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
+import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.payrollbureau.domain.model.*;
 import za.co.handyflow.platform.payrollbureau.domain.repository.*;
 import za.co.handyflow.platform.payrollbureau.dto.*;
@@ -21,6 +24,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -29,6 +33,11 @@ import java.util.UUID;
  * employee document management, and bureau billing are separate,
  * later services — see the module's own package-info.java for the
  * full planned layer list and what's not built yet.
+ * <p>
+ * FIX: backlog 1.6 — generateFeeNote()/recordPayment() now post to the
+ * general ledger via AccountingFacade. The field/imports/account-code
+ * constants were already present from an earlier pass; this completes
+ * it by actually wiring the posting calls into both methods.
  */
 @Slf4j
 @Service
@@ -53,9 +62,14 @@ public class PayrollBureauService {
     private final PayPortalAccessGrantRepository portalGrantRepo;
     private final PayBureauPayslipPdfGenerator payslipPdfGenerator;
     private final za.co.handyflow.platform.evidence.application.EvidenceFacade evidenceFacade;
+    private final AccountingFacade accountingFacade;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
+
+    private static final String AR_ACCOUNT_CODE      = "1100";
+    private static final String REVENUE_ACCOUNT_CODE = "4000";
+    private static final String VAT_ACCOUNT_CODE      = "2100";
 
     // ── Practice profile ─────────────────────────────────────────────────────
 
@@ -392,9 +406,60 @@ public class PayrollBureauService {
                 run.getEmployeeCount(), client.getPerEmployeeFee());
         feeNoteLineRepo.save(line);
 
+        // FIX: backlog 1.6 — was previously nothing here; a whole fee
+        // note's worth of revenue never reached the general ledger.
+        postFeeNoteRevenueJournal(tenantId, feeNote, subtotal, vatAmount);
+
         log.info("Generated payroll bureau fee note={} client={} payRun={} amount={}",
                 invoiceNumber, payClientId, run.getPayRunNumber(), feeNote.getTotal());
         return toFeeNoteResponse(feeNote);
+    }
+
+    /**
+     * FIX: backlog 1.6. See generateFeeNote()'s own call-site comment.
+     */
+    private void postFeeNoteRevenueJournal(TenantId tenantId, PayFeeNote feeNote,
+                                           BigDecimal subtotal, BigDecimal vatAmount) {
+        try {
+            UUID arAccountId = findAccountByCode(tenantId, AR_ACCOUNT_CODE);
+            UUID revenueAccountId = findAccountByCode(tenantId, REVENUE_ACCOUNT_CODE);
+            if (arAccountId == null || revenueAccountId == null) {
+                log.warn("Chart of Accounts missing account {} or {} for tenant={} — feeNote={} revenue not posted",
+                        AR_ACCOUNT_CODE, REVENUE_ACCOUNT_CODE, tenantId, feeNote.getId());
+                return;
+            }
+            boolean hasVat = vatAmount != null && vatAmount.compareTo(BigDecimal.ZERO) > 0;
+            UUID vatAccountId = null;
+            if (hasVat) {
+                vatAccountId = findAccountByCode(tenantId, VAT_ACCOUNT_CODE);
+                if (vatAccountId == null) {
+                    log.warn("Chart of Accounts missing VAT Output ({}) for tenant={} — feeNote={} revenue not posted",
+                            VAT_ACCOUNT_CODE, tenantId, feeNote.getId());
+                    return;
+                }
+            }
+
+            List<CreateJournalEntryRequest.JournalLineRequest> lines = new ArrayList<>();
+            lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                    arAccountId, "Payroll bureau fee — " + feeNote.getInvoiceNumber(), feeNote.getTotal(), null));
+            lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                    revenueAccountId, "Bureau fee revenue — " + feeNote.getInvoiceNumber(), null, subtotal));
+            if (hasVat) {
+                lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                        vatAccountId, "VAT output — " + feeNote.getInvoiceNumber(), null, vatAmount));
+            }
+
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(
+                    LocalDate.now(), "Payroll bureau fee note: " + feeNote.getInvoiceNumber(),
+                    feeNote.getInvoiceNumber(), "MANUAL", lines);
+
+            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
+            accountingFacade.postJournalEntry(tenantId, created.id());
+            log.info("Posted revenue journal for fee note={} tenant={}", feeNote.getInvoiceNumber(), tenantId);
+        } catch (Exception e) {
+            log.error("Failed to post revenue journal for feeNote={} tenant={}: {}",
+                    feeNote.getId(), tenantId, e.getMessage(), e);
+        }
     }
 
     @Transactional
@@ -434,9 +499,56 @@ public class PayrollBureauService {
         feeNote.recordPayment(req.amount());
         feeNoteRepo.save(feeNote);
 
+        // FIX: backlog 1.6 — was previously nothing here.
+        postPaymentJournal(tenantId, feeNote, req.amount(), req.bankAccountId());
+
         log.info("Recorded payment={} against payroll bureau fee note={} newStatus={}",
                 req.amount(), feeNote.getInvoiceNumber(), feeNote.getStatus());
         return toFeeNoteResponse(feeNote);
+    }
+
+    /**
+     * FIX: backlog 1.6. Same "bankAccountId absent → log and skip,
+     * never guess" treatment already applied everywhere else this
+     * session.
+     */
+    private void postPaymentJournal(TenantId tenantId, PayFeeNote feeNote, BigDecimal amount, UUID bankAccountId) {
+        try {
+            if (bankAccountId == null) {
+                log.warn("Payment recorded for feeNote={} tenant={} with no bankAccountId — " +
+                                "cannot post a directed payment journal without knowing which account received the funds.",
+                        feeNote.getInvoiceNumber(), tenantId);
+                return;
+            }
+            Optional<UUID> bankGl = accountingFacade.resolveBankAccountGL(tenantId, bankAccountId);
+            if (bankGl.isEmpty()) {
+                log.warn("Bank account={} for tenant={} not found or not linked — payment for feeNote={} not posted",
+                        bankAccountId, tenantId, feeNote.getInvoiceNumber());
+                return;
+            }
+            UUID arAccountId = findAccountByCode(tenantId, AR_ACCOUNT_CODE);
+            if (arAccountId == null) {
+                log.warn("Chart of Accounts missing AR ({}) for tenant={} — payment not posted", AR_ACCOUNT_CODE, tenantId);
+                return;
+            }
+
+            List<CreateJournalEntryRequest.JournalLineRequest> lines = List.of(
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            bankGl.get(), "Payment received — " + feeNote.getInvoiceNumber(), amount, null),
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            arAccountId, "Payment received — " + feeNote.getInvoiceNumber(), null, amount));
+
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(
+                    LocalDate.now(), "Payment received: " + feeNote.getInvoiceNumber(),
+                    feeNote.getInvoiceNumber(), "PAYMENT", lines);
+
+            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
+            accountingFacade.postJournalEntry(tenantId, created.id());
+            log.info("Posted payment journal for feeNote={} tenant={}", feeNote.getInvoiceNumber(), tenantId);
+        } catch (Exception e) {
+            log.error("Failed to post payment journal for feeNote={} tenant={}: {}",
+                    feeNote.getId(), tenantId, e.getMessage(), e);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -630,6 +742,16 @@ public class PayrollBureauService {
                     client.getId(), e.getMessage());
             return null;
         }
+    }
+
+    // ── GL helper ─────────────────────────────────────────────────────────────
+
+    private UUID findAccountByCode(TenantId tenantId, String code) {
+        return accountingFacade.getAccounts(tenantId).stream()
+                .filter(a -> code.equals(a.accountCode()))
+                .map(a -> a.id())
+                .findFirst()
+                .orElse(null);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

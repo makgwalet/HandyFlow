@@ -21,7 +21,7 @@
  * this module is a separately-subscribable add-on, not bundled free with
  * `hr`).
  */
-@ApplicationModule(allowedDependencies = {"shared", "identity", "billing"})
+@ApplicationModule(allowedDependencies = {"shared", "identity", "billing",  "accounting"})
 package za.co.handyflow.platform.payrollbureau;
 
 import org.springframework.modulith.ApplicationModule;

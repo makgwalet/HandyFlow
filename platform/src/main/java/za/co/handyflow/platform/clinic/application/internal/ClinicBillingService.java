@@ -4,6 +4,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
+import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.clinic.domain.model.*;
 import za.co.handyflow.platform.clinic.domain.repository.ClinicMedicalAidRepository;
 import za.co.handyflow.platform.clinic.domain.repository.*;
@@ -36,6 +39,25 @@ public class ClinicBillingService {
     private final EmailService                        emailService;
     private final ClinicPatientInvoicePdfService       patientInvoicePdfService;
     private final ClinicPaymentRepository              paymentRepo;
+    // FIX: backlog 1.6 — the shared AccountingFacade. Direct call, no
+    // event indirection — confirmed no circular dependency between
+    // clinic and accounting.
+    private final AccountingFacade accountingFacade;
+
+    // Real, confirmed seeded codes from ChartOfAccountsSeeder — not
+    // invented, same codes already used by Invoicing/POS's own GL
+    // posting this session.
+    private static final String AR_ACCOUNT_CODE      = "1100"; // Accounts Receivable
+    private static final String REVENUE_ACCOUNT_CODE = "4000"; // Revenue
+
+    // Deliberately NO VAT account/line anywhere in this class's GL
+    // posting — medical consultations are commonly VAT-exempt under
+    // South African law, and nothing in this module's billing DTOs
+    // carries a vatAmount field at all. Fabricating a VAT split with no
+    // evidence this clinic charges it would be a worse error than
+    // omitting it — if this clinic DOES charge VAT on some services,
+    // that's a real, separate design decision needing its own
+    // confirmation, not something to guess at here.
 
     // ── Create claim from consultation ────────────────────────────────────────
 
@@ -138,8 +160,56 @@ public class ClinicBillingService {
                 req.consultationRate() != null ? req.consultationRate() : BigDecimal.ZERO);
         consultationRepo.save(c);
 
+        // FIX: backlog 1.6 — was previously nothing here; a whole
+        // claim's worth of revenue never reached the general ledger.
+        // Debit AR for the full grossAmount, credit Revenue for the
+        // same amount — no VAT split (see the class-level comment on
+        // why), and no split between scheme-portion/patient-portion on
+        // the AR side either: both are owed to the practice regardless
+        // of who pays, so a single combined receivable is the correct,
+        // simple treatment here.
+        postClaimRevenueJournal(tenantId, claim);
+
         log.info("Created claim={} consultation={} gross={}", claim.getId(), consultationId, claim.getGrossAmount());
         return toResponse(claim, tenantId);
+    }
+
+    /**
+     * FIX: backlog 1.6. See createClaim()'s own call-site comment for
+     * the full rationale.
+     */
+    private void postClaimRevenueJournal(TenantId tenantId, ClinicClaim claim) {
+        try {
+            UUID arAccountId = findAccountByCode(tenantId, AR_ACCOUNT_CODE);
+            UUID revenueAccountId = findAccountByCode(tenantId, REVENUE_ACCOUNT_CODE);
+            if (arAccountId == null || revenueAccountId == null) {
+                log.warn("Chart of Accounts missing account {} or {} for tenant={} — claim={} revenue not posted",
+                        AR_ACCOUNT_CODE, REVENUE_ACCOUNT_CODE, tenantId, claim.getId());
+                return;
+            }
+
+            List<CreateJournalEntryRequest.JournalLineRequest> lines = List.of(
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            arAccountId, "Claim revenue — patient portion + scheme portion",
+                            claim.getGrossAmount(), null),
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            revenueAccountId, "Consultation/claim revenue",
+                            null, claim.getGrossAmount()));
+
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(
+                    LocalDate.now(), "Clinic claim created: " + claim.getId(),
+                    claim.getId().toString(), "MANUAL", lines);
+
+            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
+            accountingFacade.postJournalEntry(tenantId, created.id());
+            log.info("Posted revenue journal for claim={} tenant={} amount={}",
+                    claim.getId(), tenantId, claim.getGrossAmount());
+        } catch (Exception e) {
+            // Claim is already saved by the time this runs — a posting
+            // failure must never look like it affected that.
+            log.error("Failed to post revenue journal for claim={} tenant={}: {}",
+                    claim.getId(), tenantId, e.getMessage(), e);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -360,6 +430,14 @@ public class ClinicBillingService {
         log.info("Recorded payment patient={} amount={} method={}",
                 req.patientId(), req.amount(), payment.getPaymentMethod());
 
+        // FIX: backlog 1.6 — was previously nothing here; a patient
+        // payment never reached the general ledger. bankAccountId is
+        // nullable (RecordPaymentRequest's new field; existing frontend
+        // flows won't populate it immediately) — postPaymentJournal()
+        // handles that case explicitly (logs clearly, does not post,
+        // does not guess a default account).
+        postPaymentJournal(tenantId, payment, req.bankAccountId());
+
         String patientName = patientRepo.findActiveById(tenantId, req.patientId())
                 .map(ClinicPatient::getFullName).orElse("Patient");
         return new PaymentResponse(payment.getId(), payment.getPatientId(), patientName,
@@ -370,6 +448,55 @@ public class ClinicBillingService {
         // service doesn't have visibility into. The column is nullable, so
         // this is a valid (if incomplete) write, not a broken one; if you
         // want "recorded by" attribution, that's the one piece still open.
+    }
+
+    /**
+     * FIX: backlog 1.6. Same "bankAccountId absent → log and skip,
+     * never guess" treatment already applied to
+     * invoicing.InvoicingAccountingEventHandler for the identical gap.
+     */
+    private void postPaymentJournal(TenantId tenantId, ClinicPayment payment, UUID bankAccountId) {
+        try {
+            if (bankAccountId == null) {
+                log.warn("Payment recorded for patient={} tenant={} with no bankAccountId — " +
+                                "cannot post a directed payment journal without knowing which account received the funds. " +
+                                "Payment was still recorded normally; this is a ledger-posting gap only.",
+                        payment.getPatientId(), tenantId);
+                return;
+            }
+
+            Optional<UUID> bankGl = accountingFacade.resolveBankAccountGL(tenantId, bankAccountId);
+            if (bankGl.isEmpty()) {
+                log.warn("Bank account={} for tenant={} not found or not linked to a Chart of Accounts entry — " +
+                        "payment for patient={} not posted", bankAccountId, tenantId, payment.getPatientId());
+                return;
+            }
+
+            UUID arAccountId = findAccountByCode(tenantId, AR_ACCOUNT_CODE);
+            if (arAccountId == null) {
+                log.warn("Chart of Accounts missing AR ({}) for tenant={} — payment for patient={} not posted",
+                        AR_ACCOUNT_CODE, tenantId, payment.getPatientId());
+                return;
+            }
+
+            List<CreateJournalEntryRequest.JournalLineRequest> lines = List.of(
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            bankGl.get(), "Patient payment received", payment.getAmount(), null),
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            arAccountId, "Patient payment received", null, payment.getAmount()));
+
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(
+                    LocalDate.now(), "Clinic payment received: " + payment.getId(),
+                    payment.getReference(), "PAYMENT", lines);
+
+            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
+            accountingFacade.postJournalEntry(tenantId, created.id());
+            log.info("Posted payment journal for patient={} tenant={} amount={}",
+                    payment.getPatientId(), tenantId, payment.getAmount());
+        } catch (Exception e) {
+            log.error("Failed to post payment journal for patient={} tenant={}: {}",
+                    payment.getPatientId(), tenantId, e.getMessage(), e);
+        }
     }
 
     /**
@@ -512,6 +639,16 @@ public class ClinicBillingService {
                 from.atStartOfDay(SAST).toInstant(),
                 today.plusDays(1).atStartOfDay(SAST).toInstant()
         };
+    }
+
+    // ── GL helper ─────────────────────────────────────────────────────────────
+
+    private UUID findAccountByCode(TenantId tenantId, String code) {
+        return accountingFacade.getAccounts(tenantId).stream()
+                .filter(a -> code.equals(a.accountCode()))
+                .map(a -> a.id())
+                .findFirst()
+                .orElse(null);
     }
 
     // ── Mapper ────────────────────────────────────────────────────────────────

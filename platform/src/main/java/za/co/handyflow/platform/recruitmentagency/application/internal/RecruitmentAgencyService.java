@@ -14,6 +14,13 @@ import za.co.handyflow.platform.recruitmentagency.dto.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
+import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Optional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -47,6 +54,12 @@ public class RecruitmentAgencyService {
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
+
+    private final AccountingFacade accountingFacade;
+
+    private static final String AR_ACCOUNT_CODE      = "1100";
+    private static final String REVENUE_ACCOUNT_CODE = "4000";
+    private static final String VAT_ACCOUNT_CODE      = "2100";
 
     // ── Agency profile ───────────────────────────────────────────────────────
 
@@ -385,6 +398,8 @@ public class RecruitmentAgencyService {
                 placementId, invoiceNumber, description, req.invoiceDate(), req.dueDate(), subtotal, vatAmount);
         invoiceRepo.save(invoice);
 
+        postInvoiceRevenueJournal(tenantId, invoice, subtotal, vatAmount);
+
         log.info("Generated recruitment agency invoice={} client={} placement={} amount={}",
                 invoiceNumber, placement.getClientId(), placementId, invoice.getTotal());
         return toInvoiceResponse(invoice);
@@ -426,6 +441,9 @@ public class RecruitmentAgencyService {
 
         invoice.recordPayment(req.amount());
         invoiceRepo.save(invoice);
+
+        // FIX: backlog 1.6 — was previously nothing here.
+        postPaymentJournal(tenantId, invoice, req.amount(), req.bankAccountId());
 
         log.info("Recorded payment={} against recruitment agency invoice={} newStatus={}",
                 req.amount(), invoice.getInvoiceNumber(), invoice.getStatus());
@@ -613,12 +631,105 @@ public class RecruitmentAgencyService {
         return new AgencyInvoiceResponse(inv.getId(), inv.getInvoiceNumber(), inv.getDescription(),
                 inv.getInvoiceDate(), inv.getDueDate(), inv.getSubtotal(), inv.getVatAmount(),
                 inv.getTotal(), inv.getAmountPaid(), inv.balance(), inv.getStatus(),
-                inv.getSentAt(), inv.getPaidAt());
+                inv.getSentAt(), inv.getPaidAt(), inv.getPlacementId());
     }
 
     private PortalAccessGrantResponse toGrantResponse(RecPortalAccessGrant g) {
         return new PortalAccessGrantResponse(g.getId(), g.getInviteEmail(), g.getStatus(),
                 g.getInvitedAt(), g.getAcceptedAt(), g.getRevokedAt());
+    }
+
+    private void postInvoiceRevenueJournal(TenantId tenantId, RecAgencyInvoice invoice,
+                                           BigDecimal subtotal, BigDecimal vatAmount) {
+        try {
+            UUID arAccountId = findAccountByCode(tenantId, AR_ACCOUNT_CODE);
+            UUID revenueAccountId = findAccountByCode(tenantId, REVENUE_ACCOUNT_CODE);
+            if (arAccountId == null || revenueAccountId == null) {
+                log.warn("Chart of Accounts missing account {} or {} for tenant={} — invoice={} revenue not posted",
+                        AR_ACCOUNT_CODE, REVENUE_ACCOUNT_CODE, tenantId, invoice.getId());
+                return;
+            }
+            boolean hasVat = vatAmount != null && vatAmount.compareTo(BigDecimal.ZERO) > 0;
+            UUID vatAccountId = null;
+            if (hasVat) {
+                vatAccountId = findAccountByCode(tenantId, VAT_ACCOUNT_CODE);
+                if (vatAccountId == null) {
+                    log.warn("Chart of Accounts missing VAT Output ({}) for tenant={} — invoice={} revenue not posted",
+                            VAT_ACCOUNT_CODE, tenantId, invoice.getId());
+                    return;
+                }
+            }
+
+            List<CreateJournalEntryRequest.JournalLineRequest> lines = new ArrayList<>();
+            lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                    arAccountId, "Recruitment fee — " + invoice.getInvoiceNumber(), invoice.getTotal(), null));
+            lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                    revenueAccountId, "Placement fee revenue — " + invoice.getInvoiceNumber(), null, subtotal));
+            if (hasVat) {
+                lines.add(new CreateJournalEntryRequest.JournalLineRequest(
+                        vatAccountId, "VAT output — " + invoice.getInvoiceNumber(), null, vatAmount));
+            }
+
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(
+                    LocalDate.now(), "Recruitment agency invoice: " + invoice.getInvoiceNumber(),
+                    invoice.getInvoiceNumber(), "MANUAL", lines);
+
+            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
+            accountingFacade.postJournalEntry(tenantId, created.id());
+            log.info("Posted revenue journal for recruitment agency invoice={} tenant={}",
+                    invoice.getInvoiceNumber(), tenantId);
+        } catch (Exception e) {
+            log.error("Failed to post revenue journal for invoice={} tenant={}: {}",
+                    invoice.getId(), tenantId, e.getMessage(), e);
+        }
+    }
+
+    private void postPaymentJournal(TenantId tenantId, RecAgencyInvoice invoice,
+                                    BigDecimal amount, UUID bankAccountId) {
+        try {
+            if (bankAccountId == null) {
+                log.warn("Payment recorded for invoice={} tenant={} with no bankAccountId — " +
+                                "cannot post a directed payment journal without knowing which account received the funds.",
+                        invoice.getInvoiceNumber(), tenantId);
+                return;
+            }
+            Optional<UUID> bankGl = accountingFacade.resolveBankAccountGL(tenantId, bankAccountId);
+            if (bankGl.isEmpty()) {
+                log.warn("Bank account={} for tenant={} not found or not linked — payment for invoice={} not posted",
+                        bankAccountId, tenantId, invoice.getInvoiceNumber());
+                return;
+            }
+            UUID arAccountId = findAccountByCode(tenantId, AR_ACCOUNT_CODE);
+            if (arAccountId == null) {
+                log.warn("Chart of Accounts missing AR ({}) for tenant={} — payment not posted", AR_ACCOUNT_CODE, tenantId);
+                return;
+            }
+
+            List<CreateJournalEntryRequest.JournalLineRequest> lines = List.of(
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            bankGl.get(), "Payment received — " + invoice.getInvoiceNumber(), amount, null),
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            arAccountId, "Payment received — " + invoice.getInvoiceNumber(), null, amount));
+
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(
+                    LocalDate.now(), "Payment received: " + invoice.getInvoiceNumber(),
+                    invoice.getInvoiceNumber(), "PAYMENT", lines);
+
+            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
+            accountingFacade.postJournalEntry(tenantId, created.id());
+            log.info("Posted payment journal for invoice={} tenant={}", invoice.getInvoiceNumber(), tenantId);
+        } catch (Exception e) {
+            log.error("Failed to post payment journal for invoice={} tenant={}: {}",
+                    invoice.getId(), tenantId, e.getMessage(), e);
+        }
+    }
+
+    private UUID findAccountByCode(TenantId tenantId, String code) {
+        return accountingFacade.getAccounts(tenantId).stream()
+                .filter(a -> code.equals(a.accountCode()))
+                .map(a -> a.id())
+                .findFirst()
+                .orElse(null);
     }
 
 }

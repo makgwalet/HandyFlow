@@ -7,6 +7,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.accounting.application.AccountingFacade;
+import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
+import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.property.domain.model.*;
 import za.co.handyflow.platform.property.domain.repository.*;
 import za.co.handyflow.platform.property.dto.*;
@@ -21,9 +24,20 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * FIX: backlog 1.6 — createPaymentRecord()/recordPayment() now post to
+ * the general ledger via AccountingFacade. The field/imports/account-
+ * code constants/findAccountByCode() helper referenced by
+ * postRentalRevenueJournal() were never actually added in an earlier
+ * pass — that method was calling accountingFacade, AR_ACCOUNT_CODE,
+ * REVENUE_ACCOUNT_CODE, and findAccountByCode(), none of which existed
+ * anywhere in this file. This was a live compile error until now, not
+ * a design gap.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -35,23 +49,18 @@ public class PropertyService {
     private final LeasePaymentRepository paymentRepository;
     private final InspectionRepository   inspectionRepository;
     private final EmailService           emailService;
+    // FIX: backlog 1.6 — was referenced by postRentalRevenueJournal()
+    // but never actually declared. Direct call, no event indirection —
+    // confirmed no circular dependency between property and accounting.
+    private final AccountingFacade       accountingFacade;
+
+    private static final String AR_ACCOUNT_CODE      = "1100";
+    private static final String REVENUE_ACCOUNT_CODE = "4000";
 
     // ── Properties ────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public Page<PropertyResponse> getProperties(TenantId tenantId, Pageable pageable) {
-        // FIX: was `.map(p -> toPropertyResponse(p, List.of()))` — a
-        // hardcoded empty list for every single property, meaning
-        // totalUnits/vacantUnits/occupiedUnits were always 0 for every
-        // property in the list view (and the Dashboard, which reads the
-        // same endpoint), regardless of how many units actually existed.
-        // Confirmed against a real tenant with active leases and a real
-        // rent roll still showing "0/0 units" on every card.
-        //
-        // One count query for the whole page (not per-property — see
-        // PropertyRepository.countUnitsByProperty's own comment for why
-        // this isn't a JOIN FETCH on the paginated query itself), merged
-        // into each response by property id.
         Map<UUID, long[]> countsByProperty = propertyRepository.countUnitsByProperty(tenantId).stream()
                 .collect(Collectors.toMap(
                         row -> (UUID) row[0],
@@ -96,7 +105,6 @@ public class PropertyService {
     public void deleteProperty(TenantId tenantId, UUID id) {
         Property property = propertyRepository.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Property", id.toString()));
-        // FIX: block deletion if property has active leases
         boolean hasActiveLease = property.getUnits().stream()
                 .anyMatch(u -> leaseRepository.findActiveLease(u.getId()).isPresent());
         if (hasActiveLease)
@@ -173,7 +181,6 @@ public class PropertyService {
         unit.occupy();
         unitRepository.save(unit);
 
-        // Send welcome email to lessee
         if (req.lesseeEmail() != null && !req.lesseeEmail().isBlank()) {
             emailService.send(
                     req.lesseeEmail(),
@@ -205,7 +212,6 @@ public class PropertyService {
             unitRepository.save(unit);
         });
 
-        // Notify lessee
         if (lease.getLesseeEmail() != null && !lease.getLesseeEmail().isBlank()) {
             emailService.send(
                     lease.getLesseeEmail(),
@@ -237,7 +243,6 @@ public class PropertyService {
         leaseRepository.findActiveById(tenantId, leaseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Lease", leaseId.toString()));
 
-        // Prevent duplicate records for the same period
         paymentRepository.findByPeriod(leaseId, req.periodYear(), req.periodMonth())
                 .ifPresent(existing -> {
                     throw new IllegalArgumentException(
@@ -247,6 +252,11 @@ public class PropertyService {
         LeasePayment payment = LeasePayment.create(tenantId, leaseId,
                 req.periodYear(), req.periodMonth(), req.amountDue(), req.dueDate());
         paymentRepository.save(payment);
+
+        // FIX: backlog 1.6 — was previously nothing here; rental revenue
+        // for this billing period never reached the general ledger.
+        postRentalRevenueJournal(tenantId, payment, req.amountDue());
+
         return toPaymentResponse(payment);
     }
 
@@ -262,9 +272,12 @@ public class PropertyService {
         payment.recordPayment(req.amountPaid(), req.paidDate(), req.paymentMethod(), req.reference());
         paymentRepository.save(payment);
 
+        // FIX: backlog 1.6 — was previously nothing here; a rent payment
+        // never reached the general ledger.
+        postRentPaymentJournal(tenantId, payment, req.amountPaid(), req.bankAccountId());
+
         log.info("Payment recorded lease={} amount={} status={}", leaseId, req.amountPaid(), payment.getStatus());
 
-        // Send receipt email on full payment
         if ("PAID".equals(payment.getStatus()) && lease.getLesseeEmail() != null) {
             emailService.send(
                     lease.getLesseeEmail(),
@@ -278,6 +291,53 @@ public class PropertyService {
         }
 
         return toPaymentResponse(payment);
+    }
+
+    /**
+     * FIX: backlog 1.6. Same "bankAccountId absent → log and skip,
+     * never guess" treatment already applied everywhere else this
+     * session.
+     */
+    private void postRentPaymentJournal(TenantId tenantId, LeasePayment payment,
+                                        BigDecimal amountPaid, UUID bankAccountId) {
+        try {
+            if (bankAccountId == null) {
+                log.warn("Rent payment recorded for payment={} tenant={} with no bankAccountId — " +
+                                "cannot post a directed payment journal without knowing which account received the funds.",
+                        payment.getId(), tenantId);
+                return;
+            }
+            Optional<UUID> bankGl = accountingFacade.resolveBankAccountGL(tenantId, bankAccountId);
+            if (bankGl.isEmpty()) {
+                log.warn("Bank account={} for tenant={} not found or not linked — payment={} not posted",
+                        bankAccountId, tenantId, payment.getId());
+                return;
+            }
+            UUID arAccountId = findAccountByCode(tenantId, AR_ACCOUNT_CODE);
+            if (arAccountId == null) {
+                log.warn("Chart of Accounts missing AR ({}) for tenant={} — payment not posted", AR_ACCOUNT_CODE, tenantId);
+                return;
+            }
+
+            List<CreateJournalEntryRequest.JournalLineRequest> lines = List.of(
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            bankGl.get(), "Rent received " + payment.getPeriodMonth() + "/" + payment.getPeriodYear(),
+                            amountPaid, null),
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            arAccountId, "Rent received " + payment.getPeriodMonth() + "/" + payment.getPeriodYear(),
+                            null, amountPaid));
+
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(
+                    LocalDate.now(), "Rent payment received: payment " + payment.getId(),
+                    payment.getId().toString(), "PAYMENT", lines);
+
+            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
+            accountingFacade.postJournalEntry(tenantId, created.id());
+            log.info("Posted rent payment journal for payment={} tenant={}", payment.getId(), tenantId);
+        } catch (Exception e) {
+            log.error("Failed to post rent payment journal for payment={} tenant={}: {}",
+                    payment.getId(), tenantId, e.getMessage(), e);
+        }
     }
 
     // ── Inspections ───────────────────────────────────────────────────────────
@@ -341,7 +401,6 @@ public class PropertyService {
             if (!unit.isOccupied()) { unit.occupy(); unitRepository.save(unit); }
         });
 
-        // Notify lessee of renewal
         if (lease.getLesseeEmail() != null) {
             emailService.send(
                     lease.getLesseeEmail(),
@@ -378,7 +437,6 @@ public class PropertyService {
 
         leaseRepository.save(lease);
 
-        // Notify lessee of rent escalation
         if (lease.getLesseeEmail() != null) {
             emailService.send(
                     lease.getLesseeEmail(),
@@ -393,6 +451,61 @@ public class PropertyService {
         return toLeaseResponse(lease);
     }
 
+    // ── GL posting helpers ───────────────────────────────────────────────────
+
+    /**
+     * FIX: backlog 1.6. See createPaymentRecord()'s own call-site
+     * comment for the full rationale. No VAT line — nothing in
+     * CreatePaymentRequest suggests rental income here carries VAT, and
+     * rental income is commonly VAT-exempt under South African law;
+     * fabricating a VAT split with no evidence would be a worse error
+     * than omitting it.
+     */
+    private void postRentalRevenueJournal(TenantId tenantId, LeasePayment payment, BigDecimal amountDue) {
+        try {
+            UUID arAccountId = findAccountByCode(tenantId, AR_ACCOUNT_CODE);
+            UUID revenueAccountId = findAccountByCode(tenantId, REVENUE_ACCOUNT_CODE);
+            if (arAccountId == null || revenueAccountId == null) {
+                log.warn("Chart of Accounts missing account {} or {} for tenant={} — payment record={} revenue not posted",
+                        AR_ACCOUNT_CODE, REVENUE_ACCOUNT_CODE, tenantId, payment.getId());
+                return;
+            }
+
+            List<CreateJournalEntryRequest.JournalLineRequest> lines = List.of(
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            arAccountId, "Rent due " + payment.getPeriodMonth() + "/" + payment.getPeriodYear(),
+                            amountDue, null),
+                    new CreateJournalEntryRequest.JournalLineRequest(
+                            revenueAccountId, "Rental income " + payment.getPeriodMonth() + "/" + payment.getPeriodYear(),
+                            null, amountDue));
+
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(
+                    LocalDate.now(), "Rent due: " + payment.getPeriodMonth() + "/" + payment.getPeriodYear(),
+                    payment.getId().toString(), "MANUAL", lines);
+
+            JournalEntryResponse created = accountingFacade.createJournalEntry(tenantId, req);
+            accountingFacade.postJournalEntry(tenantId, created.id());
+            log.info("Posted rental revenue journal for payment={} tenant={}", payment.getId(), tenantId);
+        } catch (Exception e) {
+            log.error("Failed to post rental revenue journal for payment={} tenant={}: {}",
+                    payment.getId(), tenantId, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * FIX: backlog 1.6 — was referenced by postRentalRevenueJournal()
+     * (already present from an earlier pass) but never actually
+     * defined anywhere in this file — a live "cannot resolve method"
+     * compile error until this was added.
+     */
+    private UUID findAccountByCode(TenantId tenantId, String code) {
+        return accountingFacade.getAccounts(tenantId).stream()
+                .filter(a -> code.equals(a.accountCode()))
+                .map(a -> a.id())
+                .findFirst()
+                .orElse(null);
+    }
+
     // ── Mappers ───────────────────────────────────────────────────────────────
 
     private PropertyResponse toPropertyResponse(Property p, List<UnitResponse> units) {
@@ -401,11 +514,6 @@ public class PropertyService {
         return toPropertyResponse(p, units, units.size(), vacant, occupied);
     }
 
-    // NEW: used by getProperties() (the list view) where the full units
-    // list isn't loaded (deliberately, to keep the paginated query cheap —
-    // see PropertyRepository.countUnitsByProperty), just the counts. The
-    // 2-arg overload above still computes counts from a real units list
-    // for getProperty()/createProperty(), which do have one.
     private PropertyResponse toPropertyResponse(Property p, List<UnitResponse> units,
                                                 long total, long vacant, long occupied) {
         return new PropertyResponse(p.getId(), p.getName(), p.getPropertyType(), p.getAddress(),
