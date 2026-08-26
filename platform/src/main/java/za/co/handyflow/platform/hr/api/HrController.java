@@ -294,6 +294,26 @@ public class HrController {
                 .body(pdf);
     }
 
+
+    @PostMapping("/employees/{id}/disciplinary/{disciplinaryId}/outcome")
+    @PreAuthorize("hasAnyAuthority('HR_MANAGE','USER_UPDATE')")
+    @Operation(summary = "Record the outcome of a disciplinary hearing — verbal/written/final warning or dismissal")
+    public ResponseEntity<ApiResponse<DisciplinaryResponse>> recordDisciplinaryOutcome(
+            @PathVariable UUID id,
+            @PathVariable UUID disciplinaryId,
+            @Valid @RequestBody RecordDisciplinaryOutcomeRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Outcome recorded",
+                hrService.recordDisciplinaryOutcome(TenantContext.getTenantIdAsObject(), id, disciplinaryId, req)));
+    }
+
+    @GetMapping("/org-chart")
+    @PreAuthorize("hasAnyAuthority('HR_READ','HR_MANAGE','USER_READ')")
+    @Operation(summary = "Flat list of active employees with manager links, for rendering an org chart client-side")
+    public ResponseEntity<ApiResponse<List<OrgChartNodeResponse>>> getOrgChart() {
+        return ResponseEntity.ok(ApiResponse.success(
+                hrService.getOrgChart(TenantContext.getTenantIdAsObject())));
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private UUID resolveUserId(Principal principal) {

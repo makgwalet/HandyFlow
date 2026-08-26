@@ -24,6 +24,17 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
+/**
+ * FIX: backlog 4.6 (Piece A) — two fixes in this pass.
+ * sendQuote() had a broken logCommunication() call referencing
+ * invoiceNumber/customerName, neither of which exist in this method's
+ * scope (those belong to convertToInvoice()) — a straightforward
+ * copy-paste that would not have compiled. Corrected to this method's
+ * own real variables (quote.getQuoteNumber(), clientName).
+ * convertToInvoice()'s own email block, the one call site I originally
+ * had fully confirmed, never actually had the call added at all —
+ * added now.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -154,6 +165,23 @@ public class QuoteService {
                             quote.getQuoteNumber() + ".pdf",
                             pdfBytes
                     );
+                    // FIX: backlog 4.6 (Piece A) — corrected: the previous
+                    // version of this call referenced invoiceNumber/
+                    // customerName, neither of which exist in this
+                    // method — those belong to convertToInvoice(), not
+                    // sendQuote(). Uses this method's own real variables.
+                    // Logs this outbound quote email onto the customer's
+                    // communication log automatically, same log
+                    // CustomerCommunicationService already backs for
+                    // manual entries. Only when quote.getCustomerId() is
+                    // real — a walk-in quote's client email has nothing
+                    // to log against.
+                    if (quote.getCustomerId() != null) {
+                        crmFacade.logCommunication(tenantId, quote.getCustomerId(),
+                                "EMAIL", "OUTBOUND",
+                                "Quote " + quote.getQuoteNumber() + " emailed to " + clientName,
+                                java.time.Instant.now(), UserContext.getCurrentUserId());
+                    }
                 });
             } else {
                 log.warn("Quote={} marked SENT but no client email on file — PDF not emailed", quoteId);
@@ -267,6 +295,22 @@ public class QuoteService {
                             invoiceNumber + ".pdf",
                             pdfBytes
                     );
+
+                    // FIX: backlog 4.6 (Piece A) — was never actually
+                    // added here (only a broken copy ended up in
+                    // sendQuote() instead, now fixed separately). Logs
+                    // this outbound invoice email onto the customer's
+                    // communication log automatically, same log
+                    // CustomerCommunicationService already backs for
+                    // manual entries. Only when quote.getCustomerId() is
+                    // real — a walk-in quote's client email has nothing
+                    // to log against.
+                    if (quote.getCustomerId() != null) {
+                        crmFacade.logCommunication(tenantId, quote.getCustomerId(),
+                                "EMAIL", "OUTBOUND",
+                                "Invoice " + invoiceNumber + " emailed to " + customerName,
+                                java.time.Instant.now(), UserContext.getCurrentUserId());
+                    }
                 });
             } else {
                 log.warn("Invoice={} converted from quote={} but no client email on file — PDF not emailed",

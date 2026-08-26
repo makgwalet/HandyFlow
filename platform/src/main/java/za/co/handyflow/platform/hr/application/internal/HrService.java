@@ -242,6 +242,31 @@ public class HrService {
         return toLeaveResponse(req, tenantId);
     }
 
+    @Transactional
+    public DisciplinaryResponse recordDisciplinaryOutcome(TenantId tenantId, UUID employeeId,
+                                                          UUID disciplinaryId,
+                                                          RecordDisciplinaryOutcomeRequest req) {
+        findActive(tenantId, employeeId); // ownership check, same pattern as getDisciplinary()
+        HrDisciplinary d = disciplinaryRepo.findById(disciplinaryId)
+                .filter(x -> x.getEmployeeId().equals(employeeId) && tenantId.getValue().equals(x.getTenantId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Disciplinary", disciplinaryId.toString()));
+
+        d.setOutcome(req.outcome(), req.hearingDate() != null ? req.hearingDate() : d.getHearingDate());
+        disciplinaryRepo.save(d);
+        log.info("Disciplinary outcome={} recorded for disciplinary={} employee={}",
+                req.outcome(), disciplinaryId, employeeId);
+        return toDisciplinaryResponse(d, tenantId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrgChartNodeResponse> getOrgChart(TenantId tenantId) {
+        return employeeRepo.findAllActive(tenantId, null, null, Pageable.unpaged())
+                .getContent().stream()
+                .map(e -> new OrgChartNodeResponse(
+                        e.getId(), e.getFullName(), e.getJobTitle(), e.getDepartment(), e.getManagerId()))
+                .toList();
+    }
+
     // ── Disciplinary ──────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)

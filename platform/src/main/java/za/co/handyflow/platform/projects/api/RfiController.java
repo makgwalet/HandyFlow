@@ -6,13 +6,21 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import za.co.handyflow.platform.projects.application.internal.RfiService;
 import za.co.handyflow.platform.projects.dto.CreateRfiRequest;
 import za.co.handyflow.platform.projects.dto.RespondRfiRequest;
 import za.co.handyflow.platform.shared.ApiResponse;
+import za.co.handyflow.platform.shared.TenantContext;
 
 import java.util.UUID;
 
+/**
+ * FIX: backlog 6.3 — three new endpoints (attach/list evidence, link a
+ * Change Order). Every existing endpoint below needed zero code changes
+ * for the RfiResponse DTO switch — they were already declared as
+ * ResponseEntity<?> and simply wrap whatever RfiService now returns.
+ */
 @RestController
 @RequestMapping("/api/v1/projects")
 @RequiredArgsConstructor
@@ -69,5 +77,42 @@ public class RfiController {
     public ResponseEntity<?> cancel(@PathVariable UUID rfiId,
                                     @RequestParam(required = false) String reason) {
         return ResponseEntity.ok(ApiResponse.success("RFI cancelled", rfiService.cancel(rfiId, reason)));
+    }
+
+    /**
+     * FIX: backlog 6.3 — links this RFI to the Change Order its answer
+     * resulted in. changeOrderId is a request param, not a path segment
+     * — this reads as an action on the RFI ("link it to X"), matching
+     * the same shape as every other action endpoint in this controller,
+     * rather than a nested-resource URL.
+     */
+    @PostMapping("/rfis/{rfiId}/link-change-order")
+    @PreAuthorize("hasAuthority('PM_WRITE')")
+    public ResponseEntity<?> linkChangeOrder(@PathVariable UUID rfiId,
+                                             @RequestParam UUID changeOrderId) {
+        return ResponseEntity.ok(ApiResponse.success("RFI linked to change order",
+                rfiService.linkChangeOrder(rfiId, changeOrderId)));
+    }
+
+    // ── Evidence attachments ─────────────────────────────────────────────────
+
+    /**
+     * FIX: backlog 6.3 — same multipart upload pattern already proven
+     * for Payroll Bureau's logo attachments and Recruitment Agency's CV
+     * uploads.
+     */
+    @PostMapping(value = "/rfis/{rfiId}/attachments", consumes = "multipart/form-data")
+    @PreAuthorize("hasAuthority('PM_WRITE')")
+    public ResponseEntity<?> attachEvidence(@PathVariable UUID rfiId,
+                                            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.status(201).body(ApiResponse.success("Attachment uploaded",
+                rfiService.attachEvidence(rfiId, file,
+                        TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
+    }
+
+    @GetMapping("/rfis/{rfiId}/attachments")
+    @PreAuthorize("hasAuthority('PM_READ')")
+    public ResponseEntity<?> getAttachments(@PathVariable UUID rfiId) {
+        return ResponseEntity.ok(ApiResponse.success(rfiService.getAttachments(rfiId)));
     }
 }

@@ -422,20 +422,14 @@ public class ClinicBillingService {
     private static final ZoneId SAST = ZoneId.of("Africa/Johannesburg");
 
     @Transactional
-    public PaymentResponse recordPayment(TenantId tenantId, RecordPaymentRequest req) {
+    public PaymentResponse recordPayment(TenantId tenantId, RecordPaymentRequest req, UUID recordedBy) {
         ClinicPayment payment = ClinicPayment.record(
                 tenantId, null, req.patientId(), req.method(), req.amount(),
-                req.reference(), req.notes(), null /* recordedBy — see note below */);
+                req.reference(), req.notes(), recordedBy);
         paymentRepo.save(payment);
         log.info("Recorded payment patient={} amount={} method={}",
                 req.patientId(), req.amount(), payment.getPaymentMethod());
 
-        // FIX: backlog 1.6 — was previously nothing here; a patient
-        // payment never reached the general ledger. bankAccountId is
-        // nullable (RecordPaymentRequest's new field; existing frontend
-        // flows won't populate it immediately) — postPaymentJournal()
-        // handles that case explicitly (logs clearly, does not post,
-        // does not guess a default account).
         postPaymentJournal(tenantId, payment, req.bankAccountId());
 
         String patientName = patientRepo.findActiveById(tenantId, req.patientId())
@@ -443,11 +437,6 @@ public class ClinicBillingService {
         return new PaymentResponse(payment.getId(), payment.getPatientId(), patientName,
                 payment.getPaymentMethod(), payment.getAmount(), payment.getReference(),
                 payment.getRecordedAt(), payment.getNotes());
-        // NOTE: recordedBy (FK to users.id) is left null — resolving the
-        // authenticated user's UUID would need a UserRepository/lookup this
-        // service doesn't have visibility into. The column is nullable, so
-        // this is a valid (if incomplete) write, not a broken one; if you
-        // want "recorded by" attribution, that's the one piece still open.
     }
 
     /**

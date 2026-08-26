@@ -1,6 +1,7 @@
 package za.co.handyflow.platform.crm.application.internal;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.crm.CrmFacade;
@@ -51,12 +52,14 @@ import java.util.UUID;
  *   implementation. Worth a direct check against the real files.
  * ═══════════════════════════════════════════════════════════════════════
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 class CrmFacadeImpl implements CrmFacade {
 
     private final CustomerRepository customerRepository;
     private final CustomerConsentRepository customerConsentRepository;
+    private final za.co.handyflow.platform.crm.domain.repository.CustomerCommunicationRepository communicationRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -138,6 +141,29 @@ class CrmFacadeImpl implements CrmFacade {
                     customer.recordInvoiceLinked(invoiceId, triggeredBy);
                     customerRepository.save(customer);
                 });
+    }
+
+    /**
+     * FIX: backlog 4.6 (Piece A). See CrmFacade's own Javadoc for the
+     * full rationale. Silently skips (logs a warning, doesn't throw) if
+     * the customer isn't found — a walk-in/no-customer-record quote or
+     * invoice has nothing to log against, and that's a normal case, not
+     * an error condition.
+     */
+    @Override
+    @Transactional
+    public void logCommunication(TenantId tenantId, UUID customerId, String type, String direction,
+                                 String summary, java.time.Instant occurredAt, UUID triggeredBy) {
+        if (!customerRepository.existsActiveById(tenantId, customerId)) {
+            log.warn("logCommunication: customer={} not found/active for tenant={} — skipping", customerId, tenantId);
+            return;
+        }
+        var communication = za.co.handyflow.platform.crm.domain.model.CustomerCommunication.create(
+                tenantId, customerId,
+                za.co.handyflow.platform.crm.domain.model.CustomerCommunication.Type.valueOf(type),
+                za.co.handyflow.platform.crm.domain.model.CustomerCommunication.Direction.valueOf(direction),
+                summary, occurredAt, triggeredBy);
+        communicationRepository.save(communication);
     }
 
     /**

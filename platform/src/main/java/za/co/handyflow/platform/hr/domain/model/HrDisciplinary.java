@@ -52,8 +52,19 @@ public class HrDisciplinary {
         this.updatedAt      = Instant.now();
     }
 
-    public void setOutcome(String outcome, LocalDate hearingDate) {
-        this.outcome     = outcome;
+    /**
+     * FIX: backlog 3.5 — was setOutcome(String outcome, LocalDate
+     * hearingDate), meaning the disciplinary process's single most
+     * consequential field (what actually happened at the hearing) was
+     * completely unconstrained free text, with no real endpoint ever
+     * calling it with a non-null value at all — see HrService's own
+     * new recordDisciplinaryOutcome() for the genuinely new "record
+     * what the hearing decided" step this unlocks. Stores the enum's
+     * name() into the existing outcome column — no schema change
+     * needed, the column was always a plain string.
+     */
+    public void setOutcome(DisciplinaryOutcome outcome, LocalDate hearingDate) {
+        this.outcome     = outcome != null ? outcome.name() : null;
         this.hearingDate = hearingDate;
         this.updatedAt   = Instant.now();
     }

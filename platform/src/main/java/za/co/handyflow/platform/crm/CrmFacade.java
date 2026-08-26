@@ -49,6 +49,27 @@ public interface CrmFacade {
     void notifyBookingLinked(TenantId tenantId, UUID customerId, UUID bookingId, UUID triggeredBy);
 
     /**
+     * FIX: backlog 4.6 (Piece A) — records an automatic communication
+     * (e.g. a quote or invoice email HandyFlow itself sent) on the
+     * customer's communication log — the same log
+     * CustomerCommunicationService already backs for manual entries,
+     * now also reachable from other modules. type/direction are plain
+     * Strings, not CustomerCommunication's own Type/Direction enums —
+     * this facade's own class doc already states domain objects can't
+     * cross module boundaries; CrmFacadeImpl converts internally.
+     * Valid type values: CALL, EMAIL, MEETING, WHATSAPP, SMS, OTHER.
+     * Valid direction values: INBOUND, OUTBOUND.
+     * <p>
+     * Best-effort by design — implementations should not let a logging
+     * failure propagate as an exception the caller has to handle
+     * specially; callers already wrap their own outbound-email blocks
+     * in try/catch for exactly this "don't let a side-effect failure
+     * look like the real action failed" reason.
+     */
+    void logCommunication(TenantId tenantId, UUID customerId, String type, String direction,
+                          String summary, java.time.Instant occurredAt, UUID triggeredBy);
+
+    /**
      * Notify CRM that an invoice was raised for this customer.
      * CRM records this on the customer's activity timeline.
      */

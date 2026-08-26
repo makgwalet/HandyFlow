@@ -77,6 +77,14 @@ public class ProjectRfi {
     @Column(name = "cancellation_reason", columnDefinition = "TEXT")
     private String cancellationReason;
 
+    // FIX: backlog 6.3 — nullable link to a Change Order this RFI's
+    // answer resulted in. No FK constraint added deliberately — same
+    // "loose reference, resolved by the service layer" convention this
+    // module already uses for cross-entity links, not something new
+    // introduced here.
+    @Column(name = "change_order_id")
+    private UUID changeOrderId;
+
     // ── Timestamps ────────────────────────────────────────────────────────────
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -115,5 +123,40 @@ public class ProjectRfi {
         this.status               = "CANCELLED";
         this.cancelledAt          = LocalDateTime.now();
         this.cancellationReason   = reason;
+    }
+
+    /**
+     * FIX: backlog 6.3 — links this RFI to the Change Order its answer
+     * resulted in. Deliberately allows re-linking (no "already linked"
+     * guard) — an RFI's answer might reasonably need correcting to a
+     * different Change Order if the wrong one was picked initially, and
+     * blocking that would just push people to edit the database
+     * directly instead.
+     */
+    public void linkChangeOrder(UUID changeOrderId) {
+        this.changeOrderId = changeOrderId;
+    }
+
+    /**
+     * FIX: backlog 6.3 — same "isOverdue()" convention already
+     * established on ApBill. An RFI stops being meaningfully "overdue"
+     * once it's actually been answered (RESPONDED/CLOSED) or is no
+     * longer live (CANCELLED) — even if the closing/filing paperwork
+     * hasn't caught up yet, the thing a due date is meant to track (a
+     * timely answer) has already happened.
+     */
+    public boolean isOverdue() {
+        return dueDate != null && LocalDate.now().isAfter(dueDate)
+                && ("DRAFT".equals(status) || "SUBMITTED".equals(status));
+    }
+
+    /**
+     * FIX: backlog 6.3. Negative once overdue, matching ApBill.
+     * daysUntilDue()'s own sign convention — callers already familiar
+     * with that pattern get the same meaning here for free.
+     */
+    public int daysUntilDue() {
+        if (dueDate == null) return 0;
+        return (int) java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), dueDate);
     }
 }

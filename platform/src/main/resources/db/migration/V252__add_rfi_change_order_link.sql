@@ -1,0 +1,12 @@
+-- FIX: backlog 6.3 — RFI workflow refinement. Nullable: most RFIs never
+-- result in a scope change, so most rows stay null. Populated only when
+-- an RFI's answer leads to a real Change Order being raised, giving a
+-- traceable link between "what was asked" and "what it changed" —
+-- previously these lived in the same module with no connection at all.
+--
+-- NUMBERING NOTE: confirmed against the real schema — the last
+-- successful build reported "Current version of schema 'public': 250"
+-- before V251 (ap_bills.rejection_reason) was applied, so this is
+-- genuinely V252, not a placeholder. Still worth a quick check that
+-- nothing else landed in between before running this.
+ALTER TABLE project_rfis ADD COLUMN change_order_id UUID;

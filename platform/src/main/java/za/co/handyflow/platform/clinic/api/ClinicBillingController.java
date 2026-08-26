@@ -199,7 +199,8 @@ public class ClinicBillingController {
     public ResponseEntity<ApiResponse<PaymentResponse>> recordPayment(
             @jakarta.validation.Valid @RequestBody RecordPaymentRequest req) {
         return ResponseEntity.status(201).body(ApiResponse.success("Payment recorded",
-                billingService.recordPayment(TenantContext.getTenantIdAsObject(), req)));
+                billingService.recordPayment(TenantContext.getTenantIdAsObject(), req,
+                        TenantContext.getCurrentUserId())));
     }
 
     @GetMapping("/payments")
