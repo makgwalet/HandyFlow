@@ -43,19 +43,12 @@ class ApApprovalEventHandler {
             if ("APPROVED".equals(event.outcome())) {
                 apService.completeApprovalAndPostJournal(event.tenantId(), event.entityId());
                 log.info("[AP] Bill={} tenant={} approval completed via engine listener", event.entityId(), event.tenantId());
-            } else if ("REJECTED".equals(event.outcome())) {
-                // KNOWN GAP, not silently ignored: ApBill has no REJECTED
-                // status/transition anywhere in its confirmed real state
-                // machine (DRAFT/SECOND_APPROVAL/APPROVED/OVERDUE/PAID/
-                // CANCELLED only — confirmed directly against the full
-                // ApService.java this session). Inventing a new status
-                // transition for a financial document without a real
-                // design for it would be guessing at exactly the kind of
-                // thing this session's own discipline says not to guess
-                // at. Logging clearly for manual follow-up instead.
-                log.warn("[AP] Bill={} tenant={} was REJECTED via the approval engine — " +
-                        "ApBill has no REJECTED status/transition to apply here yet; " +
-                        "needs manual follow-up until that's designed", event.entityId(), event.tenantId());
+            }  else if ("REJECTED".equals(event.outcome())) {
+                // FIX: backlog 1.1b — real rejection handling, now that
+                // ApBill has a genuine REJECTED status. Delegates to
+                // ApService's own idempotent public method rather than
+                // duplicating the reject-and-save logic here.
+                apService.rejectBillFromEngine(event.tenantId(), event.entityId());
             }
         } catch (Exception e) {
             log.error("[AP] Failed to process approval completion for bill={} tenant={}: {}",

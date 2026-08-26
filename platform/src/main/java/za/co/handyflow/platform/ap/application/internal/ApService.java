@@ -15,10 +15,6 @@ import za.co.handyflow.platform.ap.domain.model.*;
 import za.co.handyflow.platform.ap.domain.repository.*;
 import za.co.handyflow.platform.ap.dto.*;
 import za.co.handyflow.platform.shared.*;
-// Same shared notification infra used by the recruiter module —
-// NotificationService/TenantAdminRecipients live outside AP's ownership
-// but are explicitly documented as the single cross-module entry point
-// every module uses (see NotificationService's own class Javadoc).
 import za.co.handyflow.platform.notifications.application.NotificationRequest;
 import za.co.handyflow.platform.notifications.application.Recipient;
 import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
@@ -27,7 +23,6 @@ import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.accounting.application.AccountingFacade;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
-// FIX: backlog 1.1 — AP's migration onto the shared approval engine.
 import za.co.handyflow.platform.approvals.application.ApprovalFacade;
 import za.co.handyflow.platform.approvals.dto.ApprovalRequestResponse;
 import za.co.handyflow.platform.approvals.dto.ApprovalStepResponse;
@@ -37,6 +32,16 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
+/**
+ * FIX: backlog 1.1b — approveBill() is now resubmission-aware. Your
+ * confirmed decisions: a real REJECTED status distinct from CANCELLED,
+ * and the same bill is editable and resubmittable, not terminal. Uses
+ * ApprovalFacade.resubmit() (widened this session to accept REJECTED,
+ * not just RETURNED_FOR_CORRECTION) so the new ApprovalRequest stays
+ * linked to the rejected one via resubmittedFromId — a real audit
+ * trail, not a disconnected fresh history for a bill that's genuinely
+ * been through this before.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -138,24 +143,23 @@ public class ApService {
         log.info("Created AP bill={} supplier={} amount={}", bill.getId(),
                 req.supplierName(), req.amount());
 
-        // NOT changed by the approvals-engine migration: a bill isn't
-        // "submitted for approval" at creation time — it just sits in
-        // DRAFT until someone actually calls approveBill(), which is
-        // where submission-to-the-engine now happens (on that method's
-        // first call for this bill). See approveBill()'s own comment for
-        // why. This notification is unrelated to that — it's just "hey,
-        // a new bill exists, go look at it" and stays exactly as it was.
         notifyBillPendingApproval(tenantId, bill);
 
         return toBillResponse(bill, duplicateWarning);
     }
 
+    /**
+     * FIX: backlog 1.1b — guard widened to also allow REJECTED, not just
+     * DRAFT. A rejected bill needs to be editable so it can actually be
+     * corrected before resubmission — see approveBill()'s own comment
+     * for the full resubmission flow this unlocks.
+     */
     @Transactional
     public BillResponse updateBill(TenantId tenantId, UUID id, UpdateBillRequest req) {
         ApBill bill = findBill(tenantId, id);
-        if (!"DRAFT".equals(bill.getStatus())) {
-            throw new HandyFlowException("Only DRAFT bills can be edited",
-                    HttpStatus.BAD_REQUEST, "BILL_NOT_DRAFT");
+        if (!"DRAFT".equals(bill.getStatus()) && !"REJECTED".equals(bill.getStatus())) {
+            throw new HandyFlowException("Only DRAFT or REJECTED bills can be edited",
+                    HttpStatus.BAD_REQUEST, "BILL_NOT_EDITABLE");
         }
         // Use reflection-free approach via JPQL update or direct field access
         // Since domain model has no setters, use a new create pattern isn't ideal
@@ -187,16 +191,14 @@ public class ApService {
     }
 
     /**
-     * FIX: backlog 1.1 — migrated onto the shared approval engine. The
-     * threshold check, the SEQUENTIAL two-step dance, and the "must be a
-     * different person" rule all used to be hardcoded here; they're now
-     * data (ApprovalRule, seeded as AP's platform default by the
-     * approvals engine's own migration) evaluated by
-     * ApprovalEngineService instead. This method's own job shrinks to:
-     * submit-on-first-call (AP has no separate "submit for approval"
-     * step distinct from "the act of approving" — a bill just sits in
-     * DRAFT until someone calls this), act on whichever step is
-     * currently open, and react to the outcome.
+     * FIX: backlog 1.1 — migrated onto the shared approval engine.
+     * FIX: backlog 1.1b — now resubmission-aware. If this bill is
+     * currently REJECTED and has a prior REJECTED approval request on
+     * file, this call is treated as a genuine resubmission (the bill has
+     * been edited via updateBill() and is being sent back through
+     * approval) rather than a fresh first approval — resets the bill to
+     * DRAFT and calls resubmit() instead of submit(), keeping the new
+     * ApprovalRequest linked to the rejected one via resubmittedFromId.
      * <p>
      * completeApprovalAndPostJournal() is called directly here (not left
      * purely to ApApprovalEventHandler's async listener) so the HTTP
@@ -216,7 +218,21 @@ public class ApService {
         var existing = approvalFacade.getLatestRequestForEntity(tenantId, "ap", "BILL", id);
         ApprovalRequestResponse approvalResult;
 
-        if (existing.isPresent() && isOpen(existing.get())) {
+        if ("REJECTED".equals(bill.getStatus()) && existing.isPresent()
+                && "REJECTED".equals(existing.get().status())) {
+            // FIX: backlog 1.1b — resubmission of a previously rejected,
+            // now-edited bill. See this method's own class-level comment.
+            bill.backToDraftForResubmission();
+            billRepo.save(bill);
+            approvalResult = approvalFacade.resubmit(tenantId, existing.get().id(), approvedBy,
+                    Map.of("totalAmount", bill.getTotalAmount()));
+            if (isOpen(approvalResult)) {
+                ApprovalStepResponse firstStep = firstPendingStep(approvalResult)
+                        .orElseThrow(() -> new IllegalStateException("A freshly-resubmitted request has no pending step"));
+                approvalResult = approvalFacade.actOnStep(tenantId, firstStep.id(), approvedBy,
+                        currentUserAuthorities(), "APPROVE", null, null);
+            }
+        } else if (existing.isPresent() && isOpen(existing.get())) {
             ApprovalStepResponse pendingStep = firstPendingStep(existing.get())
                     .orElseThrow(() -> new HandyFlowException(
                             "This bill's approval request has no pending step — data inconsistency, needs manual review",
@@ -242,38 +258,17 @@ public class ApService {
         if ("APPROVED".equals(approvalResult.status())) {
             completeApprovalAndPostJournal(tenantId, id);
         } else if ("REJECTED".equals(approvalResult.status())) {
-            // KNOWN GAP: ApBill has no REJECTED status/transition anywhere
-            // in its real state machine (DRAFT/SECOND_APPROVAL/APPROVED/
-            // OVERDUE/PAID/CANCELLED only) — there was never a "reject a
-            // bill" concept before this migration, only cancelBill() as a
-            // separate, unrelated action. Rather than invent a status
-            // transition ApBill's own domain model doesn't have, this is
-            // logged for manual follow-up. In practice this path is
-            // unreachable from THIS method today (nothing here ever
-            // passes "REJECT" as the decision) — it would only trigger if
-            // someone rejected via the generic engine endpoint instead,
-            // which AP's own UI doesn't currently expose a path to.
-            log.warn("Bill={} tenant={} was REJECTED via the approval engine — " +
-                    "ApBill has no REJECTED status to apply; needs manual follow-up", id, tenantId);
+            // FIX: backlog 1.1b — real rejection handling. Reloads the
+            // bill since the resubmission branch above may already have
+            // mutated it (backToDraftForResubmission()) earlier in this
+            // same call.
+            ApBill freshBill = findBill(tenantId, id);
+            freshBill.reject(findRejectionReason(tenantId, id));
+            billRepo.save(freshBill);
+            log.info("Bill={} tenant={} rejected via approval engine", id, tenantId);
         } else {
             // Still IN_PROGRESS — first approval recorded, further
             // approval(s) still pending per this bill's approval rule.
-            //
-            // FIX: restores what the OLD approveBill() did via
-            // bill.requestSecondApproval(approvedBy) — the status
-            // transition out of DRAFT, and firstApprovedBy/firstApprovedAt.
-            // This was silently dropped in the first pass of this
-            // migration and had two real consequences, not just one:
-            // (1) BillResponse.firstApprovedBy/firstApprovedAt — the
-            //     frontend's own comment says these exist to "disable the
-            //     Approve button for whoever already gave the first
-            //     approval" — would have gone permanently null.
-            // (2) updateBill()'s edit guard checks
-            //     "DRAFT".equals(bill.getStatus()) — a bill stuck in
-            //     DRAFT the whole time an approval is in flight would
-            //     still have been editable, letting someone change the
-            //     amount after the first approval already fired against
-            //     the old figure. A real correctness gap, not just a UI one.
             //
             // requestSecondApproval()'s own guard only accepts DRAFT/
             // OVERDUE as the prior state, so this only fires on the FIRST
@@ -324,6 +319,37 @@ public class ApService {
         bill.approve(journalId);
         billRepo.save(bill);
         log.info("Approved bill={} journal={}", billId, journalId);
+    }
+
+    /**
+     * FIX: backlog 1.1b — public wrapper for ApApprovalEventHandler,
+     * same idempotency reasoning as completeApprovalAndPostJournal():
+     * safe to call even if approveBill()'s own REJECTED branch already
+     * handled it directly (the HTTP-caller path runs first and commits
+     * before the async listener fires).
+     */
+    @Transactional
+    public void rejectBillFromEngine(TenantId tenantId, UUID billId) {
+        ApBill bill = findBill(tenantId, billId);
+        if ("REJECTED".equals(bill.getStatus())) return; // already handled by the other call path
+        bill.reject(findRejectionReason(tenantId, billId));
+        billRepo.save(bill);
+        log.info("[AP] Bill={} tenant={} rejected via engine listener", billId, tenantId);
+    }
+
+    /**
+     * FIX: backlog 1.1b. ApprovalCompletedEvent only carries the outcome
+     * string, not the rejecting approver's own comment — that lives on
+     * the individual ApprovalStep. Looks up the request's steps and
+     * finds whichever one was actually REJECTED to recover it.
+     */
+    private String findRejectionReason(TenantId tenantId, UUID billId) {
+        return approvalFacade.getLatestRequestForEntity(tenantId, "ap", "BILL", billId)
+                .flatMap(r -> r.steps().stream()
+                        .filter(s -> "REJECTED".equals(s.status()))
+                        .findFirst())
+                .map(ApprovalStepResponse::comment)
+                .orElse(null);
     }
 
     private boolean isOpen(ApprovalRequestResponse r) {
@@ -590,14 +616,6 @@ public class ApService {
 
         for (ApBatchItem item : items) {
             billRepo.findByIdAndTenantId(item.getBillId(), tenantId).ifPresent(bill -> {
-                // FIXED: was fetchSupplierBanking(bill.getSupplierId()) —
-                // supplierId is essentially never populated across this
-                // whole system (every bill checked this session has it
-                // null), so that call always hit its own null-guard and
-                // NEVER actually reached the buggy customers-table query
-                // beneath it. Now looks up the real ap_supplier_banking
-                // table by supplier NAME instead — matching the same
-                // pattern generateSupplierStatement() already uses.
                 String[] banking = fetchSupplierBanking(tenantId, bill.getSupplierName());
                 csv.append(escapeCsv(bill.getSupplierName())).append(",")
                         .append(escapeCsv(banking[0])).append(",")   // account number
@@ -707,21 +725,6 @@ public class ApService {
                 .orElseThrow(() -> new ResourceNotFoundException("EFT Batch", id.toString()));
     }
 
-    // FIXED, all four items from the original audit: entry numbering now
-    // comes from the real JournalNumberGenerator (via AccountingFacade ->
-    // AccountingService.createJournalEntry(), not System.currentTimeMillis()
-    // and not the custom ap_journal_number_counters table built earlier
-    // this session — that table is now dead code, see note below); this
-    // routes through AccountingFacade instead of raw JDBC, so it gets
-    // real validation (balance check, minimum lines, positive amounts)
-    // for free instead of reimplementing it; VAT is split onto its own
-    // line against the VAT Input account; and missing/unseeded accounts
-    // throw a clear, specific error instead of silently returning null.
-    // Journal entries are created as DRAFT then immediately posted in the
-    // same call — still no human review step between the two, since
-    // nothing in this session's scope asked for one, but at least both
-    // steps now go through AccountingService's real DRAFT->POSTED
-    // lifecycle instead of an INSERT hardcoded straight to 'POSTED'.
     private UUID postApprovalJournal(TenantId tenantId, ApBill bill, String expenseCode) {
         UUID expenseAccountId = findAccountByCode(tenantId, expenseCode);
         if (expenseAccountId == null) {
@@ -750,20 +753,14 @@ public class ApService {
         }
 
         List<CreateJournalEntryRequest.JournalLineRequest> lines = new ArrayList<>();
-        // Debit expense account — VAT-EXCLUSIVE amount only, so the VAT
-        // portion shows up separately as claimable Input VAT rather than
-        // being buried inside the expense line.
         lines.add(new CreateJournalEntryRequest.JournalLineRequest(
                 expenseAccountId, bill.getCategory() + " expense — " + bill.getSupplierName(),
                 bill.getAmount(), null));
-        // Debit VAT Input (Claimable) — only when the bill actually has VAT.
         if (hasVat) {
             lines.add(new CreateJournalEntryRequest.JournalLineRequest(
                     vatAccountId, "VAT input — " + bill.getSupplierName(),
                     bill.getVatAmount(), null));
         }
-        // Credit AP — full total (amount + VAT). Journal stays balanced:
-        // expense + VAT (debits) == AP (credit) == totalAmount.
         lines.add(new CreateJournalEntryRequest.JournalLineRequest(
                 apAccountId, "Accounts payable — " + bill.getSupplierName(),
                 null, bill.getTotalAmount()));
@@ -778,13 +775,6 @@ public class ApService {
         return posted.id();
     }
 
-    // Same fixes as postApprovalJournal() above, applied to payments. A
-    // payment now REQUIRES a resolvable bank account — per explicit
-    // decision earlier this session, since silently skipping the credit
-    // line when bankAccountGL couldn't be resolved used to leave a
-    // debit-only, UNBALANCED journal posted with nothing catching it.
-    // AccountingService.createJournalEntry()'s own balance check is a
-    // second, independent line of defense against that now too.
     private UUID postPaymentJournal(TenantId tenantId, ApBill bill,
                                     UUID bankAccountId, String ref) {
         if (bankAccountId == null) {
@@ -820,14 +810,6 @@ public class ApService {
         return posted.id();
     }
 
-    // nextJournalNumber() REMOVED — it's now genuinely dead code. Entry
-    // numbering happens inside AccountingService.createJournalEntry() via
-    // the real JournalNumberGenerator, so this custom per-tenant counter
-    // is no longer called from anywhere. The ap_journal_number_counters
-    // table (and its migration) are now unused — not dropped here, since
-    // dropping a table is a more consequential decision than adding one;
-    // left for you to remove deliberately if you want the cleanup.
-
     private UUID findAccountByCode(TenantId tenantId, String code) {
         try {
             return jdbc.queryForObject(
@@ -845,14 +827,6 @@ public class ApService {
         } catch (Exception e) { return null; }
     }
 
-    // FIXED — was querying `customers` (the CRM/AR table, i.e. people who
-    // owe THIS business money) by supplierId, which is essentially always
-    // null on a bill (an AP supplier, someone THIS business owes money
-    // to, was never linked to any real entity). That old query almost
-    // certainly never ran in practice — the null-guard above it caught
-    // every real call first. Now looks up the real ap_supplier_banking
-    // table by supplier NAME (case-insensitive), the only identifier
-    // that's actually populated consistently across this whole module.
     private String[] fetchSupplierBanking(TenantId tenantId, String supplierName) {
         if (supplierName == null || supplierName.isBlank()) return new String[]{"", ""};
         return supplierBankingRepo.findByTenantIdAndSupplierName(tenantId, supplierName)
@@ -871,10 +845,6 @@ public class ApService {
         return toBillResponse(b, null);
     }
 
-    // possibleDuplicateWarning is only ever non-null from createBill()'s
-    // own call site above — every other caller uses the 1-arg overload,
-    // which always passes null, so get/list responses never carry a
-    // duplicate warning (that would be meaningless outside of creation).
     private BillResponse toBillResponse(ApBill b, String possibleDuplicateWarning) {
         return new BillResponse(
                 b.getId(), b.getSupplierId(), b.getSupplierName(),
@@ -886,7 +856,8 @@ public class ApService {
                 b.getPaymentRef(), b.getBatchId(), b.getNotes(),
                 b.getJournalEntryId(), b.getPaymentJournalId(),
                 b.getFirstApprovedBy(), b.getFirstApprovedAt(),
-                b.getPaidAt(), b.getCreatedAt(), possibleDuplicateWarning);
+                b.getPaidAt(), b.getCreatedAt(), possibleDuplicateWarning,
+                b.getRejectionReason());
     }
 
     private BatchResponse toBatchResponse(ApEftBatch b, List<BillResponse> bills) {

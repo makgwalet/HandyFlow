@@ -372,13 +372,22 @@ public class ClinicService {
 
     // ── Tenant-wide consultation list (for billing consultation picker) ────────
 
+    /**
+     * FIX: backlog 13.2 — findAllUnbilled() already existed, fully
+     * correct, using the existing `billed` column — no migration was
+     * ever actually needed. Filtering at the query level also fixes a
+     * real bug the old in-memory version had: it paginated on the FULL
+     * active set first, then filtered — silently dropping any unbilled
+     * consultation outside that page's window even when there was room
+     * within the same page size counting unbilled ones alone.
+     */
     @Transactional(readOnly = true)
     public Page<ConsultationResponse> getConsultations(TenantId tenantId,
                                                        boolean unbilled,
                                                        Pageable pageable) {
-        // findAllUnbilled requires V84 migration + repo update — fall back to findAllActive
-        // when unbilled filter is requested, filter in memory until migration is applied.
-        Page<ClinicConsultation> page = consultationRepo.findAllActive(tenantId, pageable);
+        Page<ClinicConsultation> page = unbilled
+                ? consultationRepo.findAllUnbilled(tenantId, pageable)
+                : consultationRepo.findAllActive(tenantId, pageable);
 
         Set<UUID> patientIds = page.getContent().stream()
                 .map(ClinicConsultation::getPatientId)
@@ -395,16 +404,7 @@ public class ClinicService {
                         p -> p.getFirstName() + " " + p.getLastName()));
         Map<UUID, String> practNames = loadPractitionerNamesById(tenantId, practIds);
 
-        Page<ConsultationResponse> result = page.map(c -> toConsultationResponse(c, patientNames, practNames));
-
-        // In-memory unbilled filter — replace with findAllUnbilled() once repo is updated
-        if (unbilled) {
-            var filtered = result.getContent().stream()
-                    .filter(r -> !r.billed())
-                    .toList();
-            return new org.springframework.data.domain.PageImpl<>(filtered, pageable, filtered.size());
-        }
-        return result;
+        return page.map(c -> toConsultationResponse(c, patientNames, practNames));
     }
 
     // ── Edit a saved consultation ──────────────────────────────────────────────

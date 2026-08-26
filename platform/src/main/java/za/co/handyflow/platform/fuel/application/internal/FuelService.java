@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.approvals.application.ApprovalFacade;
 import za.co.handyflow.platform.fuel.FuelDispatchedToVehicleEvent;
 import za.co.handyflow.platform.fuel.domain.model.*;
 import za.co.handyflow.platform.fuel.domain.repository.*;
@@ -33,6 +34,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * FIX: backlog 5.3 — dispatchFuel()'s body had been corrupted in an
+ * earlier pass (the patch instructions' own explanatory prose had
+ * ended up pasted into the method body instead of the actual code) —
+ * the tank lookup, stock removal, dispatch creation, and the 5.1
+ * event-publish were all missing entirely. Reconstructed completely
+ * from confirmed prior content; the fuel would never have actually
+ * been dispensed with the broken version, regardless of whether it
+ * even compiled.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -55,6 +66,8 @@ public class FuelService {
     // fleet's own listener can reconcile this into cost-per-km. See
     // that event's own Javadoc for the full rationale.
     private final ApplicationEventPublisher eventPublisher;
+    // FIX: backlog 5.3 — submits dispatches for post-hoc review.
+    private final ApprovalFacade approvalFacade;
 
     @Value("${fuel.forecast.lookback-days:30}")
     private int forecastLookbackDays = 30;
@@ -295,9 +308,18 @@ public class FuelService {
                 .map(this::toDispatchResponse);
     }
 
+    /**
+     * FIX: backlog 5.3 — reconstructed after this method's body was
+     * found corrupted (patch-instruction prose had ended up pasted into
+     * the body in place of real code). The physical dispensing logic
+     * below — tank lookup, stock removal, dispatch record creation, the
+     * 5.1 event-publish — is completely unchanged from before 5.3;
+     * submitDispatchForReview() is the only new call, added at the end,
+     * after everything physical has already happened.
+     */
     @Transactional
     public DispatchResponse dispatchFuel(TenantId tenantId, UUID tankId,
-                                         DispatchFuelRequest req) {
+                                         DispatchFuelRequest req, UUID actingUserId) {
         FuelTank tank = findActiveTank(tenantId, tankId);
         var levelBefore = tank.getCurrentLitres();
         boolean wasLow = tank.isLow();
@@ -327,6 +349,19 @@ public class FuelService {
         if (!wasLow && tank.isLow()) {
             notifyLowStock(tenantId, tank);
         }
+
+        // FIX: backlog 5.3 — submits every dispatch to the engine with
+        // its litres in metadata; a tenant with no rule configured gets
+        // auto-approved (no behaviour change), a tenant who configures
+        // a "dispatches above X litres" rule gets a real pending review
+        // for large ones. The dispatch itself, and the tank's fuel
+        // level, are completely unaffected either way — this is
+        // deliberately a review record, not a gate. See
+        // ApprovalRequestResponse queryable via
+        // approvalFacade.getLatestRequestForEntity(tenantId, "fuel",
+        // "DISPATCH", dispatch.getId()) for a UI to show review status
+        // alongside the dispatch.
+        submitDispatchForReview(tenantId, dispatch, actingUserId);
 
         log.info("Fuel dispatched tank={} litres={} to={}",
                 tank.getName(), req.litresDispensed(),
@@ -504,7 +539,6 @@ public class FuelService {
         );
     }
 
-    // ✅ Keep only this one
     @Transactional
     public DeliveryResponse completeDelivery(TenantId tenantId, UUID deliveryId,
                                              CompleteDeliveryRequest req) {
@@ -552,5 +586,25 @@ public class FuelService {
         supplierRepository.save(supplier);
         log.info("Updated supplier={} tenant={}", supplierId, tenantId);
         return toSupplierResponse(supplier);
+    }
+
+    /**
+     * FIX: backlog 5.3. See dispatchFuel()'s own call-site comment for
+     * the full rationale.
+     */
+    private void submitDispatchForReview(TenantId tenantId, FuelDispatch dispatch, UUID actingUserId) {
+        try {
+            approvalFacade.submit(tenantId, "fuel", "DISPATCH", dispatch.getId(), actingUserId,
+                    java.util.Map.of("litresDispensed", dispatch.getLitresDispensed().doubleValue()));
+        } catch (Exception e) {
+            // Same principle as every other cross-module side-effect
+            // hookup this session: the dispatch is already saved and
+            // the fuel already physically dispensed by the time this
+            // runs — a submission failure must never look like it
+            // affected that, or block the operator from completing the
+            // dispatch they've already made.
+            log.error("[Fuel] Failed to submit dispatch={} for review, tenant={}: {}",
+                    dispatch.getId(), tenantId, e.getMessage(), e);
+        }
     }
 }

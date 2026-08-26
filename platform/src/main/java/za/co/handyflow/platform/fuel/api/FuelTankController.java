@@ -198,7 +198,8 @@ public class FuelTankController {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Fuel dispatched",
-                        fuelService.dispatchFuel(TenantContext.getTenantIdAsObject(), id, request)));
+                        fuelService.dispatchFuel(TenantContext.getTenantIdAsObject(), id, request,
+                                TenantContext.getCurrentUserId())));
     }
 
     // ── Dip Readings ──────────────────────────────────────────────────────────

@@ -64,6 +64,8 @@ public class ApBill {
 
     private String notes;
 
+    @Column(name = "rejection_reason") private String rejectionReason;
+
     // NEW: idempotency flag for the bill-due-soon reminder scheduler —
     // see migration comment for why this needs to exist at all.
     @Column(name = "due_soon_reminder_sent_at") private Instant dueSoonReminderSentAt;
@@ -119,6 +121,38 @@ public class ApBill {
         this.status         = "APPROVED";
         this.journalEntryId = journalEntryId;
         this.updatedAt      = Instant.now();
+    }
+
+    /**
+     * FIX: backlog 1.1b — genuinely new status, distinct from the
+     * existing cancel() action. A rejection means an approver actively
+     * reviewed this bill and said no — different from CANCELLED, which
+     * covers unrelated reasons (duplicate entry, wrong supplier). Only
+     * reachable from the same states approve() itself accepts, since
+     * rejection is the other branch of the same decision.
+     */
+    public void reject(String reason) {
+        if (!"DRAFT".equals(status) && !"OVERDUE".equals(status) && !"SECOND_APPROVAL".equals(status))
+            throw new IllegalStateException("Only DRAFT, OVERDUE, or SECOND_APPROVAL bills can be rejected");
+        this.status = "REJECTED";
+        this.rejectionReason = reason;
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * FIX: backlog 1.1b — your confirmed decision: a rejected bill is
+     * editable and resubmittable, not terminal. Called once the bill
+     * has actually been edited and is being sent back through approval
+     * — moves it back to DRAFT (the same starting state a brand-new
+     * bill uses) and clears the stale rejection reason, since it no
+     * longer describes the bill as it now stands.
+     */
+    public void backToDraftForResubmission() {
+        if (!"REJECTED".equals(status))
+            throw new IllegalStateException("Only a REJECTED bill can be resubmitted");
+        this.status = "DRAFT";
+        this.rejectionReason = null;
+        this.updatedAt = Instant.now();
     }
 
     // First step of the maker-checker flow for bills above the approval

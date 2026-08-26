@@ -192,8 +192,17 @@ public class ApprovalEngineService implements ApprovalFacade {
                                             UUID submittedBy, Map<String, Object> metadata) {
         ApprovalRequest original = requestRepo.findById(originalRequestId)
                 .orElseThrow(() -> new ResourceNotFoundException("ApprovalRequest", originalRequestId.toString()));
-        if (original.getStatus() != ApprovalRequest.Status.RETURNED_FOR_CORRECTION) {
-            throw new HandyFlowException("Only a request RETURNED_FOR_CORRECTION can be resubmitted — " +
+        // FIX: backlog 1.1b — widened to also accept REJECTED, not just
+        // RETURNED_FOR_CORRECTION. AP's rejected-bill resubmission flow
+        // needs this: an ApprovalRequest that completed as REJECTED has
+        // no path back into the system otherwise, even though nothing
+        // about resubmit()'s own logic actually depends on which
+        // terminal status the original request reached — markResubmitted()
+        // itself has no prior-status guard at all. RETURNED_FOR_CORRECTION
+        // remains supported for whatever future caller uses that status.
+        if (original.getStatus() != ApprovalRequest.Status.RETURNED_FOR_CORRECTION
+                && original.getStatus() != ApprovalRequest.Status.REJECTED) {
+            throw new HandyFlowException("Only a request REJECTED or RETURNED_FOR_CORRECTION can be resubmitted — " +
                     "current status is " + original.getStatus(), HttpStatus.BAD_REQUEST, "NOT_RESUBMITTABLE");
         }
         original.markResubmitted();

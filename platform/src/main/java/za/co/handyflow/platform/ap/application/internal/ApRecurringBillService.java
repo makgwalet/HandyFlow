@@ -225,6 +225,6 @@ public class ApRecurringBillService {
                 b.getPaymentRef(), b.getBatchId(), b.getNotes(),
                 b.getJournalEntryId(), b.getPaymentJournalId(),
                 b.getFirstApprovedBy(), b.getFirstApprovedAt(),
-                b.getPaidAt(), b.getCreatedAt(), null);
+                b.getPaidAt(), b.getCreatedAt(), null, b.getRejectionReason());
     }
 }

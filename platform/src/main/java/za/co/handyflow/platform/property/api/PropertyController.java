@@ -1,5 +1,3 @@
-// property/api/PropertyController.java
-
 package za.co.handyflow.platform.property.api;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +20,20 @@ import za.co.handyflow.platform.shared.TenantContext;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * FIX: backlog 1.7 — every endpoint in this controller was gated on
+ * generic USER_READ/USER_CREATE/USER_UPDATE/USER_DELETE, same bug class
+ * already fixed for Fuel, Accounting, Fleet, Security, Booking Agency,
+ * Events, and Recruitment Agency this session. Same three-tier split:
+ * PROPERTY_READ, PROPERTY_MANAGE for routine writes, and PROPERTY_ADMIN
+ * reserved for delete specifically — the one genuinely hard-to-undo
+ * action here, matching every other module's own segregation-of-duties
+ * precedent (Fleet/Fuel/Security all kept delete on the stricter tier
+ * while everything else, including status changes and escalations,
+ * stayed on MANAGE). No new permission migration needed —
+ * PROPERTY_READ/PROPERTY_MANAGE/PROPERTY_ADMIN already exist and are
+ * already auto-granted to every tenant's ADMIN role.
+ */
 @RestController
 @RequestMapping("/api/v1/property")
 @RequiredArgsConstructor
@@ -34,7 +46,7 @@ public class PropertyController {
     // ── Properties ────────────────────────────────────────────────────────────
 
     @GetMapping("/properties")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('PROPERTY_READ')")
     public ResponseEntity<ApiResponse<Page<PropertyResponse>>> getProperties(
             @PageableDefault(size = 20) Pageable pageable
     ) {
@@ -44,7 +56,7 @@ public class PropertyController {
     }
 
     @GetMapping("/properties/{id}")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('PROPERTY_READ')")
     @Operation(summary = "Get property with all units and vacancy summary")
     public ResponseEntity<ApiResponse<PropertyResponse>> getProperty(@PathVariable UUID id) {
         featureGuard.requireModule("property");
@@ -53,7 +65,7 @@ public class PropertyController {
     }
 
     @PostMapping("/properties")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('PROPERTY_MANAGE')")
     @Operation(summary = "Register a new property")
     public ResponseEntity<ApiResponse<PropertyResponse>> createProperty(
             @Valid @RequestBody CreatePropertyRequest request
@@ -66,7 +78,7 @@ public class PropertyController {
     }
 
     @DeleteMapping("/properties/{id}")
-    @PreAuthorize("hasAuthority('USER_DELETE')")
+    @PreAuthorize("hasAuthority('PROPERTY_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteProperty(@PathVariable UUID id) {
         featureGuard.requireModule("property");
         propertyService.deleteProperty(TenantContext.getTenantIdAsObject(), id);
@@ -76,7 +88,7 @@ public class PropertyController {
     // ── Units ─────────────────────────────────────────────────────────────────
 
     @GetMapping("/units")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('PROPERTY_READ')")
     @Operation(summary = "List units, optionally filter by propertyId or status")
     public ResponseEntity<ApiResponse<Page<UnitResponse>>> getUnits(
             @RequestParam(required = false) UUID propertyId,
@@ -90,7 +102,7 @@ public class PropertyController {
     }
 
     @PostMapping("/properties/{id}/units")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('PROPERTY_MANAGE')")
     @Operation(summary = "Add a unit to a property — validates unit number uniqueness")
     public ResponseEntity<ApiResponse<UnitResponse>> addUnit(
             @PathVariable UUID id,
@@ -105,7 +117,7 @@ public class PropertyController {
     // ── Leases ────────────────────────────────────────────────────────────────
 
     @GetMapping("/leases")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('PROPERTY_READ')")
     @Operation(summary = "List all leases, optionally filter by status")
     public ResponseEntity<ApiResponse<Page<LeaseResponse>>> getLeases(
             @RequestParam(required = false) String status,
@@ -118,7 +130,7 @@ public class PropertyController {
     }
 
     @GetMapping("/leases/{id}")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('PROPERTY_READ')")
     public ResponseEntity<ApiResponse<LeaseResponse>> getLease(@PathVariable UUID id) {
         featureGuard.requireModule("property");
         return ResponseEntity.ok(ApiResponse.success(
@@ -126,7 +138,7 @@ public class PropertyController {
     }
 
     @PostMapping("/units/{id}/leases")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('PROPERTY_MANAGE')")
     @Operation(summary = "Create a lease for a unit — sets unit to OCCUPIED")
     public ResponseEntity<ApiResponse<LeaseResponse>> createLease(
             @PathVariable UUID id,
@@ -140,7 +152,7 @@ public class PropertyController {
     }
 
     @PostMapping("/leases/{id}/terminate")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('PROPERTY_MANAGE')")
     @Operation(summary = "Terminate a lease — sets unit back to VACANT")
     public ResponseEntity<ApiResponse<LeaseResponse>> terminateLease(
             @PathVariable UUID id,
@@ -151,10 +163,46 @@ public class PropertyController {
                 propertyService.terminateLease(TenantContext.getTenantIdAsObject(), id, reason)));
     }
 
+    @PutMapping("/leases/{id}")
+    @PreAuthorize("hasAuthority('PROPERTY_MANAGE')")
+    @Operation(summary = "Update lease terms — rent, end date, payment day, escalation rate")
+    public ResponseEntity<ApiResponse<LeaseResponse>> updateLease(
+            @PathVariable UUID id,
+            @RequestBody UpdateLeaseRequest req) {
+        featureGuard.requireModule("property");
+        return ResponseEntity.ok(ApiResponse.success("Lease updated",
+                propertyService.updateLease(
+                        TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @PostMapping("/leases/{id}/renew")
+    @PreAuthorize("hasAuthority('PROPERTY_MANAGE')")
+    @Operation(summary = "Renew a lease — extend end date, auto-apply escalation if no new rent given")
+    public ResponseEntity<ApiResponse<LeaseResponse>> renewLease(
+            @PathVariable UUID id,
+            @Valid @RequestBody RenewLeaseRequest req) {
+        featureGuard.requireModule("property");
+        return ResponseEntity.ok(ApiResponse.success("Lease renewed",
+                propertyService.renewLease(
+                        TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @PostMapping("/leases/{id}/escalate")
+    @PreAuthorize("hasAuthority('PROPERTY_MANAGE')")
+    @Operation(summary = "Apply rent escalation — percentage increase or fixed new amount")
+    public ResponseEntity<ApiResponse<LeaseResponse>> escalateLease(
+            @PathVariable UUID id,
+            @RequestBody EscalateLeaseRequest req) {
+        featureGuard.requireModule("property");
+        return ResponseEntity.ok(ApiResponse.success("Rent escalated",
+                propertyService.escalateLease(
+                        TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
     // ── Payments ──────────────────────────────────────────────────────────────
 
     @GetMapping("/leases/{id}/payments")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('PROPERTY_READ')")
     public ResponseEntity<ApiResponse<Page<PaymentResponse>>> getPayments(
             @PathVariable UUID id,
             @PageableDefault(size = 20) Pageable pageable
@@ -165,7 +213,7 @@ public class PropertyController {
     }
 
     @GetMapping("/payments/outstanding")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('PROPERTY_READ')")
     @Operation(summary = "List all outstanding payments across all leases — arrears management")
     public ResponseEntity<ApiResponse<List<PaymentResponse>>> getOutstanding() {
         featureGuard.requireModule("property");
@@ -174,7 +222,7 @@ public class PropertyController {
     }
 
     @PostMapping("/leases/{id}/payments")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('PROPERTY_MANAGE')")
     @Operation(summary = "Create a payment record for a rental period")
     public ResponseEntity<ApiResponse<PaymentResponse>> createPayment(
             @PathVariable UUID id,
@@ -188,7 +236,7 @@ public class PropertyController {
     }
 
     @PostMapping("/leases/{leaseId}/payments/{paymentId}/record")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('PROPERTY_MANAGE')")
     @Operation(summary = "Record a rent payment — auto-computes PAID/PARTIAL status")
     public ResponseEntity<ApiResponse<PaymentResponse>> recordPayment(
             @PathVariable UUID leaseId,
@@ -204,7 +252,7 @@ public class PropertyController {
     // ── Inspections ───────────────────────────────────────────────────────────
 
     @GetMapping("/units/{id}/inspections")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('PROPERTY_READ')")
     public ResponseEntity<ApiResponse<Page<InspectionResponse>>> getInspections(
             @PathVariable UUID id,
             @PageableDefault(size = 20) Pageable pageable
@@ -215,7 +263,7 @@ public class PropertyController {
     }
 
     @PostMapping("/units/{id}/inspections")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('PROPERTY_MANAGE')")
     @Operation(summary = "Record a move-in, move-out, or routine inspection")
     public ResponseEntity<ApiResponse<InspectionResponse>> createInspection(
             @PathVariable UUID id,
@@ -226,39 +274,5 @@ public class PropertyController {
                 .body(ApiResponse.success("Inspection recorded",
                         propertyService.createInspection(
                                 TenantContext.getTenantIdAsObject(), id, request)));
-    }
-
-
-    @PutMapping("/leases/{id}")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
-    @Operation(summary = "Update lease terms — rent, end date, payment day, escalation rate")
-    public ResponseEntity<ApiResponse<LeaseResponse>> updateLease(
-            @PathVariable UUID id,
-            @RequestBody UpdateLeaseRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Lease updated",
-                propertyService.updateLease(
-                        TenantContext.getTenantIdAsObject(), id, req)));
-    }
-
-    @PostMapping("/leases/{id}/renew")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
-    @Operation(summary = "Renew a lease — extend end date, auto-apply escalation if no new rent given")
-    public ResponseEntity<ApiResponse<LeaseResponse>> renewLease(
-            @PathVariable UUID id,
-            @Valid @RequestBody RenewLeaseRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Lease renewed",
-                propertyService.renewLease(
-                        TenantContext.getTenantIdAsObject(), id, req)));
-    }
-
-    @PostMapping("/leases/{id}/escalate")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
-    @Operation(summary = "Apply rent escalation — percentage increase or fixed new amount")
-    public ResponseEntity<ApiResponse<LeaseResponse>> escalateLease(
-            @PathVariable UUID id,
-            @RequestBody EscalateLeaseRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Rent escalated",
-                propertyService.escalateLease(
-                        TenantContext.getTenantIdAsObject(), id, req)));
     }
 }
