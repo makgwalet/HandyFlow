@@ -26,6 +26,30 @@ import java.util.UUID;
 
 /**
  * DeviceSessionController — Phase 2 session lifecycle and resource custody.
+ * <p>
+ * FIX: only two endpoints in this file were actually the generic-
+ * permission bug being fixed here — getSessions() and forceCloseSession(),
+ * now SECURITY_READ/SECURITY_MANAGE. Every other endpoint's lack of
+ * @PreAuthorize is a confirmed, deliberate, consistent architectural
+ * pattern for this controller: guard-facing session-lifecycle and
+ * resource-custody actions resolve identity from device/session state
+ * inside the service layer (PIN entry, face liveness, the open
+ * DeviceSession itself) rather than from a Spring Security authority
+ * claim — same posture the class's own location-ping doc comment states
+ * explicitly, now confirmed to extend to open/close/checkout/return too.
+ * None of those were touched.
+ * <p>
+ * ⚠ ONE THING FLAGGED, NOT CHANGED: resolveGuardId() (GET /resolve-guard)
+ * is documented as "used INTERNALLY by CheckpointScanController and
+ * IncidentController" — but is also a real, public HTTP endpoint with no
+ * @PreAuthorize at all. Unlike the other unguarded endpoints here (which
+ * only ever expose the CALLING guard's own session/identity), this one
+ * lets any caller ask "which guard is on device X right now" — a
+ * third-party identity/whereabouts lookup, not self-service. Whether
+ * that's intentional (matching how the doc comment frames it as an
+ * internal-only helper that happens to be HTTP-reachable) or a genuine
+ * gap is a real question worth a decision, not something to silently fix
+ * or silently leave — flagging rather than guessing which it is.
  *
  * CHANGE: added POST /{sessionId}/location -- GPS ping ingestion (backend
  * pass 1 of the real-GPS-map feature; see GuardLocationService for the full
@@ -47,7 +71,7 @@ public class DeviceSessionController {
     // ── Queries ────────────────────────────────────────────────────────────────
 
     @GetMapping
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(
             summary = "List device sessions for this tenant — paginated, newest first",
             description = "Used by the admin web app's Device Sessions tab to show active " +
@@ -128,7 +152,7 @@ public class DeviceSessionController {
     }
 
     @PostMapping("/{sessionId}/force-close")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Supervisor force-closes a stuck session",
             description = """
@@ -147,7 +171,7 @@ public class DeviceSessionController {
                 sessionService.forceCloseSession(tenantId, sessionId, supervisorId, reason)));
     }
 
-    // ── GPS location ping (new) ──────────────────────────────────────────────
+    // ── GPS location ping ──────────────────────────────────────────────────────
 
     @PostMapping("/{sessionId}/location")
     @Operation(

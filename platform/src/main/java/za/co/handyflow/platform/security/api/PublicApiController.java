@@ -22,36 +22,10 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * PublicApiController — Phase 4 public API key and webhook management.
- *
- * API keys enable machine-to-machine access for client BI tools, SAPS reporting
- * feeds, or any third-party integration. Keys are read-only by default and
- * scoped to specific endpoint prefixes.
- *
- * Webhooks push events to client endpoints in real time — the same events that
- * a user would see in the Control Room or Incidents tab are delivered as signed
- * HTTP POST payloads to the client's URL. Useful for: customer dashboards that
- * embed live incident data, SIEM integrations, ERP triggers on guard no-shows.
- *
- * AUTHENTICATION FOR API KEY CALLERS:
- * Client integrations using API keys should call the same endpoints as regular
- * users, with the header:
- *   Authorization: ApiKey hf_live_<key>
- * The ApiKeyAuthFilter (not yet wired — see deployment notes) validates the key
- * and injects the tenant context, so all existing tenant-scoped endpoints work
- * transparently for API key callers with read_only=true.
- *
- * DEPLOYMENT NOTE:
- * ApiKeyAuthFilter needs to be added to SecurityConfig's filter chain BEFORE
- * JwtAuthFilter, with its own permitAll path (none — the filter handles auth
- * inline). Until it's wired, API keys exist in the DB but won't authenticate.
- */
 @Tag(name = "Security - Public API & Webhooks (Phase 4)")
 @RestController
 @RequestMapping("/api/v1/security/public-api")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('USER_UPDATE')")
 public class PublicApiController {
 
     private final PublicApiService          publicApiService;
@@ -60,6 +34,7 @@ public class PublicApiController {
     // ── API Keys ───────────────────────────────────────────────────────────────
 
     @GetMapping("/keys")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "List all active API keys for this tenant")
     public ResponseEntity<ApiResponse<List<ApiKey>>> listApiKeys() {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
@@ -67,6 +42,7 @@ public class PublicApiController {
     }
 
     @PostMapping("/keys")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Create an API key",
             description = """
@@ -89,6 +65,7 @@ public class PublicApiController {
     }
 
     @DeleteMapping("/keys/{id}")
+    @PreAuthorize("hasAuthority('SECURITY_ADMIN')")
     @Operation(summary = "Revoke an API key — immediate, cannot be undone")
     public ResponseEntity<ApiResponse<Void>> revokeApiKey(
             @PathVariable UUID id,
@@ -102,6 +79,7 @@ public class PublicApiController {
     // ── Webhooks ───────────────────────────────────────────────────────────────
 
     @GetMapping("/webhooks")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "List all webhook subscriptions")
     public ResponseEntity<ApiResponse<List<WebhookSubscriptionResponse>>> listWebhooks() {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
@@ -109,6 +87,7 @@ public class PublicApiController {
     }
 
     @PostMapping("/webhooks")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Subscribe to webhook events",
             description = """
@@ -132,6 +111,7 @@ public class PublicApiController {
     }
 
     @DeleteMapping("/webhooks/{id}")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Deactivate a webhook subscription")
     public ResponseEntity<ApiResponse<Void>> deactivateWebhook(@PathVariable UUID id) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
@@ -140,6 +120,7 @@ public class PublicApiController {
     }
 
     @PostMapping("/webhooks/{id}/reactivate")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Reactivate a suspended webhook and reset failure count")
     public ResponseEntity<ApiResponse<Void>> reactivateWebhook(@PathVariable UUID id) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
@@ -148,6 +129,7 @@ public class PublicApiController {
     }
 
     @GetMapping("/webhooks/{id}/deliveries")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "Delivery log for a webhook subscription — newest first")
     public ResponseEntity<ApiResponse<Page<WebhookDelivery>>> getDeliveries(
             @PathVariable UUID id, Pageable pageable) {

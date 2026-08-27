@@ -30,10 +30,24 @@ import java.util.Map;
  * LOCKED) rather than assuming the prior fix's own literal was right —
  * it was.
  * <p>
- * Both queries silently failed on every single scheduled run before
- * this fix — no quote-expiry reminder or pilot-countdown reminder has
- * ever actually been sent, since the exception was thrown before any
- * row could be read, every single time the job ran.
+ * FIX (second round): after the u.deleted_at fix above landed, both
+ * jobs were STILL failing on every run — two further schema mismatches,
+ * confirmed via a second round of real production stack traces:
+ * <p>
+ * (1) sendQuoteExpiryReminders() — "relation crm_customers does not
+ * exist". Every other table in this exact query (quotes, tenants,
+ * users) is unprefixed; crm_customers was the only one carrying a
+ * module prefix, inconsistent with the rest of the same query. Fixed
+ * to `customers`.
+ * <p>
+ * (2) sendPilotCountdownReminders() — "column s.plan_display_name does
+ * not exist" on subscriptions. No independent schema confirmation was
+ * available for this one — fixed to `s.plan` by inference (matching the
+ * simple, unprefixed naming every other column in the same query
+ * already resolves correctly with — status, pilot_ends_at,
+ * deleted_at), flagged as unverified rather than presented with false
+ * confidence. If `plan` turns out wrong too, this needs the real column
+ * name pulled directly from the subscriptions table schema.
  */
 @Slf4j
 @Component
@@ -66,7 +80,7 @@ public class NotificationScheduler {
             FROM quotes q
             JOIN tenants t ON t.id = q.tenant_id
             JOIN users u ON u.tenant_id = t.id AND u.status = 'ACTIVE'
-            JOIN crm_customers c ON c.id = q.customer_id
+            JOIN customers c ON c.id = q.customer_id
             WHERE q.deleted_at IS NULL
               AND q.status IN ('DRAFT', 'SENT')
               AND q.created_at::date = CURRENT_DATE - INTERVAL '23 days'
@@ -105,7 +119,7 @@ public class NotificationScheduler {
             SELECT
                 t.id AS tenant_id, t.name AS tenant_name,
                 s.pilot_ends_at,
-                s.plan_display_name,
+                s.plan,
                 u.email, u.first_name,
                 (s.pilot_ends_at::date - CURRENT_DATE) AS days_remaining
             FROM subscriptions s
@@ -126,7 +140,7 @@ public class NotificationScheduler {
                 String email       = (String) row.get("email");
                 String firstName   = (String) row.get("first_name");
                 int daysRemaining  = ((Number) row.get("days_remaining")).intValue();
-                String planName    = (String) row.get("plan_display_name");
+                String planName    = (String) row.get("plan");
 
                 emailService.send(
                         email,

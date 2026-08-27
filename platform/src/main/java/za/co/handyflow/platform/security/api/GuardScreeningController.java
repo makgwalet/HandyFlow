@@ -21,24 +21,14 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * GuardScreeningController — vetting record CRUD and the scheduling gate.
- *
- * All endpoints are supervisor-only (USER_UPDATE) — screening records contain
- * sensitive information about a guard (polygraph results, criminal record
- * checks) and are never guard-facing.
- *
- * The gate check (GET /{guardId}/gate) is advisory, not a hard block in
- * Phase 2 — see GuardScreeningService.checkScreeningGate() javadoc for why.
- * ShiftService and RotationService call the service method directly during
- * scheduling; this endpoint exists so the admin UI can show the same warning
- * before a supervisor manually assigns a shift.
- */
+
+
+
 @Tag(name = "Security - Guard Screening")
 @RestController
 @RequestMapping("/api/v1/security/guards/{guardId}/screening")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('USER_UPDATE')")
+@PreAuthorize("hasAuthority('SECURITY_MANAGE')")
 public class GuardScreeningController {
 
     private final GuardScreeningService screeningService;

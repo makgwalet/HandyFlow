@@ -24,7 +24,15 @@ import java.util.UUID;
 /**
  * ReportingController — three monthly security reports, each available as
  * JSON (for the frontend dashboard) and PDF (for download/email to clients).
- *
+ * <p>
+ * FIX: flagged repeatedly across this session's own permission-fix passes
+ * as a confirmed still-open bug, addressed here. Class-level USER_UPDATE
+ * removed — every endpoint in this controller is a read operation (JSON
+ * or PDF export), nothing destructive — replaced with method-level
+ * SECURITY_READ on all 6 endpoints, matching the tier this session's own
+ * new fourth report (Site Access / Visitor Report, Gate Access & Registry)
+ * already uses.
+ * <p>
  * CHANGE (V212): the three *Pdf() call sites now pass tenantId through to
  * PdfReportService, which uses it to fetch TenantDetails and brand the PDF
  * with the tenant's logo/company name instead of a hardcoded "HandyFlow
@@ -37,7 +45,6 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/security/reports")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('USER_UPDATE')")
 public class ReportingController {
 
     private final ReportingService  reportingService;
@@ -46,6 +53,7 @@ public class ReportingController {
     // ── 1. Site Coverage ───────────────────────────────────────────────────────
 
     @GetMapping("/site-coverage")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(
             summary = "Site coverage report (JSON)",
             description = "Shifts scheduled vs completed, patrol rounds, checkpoint scans, " +
@@ -60,6 +68,7 @@ public class ReportingController {
     }
 
     @GetMapping("/site-coverage/pdf")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(
             summary = "Site coverage report (PDF download)",
             description = "Same data as /site-coverage but rendered as a branded PDF " +
@@ -80,6 +89,7 @@ public class ReportingController {
     // ── 2. Guard Attendance ────────────────────────────────────────────────────
 
     @GetMapping("/guard-attendance")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(
             summary = "Guard attendance report (JSON)",
             description = "Shifts attended vs missed, hours worked, checkpoint scans, " +
@@ -93,6 +103,7 @@ public class ReportingController {
     }
 
     @GetMapping("/guard-attendance/pdf")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(
             summary = "Guard attendance report (PDF download)",
             description = "PDF version of the guard attendance report, branded with the " +
@@ -113,6 +124,7 @@ public class ReportingController {
     // ── 3. Monthly Summary ─────────────────────────────────────────────────────
 
     @GetMapping("/monthly-summary")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(
             summary = "Company-wide monthly summary (JSON)",
             description = "Tenant-wide rollup: total shifts/hours, all-site coverage rates, " +
@@ -125,6 +137,7 @@ public class ReportingController {
     }
 
     @GetMapping("/monthly-summary/pdf")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(
             summary = "Company-wide monthly summary (PDF download)",
             description = "PDF version of the monthly summary, branded with the tenant's " +

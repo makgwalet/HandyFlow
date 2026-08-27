@@ -29,7 +29,7 @@ public class IncidentController {
     private final FeatureGuard    featureGuard;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(
             summary = "List incidents with optional status/severity filters",
             description = "Paginated and sorted in SQL (fixes in-memory filtering bug). " +
@@ -46,7 +46,7 @@ public class IncidentController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('USER_CREATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Report a new incident",
             description = "siteId and guardId are validated as belonging to this tenant. " +
@@ -60,21 +60,20 @@ public class IncidentController {
     }
 
     @PostMapping("/{id}/acknowledge")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Acknowledge an incident — OPEN → ACKNOWLEDGED",
             description = "Records who acknowledged and when (fixes missing acknowledgedBy audit trail)."
     )
     public ResponseEntity<ApiResponse<IncidentResponse>> acknowledge(@PathVariable UUID id) {
         featureGuard.requireModule("security");
-        // Fix bug #20: pass the authenticated user so acknowledgedBy is recorded.
         UUID actorId = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success("Acknowledged",
                 incidentService.acknowledge(TenantContext.getTenantIdAsObject(), id, actorId)));
     }
 
     @PostMapping("/{id}/resolve")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Resolve an incident — ACKNOWLEDGED → RESOLVED",
             description = "Records who resolved and when (fixes missing resolvedBy audit trail)."

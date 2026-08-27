@@ -17,12 +17,7 @@ import za.co.handyflow.platform.shared.TenantContext;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * ScanLogController — endpoints for reading checkpoint scan history.
- *
- * Used by LiveMapTab to show "Last checkpoint" for each active guard.
- * Previously this was always "—" because no endpoint existed.
- */
+
 @RestController
 @RequestMapping("/api/v1/security/shifts")
 @RequiredArgsConstructor
@@ -38,7 +33,7 @@ public class ScanLogController {
      * to display "Last checkpoint: North Gate · 14:32".
      */
     @GetMapping("/{id}/scans")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "List all checkpoint scans for a shift — ordered oldest first")
     public ResponseEntity<ApiResponse<List<ScanLogResponse>>> getScans(@PathVariable UUID id) {
         featureGuard.requireModule("security");

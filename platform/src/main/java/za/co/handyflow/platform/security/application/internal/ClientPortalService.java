@@ -22,8 +22,16 @@ import java.util.UUID;
 
 /**
  * ClientPortalService — serves the read-only client portal view, plus
- * (CHANGE) an on-demand "send the portal link" action.
- *
+ * an on-demand "send the portal link" action.
+ * <p>
+ * FIX: Gate Access & Registry, Step 5. getPortalData() now also returns
+ * currentlyOnSiteCount/currentlyOnSite — same raw-JDBC, Map&lt;String,
+ * Object&gt; convention as shifts/incidents above, for internal
+ * consistency with how this whole class already works. The underlying
+ * query deliberately never selects id_number or phone at all (not just
+ * omits them at mapping time) — this endpoint is unauthenticated and
+ * external-facing, the token in the URL is the only credential.
+ * <p>
  * WHY recipientEmail supplied at send time, not stored on Site?
  * Site has no contactEmail field (confirmed against the actual entity --
  * only contactName/contactPhone exist). Rather than add one speculatively,
@@ -32,7 +40,7 @@ import java.util.UUID;
  * than assuming a stored default recipient is what's wanted. A contactEmail
  * field + "send to default contact" convenience is a natural follow-up if
  * repeatedly retyping the same address becomes annoying in practice.
- *
+ * <p>
  * WHY EmailService.send() directly, not NotificationService?
  * NotificationService/TenantAdminRecipients resolve INTERNAL tenant admins
  * as recipients -- there's no path from that pipeline to an arbitrary
@@ -40,13 +48,13 @@ import java.util.UUID;
  * the lower-level primitive documented elsewhere in this codebase as the
  * established workaround for exactly this case (external recipient, no
  * NotificationType needed).
- *
+ * <p>
  * NOTE: I have not seen EmailService's actual interface/package directly --
  * za.co.handyflow.platform.notifications.application.internal.EmailService
  * is inferred by co-location with NotificationService, which lives in the
  * same package. Verify the import path compiles; if EmailService lives
  * elsewhere, that's a one-line fix.
- *
+ * <p>
  * NOTE: portalBaseUrl is read from a new config property
  * (app.frontend.base-url) that may not exist in your application.yml yet --
  * without it, the emailed link falls back to a relative path, which won't
@@ -118,6 +126,29 @@ public class ClientPortalService {
                   AND s.deleted_at IS NULL
                 """, Integer.class, siteId);
 
+        // FIX: Gate Access & Registry, Step 5. Deliberately never selects
+        // id_number or phone — this endpoint is unauthenticated and
+        // external-facing (the token in the URL is the only credential),
+        // same POPIA posture as every other choice in this class about
+        // what an outside client is allowed to see.
+        Integer onSiteCount = jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM security_gate_register_entries e
+                WHERE e.site_id = ?
+                  AND e.logged_out_at IS NULL
+                """, Integer.class, siteId);
+
+        List<Map<String, Object>> onSite = jdbc.queryForList("""
+                SELECT
+                    e.id, e.entry_type, e.person_name, e.company,
+                    e.vehicle_registration, e.host_name, e.logged_in_at, e.status
+                FROM security_gate_register_entries e
+                WHERE e.site_id = ?
+                  AND e.logged_out_at IS NULL
+                ORDER BY e.logged_in_at DESC
+                LIMIT 50
+                """, siteId);
+
         log.info("[Portal] View site={} token={}...{}", site.getName(),
                 token.substring(0, 8), token.substring(token.length() - 4));
 
@@ -130,7 +161,9 @@ public class ClientPortalService {
                 activeGuardsNow != null ? activeGuardsNow : 0,
                 weeklyScans    != null ? weeklyScans    : 0,
                 shifts,
-                incidents
+                incidents,
+                onSiteCount != null ? onSiteCount : 0,
+                onSite
         );
     }
 
@@ -156,7 +189,7 @@ public class ClientPortalService {
         log.info("[Portal] Portal disabled site={} tenant={}", siteId, tenantId);
     }
 
-    // ── Send portal link (new) ──────────────────────────────────────────────────
+    // ── Send portal link ──────────────────────────────────────────────────────
 
     /**
      * Emails the client portal link to an arbitrary recipient. Requires the

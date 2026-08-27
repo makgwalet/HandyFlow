@@ -26,15 +26,6 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * ArmouryController — firearm register and the witnessed issue/return workflow.
- *
- * CHANGE: added GET /{id}/history/pdf -- exportable chain-of-custody PDF,
- * closing the audit gap flagged as "the immutable audit trail... but there's
- * no exportable document version." Gated USER_READ, same level as the
- * existing getById/getHistory/getIssuedToGuard endpoints -- it's a read of
- * data already accessible via those, just rendered as a document.
- */
 @Tag(name = "Security - Armoury")
 @RestController
 @RequestMapping("/api/v1/security/armoury")
@@ -47,6 +38,7 @@ public class ArmouryController {
     // ── Register CRUD ──────────────────────────────────────────────────────────
 
     @GetMapping
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "List all active (non-decommissioned) firearms")
     public ResponseEntity<ApiResponse<Page<ArmouryResponse>>> getAll(Pageable pageable) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
@@ -54,6 +46,7 @@ public class ArmouryController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "Get a single firearm's current record")
     public ResponseEntity<ApiResponse<ArmouryResponse>> getById(@PathVariable UUID id) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
@@ -61,7 +54,7 @@ public class ArmouryController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Register a new firearm in the armoury",
             description = "Serial number must be unique per tenant. License expiry is " +
@@ -74,7 +67,7 @@ public class ArmouryController {
     }
 
     @PutMapping("/{id}/license")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Update a firearm's SAPS license details (e.g. after renewal)")
     public ResponseEntity<ApiResponse<ArmouryResponse>> updateLicense(
             @PathVariable UUID id,
@@ -85,7 +78,7 @@ public class ArmouryController {
     }
 
     @PostMapping("/{id}/service")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Record a maintenance/service event for a firearm")
     public ResponseEntity<ApiResponse<ArmouryResponse>> recordService(
             @PathVariable UUID id,
@@ -96,7 +89,7 @@ public class ArmouryController {
     }
 
     @PostMapping("/{id}/report-lost")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_ADMIN')")
     @Operation(
             summary = "Report a firearm lost or stolen",
             description = "Sets status to LOST — terminal until manually resolved by support. " +
@@ -110,7 +103,7 @@ public class ArmouryController {
     }
 
     @PostMapping("/{id}/decommission")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_ADMIN')")
     @Operation(
             summary = "Permanently retire a firearm from service",
             description = "Cannot decommission a firearm that is currently ISSUED — return it first.")
@@ -125,7 +118,7 @@ public class ArmouryController {
     // ── Witnessed Issue / Return ───────────────────────────────────────────────
 
     @PostMapping("/{id}/issue")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Issue a firearm to a guard (mandatory two-person witness)",
             description = """
@@ -146,7 +139,7 @@ public class ArmouryController {
     }
 
     @PostMapping("/{id}/return")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Return an issued firearm to the armoury (mandatory two-person witness)")
     public ResponseEntity<ApiResponse<ArmouryResponse>> returnFirearm(
             @PathVariable UUID id,
@@ -159,6 +152,7 @@ public class ArmouryController {
     // ── History & Guard Queries ────────────────────────────────────────────────
 
     @GetMapping("/{id}/history")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "Full issue/return history for a firearm",
             description = "Immutable audit trail — every event, witness, and timestamp " +
                     "since the firearm was registered.")
@@ -169,6 +163,7 @@ public class ArmouryController {
     }
 
     @GetMapping("/{id}/history/pdf")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(
             summary = "Firearm chain-of-custody PDF",
             description = "Exportable version of the immutable issue/return audit trail, " +
@@ -184,6 +179,7 @@ public class ArmouryController {
     }
 
     @GetMapping("/guard/{guardId}")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "Firearms currently issued to a specific guard")
     public ResponseEntity<ApiResponse<List<ArmouryResponse>>> getIssuedToGuard(
             @PathVariable UUID guardId) {
@@ -195,7 +191,7 @@ public class ArmouryController {
     // ── Guard Firearm Competency ───────────────────────────────────────────────
 
     @PostMapping("/guard/{guardId}/competency")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Set a guard's firearm competency certificate",
             description = "Required before issue() will succeed for that guard. " +

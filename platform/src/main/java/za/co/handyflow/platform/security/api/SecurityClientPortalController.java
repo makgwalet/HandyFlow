@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.security.application.internal.ClientPortalService;
 import za.co.handyflow.platform.security.dto.ClientPortalResponse;
@@ -17,18 +18,6 @@ import za.co.handyflow.platform.shared.TenantContext;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * ClientPortalController — two groups of endpoints, plus (CHANGE) a third:
- *
- * GROUP 1: Public (no auth) — /api/v1/portal/{token}
- * GROUP 2: Authenticated (tenant only) — /api/v1/security/sites/{id}/portal/*
- *   Generates and disables portal tokens. Requires USER_UPDATE authority.
- * GROUP 3 (NEW): POST /api/v1/security/sites/{id}/portal/send -- emails the
- *   existing portal link to an arbitrary recipient (audit gap: "how do we
- *   send it to the client?"). Sits here, next to generate/disable, rather
- *   than on SiteController, since that's where the rest of the portal
- *   lifecycle already lives.
- */
 @RestController
 @RequiredArgsConstructor
 @Tag(name = "Security - Client Portal", description = "Read-only site dashboard for clients")
@@ -54,6 +43,7 @@ public class SecurityClientPortalController {
     // ── Authenticated management endpoints ────────────────────────────────────
 
     @PostMapping("/api/v1/security/sites/{id}/portal/generate")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Generate (or regenerate) a client portal token for this site",
             description = "Replaces any existing token — the old portal URL immediately stops working. " +
@@ -70,15 +60,17 @@ public class SecurityClientPortalController {
     }
 
     @DeleteMapping("/api/v1/security/sites/{id}/portal")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Disable the client portal for this site — clears the token")
     public ResponseEntity<ApiResponse<Void>> disablePortal(@PathVariable UUID id) {
         portalService.disablePortal(id, TenantContext.getTenantIdAsObject());
         return ResponseEntity.ok(ApiResponse.success("Portal disabled", null));
     }
 
-    // ── Send portal link (new) ──────────────────────────────────────────────────
+    // ── Send portal link ──────────────────────────────────────────────────────
 
     @PostMapping("/api/v1/security/sites/{id}/portal/send")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Email the client portal link to a recipient",
             description = """

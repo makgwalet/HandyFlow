@@ -31,6 +31,13 @@ import static za.co.handyflow.platform.notifications.domain.model.NotificationSe
  *   - SMS is reserved for CRITICAL, time-sensitive, or safety-relevant events
  *     only — it costs money per message and should not be default-on for
  *     routine INFO-level events.
+ *
+ * FIX: Gate Access & Registry (Security sub-module) — added GATE_OVERSTAY.
+ * WARNING, not CRITICAL, and no SMS — the plan's own §9 is explicit that an
+ * overstay is deliberately kept as a quieter, separate path from a real
+ * Incident: "most overstays are someone forgetting to sign out, not a
+ * security event." Same tone as GUARD_LATE/PATROL_ROUND_MISSED in this same
+ * section, not GUARD_NO_SHOW/DURESS_TRIGGERED.
  */
 public enum NotificationType {
 
@@ -193,6 +200,7 @@ public enum NotificationType {
     WEBHOOK_SUBSCRIPTION_SUSPENDED(WARNING, Set.of(IN_APP, EMAIL)),
     PATROL_ROUND_MISSED(WARNING, Set.of(IN_APP, EMAIL)),
     PRINCIPAL_VETTING_HIT(CRITICAL, Set.of(IN_APP, EMAIL)),
+    GATE_OVERSTAY(WARNING, Set.of(IN_APP, EMAIL)),
 
     // ── Supply Chain ─────────────────────────────────────────────────────────
     PO_APPROVED(INFO, Set.of(IN_APP, EMAIL)),

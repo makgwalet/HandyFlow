@@ -28,7 +28,7 @@ public class CheckpointScanController {
     private final FeatureGuard          featureGuard;
 
     @PostMapping("/scan")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('SECURITY_GUARD','SECURITY_MANAGE')")
     @Operation(
             summary = "Guard scans a checkpoint — logs timestamp, scan method, and optional GPS",
             description = "guardId is resolved from the authenticated session, NOT from the request body. " +
@@ -62,4 +62,3 @@ public class CheckpointScanController {
         return ResponseEntity.ok(ApiResponse.success("Checkpoint scanned", result));
     }
 }
-// Note: append above the final closing brace — done via separate file below

@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.security.application.internal.RotationService;
 import za.co.handyflow.platform.security.dto.*;
@@ -31,6 +32,7 @@ public class RotationController {
     // ── Patterns ───────────────────────────────────────────────────────────────
 
     @GetMapping
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "List all active rotation patterns for this tenant")
     public ResponseEntity<ApiResponse<Page<RotationPatternResponse>>> getPatterns(Pageable pageable) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
@@ -39,6 +41,7 @@ public class RotationController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Create a new rotation pattern for a site")
     public ResponseEntity<ApiResponse<RotationPatternResponse>> createPattern(
             @Valid @RequestBody CreateRotationPatternRequest req) {
@@ -48,6 +51,7 @@ public class RotationController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Update rotation pattern name, cycle definition, or shift length")
     public ResponseEntity<ApiResponse<RotationPatternResponse>> updatePattern(
             @PathVariable UUID id,
@@ -58,6 +62,7 @@ public class RotationController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Deactivate a rotation pattern (does not delete generated shifts)")
     public ResponseEntity<ApiResponse<Void>> deactivatePattern(@PathVariable UUID id) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
@@ -68,6 +73,7 @@ public class RotationController {
     // ── Guard Assignments ──────────────────────────────────────────────────────
 
     @PostMapping("/assignments")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Assign a guard to a rotation pattern",
             description = "Automatically ends the guard's previous open-ended assignment.")
     public ResponseEntity<ApiResponse<RotationAssignmentResponse>> assignGuard(
@@ -78,6 +84,7 @@ public class RotationController {
     }
 
     @DeleteMapping("/assignments/{assignmentId}")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "End a guard's rotation assignment on the specified date")
     public ResponseEntity<ApiResponse<Void>> endAssignment(
             @PathVariable UUID assignmentId,
@@ -90,6 +97,7 @@ public class RotationController {
     // ── Schedule Generation ────────────────────────────────────────────────────
 
     @PostMapping("/generate")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Generate shifts from a rotation pattern over a date range",
             description = """
                Materialises Shift rows for all guards assigned to the pattern.

@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.security.application.internal.ShiftSwapService;
 import za.co.handyflow.platform.security.dto.*;
@@ -21,6 +22,32 @@ import java.util.UUID;
 
 /**
  * ShiftSwapController — REST surface for the two-stage shift swap workflow.
+ * <p>
+ * FIX: permission sweep — this controller had NO @PreAuthorize anywhere,
+ * on any of its 7 endpoints, the same serious gap as RotationController
+ * and ClientPortalController's management endpoints found in the same
+ * pass. Notably, even approveSwap()/rejectSwap() — explicitly described
+ * in this class's own doc comments as "Supervisor approves"/"Supervisor
+ * rejects" — were reachable by anyone with a valid session regardless
+ * of role.
+ * <p>
+ * Mixed caller types, same shape as CheckpointScanController (guard
+ * self-service actions + supervisor actions on one controller):
+ * createSwapRequest/acceptSwap/cancelSwap are guard-initiated (a guard
+ * requesting, accepting, or cancelling their OWN swap) — gated
+ * hasAnyAuthority('SECURITY_GUARD','SECURITY_MANAGE'), same dual-caller
+ * tier as CheckpointScanController's own scan endpoint. approveSwap/
+ * rejectSwap are genuinely supervisor-only per this class's own
+ * documentation — SECURITY_MANAGE alone. Reads get SECURITY_READ.
+ * <p>
+ * NOTE, not resolved here: this controller sits under
+ * /api/v1/security/shifts/swaps — the standard tenant-JWT surface, not
+ * /api/v1/guard/** (GuardJwtFilter). If guards don't carry tenant JWTs
+ * (confirmed true for the newer guard-auth architecture this session's
+ * own Gate Access work investigated), then createSwapRequest/acceptSwap/
+ * cancelSwap may not actually be callable from a guard's own Shield app
+ * today regardless of authority tier — same open auth-surface question
+ * already flagged for CheckpointScanController, not solved here either.
  *
  * Workflow summary:
  *   POST   /swaps                       → requesting guard creates a swap request
@@ -41,6 +68,7 @@ public class ShiftSwapController {
     private final ShiftSwapService swapService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "List open swap requests awaiting supervisor action")
     public ResponseEntity<ApiResponse<Page<ShiftSwapResponse>>> getPendingSwaps(Pageable pageable) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
@@ -49,6 +77,7 @@ public class ShiftSwapController {
     }
 
     @GetMapping("/guard/{guardId}")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "List all swap requests involving a specific guard")
     public ResponseEntity<ApiResponse<Page<ShiftSwapResponse>>> getSwapsByGuard(
             @PathVariable UUID guardId, Pageable pageable) {
@@ -58,6 +87,7 @@ public class ShiftSwapController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyAuthority('SECURITY_GUARD','SECURITY_MANAGE')")
     @Operation(summary = "Request a shift swap",
             description = """
                The requesting guard initiates the swap.
@@ -74,6 +104,7 @@ public class ShiftSwapController {
     }
 
     @PostMapping("/{id}/accept")
+    @PreAuthorize("hasAnyAuthority('SECURITY_GUARD','SECURITY_MANAGE')")
     @Operation(summary = "Proposed guard accepts the swap request",
             description = """
                Moves status from PENDING to PROPOSED_ACCEPTED.
@@ -87,6 +118,7 @@ public class ShiftSwapController {
     }
 
     @PostMapping("/{id}/approve")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Supervisor approves the swap",
             description = """
                Runs full validation (guard status, PSiRA, overlap) then re-assigns
@@ -105,6 +137,7 @@ public class ShiftSwapController {
     }
 
     @PostMapping("/{id}/reject")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Supervisor rejects the swap request")
     public ResponseEntity<ApiResponse<ShiftSwapResponse>> rejectSwap(
             @PathVariable UUID id,
@@ -116,6 +149,7 @@ public class ShiftSwapController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('SECURITY_GUARD','SECURITY_MANAGE')")
     @Operation(summary = "Requesting guard cancels their swap request",
             description = "Can only be done by the guard who created it, and only while PENDING or PROPOSED_ACCEPTED.")
     public ResponseEntity<ApiResponse<ShiftSwapResponse>> cancelSwap(@PathVariable UUID id) {

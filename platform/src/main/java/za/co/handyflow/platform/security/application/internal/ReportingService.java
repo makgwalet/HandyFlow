@@ -83,6 +83,8 @@ public class ReportingService {
     private final SiteRepository            siteRepository;
     private final GuardRepository           guardRepository;
     private final PatrolRoundRepository     patrolRoundRepository;
+    private final GateRegisterEntryRepository gateRegisterEntryRepository;
+    private final AccessPointRepository       accessPointRepository;
 
     /**
      * FIX: backlog 7.1/7.2 — the single place hours-credit is decided per
@@ -322,5 +324,53 @@ public class ReportingService {
                 Math.round(overallCompletionRate * 10) / 10.0,
                 allIncidents.size(), incidentsBySeverity,
                 (int) activeGuards, siteSummaries);
+    }
+
+    /**
+     * FIX: Gate Access & Registry, Step 6 — the fourth security report.
+     * idNumber deliberately never leaves the repository layer for this
+     * report — see SiteAccessReport.EntryLine's own record Javadoc.
+     */
+    @Transactional(readOnly = true)
+    public SiteAccessReport getSiteAccessReport(TenantId tenantId, UUID siteId, YearMonth month) {
+        Instant from = month.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant to   = month.plusMonths(1).atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+
+        List<za.co.handyflow.platform.security.domain.model.GateRegisterEntry> entries =
+                gateRegisterEntryRepository.findAllBySiteAndPeriod(tenantId, siteId, from, to);
+
+        String siteName = siteRepository.findActiveById(tenantId, siteId)
+                .map(za.co.handyflow.platform.security.domain.model.Site::getName)
+                .orElse("Unknown site");
+
+        Map<UUID, String> accessPointNames = entries.stream()
+                .map(za.co.handyflow.platform.security.domain.model.GateRegisterEntry::getAccessPointId)
+                .distinct()
+                .collect(Collectors.toMap(id -> id, id -> accessPointRepository.findById(id)
+                        .map(za.co.handyflow.platform.security.domain.model.AccessPoint::getName)
+                        .orElse("Unknown access point")));
+
+        int currentlyOnSite = (int) entries.stream()
+                .filter(za.co.handyflow.platform.security.domain.model.GateRegisterEntry::isOnSite).count();
+        int departed = (int) entries.stream()
+                .filter(e -> "DEPARTED".equals(e.getStatus())).count();
+        int overstayed = (int) entries.stream()
+                .filter(e -> "OVERSTAYED".equals(e.getStatus())).count();
+
+        Map<String, Long> entriesByType = entries.stream()
+                .collect(Collectors.groupingBy(
+                        za.co.handyflow.platform.security.domain.model.GateRegisterEntry::getEntryType,
+                        Collectors.counting()));
+
+        List<SiteAccessReport.EntryLine> lines = entries.stream()
+                .map(e -> new SiteAccessReport.EntryLine(
+                        e.getEntryType(), e.getPersonName(), e.getCompany(),
+                        e.getVehicleRegistration(), accessPointNames.get(e.getAccessPointId()),
+                        e.getLoggedInAt(), e.getLoggedOutAt(), e.getStatus()))
+                .toList();
+
+        return new SiteAccessReport(siteId, siteName, month.toString(),
+                entries.size(), currentlyOnSite, departed, overstayed,
+                entriesByType, lines);
     }
 }

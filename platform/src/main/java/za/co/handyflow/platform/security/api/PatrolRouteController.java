@@ -24,12 +24,22 @@ import java.util.UUID;
 
 /**
  * PatrolRouteController — patrol route builder (admin) + round queries (live status).
- *
- * Routes are configured per site by a supervisor (USER_UPDATE authority).
- * Rounds are generated automatically when a shift starts (see
- * DeviceSessionService.openSession() → PatrolRoundService.generateRoundsForShift())
- * and are read-only from this controller — they're materialized state, not
- * something a client creates directly.
+ * <p>
+ * FIX: flagged repeatedly across this session's own permission-fix passes
+ * (Fuel 5.2, Accounting 8.1, Fleet 12.1, Guard/Site/Shift 7.0/1.7) as a
+ * confirmed still-open bug, finally addressed here. Turned out MORE
+ * serious than the earlier flagging described: getRoutesForSite() and
+ * getRoundsForShift() had NO @PreAuthorize at all — not merely the wrong
+ * generic tier, genuinely unguarded beyond the base tenant JWT
+ * requirement. Same SECURITY_READ/SECURITY_MANAGE two-tier convention
+ * as every other Security controller fixed this session — no delete
+ * endpoint here, so no SECURITY_ADMIN tier needed.
+ * <p>
+ * Routes are configured per site by a supervisor. Rounds are generated
+ * automatically when a shift starts (see DeviceSessionService.openSession()
+ * → PatrolRoundService.generateRoundsForShift()) and are read-only from
+ * this controller — they're materialized state, not something a client
+ * creates directly.
  */
 @Tag(name = "Security - Patrol Routes & Rounds")
 @RestController
@@ -42,6 +52,7 @@ public class PatrolRouteController {
     // ── Route CRUD ─────────────────────────────────────────────────────────────
 
     @GetMapping
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "List active patrol routes for a site")
     public ResponseEntity<ApiResponse<List<PatrolRoute>>> getRoutesForSite(
             @RequestParam UUID siteId) {
@@ -51,7 +62,7 @@ public class PatrolRouteController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Create a patrol route for a site",
             description = """
@@ -71,7 +82,7 @@ public class PatrolRouteController {
     }
 
     @PostMapping("/{routeId}/checkpoints")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Add a checkpoint to a patrol route",
             description = "sequence determines scan order within the route. " +
@@ -86,6 +97,7 @@ public class PatrolRouteController {
     // ── Round Queries (live status, read-only) ─────────────────────────────────
 
     @GetMapping("/rounds")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(
             summary = "Get all patrol rounds for a shift",
             description = """
