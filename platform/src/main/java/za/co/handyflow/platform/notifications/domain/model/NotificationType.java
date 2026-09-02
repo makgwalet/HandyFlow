@@ -303,6 +303,26 @@ public enum NotificationType {
     BK_AGREEMENT_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
     BK_INVOICE_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
 
+    // ── Insurance — Internal (Track 7 Module 8a) ─────────────────────────────
+    // WARNING for the 30-day-out reminder, CRITICAL for auto-EXPIRED —
+    // same tier split as FACILITY_COMPLIANCE_EXPIRING/EXPIRED and
+    // TRAININGPROVIDER_CERTIFICATE_EXPIRING/EXPIRED: a lapsed cover
+    // policy is a real financial/compliance risk discovered on a daily
+    // sweep, not an active emergency, so no SMS — same {IN_APP, EMAIL}
+    // -only CRITICAL treatment as those two precedents.
+    INSURANCE_POLICY_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
+    INSURANCE_POLICY_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),
+
+    // ── Insurance Brokerage — Provider (Track 7 Module 8b) ───────────────────
+    // Deliberately separate constants from the INSURANCE_* pair above,
+    // not reused — `insurance` and `insurancebrokerage` are independent,
+    // separately-subscribable modules (see insurancebrokerage's own
+    // package-info.java), so their notification streams stay
+    // distinguishable. Same WARNING/CRITICAL split and same reasoning
+    // as the internal pair.
+    INSURANCEBROKERAGE_POLICY_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
+    INSURANCEBROKERAGE_POLICY_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),
+
     // ── Tasks ────────────────────────────────────────────────────────────────
     TASK_ASSIGNED(INFO, Set.of(IN_APP, EMAIL)),
     TASK_COMMENT_ADDED(INFO, Set.of(IN_APP)),

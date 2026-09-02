@@ -15,22 +15,24 @@ import java.util.UUID;
 
 public interface LitigationMatterRepository extends JpaRepository<LitigationMatter, UUID> {
 
+    // FIX: see RegulatoryObligationRepository's comment — same
+    // embedded-TenantId vs SpEL-unwrap type mismatch, same fix.
     @Query("""
-        SELECT m FROM LitigationMatter m WHERE m.tenantId = :#{#tenantId.value}
+        SELECT m FROM LitigationMatter m WHERE m.tenantId = :tenantId
         AND m.deletedAt IS NULL
         AND (:status IS NULL OR m.status = :status)
         ORDER BY m.openedDate DESC
         """)
     Page<LitigationMatter> findAllActive(TenantId tenantId, LitigationStatus status, Pageable pageable);
 
-    @Query("SELECT m FROM LitigationMatter m WHERE m.tenantId = :#{#tenantId.value} AND m.id = :id AND m.deletedAt IS NULL")
+    @Query("SELECT m FROM LitigationMatter m WHERE m.tenantId = :tenantId AND m.id = :id AND m.deletedAt IS NULL")
     Optional<LitigationMatter> findActiveById(TenantId tenantId, UUID id);
 
-    @Query("SELECT COUNT(m) FROM LitigationMatter m WHERE m.tenantId = :#{#tenantId.value} AND m.deletedAt IS NULL")
+    @Query("SELECT COUNT(m) FROM LitigationMatter m WHERE m.tenantId = :tenantId AND m.deletedAt IS NULL")
     long countByTenant(TenantId tenantId);
 
     @Query("""
-    SELECT m FROM LitigationMatter m WHERE m.tenantId = :#{#tenantId.value}
+    SELECT m FROM LitigationMatter m WHERE m.tenantId = :tenantId
     AND m.deletedAt IS NULL
     AND m.closedDate IS NULL
     AND m.nextKeyDate IS NOT NULL

@@ -94,6 +94,24 @@ import { AuditorPortalLoginPage } from "./pages/auditor-portal/AuditorPortalLogi
 import { AuditorPortalAcceptInvitePage } from "./pages/auditor-portal/AuditorPortalAcceptInvitePage"
 import { AuditorPortalHomePage } from "./pages/auditor-portal/AuditorPortalHomePage"
 import { AuditorPortalTenantDetailPage } from "./pages/auditor-portal/AuditorPortalTenantDetailPage"
+import { LegalCompliancePage } from "./pages/legalcompliance/LegalCompliancePage"
+import { DebtCollectionPage } from "./pages/debtcollection/DebtCollectionPage"
+import { CollectionsAgencyPage } from "./pages/collectionsagency/CollectionsAgencyPage"
+import { CollAgencyPortalAcceptInvitePage } from "./pages/collectionsagency-portal/CollAgencyPortalAcceptInvitePage"
+import { CollAgencyPortalClientDetailPage } from "./pages/collectionsagency-portal/CollAgencyPortalClientDetailPage"
+import { CollAgencyPortalHomePage } from "./pages/collectionsagency-portal/CollAgencyPortalHomePage"
+import { CollAgencyPortalLoginPage } from "./pages/collectionsagency-portal/CollAgencyPortalLoginPage"
+import WarehousingPage from "./pages/warehousing/WarehousingPage"
+import { WhsePortalAcceptInvitePage } from "./pages/warehousing-portal/WhsePortalAcceptInvitePage"
+import { WhsePortalClientDetailPage } from "./pages/warehousing-portal/WhsePortalClientDetailPage"
+import { WhsePortalHomePage } from "./pages/warehousing-portal/WhsePortalHomePage"
+import { WhsePortalLoginPage } from "./pages/warehousing-portal/WhsePortalLoginPage"
+import TrainingPage from "./pages/training/TrainingPage"
+import TrainProvPage from "./pages/trainingprovider/TrainProvPage"
+import { TrainProvPortalAcceptInvitePage } from "./pages/trainingprovider-portal/TrainProvPortalAcceptInvitePage"
+import { TrainProvPortalHomePage } from "./pages/trainingprovider-portal/TrainProvPortalHomePage"
+import { TrainProvPortalLoginPage } from "./pages/trainingprovider-portal/TrainProvPortalLoginPage"
+import AgriculturePage from "./pages/agriculture/AgriculturePage"
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -127,6 +145,18 @@ function PortalProtectedRoute({ children }: { children: React.ReactNode }) {
 function PayrollBureauPortalProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = usePortalAuthStore(s => s.token)
   if (!token) return <Navigate to="/payroll-bureau/portal/login" replace />
+  return <>{children}</>
+}
+
+function CollAgencyPortalProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = usePortalAuthStore(s => s.token)
+  if (!token) return <Navigate to="/collections-agency/portal/login" replace />
+  return <>{children}</>
+}
+
+function WhsePortalProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = usePortalAuthStore(s => s.token)
+  if (!token) return <Navigate to="/warehousing/portal/login" replace />
   return <>{children}</>
 }
 
@@ -178,6 +208,26 @@ export default function App() {
           <Route path="/booking-agency/portal/auth/accept-invite" element={<BookingAgencyPortalAcceptInvitePage />} />
           <Route path="/booking-agency/portal" element={<BookingAgencyPortalProtectedRoute><BookingAgencyPortalHomePage /></BookingAgencyPortalProtectedRoute>} />
           <Route path="/booking-agency/portal/clients/:clientId" element={<BookingAgencyPortalProtectedRoute><BookingAgencyPortalClientDetailPage /></BookingAgencyPortalProtectedRoute>} />
+
+          <Route path="/collections-agency/portal/login"              element={<CollAgencyPortalLoginPage />} />
+          <Route path="/collections-agency/portal/auth/accept-invite" element={<CollAgencyPortalAcceptInvitePage />} />
+          <Route path="/collections-agency/portal" element={<CollAgencyPortalProtectedRoute><CollAgencyPortalHomePage /></CollAgencyPortalProtectedRoute>} />
+          <Route path="/collections-agency/portal/clients/:clientId" element={<CollAgencyPortalProtectedRoute><CollAgencyPortalClientDetailPage /></CollAgencyPortalProtectedRoute>} />
+
+          // Client portal (public auth routes + an authenticated portal route,
+          // matching the exact pattern already used for /warehousing/portal/*):
+          <Route path="/training-provider/portal/login" element={<TrainProvPortalLoginPage />} />
+          <Route path="/training-provider/portal/auth/accept-invite" element={<TrainProvPortalAcceptInvitePage />} />
+          <Route path="/training-provider/portal" element={<TrainProvPortalHomePage />} /> {/* wrap with the same portal-auth guard used for Warehousing/Collections Agency */}
+
+          <Route path="/warehousing/portal/login" element={<WhsePortalLoginPage />} />
+          <Route path="/warehousing/portal/auth/accept-invite" element={<WhsePortalAcceptInvitePage />} />
+          <Route path="/warehousing/portal" element={
+              <WhsePortalProtectedRoute><WhsePortalHomePage /></WhsePortalProtectedRoute>
+          } />
+          <Route path="/warehousing/portal/clients/:clientId" element={
+            <WhsePortalProtectedRoute><WhsePortalClientDetailPage /></WhsePortalProtectedRoute>
+          } />
 
           {/* NEW: Stage 3 — external auditor portal. Tenant-scoped, not
               client-scoped — routes reflect that: /tenants/:tenantId,
@@ -233,7 +283,14 @@ export default function App() {
             <Route path="/recurring/new"          element={<CreateRecurringSchedulePage />} />
             <Route path="/recurring"              element={<InvoicingPage />} />
             <Route path="/supply-chain"           element={<SupplyChainPage />} />
+            <Route path="/legalcompliance"        element={<LegalCompliancePage />} />
+            <Route path="/debtcollection" element={<DebtCollectionPage />} />
             <Route path="/recruitment-agency" element={<RecruitmentAgencyPage />} />
+            <Route path="/collections-agency" element={<CollectionsAgencyPage />} />
+            <Route path="/warehousing" element={<WarehousingPage />} />
+            <Route path="/training" element={<TrainingPage />} />
+            <Route path="/training-provider" element={<TrainProvPage />} />
+            <Route path="/agriculture" element={<AgriculturePage />} />
             {/* NEW: shared "needs attention" board — see import comment above. */}
             <Route path="/control-exceptions"     element={<ControlExceptionsPage />} />
 

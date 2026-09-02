@@ -12,17 +12,19 @@ import java.util.UUID;
 
 public interface PaymentPlanRepository extends JpaRepository<PaymentPlan, UUID> {
 
+    // FIX: same embedded-TenantId vs SpEL-unwrap type mismatch as
+    // RegulatoryObligationRepository (see its comment).
     @Query("""
-        SELECT p FROM PaymentPlan p WHERE p.tenantId = :#{#tenantId.value} AND p.caseId = :caseId
+        SELECT p FROM PaymentPlan p WHERE p.tenantId = :tenantId AND p.caseId = :caseId
         ORDER BY p.createdAt DESC
         """)
     List<PaymentPlan> findByCaseId(TenantId tenantId, UUID caseId);
 
-    @Query("SELECT p FROM PaymentPlan p WHERE p.tenantId = :#{#tenantId.value} AND p.id = :id")
+    @Query("SELECT p FROM PaymentPlan p WHERE p.tenantId = :tenantId AND p.id = :id")
     Optional<PaymentPlan> findByTenantIdAndId(TenantId tenantId, UUID id);
 
     @Query("""
-        SELECT p FROM PaymentPlan p WHERE p.tenantId = :#{#tenantId.value} AND p.caseId = :caseId
+        SELECT p FROM PaymentPlan p WHERE p.tenantId = :tenantId AND p.caseId = :caseId
         AND p.status = 'ACTIVE'
         """)
     Optional<PaymentPlan> findActiveByCaseId(TenantId tenantId, UUID caseId);

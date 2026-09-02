@@ -11,13 +11,15 @@ import java.util.UUID;
 
 public interface PopiaProcessingActivityRepository extends JpaRepository<PopiaProcessingActivity, UUID> {
 
+    // FIX: see RegulatoryObligationRepository's comment — same
+    // embedded-TenantId vs SpEL-unwrap type mismatch, same fix.
     @Query("""
-        SELECT a FROM PopiaProcessingActivity a WHERE a.tenantId = :#{#tenantId.value}
+        SELECT a FROM PopiaProcessingActivity a WHERE a.tenantId = :tenantId
         AND a.deletedAt IS NULL
         ORDER BY a.dataCategory, a.activityName
         """)
     List<PopiaProcessingActivity> findAllActive(TenantId tenantId);
 
-    @Query("SELECT a FROM PopiaProcessingActivity a WHERE a.tenantId = :#{#tenantId.value} AND a.id = :id AND a.deletedAt IS NULL")
+    @Query("SELECT a FROM PopiaProcessingActivity a WHERE a.tenantId = :tenantId AND a.id = :id AND a.deletedAt IS NULL")
     Optional<PopiaProcessingActivity> findActiveById(TenantId tenantId, UUID id);
 }

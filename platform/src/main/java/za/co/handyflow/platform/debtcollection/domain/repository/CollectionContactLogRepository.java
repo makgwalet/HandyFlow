@@ -10,8 +10,10 @@ import java.util.UUID;
 
 public interface CollectionContactLogRepository extends JpaRepository<CollectionContactLog, UUID> {
 
+    // FIX: same embedded-TenantId vs SpEL-unwrap type mismatch as
+    // RegulatoryObligationRepository (see its comment).
     @Query("""
-        SELECT l FROM CollectionContactLog l WHERE l.tenantId = :#{#tenantId.value} AND l.caseId = :caseId
+        SELECT l FROM CollectionContactLog l WHERE l.tenantId = :tenantId AND l.caseId = :caseId
         ORDER BY l.contactDate DESC, l.createdAt DESC
         """)
     List<CollectionContactLog> findByCaseId(TenantId tenantId, UUID caseId);

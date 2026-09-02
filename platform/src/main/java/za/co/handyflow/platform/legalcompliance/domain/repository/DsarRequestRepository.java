@@ -14,19 +14,21 @@ import java.util.UUID;
 
 public interface DsarRequestRepository extends JpaRepository<DsarRequest, UUID> {
 
+    // FIX: see RegulatoryObligationRepository's comment — same
+    // embedded-TenantId vs SpEL-unwrap type mismatch, same fix.
     @Query("""
-        SELECT d FROM DsarRequest d WHERE d.tenantId = :#{#tenantId.value}
+        SELECT d FROM DsarRequest d WHERE d.tenantId = :tenantId
         AND d.deletedAt IS NULL
         AND (:status IS NULL OR d.status = :status)
         ORDER BY d.dueDate ASC
         """)
     Page<DsarRequest> findAllActive(TenantId tenantId, DsarStatus status, Pageable pageable);
 
-    @Query("SELECT d FROM DsarRequest d WHERE d.tenantId = :#{#tenantId.value} AND d.id = :id AND d.deletedAt IS NULL")
+    @Query("SELECT d FROM DsarRequest d WHERE d.tenantId = :tenantId AND d.id = :id AND d.deletedAt IS NULL")
     Optional<DsarRequest> findActiveById(TenantId tenantId, UUID id);
 
     @Query("""
-        SELECT d FROM DsarRequest d WHERE d.tenantId = :#{#tenantId.value}
+        SELECT d FROM DsarRequest d WHERE d.tenantId = :tenantId
         AND d.deletedAt IS NULL AND d.status IN ('RECEIVED','IN_PROGRESS')
         ORDER BY d.dueDate ASC
         """)

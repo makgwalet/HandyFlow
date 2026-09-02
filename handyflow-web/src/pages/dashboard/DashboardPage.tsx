@@ -10,6 +10,10 @@ import {
   BookOpen, Calculator, Calendar, HeartPulse, PartyPopper, FilePen, Wallet,
   Palette, Headphones, CheckSquare, Megaphone, UserCheck, ShoppingCart,
   Truck, Receipt,
+  Scale,
+  Landmark,
+  Handshake,
+  Warehouse,
 } from 'lucide-react'
 import { apiClient } from '../../api/client'
 import { useAuthStore } from '../../store/auth.store'
@@ -57,6 +61,12 @@ const MODULE_REGISTRY: Record<string, AppTile> = {
   recruiter:   { key: 'recruiter',   name: 'Recruiter',      description: 'Jobs, pipeline & hiring',      icon: UserCheck,    bg: '#ECFDF5', iconColor: '#059669', route: '/recruiter'    },
   pos:         { key: 'pos',         name: 'POS & Stock',    description: 'Point of sale & inventory',    icon: ShoppingCart, bg: '#EFF6FF', iconColor: '#2563EB', route: '/pos'          },
   accountant:  { key: 'accountant',  name: 'Accountant',     description: 'Clients, SARS & billing',      icon: BookOpen,     bg: '#EFF6FF', iconColor: '#1B3A6B', route: '/accountant'   },
+  collectionsagency: { key: 'collectionsagency', name: 'Collections Agency', description: 'Client portfolios, placement & trust ledger', icon: Handshake, bg: '#F5F3FF', iconColor: '#5B21B6', route: '/collections-agency' },
+  warehousing: { key: 'warehousing', name: 'Warehousing', description: '3PL stock, shipments & billing', icon: Warehouse, bg: '#F0FDFA', iconColor: '#0F766E', route: '/warehousing' },
+  legalcompliance: { key: 'legalcompliance', name: 'Legal & Compliance', description: 'Obligations, litigation & POPIA', icon: Scale, bg: '#E0E7FF', iconColor: '#4338CA', route: '/legalcompliance' },
+  debtcollection: { key: 'debtcollection',  name: 'Debt Collection', description: 'Cases, contact trail & payment plans', icon: Landmark, bg: '#FFEDD5', iconColor: '#9A3412', route: '/debtcollection',
+
+},
 
   // ── Previously missing — added to match API moduleKey values ─────────────
   // JWT has SCM_READ, SCM_ORDER, SCM_ADMIN, SCM_INVENTORY, SCM_INVOICE → supply_chain
