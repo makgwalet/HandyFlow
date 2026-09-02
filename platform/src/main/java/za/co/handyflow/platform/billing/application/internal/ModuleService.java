@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.admin.DiscountFacade;
 import za.co.handyflow.platform.billing.domain.model.ModuleCatalogue;
 import za.co.handyflow.platform.billing.domain.model.TenantModule;
 import za.co.handyflow.platform.billing.domain.repository.ModuleCatalogueRepository;
@@ -12,12 +13,29 @@ import za.co.handyflow.platform.billing.dto.*;
 import za.co.handyflow.platform.shared.TenantId;
 import org.springframework.jdbc.core.JdbcTemplate;
 import za.co.handyflow.platform.billing.dto.CancelPreviewResponse;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
 
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * FIX: Discount Engine wiring session, Piece A. activateModule() now
+ * resolves and locks in a discount at activation time via
+ * admin.DiscountFacade — your confirmed decision (Option A): stored on
+ * TenantModule itself (discountPct/discountSource), not recomputed on
+ * later invoice cycles, and the volume-tier this resolves to is locked
+ * in too, not re-evaluated as the tenant's module count changes in
+ * future months. See DiscountFacade's own class Javadoc for why billing
+ * reaches admin through a facade rather than calling AdminDiscountService
+ * directly (billing's package-info didn't have admin in its allowed
+ * dependencies at all before this session).
+ * <p>
+ * Does NOT touch resolveDiscount()'s own resolution logic — Partnership
+ * > Volume > Code priority, non-stacking, all exactly as before. This
+ * is wiring, not a redesign, per this session's own explicit instruction.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -26,6 +44,7 @@ public class ModuleService {
     private final ModuleCatalogueRepository catalogueRepo;
     private final TenantModuleRepository    tenantModuleRepo;
     private final JdbcTemplate jdbc;
+    private final DiscountFacade discountFacade;
 
     // ── Catalogue ─────────────────────────────────────────────────────────────
 
@@ -49,7 +68,9 @@ public class ModuleService {
     @Transactional
     public TenantModuleResponse activateModule(TenantId tenantId,
                                                String moduleKey,
-                                               int trialDays) {
+                                               int trialDays,
+                                               String discountCode,
+                                               UUID activatedBy) {
         // Validate module exists
         ModuleCatalogue catalogue = catalogueRepo.findByKey(moduleKey)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -94,8 +115,26 @@ public class ModuleService {
                     : TenantModule.createActive(tenantId.getValue(), moduleKey);
         }
 
+        // FIX: Discount Engine wiring, Piece A. Resolved once here,
+        // covering both branches above (fresh creation AND
+        // re-activation) — a returning tenant with a valid partnership
+        // discount or a fresh discount code gets it recorded exactly
+        // the same as a brand-new activation. Zero-pct/"NONE" results
+        // (the normal case — most activations have no applicable
+        // discount) leave discountPct/discountSource null, matching
+        // every pre-existing TenantModule row's own correct default
+        // state.
+        DiscountFacade.DiscountOutcome discount = discountFacade.resolveAndRecordDiscount(
+                tenantId.getValue(), moduleKey, discountCode, catalogue.getMonthlyPrice(), activatedBy);
+        if (discount.pct() != null && discount.pct().compareTo(BigDecimal.ZERO) > 0) {
+            module.applyDiscount(discount.pct(), discount.source());
+        }
+
         tenantModuleRepo.save(module);
-        log.info("Activated module={} tenant={} status={}", moduleKey, tenantId, module.getStatus());
+        log.info("Activated module={} tenant={} status={} discount={}",
+                moduleKey, tenantId, module.getStatus(),
+                discount.pct() != null && discount.pct().compareTo(BigDecimal.ZERO) > 0
+                        ? discount.source() : "none");
         return toTenantModuleResponse(module, tenantId);
     }
 
@@ -124,10 +163,19 @@ public class ModuleService {
 
     @Transactional
     public void activateModules(TenantId tenantId, List<String> moduleKeys,
-                                int trialDays) {
+                                int trialDays, UUID activatedBy) {
         for (String key : moduleKeys) {
             try {
-                activateModule(tenantId, key, trialDays);
+                // FIX: Discount Engine wiring — batch activation (e.g.
+                // onboarding, activating several modules together) has
+                // no per-module discount code concept, matching this
+                // method's own pre-existing shape (no discountCode
+                // parameter here either) — discountCode is null for
+                // every module in the batch. Partnership/volume
+                // discounts still resolve and apply normally; only a
+                // one-time CODE specifically requires the single-module
+                // activateModule() call to supply one.
+                activateModule(tenantId, key, trialDays, null, activatedBy);
             } catch (Exception e) {
                 log.warn("Failed to activate module={} for tenant={}: {}",
                         key, tenantId, e.getMessage());

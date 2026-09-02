@@ -27,6 +27,11 @@ public class TenantModule {
     @Column(name = "billing_anchor")   int billingAnchor   = 1;
     @Column(name = "created_at")       Instant createdAt;
     @Column(name = "updated_at")       Instant updatedAt;
+    @Column(name = "discount_pct")
+    java.math.BigDecimal discountPct;
+
+    @Column(name = "discount_source")
+    String discountSource;
 
     public static TenantModule createTrial(UUID tenantId, String moduleKey,
                                             int trialDays) {
@@ -99,6 +104,12 @@ public class TenantModule {
 
     public boolean isFirstActivation() {
         return activationCount <= 1;
+    }
+
+    public void applyDiscount(java.math.BigDecimal pct, String source) {
+        this.discountPct    = pct;
+        this.discountSource = source;
+        this.updatedAt      = Instant.now();
     }
 
     // WHY calculate billing period end this way?

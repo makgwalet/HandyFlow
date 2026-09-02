@@ -44,8 +44,10 @@ public class ModuleController {
             @Valid @RequestBody ActivateModuleRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Module activated",
                 moduleService.activateModule(
-                        TenantContext.getTenantIdAsObject(), req.moduleKey(), 60)));
+                        TenantContext.getTenantIdAsObject(), req.moduleKey(), 60,
+                        null, TenantContext.getCurrentUserId())));
     }
+
 
     @PostMapping("/activate-batch")
     @PreAuthorize("hasAuthority('BILLING_MANAGE')")
@@ -54,7 +56,7 @@ public class ModuleController {
             @Valid @RequestBody OnboardingModuleSelection req) {
         var tenantId = TenantContext.getTenantIdAsObject();
         int trialDays = req.trialDays() > 0 ? req.trialDays() : 60;
-        moduleService.activateModules(tenantId, req.moduleKeys(), trialDays);
+        moduleService.activateModules(tenantId, req.moduleKeys(), trialDays, TenantContext.getCurrentUserId());
         return ResponseEntity.ok(ApiResponse.success("Modules activated",
                 moduleService.getTenantModules(tenantId)));
     }

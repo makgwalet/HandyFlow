@@ -41,7 +41,7 @@ class BillingEventHandlers {
         if (event.moduleKeys() != null && !event.moduleKeys().isEmpty()) {
             log.info("Billing: Activating {} modules for tenant={}",
                 event.moduleKeys().size(), event.tenantId());
-            moduleService.activateModules(event.tenantId(), event.moduleKeys(), 60);
+            moduleService.activateModules(event.tenantId(), event.moduleKeys(), 60, null);
         }
     }
 }

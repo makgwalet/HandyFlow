@@ -38,6 +38,28 @@ import static za.co.handyflow.platform.notifications.domain.model.NotificationSe
  * Incident: "most overstays are someone forgetting to sign out, not a
  * security event." Same tone as GUARD_LATE/PATROL_ROUND_MISSED in this same
  * section, not GUARD_NO_SHOW/DURESS_TRIGGERED.
+ *
+ * FIX: Track 7 Module 5a (Facilities & Maintenance, internal) — added the
+ * FACILITY_* constants. FACILITY_COMPLIANCE_EXPIRED is CRITICAL but not
+ * SMS'd — an expired electrical COC/fire/elevator/gas certificate is a real
+ * regulatory and insurance risk, but it's a paperwork lapse discovered on a
+ * daily sweep, not an active safety emergency in progress, so it follows
+ * the same {IN_APP, EMAIL}-only CRITICAL treatment as
+ * SARS_DEADLINE_OVERDUE/TRAININGPROVIDER_CERTIFICATE_EXPIRED rather than
+ * the SMS-included tier reserved for ASSET_BREAKDOWN/VEHICLE_BREAKDOWN/
+ * DURESS_TRIGGERED/GUARD_NO_SHOW/FUEL_NEGATIVE_VARIANCE.
+ *
+ * FIX: Track 7 Module 5b (Facilities Management, provider) — added the
+ * FM_* constants. Same severity reasoning as the 5a FACILITY_* set above,
+ * applied to the outsourced-provider sibling (client-billed work orders,
+ * per-client service agreements, and the practice's own invoices rather
+ * than compliance certificates).
+ *
+ * FIX: Track 7 Module 6 (Bookkeeping Services) — added the BK_* constants.
+ * BK_TRANSACTION_UNRECONCILED is WARNING, not CRITICAL — a stale
+ * reconciliation is a practice-hygiene risk worth surfacing daily, not an
+ * emergency, matching the tone of AR_AGING_ALERT/STOCK_LOW rather than
+ * SARS_DEADLINE_OVERDUE.
  */
 public enum NotificationType {
 
@@ -208,6 +230,78 @@ public enum NotificationType {
     SUPPLIER_INVOICE_DISPUTED(WARNING, Set.of(IN_APP, EMAIL)),
     SUPPLIER_INVOICE_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
     LOW_STOCK_DIGEST(INFO, Set.of(IN_APP, EMAIL)),
+
+    // ── Training ─────────────────────────────────────────────────────────────
+    TRAINING_SESSION_UPCOMING(INFO, Set.of(IN_APP, EMAIL)),
+    TRAINING_CERTIFICATE_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
+    TRAINING_CERTIFICATE_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),
+
+    // ── Warehousing ──────────────────────────────────────────────────────────
+    WAREHOUSING_INBOUND_SHIPMENT_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+    WAREHOUSING_OUTBOUND_ORDER_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+    WAREHOUSING_INVOICE_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+
+    // ── Legal / Compliance ──────────────────────────────────────────────────
+    LEGALCOMPLIANCE_OBLIGATION_DUE_SOON(WARNING, Set.of(IN_APP, EMAIL)),
+    LEGALCOMPLIANCE_OBLIGATION_OVERDUE(CRITICAL, Set.of(IN_APP, EMAIL)),
+    LEGALCOMPLIANCE_DSAR_DUE_SOON(WARNING, Set.of(IN_APP, EMAIL)),
+    LEGALCOMPLIANCE_DSAR_OVERDUE(CRITICAL, Set.of(IN_APP, EMAIL)),
+
+    // ── Legal Practice ───────────────────────────────────────────────────────
+// LpNotificationScheduler's daily 10:00 SAST sweep of LpMatterKeyDate rows
+// (court dates, prescription deadlines, filing deadlines) that are due or
+// overdue and not yet acknowledged. WARNING, not CRITICAL — same tier as
+// AG_SCOUTING_FOLLOWUP_DUE/AG_HEALTH_EVENT_DUE: a real, time-sensitive
+// professional obligation, but not itself a safety or fraud event. Both
+// IN_APP and EMAIL — a missed prescription deadline or court date is
+// something a firm needs to see even when not logged in.
+    LP_MATTER_KEYDATE_DUE(WARNING, Set.of(IN_APP, EMAIL)),
+
+    // ── Agriculture ─────────────────────────────────────────────────────────
+    AG_HEALTH_EVENT_DUE(WARNING, Set.of(IN_APP, EMAIL)),
+    AG_INVENTORY_LOW_STOCK(WARNING, Set.of(IN_APP, EMAIL)),
+    AG_SCOUTING_FOLLOWUP_DUE(WARNING, Set.of(IN_APP, EMAIL)),
+
+    // ── Debt Collection ──────────────────────────────────────────────────────
+    DEBTCOLLECTION_CASE_ACTION_DUE_SOON(WARNING, Set.of(IN_APP, EMAIL)),
+    DEBTCOLLECTION_CASE_ACTION_OVERDUE(CRITICAL, Set.of(IN_APP, EMAIL)),
+    DEBTCOLLECTION_PAYMENT_PLAN_INSTALLMENT_DUE_SOON(WARNING, Set.of(IN_APP, EMAIL)),
+    DEBTCOLLECTION_PAYMENT_PLAN_INSTALLMENT_OVERDUE(CRITICAL, Set.of(IN_APP, EMAIL)),
+
+
+    // ── Collections Agency ───────────────────────────────────────────────────
+    COLLECTIONSAGENCY_FIRM_REGISTRATION_DUE_SOON(WARNING, Set.of(IN_APP, EMAIL)),
+    COLLECTIONSAGENCY_FIRM_REGISTRATION_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),
+    COLLECTIONSAGENCY_COLLECTOR_REGISTRATION_DUE_SOON(WARNING, Set.of(IN_APP, EMAIL)),
+    COLLECTIONSAGENCY_COLLECTOR_REGISTRATION_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),
+    COLLECTIONSAGENCY_PAYMENT_PLAN_INSTALLMENT_DUE_SOON(WARNING, Set.of(IN_APP, EMAIL)),
+    COLLECTIONSAGENCY_PAYMENT_PLAN_INSTALLMENT_OVERDUE(CRITICAL, Set.of(IN_APP, EMAIL)),
+
+    // ── Training Provider ───────────────────────────────────────────────────
+    TRAININGPROVIDER_ACCREDITATION_EXPIRING(CRITICAL, Set.of(IN_APP, EMAIL)),
+    TRAININGPROVIDER_SESSION_UPCOMING(WARNING, Set.of(IN_APP, EMAIL)),
+    TRAININGPROVIDER_CERTIFICATE_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
+    TRAININGPROVIDER_CERTIFICATE_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),
+    TRAININGPROVIDER_INVOICE_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+
+    // ── Facilities & Maintenance (Internal — Track 7 Module 5a) ─────────────
+    FACILITY_PPM_DUE(INFO, Set.of(IN_APP, EMAIL)),
+    FACILITY_WORKORDER_URGENT(WARNING, Set.of(IN_APP, EMAIL)),
+    FACILITY_WORKORDER_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+    FACILITY_COMPLIANCE_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
+    FACILITY_COMPLIANCE_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),
+
+    // ── Facilities Management (Provider — Track 7 Module 5b) ────────────────
+    FM_PPM_DUE(INFO, Set.of(IN_APP, EMAIL)),
+    FM_WORKORDER_URGENT(WARNING, Set.of(IN_APP, EMAIL)),
+    FM_WORKORDER_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+    FM_AGREEMENT_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
+    FM_INVOICE_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+
+    // ── Bookkeeping Services (Track 7 Module 6) ──────────────────────────────
+    BK_TRANSACTION_UNRECONCILED(WARNING, Set.of(IN_APP, EMAIL)),
+    BK_AGREEMENT_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
+    BK_INVOICE_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
 
     // ── Tasks ────────────────────────────────────────────────────────────────
     TASK_ASSIGNED(INFO, Set.of(IN_APP, EMAIL)),

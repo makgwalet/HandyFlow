@@ -1,0 +1,110 @@
+package za.co.handyflow.platform.trainingprovider.api;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import za.co.handyflow.platform.WebMvcTestSecuritySupport;
+import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.trainingprovider.application.internal.TrainProvClientService;
+import za.co.handyflow.platform.trainingprovider.application.internal.TrainProvProfileService;
+import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvClient;
+
+import java.util.List;
+import java.util.UUID;
+
+import static org.hamcrest.Matchers.hasSize;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@WebMvcTest(TrainProvController.class)
+@Import(WebMvcTestSecuritySupport.class)
+class TrainProvControllerTest {
+
+    @Autowired MockMvc mvc;
+    @Autowired ObjectMapper mapper;
+
+    @MockitoBean TrainProvProfileService profileService;
+    @MockitoBean TrainProvClientService clientService;
+    @MockitoBean FeatureGuard featureGuard;
+
+    static final String BASE = "/api/v1/training-provider";
+
+    private TrainProvClient testClient() {
+        return TrainProvClient.create(TenantId.generate(), "CLI-00001", "Acme Corp", "REG123", "Jane",
+                "jane@acme.co.za", "0821234567", "1 Main St");
+    }
+
+    @Test
+    @WithMockUser(authorities = "TRAININGPROVIDER_READ")
+    @DisplayName("GET /clients returns 200 with TRAININGPROVIDER_READ")
+    void listClientsReturns200() throws Exception {
+        when(clientService.list(any(), any(), any(), any())).thenReturn(new PageImpl<>(List.of(testClient())));
+
+        mvc.perform(get(BASE + "/clients"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content", hasSize(1)))
+                .andExpect(jsonPath("$.data.content[0].tradingName").value("Acme Corp"));
+    }
+
+    @Test
+    @WithMockUser(authorities = "SOME_OTHER_AUTHORITY")
+    @DisplayName("GET /clients returns 403 without any TRAININGPROVIDER_* authority")
+    void listClientsReturns403WithoutAuthority() throws Exception {
+        mvc.perform(get(BASE + "/clients")).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(authorities = "TRAININGPROVIDER_READ")
+    @DisplayName("POST /clients with only TRAININGPROVIDER_READ returns 403")
+    void createClientWithReadOnlyReturns403() throws Exception {
+        mvc.perform(post(BASE + "/clients").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"tradingName":"Acme Corp"}
+                            """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(authorities = "TRAININGPROVIDER_MANAGE")
+    @DisplayName("POST /clients with TRAININGPROVIDER_MANAGE returns 201")
+    void createClientWithManageReturns201() throws Exception {
+        when(clientService.create(any(), any(), any(), any(), any(), any(), any())).thenReturn(testClient());
+
+        mvc.perform(post(BASE + "/clients").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"tradingName":"Acme Corp"}
+                            """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.clientCode").value("CLI-00001"));
+    }
+
+    @Test
+    @WithMockUser(authorities = "TRAININGPROVIDER_MANAGE")
+    @DisplayName("DELETE /clients/{id} with only TRAININGPROVIDER_MANAGE returns 403 — ADMIN only")
+    void deleteClientWithManageOnlyReturns403() throws Exception {
+        mvc.perform(delete(BASE + "/clients/" + UUID.randomUUID()).with(csrf()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(authorities = "TRAININGPROVIDER_ADMIN")
+    @DisplayName("DELETE /clients/{id} with TRAININGPROVIDER_ADMIN returns 200")
+    void deleteClientWithAdminReturns200() throws Exception {
+        mvc.perform(delete(BASE + "/clients/" + UUID.randomUUID()).with(csrf()))
+                .andExpect(status().isOk());
+    }
+}
