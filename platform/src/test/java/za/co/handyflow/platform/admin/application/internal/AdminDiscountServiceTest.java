@@ -211,7 +211,14 @@ class AdminDiscountServiceTest {
             // Partnership: 30% off. FIXED code: R50 off a R200 module = 25% off.
             // Partnership must still win — this is the exact "best wins,
             // never stacks" rule the FIXED fix was required NOT to change.
-            when(jdbc.queryForList(anyString(), any(), any()))
+            // NOTE: any(Object.class), not bare any() — JdbcTemplate overloads
+            // queryForList() several ways (String,Object...) vs
+            // (String,Class<T>,Object...) vs (String,Object[],int[]); two loose
+            // any() matchers left the call genuinely ambiguous to javac
+            // (confirmed via a real build: "reference to queryForList is
+            // ambiguous"). Typing the matcher to Object pins it to the plain
+            // varargs overload the production code actually calls.
+            when(jdbc.queryForList(anyString(), any(Object.class), any(Object.class)))
                     .thenReturn(List.of(Map.of("discount_pct", new BigDecimal("30"), "partner_name", "AcmeCo")));
             when(jdbc.queryForMap(anyString(), any()))
                     .thenReturn(discountCodeRow("FIXED", new BigDecimal("50"), "ALL"));
@@ -230,7 +237,7 @@ class AdminDiscountServiceTest {
         void fixedCodeBeatsLowerPartnership() {
             service = newService();
             // Partnership: 10% off. FIXED code: R50 off a R200 module = 25% off — code wins.
-            when(jdbc.queryForList(anyString(), any(), any()))
+            when(jdbc.queryForList(anyString(), any(Object.class), any(Object.class)))
                     .thenReturn(List.of(Map.of("discount_pct", new BigDecimal("10"), "partner_name", "AcmeCo")));
             when(jdbc.queryForMap(anyString(), any()))
                     .thenReturn(discountCodeRow("FIXED", new BigDecimal("50"), "ALL"));

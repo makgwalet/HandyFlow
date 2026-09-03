@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -154,7 +155,7 @@ class AuthServiceTest {
             doThrow(new RuntimeException("SMTP down")).when(emailService)
                     .send(anyString(), anyString(), anyString());
 
-            ArgumentCaptor<Tenant> tenantCaptor = org.mockito.ArgumentCaptor.forClass(Tenant.class);
+            ArgumentCaptor<Tenant> tenantCaptor = ArgumentCaptor.forClass(Tenant.class);
             when(roleService.createDefaultAdminRole(any())).thenAnswer(inv ->
                     adminRole(inv.getArgument(0)));
             when(subscriptionQueryFacade.getSubscription(any()))
@@ -168,7 +169,7 @@ class AuthServiceTest {
             assertThat(saved.getSlug()).isEqualTo("zeta-earthmoving");
             assertThat(saved.getStatus()).isEqualTo(Tenant.TenantStatus.TRIAL);
 
-            ArgumentCaptor<User> userCaptor = org.mockito.ArgumentCaptor.forClass(User.class);
+            ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
             verify(userRepository).save(userCaptor.capture());
             User savedOwner = userCaptor.getValue();
             assertThat(savedOwner.getEmail()).isEqualTo("owner@zeta.co.za");
