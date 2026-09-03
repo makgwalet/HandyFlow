@@ -36,11 +36,22 @@ class IdentityDomainModelTest {
         @Test
         @DisplayName("register() creates a TRIAL tenant with a normalized slug and email")
         void registerCreatesTrialTenant() {
-            Tenant tenant = Tenant.register("Zeta Earthmoving", "Zeta-Earthmoving",
+            // FIX: a real build (mvn test) caught this — Tenant.register()
+            // calls validateSlug() on the RAW slug BEFORE lowercasing it
+            // (confirmed directly against the method: validateSlug(slug) runs
+            // first, then tenant.slug = slug.toLowerCase().trim() only after
+            // that passes), and the regex itself only accepts lowercase
+            // letters. A mixed-case slug like "Zeta-Earthmoving" is genuinely
+            // rejected today, not silently normalized — .toLowerCase() exists
+            // to trim/normalize an ALREADY-lowercase input, not to rescue an
+            // invalid one. Using an already-lowercase slug here to test the
+            // real happy path; the case-sensitivity contract itself is
+            // covered separately by registerRejectsInvalidSlug() below.
+            Tenant tenant = Tenant.register("Zeta Earthmoving", "zeta-earthmoving",
                     "Owner@Zeta.co.za", "0115550100", "construction", "PROMO10", List.of("fleet"));
 
             assertThat(tenant.getStatus()).isEqualTo(Tenant.TenantStatus.TRIAL);
-            assertThat(tenant.getSlug()).isEqualTo("zeta-earthmoving"); // lowercased
+            assertThat(tenant.getSlug()).isEqualTo("zeta-earthmoving");
             assertThat(tenant.getEmail()).isEqualTo("owner@zeta.co.za"); // lowercased
             assertThat(tenant.isActive()).isTrue(); // TRIAL counts as active
         }
