@@ -41,7 +41,6 @@ import java.util.stream.Collectors;
 @Slf4j
 public class PosService {
 
-    private static final BigDecimal VAT_RATE_STANDARD = BigDecimal.valueOf(15);
     private static final BigDecimal VAT_DIVISOR       = BigDecimal.valueOf(100);
     private static final ZoneId     ZONE_SA           = ZoneId.of("Africa/Johannesburg");
 
@@ -76,6 +75,14 @@ public class PosService {
     // pos, so pos depending on accounting is a clean one-directional
     // edge, same shape as AP's own migration.
     private final AccountingFacade accountingFacade;
+    // FIX (VAT consolidation pass): replaces the private static final
+    // BigDecimal.valueOf(15) literal that used to sit above the field
+    // list — see VatRateProvider's own Javadoc for the full "scattered
+    // in 4+ places" finding this closes. ratePercent() (15.00) matches
+    // this class's own existing percentage-based arithmetic exactly, so
+    // every call site below only needed its literal swapped, not its
+    // math rewritten.
+    private final za.co.handyflow.platform.shared.VatRateProvider vatRateProvider;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Summary
@@ -288,9 +295,13 @@ public class PosService {
         }
         totalDiscount = totalDiscount.add(txnDiscountAmt);
 
-        BigDecimal netBeforeVat = subtotal.subtract(totalDiscount);
-        BigDecimal vatOnNet     = netBeforeVat.multiply(VAT_RATE_STANDARD)
-                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        // FIX (VAT consolidation pass, adjacent cleanup): removed a dead
+        // `netBeforeVat`/`vatOnNet` pair that used to sit here —
+        // confirmed via search that netBeforeVat was computed only to
+        // feed vatOnNet, and vatOnNet itself was never read anywhere in
+        // this file; the very next line's own comment already says to
+        // use the item-level `totalVat` accumulated above instead,
+        // which is what actually flows into txn.setTotals() below.
         // Use item-level VAT already computed; txn-level discount reduces it proportionally
         BigDecimal totalAmount  = savedItems.stream()
                 .map(PosTransactionItem::getLineTotal)
@@ -842,10 +853,24 @@ public class PosService {
 
         for (CreatePurchaseOrderRequest.PurchaseOrderLine line : req.items()) {
             String itemName = resolveItemName(tenantId, line.catalogueItemId(), line.itemName());
+            // FIX (VAT consolidation pass): line.vatRate() is genuinely
+            // nullable at the DTO level (no validation constrains it —
+            // confirmed directly against CreatePurchaseOrderRequest) and
+            // was previously passed straight through to
+            // PosPurchaseOrderItem.create(), whose own internal fallback
+            // (a hardcoded BigDecimal.valueOf(15)) was the only thing
+            // resolving it — unlike CatalogueItem's and
+            // PosTransactionItem's equivalent entity-level fallbacks,
+            // this one was actually reachable via a real, unprotected
+            // call path, not dead defensive code. Resolved here instead,
+            // matching the same pattern CatalogueService.createItem()/
+            // updateItem() already use — the entity's own fallback stays
+            // in place as a backstop, now genuinely unreachable too.
+            BigDecimal poVatRate = line.vatRate() != null ? line.vatRate() : vatRateProvider.ratePercent();
             PosPurchaseOrderItem poItem = PosPurchaseOrderItem.create(
                     po.getId(), tenantId.getValue(),
                     line.catalogueItemId(), itemName,
-                    line.qtyOrdered(), line.unitCost(), line.vatRate());
+                    line.qtyOrdered(), line.unitCost(), poVatRate);
             purchaseOrderItemRepo.save(poItem);
             items.add(poItem);
 
@@ -1089,10 +1114,10 @@ public class PosService {
     // was never actually wired into the entity — this uses the one that already
     // works instead of finishing the one that doesn't.
     private BigDecimal resolveVatRate(TenantId tenantId, UUID catalogueItemId) {
-        if (catalogueItemId == null) return VAT_RATE_STANDARD;
+        if (catalogueItemId == null) return vatRateProvider.ratePercent();
         return catalogueFacade.findItemById(tenantId, catalogueItemId)
-                .map(item -> item.vatRate() != null ? item.vatRate() : VAT_RATE_STANDARD)
-                .orElse(VAT_RATE_STANDARD);
+                .map(item -> item.vatRate() != null ? item.vatRate() : vatRateProvider.ratePercent())
+                .orElse(vatRateProvider.ratePercent());
     }
 
     private String resolveItemName(TenantId tenantId, UUID catalogueItemId, String fallback) {

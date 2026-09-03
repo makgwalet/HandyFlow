@@ -247,9 +247,7 @@ public class AdminDiscountService {
 
                 if ("ALL".equals(appliesTo) ||
                         ("MODULE".equals(appliesTo) && moduleKey.equals(codeModuleKey))) {
-                    BigDecimal codePct = "PERCENT".equals(code.get("discount_type"))
-                            ? (BigDecimal) code.get("value")
-                            : BigDecimal.ZERO; // FIXED handled separately below
+                    BigDecimal codePct = resolveCodePercent(code, moduleKey);
                     if (codePct.compareTo(bestPct) > 0) {
                         bestPct    = codePct;
                         bestSource = "CODE:" + discountCode.toUpperCase();
@@ -261,6 +259,74 @@ public class AdminDiscountService {
         }
 
         return new DiscountResult(bestPct, bestSource);
+    }
+
+    /**
+     * FIX: closes the "FIXED handled separately below" gap — that
+     * comment referred to logic that was never actually written, so
+     * every FIXED-type discount code silently resolved to a permanent
+     * 0% discount despite being a fully creatable, fully validated
+     * option in the real admin API (confirmed directly: {@code
+     * AdminLookupController.createDiscount()}'s own Swagger summary
+     * reads "Create a discount code — PERCENT or FIXED").
+     * <p>
+     * Deliberately does NOT change resolveDiscount()'s own resolution
+     * algorithm — Partnership/Volume/Code stay compared the exact same
+     * "highest percentage wins, never stacks" way they already were.
+     * This only finishes computing what a FIXED code's own percentage
+     * VALUE actually is, using data resolveDiscount() already has
+     * (moduleKey) via one extra lookup in this same raw-JDBC style
+     * already used throughout this class — no new field, no new
+     * cross-module dependency, no signature change to resolveDiscount()
+     * or either of its two real callers (AdminDiscountController.
+     * previewDiscount(), DiscountFacadeImpl.resolveAndRecordDiscount()).
+     * <p>
+     * A FIXED amount is converted to the equivalent percentage of that
+     * specific module's real catalogue price, so it can be compared
+     * like-for-like against the percentage-based Partnership/Volume
+     * sources using the identical ">"-wins rule already in place in the
+     * caller. Capped at 100% — a fixed discount larger than the price
+     * itself must never imply a negative effective price once
+     * applyAndRecord() later multiplies this percentage back against
+     * the tenant's real activation price.
+     * <p>
+     * If the module's catalogue price can't be resolved for any reason
+     * (unknown key, zero/null price), a FIXED code falls back to 0% —
+     * the same safe "no discount rather than guessing" behaviour every
+     * other failure path in resolveDiscount() already uses (see the
+     * catch blocks around Partnership/Volume above), not a crash and
+     * not a silently wrong number.
+     */
+    private BigDecimal resolveCodePercent(Map<String, Object> code, String moduleKey) {
+        String discountType = (String) code.get("discount_type");
+        BigDecimal value    = (BigDecimal) code.get("value");
+
+        if ("PERCENT".equals(discountType)) {
+            return value;
+        }
+
+        if ("FIXED".equals(discountType)) {
+            try {
+                BigDecimal price = jdbc.queryForObject(
+                        "SELECT monthly_price FROM module_catalogue WHERE key = ?",
+                        BigDecimal.class, moduleKey);
+                if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+                    log.debug("FIXED discount code has no positive catalogue price to convert against for module={}", moduleKey);
+                    return BigDecimal.ZERO;
+                }
+                return value.divide(price, 4, RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100))
+                        .min(BigDecimal.valueOf(100));
+            } catch (Exception e) {
+                log.debug("Could not resolve catalogue price for FIXED discount conversion, module={}: {}",
+                        moduleKey, e.getMessage());
+                return BigDecimal.ZERO;
+            }
+        }
+
+        // Unrecognized discount_type — same "no discount rather than
+        // guessing" posture as everywhere else in this method.
+        return BigDecimal.ZERO;
     }
 
     /**

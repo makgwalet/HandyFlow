@@ -19,6 +19,7 @@ import za.co.handyflow.platform.admin.domain.model.AdminAuditLog;
 import za.co.handyflow.platform.admin.domain.repository.AdminAuditLogRepository;
 import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.HandyFlowException;
+import za.co.handyflow.platform.shared.VatRateProvider;
 
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
@@ -53,8 +54,15 @@ public class AdminInvoiceService {
     private final EmailService              emailService;
     private final AdminAuditLogRepository   auditRepo;
     private final AdminNotificationService  notificationService;
+    // FIX (VAT consolidation pass): replaces the private static final
+    // BigDecimal("0.15") literal that used to live here — see
+    // VatRateProvider's own Javadoc for the full "scattered in 4+
+    // places" finding this closes. rateFraction() (0.15) is what this
+    // class's existing arithmetic already expects; ratePercent() (15.00)
+    // is what PosService/CatalogueService use instead — same underlying
+    // value, two representations, no call site had to change shape.
+    private final VatRateProvider           vatRateProvider;
 
-    private static final BigDecimal VAT_RATE   = new BigDecimal("0.15");
     private static final DeviceRgb  NAVY       = new DeviceRgb(27,  58,  107);
     private static final DeviceRgb  TEAL       = new DeviceRgb(13,  148, 136);
     private static final DeviceRgb  LIGHT_GRAY = new DeviceRgb(248, 250, 252);
@@ -104,7 +112,7 @@ public class AdminInvoiceService {
                 .map(m -> (BigDecimal) m.get("monthly_price"))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal vat   = subtotal.multiply(VAT_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal vat   = subtotal.multiply(vatRateProvider.rateFraction()).setScale(2, RoundingMode.HALF_UP);
         BigDecimal total = subtotal.add(vat);
 
         // Invoice number: HF-INV-2026-0001
@@ -144,7 +152,7 @@ public class AdminInvoiceService {
             """,
                 invoiceId, invoiceNumber, tenantId, tenantName, tenantEmail,
                 year, month, periodLabel,
-                subtotal, vat, total, VAT_RATE,
+                subtotal, vat, total, vatRateProvider.rateFraction(),
                 lineItems.toString(), dueDate, pdfBase64,
                 adminId, adminEmail);
 
@@ -460,7 +468,14 @@ public class AdminInvoiceService {
                     .setMarginTop(8);
 
             addTotalRow(totals, "Subtotal (excl. VAT)", "R " + ZAR.format(subtotal), false);
-            addTotalRow(totals, "VAT (15%)", "R " + ZAR.format(vat), false);
+            // FIX (VAT consolidation pass): this label was a separate
+            // hardcoded "VAT (15%)" string, entirely disconnected from
+            // the VAT_RATE value actually used to compute `vat` above —
+            // changing the rate would have silently made this label
+            // wrong while the real amount stayed correct. Now built
+            // from the same VatRateProvider the calculation itself uses.
+            addTotalRow(totals, "VAT (" + vatRateProvider.ratePercent().stripTrailingZeros().toPlainString() + "%)",
+                    "R " + ZAR.format(vat), false);
 
             // Total row — navy background
             Cell totalLbl = new Cell().setBackgroundColor(NAVY).setPadding(8)
