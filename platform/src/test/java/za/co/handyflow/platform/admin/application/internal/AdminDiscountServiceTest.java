@@ -92,8 +92,16 @@ class AdminDiscountServiceTest {
                     service.resolveDiscount(TENANT_ID, MODULE_KEY, "   ");
 
             assertThat(result.hasDiscount()).isFalse();
-            // The code lookup must never even run for a blank code.
-            org.mockito.Mockito.verifyNoInteractions(jdbc);
+            // FIX: a real build (mvn test) caught this — verifyNoInteractions(jdbc)
+            // was wrong. Partnership and Volume checks run unconditionally in
+            // resolveDiscount() regardless of whether a discount code was
+            // supplied at all (confirmed directly against the method: only the
+            // block guarded by `if (discountCode != null && !discountCode.isBlank())`
+            // is skipped) — only the discount-CODE-specific lookup
+            // (queryForMap against admin_discounts) is what a blank code
+            // actually suppresses. Narrowed the verification to that one call.
+            org.mockito.Mockito.verify(jdbc, org.mockito.Mockito.never())
+                    .queryForMap(anyString(), any());
         }
     }
 
