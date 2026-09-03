@@ -122,7 +122,31 @@ public class SecurityConfig {
                                 // path containing "/portal/", confirmed
                                 // directly from that filter's own
                                 // shouldNotFilter()).
-                                "/api/v1/hr/portal/auth/**"
+                                "/api/v1/hr/portal/auth/**",
+                                // FIX (identity module modernization): the
+                                // main-app team-invitation flow was
+                                // completely unreachable. UserController's
+                                // acceptInvitation() and validateToken()
+                                // are both explicitly documented as
+                                // "public — no auth required" (a new user
+                                // has no JWT to present by definition —
+                                // same shape as every portal's own
+                                // register/login above), and
+                                // AcceptInvitePage.tsx calls both with no
+                                // Authorization header. Neither path was
+                                // ever added here, so both fell through to
+                                // .anyRequest().authenticated() and were
+                                // rejected before UserController ever ran
+                                // — confirmed directly against
+                                // UserController's mappings, not assumed.
+                                // Scoped narrowly to just these two
+                                // GET/POST endpoints (not all of
+                                // /api/v1/identity/**, which is rightly
+                                // authenticated) — matches the same
+                                // narrow-permitAll convention used for
+                                // every portal auth path above.
+                                "/api/v1/identity/invitations/accept",
+                                "/api/v1/identity/invitations/validate/**"
                         ).permitAll()
                         // Everything else requires authentication
                         .anyRequest().authenticated()

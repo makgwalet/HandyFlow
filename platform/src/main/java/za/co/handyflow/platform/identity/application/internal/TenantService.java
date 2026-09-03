@@ -44,7 +44,16 @@ public class TenantService {
         Tenant tenant = tenantRepository.findById(tenantId.getValue())
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant", tenantId.getValue().toString()));
         String logoData = req.logoBase64();
-        if (logoData != null && !logoData.startsWith("data:")) {
+        // FIX: blank now means "clear the logo" and is stored as a real
+        // null, matching SettingsPage.tsx's "Remove logo" button (see
+        // UploadLogoRequest's own Javadoc). Previously this branch
+        // wrapped even an empty string into "data:image/png;base64,"
+        // — a non-null, non-empty-looking value with no actual image
+        // data — which meant Remove never actually cleared logoUrl and
+        // would have left the frontend trying to render a broken image.
+        if (logoData == null || logoData.isBlank()) {
+            logoData = null;
+        } else if (!logoData.startsWith("data:")) {
             String mime = req.mimeType() != null ? req.mimeType() : "image/png";
             logoData = "data:" + mime + ";base64," + logoData;
         }
@@ -54,13 +63,13 @@ public class TenantService {
         return toDetails(tenant);
     }
 
-    // NEW: persists correctly, but toDetails()/TenantDetails below don't
-    // yet surface billingEmail/billingContactName/billingPhone back in
-    // the response — TenantDetails is a record I don't have the source
-    // for, and extending its shape without seeing every caller risks the
-    // same class of breakage flagged elsewhere in this codebase for
-    // AuthResponse. The write is complete and correct; confirming it
-    // back to the frontend needs that file.
+    // FIX (identity module modernization): the write here was always
+    // complete and correct — the gap was entirely on the read side.
+    // TenantDetails now carries billingEmail/billingContactName/
+    // billingPhone (see that record's own comment), so toDetails() below
+    // can finally confirm what was actually saved back to the caller,
+    // and the Settings UI has something real to build a billing-contact
+    // form against.
     @Transactional
     public TenantDetails updateBillingContact(TenantId tenantId, UpdateBillingContactRequest req) {
         Tenant tenant = tenantRepository.findById(tenantId.getValue())
@@ -80,7 +89,8 @@ public class TenantService {
                 t.getId(), t.getName(), t.getSlug(), t.getVatNumber(),
                 t.getPhone(), t.getEmail(), t.getAddress(), t.getLogoUrl(),
                 t.getBankName(), t.getBankAccount(), t.getBankBranch(),
-                t.getPaymentTerms()
+                t.getPaymentTerms(),
+                t.getBillingEmail(), t.getBillingContactName(), t.getBillingPhone()
         );
     }
 }

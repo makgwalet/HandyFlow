@@ -79,6 +79,32 @@ public class UserManagementService {
         if (req.roleId() != null) {
             Role role = roleRepository.findByIdAndTenantId(req.roleId(), tenantId)
                     .orElseThrow(() -> bad("Role not found"));
+
+            // FIX (identity module modernization): nothing previously
+            // stopped a tenant's only ADMIN from being reassigned to a
+            // non-admin role — including by themselves, since this
+            // endpoint has no self-edit restriction the way
+            // setUserStatus()'s deactivate path does. That's a genuine
+            // lockout: ROLE_MANAGE/USER_UPDATE are both ADMIN-only
+            // permissions by default (see RoleService.createDefaultAdminRole()),
+            // so a tenant with zero remaining admins has no user left
+            // who can grant admin back to anyone, including via this
+            // same endpoint. Only blocks the specific case that causes
+            // the lockout — moving the LAST active admin OFF the ADMIN
+            // role — not admin-to-admin edits or changing a non-admin's
+            // role, which are always safe.
+            boolean wasActiveAdmin = user.isActive()
+                    && user.getRoles().stream().anyMatch(r -> "ADMIN".equals(r.getName()));
+            boolean stillAdmin = "ADMIN".equals(role.getName());
+            if (wasActiveAdmin && !stillAdmin) {
+                int activeAdmins = userRepository.countByTenantIdAndRoleNameAndStatus(
+                        tenantId, "ADMIN", User.UserStatus.ACTIVE);
+                if (activeAdmins <= 1) {
+                    throw bad("Cannot change this user's role — they are the only remaining " +
+                            "administrator. Promote another user to ADMIN first.");
+                }
+            }
+
             user.clearRoles();
             user.assignRole(role);
         }
@@ -97,6 +123,26 @@ public class UserManagementService {
             throw bad("You cannot deactivate your own account");
 
         User user = findUserInTenant(tenantId, userId);
+
+        // FIX (identity module modernization): the self-deactivation
+        // check above only stops an admin locking THEMSELVES out — one
+        // admin could still deactivate a DIFFERENT admin who happens to
+        // be the tenant's last one, with the exact same end result (a
+        // tenant with zero active admins, and therefore nobody left
+        // with ROLE_MANAGE/USER_DEACTIVATE to undo it). Same guard
+        // shape as updateUser()'s new role-reassignment check above;
+        // only fires on the deactivate path (active=false) and only
+        // when this user is currently an active admin.
+        if (!active && user.isActive()
+                && user.getRoles().stream().anyMatch(r -> "ADMIN".equals(r.getName()))) {
+            int activeAdmins = userRepository.countByTenantIdAndRoleNameAndStatus(
+                    tenantId, "ADMIN", User.UserStatus.ACTIVE);
+            if (activeAdmins <= 1) {
+                throw bad("Cannot deactivate this user — they are the only remaining " +
+                        "administrator. Promote another user to ADMIN first.");
+            }
+        }
+
         if (active) user.activate(); else user.deactivate();
         userRepository.save(user);
         log.info("Set user={} active={} in tenant={}", userId, active, tenantId);
@@ -219,6 +265,16 @@ public class UserManagementService {
                 .orElseThrow(() -> new ResourceNotFoundException("Invitation", invitationId.toString()));
         if (!inv.getTenantId().equals(tenantId))
             throw notFound("Invitation not found");
+        // FIX (identity module modernization): previously cancelled
+        // unconditionally regardless of current status — an already-
+        // ACCEPTED invitation could be "cancelled" after the fact with
+        // no error, silently rewriting history for a user who already
+        // has a live account (TeamTab.tsx only shows the Cancel button
+        // for PENDING rows, so this wasn't reachable from that UI, but
+        // the endpoint itself had no such guard for any other caller).
+        if (!inv.isPending())
+            throw bad("Only pending invitations can be cancelled — this one is " +
+                    inv.getStatus().name().toLowerCase() + ".");
         inv.cancel();
         invitationRepository.save(inv);
     }

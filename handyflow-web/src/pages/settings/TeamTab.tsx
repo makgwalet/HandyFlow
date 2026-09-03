@@ -59,9 +59,27 @@ export default function TeamTab() {
   const [confirmAction, setConfirmAction] = useState<{
     title: string; message: string; confirmLabel: string; onConfirm: () => void
   } | null>(null)
+  // NEW (identity module modernization): surfaces deactivate/cancel-invite
+  // failures inside the confirm modal itself — see deactivateMutation's
+  // onError comment for why the outer `error` state (which lives in the
+  // Team/Roles views, not the modal) isn't the right place for this.
+  const [confirmError, setConfirmError] = useState('')
 
   const [inviteForm, setInviteForm] = useState({
     email: '', firstName: '', lastName: '', jobTitle: '', department: '', roleId: '',
+  })
+  // NEW (identity module modernization): Edit User previously read raw
+  // values straight off the DOM via document.getElementById on submit,
+  // with no validation anywhere in between — a cleared First/Last name
+  // field submitted exactly as "" (UpdateUserRequest.firstName/lastName
+  // are now @NotBlank server-side, but the UI gave no indication why
+  // Save would fail, and previously it wouldn't have failed at all: the
+  // backend used to accept the blank value and silently wipe the name).
+  // Converted to controlled state, matching the Invite modal's own
+  // pattern directly above, so the Save button can be disabled the same
+  // way inviteForm's already is.
+  const [editForm, setEditForm] = useState({
+    firstName: '', lastName: '', jobTitle: '', department: '', roleId: '',
   })
   const [roleForm, setRoleForm] = useState({ name: '', description: '' })
   const [selectedPerms, setSelectedPerms] = useState<Set<string>>(new Set())
@@ -108,6 +126,15 @@ export default function TeamTab() {
     // that) — the modal just stays open with the button re-enabled so
     // the user can retry or cancel instead of it silently vanishing.
     onSuccess: () => { invalidate(); setConfirmAction(null) },
+    // FIX (identity module modernization): had no onError at all — a
+    // rejected deactivation (e.g. the new "you're the tenant's only
+    // remaining administrator" guard) failed completely silently: the
+    // confirm modal's button just re-enabled with no explanation, no
+    // different from a successful retry-able transient error. Surfaced
+    // via confirmError below rather than the outer `error` state, since
+    // this failure happens while the confirm modal — not the edit
+    // modal `error` sits inside — is the thing still open.
+    onError: (e: any) => setConfirmError(e.response?.data?.message || 'Failed to deactivate user'),
   })
   const reactivateMutation = useMutation({
     mutationFn: (id: string) => apiClient.post(`/api/v1/identity/users/${id}/reactivate`),
@@ -116,6 +143,12 @@ export default function TeamTab() {
   const cancelInviteMutation = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/api/v1/identity/invitations/${id}`),
     onSuccess: () => { invalidate(); setConfirmAction(null) },
+    // FIX (identity module modernization): same silent-failure gap as
+    // deactivateMutation above — this UI only ever shows Cancel for
+    // PENDING invitations, but the backend now rejects cancelling a
+    // no-longer-pending one (e.g. accepted moments earlier by the
+    // invitee in a race), and that rejection had nowhere to go.
+    onError: (e: any) => setConfirmError(e.response?.data?.message || 'Failed to cancel invitation'),
   })
   const createRoleMutation = useMutation({
     mutationFn: (body: any) => apiClient.post('/api/v1/identity/roles', body),
@@ -212,17 +245,21 @@ export default function TeamTab() {
                         </td>
                         <td style={{ padding: '14px 16px' }}>
                           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                            <button onClick={() => { setEditUser(u); setError('') }}
+                            <button onClick={() => {
+                              setEditUser(u)
+                              setEditForm({ firstName: u.firstName, lastName: u.lastName, jobTitle: u.jobTitle ?? '', department: u.department ?? '', roleId: '' })
+                              setError('')
+                            }}
                               style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 7, fontSize: 12, color: '#1D4ED8', cursor: 'pointer' }}>
                               <Pencil size={12} /> Edit
                             </button>
                             {u.status === 'ACTIVE' ? (
-                              <button onClick={() => setConfirmAction({
+                              <button onClick={() => { setConfirmError(''); setConfirmAction({
                                 title: 'Deactivate team member',
                                 message: `Deactivate ${u.firstName} ${u.lastName}? They'll lose access immediately. Their account and history are kept and can be restored by reactivating them later.`,
                                 confirmLabel: 'Deactivate',
                                 onConfirm: () => deactivateMutation.mutate(u.id),
-                              })}
+                              }) }}
                                 style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, fontSize: 12, color: '#DC2626', cursor: 'pointer' }}>
                                 <UserX size={12} /> Deactivate
                               </button>
@@ -272,7 +309,11 @@ export default function TeamTab() {
                           {isAdmin && <span style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>System</span>}
                         </div>
                         <div style={{ fontSize: 12, color: '#64748B' }}>
-                          {role.description || '—'} · {role.userCount} user{role.userCount !== 1 ? 's' : ''} · {role.permissions.size || role.permissions.length} permissions
+                          {/* FIX: role.permissions is typed (and actually serialized) as string[]
+                              — plain arrays have no .size in JS/TS, only .length. `.size` was
+                              always undefined here, silently falling through to .length on every
+                              render; this was a real `tsc -b` error (TS2339), not just untidy. */}
+                          {role.description || '—'} · {role.userCount} user{role.userCount !== 1 ? 's' : ''} · {role.permissions.length} permissions
                         </div>
                       </div>
                     </div>
@@ -345,12 +386,12 @@ export default function TeamTab() {
                         </td>
                         <td style={{ padding: '14px 16px' }}>
                           {inv.status === 'PENDING' && (
-                            <button onClick={() => setConfirmAction({
+                            <button onClick={() => { setConfirmError(''); setConfirmAction({
                               title: 'Cancel invitation',
                               message: `Cancel the invitation sent to ${inv.firstName} ${inv.lastName}? They won't be able to accept it anymore, and you'll need to send a new invitation if you change your mind.`,
                               confirmLabel: 'Cancel invitation',
                               onConfirm: () => cancelInviteMutation.mutate(inv.id),
-                            })}
+                            }) }}
                               style={{ padding: '5px 10px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, fontSize: 12, color: '#DC2626', cursor: 'pointer' }}>
                               Cancel
                             </button>
@@ -410,21 +451,23 @@ export default function TeamTab() {
         <Modal title={`Edit — ${editUser.firstName} ${editUser.lastName}`} onClose={() => { setEditUser(null); setError('') }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Field label="First name">
-                <input defaultValue={editUser.firstName} id="eu-fn" style={inp} />
+              <Field label="First name *">
+                <input value={editForm.firstName} onChange={e => setEditForm(f => ({ ...f, firstName: e.target.value }))}
+                  style={{ ...inp, borderColor: !editForm.firstName.trim() ? '#FCA5A5' : '#E2E8F0' }} />
               </Field>
-              <Field label="Last name">
-                <input defaultValue={editUser.lastName} id="eu-ln" style={inp} />
+              <Field label="Last name *">
+                <input value={editForm.lastName} onChange={e => setEditForm(f => ({ ...f, lastName: e.target.value }))}
+                  style={{ ...inp, borderColor: !editForm.lastName.trim() ? '#FCA5A5' : '#E2E8F0' }} />
               </Field>
             </div>
             <Field label="Job title">
-              <input defaultValue={editUser.jobTitle ?? ''} id="eu-jt" placeholder="Sales Manager" style={inp} />
+              <input value={editForm.jobTitle} onChange={e => setEditForm(f => ({ ...f, jobTitle: e.target.value }))} placeholder="Sales Manager" style={inp} />
             </Field>
             <Field label="Department">
-              <input defaultValue={editUser.department ?? ''} id="eu-dept" placeholder="Sales" style={inp} />
+              <input value={editForm.department} onChange={e => setEditForm(f => ({ ...f, department: e.target.value }))} placeholder="Sales" style={inp} />
             </Field>
             <Field label="Change role">
-              <select id="eu-role" defaultValue={''} style={{ ...inp, background: 'white' }}>
+              <select value={editForm.roleId} onChange={e => setEditForm(f => ({ ...f, roleId: e.target.value }))} style={{ ...inp, background: 'white' }}>
                 <option value="">Keep current role ({editUser.roles.join(', ')})</option>
                 {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
@@ -434,15 +477,31 @@ export default function TeamTab() {
           <Footer
             onCancel={() => { setEditUser(null); setError('') }}
             onSubmit={() => {
-              const fn   = (document.getElementById('eu-fn')   as HTMLInputElement).value
-              const ln   = (document.getElementById('eu-ln')   as HTMLInputElement).value
-              const jt   = (document.getElementById('eu-jt')   as HTMLInputElement).value
-              const dept = (document.getElementById('eu-dept') as HTMLInputElement).value
-              const role = (document.getElementById('eu-role') as HTMLSelectElement).value
-              updateUserMutation.mutate({ id: editUser.id, body: { firstName: fn, lastName: ln, jobTitle: jt || null, department: dept || null, roleId: role || null } })
+              setError('')
+              const firstName = editForm.firstName.trim()
+              const lastName  = editForm.lastName.trim()
+              // FIX: mirrors the backend's new @NotBlank on
+              // UpdateUserRequest — validated here too so the person
+              // gets an immediate inline reason instead of a round-trip
+              // 400. Blank names are the specific bug this whole change
+              // closes; everything else on this form stays genuinely
+              // optional, matching the API contract.
+              if (!firstName || !lastName) {
+                setError('First name and last name are required')
+                return
+              }
+              updateUserMutation.mutate({
+                id: editUser.id,
+                body: {
+                  firstName, lastName,
+                  jobTitle: editForm.jobTitle.trim() || null,
+                  department: editForm.department.trim() || null,
+                  roleId: editForm.roleId || null,
+                },
+              })
             }}
             loading={updateUserMutation.isPending}
-            disabled={false}
+            disabled={!editForm.firstName.trim() || !editForm.lastName.trim()}
             label="Save changes"
           />
         </Modal>
@@ -510,8 +569,9 @@ export default function TeamTab() {
           message={confirmAction.message}
           confirmLabel={confirmAction.confirmLabel}
           onConfirm={confirmAction.onConfirm}
-          onCancel={() => setConfirmAction(null)}
+          onCancel={() => { setConfirmAction(null); setConfirmError('') }}
           loading={deactivateMutation.isPending || cancelInviteMutation.isPending}
+          error={confirmError}
         />
       )}
     </div>
@@ -524,7 +584,8 @@ function PermissionPicker({ permissions, selected, onToggle }: {
   selected: Set<string>
   onToggle: (id: string) => void
 }) {
-  const permById = Object.fromEntries(permissions.map(p => [p.id, p]))
+  // FIX: permById was computed but never read anywhere below — a real
+  // `tsc -b` error (TS6133), not just dead code left for later.
   return (
     <div>
       <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>
@@ -580,13 +641,19 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
 // a fixed icon/title/message/two-button shape that never needs to grow
 // form fields. Kept in this file rather than a shared components dir
 // since TeamTab is currently its only caller.
-function ConfirmModal({ title, message, confirmLabel, onConfirm, onCancel, loading }: {
+function ConfirmModal({ title, message, confirmLabel, onConfirm, onCancel, loading, error }: {
   title: string
   message: string
   confirmLabel: string
   onConfirm: () => void
   onCancel: () => void
   loading: boolean
+  // NEW (identity module modernization): surfaces a rejected confirm
+  // action (e.g. the backend's "only remaining administrator" guard)
+  // instead of the confirm just silently re-enabling with no
+  // explanation — see deactivateMutation/cancelInviteMutation's own
+  // onError comments above for the bug this closes.
+  error?: string
 }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
@@ -600,7 +667,8 @@ function ConfirmModal({ title, message, confirmLabel, onConfirm, onCancel, loadi
             <p style={{ margin: 0, fontSize: 13.5, color: '#64748B', lineHeight: 1.5 }}>{message}</p>
           </div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+        {error && <ErrMsg msg={error} />}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: error ? 16 : 0 }}>
           <button onClick={onCancel} disabled={loading}
             style={{ padding: '10px 18px', border: '1px solid #E2E8F0', borderRadius: 9, background: 'white', fontSize: 14, cursor: loading ? 'default' : 'pointer', color: '#374151' }}>
             Cancel
