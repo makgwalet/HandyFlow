@@ -25,8 +25,15 @@ class LpInvoiceTest {
     private final UUID matterId = UUID.randomUUID();
 
     private LpInvoice draftInvoice(BigDecimal subtotal) {
+        // FIX (VAT sweep, module 2): LpInvoice.create() now takes an
+        // explicit vatRateFraction rather than a private hardcoded
+        // constant. Passing 0.15 explicitly here — not testing the real
+        // default, just exercising the same calculation this suite
+        // already asserts on (computesFlatFifteenPercentVat,
+        // roundsFractionalVatHalfUp both check the literal 15% math).
         return LpInvoice.create(tenantId, clientId, matterId, "INV-0001", "Professional fees",
-                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), subtotal, "Thank you");
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), subtotal, "Thank you",
+                new BigDecimal("0.15"));
     }
 
     @Nested
@@ -66,7 +73,7 @@ class LpInvoiceTest {
         @DisplayName("null issueDate defaults to today")
         void nullIssueDateDefaultsToToday() {
             LpInvoice invoice = LpInvoice.create(tenantId, clientId, matterId, "INV-0002", null,
-                    null, null, new BigDecimal("100.00"), null);
+                    null, null, new BigDecimal("100.00"), null, new BigDecimal("0.15"));
             assertThat(invoice.getIssueDate()).isEqualTo(LocalDate.now());
         }
 
@@ -74,7 +81,7 @@ class LpInvoiceTest {
         @DisplayName("matterId is nullable for a retainer-only invoice")
         void matterIdIsNullableForRetainerOnlyInvoice() {
             LpInvoice invoice = LpInvoice.create(tenantId, clientId, null, "INV-0003", "Retainer",
-                    LocalDate.now(), null, new BigDecimal("500.00"), null);
+                    LocalDate.now(), null, new BigDecimal("500.00"), null, new BigDecimal("0.15"));
             assertThat(invoice.getMatterId()).isNull();
         }
     }

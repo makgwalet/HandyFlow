@@ -16,6 +16,7 @@ import za.co.handyflow.platform.legalpractice.dto.LpInvoiceResponse;
 import za.co.handyflow.platform.legalpractice.dto.RecordInvoicePaymentRequest;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.shared.VatRateProvider;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -48,6 +49,10 @@ public class LpBillingService {
     private final LpDisbursementRepository disbursementRepo;
     private final LpClientRepository clientRepo;
     private final LpAccountingPoster accountingPoster;
+    // FIX (VAT sweep, module 2): replaces LpInvoice's own private
+    // VAT_RATE constant (flat 0.15, not configurable) — see LpInvoice's
+    // own Javadoc for the fuller reasoning.
+    private final VatRateProvider vatRateProvider;
 
     @Transactional(readOnly = true)
     public Page<LpInvoiceResponse> listForClient(TenantId tenantId, UUID clientId, Pageable pageable) {
@@ -102,7 +107,8 @@ public class LpBillingService {
 
         String invoiceNumber = nextInvoiceNumber(tenantId);
         LpInvoice invoice = LpInvoice.create(tenantId, req.clientId(), req.matterId(), invoiceNumber,
-                req.description(), LocalDate.now(), req.dueDate(), subtotal, req.notes());
+                req.description(), LocalDate.now(), req.dueDate(), subtotal, req.notes(),
+                vatRateProvider.rateFraction());
         invoiceRepo.save(invoice);
 
         for (LpTimeEntry entry : timeEntries) {

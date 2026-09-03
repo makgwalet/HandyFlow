@@ -24,17 +24,19 @@ import java.util.UUID;
  * mechanism {@code AccTimeEntry.markBilled()} already uses. {@code matterId}
  * is nullable — a retainer-only invoice isn't tied to one matter.
  * <p>
- * VAT: flat 15%, matching {@code accountant}'s own calculation convention
- * exactly (no multi-rate/zero-rated handling — same simplification that
- * module already made).
+ * VAT: flat rate applied uniformly across the whole invoice (no
+ * multi-rate/zero-rated per-line handling — same simplification
+ * {@code accountant} already made). The rate itself is caller-supplied
+ * (see {@code create()}) rather than fixed on this entity — resolved via
+ * {@code VatRateProvider} by {@code LpBillingService}, the module's one
+ * real caller, so a future rate change here tracks every other module
+ * automatically instead of needing this constant hunted down separately.
  */
 @Entity
 @Table(name = "lp_invoices")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class LpInvoice {
-
-    private static final BigDecimal VAT_RATE = new BigDecimal("0.15");
 
     @Id
     private UUID id = UUID.randomUUID();
@@ -88,7 +90,7 @@ public class LpInvoice {
 
     public static LpInvoice create(TenantId tenantId, UUID clientId, UUID matterId, String invoiceNumber,
                                     String description, LocalDate issueDate, LocalDate dueDate,
-                                    BigDecimal subtotal, String notes) {
+                                    BigDecimal subtotal, String notes, BigDecimal vatRateFraction) {
         LpInvoice inv = new LpInvoice();
         inv.tenantId = tenantId;
         inv.clientId = clientId;
@@ -98,7 +100,7 @@ public class LpInvoice {
         inv.issueDate = issueDate != null ? issueDate : LocalDate.now();
         inv.dueDate = dueDate;
         inv.subtotal = subtotal;
-        inv.vatAmount = subtotal.multiply(VAT_RATE).setScale(2, RoundingMode.HALF_UP);
+        inv.vatAmount = subtotal.multiply(vatRateFraction).setScale(2, RoundingMode.HALF_UP);
         inv.totalAmount = inv.subtotal.add(inv.vatAmount);
         inv.amountPaid = BigDecimal.ZERO;
         inv.notes = notes;

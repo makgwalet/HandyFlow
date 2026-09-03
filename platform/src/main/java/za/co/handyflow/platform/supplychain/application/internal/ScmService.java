@@ -15,6 +15,7 @@ import za.co.handyflow.platform.approvals.dto.ApprovalStepResponse;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.shared.TenantSequenceService;
+import za.co.handyflow.platform.shared.VatRateProvider;
 import za.co.handyflow.platform.supplychain.domain.enums.*;
 import za.co.handyflow.platform.supplychain.domain.model.*;
 import za.co.handyflow.platform.supplychain.domain.repository.*;
@@ -57,6 +58,10 @@ public class ScmService {
     private final za.co.handyflow.platform.controls.application.ControlExceptionFacade controlExceptionFacade;
 
     private final ApprovalFacade approvalFacade;
+    // FIX (VAT sweep, module 2): replaces AddPoLineRequest.vatRate()'s
+    // "defaults to 15% if null" fallback below, which was falling
+    // through unresolved to ScPoLine's own hardcoded default.
+    private final VatRateProvider vatRateProvider;
 
     private static final String PO_APPROVALS_MODULE = "supplychain";
     private static final String PO_APPROVALS_ENTITY_TYPE = "PURCHASE_ORDER";
@@ -420,7 +425,8 @@ public class ScmService {
 
         ScPoLine line = ScPoLine.create(tenantId.getValue(), po.getId(),
                 req.catalogueItemId(), req.itemName(), req.supplierSku(),
-                req.qtyOrdered(), req.unitCost(), req.vatRate());
+                req.qtyOrdered(), req.unitCost(),
+                req.vatRate() != null ? req.vatRate() : vatRateProvider.ratePercent());
         poLineRepo.save(line);
         recalculatePoTotals(po);
         return poRepo.save(po);

@@ -32,8 +32,15 @@ public class FeeNoteLine {
     /**
      * Line from a time entry — description, quantity = hours, unit_price = hourly rate.
      */
+    // FIX (VAT sweep, module 2): added a vatRate parameter. Previously
+    // this hardcoded 15.00 whenever includeVat was true with no way for
+    // a caller to supply the real rate at all (unlike the other
+    // findings in this sweep, there wasn't even a nullable override to
+    // fall through — the rate was simply fixed). The only real caller
+    // (AccountantService.buildFeeNoteLine) now resolves it via
+    // VatRateProvider before calling here.
     public static FeeNoteLine forTimeEntry(UUID feeNoteId, TimeEntry entry,
-                                           boolean includeVat, int order) {
+                                           boolean includeVat, BigDecimal vatRate, int order) {
         FeeNoteLine l = new FeeNoteLine();
         l.feeNoteId   = feeNoteId;
         l.timeEntryId = entry.getId();
@@ -41,7 +48,7 @@ public class FeeNoteLine {
                 + (entry.getDescription() != null ? " — " + entry.getDescription() : "");
         l.quantity    = entry.getHours();
         l.unitPrice   = entry.getHourlyRate();
-        l.vatRate     = includeVat ? new BigDecimal("15.00") : BigDecimal.ZERO;
+        l.vatRate     = includeVat ? vatRate : BigDecimal.ZERO;
         l.amount      = entry.lineTotal();
         l.lineOrder   = order;
         return l;
@@ -50,6 +57,12 @@ public class FeeNoteLine {
     /**
      * Fixed-fee line — description and amount supplied directly.
      */
+    // NOTE: confirmed via full-repo search this factory has zero callers
+    // anywhere (production or test) — the fixed-fee subtotal path in
+    // AccountantService.createFeeNote() uses req.fixedFee() directly as
+    // the FeeNote's own subtotal and never builds a line item through
+    // here. Left untouched rather than half-fixed dead code; flagging
+    // for whoever eventually wires a real caller to this factory.
     public static FeeNoteLine fixedFee(UUID feeNoteId, String description,
                                        BigDecimal amount, boolean includeVat, int order) {
         FeeNoteLine l = new FeeNoteLine();

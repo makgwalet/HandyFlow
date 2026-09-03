@@ -17,6 +17,7 @@ import za.co.handyflow.platform.bookingagency.dto.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.shared.VatRateProvider;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -56,6 +57,9 @@ public class BookingAgencyService {
     // FIX: backlog 1.6 — the shared AccountingFacade. Direct call, no
     // event indirection — confirmed no circular dependency.
     private final AccountingFacade accountingFacade;
+    // FIX (VAT sweep, module 2): replaces a hardcoded
+    // subtotal.multiply(new BigDecimal("0.15")) fallback below.
+    private final VatRateProvider vatRateProvider;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -362,7 +366,7 @@ public class BookingAgencyService {
 
         BigDecimal subtotal = client.getMonthlyRetainerAmount();
         BigDecimal vatAmount = req.includeVat()
-                ? subtotal.multiply(new BigDecimal("0.15")).setScale(2, RoundingMode.HALF_UP)
+                ? subtotal.multiply(vatRateProvider.rateFraction()).setScale(2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
 
         String invoiceNumber = "BAI" + String.format("%05d",

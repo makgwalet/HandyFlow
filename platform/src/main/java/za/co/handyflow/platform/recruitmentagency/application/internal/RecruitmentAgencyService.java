@@ -14,6 +14,7 @@ import za.co.handyflow.platform.recruitmentagency.dto.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.shared.VatRateProvider;
 import za.co.handyflow.platform.accounting.application.AccountingFacade;
 import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
@@ -56,6 +57,14 @@ public class RecruitmentAgencyService {
     private String frontendUrl;
 
     private final AccountingFacade accountingFacade;
+    // FIX (VAT sweep, module 2): replaces a hardcoded
+    // subtotal.multiply(new BigDecimal("0.15")) fallback below for the
+    // placement invoice's VAT calculation. NOTE: this module also has a
+    // defaultFeePct() helper defaulting to "15.00" — that one is the
+    // agency's placement-fee commission percentage, an unrelated
+    // business concept that coincidentally shares the same numeral;
+    // confirmed via its own doc comment and left untouched.
+    private final VatRateProvider vatRateProvider;
 
     private static final String AR_ACCOUNT_CODE      = "1100";
     private static final String REVENUE_ACCOUNT_CODE = "4000";
@@ -386,7 +395,7 @@ public class RecruitmentAgencyService {
 
         BigDecimal subtotal = placement.getPlacementFeeAmount();
         BigDecimal vatAmount = req.includeVat()
-                ? subtotal.multiply(new BigDecimal("0.15")).setScale(2, RoundingMode.HALF_UP)
+                ? subtotal.multiply(vatRateProvider.rateFraction()).setScale(2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
 
         String invoiceNumber = "RAI" + String.format("%05d",

@@ -16,7 +16,9 @@ import za.co.handyflow.platform.invoicing.dto.CreditNoteResponse;
 import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.shared.VatRateProvider;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -33,6 +35,13 @@ public class CreditNoteService {
     private final CreditNotePdfService pdfService;
     private final CrmFacade crmFacade;
     private final EmailService emailService;
+    // FIX (VAT sweep, module 2): CreateCreditNoteRequest.vatRate() is
+    // genuinely nullable ("defaults to 15% if null", per that DTO's own
+    // comment) and was falling through to CreditNote.create()'s
+    // hardcoded new BigDecimal("15.00") — a genuinely reachable gap, not
+    // dead defensive code, same shape as the earlier
+    // PosPurchaseOrderItem finding. Resolved here instead.
+    private final VatRateProvider vatRateProvider;
 
     @Transactional
     public CreditNoteResponse createCreditNote(TenantId tenantId, UUID invoiceId, CreateCreditNoteRequest req) {
@@ -45,9 +54,10 @@ public class CreditNoteService {
         }
 
         String number = numberGenerator.next(tenantId);
+        BigDecimal vatRate = req.vatRate() != null ? req.vatRate() : vatRateProvider.ratePercent();
         CreditNote creditNote = CreditNote.create(
                 tenantId, invoiceId, number, req.reason(), req.description(),
-                req.amount(), req.vatRate(), invoice.getCurrency());
+                req.amount(), vatRate, invoice.getCurrency());
         creditNoteRepo.save(creditNote);
         log.info("Created credit note={} invoice={} total={}",
                 number, invoice.getInvoiceNumber(), creditNote.getTotal());
