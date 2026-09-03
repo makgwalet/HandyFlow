@@ -62,7 +62,30 @@ class ArchitectureVerificationTest {
      * future version bump, this test will most likely start FAILING
      * (loudly, visibly) rather than silently passing when it shouldn't —
      * that's the safer failure mode to design for here.
+     * <p>
+     * FIX (test-debt sweep): confirmed via a real mvn test run that the
+     * exclusion check below was unconditionally broken — it could never
+     * pass, even in a hypothetical world with zero OTHER violations,
+     * because Modulith's own cycle-detection report describes the
+     * accepted cycle's two directions using the exact same
+     * "Module 'X' depends on module 'Y' ... Allowed targets: ..." phrasing
+     * this check was using to detect UNRELATED, genuinely new violations.
+     * Confirmed directly in a real failure message: two lines reading
+     * "Module 'identity' depends on module 'billing' ... Allowed targets:
+     * shared, billing, notifications" — billing IS already in identity's
+     * own allowedDependencies (confirmed against identity's own
+     * package-info.java), so this isn't an undeclared-dependency
+     * violation at all; it's Modulith describing one of the cycle's own
+     * two edges as supporting detail. The blanket
+     * !message.contains("Module '") check couldn't tell that apart from a
+     * real violation for some unrelated module pair. Narrowed to only
+     * exclude "Module '(identity|billing)' depends on module
+     * '(identity|billing)'" lines specifically — any OTHER module pair
+     * still fails this test exactly as before.
      */
+    private static final java.util.regex.Pattern UNRELATED_MODULE_DEPENDENCY = java.util.regex.Pattern.compile(
+            "Module '(?!identity'|billing')[a-zA-Z]+' depends on (?:module '(?!identity'|billing')[a-zA-Z]+'|non-exposed type)");
+
     @Test
     void verifiesModuleStructure() {
         try {
@@ -72,7 +95,7 @@ class ArchitectureVerificationTest {
 
             boolean mentionsOnlyKnownCycle =
                     message.contains("billing") && message.contains("identity")
-                            && !message.contains("Module '") // no "Module 'X' depends on module 'Y'" undeclared-dependency violations
+                            && !UNRELATED_MODULE_DEPENDENCY.matcher(message).find()
                             && countOccurrences(message, "Cycle detected") == 1;
 
             if (!mentionsOnlyKnownCycle) {
