@@ -9,6 +9,12 @@ package za.co.handyflow.platform;
 // existing tests already do — paste one of your real test files and I'll
 // rewrite this to match exactly, the same way the POS settings panel was
 // rewritten once the real frontend conventions were confirmed.
+//
+// FIX (test-debt sweep): a real mvn test run flagged 32 "missing"
+// permissions, 30 of which were genuine (see V269 migration) and 2 of
+// which (SUPERADMIN, PORTAL_USER) were false positives caused by two
+// separate bugs in this file's own extraction logic — see both fixes
+// below and each one's own comment for the full reasoning.
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,6 +69,34 @@ public class PermissionConsistencyTest {
     // @PreAuthorize expression (e.g. a role name, a comparison value).
     private static final Pattern PERMISSION_LITERAL = Pattern.compile("'([A-Z][A-Z0-9_]*)'");
 
+    // FIX (test-debt sweep): isolates hasAuthority(...)/hasAnyAuthority(...)
+    // call argument lists specifically, so PERMISSION_LITERAL is only ever
+    // applied inside one of those. Previously PERMISSION_LITERAL ran
+    // against the whole expression, which also matched literals inside
+    // hasRole(...) calls — a genuinely different authorization mechanism
+    // in this codebase (hasRole('X') checks a ROLE_-prefixed authority,
+    // confirmed via AdminController's hasRole('SUPERADMIN') to be granted
+    // directly by AdminJwtFilter from a separate platform-admin JWT, with
+    // no relationship to this table at all). A non-greedy [^)]* is safe
+    // here because every real hasAuthority/hasAnyAuthority call in this
+    // codebase's @PreAuthorize expressions is a flat list of quoted
+    // literals with no nested parens.
+    private static final Pattern AUTHORITY_CALL =
+            Pattern.compile("has(?:Any)?Authority\\s*\\(([^)]*)\\)");
+
+    // FIX (test-debt sweep): PORTAL_USER is a genuine hasAuthority('...')
+    // check (AccountantPortalAuthController#acceptAdditionalInvite), so
+    // the AUTHORITY_CALL narrowing above doesn't exclude it — but it's
+    // still not a DB-backed permission. Confirmed via PortalJwtFilter.java:
+    // it grants PORTAL_USER directly as a hardcoded
+    // new SimpleGrantedAuthority("PORTAL_USER") synthetic marker meaning
+    // "this request came from a portal-user JWT", same shape as
+    // SUPERADMIN just via hasAuthority() instead of hasRole(). Real,
+    // correctly-enforced authorities that were never meant to have a row
+    // in this table — excluded explicitly rather than silently, so the
+    // exclusion itself stays visible and reviewable.
+    private static final Set<String> KNOWN_NON_DATABASE_AUTHORITIES = Set.of("PORTAL_USER");
+
     private static final String BASE_PACKAGE = "za.co.handyflow.platform";
 
     @Autowired
@@ -102,6 +136,7 @@ public class PermissionConsistencyTest {
 
         Set<String> missing = new TreeSet<>();
         for (String permission : referencedPermissions.keySet()) {
+            if (KNOWN_NON_DATABASE_AUTHORITIES.contains(permission)) continue;
             if (!seededPermissions.contains(permission)) {
                 missing.add(permission);
             }
@@ -125,9 +160,12 @@ public class PermissionConsistencyTest {
 
     private Set<String> extractPermissions(String preAuthorizeExpression) {
         Set<String> found = new HashSet<>();
-        Matcher matcher = PERMISSION_LITERAL.matcher(preAuthorizeExpression);
-        while (matcher.find()) {
-            found.add(matcher.group(1));
+        Matcher callMatcher = AUTHORITY_CALL.matcher(preAuthorizeExpression);
+        while (callMatcher.find()) {
+            Matcher literalMatcher = PERMISSION_LITERAL.matcher(callMatcher.group(1));
+            while (literalMatcher.find()) {
+                found.add(literalMatcher.group(1));
+            }
         }
         return found;
     }
