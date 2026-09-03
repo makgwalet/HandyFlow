@@ -42,6 +42,16 @@ public class PosTransactionItem {
         i.sku              = sku;
         i.qty              = qty;
         i.unitPrice        = unitPrice;
+        // FIX (VAT consolidation pass): both real callers in PosService
+        // (processSale() via resolveVatRate(), and the refund path via
+        // orig.getVatRate()) always resolve a concrete non-null vatRate
+        // before reaching here — confirmed by reading both call sites —
+        // so this fallback is not reachable through the real
+        // application flow. Left as a defensive default rather than
+        // wired to VatRateProvider directly: a domain entity's static
+        // factory shouldn't reach into Spring-managed config, matching
+        // the same convention already established for CatalogueItem's
+        // own equivalent fallback.
         i.vatRate          = vatRate != null ? vatRate : BigDecimal.valueOf(15);
         i.discountPct      = discountPct != null ? discountPct : BigDecimal.ZERO;
         // Calculate line total

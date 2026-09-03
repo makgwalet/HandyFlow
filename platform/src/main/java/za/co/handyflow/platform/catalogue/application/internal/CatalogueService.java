@@ -14,6 +14,7 @@ import za.co.handyflow.platform.catalogue.dto.CreateCategoryRequest;
 import za.co.handyflow.platform.catalogue.dto.CreateItemRequest;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.shared.VatRateProvider;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -26,6 +27,13 @@ public class CatalogueService {
 
     private final CatalogueItemRepository itemRepository;
     private final CatalogueCategoryRepository categoryRepository;
+    // FIX (VAT consolidation pass): replaces the two separate hardcoded
+    // new BigDecimal("15.00") fallbacks that used to live independently
+    // in createItem() and updateItem() below (confirmed duplicated
+    // within this one file, not just across the codebase) — see
+    // VatRateProvider's own Javadoc for the fuller "scattered in 4+
+    // places" finding this closes.
+    private final VatRateProvider vatRateProvider;
 
     @Transactional(readOnly = true)
     public List<CatalogueItemSummary> searchItems(TenantId tenantId, String query) {
@@ -56,7 +64,7 @@ public class CatalogueService {
 
         BigDecimal vatRate = request.vatRate() != null
                 ? request.vatRate()
-                : new BigDecimal("15.00");
+                : vatRateProvider.ratePercent();
 
         CatalogueItem item = CatalogueItem.create(
                 tenantId, category, request.name(), request.description(),
@@ -117,7 +125,7 @@ public class CatalogueService {
                     .orElseThrow(() -> new ResourceNotFoundException("Category", request.categoryId().toString()));
         }
 
-        BigDecimal vatRate = request.vatRate() != null ? request.vatRate() : new BigDecimal("15.00");
+        BigDecimal vatRate = request.vatRate() != null ? request.vatRate() : vatRateProvider.ratePercent();
 
         item.update(request.name(), request.description(), category,
                 request.unit(), request.defaultPrice(), vatRate);

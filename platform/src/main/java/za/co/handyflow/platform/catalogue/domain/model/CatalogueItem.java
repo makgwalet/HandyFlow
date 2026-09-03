@@ -75,6 +75,17 @@ public class CatalogueItem {
         item.description = description;
         item.unit = unit;
         item.defaultPrice = defaultPrice;
+        // FIX (VAT consolidation pass): CatalogueService.createItem() —
+        // this factory's only real caller, confirmed by search — now
+        // always resolves a concrete default via VatRateProvider before
+        // calling here, so this fallback is no longer reachable through
+        // the actual application flow. Left in place, not deleted or
+        // wired to VatRateProvider itself: a domain entity's static
+        // factory shouldn't reach into Spring-managed config (matches
+        // this codebase's own convention of keeping entities free of
+        // framework dependencies), and this remains a reasonable,
+        // harmless defensive default for any future direct caller that
+        // doesn't resolve one first.
         item.vatRate = vatRate != null ? vatRate : new BigDecimal("15.00");
         item.active = true;
         item.createdAt = Instant.now();

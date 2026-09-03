@@ -119,6 +119,12 @@ app:
     url: ${FRONTEND_URL:http://localhost:5173}
   notifications:
     enabled: ${NOTIFICATIONS_ENABLED:true}
+  # NEW (VAT consolidation pass): backs shared.VatRateProvider — the
+  # single source every previously-independent hardcoded 15% now reads
+  # from. See that class's own Javadoc for why this is a plain
+  # configurable value rather than a historical rate table.
+  tax:
+    vat-rate-pct: ${VAT_RATE_PCT:15.00}
 
 # ==================== ACTUATOR ====================
 management:

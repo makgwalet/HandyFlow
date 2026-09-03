@@ -36,6 +36,18 @@ public class PosPurchaseOrderItem {
         i.itemName         = itemName;
         i.qtyOrdered       = qtyOrdered;
         i.unitCost         = unitCost;
+        // FIX (VAT consolidation pass): this fallback WAS genuinely
+        // reachable, unlike CatalogueItem's/PosTransactionItem's own
+        // equivalent defaults — PosService.createPurchaseOrder() now
+        // resolves a concrete default via VatRateProvider before
+        // calling here (line.vatRate() is nullable at the DTO level
+        // with no validation constraining it, confirmed directly
+        // against CreatePurchaseOrderRequest, and previously flowed
+        // straight through to this exact line unresolved). Left in
+        // place as a defensive backstop for any other future caller,
+        // now genuinely unreachable via the real application flow —
+        // not wired to VatRateProvider directly since a domain entity's
+        // static factory shouldn't reach into Spring-managed config.
         i.vatRate          = vatRate != null ? vatRate : BigDecimal.valueOf(15);
         BigDecimal sub     = unitCost.multiply(qtyOrdered);
         BigDecimal vat     = sub.multiply(i.vatRate)
