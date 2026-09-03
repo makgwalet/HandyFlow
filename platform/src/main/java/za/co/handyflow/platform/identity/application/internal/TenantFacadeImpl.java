@@ -33,7 +33,10 @@ class TenantFacadeImpl implements TenantFacade {
                         t.getBankName(),
                         t.getBankAccount(),
                         t.getBankBranch(),
-                        t.getPaymentTerms()
+                        t.getPaymentTerms(),
+                        t.getBillingEmail(),
+                        t.getBillingContactName(),
+                        t.getBillingPhone()
                 ));
     }
 
@@ -53,7 +56,10 @@ class TenantFacadeImpl implements TenantFacade {
                         t.getBankName(),
                         t.getBankAccount(),
                         t.getBankBranch(),
-                        t.getPaymentTerms()
+                        t.getPaymentTerms(),
+                        t.getBillingEmail(),
+                        t.getBillingContactName(),
+                        t.getBillingPhone()
                 ))
                 .filter(td -> td.email() != null && !td.email().isBlank())
                 .toList();

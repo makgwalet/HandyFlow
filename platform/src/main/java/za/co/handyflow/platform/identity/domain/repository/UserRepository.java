@@ -45,4 +45,24 @@ public interface UserRepository extends JpaRepository<User, UUID> {
         AND r.name = :roleName
         """)
     int countByTenantIdAndRoleName(TenantId tenantId, String roleName);
+
+    /**
+     * NEW (identity module modernization): same shape as
+     * countByTenantIdAndRoleName above, but also filters on status —
+     * needed to answer "is this the tenant's last remaining ADMIN"
+     * correctly. countByTenantIdAndRoleName alone counts every user
+     * with that role regardless of ACTIVE/INACTIVE, so it can't
+     * distinguish "one active admin plus three deactivated ones" from
+     * "four active admins" — exactly the distinction
+     * UserManagementService's new last-admin guard needs.
+     */
+    @Query("""
+        SELECT COUNT(u) FROM User u
+        JOIN u.roles r
+        WHERE u.tenantId = :tenantId
+        AND r.name = :roleName
+        AND u.status = :status
+        """)
+    int countByTenantIdAndRoleNameAndStatus(TenantId tenantId, String roleName,
+                                             User.UserStatus status);
 }

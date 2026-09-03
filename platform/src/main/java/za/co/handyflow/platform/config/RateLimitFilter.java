@@ -82,6 +82,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
             new Limit("portal:login", "/api/v1/accountant/portal/auth/login", 10, 10 * 60 * 1_000L),
             new Limit("payrollportal:register", "/api/v1/payroll-bureau/portal/auth/register", 5, 60 * 60 * 1_000L),
             new Limit("payrollportal:login", "/api/v1/payroll-bureau/portal/auth/login", 10, 10 * 60 * 1_000L),
+
+            // NEW (identity module modernization): main-app invitation
+            // acceptance — just made reachable via SecurityConfig's
+            // permitAll() fix above. Same risk shape as
+            // "portal:register" (invite-only, a legitimate user only
+            // ever calls this once) rather than open registration, so
+            // the same 5/hour ceiling applies.
+            new Limit("identity:invitation-accept", "/api/v1/identity/invitations/accept", 5, 60 * 60 * 1_000L),
     };
 
     @Override

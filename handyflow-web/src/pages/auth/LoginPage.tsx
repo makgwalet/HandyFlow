@@ -20,6 +20,22 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>
 
+// FIX (identity module modernization): every login failure previously
+// showed the exact same hardcoded "Invalid credentials" text — including
+// a 429 from RateLimitFilter ("Too many requests — please try again
+// shortly"), a suspended/cancelled tenant (AuthService throws "This
+// account is suspended or cancelled"), and a deactivated user ("Your
+// account has been deactivated"). All three are real, distinct,
+// actionable messages the backend already produces; showing "Invalid
+// credentials" for a locked-out or suspended account sends the person
+// straight back to retyping a password that was never the problem. Falls
+// back to the generic message only when the backend didn't send one at
+// all (e.g. a network error with no response body).
+function loginErrorMessage(error: unknown): string {
+  const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+  return message && message.trim().length > 0 ? message : 'Invalid credentials. Please try again.'
+}
+
 export function LoginPage() {
   const navigate = useNavigate()
   const { setAuth } = useAuthStore()
@@ -103,7 +119,7 @@ export function LoginPage() {
 
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                Invalid credentials. Please try again.
+                {loginErrorMessage(error)}
               </div>
             )}
 
