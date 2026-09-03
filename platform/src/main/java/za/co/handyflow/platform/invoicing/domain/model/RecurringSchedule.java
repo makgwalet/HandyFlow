@@ -121,6 +121,14 @@ public class RecurringSchedule {
     private BigDecimal minimumHoursPerCycle;
 
     /** VAT rate applied to the hours × rate line. */
+    // FIX (VAT sweep, module 2): RecurringScheduleService now always
+    // resolves a concrete default via VatRateProvider before calling the
+    // factory below, so this field-level default (a JPA no-arg-constructor
+    // safety net, not really a business default) and the factory's own
+    // null-coalescing fallback are both effectively unreachable via the
+    // real application flow — left in place as defensive backstops
+    // rather than wired to VatRateProvider directly, since a domain
+    // entity shouldn't reach into Spring-managed config.
     @Column(name = "hours_vat_rate", precision = 5, scale = 2)
     private BigDecimal hoursVatRate = new BigDecimal("15.00");
 
@@ -248,6 +256,11 @@ public class RecurringSchedule {
         s.variableHours         = true;
         s.ratePerHour           = ratePerHour;
         s.minimumHoursPerCycle  = minimumHoursPerCycle;
+        // FIX (VAT sweep, module 2): RecurringScheduleService now always
+        // resolves a concrete default via VatRateProvider before calling
+        // this factory, so this fallback is no longer reachable through
+        // the real application flow — left as a defensive backstop, same
+        // reasoning as the field-level default above.
         s.hoursVatRate          = hoursVatRate != null ? hoursVatRate : new BigDecimal("15.00");
         s.contractStartDate     = contractStartDate;
         s.contractEndDate       = contractEndDate;

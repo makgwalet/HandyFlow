@@ -15,6 +15,7 @@ import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.shared.UserContext;
+import za.co.handyflow.platform.shared.VatRateProvider;
 import org.springframework.beans.factory.annotation.Value;
 import za.co.handyflow.platform.identity.TenantFacade;
 import za.co.handyflow.platform.shared.EmailService;
@@ -52,6 +53,11 @@ public class QuoteService {
     private final QuotePdfService quotePdfService;
     private final InvoicePaymentTermsResolver paymentTermsResolver;
     private final StaffNotifier staffNotifier;
+    // FIX (VAT sweep, module 2): replaces two independent
+    // new BigDecimal("15.00") fallbacks below — see VatRateProvider's own
+    // Javadoc for the fuller "scattered across the codebase" finding
+    // this closes.
+    private final VatRateProvider vatRateProvider;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -115,9 +121,9 @@ public class QuoteService {
             vatRate = catalogueFacade
                     .findItemById(tenantId, request.catalogueItemId())
                     .map(item -> item.vatRate())
-                    .orElse(new BigDecimal("15.00"));
+                    .orElse(vatRateProvider.ratePercent());
         }
-        if (vatRate == null) vatRate = new BigDecimal("15.00");
+        if (vatRate == null) vatRate = vatRateProvider.ratePercent();
 
         QuoteLineItem lineItem = QuoteLineItem.create(
                 quote, tenantId,

@@ -77,6 +77,15 @@ public class CreditNote {
         cn.reason = reason;
         cn.description = description;
         cn.subtotal = amountExVat.setScale(2, RoundingMode.HALF_UP);
+        // FIX (VAT sweep, module 2): CreditNoteService is this factory's
+        // only real caller (confirmed by search) and now always resolves
+        // a concrete default via VatRateProvider before calling here, so
+        // this fallback is no longer reachable through the actual
+        // application flow — left in place as a defensive backstop
+        // rather than wired to VatRateProvider directly, since a domain
+        // entity's static factory shouldn't reach into Spring-managed
+        // config (matches the convention already established for
+        // CatalogueItem's/PosTransactionItem's own equivalent fallbacks).
         BigDecimal rate = vatRate != null ? vatRate : new BigDecimal("15.00");
         cn.vatTotal = cn.subtotal.multiply(rate)
                 .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);

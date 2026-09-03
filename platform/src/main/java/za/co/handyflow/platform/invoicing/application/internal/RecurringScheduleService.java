@@ -13,6 +13,7 @@ import za.co.handyflow.platform.invoicing.domain.repository.RecurringScheduleRep
 import za.co.handyflow.platform.invoicing.dto.*;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.shared.VatRateProvider;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -35,6 +36,9 @@ public class RecurringScheduleService {
     // whole fix; Spring wires it automatically since InvoicePaymentTermsResolver
     // is already a @Component in the same package.
     private final InvoicePaymentTermsResolver paymentTermsResolver;
+    // FIX (VAT sweep, module 2): replaces two independent
+    // new BigDecimal("15.00") fallbacks below.
+    private final VatRateProvider vatRateProvider;
 
 // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -102,7 +106,7 @@ public class RecurringScheduleService {
                                                  AddLineItemRequest req) {
         var schedule = findActive(tenantId, scheduleId);
 
-        BigDecimal vatRate = req.vatRate() != null ? req.vatRate() : new BigDecimal("15.00");
+        BigDecimal vatRate = req.vatRate() != null ? req.vatRate() : vatRateProvider.ratePercent();
 
         var li = RecurringLineItem.create(
                 schedule, tenantId,
@@ -220,7 +224,13 @@ public class RecurringScheduleService {
                 freq,
                 req.ratePerHour(),
                 req.minimumHoursPerCycle(),
-                req.hoursVatRate(),
+                // FIX (VAT sweep, module 2): req.hoursVatRate() is
+                // genuinely nullable ("defaults to 15 if null", per that
+                // DTO's own comment) and was falling straight through
+                // unresolved to RecurringSchedule's hardcoded fallback —
+                // a live, reachable gap, same shape as the earlier
+                // PosPurchaseOrderItem/CreditNote findings. Resolved here.
+                req.hoursVatRate() != null ? req.hoursVatRate() : vatRateProvider.ratePercent(),
                 req.contractStartDate(),
                 req.contractEndDate(),
                 req.contractedTotalHours(),
@@ -264,7 +274,7 @@ public class RecurringScheduleService {
         BigDecimal lineTotal = billed.multiply(schedule.getRatePerHour())
                 .setScale(2, java.math.RoundingMode.HALF_UP);
         BigDecimal vatRate   = schedule.getHoursVatRate() != null
-                ? schedule.getHoursVatRate() : new BigDecimal("15.00");
+                ? schedule.getHoursVatRate() : vatRateProvider.ratePercent();
         BigDecimal vatAmount = lineTotal.multiply(vatRate)
                 .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
         BigDecimal total     = lineTotal.add(vatAmount);

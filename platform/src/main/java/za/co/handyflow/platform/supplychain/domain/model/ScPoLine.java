@@ -25,6 +25,14 @@ public class ScPoLine {
     @Column(name = "qty_received",      nullable = false, precision = 12, scale = 3) BigDecimal qtyReceived   = BigDecimal.ZERO;
     @Column(name = "qty_invoiced",      nullable = false, precision = 12, scale = 3) BigDecimal qtyInvoiced   = BigDecimal.ZERO;
     @Column(name = "unit_cost",         nullable = false, precision = 15, scale = 2) BigDecimal unitCost;
+    // FIX (VAT sweep, module 2): ScmService now always resolves a
+    // concrete default via VatRateProvider before calling create()
+    // below, so this field-level default (a JPA no-arg-constructor
+    // safety net) and the factory's own null-coalescing fallback are
+    // both effectively unreachable via the real application flow —
+    // left in place as defensive backstops rather than wired to
+    // VatRateProvider directly, since a domain entity shouldn't reach
+    // into Spring-managed config.
     @Column(name = "vat_rate",          nullable = false, precision = 5,  scale = 2) BigDecimal vatRate       = BigDecimal.valueOf(15);
     @Column(name = "vat_amount",        nullable = false, precision = 15, scale = 2) BigDecimal vatAmount     = BigDecimal.ZERO;
     @Column(name = "line_total",        nullable = false, precision = 15, scale = 2) BigDecimal lineTotal     = BigDecimal.ZERO;
