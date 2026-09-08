@@ -2,8 +2,10 @@ package za.co.handyflow.platform;
 
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import za.co.handyflow.platform.config.SecurityConfig;
 import za.co.handyflow.platform.shared.RateLimiter;
 import za.co.handyflow.platform.security.application.internal.GuardAuthService;
 import za.co.handyflow.platform.security.application.internal.PublicApiService;
@@ -33,6 +35,34 @@ import za.co.handyflow.platform.shared.PortalJwtService;
  * fails context startup with
  * {@code NoSuchBeanDefinitionException: JwtService} before a single test runs.
  * <p>
+ * FIX (403-vs-409 investigation): confirmed empirically via a throwaway
+ * diagnostic (AopUtils.isAopProxy on the controller bean MockMvc actually
+ * invokes) that this class's own doc comment above was WRONG about one
+ * specific claim — "@WebMvcTest pulls in SecurityConfig" was describing
+ * an assumption, not a verified mechanism, and this class never actually
+ * @Imported SecurityConfig anywhere in its real code, only provided mock
+ * beans for SecurityConfig's own dependencies. SecurityConfig's @Bean
+ * methods clearly DO run somehow (confirmed by the NoSuchBeanDefinitionException
+ * behavior documented above), so SecurityConfig itself IS being discovered
+ * by @WebMvcTest's own auto-detection — but @EnableMethodSecurity's AOP
+ * auto-proxying (which needs its own BeanPostProcessor registered before
+ * ANY singleton bean, including the controller, is instantiated) was
+ * empirically confirmed NOT to have applied: the controller bean under
+ * test was a completely raw, unproxied instance
+ * (isAopProxy/isCglibProxy/isJdkDynamicProxy all false), meaning
+ * @PreAuthorize was structurally incapable of firing regardless of what
+ * authority @WithMockUser granted. Explicit @Import here — rather than
+ * relying on @WebMvcTest's own auto-detection timing — routes
+ * SecurityConfig (and @EnableMethodSecurity's own nested
+ * @Import(AutoProxyRegistrar.class) chain) through Spring's standard,
+ * deterministic ConfigurationClassParser pipeline, which is guaranteed to
+ * run before singleton bean instantiation. This is the most likely fix
+ * given the empirical evidence, but I could not re-run the diagnostic
+ * myself to confirm it actually resolves the unproxied-bean finding —
+ * please re-run PreAuthorizeDiagnosticTest after applying this and
+ * confirm isAopProxy flips to true and the wrong-authority request
+ * returns 403 before deleting that diagnostic test.
+ * <p>
  * USAGE — add both of these to the test class:
  * <pre>{@code
  * @WebMvcTest(HrController.class)
@@ -54,6 +84,7 @@ import za.co.handyflow.platform.shared.PortalJwtService;
  * backlog item this class was built for. Flagging it here so it isn't lost.
  */
 @TestConfiguration
+@Import(SecurityConfig.class)
 public class WebMvcTestSecuritySupport {
 
     @Bean
