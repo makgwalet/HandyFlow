@@ -266,9 +266,7 @@ public class DeliveryReceiptPdfService {
                     .setMarginBottom(4));
         }
 
-        receivedBy.add(signatureLine("Signature:", regular));
-
-        pod.addCell(deliveredBy);
+        addReceiverSignature(receivedBy, d, regular);
         pod.addCell(receivedBy);
         doc.add(pod);
 
@@ -357,6 +355,51 @@ public class DeliveryReceiptPdfService {
                 .add(new Text(value.isEmpty() ? "____________________" : value)
                         .setFont(bold).setFontSize(8.5f).setFontColor(TEXT_DARK))
                 .setMarginBottom(5);
+    }
+
+    // FIX (P0 backlog item 1.9): renders the actual captured signature
+    // image when one exists, falling back to the static placeholder line
+    // otherwise — same data: URI decode pattern as
+    // ReceiptPdfService.decodeLogoBytes elsewhere in this codebase.
+    // Previously this was unconditionally the static line regardless of
+    // whether a signature was actually captured, which is exactly the
+    // "signature theatre" gap flagged in the P0 review: the PDF implied a
+    // signature process that didn't exist. Now it only shows a line when
+    // that's honestly what happened.
+    // NOTE: takes the Cell directly and adds to it, rather than returning
+    // a common element type — Image implements ILeafElement, not
+    // IBlockElement, in this iText7 version (confirmed via the identical,
+    // already-documented build-failure fix in ClinicPatientInvoicePdfService
+    // and three other PDF services in this codebase), so a single method
+    // trying to return either an Image or a Paragraph as one shared type
+    // wouldn't compile.
+    private void addReceiverSignature(Cell receivedBy, FuelDelivery d, PdfFont regular) {
+        String url = d.getReceiverSignatureUrl();
+        if (url != null && !url.isBlank()) {
+            try {
+                byte[] imageBytes = decodeSignatureBytes(url);
+                Image signature = new Image(com.itextpdf.io.image.ImageDataFactory.create(imageBytes))
+                        .setMaxHeight(40).setAutoScale(false)
+                        .setMarginTop(4).setMarginBottom(4);
+                receivedBy.add(signature);
+                return;
+            } catch (Exception ex) {
+                log.warn("Could not load receiver signature for delivery {}: {}", d.getId(), ex.getMessage());
+            }
+        }
+        receivedBy.add(signatureLine("Signature:", regular));
+    }
+
+    /** Same fix as ReceiptPdfService/InvoicePdfService/QuotePdfService — signature url is a data: URI. */
+    private byte[] decodeSignatureBytes(String url) throws Exception {
+        if (url.startsWith("data:")) {
+            int commaIdx = url.indexOf(',');
+            if (commaIdx < 0) throw new IllegalArgumentException("Malformed data URI");
+            return java.util.Base64.getDecoder().decode(url.substring(commaIdx + 1));
+        }
+        try (var in = new java.net.URL(url).openStream()) {
+            return in.readAllBytes();
+        }
     }
 
     private Paragraph signatureLine(String label, PdfFont regular) {

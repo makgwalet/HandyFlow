@@ -157,7 +157,7 @@ public class FuelDelivery {
     public void complete(BigDecimal litresDelivered, String receiverName,
                          String receiverIdBadge, BigDecimal meterReadingStart,
                          BigDecimal meterReadingEnd, Boolean signedOnBehalf,
-                         String onBehalfOf) {
+                         String onBehalfOf, String receiverSignatureUrl) {
         this.status              = "DELIVERED";
         this.litresDelivered     = litresDelivered;
         this.deliveredAt         = Instant.now();
@@ -170,6 +170,7 @@ public class FuelDelivery {
         this.updatedAt           = Instant.now();
         this.signedOnBehalf  = Boolean.TRUE.equals(signedOnBehalf);
         this.onBehalfOf      = onBehalfOf;
+        this.receiverSignatureUrl = receiverSignatureUrl;
     }
 
     public void assignReceiptNumber(String receiptNumber) {
