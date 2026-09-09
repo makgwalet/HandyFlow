@@ -3,13 +3,14 @@ import { useState } from "react"
 import {
   Shield, MapPin, Clock, AlertTriangle, LayoutDashboard, Radio,
   Crosshair, Siren, Camera, FileBarChart, Tablet, Lock, Users,
-  DollarSign, GitBranch, Key, DoorOpen, Route,
+  DollarSign, GitBranch, Key, DoorOpen, Route, RefreshCw,
 } from "lucide-react"
 import SecurityDashboard  from "./SecurityDashboard"
 import GuardsTab          from "./GuardsTab"
 import SitesTab           from "./SitesTab"
 import GateAccessTab      from "./GateAccessTab"
 import PatrolRoutesTab    from "./PatrolRoutesTab"
+import RotationPatternsTab from "./RotationPatternsTab"
 import ShiftsTab          from "./ShiftsTab"
 import IncidentsTab       from "./IncidentsTab"
 import LiveMapTab         from "./LiveMapTab"
@@ -24,7 +25,7 @@ import BranchesTab        from "./BranchesTab"
 import PublicApiTab       from "./PublicApiTab"
 
 type Module  = "ops" | "cp" | "admin"
-type OpsTab  = "dashboard" | "guards" | "sites" | "gate-access" | "patrol-routes" | "shifts" | "incidents" | "live" | "control-room" | "armoury" | "cctv" | "sessions" | "reports"
+type OpsTab  = "dashboard" | "guards" | "sites" | "gate-access" | "patrol-routes" | "rotation-patterns" | "shifts" | "incidents" | "live" | "control-room" | "armoury" | "cctv" | "sessions" | "reports"
 type CpTab   = "cp-overview"
 type ATab    = OpsTab | CpTab | "admin-overview" | "payroll" | "branches" | "public-api"
 
@@ -34,6 +35,7 @@ const OPS_TABS = [
   { id: "sites",        label: "Sites",        icon: MapPin },
   { id: "gate-access",  label: "Gate Access",  icon: DoorOpen },
   { id: "patrol-routes", label: "Patrol Routes", icon: Route },
+  { id: "rotation-patterns", label: "Rotation Patterns", icon: RefreshCw },
   { id: "shifts",       label: "Shifts",       icon: Clock },
   { id: "incidents",    label: "Incidents",    icon: AlertTriangle },
   { id: "control-room", label: "Control Room", icon: Siren,       badge: "LIVE" },
@@ -137,6 +139,7 @@ export function SecurityPage() {
           {tab === "sites"         && <SitesTab />}
           {tab === "gate-access"   && <GateAccessTab />}
           {tab === "patrol-routes" && <PatrolRoutesTab />}
+          {tab === "rotation-patterns" && <RotationPatternsTab />}
           {tab === "shifts"        && <ShiftsTab />}
           {tab === "incidents"     && <IncidentsTab />}
           {tab === "live"          && <LiveMapTab />}
