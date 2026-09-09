@@ -20,15 +20,10 @@
 //
 // All other behavior/logic is unchanged from the original file.
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import {
-  Plus, Search, Shield, Phone, BadgeCheck, Trash2, X,
-  Edit2, Eye, AlertCircle, Fingerprint, Upload,
-  CheckCircle, AlertTriangle, Clock, Ban, HelpCircle, Calendar,
-} from "lucide-react"
-
+import { Plus, Search, Shield, Phone, BadgeCheck, Trash2, X, Edit2, Eye, AlertCircle, Fingerprint, Upload, CheckCircle, AlertTriangle, Clock, Ban, HelpCircle, Calendar } from "lucide-react"
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface Guard {
@@ -159,21 +154,19 @@ interface GuardFormFieldsProps {
   capturedPhoto: string | null
   setCapturedPhoto: (v: string | null) => void
   photoMode: "none" | "camera"
-  videoRef: React.RefObject<HTMLVideoElement>
-  canvasRef: React.RefObject<HTMLCanvasElement>
+  videoRef: React.RefObject<HTMLVideoElement | null>
+  canvasRef: React.RefObject<HTMLCanvasElement | null>
   startCamera: () => void
   capturePhoto: () => void
   stopCamera: () => void
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
-  fpStatus: "idle" | "scanning" | "done"
-  setFpStatus: (v: "idle" | "scanning" | "done") => void
 }
 
 function GuardFormFields({
   form, setForm, fieldErrors, setFieldErrors,
   capturedPhoto, setCapturedPhoto, photoMode,
   videoRef, canvasRef, startCamera, capturePhoto, stopCamera,
-  handleFileUpload, fpStatus, setFpStatus,
+  handleFileUpload,
 }: GuardFormFieldsProps) {
   const idFeedback = validateSaId(form.idNumber)
   const inpSt = (key: string) => inputStyle(fieldErrors, key)
@@ -276,17 +269,29 @@ function GuardFormFields({
         )}
       </div>
 
-      {/* Fingerprint stub */}
+      {/* FIX (P0 backlog item 1.4): this used to be a fake capture —
+          setTimeout(() => setFpStatus("done"), 2500) with no scanner
+          invoked and nothing stored, ending in a "Captured" success
+          state regardless. Replaced with an honest, permanently-disabled
+          state rather than a real capture flow — actual fingerprint
+          hardware integration is a genuinely separate, larger piece of
+          work (needs a scanner SDK, not something a web app can do on
+          its own), and the report's own recommendation was "either wire
+          to a real capture flow or replace with a clear 'not yet
+          available' state." The FINGERPRINT_FORM document-upload
+          category already covers this need today (a scanned paper form,
+          uploaded like any other guard document) — this stub no longer
+          pretends to be a substitute for it. */}
       <div style={{ marginTop: 12, padding: 16, background: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 2 }}>Fingerprint</div>
-            <div style={{ fontSize: 11, color: "#94A3B8" }}>Requires fingerprint scanner device</div>
+            <div style={{ fontSize: 11, color: "#94A3B8" }}>Not available in the web console — requires scanner hardware. Use the "Fingerprint Form" document upload instead.</div>
           </div>
-          <button onClick={() => { setFpStatus("scanning"); setTimeout(() => setFpStatus("done"), 2500) }} disabled={fpStatus === "scanning"}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: fpStatus === "done" ? "#DCFCE7" : "#F5F3FF", color: fpStatus === "done" ? "#166534" : "#7C3AED", border: `1px solid ${fpStatus === "done" ? "#86EFAC" : "#DDD6FE"}`, borderRadius: 8, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
+          <button disabled
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "#F1F5F9", color: "#94A3B8", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "not-allowed", fontWeight: 600 }}>
             <Fingerprint size={13} />
-            {fpStatus === "done" ? "Captured" : fpStatus === "scanning" ? "Scanning..." : "Scan Fingerprint"}
+            Not Available
           </button>
         </div>
       </div>
@@ -313,7 +318,9 @@ export default function GuardsTab() {
   const [photoMode,       setPhotoMode]       = useState<"none" | "camera">("none")
   const [capturedPhoto,   setCapturedPhoto]   = useState<string | null>(null)
   const [cameraStream,    setCameraStream]    = useState<MediaStream | null>(null)
-  const [fpStatus,        setFpStatus]        = useState<"idle" | "scanning" | "done">("idle")
+  // FIX (P0 backlog item 1.3) — see the enrollGuard mutation's own
+  // comment for the full context on why this exists.
+  const [enrollPin,       setEnrollPin]        = useState("")
   const [statusFilter,    setStatusFilter]    = useState("ALL")
   const [newStatus,       setNewStatus]       = useState("")
   const [statusNote,      setStatusNote]      = useState("")
@@ -363,10 +370,17 @@ export default function GuardsTab() {
     onError:   (e: any) => setApiError(e.response?.data?.message ?? "Failed to remove guard"),
   })
 
+  const enrollGuard = useMutation({
+    mutationFn: ({ id, pin }: { id: string; pin: string }) =>
+      apiClient.post(`/api/v1/security/guards/${id}/enrol`, { pin }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["guards"] }); setEnrollPin("") },
+    onError:   (e: any) => setApiError(e.response?.data?.message ?? "Failed to enroll guard"),
+  })
+
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  const closeAdd  = () => { setShowAdd(false);  setForm(EMPTY_FORM); setFieldErrors({}); setApiError(""); stopCamera(); setCapturedPhoto(null); setFpStatus("idle") }
-  const closeEdit = () => { setEditing(null);   setForm(EMPTY_FORM); setFieldErrors({}); setApiError(""); stopCamera(); setCapturedPhoto(null); setFpStatus("idle") }
+  const closeAdd  = () => { setShowAdd(false);  setForm(EMPTY_FORM); setFieldErrors({}); setApiError(""); stopCamera(); setCapturedPhoto(null) }
+  const closeEdit = () => { setEditing(null);   setForm(EMPTY_FORM); setFieldErrors({}); setApiError(""); stopCamera(); setCapturedPhoto(null); setEnrollPin("") }
 
   const openEdit = (g: Guard) => {
     setEditing(g)
@@ -437,7 +451,7 @@ export default function GuardsTab() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or PSiRA..."
             style={{ paddingLeft: 36, paddingRight: 14, paddingTop: 9, paddingBottom: 9, border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, width: 260, outline: "none" }} />
         </div>
-        <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError(""); setCapturedPhoto(null); setFpStatus("idle") }}
+        <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError(""); setCapturedPhoto(null) }}
           style={{ display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Add Guard
         </button>
@@ -581,7 +595,6 @@ export default function GuardsTab() {
             photoMode={photoMode} videoRef={videoRef} canvasRef={canvasRef}
             startCamera={startCamera} capturePhoto={capturePhoto} stopCamera={stopCamera}
             handleFileUpload={handleFileUpload}
-            fpStatus={fpStatus} setFpStatus={setFpStatus}
           />
           {apiError && <ErrBanner msg={apiError} />}
           <Footer onCancel={closeAdd} onSubmit={() => handleSubmit(false)} loading={createGuard.isPending} label="Add Guard" />
@@ -596,8 +609,30 @@ export default function GuardsTab() {
             photoMode={photoMode} videoRef={videoRef} canvasRef={canvasRef}
             startCamera={startCamera} capturePhoto={capturePhoto} stopCamera={stopCamera}
             handleFileUpload={handleFileUpload}
-            fpStatus={fpStatus} setFpStatus={setFpStatus}
           />
+          {/* FIX (P0 backlog item 1.3) — see the enrollGuard mutation's own
+              comment for the full context on why this exists. */}
+          <div style={{ marginTop: 12, padding: 16, background: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 2 }}>Mobile App Access</div>
+            <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 10 }}>
+              Set or reset this guard's PIN to enable Shield app login. Communicate the PIN verbally or via SMS — never email.
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                value={enrollPin}
+                onChange={e => setEnrollPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="6-digit PIN"
+                inputMode="numeric"
+                style={{ flex: 1, padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, outline: "none", letterSpacing: 2 }}
+              />
+              <button
+                onClick={() => enrollGuard.mutate({ id: editing.id, pin: enrollPin })}
+                disabled={enrollPin.length !== 6 || enrollGuard.isPending}
+                style={{ padding: "9px 16px", background: enrollPin.length === 6 ? "#0D9488" : "#F1F5F9", color: enrollPin.length === 6 ? "#fff" : "#94A3B8", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: enrollPin.length === 6 ? "pointer" : "not-allowed" }}>
+                {enrollGuard.isPending ? "Enrolling…" : enrollGuard.isSuccess && enrollPin === "" ? "Enrolled ✓" : "Set PIN"}
+              </button>
+            </div>
+          </div>
           {apiError && <ErrBanner msg={apiError} />}
           <Footer onCancel={closeEdit} onSubmit={() => handleSubmit(true)} loading={updateGuard.isPending} label="Save Changes" />
         </Modal>
