@@ -248,6 +248,14 @@ export default function DashboardTab() {
               { label: "Balance Sheet",  url: `/api/v1/accounting/reports/balance-sheet/pdf?from=${yearStart}&to=${today}`,   file: `BS-${yearStart}-to-${today}.pdf`,          color: NAVY   },
               { label: "Trial Balance",  url: `/api/v1/accounting/reports/trial-balance/pdf?from=${yearStart}&to=${today}`,   file: `TB-${yearStart}-to-${today}.pdf`,          color: AMBER  },
               { label: "VAT201 Summary", url: `/api/v1/accounting/reports/vat201/pdf?from=${yearStart}&to=${today}`,         file: `VAT201-${yearStart}-to-${today}.pdf`,       color: PURPLE },
+              // FIX (P1 backlog): the endpoint has always existed
+              // (GET /reports/ar-aging/pdf) — confirmed via direct grep
+              // of the controller — this list just never included it.
+              // No from/to params on this one: the endpoint's own
+              // @Operation summary states it's always as-at-today, same
+              // as the JSON version this dashboard already fetches for
+              // its own KPI display above.
+              { label: "AR Aging",       url: `/api/v1/accounting/reports/ar-aging/pdf`,                                    file: `AR-Aging-${today}.pdf`,                     color: GREEN  },
             ].map(r => (
               <button key={r.label}
                 onClick={() => downloadPdf(r.url, r.file)}
