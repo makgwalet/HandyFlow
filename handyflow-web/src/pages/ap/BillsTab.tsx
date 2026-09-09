@@ -2,12 +2,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import {
-  Plus, X, CheckCircle, XCircle, Search, Download,
-  FileText, Upload, AlertTriangle, ChevronRight,
-  DollarSign, Clock, Edit3, Paperclip, Loader2, Mail,
-} from "lucide-react"
-
+import { Plus, X, CheckCircle, XCircle, Search, Download, FileText, Upload, AlertTriangle, ChevronRight, DollarSign, Edit3, Paperclip, Loader2, Mail } from "lucide-react"
 interface Bill {
   id: string; supplierId: string | null; supplierName: string
   billNumber: string; billDate: string; dueDate: string
@@ -19,6 +14,9 @@ interface Bill {
   notes: string | null; paidAt: string | null; createdAt: string
   firstApprovedBy: string | null; firstApprovedAt: string | null
   possibleDuplicateWarning?: string | null
+  // FIX (P1 backlog): was already returned by the API (added in a prior
+  // fix, per that DTO's own comment) but never typed or displayed here.
+  rejectionReason: string | null
 }
 
 const STATUS: Record<string, { color: string; bg: string; border: string; dot: string; label: string }> = {
@@ -28,6 +26,10 @@ const STATUS: Record<string, { color: string; bg: string; border: string; dot: s
   PAID:      { color: "#1D4ED8", bg: "#EFF6FF", border: "#BFDBFE", dot: "#3B82F6", label: "Paid" },
   OVERDUE:   { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", dot: "#EF4444", label: "Overdue" },
   CANCELLED: { color: "#94A3B8", bg: "#F8FAFC", border: "#E2E8F0", dot: "#CBD5E1", label: "Cancelled" },
+  // FIX (P1 backlog): this key was simply missing — a rejected bill was
+  // falling through to the STATUS.DRAFT fallback and showing a "Draft"
+  // badge, which is actively wrong, not just an omission.
+  REJECTED:  { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", dot: "#EF4444", label: "Rejected" },
 }
 
 const CATEGORIES = ["RENT","UTILITIES","FUEL","SALARY","PROFESSIONAL_FEES","EQUIPMENT","MAINTENANCE","INSURANCE","SUBSCRIPTIONS","MARKETING","OTHER"]
@@ -361,6 +363,18 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
               </div>
               <button onClick={() => { setSelected(null); setRemittanceNotice("") }} style={{ background: "#F1F5F9", border: "none", borderRadius: "50%", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#64748B" }}><X size={14} /></button>
             </div>
+
+            {/* FIX (P1 backlog): rejectionReason was already returned by
+                the API "so the person editing a rejected bill can
+                actually see why it was rejected before resubmitting it"
+                (per that field's own backend comment) but never shown
+                anywhere in this file. */}
+            {selected.status === "REJECTED" && selected.rejectionReason && (
+              <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, padding: "12px 14px", marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", marginBottom: 3, textTransform: "uppercase" as const, letterSpacing: 0.4 }}>Rejection reason</div>
+                <div style={{ fontSize: 13, color: "#374151" }}>{selected.rejectionReason}</div>
+              </div>
+            )}
 
             {/* Amount hero */}
             <div style={{ background: "#F8FAFC", borderRadius: 12, padding: "18px 20px", marginBottom: 20, textAlign: "center" as const, border: "1px solid #E2E8F0" }}>
