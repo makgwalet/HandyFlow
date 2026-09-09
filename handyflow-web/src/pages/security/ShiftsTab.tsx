@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import {
   Plus, Clock, CheckCircle, PlayCircle, AlertCircle,
-  X, Calendar, Edit2, AlertTriangle,
+  X, Calendar, Edit2, AlertTriangle, UserX, TimerOff, LogOut,
 } from "lucide-react"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -132,6 +132,24 @@ export default function ShiftsTab() {
     mutationFn: (id: string) => apiClient.post(`/api/v1/security/shifts/${id}/complete`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["shifts"] }),
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to complete shift"),
+  })
+
+  // FIX (P1 backlog): dismiss-no-show, close-overtime, and pull have all
+  // existed server-side — fully built, documented, and audited — with no
+  // buttons anywhere in this tab to trigger them. Single shared mutation
+  // + modal for all three, matching the backend's own shared
+  // ShiftSupervisorActionRequest DTO (all three take just a mandatory
+  // written reason).
+  const [interrupting, setInterrupting] = useState<{ shift: any; action: "dismiss-no-show" | "close-overtime" | "pull"; label: string } | null>(null)
+  const [interruptReason, setInterruptReason] = useState("")
+  const interruptMut = useMutation({
+    mutationFn: ({ id, action, reason }: { id: string; action: string; reason: string }) =>
+      apiClient.post(`/api/v1/security/shifts/${id}/${action}`, { reason }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["shifts"] })
+      setInterrupting(null); setInterruptReason("")
+    },
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to record this action"),
   })
 
   // ── Handlers ──────────────────────────────────────────────────────────────────
@@ -318,10 +336,31 @@ export default function ShiftsTab() {
                     </button>
                   )}
 
+                  {isScheduled && (
+                    <button onClick={() => setInterrupting({ shift, action: "dismiss-no-show", label: "Dismiss No-Show" })} title="Dismiss a no-show/late alert for this shift"
+                      style={{ display: "flex", alignItems: "center", gap: 5, background: "#F8FAFC", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      <UserX size={13} /> Dismiss No-Show
+                    </button>
+                  )}
+
                   {isActive && (
                     <button onClick={() => completeShift.mutate(shift.id)} disabled={completeShift.isPending}
                       style={{ display: "flex", alignItems: "center", gap: 5, background: "#F0FDF4", color: "#0D9488", border: "1px solid #99F6E4", borderRadius: 7, padding: "7px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                       <CheckCircle size={13} /> Complete
+                    </button>
+                  )}
+
+                  {isActive && (
+                    <button onClick={() => setInterrupting({ shift, action: "close-overtime", label: "Force-Close Overtime" })} title="Force-close a shift running in unconfirmed overtime"
+                      style={{ display: "flex", alignItems: "center", gap: 5, background: "#FFFBEB", color: "#B45309", border: "1px solid #FDE68A", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      <TimerOff size={13} /> Close Overtime
+                    </button>
+                  )}
+
+                  {isActive && (
+                    <button onClick={() => setInterrupting({ shift, action: "pull", label: "Pull From Site" })} title="Supervisor-initiated interrupt — client complaint, guard unwell, redeployment, etc."
+                      style={{ display: "flex", alignItems: "center", gap: 5, background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      <LogOut size={13} /> Pull From Site
                     </button>
                   )}
                 </div>
@@ -458,6 +497,37 @@ export default function ShiftsTab() {
             <button onClick={() => { setEditing(null); setApiError("") }} style={cancelBtn}>Cancel</button>
             <button onClick={handleUpdate} disabled={updateShift.isPending} style={submitBtn}>
               {updateShift.isPending ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Supervisor Interrupt Modal — dismiss-no-show / close-overtime / pull ── */}
+      {interrupting && (
+        <Modal onClose={() => { setInterrupting(null); setInterruptReason(""); setApiError("") }}
+          title={interrupting.label}
+          icon={<AlertTriangle size={18} color="#B45309" />} iconBg="#FFFBEB">
+          <div style={{ marginBottom: 16, padding: "12px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8 }}>
+            <div style={{ fontSize: 13, color: "#0F172A" }}>
+              {guardName(interrupting.shift.guardId)} → {siteName(interrupting.shift.siteId)}
+            </div>
+          </div>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>
+            Reason <span style={{ color: "#DC2626" }}>*</span>
+          </label>
+          <textarea value={interruptReason} onChange={e => setInterruptReason(e.target.value)}
+            rows={3} placeholder="Required — this action is fully audited"
+            style={{ width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, outline: "none", resize: "vertical" as const, fontFamily: "inherit" }} />
+
+          {apiError && <ErrBanner msg={apiError} />}
+
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+            <button onClick={() => { setInterrupting(null); setInterruptReason(""); setApiError("") }} style={cancelBtn}>Cancel</button>
+            <button
+              onClick={() => interruptMut.mutate({ id: interrupting.shift.id, action: interrupting.action, reason: interruptReason })}
+              disabled={interruptMut.isPending || !interruptReason.trim()}
+              style={{ ...submitBtn, background: interruptReason.trim() ? "#DC2626" : "#F1F5F9", opacity: interruptReason.trim() ? 1 : 0.6 }}>
+              {interruptMut.isPending ? "Saving…" : "Confirm"}
             </button>
           </div>
         </Modal>
