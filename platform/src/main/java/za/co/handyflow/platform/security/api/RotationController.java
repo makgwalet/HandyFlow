@@ -83,6 +83,20 @@ public class RotationController {
                 .body(ApiResponse.success(rotationService.assignGuard(tenantId, req)));
     }
 
+    // FIX (P1 backlog): getAssignmentsForPattern's own service-method
+    // comment has the fuller context — this endpoint didn't exist at
+    // all before, meaning an assignment could be created but never
+    // discovered again in order to end it.
+    @GetMapping("/{patternId}/assignments")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
+    @Operation(summary = "Active guard assignments for a rotation pattern")
+    public ResponseEntity<ApiResponse<java.util.List<RotationAssignmentResponse>>> getAssignmentsForPattern(
+            @PathVariable UUID patternId) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(
+                rotationService.getAssignmentsForPattern(tenantId, patternId)));
+    }
+
     @DeleteMapping("/assignments/{assignmentId}")
     @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "End a guard's rotation assignment on the specified date")

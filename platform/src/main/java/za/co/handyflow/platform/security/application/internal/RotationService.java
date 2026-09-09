@@ -53,6 +53,22 @@ public class RotationService {
                 .map(p -> toPatternResponse(p, tenantId));
     }
 
+    // FIX (P1 backlog): findActiveByPattern already existed at the
+    // repository level (used internally for assignedGuardCount on
+    // RotationPatternResponse and for schedule generation) but was never
+    // exposed through a service method or controller endpoint — there
+    // was a way to CREATE a rotation assignment but no way to ever see
+    // one to end it. Same shape of gap as FuelDelivery.dispatch()/
+    // .cancel() earlier this session: the data-access capability
+    // existed, just needed the thin service+controller layer wired to
+    // it. Reuses the existing toAssignmentResponse mapper unchanged.
+    @Transactional(readOnly = true)
+    public java.util.List<RotationAssignmentResponse> getAssignmentsForPattern(TenantId tenantId, UUID patternId) {
+        return assignmentRepository.findActiveByPattern(tenantId, patternId).stream()
+                .map(a -> toAssignmentResponse(a, tenantId))
+                .toList();
+    }
+
     @Transactional
     public RotationPatternResponse createPattern(TenantId tenantId,
                                                  CreateRotationPatternRequest req) {
