@@ -1,6 +1,6 @@
 // src/pages/fuel/DispatchesTab.tsx
 // KEY FIX: res.data?.data?.content — was res.data.content which skips ApiResponse wrapper
-import { useState } from "react"
+import { useState, Fragment } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Plus, Fuel, X, AlertCircle, AlertTriangle, List, BarChart3, Download } from "lucide-react"
@@ -9,7 +9,6 @@ const unwrap     = (r: any) => { const p = r.data?.data ?? r.data; return p?.con
 const unwrapList = (r: any): any[] => { const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : (d?.content ?? []) }
 const fmtDate    = (iso: string) => new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })
 const fmtTime    = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })
-const fmtR       = (n: any)     => n != null ? `R ${Number(n).toFixed(4)}` : "—"
 const fmtRTotal  = (n: any)     => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const EMPTY_FORM = { tankId: "", litresDispensed: "", pricePerLitre: "", recipientName: "", authorisedBy: "", odometerReading: "", hoursReading: "", notes: "" }
@@ -40,6 +39,17 @@ export default function DispatchesTab() {
   }
   const [error, setError]               = useState("")
   const [form, setForm]                 = useState(EMPTY_FORM)
+  // FIX (P1 backlog): every dispatch is already submitted to the
+  // Approvals engine for review (see FuelService.submitDispatchForReview's
+  // own comment), but there was no way to see the result anywhere.
+  // Lazy, one-at-a-time fetch on click rather than eagerly fetching for
+  // up to 200 visible rows at once.
+  const [expandedApprovalId, setExpandedApprovalId] = useState<string | null>(null)
+  const approvalStatusQuery = useQuery<any>({
+    queryKey: ["dispatch-approval-status", expandedApprovalId],
+    queryFn: async () => (await apiClient.get(`/api/v1/fuel/dispatches/${expandedApprovalId}/approval-status`)).data?.data,
+    enabled: !!expandedApprovalId,
+  })
 
   const { data: dispatches = [], isLoading } = useQuery<any[]>({
     queryKey: ["dispatches"],
@@ -198,14 +208,15 @@ export default function DispatchesTab() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
-                {["Recipient","Litres","Level Change","Price/L","Authorised By","Odometer / Hours","Date & Time"].map(h => (
+                {["Recipient","Litres","Level Change","Price/L","Authorised By","Odometer / Hours","Date & Time","Review"].map(h => (
                   <th key={h} style={{ padding: "11px 14px", textAlign: "left", fontWeight: 700, fontSize: 11, color: "#64748B", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtered.map((d, i) => (
-                <tr key={d.id} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #F1F5F9" : "none", background: "#fff" }}>
+                <Fragment key={d.id}>
+                <tr style={{ borderBottom: expandedApprovalId === d.id || i < filtered.length - 1 ? "1px solid #F1F5F9" : "none", background: "#fff" }}>
                   <td style={{ padding: "12px 14px" }}>
                     <div style={{ fontWeight: 600, color: "#0F172A" }}>{d.recipientName || "—"}</div>
                   </td>
@@ -228,7 +239,42 @@ export default function DispatchesTab() {
                     {fmtDate(d.dispatchedAt)}<br />
                     <span style={{ color: "#94A3B8" }}>{fmtTime(d.dispatchedAt)}</span>
                   </td>
+                  <td style={{ padding: "12px 14px" }}>
+                    <button onClick={() => setExpandedApprovalId(expandedApprovalId === d.id ? null : d.id)}
+                      style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", cursor: "pointer", whiteSpace: "nowrap" }}>
+                      {expandedApprovalId === d.id ? "Hide" : "Status"}
+                    </button>
+                  </td>
                 </tr>
+                {expandedApprovalId === d.id && (
+                  <tr style={{ borderBottom: i < filtered.length - 1 ? "1px solid #F1F5F9" : "none" }}>
+                    <td colSpan={8} style={{ padding: "10px 14px", background: "#F8FAFC" }}>
+                      {approvalStatusQuery.isLoading ? (
+                        <span style={{ fontSize: 12, color: "#94A3B8" }}>Loading…</span>
+                      ) : !approvalStatusQuery.data ? (
+                        <span style={{ fontSize: 12, color: "#94A3B8" }}>No review record — auto-approved (no review rule configured for this tenant).</span>
+                      ) : (
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: approvalStatusQuery.data.steps?.length ? 8 : 0 }}>
+                            <span style={{
+                              fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20,
+                              background: approvalStatusQuery.data.status === "APPROVED" ? "#DCFCE7" : approvalStatusQuery.data.status === "REJECTED" ? "#FEF2F2" : "#FFFBEB",
+                              color: approvalStatusQuery.data.status === "APPROVED" ? "#166534" : approvalStatusQuery.data.status === "REJECTED" ? "#DC2626" : "#B45309",
+                            }}>{approvalStatusQuery.data.status}</span>
+                            {approvalStatusQuery.data.approvalMode && <span style={{ fontSize: 11, color: "#94A3B8" }}>{approvalStatusQuery.data.approvalMode.replace(/_/g, " ")}</span>}
+                          </div>
+                          {(approvalStatusQuery.data.steps ?? []).map((s: any) => (
+                            <div key={s.id} style={{ fontSize: 12, color: "#475569", padding: "3px 0" }}>
+                              Step {s.stepOrder + 1}: <strong>{s.approverName ?? s.approverValue}</strong> — <span style={{ color: s.status === "APPROVED" ? "#166534" : s.status === "REJECTED" ? "#DC2626" : "#94A3B8" }}>{s.status}</span>
+                              {s.comment && <span style={{ color: "#94A3B8" }}> — "{s.comment}"</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
           </table>
