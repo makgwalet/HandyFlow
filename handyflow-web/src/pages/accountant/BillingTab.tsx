@@ -19,11 +19,19 @@ const STATUS_CFG: Record<string, { color: string; bg: string; label: string }> =
   WRITTEN_OFF: { color: "#94A3B8", bg: "#F8FAFC", label: "Written off"},
 }
 
-export default function BillingTab() {
+export default function BillingTab({ initialClientId }: { initialClientId?: string | null } = {}) {
   const qc = useQueryClient()
-  const [tab, setTab]           = useState<"outstanding" | "generate">("outstanding")
+  // FIX (P1 backlog): "per-client fee-note history" — the full endpoint
+  // (GET /clients/{id}/fee-notes, every status, paginated) already
+  // existed, built specifically for this per its own controller comment
+  // ("closes the 'unified client detail page' gap"), but nothing in the
+  // frontend ever called it. This tab only ever showed outstanding
+  // (unpaid) fee notes, tenant-wide, with no client filter at all —
+  // ClientsTab's "View all" link navigated here but passed no client
+  // context, so it didn't actually deliver a per-client view.
+  const [tab, setTab]           = useState<"outstanding" | "generate" | "client-history">(initialClientId ? "client-history" : "outstanding")
+  const [historyClientId, setHistoryClientId] = useState<string | null>(initialClientId ?? null)
   const [showGen, setShowGen]   = useState(false)
-  const [selClient, setSelClient] = useState("")
   const [error, setError]       = useState("")
   const [sending, setSending]   = useState<string | null>(null)
 
@@ -52,6 +60,15 @@ export default function BillingTab() {
   const { data: outstanding = [], isLoading } = useQuery<any[]>({
     queryKey: ["acc-outstanding"],
     queryFn: async () => unwrap(await apiClient.get("/api/v1/accountant/fee-notes/outstanding")),
+  })
+
+  const { data: clientHistory, isLoading: historyLoading } = useQuery<{ content: any[]; totalElements: number }>({
+    queryKey: ["acc-client-fee-notes", historyClientId],
+    queryFn: async () => {
+      const r = await apiClient.get(`/api/v1/accountant/clients/${historyClientId}/fee-notes?size=100`)
+      return (r.data?.data ?? r.data) as { content: any[]; totalElements: number }
+    },
+    enabled: !!historyClientId && tab === "client-history",
   })
 
   const { data: unbilled = [] } = useQuery<any[]>({
@@ -143,10 +160,10 @@ export default function BillingTab() {
       {/* Tabs */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
         <div style={{ display: "flex", gap: 2, background: "#F1F5F9", borderRadius: 9, padding: 3 }}>
-          {(["outstanding", "generate"] as const).map(t => (
+          {(historyClientId ? (["client-history", "outstanding", "generate"] as const) : (["outstanding", "generate"] as const)).map(t => (
             <button key={t} onClick={() => setTab(t)}
               style={{ padding: "6px 16px", borderRadius: 7, border: "none", fontSize: 13, fontWeight: tab === t ? 700 : 400, background: tab === t ? "#fff" : "transparent", color: tab === t ? "#0F172A" : "#64748B", cursor: "pointer", boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none" }}>
-              {t === "outstanding" ? "Debtors" : "Generate fee note"}
+              {t === "outstanding" ? "Debtors" : t === "generate" ? "Generate fee note" : "Client History"}
             </button>
           ))}
         </div>
@@ -155,6 +172,45 @@ export default function BillingTab() {
           <Plus size={15} /> New Fee Note
         </button>
       </div>
+
+      {tab === "client-history" && historyClientId && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ fontSize: 13, color: "#64748B" }}>Full fee note history — every status, not just outstanding</div>
+            <button onClick={() => { setHistoryClientId(null); setTab("outstanding") }}
+              style={{ fontSize: 12, color: "#64748B", background: "none", border: "1px solid #E2E8F0", borderRadius: 7, padding: "5px 12px", cursor: "pointer" }}>
+              Clear client filter
+            </button>
+          </div>
+          {historyLoading ? (
+            <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading...</div>
+          ) : !clientHistory?.content?.length ? (
+            <div style={{ textAlign: "center", padding: "50px 20px", color: "#94A3B8" }}>
+              <FileText size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
+              <div style={{ fontWeight: 600, color: "#475569" }}>No fee notes for this client yet</div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {clientHistory.content.map((inv: any) => {
+                const sc = STATUS_CFG[inv.status] ?? STATUS_CFG.SENT
+                return (
+                  <div key={inv.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", border: "1px solid #E2E8F0", borderRadius: 10, background: "#fff", gap: 10, flexWrap: "wrap" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                        <span style={{ fontFamily: "monospace", fontSize: 12, color: "#64748B" }}>{inv.invoiceNumber}</span>
+                        <span style={{ background: sc.bg, color: sc.color, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{sc.label}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#94A3B8" }}>Due: {fmtD(inv.dueDate)} · Issued: {fmtD(inv.invoiceDate)}</div>
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>{fmtR(inv.totalAmount)}</div>
+                  </div>
+                )
+              })}
+              <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 4 }}>{clientHistory.totalElements} total fee note{clientHistory.totalElements !== 1 ? "s" : ""}</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {tab === "outstanding" && (
         <div>

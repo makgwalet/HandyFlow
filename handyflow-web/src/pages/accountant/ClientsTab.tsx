@@ -2,8 +2,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, X, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Users, Search, Paperclip, Trash2, Download } from "lucide-react"
-
+import { Plus, X, ChevronDown, ChevronUp, CheckCircle, Users, Search, Paperclip, Trash2 } from "lucide-react"
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
 const fmtD   = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
 // NEW: closes the "unified client detail page" gap — no money-
@@ -24,7 +23,12 @@ const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 6
 // the Client Workspace modal's "View all" links switch to the relevant
 // full tab (Compliance/Billing/Journals/Time), matching the exact
 // pattern AccountantDashboard already uses.
-export default function ClientsTab({ onNavigate }: { onNavigate?: (tab: string) => void }) {
+// FIX (P1 backlog): onNavigate now optionally carries the client id
+// through — previously it only switched tabs with no context, so
+// "View all" from a client's own workspace landed on a genuinely
+// unfiltered tab (all clients' outstanding fee notes / unbilled time),
+// not actually a per-client view despite what the link implied.
+export default function ClientsTab({ onNavigate }: { onNavigate?: (tab: string, clientId?: string) => void }) {
   const qc = useQueryClient()
   const [search, setSearch]     = useState("")
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -565,7 +569,7 @@ export default function ClientsTab({ onNavigate }: { onNavigate?: (tab: string) 
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>Fee Notes</div>
-                      {onNavigate && <button onClick={() => onNavigate("billing")} style={{ fontSize: 12, color: "#1B3A6B", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>View all →</button>}
+                      {onNavigate && <button onClick={() => onNavigate("billing", workspaceFor.id)} style={{ fontSize: 12, color: "#1B3A6B", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>View all →</button>}
                     </div>
                     {(clientDetail.recentFeeNotes ?? []).length === 0 ? (
                       <div style={{ fontSize: 12, color: "#94A3B8" }}>No fee notes yet.</div>
@@ -608,7 +612,7 @@ export default function ClientsTab({ onNavigate }: { onNavigate?: (tab: string) 
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>Time</div>
-                      {onNavigate && <button onClick={() => onNavigate("time")} style={{ fontSize: 12, color: "#1B3A6B", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>View all →</button>}
+                      {onNavigate && <button onClick={() => onNavigate("time", workspaceFor.id)} style={{ fontSize: 12, color: "#1B3A6B", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>View all →</button>}
                     </div>
                     {(clientDetail.recentTimeEntries ?? []).length === 0 ? (
                       <div style={{ fontSize: 12, color: "#94A3B8" }}>No time logged yet.</div>

@@ -12,11 +12,30 @@ const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 6
 
 const ACTIVITIES = ["AUDIT","BOOKKEEPING","TAX","SECRETARIAL","ADVISORY","TRAINING","ADMIN","OTHER"]
 
-export default function TimeTab() {
+export default function TimeTab({ initialClientId }: { initialClientId?: string | null } = {}) {
   const qc = useQueryClient()
   const [showLog, setShowLog]   = useState(false)
-  const [selClient, setSelClient] = useState<string>("ALL")
+  const [selClient, setSelClient] = useState<string>(initialClientId ?? "ALL")
   const [error, setError] = useState("")
+  // FIX (P1 backlog): "per-client time-entry history" — the full
+  // endpoint (GET /clients/{id}/time, every status not just unbilled,
+  // paginated) already existed, built specifically for this per its own
+  // controller comment ("closes the 'unified client detail page' gap"),
+  // but nothing in the frontend ever called it — this tab only ever
+  // showed unbilled WIP, client-side filtered from an already-unbilled-
+  // only fetch. Read-only, unlike the unbilled view above (which
+  // supports edit/delete) — matches the existing edit/delete comment's
+  // own reasoning that those actions only make sense on unbilled
+  // entries in the first place.
+  const [showFullHistory, setShowFullHistory] = useState(!!initialClientId)
+  const { data: fullHistory, isLoading: historyLoading } = useQuery<{ content: any[]; totalElements: number }>({
+    queryKey: ["acc-client-time-history", selClient],
+    queryFn: async () => {
+      const r = await apiClient.get(`/api/v1/accountant/clients/${selClient}/time?size=100`)
+      return (r.data?.data ?? r.data) as { content: any[]; totalElements: number }
+    },
+    enabled: showFullHistory && selClient !== "ALL",
+  })
   // NEW: closes the accountant module audit's "staff-level time
   // report" gap.
   const [view, setView] = useState<"my-time" | "staff-report">("my-time")
@@ -155,11 +174,17 @@ export default function TimeTab() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <select value={selClient} onChange={e => setSelClient(e.target.value)}
+          <select value={selClient} onChange={e => { setSelClient(e.target.value); if (e.target.value === "ALL") setShowFullHistory(false) }}
             style={{ padding: "7px 10px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none", background: "#fff" }}>
             <option value="ALL">All clients</option>
             {(clients as any[]).map((c: any) => <option key={c.id} value={c.id}>{c.tradingName}</option>)}
           </select>
+          {selClient !== "ALL" && (
+            <button onClick={() => setShowFullHistory(v => !v)}
+              style={{ padding: "7px 14px", border: `1px solid ${showFullHistory ? "#1B3A6B" : "#E2E8F0"}`, borderRadius: 8, fontSize: 13, fontWeight: 600, background: showFullHistory ? "#EFF6FF" : "#fff", color: showFullHistory ? "#1B3A6B" : "#64748B", cursor: "pointer" }}>
+              {showFullHistory ? "Showing Full History" : "Full History"}
+            </button>
+          )}
           <button onClick={() => { setShowLog(true); setError("") }}
             style={{ display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             <Plus size={15} /> Log Time
@@ -167,7 +192,32 @@ export default function TimeTab() {
         </div>
       </div>
 
-      {filteredEntries.length === 0 ? (
+      {showFullHistory && selClient !== "ALL" ? (
+        historyLoading ? (
+          <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading...</div>
+        ) : !fullHistory?.content?.length ? (
+          <div style={{ textAlign: "center", padding: "50px 20px", color: "#94A3B8" }}>
+            <Clock size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
+            <div style={{ fontWeight: 600, color: "#475569" }}>No time entries for this client yet</div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {fullHistory.content.map((e: any) => (
+              <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{e.description || e.activityType}</div>
+                  <div style={{ fontSize: 11, color: "#94A3B8" }}>{fmtD(e.entryDate)} · {e.activityType} · {e.billable ? (e.billed ? "Billed" : "Unbilled") : "Non-billable"}</div>
+                </div>
+                <div style={{ textAlign: "right" as const }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{Number(e.hours).toFixed(2)}h</div>
+                  {e.lineTotal != null && <div style={{ fontSize: 11, color: "#0D9488" }}>{fmtR(e.lineTotal)}</div>}
+                </div>
+              </div>
+            ))}
+            <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 4 }}>{fullHistory.totalElements} total entries</div>
+          </div>
+        )
+      ) : filteredEntries.length === 0 ? (
         <div style={{ textAlign: "center", padding: "50px 20px", color: "#94A3B8" }}>
           <Clock size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
           <div style={{ fontWeight: 600, color: "#475569" }}>No unbilled time</div>

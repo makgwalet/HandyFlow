@@ -32,6 +32,10 @@ const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 6
 export function AccountantPage() {
   const qc = useQueryClient()
   const [tab, setTab] = useState<Tab>("dashboard")
+  // FIX (P1 backlog): "View all" from a client's workspace previously
+  // switched tabs with no context — see ClientsTab's own onNavigate
+  // comment for the fuller reasoning.
+  const [filterClientId, setFilterClientId] = useState<string | undefined>(undefined)
   const [showSetup, setShowSetup] = useState(false)
   const [profileForm, setProfileForm] = useState({
     firmName: "", practiceNumber: "", vatNumber: "",
@@ -138,7 +142,7 @@ export function AccountantPage() {
             const Icon   = t.icon
             const active = tab === t.id
             return (
-              <button key={t.id} onClick={() => setTab(t.id)}
+              <button key={t.id} onClick={() => { setFilterClientId(undefined); setTab(t.id) }}
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", background: "none", border: "none", whiteSpace: "nowrap" as const, borderBottom: active ? "2px solid #1B3A6B" : "2px solid transparent", color: active ? "#1B3A6B" : "#64748B", fontWeight: active ? 600 : 400, fontSize: 14, cursor: "pointer", marginBottom: -1 }}>
                 <Icon size={15} />{t.label}
               </button>
@@ -146,11 +150,11 @@ export function AccountantPage() {
           })}
         </div>
 
-        {tab === "dashboard" && <AccountantDashboard onNavigate={setTab} />}
-        {tab === "clients"   && <ClientsTab onNavigate={setTab} />}
+        {tab === "dashboard" && <AccountantDashboard onNavigate={(t) => { setFilterClientId(undefined); setTab(t) }} />}
+        {tab === "clients"   && <ClientsTab onNavigate={(t, clientId) => { setFilterClientId(clientId); setTab(t as Tab) }} />}
         {tab === "deadlines" && <DeadlinesTab />}
-        {tab === "time"      && <TimeTab />}
-        {tab === "billing"   && <BillingTab />}
+        {tab === "time"      && <TimeTab initialClientId={filterClientId} />}
+        {tab === "billing"   && <BillingTab initialClientId={filterClientId} />}
         {tab === "journals"  && <JournalsTab />}
         {tab === "workpapers" && <WorkpapersTab />}
       </div>
