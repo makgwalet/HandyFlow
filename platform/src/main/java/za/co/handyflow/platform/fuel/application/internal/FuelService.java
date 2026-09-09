@@ -557,10 +557,10 @@ public class FuelService {
                 req.litresDelivered(), req.receiverName(),
                 req.receiverIdBadge(), req.meterReadingStart(),
                 req.meterReadingEnd(), req.signedOnBehalf(),
-                req.onBehalfOf()
+                req.onBehalfOf(), req.receiverSignatureUrl()
         );
 
-        delivery.assignReceiptNumber(receiptNumberGenerator.generate());
+        delivery.assignReceiptNumber(receiptNumberGenerator.generate(tenantId));
         deliveryRepository.save(delivery);
 
         if (!wasLow && tank.isLow()) {
