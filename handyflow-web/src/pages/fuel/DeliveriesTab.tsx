@@ -1,8 +1,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, Truck, CheckCircle, Clock, X, Download } from "lucide-react"
-
+import { Plus, Truck, CheckCircle, X, Download } from "lucide-react"
 interface Delivery {
   id: string
   tankId: string
@@ -94,6 +93,31 @@ export default function DeliveriesTab() {
     onError: (e: any) => setError(e.response?.data?.message || "Failed to complete delivery"),
   })
 
+  // FIX (P1 backlog): dispatch and cancel both existed server-side
+  // (confirmed and just wired in a prior backend fix — see
+  // FuelDelivery.dispatch()/.cancel()'s own comments) with no buttons
+  // anywhere in this tab. Deliveries jumped straight from SCHEDULED to
+  // DELIVERED with no in-transit tracking and no way to cancel one.
+  const [showDispatch, setShowDispatch] = useState<Delivery | null>(null)
+  const [dispatchForm, setDispatchForm] = useState({ driverName: "", vehicleReg: "" })
+  const dispatchDelivery = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: any }) =>
+      apiClient.post(`/api/v1/fuel/deliveries/${id}/dispatch`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["deliveries"] })
+      setShowDispatch(null)
+      setDispatchForm({ driverName: "", vehicleReg: "" })
+      setError("")
+    },
+    onError: (e: any) => setError(e.response?.data?.message || "Failed to dispatch delivery"),
+  })
+
+  const cancelDelivery = useMutation({
+    mutationFn: (id: string) => apiClient.post(`/api/v1/fuel/deliveries/${id}/cancel`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["deliveries"] }),
+    onError: (e: any) => setError(e.response?.data?.message || "Failed to cancel delivery"),
+  })
+
   const downloadReceipt = async (deliveryId: string, receiptNumber: string) => {
     try {
       const res = await apiClient.get(`/api/v1/fuel/deliveries/${deliveryId}/receipt`, { responseType: "blob" })
@@ -179,8 +203,18 @@ export default function DeliveriesTab() {
                     </div>
                     <span style={{ background: cfg.bg, color: cfg.color, padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>{cfg.label}</span>
                     {d.status === "SCHEDULED" && (
+                      <button onClick={() => { setShowDispatch(d); setError("") }} style={{ display: "flex", alignItems: "center", gap: 5, background: "#FFFBEB", color: "#B45309", border: "1px solid #FDE68A", borderRadius: 7, padding: "7px 14px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+                        <Truck size={13} /> Mark In Transit
+                      </button>
+                    )}
+                    {(d.status === "SCHEDULED" || d.status === "IN_TRANSIT") && (
                       <button onClick={() => { setShowComplete(d); setCompleteForm(f => ({ ...f, litresDelivered: d.litresOrdered.toString() })); setError("") }} style={{ display: "flex", alignItems: "center", gap: 5, background: "#166534", color: "#fff", border: "none", borderRadius: 7, padding: "7px 14px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
                         <CheckCircle size={13} /> Complete
+                      </button>
+                    )}
+                    {(d.status === "SCHEDULED" || d.status === "IN_TRANSIT") && (
+                      <button onClick={() => { if (confirm("Cancel this delivery?")) cancelDelivery.mutate(d.id) }} disabled={cancelDelivery.isPending} style={{ display: "flex", alignItems: "center", gap: 5, background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        <X size={13} /> Cancel
                       </button>
                     )}
                     {d.status === "DELIVERED" && d.receiptNumber && (
@@ -269,6 +303,31 @@ export default function DeliveriesTab() {
       )}
 
       {/* Complete Delivery Modal */}
+      {showDispatch && (
+        <Modal title={`Mark In Transit — ${showDispatch.fuelType} ${showDispatch.litresOrdered.toLocaleString()}L`} onClose={() => { setShowDispatch(null); setError("") }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <label style={labelStyle}>Driver Name *</label>
+              <input value={dispatchForm.driverName} onChange={e => setDispatchForm(f => ({ ...f, driverName: e.target.value }))} placeholder="Sipho Ndlovu" style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Vehicle Registration *</label>
+              <input value={dispatchForm.vehicleReg} onChange={e => setDispatchForm(f => ({ ...f, vehicleReg: e.target.value }))} placeholder="CA 123-456" style={inputStyle} />
+            </div>
+            {error && <div style={{ color: "#DC2626", fontSize: 13 }}>{error}</div>}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 6 }}>
+              <button onClick={() => { setShowDispatch(null); setError("") }} style={{ padding: "9px 16px", background: "#F1F5F9", border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", color: "#64748B" }}>Cancel</button>
+              <button
+                onClick={() => dispatchDelivery.mutate({ id: showDispatch.id, body: dispatchForm })}
+                disabled={dispatchDelivery.isPending || !dispatchForm.driverName.trim() || !dispatchForm.vehicleReg.trim()}
+                style={btnPrimary}>
+                {dispatchDelivery.isPending ? "Saving…" : "Mark In Transit"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {showComplete && (
         <Modal title={`Complete Delivery — ${showComplete.fuelType} ${showComplete.litresOrdered.toLocaleString()}L`} onClose={() => { setShowComplete(null); setError("") }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
