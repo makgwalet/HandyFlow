@@ -60,6 +60,27 @@ export default function WorkpapersTab() {
     enabled: !!selClient && !!selFolder,
   })
 
+  // FIX (P1 backlog): restoreFile() has always existed server-side to
+  // undo a soft-delete, but this tab never showed deleted files at all
+  // — there was no way to discover one to restore. showDeleted toggles
+  // a separate fetch (only runs when actually opened, not on every
+  // folder view) rather than always fetching both lists.
+  const [showDeleted, setShowDeleted] = useState(false)
+  const { data: deletedFiles = [], isLoading: deletedLoading } = useQuery<any[]>({
+    queryKey: ["acc-wp-deleted-files", selClient, selFolder?.id],
+    queryFn: async () => unwrap(await apiClient.get(`/api/v1/accountant/clients/${selClient}/workpaper-folders/${selFolder.id}/files/deleted`)),
+    enabled: !!selClient && !!selFolder && showDeleted,
+  })
+
+  const restoreMut = useMutation({
+    mutationFn: (fileId: string) => apiClient.post(`/api/v1/accountant/clients/${selClient}/workpaper-files/${fileId}/restore`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["acc-wp-files", selClient, selFolder?.id] })
+      qc.invalidateQueries({ queryKey: ["acc-wp-deleted-files", selClient, selFolder?.id] })
+    },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to restore file"),
+  })
+
   const { data: auditLog = [], isLoading: auditLoading } = useQuery<any[]>({
     queryKey: ["acc-wp-audit", selClient, auditFile?.id],
     queryFn: async () => unwrap(await apiClient.get(`/api/v1/accountant/clients/${selClient}/workpaper-files/${auditFile.id}/audit`)),
@@ -189,10 +210,17 @@ export default function WorkpapersTab() {
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                   <div style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{selFolder.name}</div>
-                  <button onClick={() => { setShowUpload(true); setError("") }}
-                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                    <Upload size={14} /> Upload File
-                  </button>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {/* FIX (P1 backlog) — see the restoreMut mutation's own comment. */}
+                    <button onClick={() => setShowDeleted(v => !v)}
+                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: showDeleted ? "#F1F5F9" : "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                      <History size={14} /> {showDeleted ? "Hide" : "Show"} Deleted
+                    </button>
+                    <button onClick={() => { setShowUpload(true); setError("") }}
+                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                      <Upload size={14} /> Upload File
+                    </button>
+                  </div>
                 </div>
 
                 {filesLoading ? (
@@ -250,6 +278,37 @@ export default function WorkpapersTab() {
                         </div>
                       )
                     })}
+                  </div>
+                )}
+
+                {showDeleted && (
+                  <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #E2E8F0" }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#94A3B8", marginBottom: 10, textTransform: "uppercase" as const, letterSpacing: 0.4 }}>
+                      Deleted Files
+                    </div>
+                    {deletedLoading ? (
+                      <div style={{ textAlign: "center", padding: 20, color: "#94A3B8" }}>Loading…</div>
+                    ) : deletedFiles.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: 20, color: "#94A3B8", fontSize: 13 }}>No deleted files in this folder.</div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {deletedFiles.map((f: any) => (
+                          <div key={f.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <FileText size={16} style={{ color: "#94A3B8" }} />
+                              <div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{f.fileName}</div>
+                                <div style={{ fontSize: 11, color: "#94A3B8" }}>v{f.versionNumber}</div>
+                              </div>
+                            </div>
+                            <button onClick={() => restoreMut.mutate(f.id)} disabled={restoreMut.isPending} title="Restore"
+                              style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 7, cursor: "pointer", color: "#166534", fontSize: 12, fontWeight: 600 }}>
+                              <History size={13} /> Restore
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -44,6 +44,22 @@ public interface AccWorkpaperFileRepository extends JpaRepository<AccWorkpaperFi
     List<WorkpaperFileSummaryProjection> findSummariesByFolder(@Param("tenantId") UUID tenantId,
                                                                @Param("folderId") UUID folderId);
 
+    // FIX (P1 backlog): mirrors findSummariesByFolder exactly, just
+    // inverting the deletedAt filter — a soft-delete "oops" recovery
+    // path already existed server-side (restoreFile()) with no way to
+    // discover a file to restore, since nothing ever queried for
+    // deleted ones.
+    @Query("""
+        SELECT f.id as id, f.fileName as fileName, f.mimeType as mimeType, f.fileSizeBytes as fileSizeBytes,
+               f.reviewStatus as reviewStatus, f.versionNumber as versionNumber, f.supersededBy as supersededBy,
+               f.createdAt as createdAt
+        FROM AccountantWorkpaperFile f
+        WHERE f.tenantId = :tenantId AND f.folderId = :folderId AND f.deletedAt IS NOT NULL
+        ORDER BY f.createdAt DESC
+    """)
+    List<WorkpaperFileSummaryProjection> findDeletedSummariesByFolder(@Param("tenantId") UUID tenantId,
+                                                                      @Param("folderId") UUID folderId);
+
     /**
      * The current (non-superseded, non-deleted) version of a file by
      * name within a folder — backs versioning on re-upload. If found,

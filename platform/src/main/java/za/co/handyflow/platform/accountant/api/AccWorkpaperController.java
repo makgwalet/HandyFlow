@@ -68,6 +68,19 @@ public class AccWorkpaperController {
                 workpaperService.getFiles(TenantContext.getTenantIdAsObject(), id, folderId)));
     }
 
+    // FIX (P1 backlog): getFiles() has always excluded soft-deleted
+    // files (deletedAt IS NULL), and restoreFile() (below) has always
+    // existed to undo a soft-delete — but nothing ever queried for
+    // deleted files, so there was no way to discover one to restore.
+    @GetMapping("/clients/{id}/workpaper-folders/{folderId}/files/deleted")
+    @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
+    @Operation(summary = "List soft-deleted files in a workpaper folder — for the Restore action")
+    public ResponseEntity<ApiResponse<List<WorkpaperFileResponse>>> getDeletedFiles(
+            @PathVariable UUID id, @PathVariable UUID folderId) {
+        return ResponseEntity.ok(ApiResponse.success("Deleted workpaper files",
+                workpaperService.getDeletedFiles(TenantContext.getTenantIdAsObject(), id, folderId)));
+    }
+
     @GetMapping(value = "/clients/{id}/workpaper-files/{fileId}", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
     @PreAuthorize("hasAnyAuthority('USER_READ','ACCOUNTANT_READ')")
     @Operation(summary = "Download a workpaper file")

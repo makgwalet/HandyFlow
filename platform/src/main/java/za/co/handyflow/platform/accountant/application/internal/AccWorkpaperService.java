@@ -144,6 +144,24 @@ public class AccWorkpaperService {
                 .toList();
     }
 
+    // FIX (P1 backlog): mirrors getFiles() exactly — same folder-ownership
+    // check, same response mapping — just backed by
+    // findDeletedSummariesByFolder instead. See that repository method's
+    // own comment for why this exists.
+    public List<WorkpaperFileResponse> getDeletedFiles(TenantId tenantId, UUID clientId, UUID folderId) {
+        findActiveClient(tenantId, clientId);
+        AccWorkpaperFolder folder = folderRepo.findByTenantIdAndId(tenantId.getValue(), folderId)
+                .orElseThrow(() -> new HandyFlowException("Folder not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
+        if (!folder.getClientId().equals(clientId)) {
+            throw new HandyFlowException("Folder not found", HttpStatus.NOT_FOUND, "NOT_FOUND");
+        }
+        return fileRepo.findDeletedSummariesByFolder(tenantId.getValue(), folderId).stream()
+                .map(p -> new WorkpaperFileResponse(p.getId(), folderId, p.getFileName(), p.getMimeType(),
+                        p.getFileSizeBytes(), p.getReviewStatus(), p.getVersionNumber(), p.getSupersededBy(),
+                        p.getCreatedAt()))
+                .toList();
+    }
+
     public record WorkpaperFileDownload(byte[] content, String mimeType, String fileName) {}
 
     @Transactional
