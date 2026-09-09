@@ -123,6 +123,28 @@ public class SecurityConfig {
                                 // directly from that filter's own
                                 // shouldNotFilter()).
                                 "/api/v1/hr/portal/auth/**",
+                                // FIX: four fully-built client portals —
+                                // Warehousing, Training Provider,
+                                // Facilities Management, Recruitment
+                                // Agency — were completely unusable.
+                                // Confirmed directly: none of their
+                                // /portal/auth/register or /auth/login
+                                // paths were anywhere in this permitAll()
+                                // list, so a brand-new user (who by
+                                // definition has no JWT yet) hit
+                                // .anyRequest().authenticated() and was
+                                // rejected before any of these
+                                // controllers ever ran — same class of
+                                // bug as the identity invitation-accept
+                                // fix below, just never caught for these
+                                // four because nothing exercised the
+                                // full login flow end-to-end. Same narrow
+                                // /portal/auth/** scoping convention as
+                                // every other portal above.
+                                "/api/v1/warehousing/portal/auth/**",
+                                "/api/v1/training-provider/portal/auth/**",
+                                "/api/v1/facilitiesmanagement/portal/auth/**",
+                                "/api/v1/recruitment-agency/portal/auth/**",
                                 // FIX (identity module modernization): the
                                 // main-app team-invitation flow was
                                 // completely unreachable. UserController's

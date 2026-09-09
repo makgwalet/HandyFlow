@@ -83,6 +83,22 @@ public class RateLimitFilter extends OncePerRequestFilter {
             new Limit("payrollportal:register", "/api/v1/payroll-bureau/portal/auth/register", 5, 60 * 60 * 1_000L),
             new Limit("payrollportal:login", "/api/v1/payroll-bureau/portal/auth/login", 10, 10 * 60 * 1_000L),
 
+            // FIX: same reasoning as the accountant/payroll-bureau
+            // portal limits above, applied to the four portals whose
+            // auth paths were just added to SecurityConfig's
+            // permitAll() — register is invite-only (5/hour is
+            // generous for a legitimate one-time accept), login gets
+            // the same brute-force-resistant ceiling as every other
+            // login endpoint in this file.
+            new Limit("whseportal:register", "/api/v1/warehousing/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("whseportal:login", "/api/v1/warehousing/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("trainprovportal:register", "/api/v1/training-provider/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("trainprovportal:login", "/api/v1/training-provider/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("fmportal:register", "/api/v1/facilitiesmanagement/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("fmportal:login", "/api/v1/facilitiesmanagement/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("recagencyportal:register", "/api/v1/recruitment-agency/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("recagencyportal:login", "/api/v1/recruitment-agency/portal/auth/login", 10, 10 * 60 * 1_000L),
+
             // NEW (identity module modernization): main-app invitation
             // acceptance — just made reachable via SecurityConfig's
             // permitAll() fix above. Same risk shape as
