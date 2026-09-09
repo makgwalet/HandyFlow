@@ -12,6 +12,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * AccJournalEntry — this tenant's own internal general ledger.
+ * <p>
+ * ARCHITECTURAL DECISION (confirmed with the product owner, not a bug):
+ * this ledger is deliberately independent from the Accountant module's
+ * own journal (AccJournal / prac_journals / prac_journal_lines), which
+ * represents an external accounting firm's engagement records for this
+ * tenant — a different service, kept separately by design, not merely
+ * a different table for the same books. A tenant using both modules
+ * will have two trial balances that this system never reconciles
+ * against each other; that is the intended behaviour, not a gap to
+ * close. Do not add a reconciliation path or merge these two ledgers
+ * without a fresh product decision — the separation exists specifically
+ * because AccJournal represents work done BY an external party, not
+ * work done substituting for the tenant's own internal bookkeeping.
+ */
 @Entity
 @Table(name = "acc_journal_entries")
 @Getter

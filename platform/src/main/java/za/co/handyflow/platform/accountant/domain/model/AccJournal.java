@@ -12,6 +12,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * AccJournal — an external accounting firm's own engagement ledger for
+ * one of their clients (clientId), rendered here as a distinct external
+ * service — not this tenant's internal books.
+ * <p>
+ * ARCHITECTURAL DECISION (confirmed with the product owner, not a bug):
+ * deliberately independent from the Accounting module's own ledger
+ * (AccJournalEntry / acc_journal_entries), which is a tenant's own
+ * internal general ledger. The two are never reconciled against each
+ * other, on purpose — see AccJournalEntry's own doc comment for the
+ * fuller reasoning. Do not add a reconciliation path or merge these
+ * two ledgers without a fresh product decision.
+ */
 @Entity(name = "AccountantJournal")
 @Table(name = "prac_journals")
 @Getter
