@@ -268,12 +268,27 @@ public class AccountantService {
         return toJournalResponse(journal);
     }
 
+    // FIX (P0 backlog item 1.8): AccountingService.postJournalEntryWithReview()
+    // already rejects same-person creator/poster ("this journal entry was
+    // created by you — a different person must post it"); this method
+    // never had the equivalent check at all — approve() + post() ran
+    // back-to-back with zero comparison against who prepared the journal.
+    // Mirrors Accounting's exact pattern, including its same going-forward-
+    // only carve-out: preparedBy == null (journals created before this
+    // field existed, or via any path that doesn't set it) skips the check
+    // rather than blocking, since there's nothing reliable to compare
+    // against.
     @Transactional
     public JournalResponse postJournal(TenantId tenantId, UUID clientId, UUID journalId, UUID approver) {
         AccJournal journal = journalRepo.findByTenantIdAndId(tenantId.getValue(), journalId)
                 .orElseThrow(() -> new ResourceNotFoundException("Journal", journalId.toString()));
         if (!journal.getClientId().equals(clientId)) {
             throw new ResourceNotFoundException("Journal", journalId.toString());
+        }
+        if (journal.getPreparedBy() != null && journal.getPreparedBy().equals(approver)) {
+            throw new HandyFlowException(
+                    "This journal was prepared by you — a different person must approve and post it",
+                    HttpStatus.BAD_REQUEST, "SAME_PERSON");
         }
         journal.approve(approver);
         journal.post();
