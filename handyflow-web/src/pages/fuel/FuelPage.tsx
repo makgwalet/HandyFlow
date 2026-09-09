@@ -1,14 +1,16 @@
 // src/pages/fuel/FuelPage.tsx
 import { useState } from "react"
-import { Droplets, Fuel, Truck, Users, LayoutDashboard, ArrowDownToLine } from "lucide-react"
+import { Droplets, Fuel, Truck, Users, LayoutDashboard, ArrowDownToLine, TrendingUp } from "lucide-react"
 import FuelDashboard  from "./FuelDashboard"
 import TanksTab       from "./TanksTab"
 import ReceiptsTab    from "./ReceiptsTab"
 import DispatchesTab  from "./DispatchesTab"
 import DeliveriesTab  from "./DeliveriesTab"
 import SuppliersTab   from "./SuppliersTab"
+import MarginTab      from "./MarginTab"
+import { usePermission } from "../../hooks/usePermission"
 
-type Tab = "dashboard" | "tanks" | "receipts" | "dispatches" | "deliveries" | "suppliers"
+type Tab = "dashboard" | "tanks" | "receipts" | "dispatches" | "deliveries" | "suppliers" | "margin"
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "dashboard",  label: "Dashboard",    icon: LayoutDashboard },
@@ -21,6 +23,13 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 
 export function FuelPage() {
   const [tab, setTab] = useState<Tab>("dashboard")
+  // Client-side mirror of the server-side FUEL_MARGIN_READ gate — see
+  // usePermission's own doc comment for why this doesn't replace the
+  // real check, it just avoids showing a tab whose click would 403.
+  const canViewMargin = usePermission("FUEL_MARGIN_READ")
+  const visibleTabs = canViewMargin
+    ? [...TABS, { id: "margin" as Tab, label: "Cost & Margin", icon: TrendingUp }]
+    : TABS
 
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -38,7 +47,7 @@ export function FuelPage() {
 
       <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 14, padding: 24 }}>
         <div style={{ display: "flex", gap: 2, borderBottom: "1px solid #E2E8F0", marginBottom: 28, overflowX: "auto" }}>
-          {TABS.map(t => {
+          {visibleTabs.map(t => {
             const Icon = t.icon
             const active = tab === t.id
             return (
@@ -62,6 +71,7 @@ export function FuelPage() {
         {tab === "dispatches" && <DispatchesTab />}
         {tab === "deliveries" && <DeliveriesTab />}
         {tab === "suppliers"  && <SuppliersTab />}
+        {tab === "margin"     && canViewMargin && <MarginTab />}
       </div>
     </div>
   )
