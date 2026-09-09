@@ -150,10 +150,26 @@ public class GuardJwtFilter extends OncePerRequestFilter {
         details.put("userId",   guardIdStr);
         authentication.setDetails(details);
 
-        chain.doFilter(request, response);
-
-        // Clear after request
-        SecurityContextHolder.clearContext();
+        // FIX (P0 backlog): chain.doFilter() + clearContext() used to sit
+        // completely outside any try/finally here -- if anything
+        // downstream threw, clearContext() never ran, and because Tomcat
+        // reuses pooled threads across requests, this guard's security
+        // context could leak into whatever unrelated request that thread
+        // handles next. JwtAuthFilter already wraps the equivalent code
+        // in try/finally with its own "thread goes back to pool after
+        // this -- MUST be clean" comment; this filter just never got the
+        // same treatment. Mirroring that here. (Not adding
+        // TenantContext.clear() to match -- unlike JwtAuthFilter, this
+        // filter never calls TenantContext.setTenantId()/setUserId()
+        // directly; TenantContext reads guard identity dynamically from
+        // the SecurityContext authentication details set above, so
+        // clearing SecurityContextHolder alone is what's actually needed
+        // here.)
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     private void sendUnauthorized(HttpServletResponse response, String message)

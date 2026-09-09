@@ -138,6 +138,26 @@ public class SiteController {
                         TenantContext.getTenantIdAsObject(), siteId, checkpointId)));
     }
 
+    @PatchMapping("/{id}/branch")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @Operation(
+            summary = "Assign or clear a site's branch",
+            description = """
+            FIX (P0 backlog): SiteService.assignBranch() and Site.assignBranch()
+            have existed since V218, but this controller method was never
+            added -- SitesTab's branch-assignment dropdown has been calling
+            this exact PATCH /{id}/branch route and getting a 404 in
+            production the whole time. branchId is nullable; passing null
+            clears the assignment, matching Site.assignBranch()'s own
+            documented convention.
+            """)
+    public ResponseEntity<ApiResponse<Void>> assignBranch(
+            @PathVariable UUID id, @RequestBody AssignSiteBranchRequest req) {
+        featureGuard.requireModule("security");
+        siteService.assignBranch(TenantContext.getTenantIdAsObject(), id, req.branchId());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
     @PatchMapping("/{id}/qr-enforcement")
     @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
