@@ -145,6 +145,12 @@ public class SecurityConfig {
                                 "/api/v1/training-provider/portal/auth/**",
                                 "/api/v1/facilitiesmanagement/portal/auth/**",
                                 "/api/v1/recruitment-agency/portal/auth/**",
+                                // FIX (Property tenant portal): added
+                                // proactively as part of building this
+                                // portal, not discovered broken after
+                                // the fact — same narrow /portal/auth/**
+                                // convention as every entry above.
+                                "/api/v1/property/portal/auth/**",
                                 // FIX (identity module modernization): the
                                 // main-app team-invitation flow was
                                 // completely unreachable. UserController's
