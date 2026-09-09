@@ -3,11 +3,12 @@ import { useState } from "react"
 import {
   Shield, MapPin, Clock, AlertTriangle, LayoutDashboard, Radio,
   Crosshair, Siren, Camera, FileBarChart, Tablet, Lock, Users,
-  DollarSign, GitBranch, Key,
+  DollarSign, GitBranch, Key, DoorOpen,
 } from "lucide-react"
 import SecurityDashboard  from "./SecurityDashboard"
 import GuardsTab          from "./GuardsTab"
 import SitesTab           from "./SitesTab"
+import GateAccessTab      from "./GateAccessTab"
 import ShiftsTab          from "./ShiftsTab"
 import IncidentsTab       from "./IncidentsTab"
 import LiveMapTab         from "./LiveMapTab"
@@ -22,7 +23,7 @@ import BranchesTab        from "./BranchesTab"
 import PublicApiTab       from "./PublicApiTab"
 
 type Module  = "ops" | "cp" | "admin"
-type OpsTab  = "dashboard" | "guards" | "sites" | "shifts" | "incidents" | "live" | "control-room" | "armoury" | "cctv" | "sessions" | "reports"
+type OpsTab  = "dashboard" | "guards" | "sites" | "gate-access" | "shifts" | "incidents" | "live" | "control-room" | "armoury" | "cctv" | "sessions" | "reports"
 type CpTab   = "cp-overview"
 type ATab    = OpsTab | CpTab | "admin-overview" | "payroll" | "branches" | "public-api"
 
@@ -30,6 +31,7 @@ const OPS_TABS = [
   { id: "dashboard",    label: "Dashboard",    icon: LayoutDashboard },
   { id: "guards",       label: "Guards",       icon: Shield },
   { id: "sites",        label: "Sites",        icon: MapPin },
+  { id: "gate-access",  label: "Gate Access",  icon: DoorOpen },
   { id: "shifts",       label: "Shifts",       icon: Clock },
   { id: "incidents",    label: "Incidents",    icon: AlertTriangle },
   { id: "control-room", label: "Control Room", icon: Siren,       badge: "LIVE" },
@@ -131,6 +133,7 @@ export function SecurityPage() {
           {tab === "dashboard"     && <SecurityDashboard onNavigate={setTab as any} />}
           {tab === "guards"        && <GuardsTab />}
           {tab === "sites"         && <SitesTab />}
+          {tab === "gate-access"   && <GateAccessTab />}
           {tab === "shifts"        && <ShiftsTab />}
           {tab === "incidents"     && <IncidentsTab />}
           {tab === "live"          && <LiveMapTab />}
