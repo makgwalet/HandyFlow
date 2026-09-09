@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Lock, Plus, Shield, Users2, Edit2, Ban, History, Eye, FileDown, Paperclip, Download, Trash2 } from "lucide-react"
+import { Lock, Plus, Shield, Users2, Edit2, Ban, History, Eye, FileDown, Paperclip, Download, Trash2, Car, Crosshair, MapPinned, CheckCircle2, Wrench, UserCheck, UserMinus } from "lucide-react"
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface Principal {
@@ -43,8 +43,8 @@ interface ItineraryStop {
   status: "PENDING" | "IN_PROGRESS" | "COMPLETED"
 }
 
-type View = "details" | "itinerary" | "evidence"
-type MainView = "engagements" | "principals"
+type View = "details" | "itinerary" | "evidence" | "armoury"
+type MainView = "engagements" | "principals" | "vehicles"
 
 interface AuditEvent {
   id: string; actorId: string | null; actorType: string
@@ -57,6 +57,42 @@ interface Evidence {
   evidenceType: string; status: string; uploadedByName: string; createdAt: string
 }
 
+// FIX (P1 backlog, second pass): everything below was flagged and
+// deliberately deferred when this tab was first expanded — vehicles,
+// armoury-for-detail, and advance surveys, each substantial enough to
+// need its own scoping pass. Confirmed against the real DTOs/entities
+// before building any of it (same discipline as the first pass).
+interface Guard { id: string; fullName: string }
+
+interface Vehicle {
+  id: string; vehicleType: string; registration: string; makeModel: string | null
+  armored: boolean; assignedDriverGuardId: string | null; assignedDriverName: string | null
+  status: "AVAILABLE" | "IN_USE" | "IN_SERVICE" | "DECOMMISSIONED"
+  notes: string | null; createdAt: string
+}
+
+interface Firearm {
+  id: string; firearmSerial: string; firearmType: string; makeModel: string | null
+  status: string; licenseExpired: boolean
+}
+
+// ArmouryLog is returned as the raw entity (not a Response DTO) from
+// getArmouryForDetail — confirmed via direct read of the controller —
+// so only armouryId/guardId/witnessedByGuardId are available, no
+// resolved names. Cross-referenced against the armoury/guards lists
+// this component already fetches, same approach as GateAccessTab
+// cross-referencing checkpoints via site detail.
+interface ArmouryLogEntry {
+  id: string; armouryId: string; guardId: string; action: "ISSUE" | "RETURN"
+  witnessedByGuardId: string; conditionNotes: string | null; occurredAt: string
+}
+
+interface AdvanceSurvey {
+  id: string; itineraryStopId: string; surveyedByGuardId: string; surveyedByGuardName: string
+  surveyedAt: string; entryExitRoutesNotes: string | null; hazardsNoted: string | null
+  allClear: boolean
+}
+
 // ── Config ─────────────────────────────────────────────────────────────────────
 
 const THREAT_LEVEL: Record<string, { color: string; bg: string }> = {
@@ -64,6 +100,13 @@ const THREAT_LEVEL: Record<string, { color: string; bg: string }> = {
   MEDIUM:   { color: "#B45309", bg: "#FFFBEB" },
   HIGH:     { color: "#C2410C", bg: "#FFEDD5" },
   CRITICAL: { color: "#DC2626", bg: "#FEF2F2" },
+}
+
+const VEHICLE_STATUS: Record<string, { color: string; bg: string; label: string }> = {
+  AVAILABLE:      { color: "#166534", bg: "#DCFCE7", label: "Available" },
+  IN_USE:         { color: "#B45309", bg: "#FFFBEB", label: "In Use" },
+  IN_SERVICE:     { color: "#64748B", bg: "#F1F5F9", label: "In Service" },
+  DECOMMISSIONED: { color: "#94A3B8", bg: "#F8FAFC", label: "Decommissioned" },
 }
 
 const DETAIL_STATUS = {
@@ -104,6 +147,28 @@ export default function CloseProtectionTab() {
   })
   const [evidenceUploadFor, setEvidenceUploadFor] = useState<{ type: "PRINCIPAL" | "PROTECTION_DETAIL"; id: string } | null>(null)
   const [evidenceForm, setEvidenceForm] = useState({ category: "ID_DOCUMENT", fileName: "", fileBase64: "", notes: "" })
+
+  // Vehicles
+  const [showVehicleForm, setShowVehicleForm] = useState(false)
+  const [vehicleForm, setVehicleForm] = useState({ vehicleType: "PRINCIPAL_CAR", registration: "", makeModel: "", armored: false, notes: "" })
+  const [assignDriverFor, setAssignDriverFor] = useState<Vehicle | null>(null)
+  const [driverGuardId, setDriverGuardId] = useState("")
+  const [serviceFor, setServiceFor] = useState<Vehicle | null>(null)
+  const [serviceNotes, setServiceNotes] = useState("")
+
+  // Team assignment (prerequisite for armoury-for-detail — an assignmentId
+  // has to exist before a firearm can be issued against it)
+  const [showAssignForm, setShowAssignForm] = useState(false)
+  const [assignForm, setAssignForm] = useState({ guardId: "", role: "CPO" })
+
+  // Armoury-for-detail
+  const [showIssueForm, setShowIssueForm] = useState(false)
+  const [issueForm, setIssueForm] = useState({ assignmentId: "", armouryId: "", witnessedByGuardId: "", conditionNotes: "" })
+
+  // Advance surveys
+  const [surveyFor, setSurveyFor] = useState<ItineraryStop | null>(null)
+  const [surveyForm, setSurveyForm] = useState({ entryExitRoutesNotes: "", hazardsNoted: "", allClear: true })
+  const [expandedStopSurveys, setExpandedStopSurveys] = useState<string | null>(null)
 
   const [detailForm, setDetailForm] = useState({
     principalId: "", detailType: "MOBILE", startAt: "", endAt: "", clientReference: "", notes: "",
@@ -257,6 +322,120 @@ export default function CloseProtectionTab() {
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to delete evidence"),
   })
 
+  // FIX (P1 backlog, second pass) — guards list, shared across team
+  // assignment and armoury-for-detail witness/receiver pickers.
+  const { data: guards = [] } = useQuery<Guard[]>({
+    queryKey: ["guards-list-for-cp"],
+    queryFn: async () => {
+      const r = await apiClient.get("/api/v1/security/guards?size=200")
+      const p = r.data?.data ?? r.data
+      return (p?.content ?? p) as Guard[]
+    },
+  })
+  const guardName = (id: string) => guards.find(g => g.id === id)?.fullName ?? id.slice(0, 8)
+
+  // ── Vehicles ─────────────────────────────────────────────────────────────────
+  const { data: vehicles = [], isLoading: vehiclesLoading } = useQuery<Vehicle[]>({
+    queryKey: ["cp-vehicles"],
+    queryFn: async () => {
+      const r = await apiClient.get("/api/v1/security/cp/vehicles?size=100")
+      const p = r.data?.data ?? r.data
+      return (p?.content ?? p) as Vehicle[]
+    },
+    enabled: mainView === "vehicles",
+  })
+  const registerVehicle = useMutation({
+    mutationFn: () => apiClient.post("/api/v1/security/cp/vehicles", vehicleForm),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cp-vehicles"] }); setShowVehicleForm(false); setApiError("") },
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to register vehicle"),
+  })
+  const assignDriver = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/security/cp/vehicles/${assignDriverFor!.id}/driver`, { guardId: driverGuardId }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cp-vehicles"] }); setAssignDriverFor(null); setDriverGuardId(""); setApiError("") },
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to assign driver"),
+  })
+  const releaseDriver = useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/api/v1/security/cp/vehicles/${id}/driver`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cp-vehicles"] }),
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to release driver"),
+  })
+  const sendForService = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/security/cp/vehicles/${serviceFor!.id}/service`, { notes: serviceNotes }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cp-vehicles"] }); setServiceFor(null); setServiceNotes(""); setApiError("") },
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to send vehicle for service"),
+  })
+  const returnFromService = useMutation({
+    mutationFn: (id: string) => apiClient.post(`/api/v1/security/cp/vehicles/${id}/return-from-service`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cp-vehicles"] }),
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to return vehicle from service"),
+  })
+  const decommissionVehicle = useMutation({
+    mutationFn: (id: string) => apiClient.post(`/api/v1/security/cp/vehicles/${id}/decommission`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cp-vehicles"] }),
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to decommission vehicle"),
+  })
+
+  // ── Team assignment ──────────────────────────────────────────────────────────
+  const assignToDetail = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/security/cp/details/${selectedDetail!.id}/team`, assignForm),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cp-team", selectedDetail?.id] }); setShowAssignForm(false); setAssignForm({ guardId: "", role: "CPO" }); setApiError("") },
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to assign guard"),
+  })
+  const endAssignment = useMutation({
+    mutationFn: (assignmentId: string) => apiClient.delete(`/api/v1/security/cp/team/${assignmentId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cp-team", selectedDetail?.id] }),
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to end assignment"),
+  })
+
+  // ── Armoury-for-detail ───────────────────────────────────────────────────────
+  const { data: detailArmoury = [] } = useQuery<ArmouryLogEntry[]>({
+    queryKey: ["cp-detail-armoury", selectedDetail?.id],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/cp/details/${selectedDetail!.id}/armoury`)).data?.data ?? [],
+    enabled: !!selectedDetail && view === "armoury",
+  })
+  const { data: firearms = [] } = useQuery<Firearm[]>({
+    queryKey: ["armoury-list-for-cp"],
+    queryFn: async () => {
+      const r = await apiClient.get("/api/v1/security/armoury?size=100")
+      const p = r.data?.data ?? r.data
+      return (p?.content ?? p) as Firearm[]
+    },
+    enabled: view === "armoury",
+  })
+  const availableFirearms = firearms.filter(f => f.status === "AVAILABLE" && !f.licenseExpired)
+  const firearmLabel = (id: string) => { const f = firearms.find(x => x.id === id); return f ? `${f.firearmSerial} (${f.firearmType})` : id.slice(0, 8) }
+  const activeTeam: any[] = (team as any[]).filter(a => a.active)
+
+  const issueFirearm = useMutation({
+    mutationFn: () => {
+      const { assignmentId, armouryId, ...body } = issueForm
+      const assignment = activeTeam.find(a => a.id === assignmentId)
+      return apiClient.post(
+        `/api/v1/security/cp/details/${selectedDetail!.id}/team/${assignmentId}/firearms/${armouryId}/issue`,
+        { ...body, guardId: assignment?.guardId })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["cp-detail-armoury", selectedDetail?.id] })
+      setShowIssueForm(false); setIssueForm({ assignmentId: "", armouryId: "", witnessedByGuardId: "", conditionNotes: "" }); setApiError("")
+    },
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to issue firearm"),
+  })
+
+  // ── Advance surveys ──────────────────────────────────────────────────────────
+  const stopSurveysQuery = useQuery<AdvanceSurvey[]>({
+    queryKey: ["cp-stop-surveys", expandedStopSurveys],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/cp/itinerary/${expandedStopSurveys}/surveys`)).data?.data ?? [],
+    enabled: !!expandedStopSurveys,
+  })
+  const conductSurvey = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/security/cp/itinerary/${surveyFor!.id}/surveys`, surveyForm),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["cp-stop-surveys", surveyFor?.id] })
+      setSurveyFor(null); setSurveyForm({ entryExitRoutesNotes: "", hazardsNoted: "", allClear: true }); setApiError("")
+    },
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to record survey"),
+  })
+
   return (
     <div>
       {/* Header */}
@@ -275,10 +454,15 @@ export default function CloseProtectionTab() {
               style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "none", background: "#7C3AED", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
               <Plus size={14} /> New Detail
             </button>
-          ) : (
+          ) : mainView === "principals" ? (
             <button onClick={() => { setPrincipalForm({ fullName: "", aliasCodename: "", threatLevel: "LOW", medicalNotes: "", knownThreats: "" }); setShowPrincipalForm("new"); setApiError("") }}
               style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "none", background: "#7C3AED", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
               <Plus size={14} /> New Principal
+            </button>
+          ) : (
+            <button onClick={() => { setVehicleForm({ vehicleType: "PRINCIPAL_CAR", registration: "", makeModel: "", armored: false, notes: "" }); setShowVehicleForm(true); setApiError("") }}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "none", background: "#7C3AED", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              <Plus size={14} /> Register Vehicle
             </button>
           )}
         </div>
@@ -288,7 +472,7 @@ export default function CloseProtectionTab() {
           state block near the top of this component for the fuller
           context. */}
       <div style={{ display: "flex", gap: 6, marginBottom: 20, borderBottom: "1px solid #E2E8F0" }}>
-        {([["engagements", "Engagements", Shield], ["principals", "Principals", Users2]] as const).map(([id, label, Icon]) => (
+        {([["engagements", "Engagements", Shield], ["principals", "Principals", Users2], ["vehicles", "Vehicles", Car]] as const).map(([id, label, Icon]) => (
           <button key={id} onClick={() => setMainView(id)}
             style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 14px", background: "none", border: "none", borderBottom: mainView === id ? "2px solid #7C3AED" : "2px solid transparent", color: mainView === id ? "#7C3AED" : "#64748B", fontWeight: mainView === id ? 700 : 500, fontSize: 13, cursor: "pointer" }}>
             <Icon size={14} /> {label}
@@ -369,10 +553,10 @@ export default function CloseProtectionTab() {
 
               {/* Sub-tabs */}
               <div style={{ display: "flex", borderBottom: "1px solid #E2E8F0" }}>
-                {(["details", "itinerary", "evidence"] as View[]).map(v => (
+                {(["details", "itinerary", "evidence", "armoury"] as View[]).map(v => (
                   <button key={v} onClick={() => setView(v)}
                     style={{ padding: "10px 16px", border: "none", borderBottom: `2px solid ${view === v ? "#7C3AED" : "transparent"}`, background: "none", color: view === v ? "#7C3AED" : "#64748B", fontSize: 12, fontWeight: view === v ? 600 : 400, cursor: "pointer", marginBottom: -1, textTransform: "capitalize" as const }}>
-                    {v === "details" ? "Team" : v === "itinerary" ? "Itinerary" : "Evidence"}
+                    {v === "details" ? "Team" : v === "itinerary" ? "Itinerary" : v === "evidence" ? "Evidence" : "Armoury"}
                   </button>
                 ))}
               </div>
@@ -380,22 +564,36 @@ export default function CloseProtectionTab() {
               <div style={{ padding: 20 }}>
                 {view === "details" && (
                   <div>
-                    <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "#64748B", marginBottom: 12 }}>
-                      Team Roster — {(team as any[]).length} assigned
-                    </p>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                      <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "#64748B", margin: 0 }}>
+                        Team Roster — {(team as any[]).length} assigned
+                      </p>
+                      <button onClick={() => { setAssignForm({ guardId: "", role: "CPO" }); setShowAssignForm(true); setApiError("") }}
+                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid #7C3AED", background: "#F5F3FF", color: "#7C3AED", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                        <UserCheck size={12} /> Assign
+                      </button>
+                    </div>
                     {(team as any[]).length === 0 ? (
                       <p style={{ color: "#94A3B8", fontSize: 12 }}>No team members assigned yet</p>
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {(team as any[]).map((a: any) => (
-                          <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", border: "1px solid #E2E8F0", borderRadius: 8 }}>
-                            <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#EDE9FE", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                              <Shield size={14} color="#7C3AED" />
+                          <div key={a.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 14px", border: "1px solid #E2E8F0", borderRadius: 8, opacity: a.active ? 1 : 0.5 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                              <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#EDE9FE", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <Shield size={14} color="#7C3AED" />
+                              </div>
+                              <div>
+                                <p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: "#0F172A" }}>{a.guardName}</p>
+                                <p style={{ margin: 0, fontSize: 11, color: "#7C3AED" }}>{a.role.replace(/_/g, " ")}{!a.active && " · Ended"}</p>
+                              </div>
                             </div>
-                            <div>
-                              <p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: "#0F172A" }}>{a.guardName}</p>
-                              <p style={{ margin: 0, fontSize: 11, color: "#7C3AED" }}>{a.role.replace(/_/g, " ")}</p>
-                            </div>
+                            {a.active && (
+                              <button onClick={() => endAssignment.mutate(a.id)} title="End assignment"
+                                style={{ padding: "6px 8px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, cursor: "pointer", color: "#DC2626" }}>
+                                <UserMinus size={13} />
+                              </button>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -419,7 +617,8 @@ export default function CloseProtectionTab() {
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {(itinerary as ItineraryStop[]).map(stop => (
-                          <div key={stop.id} style={{ display: "flex", gap: 12, padding: "12px 14px", border: "1px solid #E2E8F0", borderRadius: 10 }}>
+                          <div key={stop.id}>
+                          <div style={{ display: "flex", gap: 12, padding: "12px 14px", border: "1px solid #E2E8F0", borderRadius: 10 }}>
                             <div style={{ width: 24, height: 24, borderRadius: "50%", background: stop.status === "COMPLETED" ? "#DCFCE7" : stop.status === "IN_PROGRESS" ? "#FEF3C7" : "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 10, fontWeight: 800, color: stop.status === "COMPLETED" ? "#166534" : stop.status === "IN_PROGRESS" ? "#92400E" : "#94A3B8" }}>
                               {stop.sequence}
                             </div>
@@ -434,7 +633,11 @@ export default function CloseProtectionTab() {
                                 {stop.actualArrival && ` · Arrived ${fmtTime(stop.actualArrival)}`}
                               </p>
                             </div>
-                            <div style={{ display: "flex", gap: 6 }}>
+                            <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+                              <button onClick={() => setExpandedStopSurveys(expandedStopSurveys === stop.id ? null : stop.id)}
+                                style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", cursor: "pointer" }}>
+                                Surveys
+                              </button>
                               {stop.status === "PENDING" && (
                                 <button onClick={() => arriveStop.mutate(stop.id)}
                                   style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid #7C3AED", background: "#F5F3FF", color: "#7C3AED", cursor: "pointer" }}>
@@ -449,6 +652,35 @@ export default function CloseProtectionTab() {
                               )}
                             </div>
                           </div>
+
+                          {expandedStopSurveys === stop.id && (
+                            <div style={{ marginTop: 6, marginLeft: 36, padding: "10px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" as const }}>Advance Surveys</span>
+                                <button onClick={() => { setSurveyForm({ entryExitRoutesNotes: "", hazardsNoted: "", allClear: true }); setSurveyFor(stop) }}
+                                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 6, border: "1px solid #7C3AED", background: "#F5F3FF", color: "#7C3AED", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                                  <MapPinned size={11} /> Conduct Survey
+                                </button>
+                              </div>
+                              {stopSurveysQuery.isLoading ? (
+                                <p style={{ color: "#94A3B8", fontSize: 12, margin: 0 }}>Loading…</p>
+                              ) : !stopSurveysQuery.data?.length ? (
+                                <p style={{ color: "#94A3B8", fontSize: 12, margin: 0 }}>No surveys conducted yet.</p>
+                              ) : (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                  {stopSurveysQuery.data.map(sv => (
+                                    <div key={sv.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, padding: "6px 10px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 6 }}>
+                                      {sv.allClear ? <CheckCircle2 size={13} color="#166534" /> : <Ban size={13} color="#DC2626" />}
+                                      <span style={{ fontWeight: 600, color: sv.allClear ? "#166534" : "#DC2626" }}>{sv.allClear ? "All Clear" : "Not Clear"}</span>
+                                      <span style={{ color: "#94A3B8" }}>by {sv.surveyedByGuardName} · {fmtTime(sv.surveyedAt)}</span>
+                                      {sv.hazardsNoted && <span style={{ color: "#C2410C", marginLeft: "auto" }}>{sv.hazardsNoted}</span>}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          </div>
                         ))}
                       </div>
                     )}
@@ -462,6 +694,39 @@ export default function CloseProtectionTab() {
                     onDownload={downloadEvidence}
                     onDelete={(evidenceId) => { const reason = prompt("Reason for removing this evidence?"); if (reason) deleteEvidence.mutate({ evidenceId, reason }) }}
                   />
+                )}
+
+                {view === "armoury" && selectedDetail && (
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                      <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "#64748B", margin: 0 }}>
+                        Firearm Issue History — {detailArmoury.length} event{detailArmoury.length !== 1 ? "s" : ""}
+                      </p>
+                      <button onClick={() => { setIssueForm({ assignmentId: "", armouryId: "", witnessedByGuardId: "", conditionNotes: "" }); setShowIssueForm(true); setApiError("") }}
+                        disabled={activeTeam.length === 0}
+                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid #7C3AED", background: activeTeam.length ? "#F5F3FF" : "#F8FAFC", color: activeTeam.length ? "#7C3AED" : "#CBD5E1", fontSize: 11, fontWeight: 600, cursor: activeTeam.length ? "pointer" : "not-allowed" }}>
+                        <Crosshair size={12} /> Issue Firearm
+                      </button>
+                    </div>
+                    {activeTeam.length === 0 && (
+                      <p style={{ color: "#CBD5E1", fontSize: 12, marginBottom: 12 }}>Assign a guard to the team first — a firearm can only be issued against an active team assignment.</p>
+                    )}
+                    {detailArmoury.length === 0 ? (
+                      <p style={{ color: "#94A3B8", fontSize: 12 }}>No firearms issued for this detail yet.</p>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {detailArmoury.map(log => (
+                          <div key={log.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
+                            <Crosshair size={13} color={log.action === "ISSUE" ? "#7C3AED" : "#64748B"} />
+                            <span style={{ fontWeight: 600, color: "#0F172A" }}>{log.action}</span>
+                            <span style={{ color: "#94A3B8" }}>{firearmLabel(log.armouryId)} → {guardName(log.guardId)}</span>
+                            <span style={{ color: "#CBD5E1" }}>witnessed by {guardName(log.witnessedByGuardId)}</span>
+                            <span style={{ color: "#CBD5E1", marginLeft: "auto" }}>{fmtTime(log.occurredAt)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -486,6 +751,67 @@ export default function CloseProtectionTab() {
           onDownloadEvidence={downloadEvidence}
           onDeleteEvidence={(evidenceId) => { const reason = prompt("Reason for removing this evidence?"); if (reason) deleteEvidence.mutate({ evidenceId, reason }) }}
         />
+      )}
+
+      {mainView === "vehicles" && (
+        <div>
+          {vehiclesLoading ? (
+            <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>Loading…</div>
+          ) : vehicles.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+              No protection vehicles registered yet.
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {vehicles.map(v => {
+                const sc = VEHICLE_STATUS[v.status] ?? VEHICLE_STATUS.AVAILABLE
+                return (
+                  <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 9, background: "#F5F3FF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <Car size={16} color="#7C3AED" />
+                      </div>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{v.registration}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: "#7C3AED", background: "#F5F3FF", padding: "2px 8px", borderRadius: 4 }}>{v.vehicleType.replace(/_/g, " ")}</span>
+                          {v.armored && <span style={{ fontSize: 10, fontWeight: 700, color: "#166534", background: "#DCFCE7", padding: "2px 8px", borderRadius: 4 }}>ARMORED</span>}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                          {v.makeModel && <>{v.makeModel} · </>}
+                          {v.assignedDriverName ? `Driver: ${v.assignedDriverName}` : "No driver assigned"}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: sc.bg, color: sc.color }}>{sc.label}</span>
+                      {v.status === "AVAILABLE" && (
+                        <button onClick={() => { setDriverGuardId(""); setAssignDriverFor(v) }} title="Assign driver"
+                          style={{ padding: "6px 8px", background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 7, cursor: "pointer", color: "#0369A1" }}><UserCheck size={13} /></button>
+                      )}
+                      {v.status === "IN_USE" && (
+                        <button onClick={() => releaseDriver.mutate(v.id)} title="Release driver"
+                          style={{ padding: "6px 8px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 7, cursor: "pointer", color: "#B45309" }}><UserMinus size={13} /></button>
+                      )}
+                      {v.status === "AVAILABLE" && (
+                        <button onClick={() => { setServiceNotes(""); setServiceFor(v) }} title="Send for service"
+                          style={{ padding: "6px 8px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, cursor: "pointer", color: "#64748B" }}><Wrench size={13} /></button>
+                      )}
+                      {v.status === "IN_SERVICE" && (
+                        <button onClick={() => returnFromService.mutate(v.id)} title="Return from service"
+                          style={{ padding: "6px 8px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 7, cursor: "pointer", color: "#166534" }}><CheckCircle2 size={13} /></button>
+                      )}
+                      {v.status !== "DECOMMISSIONED" && (
+                        <button onClick={() => { if (confirm(`Permanently decommission ${v.registration}?`)) decommissionVehicle.mutate(v.id) }} title="Decommission"
+                          style={{ padding: "6px 8px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, cursor: "pointer", color: "#DC2626" }}><Ban size={13} /></button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       {/* New detail modal */}
@@ -643,6 +969,198 @@ export default function CloseProtectionTab() {
               <button onClick={() => setEvidenceUploadFor(null)} style={secondaryBtn}>Cancel</button>
               <button onClick={() => uploadEvidence.mutate()} disabled={!evidenceForm.fileBase64 || uploadEvidence.isPending} style={{ ...primaryBtn, background: "#7C3AED" }}>
                 {uploadEvidence.isPending ? "Uploading…" : "Upload"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Register vehicle modal */}
+      {showVehicleForm && (
+        <div style={modalOverlay}>
+          <div style={modalBox}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Register Vehicle</h3>
+            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <label style={lblStyle}>Type</label>
+                <select value={vehicleForm.vehicleType} onChange={e => setVehicleForm(f => ({ ...f, vehicleType: e.target.value }))} style={inputStyle}>
+                  <option value="PRINCIPAL_CAR">Principal Car</option>
+                  <option value="LEAD_CAR">Lead Car</option>
+                  <option value="FOLLOW_CAR">Follow Car</option>
+                </select>
+              </div>
+              <div>
+                <label style={lblStyle}>Registration *</label>
+                <input value={vehicleForm.registration} onChange={e => setVehicleForm(f => ({ ...f, registration: e.target.value }))} placeholder="CA 123-456" style={inputStyle} />
+              </div>
+              <div>
+                <label style={lblStyle}>Make / Model</label>
+                <input value={vehicleForm.makeModel} onChange={e => setVehicleForm(f => ({ ...f, makeModel: e.target.value }))} style={inputStyle} />
+              </div>
+              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, cursor: "pointer" }}>
+                <input type="checkbox" checked={vehicleForm.armored} onChange={e => setVehicleForm(f => ({ ...f, armored: e.target.checked }))} />
+                Armored
+              </label>
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+              <button onClick={() => setShowVehicleForm(false)} style={secondaryBtn}>Cancel</button>
+              <button onClick={() => registerVehicle.mutate()} disabled={!vehicleForm.registration.trim() || registerVehicle.isPending} style={{ ...primaryBtn, background: "#7C3AED" }}>
+                {registerVehicle.isPending ? "Registering…" : "Register"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign driver modal */}
+      {assignDriverFor && (
+        <div style={modalOverlay}>
+          <div style={modalBox}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Assign Driver — {assignDriverFor.registration}</h3>
+            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            <div style={{ marginBottom: 4 }}>
+              <label style={lblStyle}>Guard *</label>
+              <select value={driverGuardId} onChange={e => setDriverGuardId(e.target.value)} style={inputStyle}>
+                <option value="">Select guard…</option>
+                {guards.map(g => <option key={g.id} value={g.id}>{g.fullName}</option>)}
+              </select>
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+              <button onClick={() => setAssignDriverFor(null)} style={secondaryBtn}>Cancel</button>
+              <button onClick={() => assignDriver.mutate()} disabled={!driverGuardId || assignDriver.isPending} style={{ ...primaryBtn, background: "#7C3AED" }}>
+                {assignDriver.isPending ? "Assigning…" : "Assign"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send for service modal */}
+      {serviceFor && (
+        <div style={modalOverlay}>
+          <div style={modalBox}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Send for Service — {serviceFor.registration}</h3>
+            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            <div style={{ marginBottom: 4 }}>
+              <label style={lblStyle}>Notes *</label>
+              <textarea value={serviceNotes} onChange={e => setServiceNotes(e.target.value)} rows={3} style={{ ...inputStyle, fontFamily: "inherit", resize: "vertical" as const }} />
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+              <button onClick={() => setServiceFor(null)} style={secondaryBtn}>Cancel</button>
+              <button onClick={() => sendForService.mutate()} disabled={!serviceNotes.trim() || sendForService.isPending} style={{ ...primaryBtn, background: "#7C3AED" }}>
+                {sendForService.isPending ? "Saving…" : "Send for Service"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign to team modal */}
+      {showAssignForm && selectedDetail && (
+        <div style={modalOverlay}>
+          <div style={modalBox}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Assign to Team</h3>
+            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <label style={lblStyle}>Guard *</label>
+                <select value={assignForm.guardId} onChange={e => setAssignForm(f => ({ ...f, guardId: e.target.value }))} style={inputStyle}>
+                  <option value="">Select guard…</option>
+                  {guards.map(g => <option key={g.id} value={g.id}>{g.fullName}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={lblStyle}>Role</label>
+                <select value={assignForm.role} onChange={e => setAssignForm(f => ({ ...f, role: e.target.value }))} style={inputStyle}>
+                  <option value="TEAM_LEADER">Team Leader</option>
+                  <option value="DRIVER">Driver</option>
+                  <option value="CPO">CPO</option>
+                  <option value="ADVANCE">Advance</option>
+                  <option value="COUNTER_SURVEILLANCE">Counter Surveillance</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+              <button onClick={() => setShowAssignForm(false)} style={secondaryBtn}>Cancel</button>
+              <button onClick={() => assignToDetail.mutate()} disabled={!assignForm.guardId || assignToDetail.isPending} style={{ ...primaryBtn, background: "#7C3AED" }}>
+                {assignToDetail.isPending ? "Assigning…" : "Assign"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Issue firearm modal */}
+      {showIssueForm && selectedDetail && (
+        <div style={modalOverlay}>
+          <div style={modalBox}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Issue Firearm</h3>
+            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <label style={lblStyle}>Receiving Guard (from team roster) *</label>
+                <select value={issueForm.assignmentId} onChange={e => setIssueForm(f => ({ ...f, assignmentId: e.target.value }))} style={inputStyle}>
+                  <option value="">Select assignment…</option>
+                  {activeTeam.map(a => <option key={a.id} value={a.id}>{a.guardName} — {a.role.replace(/_/g, " ")}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={lblStyle}>Firearm *</label>
+                <select value={issueForm.armouryId} onChange={e => setIssueForm(f => ({ ...f, armouryId: e.target.value }))} style={inputStyle}>
+                  <option value="">Select firearm…</option>
+                  {availableFirearms.map(f => <option key={f.id} value={f.id}>{f.firearmSerial} — {f.firearmType}</option>)}
+                </select>
+                {availableFirearms.length === 0 && <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>No available, in-license firearms in the armoury.</div>}
+              </div>
+              <div>
+                <label style={lblStyle}>Witness (must be a different guard) *</label>
+                <select value={issueForm.witnessedByGuardId} onChange={e => setIssueForm(f => ({ ...f, witnessedByGuardId: e.target.value }))} style={inputStyle}>
+                  <option value="">Select witness…</option>
+                  {guards.filter(g => g.id !== activeTeam.find(a => a.id === issueForm.assignmentId)?.guardId).map(g => <option key={g.id} value={g.id}>{g.fullName}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={lblStyle}>Condition Notes</label>
+                <input value={issueForm.conditionNotes} onChange={e => setIssueForm(f => ({ ...f, conditionNotes: e.target.value }))} style={inputStyle} />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+              <button onClick={() => setShowIssueForm(false)} style={secondaryBtn}>Cancel</button>
+              <button onClick={() => issueFirearm.mutate()}
+                disabled={!issueForm.assignmentId || !issueForm.armouryId || !issueForm.witnessedByGuardId || issueFirearm.isPending}
+                style={{ ...primaryBtn, background: "#7C3AED" }}>
+                {issueFirearm.isPending ? "Issuing…" : "Issue"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Conduct survey modal */}
+      {surveyFor && (
+        <div style={modalOverlay}>
+          <div style={modalBox}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Conduct Survey — {surveyFor.locationName}</h3>
+            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <label style={lblStyle}>Entry/Exit Routes</label>
+                <textarea value={surveyForm.entryExitRoutesNotes} onChange={e => setSurveyForm(f => ({ ...f, entryExitRoutesNotes: e.target.value }))} rows={2} style={{ ...inputStyle, fontFamily: "inherit", resize: "vertical" as const }} />
+              </div>
+              <div>
+                <label style={lblStyle}>Hazards Noted</label>
+                <textarea value={surveyForm.hazardsNoted} onChange={e => setSurveyForm(f => ({ ...f, hazardsNoted: e.target.value }))} rows={2} style={{ ...inputStyle, fontFamily: "inherit", resize: "vertical" as const }} />
+              </div>
+              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, cursor: "pointer" }}>
+                <input type="checkbox" checked={surveyForm.allClear} onChange={e => setSurveyForm(f => ({ ...f, allClear: e.target.checked }))} />
+                All clear — safe for principal arrival
+              </label>
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+              <button onClick={() => setSurveyFor(null)} style={secondaryBtn}>Cancel</button>
+              <button onClick={() => conductSurvey.mutate()} disabled={conductSurvey.isPending} style={{ ...primaryBtn, background: "#7C3AED" }}>
+                {conductSurvey.isPending ? "Saving…" : "Submit Survey"}
               </button>
             </div>
           </div>
