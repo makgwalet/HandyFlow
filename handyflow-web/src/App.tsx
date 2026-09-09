@@ -106,6 +106,9 @@ import { WhsePortalAcceptInvitePage } from "./pages/warehousing-portal/WhsePorta
 import { WhsePortalClientDetailPage } from "./pages/warehousing-portal/WhsePortalClientDetailPage"
 import { WhsePortalHomePage } from "./pages/warehousing-portal/WhsePortalHomePage"
 import { WhsePortalLoginPage } from "./pages/warehousing-portal/WhsePortalLoginPage"
+import { PropPortalLoginPage } from "./pages/property-portal/PropPortalLoginPage"
+import { PropPortalAcceptInvitePage } from "./pages/property-portal/PropPortalAcceptInvitePage"
+import { PropPortalHomePage } from "./pages/property-portal/PropPortalHomePage"
 import TrainingPage from "./pages/training/TrainingPage"
 import TrainProvPage from "./pages/trainingprovider/TrainProvPage"
 import { TrainProvPortalAcceptInvitePage } from "./pages/trainingprovider-portal/TrainProvPortalAcceptInvitePage"
@@ -157,6 +160,12 @@ function CollAgencyPortalProtectedRoute({ children }: { children: React.ReactNod
 function WhsePortalProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = usePortalAuthStore(s => s.token)
   if (!token) return <Navigate to="/warehousing/portal/login" replace />
+  return <>{children}</>
+}
+
+function PropPortalProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = usePortalAuthStore(s => s.token)
+  if (!token) return <Navigate to="/property/portal/login" replace />
   return <>{children}</>
 }
 
@@ -227,6 +236,15 @@ export default function App() {
           } />
           <Route path="/warehousing/portal/clients/:clientId" element={
             <WhsePortalProtectedRoute><WhsePortalClientDetailPage /></WhsePortalProtectedRoute>
+          } />
+
+          {/* Property tenant portal — 3 routes only (no separate lease-
+              detail route), per the agreed design: PropPortalHomePage
+              does double duty as the list AND the detail view. */}
+          <Route path="/property/portal/login" element={<PropPortalLoginPage />} />
+          <Route path="/property/portal/auth/accept-invite" element={<PropPortalAcceptInvitePage />} />
+          <Route path="/property/portal" element={
+              <PropPortalProtectedRoute><PropPortalHomePage /></PropPortalProtectedRoute>
           } />
 
           {/* NEW: Stage 3 — external auditor portal. Tenant-scoped, not

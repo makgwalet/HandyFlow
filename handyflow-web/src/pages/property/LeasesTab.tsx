@@ -2,8 +2,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, X, ChevronDown, ChevronUp, FileText, User, AlertTriangle, RefreshCw, TrendingUp } from "lucide-react"
-
+import { Plus, X, ChevronDown, ChevronUp, FileText, RefreshCw, TrendingUp, KeyRound, Ban } from "lucide-react"
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
 const fmtR   = (n: any) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
 const fmtD   = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
@@ -31,6 +30,10 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
   const [showRenew, setRenew]     = useState<any | null>(null)
   const [showEscalate, setEscalate] = useState<any | null>(null)
   const [showTerminate, setTerminate] = useState<any | null>(null)
+  // FIX (P4 backlog): Property tenant portal — invite/list/revoke UI,
+  // wired to the new PropPortalAdminController built alongside it.
+  const [showPortal, setShowPortal] = useState<any | null>(null)
+  const [portalEmail, setPortalEmail] = useState("")
   const [error, setError] = useState("")
 
   const INIT = () => ({
@@ -93,6 +96,22 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
       apiClient.post(`/api/v1/property/leases/${id}/escalate`, body),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["leases"] }); setEscalate(null); setError("") },
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to escalate rent"),
+  })
+
+  const portalGrantsQuery = useQuery<any[]>({
+    queryKey: ["prop-portal-grants", showPortal?.id],
+    queryFn: async () => (await apiClient.get(`/api/v1/property/leases/${showPortal.id}/portal-access`)).data?.data ?? [],
+    enabled: !!showPortal,
+  })
+  const invitePortal = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/property/leases/${showPortal.id}/portal-access`, { email: portalEmail }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["prop-portal-grants", showPortal?.id] }); setPortalEmail(""); setError("") },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to send invite"),
+  })
+  const revokePortal = useMutation({
+    mutationFn: (grantId: string) => apiClient.post(`/api/v1/property/leases/${showPortal.id}/portal-access/${grantId}/revoke`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["prop-portal-grants", showPortal?.id] }),
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to revoke access"),
   })
 
   const vacantUnits = (units as any[]).filter(u => u.status === "VACANT")
@@ -183,6 +202,10 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
                         <button onClick={() => { setTerminate(l); setTermReason(""); setError("") }}
                           style={{ padding: "7px 13px", background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                           Terminate
+                        </button>
+                        <button onClick={() => { setShowPortal(l); setPortalEmail(l.lesseeEmail ?? ""); setError("") }}
+                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 13px", background: "#EFF6FF", color: "#1B3A6B", border: "1px solid #BFDBFE", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          <KeyRound size={12} /> Portal Access
                         </button>
                       </div>
                     )}
@@ -321,6 +344,45 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
               escalationPercent: escalateForm.escalationPercent ? parseFloat(escalateForm.escalationPercent) : null,
               newMonthlyRent: escalateForm.newMonthlyRent ? parseFloat(escalateForm.newMonthlyRent) : null,
             }})} />
+        </ModalShell>
+      )}
+
+      {/* Portal Access modal */}
+      {showPortal && (
+        <ModalShell title={`Portal Access — ${showPortal.lesseeName}`} onClose={() => { setShowPortal(null); setPortalEmail("") }}>
+          <div style={{ marginBottom: 16 }}>
+            <label style={lbl}>Invite email</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input value={portalEmail} onChange={e => setPortalEmail(e.target.value)} placeholder="tenant@example.com" style={{ ...inp, flex: 1 }} />
+              <button onClick={() => invitePortal.mutate()} disabled={!portalEmail.trim() || invitePortal.isPending}
+                style={{ padding: "9px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" as const }}>
+                {invitePortal.isPending ? "Sending…" : "Send Invite"}
+              </button>
+            </div>
+          </div>
+          {error && <ErrBox msg={error} />}
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, marginBottom: 8 }}>Existing Invites</div>
+          {portalGrantsQuery.isLoading ? (
+            <p style={{ fontSize: 12, color: "#94A3B8" }}>Loading…</p>
+          ) : !portalGrantsQuery.data?.length ? (
+            <p style={{ fontSize: 12, color: "#94A3B8" }}>No portal invites sent yet.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {portalGrantsQuery.data.map((g: any) => (
+                <div key={g.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12 }}>
+                  <span>{g.inviteEmail}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontWeight: 600, color: g.status === "ACTIVE" ? "#166534" : g.status === "REVOKED" ? "#94A3B8" : "#B45309" }}>{g.status}</span>
+                    {g.status !== "REVOKED" && (
+                      <button onClick={() => revokePortal.mutate(g.id)} title="Revoke" style={{ padding: "4px 6px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, cursor: "pointer", color: "#DC2626" }}>
+                        <Ban size={11} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </ModalShell>
       )}
 
