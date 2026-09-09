@@ -25,6 +25,15 @@ public interface FuelDeliveryRepository extends JpaRepository<FuelDelivery, UUID
     @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.id = :id AND d.deletedAt IS NULL")
     Optional<FuelDelivery> findActiveById(TenantId tenantId, UUID id);
 
+    // FIX (fuel cost/margin engine): backs the margin report, same
+    // pattern as FuelDispatchRepository.findByTenantAndDispatchedAtBetween
+    // (that one already existed for the usage report; this one didn't
+    // exist at all for deliveries). Filters on deliveredAt, not
+    // scheduledAt — the margin report is about completed transactions
+    // within the period, not ones merely scheduled in it.
+    @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.status = 'DELIVERED' AND d.deletedAt IS NULL AND d.deliveredAt BETWEEN :from AND :to ORDER BY d.deliveredAt ASC")
+    List<FuelDelivery> findDeliveredBetween(TenantId tenantId, Instant from, Instant to);
+
     // ── Notification scheduler (cross-tenant sweeps) ────────────────────────
     // "Not yet delivered" is expressed as status IN ('SCHEDULED','IN_TRANSIT') rather
     // than != 'DELIVERED', so a CANCELLED delivery is correctly excluded from both

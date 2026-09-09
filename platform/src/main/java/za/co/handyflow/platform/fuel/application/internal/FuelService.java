@@ -216,6 +216,77 @@ public class FuelService {
         return usageReportPdfGenerator.generate(dispatches, rangeFrom, rangeTo, resolveTenantName(tenantId));
     }
 
+    // FIX (fuel cost/margin engine, agreed design): the margin report
+    // itself. Combines deliveries (always customer-billed) and
+    // dispatches (customer-billed OR internal — both included, per the
+    // agreed design that internal fuel cost should be visible too, just
+    // without a margin figure). Reuses the same default-to-current-month
+    // convention as generateUsageReport() above for consistency. Labels
+    // use receiverName/recipientName directly off each entity rather
+    // than resolving customer/vehicle/asset names via extra queries —
+    // keeps this report self-contained and avoids N+1 lookups across
+    // three different entity types for what's fundamentally a financial
+    // summary, not a detail view.
+    @Transactional(readOnly = true)
+    public FuelMarginReportResponse generateMarginReport(TenantId tenantId, Instant from, Instant to) {
+        Instant rangeTo   = to != null ? to : Instant.now();
+        Instant rangeFrom = from != null ? from : rangeTo.atZone(java.time.ZoneId.of("Africa/Johannesburg"))
+                .toLocalDate().withDayOfMonth(1).atStartOfDay(java.time.ZoneId.of("Africa/Johannesburg")).toInstant();
+
+        List<FuelDelivery> deliveries = deliveryRepository.findDeliveredBetween(tenantId, rangeFrom, rangeTo);
+        List<FuelDispatch> dispatches = dispatchRepository.findByTenantAndDispatchedAtBetween(tenantId, rangeFrom, rangeTo);
+
+        List<FuelMarginLineResponse> lines = new java.util.ArrayList<>();
+        BigDecimal totalRevenue = BigDecimal.ZERO;
+        BigDecimal totalCostOfRevenueGenerating = BigDecimal.ZERO;
+        BigDecimal totalInternalLitres = BigDecimal.ZERO;
+        BigDecimal totalInternalCost = BigDecimal.ZERO;
+        int transactionsWithoutCostData = 0;
+
+        for (FuelDelivery d : deliveries) {
+            BigDecimal revenue = d.getTotalAmount();
+            BigDecimal cost = d.getCostPerLitreAtSale() != null
+                    ? d.getCostPerLitreAtSale().multiply(d.getLitresDelivered()) : null;
+            BigDecimal margin = cost != null ? revenue.subtract(cost) : null;
+            BigDecimal marginPct = (margin != null && revenue.compareTo(BigDecimal.ZERO) > 0)
+                    ? margin.divide(revenue, 4, java.math.RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)) : null;
+            if (cost == null) transactionsWithoutCostData++;
+            else { totalRevenue = totalRevenue.add(revenue); totalCostOfRevenueGenerating = totalCostOfRevenueGenerating.add(cost); }
+
+            lines.add(new FuelMarginLineResponse("DELIVERY", d.getId(), d.getTankId(), d.getDeliveredAt(),
+                    d.getLitresDelivered(), d.getPricePerLitre(), d.getCostPerLitreAtSale(),
+                    revenue, cost, margin, marginPct, d.getReceiverName()));
+        }
+
+        for (FuelDispatch d : dispatches) {
+            boolean billed = d.getPricePerLitre() != null;
+            BigDecimal revenue = billed ? d.getPricePerLitre().multiply(d.getLitresDispensed()) : null;
+            BigDecimal cost = d.getCostPerLitreAtSale() != null
+                    ? d.getCostPerLitreAtSale().multiply(d.getLitresDispensed()) : null;
+            BigDecimal margin = (billed && cost != null) ? revenue.subtract(cost) : null;
+            BigDecimal marginPct = (margin != null && revenue.compareTo(BigDecimal.ZERO) > 0)
+                    ? margin.divide(revenue, 4, java.math.RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)) : null;
+
+            if (cost == null) transactionsWithoutCostData++;
+            else if (billed) { totalRevenue = totalRevenue.add(revenue); totalCostOfRevenueGenerating = totalCostOfRevenueGenerating.add(cost); }
+            else { totalInternalLitres = totalInternalLitres.add(d.getLitresDispensed()); totalInternalCost = totalInternalCost.add(cost); }
+
+            lines.add(new FuelMarginLineResponse("DISPATCH", d.getId(), d.getTankId(), d.getDispatchedAt(),
+                    d.getLitresDispensed(), d.getPricePerLitre(), d.getCostPerLitreAtSale(),
+                    revenue, cost, margin, marginPct, d.getRecipientName()));
+        }
+
+        BigDecimal totalMargin = totalRevenue.subtract(totalCostOfRevenueGenerating);
+        BigDecimal marginPercent = totalRevenue.compareTo(BigDecimal.ZERO) > 0
+                ? totalMargin.divide(totalRevenue, 4, java.math.RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)) : null;
+
+        return new FuelMarginReportResponse(
+                rangeFrom.atZone(java.time.ZoneId.of("Africa/Johannesburg")).toLocalDate(),
+                rangeTo.atZone(java.time.ZoneId.of("Africa/Johannesburg")).toLocalDate(),
+                totalRevenue, totalCostOfRevenueGenerating, totalMargin, marginPercent,
+                totalInternalLitres, totalInternalCost, transactionsWithoutCostData, lines);
+    }
+
     /**
      * FIX: "no supplier statement/receiving report PDF" gap — receipts
      * already capture supplier, litres, and cost per delivery, but there
@@ -286,8 +357,10 @@ public class FuelService {
         FuelTank tank = findActiveTank(tenantId, tankId);
         var levelBefore = tank.getCurrentLitres();
 
-        // addStock validates capacity — throws if would overflow
-        var levelAfter = tank.addStock(req.litresReceived());
+        // addStock validates capacity — throws if would overflow.
+        // Now also recalculates the tank's weighted-average cost —
+        // see FuelTank.addStock()'s own comment for the formula.
+        var levelAfter = tank.addStock(req.litresReceived(), req.pricePerLitre());
         tankRepository.save(tank);
 
         FuelReceipt receipt = FuelReceipt.create(tenantId, tankId,
@@ -348,6 +421,10 @@ public class FuelService {
                 req.recipientName(), req.litresDispensed(), req.pricePerLitre(),
                 req.dispatchedAt(), req.odometerReading(), req.hoursReading(),
                 req.authorisedBy(), req.notes(), levelBefore, levelAfter);
+        // Fuel cost/margin engine — captured for every dispatch, not
+        // just customer-billed ones, per the agreed design. See
+        // FuelDispatch.recordCostSnapshot()'s own comment.
+        dispatch.recordCostSnapshot(tank.getCostPerLitreWac());
         dispatchRepository.save(dispatch);
 
         // FIX: backlog 5.1 — only when the dispatch actually went to a
@@ -574,6 +651,10 @@ public class FuelService {
                 req.meterReadingEnd(), req.signedOnBehalf(),
                 req.onBehalfOf(), req.receiverSignatureUrl()
         );
+        // Fuel cost/margin engine — see FuelDelivery.recordCostSnapshot()'s
+        // own comment for why this is a separate call rather than a
+        // parameter on complete() above.
+        delivery.recordCostSnapshot(tank.getCostPerLitreWac());
 
         delivery.assignReceiptNumber(receiptNumberGenerator.generate(tenantId));
         deliveryRepository.save(delivery);

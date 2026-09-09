@@ -92,6 +92,13 @@ public class FuelDelivery {
     @Column(name = "receiver_signature_url")
     private String receiverSignatureUrl;
 
+    // Fuel cost/margin engine — snapshot of the tank's WAC at the moment
+    // this delivery was completed, NOT a live reference. See V271's own
+    // migration comment for the fuller design context, and
+    // FuelTank.addStock() for how the WAC itself is maintained.
+    @Column(name = "cost_per_litre_at_sale", precision = 10, scale = 4)
+    private BigDecimal costPerLitreAtSale;
+
     @Column(name = "meter_reading_start", precision = 12, scale = 2)
     private BigDecimal meterReadingStart;
 
@@ -185,6 +192,16 @@ public class FuelDelivery {
     }
 
     public boolean isDeleted() { return deletedAt != null; }
+
+    // FIX (fuel cost/margin engine, agreed design): called separately
+    // from complete(), right after the service calls
+    // tank.removeStock() — the WAC snapshot is derived from tank state
+    // at that moment, not part of the delivery's own transactional
+    // details, so it's kept as its own small method rather than
+    // bloating complete()'s already-long parameter list.
+    public void recordCostSnapshot(BigDecimal costPerLitreAtSale) {
+        this.costPerLitreAtSale = costPerLitreAtSale;
+    }
 
     /** Marks the upcoming-delivery reminder as sent. */
     public void markReminderSent() {

@@ -37,6 +37,13 @@ public class FuelTank {
     @Column(name = "current_litres", nullable = false, precision = 12, scale = 2)
     private BigDecimal currentLitres = BigDecimal.ZERO;
 
+    // Fuel cost/margin engine — weighted-average cost, recalculated on
+    // every receipt in addStock(). Nullable: a brand-new tank with no
+    // receipts yet has no WAC. See V271's own migration comment for the
+    // fuller design context.
+    @Column(name = "cost_per_litre_wac", precision = 10, scale = 4)
+    private BigDecimal costPerLitreWac;
+
     private String location;
     private String notes;
 
@@ -73,7 +80,15 @@ public class FuelTank {
         return t;
     }
 
-    public BigDecimal addStock(BigDecimal litres) {
+    // FIX (fuel cost/margin engine, agreed design): now takes the
+    // receipt's price so it can recalculate the tank's running
+    // weighted-average cost on every fill-up. Standard WAC formula:
+    // (currentLitres * currentWac + receivedLitres * receiptPrice) /
+    // (currentLitres + receivedLitres). First-ever receipt on a tank
+    // with no prior WAC just becomes the WAC outright (currentLitres is
+    // 0, so the formula reduces to receiptPrice directly — no special
+    // case needed).
+    public BigDecimal addStock(BigDecimal litres, BigDecimal receiptPricePerLitre) {
         BigDecimal newLevel = this.currentLitres.add(litres);
         if (newLevel.compareTo(this.capacityLitres) > 0) {
             throw new IllegalArgumentException(
@@ -82,6 +97,12 @@ public class FuelTank {
                             currentLitres + "L"
             );
         }
+        BigDecimal existingValue = this.currentLitres.multiply(
+                this.costPerLitreWac != null ? this.costPerLitreWac : BigDecimal.ZERO);
+        BigDecimal incomingValue = litres.multiply(receiptPricePerLitre);
+        this.costPerLitreWac = newLevel.compareTo(BigDecimal.ZERO) > 0
+                ? existingValue.add(incomingValue).divide(newLevel, 4, java.math.RoundingMode.HALF_UP)
+                : this.costPerLitreWac;
         this.currentLitres = newLevel;
         this.updatedAt     = Instant.now();
         return this.currentLitres;

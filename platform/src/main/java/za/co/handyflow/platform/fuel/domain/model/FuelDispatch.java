@@ -66,6 +66,15 @@ public class FuelDispatch {
     @Column(name = "level_after", precision = 12, scale = 2)
     private BigDecimal levelAfter;
 
+    // Fuel cost/margin engine — snapshot of the tank's WAC at the moment
+    // this dispatch was recorded. Captured for EVERY dispatch, not just
+    // customer-billed ones (pricePerLitre set) — internal fleet/asset
+    // dispatches get this too, per the agreed design, giving an
+    // internal fuel-cost view even where there's no sale/margin. See
+    // V271's own migration comment for the fuller context.
+    @Column(name = "cost_per_litre_at_sale", precision = 10, scale = 4)
+    private BigDecimal costPerLitreAtSale;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -107,6 +116,14 @@ public class FuelDispatch {
     }
 
     public boolean isDeleted() { return deletedAt != null; }
+
+    // FIX (fuel cost/margin engine, agreed design): same reasoning as
+    // FuelDelivery.recordCostSnapshot() — called separately, right
+    // after the service calls tank.removeStock(), since the WAC
+    // snapshot is derived from tank state at that moment.
+    public void recordCostSnapshot(BigDecimal costPerLitreAtSale) {
+        this.costPerLitreAtSale = costPerLitreAtSale;
+    }
 
     @PreUpdate
     void onUpdate() { this.updatedAt = Instant.now(); }

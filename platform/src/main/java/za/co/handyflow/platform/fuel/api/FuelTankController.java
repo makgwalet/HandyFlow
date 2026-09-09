@@ -274,6 +274,23 @@ public class FuelTankController {
                 .body(pdf);
     }
 
+    // FIX (fuel cost/margin engine, agreed design): gated on a separate
+    // permission from FUEL_READ — margin reveals wholesale cost, which
+    // the product owner explicitly wanted more restricted than ordinary
+    // transaction visibility.
+    @GetMapping("/margin-report")
+    @PreAuthorize("hasAuthority('FUEL_MARGIN_READ')")
+    @Operation(summary = "Fuel cost/margin report — defaults to the current calendar month",
+            description = "Combines deliveries and dispatches. Internal (non-customer-billed) " +
+                    "dispatches show cost but no revenue/margin, since there's no sale.")
+    public ResponseEntity<ApiResponse<FuelMarginReportResponse>> getMarginReport(
+            @RequestParam(required = false) Instant from,
+            @RequestParam(required = false) Instant to) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(
+                fuelService.generateMarginReport(TenantContext.getTenantIdAsObject(), from, to)));
+    }
+
     // ── Deliveries ────────────────────────────────────────────────────────────
 
     @GetMapping("/deliveries")
