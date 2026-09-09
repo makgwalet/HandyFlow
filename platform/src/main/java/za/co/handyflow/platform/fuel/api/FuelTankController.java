@@ -190,6 +190,22 @@ public class FuelTankController {
                 fuelService.getDispatches(TenantContext.getTenantIdAsObject(), pageable)));
     }
 
+    // FIX (P1 backlog): getDispatchApprovalStatus's own service-method
+    // comment has the fuller context — every dispatch is already
+    // submitted for review, but nothing ever exposed a way to see the
+    // result. Returns null (not 404) when no review record exists —
+    // e.g. auto-approved, no rule configured — so the frontend can
+    // treat "no review needed" as a normal, expected state rather than
+    // an error to handle.
+    @GetMapping("/dispatches/{id}/approval-status")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.approvals.dto.ApprovalRequestResponse>> getDispatchApprovalStatus(
+            @PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(
+                fuelService.getDispatchApprovalStatus(TenantContext.getTenantIdAsObject(), id)));
+    }
+
     @PostMapping("/tanks/{id}/dispatch")
     @PreAuthorize("hasAuthority('FUEL_MANAGE')")
     public ResponseEntity<ApiResponse<DispatchResponse>> dispatchFuel(

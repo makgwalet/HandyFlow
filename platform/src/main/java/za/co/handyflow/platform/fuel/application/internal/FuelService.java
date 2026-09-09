@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.approvals.application.ApprovalFacade;
+import za.co.handyflow.platform.approvals.dto.ApprovalRequestResponse;
 import za.co.handyflow.platform.fuel.FuelDispatchedToVehicleEvent;
 import za.co.handyflow.platform.fuel.domain.model.*;
 import za.co.handyflow.platform.fuel.domain.repository.*;
@@ -306,6 +307,20 @@ public class FuelService {
     public Page<DispatchResponse> getDispatches(TenantId tenantId, Pageable pageable) {
         return dispatchRepository.findAllActive(tenantId, pageable)
                 .map(this::toDispatchResponse);
+    }
+
+    // FIX (P1 backlog): submitDispatchForReview()'s own call-site comment
+    // already pointed at exactly this — "See ApprovalRequestResponse
+    // queryable via approvalFacade.getLatestRequestForEntity(...) for a
+    // UI to show review status alongside the dispatch" — but nothing
+    // ever exposed that facade call through an endpoint. Returns empty
+    // for a dispatch that was auto-approved (no rule configured) or
+    // predates this feature, matching getLatestRequestForEntity's own
+    // Optional semantics — the controller maps that to a plain null.
+    @Transactional(readOnly = true)
+    public ApprovalRequestResponse getDispatchApprovalStatus(TenantId tenantId, UUID dispatchId) {
+        return approvalFacade.getLatestRequestForEntity(tenantId, "fuel", "DISPATCH", dispatchId)
+                .orElse(null);
     }
 
     /**
