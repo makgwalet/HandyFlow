@@ -23,7 +23,8 @@
 import { useState, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Plus, Search, Shield, Phone, BadgeCheck, Trash2, X, Edit2, Eye, AlertCircle, Fingerprint, Upload, CheckCircle, AlertTriangle, Clock, Ban, HelpCircle, Calendar } from "lucide-react"
+import { Plus, Search, Shield, Phone, BadgeCheck, Trash2, X, Edit2, Eye, AlertCircle, Fingerprint, Upload, CheckCircle, AlertTriangle, Clock, Ban, HelpCircle, Calendar, ShieldCheck } from "lucide-react"
+import { usePermission } from "../../hooks/usePermission"
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface Guard {
@@ -34,6 +35,9 @@ interface Guard {
   psiraExpiryDate: string | null
   notes: string | null; photoUrl: string | null; createdAt: string
   employeeCode: string | null
+  // FIX (Security P4 — VettingController): field always existed on the
+  // backend entity but GuardResponse never exposed it until now.
+  cpVettingTier: string | null
 }
 
 interface GuardFormState {
@@ -305,6 +309,12 @@ export default function GuardsTab() {
   const qc = useQueryClient()
   const videoRef  = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  // FIX (Security P4 — VettingController) — see the setCpVettingTier
+  // mutation's own comment. VettingController requires VIP_DETAIL_ACCESS,
+  // stricter than the SECURITY_MANAGE the rest of this tab uses, so the
+  // section is only shown to users who actually have it — same
+  // client-side-mirror convention as the fuel margin report.
+  const canViewCpTier = usePermission("VIP_DETAIL_ACCESS")
 
   const [search,          setSearch]          = useState("")
   const [showAdd,         setShowAdd]         = useState(false)
@@ -375,6 +385,19 @@ export default function GuardsTab() {
       apiClient.post(`/api/v1/security/guards/${id}/enrol`, { pin }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["guards"] }); setEnrollPin("") },
     onError:   (e: any) => setApiError(e.response?.data?.message ?? "Failed to enroll guard"),
+  })
+
+  // FIX (Security P4 — VettingController): cpVettingTier has always
+  // existed on Guard and is enforced automatically by
+  // CloseProtectionService's DetailAssignment gate, but there was no
+  // way to set it (or see it, until GuardResponse was extended
+  // alongside this) anywhere in the admin UI.
+  const [cpTierForm, setCpTierForm] = useState({ tier: "STANDARD", clearedAt: new Date().toISOString().slice(0, 10), expiresAt: "" })
+  const setCpVettingTier = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: any }) =>
+      apiClient.post(`/api/v1/security/cp/vetting/officers/${id}/tier`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["guards"] }),
+    onError:   (e: any) => setApiError(e.response?.data?.message ?? "Failed to set CP vetting tier"),
   })
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -633,6 +656,40 @@ export default function GuardsTab() {
               </button>
             </div>
           </div>
+
+          {canViewCpTier && (
+            <div style={{ marginTop: 12, padding: 16, background: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                <ShieldCheck size={14} color="#7C3AED" />
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>Close Protection Clearance</div>
+              </div>
+              <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 10 }}>
+                Current tier: <strong style={{ color: "#374151" }}>{editing.cpVettingTier ?? "Not set"}</strong> — enforced automatically on every CP detail assignment attempt.
+              </div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                <select value={cpTierForm.tier} onChange={e => setCpTierForm(f => ({ ...f, tier: e.target.value }))}
+                  style={{ flex: 1, padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none", background: "#fff" }}>
+                  <option value="STANDARD">Standard</option>
+                  <option value="ENHANCED">Enhanced</option>
+                  <option value="HIGH">High</option>
+                  <option value="CRITICAL">Critical</option>
+                </select>
+                <input type="date" value={cpTierForm.clearedAt} onChange={e => setCpTierForm(f => ({ ...f, clearedAt: e.target.value }))}
+                  style={{ padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none" }} />
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input type="date" value={cpTierForm.expiresAt} onChange={e => setCpTierForm(f => ({ ...f, expiresAt: e.target.value }))}
+                  placeholder="Expires (optional)"
+                  style={{ flex: 1, padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none" }} />
+                <button
+                  onClick={() => setCpVettingTier.mutate({ id: editing.id, body: { tier: cpTierForm.tier, clearedAt: cpTierForm.clearedAt, expiresAt: cpTierForm.expiresAt || null } })}
+                  disabled={setCpVettingTier.isPending}
+                  style={{ padding: "9px 16px", background: "#7C3AED", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" as const }}>
+                  {setCpVettingTier.isPending ? "Saving…" : "Set Tier"}
+                </button>
+              </div>
+            </div>
+          )}
           {apiError && <ErrBanner msg={apiError} />}
           <Footer onCancel={closeEdit} onSubmit={() => handleSubmit(true)} loading={updateGuard.isPending} label="Save Changes" />
         </Modal>
