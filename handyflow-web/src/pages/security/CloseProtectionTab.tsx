@@ -139,13 +139,26 @@ export default function CloseProtectionTab() {
   // the type union but never actually rendered anywhere (dead code, not
   // a real feature).
   const [selectedPrincipal, setSelectedPrincipal] = useState<Principal | null>(null)
-  const [principalView,     setPrincipalView]     = useState<"overview" | "audit" | "evidence">("overview")
+  const [principalView,     setPrincipalView]     = useState<"overview" | "audit" | "evidence" | "vetting">("overview")
   const [auditMode,         setAuditMode]         = useState<"all" | "views">("all")
   const [showPrincipalForm, setShowPrincipalForm] = useState<Principal | "new" | null>(null)
   const [principalForm, setPrincipalForm] = useState({
     fullName: "", aliasCodename: "", threatLevel: "LOW", medicalNotes: "", knownThreats: "",
   })
   const [evidenceUploadFor, setEvidenceUploadFor] = useState<{ type: "PRINCIPAL" | "PROTECTION_DETAIL"; id: string } | null>(null)
+
+  // FIX (Security P4 — VettingController): confirmed genuinely separate
+  // from everything else already built in this tab — officer CP
+  // clearance tiers, principal vetting checks (sanctions/PEP/adverse
+  // media screening), and the declined-principals register, all
+  // VIP_DETAIL_ACCESS-gated like the rest of Close Protection.
+  const [showVettingForm, setShowVettingForm] = useState(false)
+  const [vettingTypeForm, setVettingTypeForm] = useState("SANCTIONS_SCREENING")
+  const [resultFor, setResultForVetting] = useState<any | null>(null)
+  const [resultVettingForm, setResultVettingForm] = useState({ result: "CLEAR", conductedBy: "", conductedAt: "", nextReviewAt: "", reportRef: "", notes: "" })
+  const [showDeclineForm, setShowDeclineForm] = useState(false)
+  const [declineForm, setDeclineForm] = useState({ reason: "", sensitiveDetail: "" })
+  const [showDeclinedRegister, setShowDeclinedRegister] = useState(false)
   const [evidenceForm, setEvidenceForm] = useState({ category: "ID_DOCUMENT", fileName: "", fileBase64: "", notes: "" })
 
   // Vehicles
@@ -436,6 +449,39 @@ export default function CloseProtectionTab() {
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to record survey"),
   })
 
+  // ── Vetting (VettingController) ──────────────────────────────────────────────
+  const vettingHistoryQuery = useQuery<any[]>({
+    queryKey: ["cp-vetting-history", selectedPrincipal?.id],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/cp/vetting/principals/${selectedPrincipal!.id}`)).data?.data ?? [],
+    enabled: !!selectedPrincipal && principalView === "vetting",
+  })
+  const createVettingCheck = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/security/cp/vetting/principals/${selectedPrincipal!.id}`, { vettingType: vettingTypeForm }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cp-vetting-history", selectedPrincipal?.id] }); setShowVettingForm(false); setApiError("") },
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to initiate vetting check"),
+  })
+  const recordVettingResult = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/security/cp/vetting/checks/${resultFor!.id}/result`, resultVettingForm),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["cp-vetting-history", selectedPrincipal?.id] })
+      setResultForVetting(null); setApiError("")
+    },
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to record vetting result"),
+  })
+  const declinedRegisterQuery = useQuery<any[]>({
+    queryKey: ["cp-declined-register"],
+    queryFn: async () => (await apiClient.get("/api/v1/security/cp/vetting/declined")).data?.data ?? [],
+    enabled: showDeclinedRegister,
+  })
+  const declinePrincipalMutation = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/security/cp/vetting/principals/${selectedPrincipal!.id}/decline`, declineForm),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["cp-declined-register"] })
+      setShowDeclineForm(false); setDeclineForm({ reason: "", sensitiveDetail: "" }); setApiError("")
+    },
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to record decline"),
+  })
+
   return (
     <div>
       {/* Header */}
@@ -455,10 +501,16 @@ export default function CloseProtectionTab() {
               <Plus size={14} /> New Detail
             </button>
           ) : mainView === "principals" ? (
-            <button onClick={() => { setPrincipalForm({ fullName: "", aliasCodename: "", threatLevel: "LOW", medicalNotes: "", knownThreats: "" }); setShowPrincipalForm("new"); setApiError("") }}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "none", background: "#7C3AED", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-              <Plus size={14} /> New Principal
-            </button>
+            <>
+              <button onClick={() => setShowDeclinedRegister(true)}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                Declined Register
+              </button>
+              <button onClick={() => { setPrincipalForm({ fullName: "", aliasCodename: "", threatLevel: "LOW", medicalNotes: "", knownThreats: "" }); setShowPrincipalForm("new"); setApiError("") }}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "none", background: "#7C3AED", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                <Plus size={14} /> New Principal
+              </button>
+            </>
           ) : (
             <button onClick={() => { setVehicleForm({ vehicleType: "PRINCIPAL_CAR", registration: "", makeModel: "", armored: false, notes: "" }); setShowVehicleForm(true); setApiError("") }}
               style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "none", background: "#7C3AED", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
@@ -750,6 +802,10 @@ export default function CloseProtectionTab() {
           onUploadEvidence={(id) => { setEvidenceUploadFor({ type: "PRINCIPAL", id }); setEvidenceForm({ category: "ID_DOCUMENT", fileName: "", fileBase64: "", notes: "" }); setApiError("") }}
           onDownloadEvidence={downloadEvidence}
           onDeleteEvidence={(evidenceId) => { const reason = prompt("Reason for removing this evidence?"); if (reason) deleteEvidence.mutate({ evidenceId, reason }) }}
+          vettingHistoryQuery={vettingHistoryQuery}
+          onCreateVetting={() => { setVettingTypeForm("SANCTIONS_SCREENING"); setShowVettingForm(true); setApiError("") }}
+          onRecordVettingResult={(check) => { setResultVettingForm({ result: "CLEAR", conductedBy: "", conductedAt: new Date().toISOString().slice(0, 10), nextReviewAt: "", reportRef: "", notes: "" }); setResultForVetting(check) }}
+          onDeclinePrincipal={() => { setDeclineForm({ reason: "", sensitiveDetail: "" }); setShowDeclineForm(true); setApiError("") }}
         />
       )}
 
@@ -1166,6 +1222,133 @@ export default function CloseProtectionTab() {
           </div>
         </div>
       )}
+
+      {/* New vetting check modal */}
+      {showVettingForm && selectedPrincipal && (
+        <div style={modalOverlay}>
+          <div style={modalBox}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>New Vetting Check — {selectedPrincipal.aliasCodename}</h3>
+            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            <div style={{ marginBottom: 4 }}>
+              <label style={lblStyle}>Type</label>
+              <select value={vettingTypeForm} onChange={e => setVettingTypeForm(e.target.value)} style={inputStyle}>
+                <option value="SANCTIONS_SCREENING">Sanctions Screening</option>
+                <option value="PEP_CHECK">PEP Check</option>
+                <option value="ADVERSE_MEDIA">Adverse Media</option>
+                <option value="SOURCE_OF_FUNDS">Source of Funds</option>
+                <option value="CRIMINAL_ASSOCIATES">Criminal Associates</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+              <button onClick={() => setShowVettingForm(false)} style={secondaryBtn}>Cancel</button>
+              <button onClick={() => createVettingCheck.mutate()} disabled={createVettingCheck.isPending} style={{ ...primaryBtn, background: "#7C3AED" }}>
+                {createVettingCheck.isPending ? "Creating…" : "Initiate Check"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Record vetting result modal */}
+      {resultFor && (
+        <div style={modalOverlay}>
+          <div style={modalBox}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Record Result — {resultFor.vettingType.replace(/_/g, " ")}</h3>
+            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <label style={lblStyle}>Result</label>
+                <select value={resultVettingForm.result} onChange={e => setResultVettingForm(f => ({ ...f, result: e.target.value }))} style={inputStyle}>
+                  <option value="CLEAR">Clear</option>
+                  <option value="HIT">Hit</option>
+                  <option value="INCONCLUSIVE">Inconclusive</option>
+                </select>
+              </div>
+              <div>
+                <label style={lblStyle}>Conducted By</label>
+                <input value={resultVettingForm.conductedBy} onChange={e => setResultVettingForm(f => ({ ...f, conductedBy: e.target.value }))} placeholder="Screening provider" style={inputStyle} />
+              </div>
+              <div>
+                <label style={lblStyle}>Next Review Date</label>
+                <input type="date" value={resultVettingForm.nextReviewAt} onChange={e => setResultVettingForm(f => ({ ...f, nextReviewAt: e.target.value }))} style={inputStyle} />
+              </div>
+              <div>
+                <label style={lblStyle}>Report Reference</label>
+                <input value={resultVettingForm.reportRef} onChange={e => setResultVettingForm(f => ({ ...f, reportRef: e.target.value }))} style={inputStyle} />
+              </div>
+              <div>
+                <label style={lblStyle}>Notes</label>
+                <textarea value={resultVettingForm.notes} onChange={e => setResultVettingForm(f => ({ ...f, notes: e.target.value }))} rows={2} style={{ ...inputStyle, fontFamily: "inherit", resize: "vertical" as const }} />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+              <button onClick={() => setResultForVetting(null)} style={secondaryBtn}>Cancel</button>
+              <button onClick={() => recordVettingResult.mutate()} disabled={recordVettingResult.isPending} style={{ ...primaryBtn, background: "#7C3AED" }}>
+                {recordVettingResult.isPending ? "Saving…" : "Save Result"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Decline principal modal */}
+      {showDeclineForm && selectedPrincipal && (
+        <div style={modalOverlay}>
+          <div style={modalBox}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Decline Engagement — {selectedPrincipal.aliasCodename}</h3>
+            <p style={{ fontSize: 12, color: "#94A3B8", marginBottom: 14 }}>Records a compliance decision not to work with this person. Does not prevent re-accepting in future — this is a compliance record, not a system block.</p>
+            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            <div style={{ marginBottom: 12 }}>
+              <label style={lblStyle}>Reason *</label>
+              <input value={declineForm.reason} onChange={e => setDeclineForm(f => ({ ...f, reason: e.target.value }))} style={inputStyle} />
+            </div>
+            <div>
+              <label style={lblStyle}>Sensitive Detail (encrypted before storage)</label>
+              <textarea value={declineForm.sensitiveDetail} onChange={e => setDeclineForm(f => ({ ...f, sensitiveDetail: e.target.value }))} rows={3} style={{ ...inputStyle, fontFamily: "inherit", resize: "vertical" as const }} />
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+              <button onClick={() => setShowDeclineForm(false)} style={secondaryBtn}>Cancel</button>
+              <button onClick={() => declinePrincipalMutation.mutate()} disabled={!declineForm.reason.trim() || declinePrincipalMutation.isPending}
+                style={{ ...primaryBtn, background: "#DC2626" }}>
+                {declinePrincipalMutation.isPending ? "Saving…" : "Record Decline"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Declined register modal */}
+      {showDeclinedRegister && (
+        <div style={modalOverlay}>
+          <div style={{ ...modalBox, width: 520, maxHeight: "80vh", overflowY: "auto" as const }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Declined Principals Register</h3>
+              <button onClick={() => setShowDeclinedRegister(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>✕</button>
+            </div>
+            {declinedRegisterQuery.isLoading ? (
+              <p style={{ color: "#94A3B8", fontSize: 12 }}>Loading…</p>
+            ) : !declinedRegisterQuery.data?.length ? (
+              <p style={{ color: "#94A3B8", fontSize: 12 }}>No declined engagements on record.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {declinedRegisterQuery.data.map((d: any) => {
+                  const p = principals.find(pr => pr.id === d.principalId)
+                  return (
+                    <div key={d.id} style={{ padding: "10px 14px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ fontWeight: 700, color: "#0F172A" }}>{p?.aliasCodename ?? d.principalId.slice(0, 8)}</span>
+                        <span style={{ color: "#94A3B8" }}>{d.declinedAt}</span>
+                      </div>
+                      <div style={{ color: "#64748B", marginTop: 3 }}>{d.reason}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1176,10 +1359,11 @@ function PrincipalsView({
   principals, selectedPrincipal, setSelectedPrincipal, principalView, setPrincipalView,
   auditMode, setAuditMode, auditData, auditLoading, evidenceQuery,
   onEdit, onDeactivate, onDownloadVettingPdf, onUploadEvidence, onDownloadEvidence, onDeleteEvidence,
+  vettingHistoryQuery, onCreateVetting, onRecordVettingResult, onDeclinePrincipal,
 }: {
   principals: Principal[]
   selectedPrincipal: Principal | null; setSelectedPrincipal: (p: Principal | null) => void
-  principalView: "overview" | "audit" | "evidence"; setPrincipalView: (v: "overview" | "audit" | "evidence") => void
+  principalView: "overview" | "audit" | "evidence" | "vetting"; setPrincipalView: (v: "overview" | "audit" | "evidence" | "vetting") => void
   auditMode: "all" | "views"; setAuditMode: (m: "all" | "views") => void
   auditData?: { content: AuditEvent[] }; auditLoading: boolean
   evidenceQuery: ReturnType<typeof useQuery<Evidence[]>>
@@ -1189,6 +1373,10 @@ function PrincipalsView({
   onUploadEvidence: (id: string) => void
   onDownloadEvidence: (ev: Evidence) => void
   onDeleteEvidence: (evidenceId: string) => void
+  vettingHistoryQuery: ReturnType<typeof useQuery<any[]>>
+  onCreateVetting: () => void
+  onRecordVettingResult: (check: any) => void
+  onDeclinePrincipal: () => void
 }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 20 }}>
@@ -1250,7 +1438,7 @@ function PrincipalsView({
             </div>
 
             <div style={{ display: "flex", borderBottom: "1px solid #E2E8F0" }}>
-              {(["overview", "audit", "evidence"] as const).map(v => (
+              {(["overview", "audit", "evidence", "vetting"] as const).map(v => (
                 <button key={v} onClick={() => setPrincipalView(v)}
                   style={{ padding: "10px 16px", border: "none", borderBottom: `2px solid ${principalView === v ? "#7C3AED" : "transparent"}`, background: "none", color: principalView === v ? "#7C3AED" : "#64748B", fontSize: 12, fontWeight: principalView === v ? 600 : 400, cursor: "pointer", marginBottom: -1, textTransform: "capitalize" as const }}>
                   {v}
@@ -1308,6 +1496,56 @@ function PrincipalsView({
 
               {principalView === "evidence" && (
                 <EvidenceList query={evidenceQuery} onUpload={() => onUploadEvidence(selectedPrincipal.id)} onDownload={onDownloadEvidence} onDelete={onDeleteEvidence} />
+              )}
+
+              {principalView === "vetting" && (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "#64748B", margin: 0 }}>
+                      Vetting Checks — {vettingHistoryQuery.data?.length ?? 0}
+                    </p>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={onDeclinePrincipal}
+                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid #FECACA", background: "#FEF2F2", color: "#DC2626", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                        Decline Engagement
+                      </button>
+                      <button onClick={onCreateVetting}
+                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid #7C3AED", background: "#F5F3FF", color: "#7C3AED", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                        <Plus size={12} /> New Check
+                      </button>
+                    </div>
+                  </div>
+                  {vettingHistoryQuery.isLoading ? (
+                    <p style={{ color: "#94A3B8", fontSize: 12 }}>Loading…</p>
+                  ) : !vettingHistoryQuery.data?.length ? (
+                    <p style={{ color: "#94A3B8", fontSize: 12 }}>No vetting checks recorded yet.</p>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {vettingHistoryQuery.data.map((v: any) => {
+                        const resultColor = v.result === "CLEAR" ? "#166534" : v.result === "HIT" ? "#DC2626" : v.result === "INCONCLUSIVE" ? "#B45309" : "#64748B"
+                        const resultBg = v.result === "CLEAR" ? "#DCFCE7" : v.result === "HIT" ? "#FEF2F2" : v.result === "INCONCLUSIVE" ? "#FFFBEB" : "#F1F5F9"
+                        return (
+                          <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
+                            <div>
+                              <span style={{ fontWeight: 700, color: "#0F172A" }}>{v.vettingType.replace(/_/g, " ")}</span>
+                              {v.conductedAt && <span style={{ color: "#94A3B8", marginLeft: 8 }}>Conducted {v.conductedAt}{v.conductedBy && ` by ${v.conductedBy}`}</span>}
+                              {v.nextReviewAt && <span style={{ color: "#94A3B8", marginLeft: 8 }}>· Next review {v.nextReviewAt}</span>}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20, background: resultBg, color: resultColor }}>{v.result}</span>
+                              {v.result === "PENDING" && (
+                                <button onClick={() => onRecordVettingResult(v)}
+                                  style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #7C3AED", background: "#F5F3FF", color: "#7C3AED", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                                  Record Result
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
