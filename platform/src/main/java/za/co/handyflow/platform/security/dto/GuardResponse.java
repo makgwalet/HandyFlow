@@ -33,5 +33,13 @@ public record GuardResponse(
         LocalDate psiraExpiryDate,
         String    employeeCode,
         String    emergencyContactName,
-        String    emergencyContactPhone
+        String    emergencyContactPhone,
+        // FIX (Security P4 — VettingController now has a frontend):
+        // cpVettingTier has always existed on the Guard entity (set via
+        // VettingController's POST /officers/{guardId}/tier) but was
+        // never exposed through this response — meaning the tier could
+        // be SET through the API but never SEEN again anywhere. Appended
+        // at the end, matching this record's own established
+        // convention (see the V214 employeeCode addition above).
+        String    cpVettingTier
 ) {}

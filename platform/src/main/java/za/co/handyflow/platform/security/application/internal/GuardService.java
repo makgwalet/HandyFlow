@@ -416,7 +416,8 @@ public class GuardService {
                 g.getPsiraExpiryDate(),
                 g.getEmployeeCode(),
                 g.getEmergencyContactName(),
-                g.getEmergencyContactPhone()
+                g.getEmergencyContactPhone(),
+                g.getCpVettingTier()
         );
     }
 }
