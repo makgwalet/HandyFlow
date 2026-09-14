@@ -5,6 +5,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.identity.domain.repository.UserRepository;
+import za.co.handyflow.platform.accounting.domain.model.AccJournalEntry;
+import za.co.handyflow.platform.accounting.domain.repository.AccJournalEntryRepository;
 import za.co.handyflow.platform.internalaudit.domain.model.AnnualAuditPlan;
 import za.co.handyflow.platform.internalaudit.domain.model.AuditEngagement;
 import za.co.handyflow.platform.internalaudit.domain.model.AuditPlanEntry;
@@ -14,6 +16,10 @@ import za.co.handyflow.platform.internalaudit.domain.model.AuditWorkpaperFolder;
 import za.co.handyflow.platform.internalaudit.domain.model.EngagementAssignment;
 import za.co.handyflow.platform.internalaudit.domain.model.RiskAssessment;
 import za.co.handyflow.platform.internalaudit.domain.model.SpecificMateriality;
+import za.co.handyflow.platform.internalaudit.domain.model.SamplingPlan;
+import za.co.handyflow.platform.internalaudit.domain.model.SampleItem;
+import za.co.handyflow.platform.internalaudit.domain.model.AuditTest;
+import za.co.handyflow.platform.internalaudit.domain.model.AuditException;
 import za.co.handyflow.platform.internalaudit.domain.repository.AnnualAuditPlanRepository;
 import za.co.handyflow.platform.internalaudit.domain.repository.AuditEngagementRepository;
 import za.co.handyflow.platform.internalaudit.domain.repository.AuditPlanEntryRepository;
@@ -23,11 +29,17 @@ import za.co.handyflow.platform.internalaudit.domain.repository.AuditWorkpaperFo
 import za.co.handyflow.platform.internalaudit.domain.repository.EngagementAssignmentRepository;
 import za.co.handyflow.platform.internalaudit.domain.repository.RiskAssessmentRepository;
 import za.co.handyflow.platform.internalaudit.domain.repository.SpecificMaterialityRepository;
+import za.co.handyflow.platform.internalaudit.domain.repository.SamplingPlanRepository;
+import za.co.handyflow.platform.internalaudit.domain.repository.SampleItemRepository;
+import za.co.handyflow.platform.internalaudit.domain.repository.AuditTestRepository;
+import za.co.handyflow.platform.internalaudit.domain.repository.AuditExceptionRepository;
 import za.co.handyflow.platform.internalaudit.dto.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -55,6 +67,11 @@ public class InternalAuditService {
     private final SpecificMaterialityRepository specificMaterialityRepo;
     private final AuditWorkpaperFolderRepository workpaperFolderRepo;
     private final AuditWorkpaperFileRepository workpaperFileRepo;
+    private final SamplingPlanRepository samplingPlanRepo;
+    private final SampleItemRepository sampleItemRepo;
+    private final AuditTestRepository auditTestRepo;
+    private final AuditExceptionRepository auditExceptionRepo;
+    private final AccJournalEntryRepository journalEntryRepo;
 
     // ── Universe ─────────────────────────────────────────────────────────────
 
@@ -420,5 +437,139 @@ public class InternalAuditService {
         return new WorkpaperFileResponse(f.getId(), f.getFolderId(), f.getFileName(), f.getMimeType(), f.getFileSizeBytes(),
                 f.getReviewStatus(), f.getPreparedBy(), f.getPreparedAt(), f.getReviewedBy(), f.getReviewedAt(),
                 f.getSignedOffBy(), f.getSignedOffAt(), f.getVersionNumber(), f.getSupersededBy(), f.getCreatedAt());
+    }
+
+    // ── Phase 3: GL Sampling & Testing ──────────────────────────────────────────
+    // journalEntryRepo.findPostedInRange() already existed (used
+    // internally elsewhere in Accounting) — no new query needed on that
+    // side. Drawing the sample uses simple random selection
+    // (Collections.shuffle) rather than a cryptographic RNG — audit
+    // sample selection needs to be unbiased, not adversarially
+    // unpredictable, so java.util.Random's default seeding is
+    // appropriate here and matches how "Random" selection is described
+    // in the agreed design (auditor-judgment sample SIZE, system does
+    // the physical random draw).
+
+    @Transactional
+    public SamplingPlanResponse createSamplingPlan(TenantId tenantId, UUID engagementId,
+                                                    CreateSamplingPlanRequest req, UUID preparedBy) {
+        engagementRepo.findByTenantAndId(tenantId.getValue(), engagementId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditEngagement", engagementId.toString()));
+
+        List<AccJournalEntry> population = journalEntryRepo.findPostedInRange(
+                tenantId, req.samplePeriodFrom(), req.samplePeriodTo());
+        if (req.sampleSize() > population.size()) {
+            throw new HandyFlowException(
+                    "Sample size (" + req.sampleSize() + ") cannot exceed the population (" + population.size() + " posted journal entries in this period)",
+                    HttpStatus.BAD_REQUEST, "SAMPLE_SIZE_EXCEEDS_POPULATION");
+        }
+        java.math.BigDecimal populationValue = population.stream()
+                .map(AccJournalEntry::getTotalDebit).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+        SamplingPlan plan = SamplingPlan.create(tenantId.getValue(), engagementId, population.size(), populationValue,
+                req.samplingObjective(), req.riskLevel(), req.expectedErrorRate(), req.tolerableErrorRate(),
+                req.sampleSize(), req.selectionMethod() != null ? req.selectionMethod() : "RANDOM",
+                req.samplePeriodFrom(), req.samplePeriodTo(), req.exclusions(), req.rationale(), preparedBy);
+        samplingPlanRepo.save(plan);
+
+        // Draw the sample immediately — the plan and its drawn items are
+        // one atomic unit; there's no meaningful "plan exists with no
+        // sample drawn yet" state worth modeling separately in V1.
+        List<AccJournalEntry> shuffled = new ArrayList<>(population);
+        Collections.shuffle(shuffled);
+        for (AccJournalEntry je : shuffled.subList(0, req.sampleSize())) {
+            SampleItem item = SampleItem.create(tenantId.getValue(), plan.getId(), je.getId(),
+                    je.getEntryNumber(), je.getEntryDate(), je.getTotalDebit());
+            sampleItemRepo.save(item);
+        }
+
+        return toSamplingPlanResponse(plan);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SamplingPlanResponse> getSamplingPlans(TenantId tenantId, UUID engagementId) {
+        return samplingPlanRepo.findByEngagement(tenantId.getValue(), engagementId).stream()
+                .map(this::toSamplingPlanResponse).toList();
+    }
+
+    @Transactional
+    public SamplingPlanResponse reviewSamplingPlan(TenantId tenantId, UUID planId, UUID reviewedBy) {
+        SamplingPlan plan = samplingPlanRepo.findByTenantAndId(tenantId.getValue(), planId)
+                .orElseThrow(() -> new ResourceNotFoundException("SamplingPlan", planId.toString()));
+        plan.review(reviewedBy);
+        plan.finalizePlan();
+        samplingPlanRepo.save(plan);
+        return toSamplingPlanResponse(plan);
+    }
+
+    @Transactional
+    public AuditTestResponse createTest(TenantId tenantId, UUID sampleItemId, CreateAuditTestRequest req) {
+        sampleItemRepo.findByTenantAndId(tenantId.getValue(), sampleItemId)
+                .orElseThrow(() -> new ResourceNotFoundException("SampleItem", sampleItemId.toString()));
+        AuditTest test = AuditTest.create(tenantId.getValue(), sampleItemId, req.procedure());
+        auditTestRepo.save(test);
+        return toTestResponse(test);
+    }
+
+    @Transactional
+    public AuditTestResponse recordTestResult(TenantId tenantId, UUID testId, RecordTestResultRequest req, UUID testedBy) {
+        AuditTest test = auditTestRepo.findByTenantAndId(tenantId.getValue(), testId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditTest", testId.toString()));
+        test.recordResult(req.result(), req.notes(), testedBy);
+        auditTestRepo.save(test);
+        return toTestResponse(test);
+    }
+
+    @Transactional
+    public AuditExceptionResponse raiseException(TenantId tenantId, UUID testId, RaiseExceptionRequest req, UUID raisedBy) {
+        auditTestRepo.findByTenantAndId(tenantId.getValue(), testId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditTest", testId.toString()));
+        AuditException ex = AuditException.raise(tenantId.getValue(), testId, req.description(), req.severity(), raisedBy);
+        auditExceptionRepo.save(ex);
+        return toExceptionResponse(ex);
+    }
+
+    @Transactional
+    public AuditExceptionResponse dismissException(TenantId tenantId, UUID exceptionId, DismissExceptionRequest req) {
+        AuditException ex = auditExceptionRepo.findByTenantAndId(tenantId.getValue(), exceptionId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditException", exceptionId.toString()));
+        ex.dismiss(req.resolutionNotes());
+        auditExceptionRepo.save(ex);
+        return toExceptionResponse(ex);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AuditExceptionResponse> getExceptionsForEngagement(TenantId tenantId, UUID engagementId) {
+        return auditExceptionRepo.findByEngagement(tenantId.getValue(), engagementId).stream()
+                .map(this::toExceptionResponse).toList();
+    }
+
+    private SamplingPlanResponse toSamplingPlanResponse(SamplingPlan p) {
+        List<SampleItemResponse> items = sampleItemRepo.findByPlan(p.getTenantId(), p.getId()).stream()
+                .map(this::toSampleItemResponse).toList();
+        return new SamplingPlanResponse(p.getId(), p.getEngagementId(), p.getPopulation(), p.getPopulationValue(),
+                p.getSamplingObjective(), p.getSamplingMethod(), p.getRiskLevel(), p.getConfidenceLevel(),
+                p.getExpectedErrorRate(), p.getTolerableErrorRate(), p.getSampleSize(), p.getSelectionMethod(),
+                p.getSamplePeriodFrom(), p.getSamplePeriodTo(), p.getExclusions(), p.getRationale(),
+                p.getPreparedBy(), p.getReviewedBy(), p.getStatus(), p.getCreatedAt(), items);
+    }
+
+    private SampleItemResponse toSampleItemResponse(SampleItem s) {
+        List<AuditTestResponse> tests = auditTestRepo.findBySampleItem(s.getTenantId(), s.getId()).stream()
+                .map(this::toTestResponse).toList();
+        return new SampleItemResponse(s.getId(), s.getJournalEntryId(), s.getEntryNumberSnapshot(),
+                s.getEntryDateSnapshot(), s.getAmountSnapshot(), s.getNotes(), s.getSelectedAt(), tests);
+    }
+
+    private AuditTestResponse toTestResponse(AuditTest t) {
+        List<AuditExceptionResponse> exceptions = auditExceptionRepo.findByTest(t.getTenantId(), t.getId()).stream()
+                .map(this::toExceptionResponse).toList();
+        return new AuditTestResponse(t.getId(), t.getSampleItemId(), t.getProcedure(), t.getResult(), t.getNotes(),
+                t.getTestedBy(), t.getTestedAt(), exceptions);
+    }
+
+    private AuditExceptionResponse toExceptionResponse(AuditException e) {
+        return new AuditExceptionResponse(e.getId(), e.getAuditTestId(), e.getDescription(), e.getSeverity(),
+                e.getStatus(), e.getRaisedBy(), e.getRaisedAt(), e.getResolutionNotes());
     }
 }

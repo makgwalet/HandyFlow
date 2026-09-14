@@ -289,4 +289,85 @@ public class InternalAuditController {
         return ResponseEntity.ok(ApiResponse.success(
                 auditService.restoreWorkpaperFile(TenantContext.getTenantIdAsObject(), fileId)));
     }
+
+    // ── Phase 3: GL Sampling & Testing ──────────────────────────────────────────
+
+    @PostMapping("/engagements/{id}/sampling-plans")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    @Operation(summary = "Create a sampling plan and draw the sample",
+            description = "Population is calculated server-side from posted journal entries in the given period. The sample is drawn immediately using random selection.")
+    public ResponseEntity<ApiResponse<SamplingPlanResponse>> createSamplingPlan(
+            @PathVariable UUID id, @Valid @RequestBody CreateSamplingPlanRequest req) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                auditService.createSamplingPlan(TenantContext.getTenantIdAsObject(), id, req,
+                        TenantContext.getCurrentUserId())));
+    }
+
+    @GetMapping("/engagements/{id}/sampling-plans")
+    @PreAuthorize("hasAuthority('AUDIT_READ')")
+    public ResponseEntity<ApiResponse<List<SamplingPlanResponse>>> getSamplingPlans(@PathVariable UUID id) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.getSamplingPlans(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/sampling-plans/{id}/review")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    @Operation(summary = "Review and finalize a sampling plan")
+    public ResponseEntity<ApiResponse<SamplingPlanResponse>> reviewSamplingPlan(@PathVariable UUID id) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.reviewSamplingPlan(TenantContext.getTenantIdAsObject(), id,
+                        TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/sample-items/{id}/tests")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    public ResponseEntity<ApiResponse<AuditTestResponse>> createTest(
+            @PathVariable UUID id, @Valid @RequestBody CreateAuditTestRequest req) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                auditService.createTest(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @PostMapping("/tests/{id}/result")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    public ResponseEntity<ApiResponse<AuditTestResponse>> recordTestResult(
+            @PathVariable UUID id, @Valid @RequestBody RecordTestResultRequest req) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.recordTestResult(TenantContext.getTenantIdAsObject(), id, req,
+                        TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/tests/{id}/exceptions")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    @Operation(summary = "Raise an exception against a test",
+            description = "severity is independent of the engagement/sampling plan's own risk level — never derived from it, per the agreed hard constraint.")
+    public ResponseEntity<ApiResponse<AuditExceptionResponse>> raiseException(
+            @PathVariable UUID id, @Valid @RequestBody RaiseExceptionRequest req) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                auditService.raiseException(TenantContext.getTenantIdAsObject(), id, req,
+                        TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/exceptions/{id}/dismiss")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    public ResponseEntity<ApiResponse<AuditExceptionResponse>> dismissException(
+            @PathVariable UUID id, @Valid @RequestBody DismissExceptionRequest req) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.dismissException(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @GetMapping("/engagements/{id}/exceptions")
+    @PreAuthorize("hasAuthority('AUDIT_READ')")
+    @Operation(summary = "All exceptions across every sampling plan for this engagement")
+    public ResponseEntity<ApiResponse<List<AuditExceptionResponse>>> getExceptions(@PathVariable UUID id) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.getExceptionsForEngagement(TenantContext.getTenantIdAsObject(), id)));
+    }
 }
