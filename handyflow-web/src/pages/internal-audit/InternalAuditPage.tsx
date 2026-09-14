@@ -12,6 +12,7 @@ import { apiClient } from "../../api/client"
 import {
   Database, CalendarRange, ClipboardList, Plus, ChevronDown, ChevronUp,
   ShieldAlert, Users2, UserPlus, CheckCircle2, Ban,
+  FileText, Upload, Trash2, RotateCcw, Eye, Folder,
 } from "lucide-react"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -46,8 +47,19 @@ interface Engagement {
   id: string; planEntryId: string | null; universeEntryId: string; universeEntryName: string
   name: string; status: string; startDate: string | null; endDate: string | null
   createdBy: string | null; createdAt: string; assignments: EngagementAssignment[]
+  objectives: string | null; scope: string | null; auditCriteria: string | null
+  overallMateriality: number | null; performanceMateriality: number | null; clearlyTrivialThreshold: number | null
+  specificMateriality: SpecificMaterialityResp[]
 }
 interface UserOption { id: string; firstName: string; lastName: string; email: string }
+interface SpecificMaterialityResp { id: string; accountOrGlSegment: string; threshold: number }
+interface WorkpaperFolder { id: string; name: string; parentId: string | null; folderType: string | null; sortOrder: number }
+interface WorkpaperFile {
+  id: string; folderId: string; fileName: string; mimeType: string | null; fileSizeBytes: number | null
+  reviewStatus: string; preparedBy: string | null; preparedAt: string | null
+  reviewedBy: string | null; reviewedAt: string | null; signedOffBy: string | null; signedOffAt: string | null
+  versionNumber: number; supersededBy: string | null; createdAt: string
+}
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 
@@ -58,6 +70,16 @@ const RISK_CFG: Record<string, { color: string; bg: string }> = {
   CRITICAL: { color: "#DC2626", bg: "#FEF2F2" },
 }
 const ENGAGEMENT_ROLES = ["HEAD_OF_INTERNAL_AUDIT", "AUDIT_MANAGER", "SENIOR_AUDITOR", "AUDITOR", "AUDIT_REVIEWER"]
+const ALLOWED_WP_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png",
+  "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]
+const MAX_WP_BYTES = 10 * 1024 * 1024
+const WP_STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
+  DRAFT:      { label: "Draft",      color: "#64748B", bg: "#F1F5F9" },
+  PREPARED:   { label: "Prepared",   color: "#B45309", bg: "#FFFBEB" },
+  REVIEWED:   { label: "Reviewed",   color: "#1D4ED8", bg: "#EFF6FF" },
+  SIGNED_OFF: { label: "Signed Off", color: "#166534", bg: "#DCFCE7" },
+}
 
 const TOP_TABS = [
   { id: "universe",    label: "Audit Universe", icon: Database },
@@ -512,6 +534,104 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
   const [showAssign, setShowAssign] = useState<string | null>(null)
   const [assignForm, setAssignForm] = useState({ userId: "", role: "AUDITOR" })
 
+  // Phase 2 — sub-tabs within the expanded engagement (Team already
+  // existed; Planning and Workpapers are new). Only one engagement can
+  // be expanded at a time (the existing accordion pattern), so a single
+  // sub-tab state is enough — reset to "team" whenever a different
+  // engagement is expanded.
+  const [engagementSubTab, setEngagementSubTab] = useState<"team" | "planning" | "workpapers">("team")
+  const [planningForm, setPlanningForm] = useState({ objectives: "", scope: "", auditCriteria: "", overallMateriality: "", performanceMateriality: "", clearlyTrivialThreshold: "" })
+  const [showAddMateriality, setShowAddMateriality] = useState(false)
+  const [materialityForm, setMaterialityForm] = useState({ accountOrGlSegment: "", threshold: "" })
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+  const [showNewFolder, setShowNewFolder] = useState(false)
+  const [folderForm, setFolderForm] = useState({ name: "", folderType: "GENERAL" })
+  const [showDeletedFiles, setShowDeletedFiles] = useState(false)
+  const [uploadFileName, setUploadFileName] = useState("")
+
+  const updatePlanning = useMutation({
+    mutationFn: (engagementId: string) => apiClient.put(`/api/v1/internal-audit/engagements/${engagementId}/planning`, {
+      objectives: planningForm.objectives || null, scope: planningForm.scope || null, auditCriteria: planningForm.auditCriteria || null,
+      overallMateriality: planningForm.overallMateriality ? Number(planningForm.overallMateriality) : null,
+      performanceMateriality: planningForm.performanceMateriality ? Number(planningForm.performanceMateriality) : null,
+      clearlyTrivialThreshold: planningForm.clearlyTrivialThreshold ? Number(planningForm.clearlyTrivialThreshold) : null,
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ia-engagements"] }); setError("") },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to save planning detail"),
+  })
+  const addMateriality = useMutation({
+    mutationFn: (engagementId: string) => apiClient.post(`/api/v1/internal-audit/engagements/${engagementId}/specific-materiality`, {
+      accountOrGlSegment: materialityForm.accountOrGlSegment, threshold: Number(materialityForm.threshold),
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ia-engagements"] }); setShowAddMateriality(false); setMaterialityForm({ accountOrGlSegment: "", threshold: "" }); setError("") },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to add materiality threshold"),
+  })
+
+  const foldersQuery = useQuery<WorkpaperFolder[]>({
+    queryKey: ["ia-wp-folders", expanded],
+    queryFn: async () => (await apiClient.get(`/api/v1/internal-audit/engagements/${expanded}/workpaper-folders`)).data,
+    enabled: !!expanded && engagementSubTab === "workpapers",
+  })
+  const filesQuery = useQuery<WorkpaperFile[]>({
+    queryKey: ["ia-wp-files", selectedFolder, showDeletedFiles],
+    queryFn: async () => (await apiClient.get(
+      `/api/v1/internal-audit/engagements/${expanded}/workpaper-folders/${selectedFolder}/files${showDeletedFiles ? "/deleted" : ""}`
+    )).data,
+    enabled: !!expanded && !!selectedFolder,
+  })
+  const createFolder = useMutation({
+    mutationFn: (engagementId: string) => apiClient.post(`/api/v1/internal-audit/engagements/${engagementId}/workpaper-folders`, { ...folderForm, sortOrder: 0 }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ia-wp-folders", expanded] }); setShowNewFolder(false); setError("") },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to create folder"),
+  })
+  const uploadFile = useMutation({
+    mutationFn: (body: { folderId: string; fileName: string; mimeType: string; fileSizeBytes: number; fileContentBase64: string }) =>
+      apiClient.post(`/api/v1/internal-audit/engagements/${expanded}/workpaper-files`, body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ia-wp-files", selectedFolder, showDeletedFiles] }); setUploadFileName(""); setError("") },
+    onError: (e: any) => { setError(e.response?.data?.message ?? "Failed to upload file"); setUploadFileName("") },
+  })
+  const updateFileStatus = useMutation({
+    mutationFn: ({ fileId, action }: { fileId: string; action: string }) =>
+      apiClient.post(`/api/v1/internal-audit/workpaper-files/${fileId}/status`, { action }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ia-wp-files", selectedFolder, showDeletedFiles] }),
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to update file status"),
+  })
+  const deleteFile = useMutation({
+    mutationFn: (fileId: string) => apiClient.delete(`/api/v1/internal-audit/workpaper-files/${fileId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ia-wp-files", selectedFolder, showDeletedFiles] }),
+  })
+  const restoreFile = useMutation({
+    mutationFn: (fileId: string) => apiClient.post(`/api/v1/internal-audit/workpaper-files/${fileId}/restore`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ia-wp-files", selectedFolder, showDeletedFiles] }),
+  })
+
+  const handleFileUpload = (file: File) => {
+    setError("")
+    if (!ALLOWED_WP_TYPES.includes(file.type)) { setError("Unsupported file type — please upload a PDF, JPG, PNG, Word, or Excel document"); return }
+    if (file.size > MAX_WP_BYTES) { setError(`File is too large — maximum is ${MAX_WP_BYTES / (1024 * 1024)}MB`); return }
+    setUploadFileName(file.name)
+    const reader = new FileReader()
+    reader.onload = () => {
+      const base64 = ((reader.result as string) || "").split(",")[1] ?? ""
+      uploadFile.mutate({ folderId: selectedFolder!, fileName: file.name, mimeType: file.type || "application/octet-stream", fileSizeBytes: file.size, fileContentBase64: base64 })
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const expandEngagement = (eng: Engagement) => {
+    const opening = expanded !== eng.id
+    setExpanded(opening ? eng.id : null)
+    setEngagementSubTab("team")
+    setSelectedFolder(null)
+    if (opening) {
+      setPlanningForm({
+        objectives: eng.objectives ?? "", scope: eng.scope ?? "", auditCriteria: eng.auditCriteria ?? "",
+        overallMateriality: eng.overallMateriality?.toString() ?? "", performanceMateriality: eng.performanceMateriality?.toString() ?? "",
+        clearlyTrivialThreshold: eng.clearlyTrivialThreshold?.toString() ?? "",
+      })
+    }
+  }
+
   const allPlanEntries = plans.flatMap(p => p.entries.map(e => ({ ...e, planYear: p.planYear })))
 
   const createEngagement = useMutation({
@@ -551,7 +671,7 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
             <div key={e.id} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <button onClick={() => setExpanded(expanded === e.id ? null : e.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
+                  <button onClick={() => expandEngagement(e)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
                     {expanded === e.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </button>
                   <div>
@@ -564,24 +684,174 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
 
               {expanded === e.id && (
                 <div style={{ padding: "0 16px 16px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingTop: 12, borderTop: "1px solid #F1F5F9" }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>Team — {e.assignments.length}</span>
-                    <button onClick={() => { setAssignForm({ userId: "", role: "AUDITOR" }); setShowAssign(e.id); setError("") }}
-                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid #1B3A6B", background: "#EFF6FF", color: "#1B3A6B", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-                      <UserPlus size={11} /> Assign
-                    </button>
+                  <div style={{ display: "flex", gap: 4, marginBottom: 12, paddingTop: 12, borderTop: "1px solid #F1F5F9" }}>
+                    {(["team", "planning", "workpapers"] as const).map(st => (
+                      <button key={st} onClick={() => setEngagementSubTab(st)}
+                        style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: engagementSubTab === st ? "#EFF6FF" : "transparent", color: engagementSubTab === st ? "#1B3A6B" : "#94A3B8", fontWeight: engagementSubTab === st ? 700 : 500, fontSize: 12, cursor: "pointer", textTransform: "capitalize" as const }}>
+                        {st}
+                      </button>
+                    ))}
                   </div>
-                  {e.assignments.length === 0 ? (
-                    <p style={{ fontSize: 12, color: "#94A3B8" }}>No team members assigned yet.</p>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {e.assignments.map(a => (
-                        <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
-                          <Users2 size={13} color="#7C3AED" />
-                          <span style={{ fontWeight: 600, color: "#0F172A" }}>{a.userName}</span>
-                          <span style={{ color: "#7C3AED", fontWeight: 600 }}>{a.role.replace(/_/g, " ")}</span>
+
+                  {engagementSubTab === "team" && (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>Team — {e.assignments.length}</span>
+                        <button onClick={() => { setAssignForm({ userId: "", role: "AUDITOR" }); setShowAssign(e.id); setError("") }}
+                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid #1B3A6B", background: "#EFF6FF", color: "#1B3A6B", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                          <UserPlus size={11} /> Assign
+                        </button>
+                      </div>
+                      {e.assignments.length === 0 ? (
+                        <p style={{ fontSize: 12, color: "#94A3B8" }}>No team members assigned yet.</p>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {e.assignments.map(a => (
+                            <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
+                              <Users2 size={13} color="#7C3AED" />
+                              <span style={{ fontWeight: 600, color: "#0F172A" }}>{a.userName}</span>
+                              <span style={{ color: "#7C3AED", fontWeight: 600 }}>{a.role.replace(/_/g, " ")}</span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
+                    </div>
+                  )}
+
+                  {engagementSubTab === "planning" && (
+                    <div>
+                      <div style={{ marginBottom: 12 }}>
+                        <label style={lbl}>Objectives</label>
+                        <textarea value={planningForm.objectives} onChange={ev => setPlanningForm(f => ({ ...f, objectives: ev.target.value }))} rows={2} style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
+                      </div>
+                      <div style={{ marginBottom: 12 }}>
+                        <label style={lbl}>Scope</label>
+                        <textarea value={planningForm.scope} onChange={ev => setPlanningForm(f => ({ ...f, scope: ev.target.value }))} rows={2} style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
+                      </div>
+                      <div style={{ marginBottom: 12 }}>
+                        <label style={lbl}>Audit Criteria</label>
+                        <textarea value={planningForm.auditCriteria} onChange={ev => setPlanningForm(f => ({ ...f, auditCriteria: ev.target.value }))} rows={2} style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 14 }}>
+                        <div>
+                          <label style={lbl}>Overall Materiality</label>
+                          <input type="number" value={planningForm.overallMateriality} onChange={ev => setPlanningForm(f => ({ ...f, overallMateriality: ev.target.value }))} style={inp} />
+                        </div>
+                        <div>
+                          <label style={lbl}>Performance Materiality</label>
+                          <input type="number" value={planningForm.performanceMateriality} onChange={ev => setPlanningForm(f => ({ ...f, performanceMateriality: ev.target.value }))} style={inp} />
+                        </div>
+                        <div>
+                          <label style={lbl}>Clearly Trivial</label>
+                          <input type="number" value={planningForm.clearlyTrivialThreshold} onChange={ev => setPlanningForm(f => ({ ...f, clearlyTrivialThreshold: ev.target.value }))} style={inp} />
+                        </div>
+                      </div>
+                      <button onClick={() => updatePlanning.mutate(e.id)} disabled={updatePlanning.isPending}
+                        style={{ padding: "7px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", marginBottom: 18 }}>
+                        {updatePlanning.isPending ? "Saving…" : "Save Planning Detail"}
+                      </button>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingTop: 14, borderTop: "1px solid #F1F5F9" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>Specific Materiality (optional)</span>
+                        <button onClick={() => { setMaterialityForm({ accountOrGlSegment: "", threshold: "" }); setShowAddMateriality(true) }}
+                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid #1B3A6B", background: "#EFF6FF", color: "#1B3A6B", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                          <Plus size={11} /> Add
+                        </button>
+                      </div>
+                      {e.specificMateriality.length === 0 ? (
+                        <p style={{ fontSize: 12, color: "#94A3B8" }}>No account-specific thresholds — the engagement-level materiality above applies to everything by default.</p>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {e.specificMateriality.map(m => (
+                            <div key={m.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
+                              <span style={{ fontWeight: 600, color: "#0F172A" }}>{m.accountOrGlSegment}</span>
+                              <span style={{ color: "#64748B" }}>R {m.threshold.toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {engagementSubTab === "workpapers" && (
+                    <div>
+                      <div style={{ display: "flex", gap: 12 }}>
+                        <div style={{ width: 180, flexShrink: 0 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>Folders</span>
+                            <button onClick={() => { setFolderForm({ name: "", folderType: "GENERAL" }); setShowNewFolder(true) }} style={{ background: "none", border: "none", cursor: "pointer", color: "#1B3A6B" }}><Plus size={13} /></button>
+                          </div>
+                          {foldersQuery.isLoading ? (
+                            <p style={{ fontSize: 11, color: "#94A3B8" }}>Loading…</p>
+                          ) : !foldersQuery.data?.length ? (
+                            <p style={{ fontSize: 11, color: "#94A3B8" }}>No folders yet.</p>
+                          ) : (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                              {foldersQuery.data.map(f => (
+                                <button key={f.id} onClick={() => { setSelectedFolder(f.id); setShowDeletedFiles(false) }}
+                                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", borderRadius: 6, border: "none", background: selectedFolder === f.id ? "#EFF6FF" : "transparent", color: selectedFolder === f.id ? "#1B3A6B" : "#374151", fontSize: 12, fontWeight: selectedFolder === f.id ? 700 : 500, cursor: "pointer", textAlign: "left" as const }}>
+                                  <Folder size={12} /> {f.name}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ flex: 1, borderLeft: "1px solid #F1F5F9", paddingLeft: 14 }}>
+                          {!selectedFolder ? (
+                            <p style={{ fontSize: 12, color: "#94A3B8" }}>Select a folder to view its files.</p>
+                          ) : (
+                            <div>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                                <button onClick={() => setShowDeletedFiles(v => !v)}
+                                  style={{ fontSize: 11, color: "#64748B", background: "none", border: "1px solid #E2E8F0", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
+                                  {showDeletedFiles ? "Show Active" : "Show Deleted"}
+                                </button>
+                                {!showDeletedFiles && (
+                                  <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: "#1B3A6B", cursor: "pointer" }}>
+                                    <Upload size={12} /> {uploadFile.isPending ? `Uploading ${uploadFileName}…` : "Upload File"}
+                                    <input type="file" style={{ display: "none" }} onChange={ev => { const f = ev.target.files?.[0]; if (f) handleFileUpload(f); ev.target.value = "" }} />
+                                  </label>
+                                )}
+                              </div>
+                              {filesQuery.isLoading ? (
+                                <p style={{ fontSize: 12, color: "#94A3B8" }}>Loading…</p>
+                              ) : !filesQuery.data?.length ? (
+                                <p style={{ fontSize: 12, color: "#94A3B8" }}>{showDeletedFiles ? "No deleted files." : "No files in this folder yet."}</p>
+                              ) : (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                  {filesQuery.data.map(f => {
+                                    const sc = WP_STATUS_CFG[f.reviewStatus] ?? WP_STATUS_CFG.DRAFT
+                                    return (
+                                      <div key={f.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                          <FileText size={13} color="#94A3B8" />
+                                          <span style={{ fontWeight: 600, color: "#0F172A" }}>{f.fileName}</span>
+                                          <span style={{ color: "#CBD5E1" }}>v{f.versionNumber}</span>
+                                          <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: sc.bg, color: sc.color }}>{sc.label}</span>
+                                        </div>
+                                        <div style={{ display: "flex", gap: 6 }}>
+                                          {showDeletedFiles ? (
+                                            <button onClick={() => restoreFile.mutate(f.id)} title="Restore" style={{ padding: "4px 6px", background: "#DCFCE7", border: "1px solid #86EFAC", borderRadius: 6, cursor: "pointer", color: "#166534" }}><RotateCcw size={12} /></button>
+                                          ) : (
+                                            <>
+                                              {f.reviewStatus === "DRAFT" && <button onClick={() => updateFileStatus.mutate({ fileId: f.id, action: "PREPARE" })} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 11, cursor: "pointer" }}>Prepare</button>}
+                                              {f.reviewStatus === "PREPARED" && <button onClick={() => updateFileStatus.mutate({ fileId: f.id, action: "REVIEW" })} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 11, cursor: "pointer" }}>Review</button>}
+                                              {f.reviewStatus === "REVIEWED" && <button onClick={() => updateFileStatus.mutate({ fileId: f.id, action: "SIGN_OFF" })} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #86EFAC", background: "#DCFCE7", color: "#166534", fontSize: 11, cursor: "pointer" }}>Sign Off</button>}
+                                              {f.reviewStatus !== "DRAFT" && <button onClick={() => updateFileStatus.mutate({ fileId: f.id, action: "REOPEN" })} title="Reopen" style={{ padding: "4px 6px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 6, cursor: "pointer", color: "#94A3B8" }}><Eye size={12} /></button>}
+                                              <button onClick={() => deleteFile.mutate(f.id)} title="Delete" style={{ padding: "4px 6px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, cursor: "pointer", color: "#DC2626" }}><Trash2 size={12} /></button>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -656,6 +926,56 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
               <button onClick={() => setShowAssign(null)} style={cancelBtn}>Cancel</button>
               <button onClick={() => assignRole.mutate()} disabled={!assignForm.userId || assignRole.isPending} style={submitBtn}>
                 {assignRole.isPending ? "Assigning…" : "Assign"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showNewFolder && expanded && (
+        <div style={modalOverlay}>
+          <div style={{ ...modalBox, width: 360 }}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>New Folder</h3>
+            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl}>Name *</label>
+              <input value={folderForm.name} onChange={e => setFolderForm(f => ({ ...f, name: e.target.value }))} placeholder="Fieldwork" style={inp} />
+            </div>
+            <div style={{ marginBottom: 18 }}>
+              <label style={lbl}>Type</label>
+              <select value={folderForm.folderType} onChange={e => setFolderForm(f => ({ ...f, folderType: e.target.value }))} style={inp}>
+                <option value="PLANNING">Planning</option><option value="FIELDWORK">Fieldwork</option>
+                <option value="SAMPLING">Sampling</option><option value="FINDINGS">Findings</option>
+                <option value="REPORTING">Reporting</option><option value="GENERAL">General</option>
+              </select>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button onClick={() => setShowNewFolder(false)} style={cancelBtn}>Cancel</button>
+              <button onClick={() => createFolder.mutate(expanded)} disabled={!folderForm.name.trim() || createFolder.isPending} style={submitBtn}>
+                {createFolder.isPending ? "Creating…" : "Create"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddMateriality && expanded && (
+        <div style={modalOverlay}>
+          <div style={{ ...modalBox, width: 380 }}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Add Specific Materiality</h3>
+            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl}>Account / GL Segment *</label>
+              <input value={materialityForm.accountOrGlSegment} onChange={e => setMaterialityForm(f => ({ ...f, accountOrGlSegment: e.target.value }))} placeholder="Petty Cash" style={inp} />
+            </div>
+            <div style={{ marginBottom: 18 }}>
+              <label style={lbl}>Threshold *</label>
+              <input type="number" value={materialityForm.threshold} onChange={e => setMaterialityForm(f => ({ ...f, threshold: e.target.value }))} style={inp} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button onClick={() => setShowAddMateriality(false)} style={cancelBtn}>Cancel</button>
+              <button onClick={() => addMateriality.mutate(expanded)} disabled={!materialityForm.accountOrGlSegment.trim() || !materialityForm.threshold || addMateriality.isPending} style={submitBtn}>
+                {addMateriality.isPending ? "Adding…" : "Add"}
               </button>
             </div>
           </div>
