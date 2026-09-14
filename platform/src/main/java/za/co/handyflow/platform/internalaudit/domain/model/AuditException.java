@@ -60,4 +60,18 @@ public class AuditException {
         this.status = "DISMISSED";
         this.resolutionNotes = resolutionNotes;
     }
+
+    /**
+     * Called when this exception genuinely warrants a formal finding
+     * (Phase 4) rather than being dismissed as a one-off. Refuses to
+     * promote an already-DISMISSED or already-promoted exception —
+     * each exception has exactly one real disposition.
+     */
+    public void promote(UUID findingId) {
+        if (!"OPEN".equals(status)) {
+            throw new IllegalStateException("Only an OPEN exception can be promoted to a finding. Current status: " + status);
+        }
+        this.status = "PROMOTED_TO_FINDING";
+        this.promotedToFindingId = findingId;
+    }
 }

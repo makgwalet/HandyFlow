@@ -7,6 +7,10 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.identity.domain.repository.UserRepository;
 import za.co.handyflow.platform.accounting.domain.model.AccJournalEntry;
 import za.co.handyflow.platform.accounting.domain.repository.AccJournalEntryRepository;
+import za.co.handyflow.platform.approvals.application.ApprovalFacade;
+import za.co.handyflow.platform.approvals.domain.model.ApprovalRule;
+import za.co.handyflow.platform.approvals.dto.ApprovalRequestResponse;
+import za.co.handyflow.platform.approvals.dto.ChainEntryInput;
 import za.co.handyflow.platform.internalaudit.domain.model.AnnualAuditPlan;
 import za.co.handyflow.platform.internalaudit.domain.model.AuditEngagement;
 import za.co.handyflow.platform.internalaudit.domain.model.AuditPlanEntry;
@@ -33,6 +37,8 @@ import za.co.handyflow.platform.internalaudit.domain.repository.SamplingPlanRepo
 import za.co.handyflow.platform.internalaudit.domain.repository.SampleItemRepository;
 import za.co.handyflow.platform.internalaudit.domain.repository.AuditTestRepository;
 import za.co.handyflow.platform.internalaudit.domain.repository.AuditExceptionRepository;
+import za.co.handyflow.platform.internalaudit.domain.repository.AuditFindingRepository;
+import za.co.handyflow.platform.internalaudit.domain.model.AuditFinding;
 import za.co.handyflow.platform.internalaudit.dto.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
@@ -41,6 +47,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -72,6 +79,8 @@ public class InternalAuditService {
     private final AuditTestRepository auditTestRepo;
     private final AuditExceptionRepository auditExceptionRepo;
     private final AccJournalEntryRepository journalEntryRepo;
+    private final AuditFindingRepository findingRepo;
+    private final ApprovalFacade approvalFacade;
 
     // ── Universe ─────────────────────────────────────────────────────────────
 
@@ -571,5 +580,124 @@ public class InternalAuditService {
     private AuditExceptionResponse toExceptionResponse(AuditException e) {
         return new AuditExceptionResponse(e.getId(), e.getAuditTestId(), e.getDescription(), e.getSeverity(),
                 e.getStatus(), e.getRaisedBy(), e.getRaisedAt(), e.getResolutionNotes());
+    }
+
+    // ── Phase 4: Findings, Remediation, Report Sign-off ─────────────────────────
+
+    @Transactional
+    public FindingResponse createFinding(TenantId tenantId, UUID engagementId, CreateFindingRequest req, UUID createdBy) {
+        engagementRepo.findByTenantAndId(tenantId.getValue(), engagementId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditEngagement", engagementId.toString()));
+
+        AuditFinding finding = AuditFinding.create(tenantId.getValue(), engagementId, req.sourceExceptionId(),
+                req.title(), req.description(), req.rootCause(), req.recommendation(), req.severity(),
+                req.owner(), req.dueDate(), createdBy);
+        findingRepo.save(finding);
+
+        if (req.sourceExceptionId() != null) {
+            AuditException ex = auditExceptionRepo.findByTenantAndId(tenantId.getValue(), req.sourceExceptionId())
+                    .orElseThrow(() -> new ResourceNotFoundException("AuditException", req.sourceExceptionId().toString()));
+            try {
+                ex.promote(finding.getId());
+            } catch (IllegalStateException e) {
+                throw new HandyFlowException(e.getMessage(), HttpStatus.CONFLICT, "INVALID_STATUS");
+            }
+            auditExceptionRepo.save(ex);
+        }
+        return toFindingResponse(finding);
+    }
+
+    @Transactional(readOnly = true)
+    public List<FindingResponse> getFindings(TenantId tenantId, UUID engagementId) {
+        return findingRepo.findByEngagement(tenantId.getValue(), engagementId).stream()
+                .map(this::toFindingResponse).toList();
+    }
+
+    @Transactional
+    public FindingResponse recordManagementResponse(TenantId tenantId, UUID findingId, RecordManagementResponseRequest req) {
+        AuditFinding f = findingRepo.findByTenantAndId(tenantId.getValue(), findingId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditFinding", findingId.toString()));
+        f.recordManagementResponse(req.response());
+        findingRepo.save(f);
+        return toFindingResponse(f);
+    }
+
+    @Transactional
+    public FindingResponse resolveFinding(TenantId tenantId, UUID findingId) {
+        AuditFinding f = findingRepo.findByTenantAndId(tenantId.getValue(), findingId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditFinding", findingId.toString()));
+        f.resolve();
+        findingRepo.save(f);
+        return toFindingResponse(f);
+    }
+
+    @Transactional
+    public FindingResponse closeFinding(TenantId tenantId, UUID findingId) {
+        AuditFinding f = findingRepo.findByTenantAndId(tenantId.getValue(), findingId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditFinding", findingId.toString()));
+        try {
+            f.close();
+        } catch (IllegalStateException e) {
+            throw new HandyFlowException(e.getMessage(), HttpStatus.CONFLICT, "INVALID_STATUS");
+        }
+        findingRepo.save(f);
+        return toFindingResponse(f);
+    }
+
+    @Transactional
+    public FindingResponse reopenFinding(TenantId tenantId, UUID findingId) {
+        AuditFinding f = findingRepo.findByTenantAndId(tenantId.getValue(), findingId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditFinding", findingId.toString()));
+        f.reopen();
+        findingRepo.save(f);
+        return toFindingResponse(f);
+    }
+
+    /**
+     * Reuses ApprovalFacade.submitAdHoc() rather than the rule-matched
+     * submit() — the report's approver is a real, specific person (the
+     * engagement's own Head of Internal Audit, per EngagementAssignment
+     * — the agreed engagement-scoped role model from Phase 1), not
+     * something a tenant-wide condition-matched rule should decide.
+     * This is exactly the case ChainEntryInput's own Javadoc already
+     * anticipated: "a staff member picks the exact approver list...
+     * fresh for each" submission, not AP's tenant-wide rule shape.
+     * Fails clearly if no one holds that role on this engagement yet —
+     * there is genuinely no one to approve it.
+     */
+    @Transactional
+    public ApprovalRequestResponse submitReportForApproval(TenantId tenantId, UUID engagementId, UUID submittedBy) {
+        engagementRepo.findByTenantAndId(tenantId.getValue(), engagementId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditEngagement", engagementId.toString()));
+
+        UUID headOfInternalAudit = assignmentRepo.findByEngagement(tenantId.getValue(), engagementId).stream()
+                .filter(a -> "HEAD_OF_INTERNAL_AUDIT".equals(a.getRole()))
+                .map(EngagementAssignment::getUserId)
+                .findFirst()
+                .orElseThrow(() -> new HandyFlowException(
+                        "No one holds the Head of Internal Audit role on this engagement yet — assign one before submitting the report for sign-off",
+                        HttpStatus.CONFLICT, "NO_APPROVER"));
+
+        return approvalFacade.submitAdHoc(tenantId, "internalaudit", "ENGAGEMENT_REPORT", engagementId, submittedBy,
+                ApprovalRule.ApprovalMode.SEQUENTIAL,
+                List.of(new ChainEntryInput("USER", headOfInternalAudit.toString(), null, false)),
+                Map.of());
+    }
+
+    @Transactional(readOnly = true)
+    public ReportSignOffStatusResponse getReportApprovalStatus(TenantId tenantId, UUID engagementId) {
+        return approvalFacade.getLatestRequestForEntity(tenantId, "internalaudit", "ENGAGEMENT_REPORT", engagementId)
+                .map(r -> new ReportSignOffStatusResponse(r.status(), r.approvalMode()))
+                .orElse(null);
+    }
+
+    private FindingResponse toFindingResponse(AuditFinding f) {
+        String ownerName = f.getOwner() != null
+                ? userRepo.findById(f.getOwner()).map(u -> (u.getFirstName() + " " + u.getLastName()).trim()).orElse("Unknown")
+                : null;
+        return new FindingResponse(f.getId(), f.getEngagementId(), f.getSourceExceptionId(), f.getTitle(),
+                f.getDescription(), f.getRootCause(), f.getRecommendation(), f.getManagementResponse(),
+                f.getSeverity(), f.getOwner(), ownerName, f.getDueDate(), f.getStatus(),
+                f.getCreatedBy(), f.getCreatedAt(), f.getResolvedAt());
     }
 }

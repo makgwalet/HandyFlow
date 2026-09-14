@@ -370,4 +370,81 @@ public class InternalAuditController {
         return ResponseEntity.ok(ApiResponse.success(
                 auditService.getExceptionsForEngagement(TenantContext.getTenantIdAsObject(), id)));
     }
+
+    // ── Phase 4: Findings, Remediation, Report Sign-off ─────────────────────────
+
+    @PostMapping("/engagements/{id}/findings")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    @Operation(summary = "Raise a finding — directly, or by promoting an exception",
+            description = "sourceExceptionId is optional. When set, the referenced exception is atomically promoted (status -> PROMOTED_TO_FINDING) in the same call.")
+    public ResponseEntity<ApiResponse<FindingResponse>> createFinding(
+            @PathVariable UUID id, @Valid @RequestBody CreateFindingRequest req) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                auditService.createFinding(TenantContext.getTenantIdAsObject(), id, req,
+                        TenantContext.getCurrentUserId())));
+    }
+
+    @GetMapping("/engagements/{id}/findings")
+    @PreAuthorize("hasAuthority('AUDIT_READ')")
+    public ResponseEntity<ApiResponse<List<FindingResponse>>> getFindings(@PathVariable UUID id) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.getFindings(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/findings/{id}/management-response")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    @Operation(summary = "Record the auditee's management response to a finding")
+    public ResponseEntity<ApiResponse<FindingResponse>> recordManagementResponse(
+            @PathVariable UUID id, @Valid @RequestBody RecordManagementResponseRequest req) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.recordManagementResponse(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @PostMapping("/findings/{id}/resolve")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    public ResponseEntity<ApiResponse<FindingResponse>> resolveFinding(@PathVariable UUID id) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.resolveFinding(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/findings/{id}/close")
+    @PreAuthorize("hasAuthority('AUDIT_ADMIN')")
+    @Operation(summary = "Close a resolved finding", description = "AUDIT_ADMIN-gated — closing is a final sign-off action, matching the same tier as approving the annual plan.")
+    public ResponseEntity<ApiResponse<FindingResponse>> closeFinding(@PathVariable UUID id) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.closeFinding(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/findings/{id}/reopen")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    public ResponseEntity<ApiResponse<FindingResponse>> reopenFinding(@PathVariable UUID id) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.reopenFinding(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/engagements/{id}/report/submit")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    @Operation(summary = "Submit the engagement report for sign-off",
+            description = "Routed to whoever holds the Head of Internal Audit role on this specific engagement (EngagementAssignment), not a tenant-wide rule.")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.approvals.dto.ApprovalRequestResponse>> submitReportForApproval(
+            @PathVariable UUID id) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                auditService.submitReportForApproval(TenantContext.getTenantIdAsObject(), id,
+                        TenantContext.getCurrentUserId())));
+    }
+
+    @GetMapping("/engagements/{id}/report/status")
+    @PreAuthorize("hasAuthority('AUDIT_READ')")
+    public ResponseEntity<ApiResponse<ReportSignOffStatusResponse>> getReportApprovalStatus(@PathVariable UUID id) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.getReportApprovalStatus(TenantContext.getTenantIdAsObject(), id)));
+    }
 }
