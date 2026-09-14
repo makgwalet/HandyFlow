@@ -7,7 +7,7 @@ import {
   HeartPulse, PartyPopper, FilePen, Wallet, Briefcase,
   Bell, User, Lock, LogOut, ChevronDown,
   Palette, Headphones, CheckSquare, Megaphone, UserCheck, ShoppingCart,
-  Truck, Receipt, UserCog,
+  Truck, Receipt, UserCog, ShieldCheck,
 } from 'lucide-react'
 import { apiClient } from '../../api/client'
 import { useAuthStore } from '../../store/auth.store'
@@ -40,6 +40,7 @@ const MODULE_REGISTRY: Record<string, { icon: React.ElementType; label: string; 
   supply_chain: { icon: Truck,         label: 'Supply Chain', route: '/supply-chain' },
   ap:           { icon: Receipt,       label: 'Payables',     route: '/ap'           },
   accountant:   { icon: UserCog,       label: 'Accountant',   route: '/accountant'   },
+  'internal-audit': { icon: ShieldCheck, label: 'Internal Audit', route: '/internal-audit' },
 }
 
 // Always reachable regardless of subscription — not part of the pin/switcher

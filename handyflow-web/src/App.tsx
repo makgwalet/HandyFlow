@@ -15,6 +15,7 @@ import { useAuthStore }                 from "./store/auth.store"
 // NEW: closes "not added to App.tsx, redirects to saas".
 import { usePortalAuthStore }           from "./store/portalAuth.store"
 import { FuelPage }                     from "./pages/fuel/FuelPage"
+import InternalAuditPage                from "./pages/internal-audit/InternalAuditPage"
 import { PropertyPage }                 from "./pages/property/PropertyPage"
 import { FleetPage }                    from "./pages/fleet/FleetPage"
 import { SettingsPage }                 from './pages/settings/SettingsPage'
@@ -273,6 +274,7 @@ export default function App() {
             <Route path="/billing"     element={<BillingPage />} />
             <Route path="/security"    element={<SecurityPage />} />
             <Route path="/fuel"        element={<FuelPage />} />
+            <Route path="/internal-audit" element={<InternalAuditPage />} />
             <Route path="/earthmoving" element={<EarthMovingPage />} />
             <Route path="/property"    element={<PropertyPage />} />
  <Route path="/fleet"       element={<FleetPage />} />
