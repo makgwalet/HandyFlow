@@ -64,6 +64,13 @@ interface AuditExceptionResp {
   id: string; auditTestId: string; description: string; severity: string; status: string
   raisedBy: string | null; raisedAt: string; resolutionNotes: string | null
 }
+interface FindingResp {
+  id: string; engagementId: string; sourceExceptionId: string | null; title: string; description: string
+  rootCause: string | null; recommendation: string | null; managementResponse: string | null; severity: string
+  owner: string | null; ownerName: string | null; dueDate: string | null; status: string
+  createdBy: string | null; createdAt: string; resolvedAt: string | null
+}
+interface ReportSignOffStatus { status: string; approvalMode: string | null }
 interface AuditTestResp {
   id: string; sampleItemId: string; procedure: string; result: string; notes: string | null
   testedBy: string | null; testedAt: string | null; exceptions: AuditExceptionResp[]
@@ -559,7 +566,7 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
   // be expanded at a time (the existing accordion pattern), so a single
   // sub-tab state is enough — reset to "team" whenever a different
   // engagement is expanded.
-  const [engagementSubTab, setEngagementSubTab] = useState<"team" | "planning" | "workpapers" | "sampling">("team")
+  const [engagementSubTab, setEngagementSubTab] = useState<"team" | "planning" | "workpapers" | "sampling" | "findings">("team")
   const [planningForm, setPlanningForm] = useState({ objectives: "", scope: "", auditCriteria: "", overallMateriality: "", performanceMateriality: "", clearlyTrivialThreshold: "" })
   const [showAddMateriality, setShowAddMateriality] = useState(false)
   const [materialityForm, setMaterialityForm] = useState({ accountOrGlSegment: "", threshold: "" })
@@ -630,6 +637,60 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
     mutationFn: ({ id, resolutionNotes }: { id: string; resolutionNotes: string }) =>
       apiClient.post(`/api/v1/internal-audit/exceptions/${id}/dismiss`, { resolutionNotes }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["ia-exceptions", expanded] }); qc.invalidateQueries({ queryKey: ["ia-sampling-plans", expanded] }) },
+  })
+
+  // Phase 4 — findings, remediation, report sign-off
+  const [showNewFinding, setShowNewFinding] = useState(false)
+  const [findingForm, setFindingForm] = useState({ sourceExceptionId: "", title: "", description: "", rootCause: "", recommendation: "", severity: "MEDIUM", owner: "", dueDate: "" })
+  const [showMgmtResponse, setShowMgmtResponse] = useState<string | null>(null)
+  const [mgmtResponseText, setMgmtResponseText] = useState("")
+
+  const findingsQuery = useQuery<FindingResp[]>({
+    queryKey: ["ia-findings", expanded],
+    queryFn: async () => (await apiClient.get(`/api/v1/internal-audit/engagements/${expanded}/findings`)).data,
+    enabled: !!expanded && engagementSubTab === "findings",
+  })
+  const reportStatusQuery = useQuery<ReportSignOffStatus | null>({
+    queryKey: ["ia-report-status", expanded],
+    queryFn: async () => (await apiClient.get(`/api/v1/internal-audit/engagements/${expanded}/report/status`)).data,
+    enabled: !!expanded && engagementSubTab === "findings",
+  })
+
+  const openExceptionsForFinding = exceptionsQuery.data?.filter(ex => ex.status === "OPEN") ?? []
+
+  const createFinding = useMutation({
+    mutationFn: (engagementId: string) => apiClient.post(`/api/v1/internal-audit/engagements/${engagementId}/findings`, {
+      ...findingForm, sourceExceptionId: findingForm.sourceExceptionId || null, owner: findingForm.owner || null, dueDate: findingForm.dueDate || null,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ia-findings", expanded] })
+      qc.invalidateQueries({ queryKey: ["ia-exceptions", expanded] })
+      setShowNewFinding(false); setError("")
+    },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to raise finding"),
+  })
+  const recordMgmtResponse = useMutation({
+    mutationFn: (findingId: string) => apiClient.post(`/api/v1/internal-audit/findings/${findingId}/management-response`, { response: mgmtResponseText }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ia-findings", expanded] }); setShowMgmtResponse(null); setError("") },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to record response"),
+  })
+  const resolveFinding = useMutation({
+    mutationFn: (findingId: string) => apiClient.post(`/api/v1/internal-audit/findings/${findingId}/resolve`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ia-findings", expanded] }),
+  })
+  const closeFinding = useMutation({
+    mutationFn: (findingId: string) => apiClient.post(`/api/v1/internal-audit/findings/${findingId}/close`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ia-findings", expanded] }),
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to close finding"),
+  })
+  const reopenFinding = useMutation({
+    mutationFn: (findingId: string) => apiClient.post(`/api/v1/internal-audit/findings/${findingId}/reopen`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ia-findings", expanded] }),
+  })
+  const submitReport = useMutation({
+    mutationFn: (engagementId: string) => apiClient.post(`/api/v1/internal-audit/engagements/${engagementId}/report/submit`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ia-report-status", expanded] }); setError("") },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to submit report for sign-off"),
   })
 
   const updatePlanning = useMutation({
@@ -768,7 +829,7 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
               {expanded === e.id && (
                 <div style={{ padding: "0 16px 16px" }}>
                   <div style={{ display: "flex", gap: 4, marginBottom: 12, paddingTop: 12, borderTop: "1px solid #F1F5F9" }}>
-                    {(["team", "planning", "workpapers", "sampling"] as const).map(st => (
+                    {(["team", "planning", "workpapers", "sampling", "findings"] as const).map(st => (
                       <button key={st} onClick={() => setEngagementSubTab(st)}
                         style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: engagementSubTab === st ? "#EFF6FF" : "transparent", color: engagementSubTab === st ? "#1B3A6B" : "#94A3B8", fontWeight: engagementSubTab === st ? 700 : 500, fontSize: 12, cursor: "pointer", textTransform: "capitalize" as const }}>
                         {st}
@@ -1050,6 +1111,96 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                       )}
                     </div>
                   )}
+
+                  {engagementSubTab === "findings" && (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                        <div>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>Report Sign-off</span>
+                          {reportStatusQuery.data ? (
+                            <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 20, background: reportStatusQuery.data.status === "APPROVED" ? "#DCFCE7" : reportStatusQuery.data.status === "REJECTED" ? "#FEF2F2" : "#FFFBEB", color: reportStatusQuery.data.status === "APPROVED" ? "#166534" : reportStatusQuery.data.status === "REJECTED" ? "#DC2626" : "#B45309" }}>{reportStatusQuery.data.status}</span>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>Not yet submitted for sign-off.</div>
+                          )}
+                        </div>
+                        <button onClick={() => submitReport.mutate(e.id)} disabled={submitReport.isPending}
+                          style={{ padding: "7px 14px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          {submitReport.isPending ? "Submitting…" : reportStatusQuery.data ? "Resubmit for Sign-off" : "Submit for Sign-off"}
+                        </button>
+                      </div>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingTop: 12, borderTop: "1px solid #F1F5F9" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>Findings — {findingsQuery.data?.length ?? 0}</span>
+                        <button onClick={() => { setFindingForm({ sourceExceptionId: "", title: "", description: "", rootCause: "", recommendation: "", severity: "MEDIUM", owner: "", dueDate: "" }); setShowNewFinding(true); setError("") }}
+                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid #1B3A6B", background: "#EFF6FF", color: "#1B3A6B", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                          <Plus size={11} /> Raise Finding
+                        </button>
+                      </div>
+
+                      {findingsQuery.isLoading ? (
+                        <p style={{ fontSize: 12, color: "#94A3B8" }}>Loading…</p>
+                      ) : !findingsQuery.data?.length ? (
+                        <p style={{ fontSize: 12, color: "#94A3B8" }}>No findings raised for this engagement yet.</p>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {findingsQuery.data.map(f => {
+                            const sevColor = f.severity === "CRITICAL" || f.severity === "HIGH" ? "#DC2626" : f.severity === "MEDIUM" ? "#B45309" : "#64748B"
+                            const sevBg = f.severity === "CRITICAL" || f.severity === "HIGH" ? "#FEF2F2" : f.severity === "MEDIUM" ? "#FFFBEB" : "#F1F5F9"
+                            const statusColor = f.status === "CLOSED" ? "#166534" : f.status === "RESOLVED" ? "#1D4ED8" : f.status === "IN_PROGRESS" ? "#B45309" : "#64748B"
+                            const statusBg = f.status === "CLOSED" ? "#DCFCE7" : f.status === "RESOLVED" ? "#EFF6FF" : f.status === "IN_PROGRESS" ? "#FFFBEB" : "#F1F5F9"
+                            return (
+                              <div key={f.id} style={{ padding: "12px 14px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10, fontSize: 12 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                                  <span style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{f.title}</span>
+                                  <div style={{ display: "flex", gap: 6 }}>
+                                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: sevBg, color: sevColor }}>{f.severity}</span>
+                                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: statusBg, color: statusColor }}>{f.status.replace(/_/g, " ")}</span>
+                                  </div>
+                                </div>
+                                <p style={{ margin: "0 0 6px", color: "#374151" }}>{f.description}</p>
+                                {f.rootCause && <p style={{ margin: "0 0 4px", color: "#94A3B8" }}><strong>Root cause:</strong> {f.rootCause}</p>}
+                                {f.recommendation && <p style={{ margin: "0 0 4px", color: "#94A3B8" }}><strong>Recommendation:</strong> {f.recommendation}</p>}
+                                {f.managementResponse && <p style={{ margin: "0 0 4px", color: "#1D4ED8" }}><strong>Management response:</strong> {f.managementResponse}</p>}
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                                  <span style={{ color: "#94A3B8" }}>
+                                    {f.ownerName && `Owner: ${f.ownerName}`}{f.dueDate && ` · Due ${f.dueDate}`}
+                                  </span>
+                                  <div style={{ display: "flex", gap: 6 }}>
+                                    {(f.status === "OPEN" || f.status === "IN_PROGRESS") && !f.managementResponse && (
+                                      <button onClick={() => { setMgmtResponseText(""); setShowMgmtResponse(f.id) }}
+                                        style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                                        Add Management Response
+                                      </button>
+                                    )}
+                                    {f.status === "IN_PROGRESS" && (
+                                      <button onClick={() => resolveFinding.mutate(f.id)}
+                                        style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid #BFDBFE", background: "#EFF6FF", color: "#1D4ED8", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                                        Mark Resolved
+                                      </button>
+                                    )}
+                                    {f.status === "RESOLVED" && (
+                                      <>
+                                        <button onClick={() => reopenFinding.mutate(f.id)}
+                                          style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                                          Reopen
+                                        </button>
+                                        <button onClick={() => closeFinding.mutate(f.id)}
+                                          style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid #86EFAC", background: "#DCFCE7", color: "#166534", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                                          Close
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1307,6 +1458,82 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
               <button onClick={() => setShowRaiseException(null)} style={cancelBtn}>Cancel</button>
               <button onClick={() => raiseException.mutate(showRaiseException)} disabled={!exceptionForm.description.trim() || raiseException.isPending} style={submitBtn}>
                 {raiseException.isPending ? "Raising…" : "Raise Exception"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showNewFinding && expanded && (
+        <div style={modalOverlay}>
+          <div style={modalBox}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Raise Finding</h3>
+            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            {openExceptionsForFinding.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={lbl}>Promote an Open Exception (optional)</label>
+                <select value={findingForm.sourceExceptionId} onChange={e => setFindingForm(f => ({ ...f, sourceExceptionId: e.target.value }))} style={inp}>
+                  <option value="">None — raise directly</option>
+                  {openExceptionsForFinding.map(ex => <option key={ex.id} value={ex.id}>{ex.description.slice(0, 60)}</option>)}
+                </select>
+              </div>
+            )}
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl}>Title *</label>
+              <input value={findingForm.title} onChange={e => setFindingForm(f => ({ ...f, title: e.target.value }))} style={inp} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl}>Description *</label>
+              <textarea value={findingForm.description} onChange={e => setFindingForm(f => ({ ...f, description: e.target.value }))} rows={2} style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl}>Root Cause</label>
+              <textarea value={findingForm.rootCause} onChange={e => setFindingForm(f => ({ ...f, rootCause: e.target.value }))} rows={2} style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl}>Recommendation</label>
+              <textarea value={findingForm.recommendation} onChange={e => setFindingForm(f => ({ ...f, recommendation: e.target.value }))} rows={2} style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
+            </div>
+            <div style={{ display: "flex", gap: 12, marginBottom: 18 }}>
+              <div style={{ flex: 1 }}>
+                <label style={lbl}>Severity</label>
+                <select value={findingForm.severity} onChange={e => setFindingForm(f => ({ ...f, severity: e.target.value }))} style={inp}>
+                  <option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option><option value="CRITICAL">Critical</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={lbl}>Owner</label>
+                <select value={findingForm.owner} onChange={e => setFindingForm(f => ({ ...f, owner: e.target.value }))} style={inp}>
+                  <option value="">Unassigned</option>
+                  {users.map(u => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={lbl}>Due Date</label>
+                <input type="date" value={findingForm.dueDate} onChange={e => setFindingForm(f => ({ ...f, dueDate: e.target.value }))} style={inp} />
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button onClick={() => setShowNewFinding(false)} style={cancelBtn}>Cancel</button>
+              <button onClick={() => createFinding.mutate(expanded)} disabled={!findingForm.title.trim() || !findingForm.description.trim() || createFinding.isPending} style={submitBtn}>
+                {createFinding.isPending ? "Raising…" : "Raise Finding"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMgmtResponse && (
+        <div style={modalOverlay}>
+          <div style={{ ...modalBox, width: 420 }}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Management Response</h3>
+            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <label style={lbl}>The auditee's response *</label>
+            <textarea value={mgmtResponseText} onChange={e => setMgmtResponseText(e.target.value)} rows={4} style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
+              <button onClick={() => setShowMgmtResponse(null)} style={cancelBtn}>Cancel</button>
+              <button onClick={() => recordMgmtResponse.mutate(showMgmtResponse)} disabled={!mgmtResponseText.trim() || recordMgmtResponse.isPending} style={submitBtn}>
+                {recordMgmtResponse.isPending ? "Saving…" : "Save Response"}
               </button>
             </div>
           </div>
