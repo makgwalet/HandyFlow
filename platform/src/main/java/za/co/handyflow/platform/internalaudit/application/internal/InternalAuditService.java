@@ -9,20 +9,27 @@ import za.co.handyflow.platform.internalaudit.domain.model.AnnualAuditPlan;
 import za.co.handyflow.platform.internalaudit.domain.model.AuditEngagement;
 import za.co.handyflow.platform.internalaudit.domain.model.AuditPlanEntry;
 import za.co.handyflow.platform.internalaudit.domain.model.AuditUniverseEntry;
+import za.co.handyflow.platform.internalaudit.domain.model.AuditWorkpaperFile;
+import za.co.handyflow.platform.internalaudit.domain.model.AuditWorkpaperFolder;
 import za.co.handyflow.platform.internalaudit.domain.model.EngagementAssignment;
 import za.co.handyflow.platform.internalaudit.domain.model.RiskAssessment;
+import za.co.handyflow.platform.internalaudit.domain.model.SpecificMateriality;
 import za.co.handyflow.platform.internalaudit.domain.repository.AnnualAuditPlanRepository;
 import za.co.handyflow.platform.internalaudit.domain.repository.AuditEngagementRepository;
 import za.co.handyflow.platform.internalaudit.domain.repository.AuditPlanEntryRepository;
 import za.co.handyflow.platform.internalaudit.domain.repository.AuditUniverseEntryRepository;
+import za.co.handyflow.platform.internalaudit.domain.repository.AuditWorkpaperFileRepository;
+import za.co.handyflow.platform.internalaudit.domain.repository.AuditWorkpaperFolderRepository;
 import za.co.handyflow.platform.internalaudit.domain.repository.EngagementAssignmentRepository;
 import za.co.handyflow.platform.internalaudit.domain.repository.RiskAssessmentRepository;
+import za.co.handyflow.platform.internalaudit.domain.repository.SpecificMaterialityRepository;
 import za.co.handyflow.platform.internalaudit.dto.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -45,6 +52,9 @@ public class InternalAuditService {
     private final AuditEngagementRepository engagementRepo;
     private final EngagementAssignmentRepository assignmentRepo;
     private final UserRepository userRepo;
+    private final SpecificMaterialityRepository specificMaterialityRepo;
+    private final AuditWorkpaperFolderRepository workpaperFolderRepo;
+    private final AuditWorkpaperFileRepository workpaperFileRepo;
 
     // ── Universe ─────────────────────────────────────────────────────────────
 
@@ -235,9 +245,13 @@ public class InternalAuditService {
                 .map(AuditUniverseEntry::getName).orElse("Unknown");
         List<EngagementAssignmentResponse> assignments = assignmentRepo.findByEngagement(e.getTenantId(), e.getId())
                 .stream().map(this::toAssignmentResponse).toList();
+        List<SpecificMaterialityResponse> specificMateriality = specificMaterialityRepo.findByEngagement(e.getTenantId(), e.getId())
+                .stream().map(m -> new SpecificMaterialityResponse(m.getId(), m.getAccountOrGlSegment(), m.getThreshold())).toList();
         return new EngagementResponse(e.getId(), e.getPlanEntryId(), e.getUniverseEntryId(), universeEntryName,
                 e.getName(), e.getStatus(), e.getStartDate(), e.getEndDate(), e.getCreatedBy(), e.getCreatedAt(),
-                assignments);
+                assignments, e.getObjectives(), e.getScope(), e.getAuditCriteria(),
+                e.getOverallMateriality(), e.getPerformanceMateriality(), e.getClearlyTrivialThreshold(),
+                specificMateriality);
     }
 
     private EngagementAssignmentResponse toAssignmentResponse(EngagementAssignment a) {
@@ -246,5 +260,165 @@ public class InternalAuditService {
                 .orElse("Unknown");
         return new EngagementAssignmentResponse(a.getId(), a.getUserId(), userName, a.getRole(),
                 a.getAssignedBy(), a.getAssignedAt());
+    }
+
+    // ── Phase 2: Planning detail + Materiality ──────────────────────────────────
+
+    @Transactional
+    public EngagementResponse updatePlanning(TenantId tenantId, UUID engagementId, UpdatePlanningRequest req) {
+        AuditEngagement e = engagementRepo.findByTenantAndId(tenantId.getValue(), engagementId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditEngagement", engagementId.toString()));
+        e.updatePlanning(req.objectives(), req.scope(), req.auditCriteria(),
+                req.overallMateriality(), req.performanceMateriality(), req.clearlyTrivialThreshold());
+        engagementRepo.save(e);
+        return toEngagementResponse(e);
+    }
+
+    @Transactional
+    public SpecificMaterialityResponse addSpecificMateriality(TenantId tenantId, UUID engagementId,
+                                                               AddSpecificMaterialityRequest req) {
+        engagementRepo.findByTenantAndId(tenantId.getValue(), engagementId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditEngagement", engagementId.toString()));
+        SpecificMateriality m = SpecificMateriality.create(tenantId.getValue(), engagementId,
+                req.accountOrGlSegment(), req.threshold());
+        specificMaterialityRepo.save(m);
+        return new SpecificMaterialityResponse(m.getId(), m.getAccountOrGlSegment(), m.getThreshold());
+    }
+
+    // ── Phase 2: Workpapers ──────────────────────────────────────────────────────
+    // Direct structural mirror of AccWorkpaperService (Accountant module)
+    // — same file-type/size validation, same versioning-on-reupload
+    // logic. See AuditWorkpaperFile's own class comment for the fuller
+    // reasoning.
+
+    private static final long MAX_WORKPAPER_FILE_BYTES = 10L * 1024 * 1024;
+    private static final Set<String> ALLOWED_WORKPAPER_TYPES = Set.of(
+            "application/pdf", "image/jpeg", "image/jpg", "image/png",
+            "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    @Transactional
+    public WorkpaperFolderResponse createWorkpaperFolder(TenantId tenantId, UUID engagementId,
+                                                          CreateWorkpaperFolderRequest req) {
+        engagementRepo.findByTenantAndId(tenantId.getValue(), engagementId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditEngagement", engagementId.toString()));
+        AuditWorkpaperFolder f = AuditWorkpaperFolder.create(tenantId.getValue(), engagementId,
+                req.parentId(), req.name(), req.folderType(), req.sortOrder());
+        workpaperFolderRepo.save(f);
+        return toFolderResponse(f);
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorkpaperFolderResponse> getWorkpaperFolders(TenantId tenantId, UUID engagementId) {
+        return workpaperFolderRepo.findByEngagement(tenantId.getValue(), engagementId).stream()
+                .map(this::toFolderResponse).toList();
+    }
+
+    @Transactional
+    public WorkpaperFileResponse uploadWorkpaperFile(TenantId tenantId, UUID engagementId,
+                                                      UploadWorkpaperFileRequest req) {
+        engagementRepo.findByTenantAndId(tenantId.getValue(), engagementId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditEngagement", engagementId.toString()));
+        AuditWorkpaperFolder folder = workpaperFolderRepo.findByTenantAndId(tenantId.getValue(), req.folderId())
+                .orElseThrow(() -> new HandyFlowException("Folder not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
+        if (!folder.getEngagementId().equals(engagementId)) {
+            throw new HandyFlowException("Folder not found", HttpStatus.NOT_FOUND, "NOT_FOUND");
+        }
+
+        String mimeType = req.mimeType() != null ? req.mimeType() : "application/octet-stream";
+        if (!ALLOWED_WORKPAPER_TYPES.contains(mimeType)) {
+            throw new HandyFlowException(
+                    "Unsupported file type — please upload a PDF, JPG, PNG, Word, or Excel document",
+                    HttpStatus.BAD_REQUEST, "UNSUPPORTED_FILE_TYPE");
+        }
+        long approxDecodedBytes = (req.fileContentBase64().length() * 3L) / 4;
+        if (approxDecodedBytes > MAX_WORKPAPER_FILE_BYTES) {
+            throw new HandyFlowException(
+                    "File is too large — maximum is " + (MAX_WORKPAPER_FILE_BYTES / (1024 * 1024)) + "MB",
+                    HttpStatus.BAD_REQUEST, "FILE_TOO_LARGE");
+        }
+
+        AuditWorkpaperFile previous = workpaperFileRepo
+                .findCurrentVersionByName(tenantId.getValue(), req.folderId(), req.fileName()).orElse(null);
+        int nextVersion = previous != null ? previous.getVersionNumber() + 1 : 1;
+
+        AuditWorkpaperFile file = AuditWorkpaperFile.create(tenantId.getValue(), engagementId, req.folderId(),
+                req.fileName(), mimeType, req.fileSizeBytes(), req.fileContentBase64(), nextVersion);
+        workpaperFileRepo.save(file);
+
+        if (previous != null) {
+            previous.markSuperseded(file.getId());
+            workpaperFileRepo.save(previous);
+        }
+        return toFileResponse(file);
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorkpaperFileResponse> getWorkpaperFiles(TenantId tenantId, UUID folderId) {
+        return workpaperFileRepo.findActiveByFolder(tenantId.getValue(), folderId).stream()
+                .map(this::toFileResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorkpaperFileResponse> getDeletedWorkpaperFiles(TenantId tenantId, UUID folderId) {
+        return workpaperFileRepo.findDeletedByFolder(tenantId.getValue(), folderId).stream()
+                .map(this::toFileResponse).toList();
+    }
+
+    /**
+     * action is one of PREPARE | REVIEW | SIGN_OFF | REOPEN — maps
+     * directly onto AuditWorkpaperFile's own domain methods rather than
+     * letting the caller set an arbitrary reviewStatus string. Who is
+     * allowed to review/sign off (segregation of duties — a preparer
+     * shouldn't review their own work) is a Phase 3+ enforcement point
+     * once EngagementAssignment roles are checked here; not yet wired
+     * in this pass.
+     */
+    @Transactional
+    public WorkpaperFileResponse updateWorkpaperFileStatus(TenantId tenantId, UUID fileId,
+                                                            UpdateWorkpaperStatusRequest req, UUID actingUserId) {
+        AuditWorkpaperFile file = workpaperFileRepo.findByTenantAndId(tenantId.getValue(), fileId)
+                .orElseThrow(() -> new ResourceNotFoundException("WorkpaperFile", fileId.toString()));
+        try {
+            switch (req.action()) {
+                case "PREPARE" -> file.markPrepared(actingUserId);
+                case "REVIEW" -> file.markReviewed(actingUserId);
+                case "SIGN_OFF" -> file.signOff(actingUserId);
+                case "REOPEN" -> file.reopen();
+                default -> throw new HandyFlowException("Unknown action: " + req.action(), HttpStatus.BAD_REQUEST, "INVALID_ACTION");
+            }
+        } catch (IllegalStateException ex) {
+            throw new HandyFlowException(ex.getMessage(), HttpStatus.CONFLICT, "INVALID_STATUS");
+        }
+        workpaperFileRepo.save(file);
+        return toFileResponse(file);
+    }
+
+    @Transactional
+    public void deleteWorkpaperFile(TenantId tenantId, UUID fileId) {
+        AuditWorkpaperFile file = workpaperFileRepo.findByTenantAndId(tenantId.getValue(), fileId)
+                .orElseThrow(() -> new ResourceNotFoundException("WorkpaperFile", fileId.toString()));
+        file.softDelete();
+        workpaperFileRepo.save(file);
+    }
+
+    @Transactional
+    public WorkpaperFileResponse restoreWorkpaperFile(TenantId tenantId, UUID fileId) {
+        AuditWorkpaperFile file = workpaperFileRepo.findByTenantAndId(tenantId.getValue(), fileId)
+                .orElseThrow(() -> new ResourceNotFoundException("WorkpaperFile", fileId.toString()));
+        file.restore();
+        workpaperFileRepo.save(file);
+        return toFileResponse(file);
+    }
+
+    private WorkpaperFolderResponse toFolderResponse(AuditWorkpaperFolder f) {
+        return new WorkpaperFolderResponse(f.getId(), f.getName(), f.getParentId(), f.getFolderType(), f.getSortOrder());
+    }
+
+    private WorkpaperFileResponse toFileResponse(AuditWorkpaperFile f) {
+        return new WorkpaperFileResponse(f.getId(), f.getFolderId(), f.getFileName(), f.getMimeType(), f.getFileSizeBytes(),
+                f.getReviewStatus(), f.getPreparedBy(), f.getPreparedAt(), f.getReviewedBy(), f.getReviewedAt(),
+                f.getSignedOffBy(), f.getSignedOffAt(), f.getVersionNumber(), f.getSupersededBy(), f.getCreatedAt());
     }
 }

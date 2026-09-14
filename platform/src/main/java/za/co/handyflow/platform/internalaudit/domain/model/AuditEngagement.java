@@ -41,6 +41,18 @@ public class AuditEngagement {
     @Column(name = "created_by") private UUID createdBy;
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
 
+    // Phase 2 — planning detail + the materiality model, per the agreed
+    // design. overallMateriality/performanceMateriality/
+    // clearlyTrivialThreshold are the engagement-level default; see
+    // SpecificMateriality for the optional per-account/GL-segment
+    // override.
+    @Column(name = "objectives") private String objectives;
+    @Column(name = "scope") private String scope;
+    @Column(name = "audit_criteria") private String auditCriteria;
+    @Column(name = "overall_materiality") private java.math.BigDecimal overallMateriality;
+    @Column(name = "performance_materiality") private java.math.BigDecimal performanceMateriality;
+    @Column(name = "clearly_trivial_threshold") private java.math.BigDecimal clearlyTrivialThreshold;
+
     public static AuditEngagement create(UUID tenantId, UUID planEntryId, UUID universeEntryId,
                                          String name, LocalDate startDate, LocalDate endDate, UUID createdBy) {
         AuditEngagement e = new AuditEngagement();
@@ -57,5 +69,17 @@ public class AuditEngagement {
 
     public void advanceStatus(String status) {
         this.status = status;
+    }
+
+    public void updatePlanning(String objectives, String scope, String auditCriteria,
+                               java.math.BigDecimal overallMateriality,
+                               java.math.BigDecimal performanceMateriality,
+                               java.math.BigDecimal clearlyTrivialThreshold) {
+        this.objectives = objectives;
+        this.scope = scope;
+        this.auditCriteria = auditCriteria;
+        this.overallMateriality = overallMateriality;
+        this.performanceMateriality = performanceMateriality;
+        this.clearlyTrivialThreshold = clearlyTrivialThreshold;
     }
 }

@@ -189,4 +189,104 @@ public class InternalAuditController {
                 auditService.assignRole(TenantContext.getTenantIdAsObject(), id, req,
                         TenantContext.getCurrentUserId())));
     }
+
+    // ── Phase 2: Planning detail + Materiality ──────────────────────────────────
+
+    @PutMapping("/engagements/{id}/planning")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    @Operation(summary = "Set engagement planning detail and the engagement-level materiality thresholds")
+    public ResponseEntity<ApiResponse<EngagementResponse>> updatePlanning(
+            @PathVariable UUID id, @RequestBody UpdatePlanningRequest req) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.updatePlanning(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @PostMapping("/engagements/{id}/specific-materiality")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    @Operation(summary = "Add an optional account/GL-segment-specific materiality threshold",
+            description = "Only created when the auditor decides a specific account genuinely needs its own threshold — not a required per-account configuration step.")
+    public ResponseEntity<ApiResponse<SpecificMaterialityResponse>> addSpecificMateriality(
+            @PathVariable UUID id, @Valid @RequestBody AddSpecificMaterialityRequest req) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                auditService.addSpecificMateriality(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    // ── Phase 2: Workpapers ──────────────────────────────────────────────────────
+    // Direct structural mirror of AccWorkpaperController — see
+    // InternalAuditService's own comment on this section for the fuller
+    // reasoning.
+
+    @PostMapping("/engagements/{id}/workpaper-folders")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    public ResponseEntity<ApiResponse<WorkpaperFolderResponse>> createWorkpaperFolder(
+            @PathVariable UUID id, @Valid @RequestBody CreateWorkpaperFolderRequest req) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                auditService.createWorkpaperFolder(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @GetMapping("/engagements/{id}/workpaper-folders")
+    @PreAuthorize("hasAuthority('AUDIT_READ')")
+    public ResponseEntity<ApiResponse<List<WorkpaperFolderResponse>>> getWorkpaperFolders(@PathVariable UUID id) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.getWorkpaperFolders(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/engagements/{id}/workpaper-files")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    public ResponseEntity<ApiResponse<WorkpaperFileResponse>> uploadWorkpaperFile(
+            @PathVariable UUID id, @Valid @RequestBody UploadWorkpaperFileRequest req) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                auditService.uploadWorkpaperFile(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @GetMapping("/engagements/{id}/workpaper-folders/{folderId}/files")
+    @PreAuthorize("hasAuthority('AUDIT_READ')")
+    public ResponseEntity<ApiResponse<List<WorkpaperFileResponse>>> getWorkpaperFiles(
+            @PathVariable UUID id, @PathVariable UUID folderId) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.getWorkpaperFiles(TenantContext.getTenantIdAsObject(), folderId)));
+    }
+
+    @GetMapping("/engagements/{id}/workpaper-folders/{folderId}/files/deleted")
+    @PreAuthorize("hasAuthority('AUDIT_READ')")
+    public ResponseEntity<ApiResponse<List<WorkpaperFileResponse>>> getDeletedWorkpaperFiles(
+            @PathVariable UUID id, @PathVariable UUID folderId) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.getDeletedWorkpaperFiles(TenantContext.getTenantIdAsObject(), folderId)));
+    }
+
+    @PostMapping("/workpaper-files/{fileId}/status")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    @Operation(summary = "Advance or reopen a workpaper file's review status",
+            description = "action is one of PREPARE | REVIEW | SIGN_OFF | REOPEN — maps directly onto the file's own state machine.")
+    public ResponseEntity<ApiResponse<WorkpaperFileResponse>> updateWorkpaperFileStatus(
+            @PathVariable UUID fileId, @Valid @RequestBody UpdateWorkpaperStatusRequest req) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.updateWorkpaperFileStatus(TenantContext.getTenantIdAsObject(), fileId, req,
+                        TenantContext.getCurrentUserId())));
+    }
+
+    @DeleteMapping("/workpaper-files/{fileId}")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    public ResponseEntity<ApiResponse<Void>> deleteWorkpaperFile(@PathVariable UUID fileId) {
+        featureGuard.requireModule("internal-audit");
+        auditService.deleteWorkpaperFile(TenantContext.getTenantIdAsObject(), fileId);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @PostMapping("/workpaper-files/{fileId}/restore")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    public ResponseEntity<ApiResponse<WorkpaperFileResponse>> restoreWorkpaperFile(@PathVariable UUID fileId) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.restoreWorkpaperFile(TenantContext.getTenantIdAsObject(), fileId)));
+    }
 }
