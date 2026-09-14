@@ -60,6 +60,26 @@ interface WorkpaperFile {
   reviewedBy: string | null; reviewedAt: string | null; signedOffBy: string | null; signedOffAt: string | null
   versionNumber: number; supersededBy: string | null; createdAt: string
 }
+interface AuditExceptionResp {
+  id: string; auditTestId: string; description: string; severity: string; status: string
+  raisedBy: string | null; raisedAt: string; resolutionNotes: string | null
+}
+interface AuditTestResp {
+  id: string; sampleItemId: string; procedure: string; result: string; notes: string | null
+  testedBy: string | null; testedAt: string | null; exceptions: AuditExceptionResp[]
+}
+interface SampleItemResp {
+  id: string; journalEntryId: string; entryNumberSnapshot: string | null; entryDateSnapshot: string | null
+  amountSnapshot: number | null; notes: string | null; selectedAt: string; tests: AuditTestResp[]
+}
+interface SamplingPlanResp {
+  id: string; engagementId: string
+  population: number; populationValue: number | null; samplingObjective: string | null; samplingMethod: string
+  riskLevel: string | null; expectedErrorRate: number | null; tolerableErrorRate: number | null
+  sampleSize: number; selectionMethod: string; samplePeriodFrom: string | null; samplePeriodTo: string | null
+  exclusions: string | null; rationale: string | null; preparedBy: string | null; reviewedBy: string | null
+  status: string; createdAt: string; items: SampleItemResp[]
+}
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 
@@ -539,7 +559,7 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
   // be expanded at a time (the existing accordion pattern), so a single
   // sub-tab state is enough — reset to "team" whenever a different
   // engagement is expanded.
-  const [engagementSubTab, setEngagementSubTab] = useState<"team" | "planning" | "workpapers">("team")
+  const [engagementSubTab, setEngagementSubTab] = useState<"team" | "planning" | "workpapers" | "sampling">("team")
   const [planningForm, setPlanningForm] = useState({ objectives: "", scope: "", auditCriteria: "", overallMateriality: "", performanceMateriality: "", clearlyTrivialThreshold: "" })
   const [showAddMateriality, setShowAddMateriality] = useState(false)
   const [materialityForm, setMaterialityForm] = useState({ accountOrGlSegment: "", threshold: "" })
@@ -548,6 +568,69 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
   const [folderForm, setFolderForm] = useState({ name: "", folderType: "GENERAL" })
   const [showDeletedFiles, setShowDeletedFiles] = useState(false)
   const [uploadFileName, setUploadFileName] = useState("")
+
+  // Phase 3 — sampling & testing
+  const [expandedPlan, setExpandedPlan] = useState<string | null>(null)
+  const [showNewPlan, setShowNewPlan] = useState(false)
+  const [planForm, setPlanForm] = useState({
+    samplingObjective: "", riskLevel: "MEDIUM", expectedErrorRate: "", tolerableErrorRate: "",
+    sampleSize: 25, selectionMethod: "RANDOM", samplePeriodFrom: "", samplePeriodTo: "", exclusions: "", rationale: "",
+  })
+  const [showNewTest, setShowNewTest] = useState<string | null>(null) // sampleItemId
+  const [testProcedure, setTestProcedure] = useState("")
+  const [showRecordResult, setShowRecordResult] = useState<string | null>(null) // testId
+  const [resultForm, setResultForm] = useState({ result: "PASS", notes: "" })
+  const [showRaiseException, setShowRaiseException] = useState<string | null>(null) // testId
+  const [exceptionForm, setExceptionForm] = useState({ description: "", severity: "MEDIUM" })
+
+  const samplingPlansQuery = useQuery<SamplingPlanResp[]>({
+    queryKey: ["ia-sampling-plans", expanded],
+    queryFn: async () => (await apiClient.get(`/api/v1/internal-audit/engagements/${expanded}/sampling-plans`)).data,
+    enabled: !!expanded && engagementSubTab === "sampling",
+  })
+  const exceptionsQuery = useQuery<AuditExceptionResp[]>({
+    queryKey: ["ia-exceptions", expanded],
+    queryFn: async () => (await apiClient.get(`/api/v1/internal-audit/engagements/${expanded}/exceptions`)).data,
+    enabled: !!expanded && engagementSubTab === "sampling",
+  })
+
+  const createSamplingPlan = useMutation({
+    mutationFn: (engagementId: string) => apiClient.post(`/api/v1/internal-audit/engagements/${engagementId}/sampling-plans`, {
+      ...planForm,
+      expectedErrorRate: planForm.expectedErrorRate ? Number(planForm.expectedErrorRate) : null,
+      tolerableErrorRate: planForm.tolerableErrorRate ? Number(planForm.tolerableErrorRate) : null,
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ia-sampling-plans", expanded] }); setShowNewPlan(false); setError("") },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to create sampling plan"),
+  })
+  const reviewPlan = useMutation({
+    mutationFn: (planId: string) => apiClient.post(`/api/v1/internal-audit/sampling-plans/${planId}/review`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ia-sampling-plans", expanded] }),
+  })
+  const createTest = useMutation({
+    mutationFn: (sampleItemId: string) => apiClient.post(`/api/v1/internal-audit/sample-items/${sampleItemId}/tests`, { procedure: testProcedure }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ia-sampling-plans", expanded] }); setShowNewTest(null); setTestProcedure(""); setError("") },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to create test"),
+  })
+  const recordResult = useMutation({
+    mutationFn: (testId: string) => apiClient.post(`/api/v1/internal-audit/tests/${testId}/result`, resultForm),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ia-sampling-plans", expanded] }); setShowRecordResult(null); setError("") },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to record result"),
+  })
+  const raiseException = useMutation({
+    mutationFn: (testId: string) => apiClient.post(`/api/v1/internal-audit/tests/${testId}/exceptions`, exceptionForm),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ia-sampling-plans", expanded] })
+      qc.invalidateQueries({ queryKey: ["ia-exceptions", expanded] })
+      setShowRaiseException(null); setExceptionForm({ description: "", severity: "MEDIUM" }); setError("")
+    },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to raise exception"),
+  })
+  const dismissException = useMutation({
+    mutationFn: ({ id, resolutionNotes }: { id: string; resolutionNotes: string }) =>
+      apiClient.post(`/api/v1/internal-audit/exceptions/${id}/dismiss`, { resolutionNotes }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ia-exceptions", expanded] }); qc.invalidateQueries({ queryKey: ["ia-sampling-plans", expanded] }) },
+  })
 
   const updatePlanning = useMutation({
     mutationFn: (engagementId: string) => apiClient.put(`/api/v1/internal-audit/engagements/${engagementId}/planning`, {
@@ -685,7 +768,7 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
               {expanded === e.id && (
                 <div style={{ padding: "0 16px 16px" }}>
                   <div style={{ display: "flex", gap: 4, marginBottom: 12, paddingTop: 12, borderTop: "1px solid #F1F5F9" }}>
-                    {(["team", "planning", "workpapers"] as const).map(st => (
+                    {(["team", "planning", "workpapers", "sampling"] as const).map(st => (
                       <button key={st} onClick={() => setEngagementSubTab(st)}
                         style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: engagementSubTab === st ? "#EFF6FF" : "transparent", color: engagementSubTab === st ? "#1B3A6B" : "#94A3B8", fontWeight: engagementSubTab === st ? 700 : 500, fontSize: 12, cursor: "pointer", textTransform: "capitalize" as const }}>
                         {st}
@@ -854,6 +937,119 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                       </div>
                     </div>
                   )}
+
+                  {engagementSubTab === "sampling" && (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>Sampling Plans — {samplingPlansQuery.data?.length ?? 0}</span>
+                        <button onClick={() => { setPlanForm({ samplingObjective: "", riskLevel: "MEDIUM", expectedErrorRate: "", tolerableErrorRate: "", sampleSize: 25, selectionMethod: "RANDOM", samplePeriodFrom: "", samplePeriodTo: "", exclusions: "", rationale: "" }); setShowNewPlan(true); setError("") }}
+                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid #1B3A6B", background: "#EFF6FF", color: "#1B3A6B", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                          <Plus size={11} /> New Sampling Plan
+                        </button>
+                      </div>
+
+                      {samplingPlansQuery.isLoading ? (
+                        <p style={{ fontSize: 12, color: "#94A3B8" }}>Loading…</p>
+                      ) : !samplingPlansQuery.data?.length ? (
+                        <p style={{ fontSize: 12, color: "#94A3B8" }}>No sampling plans yet.</p>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
+                          {samplingPlansQuery.data.map(p => (
+                            <div key={p.id} style={{ border: "1px solid #E2E8F0", borderRadius: 8 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", cursor: "pointer" }} onClick={() => setExpandedPlan(expandedPlan === p.id ? null : p.id)}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  {expandedPlan === p.id ? <ChevronUp size={13} color="#94A3B8" /> : <ChevronDown size={13} color="#94A3B8" />}
+                                  <span style={{ fontWeight: 700, fontSize: 12, color: "#0F172A" }}>{p.samplePeriodFrom} to {p.samplePeriodTo}</span>
+                                  <span style={{ fontSize: 11, color: "#94A3B8" }}>{p.sampleSize} of {p.population} entries</span>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: p.status === "FINALIZED" ? "#DCFCE7" : "#F1F5F9", color: p.status === "FINALIZED" ? "#166534" : "#64748B" }}>{p.status}</span>
+                                  {p.status === "DRAFT" && (
+                                    <button onClick={ev => { ev.stopPropagation(); reviewPlan.mutate(p.id) }}
+                                      style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #86EFAC", background: "#DCFCE7", color: "#166534", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                                      Review & Finalize
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {expandedPlan === p.id && (
+                                <div style={{ padding: "0 12px 12px", borderTop: "1px solid #F1F5F9" }}>
+                                  {p.rationale && <p style={{ fontSize: 11, color: "#94A3B8", margin: "10px 0" }}>{p.rationale}</p>}
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+                                    {p.items.map(item => (
+                                      <div key={item.id} style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, padding: "8px 10px" }}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: item.tests.length ? 6 : 0 }}>
+                                          <span style={{ fontSize: 12, fontWeight: 600, color: "#0F172A" }}>{item.entryNumberSnapshot} — {item.entryDateSnapshot}</span>
+                                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                            <span style={{ fontSize: 11, color: "#64748B" }}>R {item.amountSnapshot?.toLocaleString() ?? "—"}</span>
+                                            <button onClick={() => { setTestProcedure(""); setShowNewTest(item.id) }}
+                                              style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                                              + Test
+                                            </button>
+                                          </div>
+                                        </div>
+                                        {item.tests.map(t => (
+                                          <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 8px", background: "#fff", border: "1px solid #F1F5F9", borderRadius: 6, fontSize: 11, marginTop: 4 }}>
+                                            <span style={{ color: "#374151" }}>{t.procedure}</span>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20, background: t.result === "PASS" ? "#DCFCE7" : t.result === "PENDING" ? "#F1F5F9" : "#FEF2F2", color: t.result === "PASS" ? "#166534" : t.result === "PENDING" ? "#64748B" : "#DC2626" }}>{t.result}</span>
+                                              {t.result === "PENDING" && (
+                                                <button onClick={() => { setResultForm({ result: "PASS", notes: "" }); setShowRecordResult(t.id) }}
+                                                  style={{ padding: "2px 7px", borderRadius: 5, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 10, cursor: "pointer" }}>
+                                                  Record
+                                                </button>
+                                              )}
+                                              {(t.result === "FAIL" || t.result === "EXCEPTION") && t.exceptions.length === 0 && (
+                                                <button onClick={() => { setExceptionForm({ description: "", severity: "MEDIUM" }); setShowRaiseException(t.id) }}
+                                                  style={{ padding: "2px 7px", borderRadius: 5, border: "1px solid #FECACA", background: "#FEF2F2", color: "#DC2626", fontSize: 10, cursor: "pointer" }}>
+                                                  Raise Exception
+                                                </button>
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, marginBottom: 8, paddingTop: 12, borderTop: "1px solid #F1F5F9" }}>
+                        Exceptions — {exceptionsQuery.data?.length ?? 0}
+                      </div>
+                      {!exceptionsQuery.data?.length ? (
+                        <p style={{ fontSize: 12, color: "#94A3B8" }}>No exceptions raised for this engagement.</p>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {exceptionsQuery.data.map(ex => {
+                            const sevColor = ex.severity === "CRITICAL" || ex.severity === "HIGH" ? "#DC2626" : ex.severity === "MEDIUM" ? "#B45309" : "#64748B"
+                            const sevBg = ex.severity === "CRITICAL" || ex.severity === "HIGH" ? "#FEF2F2" : ex.severity === "MEDIUM" ? "#FFFBEB" : "#F1F5F9"
+                            return (
+                              <div key={ex.id} style={{ padding: "9px 12px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: sevBg, color: sevColor }}>{ex.severity}</span>
+                                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: ex.status === "OPEN" ? "#FFFBEB" : "#F1F5F9", color: ex.status === "OPEN" ? "#B45309" : "#64748B" }}>{ex.status}</span>
+                                </div>
+                                <p style={{ margin: 0, color: "#374151" }}>{ex.description}</p>
+                                {ex.resolutionNotes && <p style={{ margin: "4px 0 0", color: "#94A3B8", fontStyle: "italic" }}>{ex.resolutionNotes}</p>}
+                                {ex.status === "OPEN" && (
+                                  <button onClick={() => { const notes = prompt("Resolution notes?"); if (notes) dismissException.mutate({ id: ex.id, resolutionNotes: notes }) }}
+                                    style={{ marginTop: 6, padding: "3px 9px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                                    Dismiss
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -976,6 +1172,141 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
               <button onClick={() => setShowAddMateriality(false)} style={cancelBtn}>Cancel</button>
               <button onClick={() => addMateriality.mutate(expanded)} disabled={!materialityForm.accountOrGlSegment.trim() || !materialityForm.threshold || addMateriality.isPending} style={submitBtn}>
                 {addMateriality.isPending ? "Adding…" : "Add"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showNewPlan && expanded && (
+        <div style={modalOverlay}>
+          <div style={modalBox}>
+            <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>New Sampling Plan</h3>
+            <p style={{ fontSize: 11, color: "#94A3B8", marginBottom: 16 }}>Population is calculated automatically from posted journal entries in the period below. The sample is drawn immediately using random selection.</p>
+            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+              <div style={{ flex: 1 }}>
+                <label style={lbl}>Period From *</label>
+                <input type="date" value={planForm.samplePeriodFrom} onChange={e => setPlanForm(f => ({ ...f, samplePeriodFrom: e.target.value }))} style={inp} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={lbl}>Period To *</label>
+                <input type="date" value={planForm.samplePeriodTo} onChange={e => setPlanForm(f => ({ ...f, samplePeriodTo: e.target.value }))} style={inp} />
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl}>Sampling Objective</label>
+              <input value={planForm.samplingObjective} onChange={e => setPlanForm(f => ({ ...f, samplingObjective: e.target.value }))} placeholder="e.g. Test whether journal entries are properly authorised" style={inp} />
+            </div>
+            <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+              <div style={{ flex: 1 }}>
+                <label style={lbl}>Sample Size *</label>
+                <input type="number" min={1} value={planForm.sampleSize} onChange={e => setPlanForm(f => ({ ...f, sampleSize: Number(e.target.value) }))} style={inp} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={lbl}>Selection Method</label>
+                <select value={planForm.selectionMethod} onChange={e => setPlanForm(f => ({ ...f, selectionMethod: e.target.value }))} style={inp}>
+                  <option value="RANDOM">Random</option><option value="SYSTEMATIC">Systematic</option><option value="JUDGMENTAL">Judgmental</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+              <div style={{ flex: 1 }}>
+                <label style={lbl}>Risk Level</label>
+                <select value={planForm.riskLevel} onChange={e => setPlanForm(f => ({ ...f, riskLevel: e.target.value }))} style={inp}>
+                  <option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option><option value="CRITICAL">Critical</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={lbl}>Expected Error Rate (%)</label>
+                <input type="number" value={planForm.expectedErrorRate} onChange={e => setPlanForm(f => ({ ...f, expectedErrorRate: e.target.value }))} style={inp} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={lbl}>Tolerable Error Rate (%)</label>
+                <input type="number" value={planForm.tolerableErrorRate} onChange={e => setPlanForm(f => ({ ...f, tolerableErrorRate: e.target.value }))} style={inp} />
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl}>Exclusions</label>
+              <input value={planForm.exclusions} onChange={e => setPlanForm(f => ({ ...f, exclusions: e.target.value }))} placeholder="e.g. Reversing entries, intercompany eliminations" style={inp} />
+            </div>
+            <div style={{ marginBottom: 18 }}>
+              <label style={lbl}>Rationale</label>
+              <textarea value={planForm.rationale} onChange={e => setPlanForm(f => ({ ...f, rationale: e.target.value }))} rows={2} style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button onClick={() => setShowNewPlan(false)} style={cancelBtn}>Cancel</button>
+              <button onClick={() => createSamplingPlan.mutate(expanded)} disabled={!planForm.samplePeriodFrom || !planForm.samplePeriodTo || !planForm.sampleSize || createSamplingPlan.isPending} style={submitBtn}>
+                {createSamplingPlan.isPending ? "Drawing Sample…" : "Create & Draw Sample"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showNewTest && (
+        <div style={modalOverlay}>
+          <div style={{ ...modalBox, width: 400 }}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>New Test</h3>
+            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <label style={lbl}>Procedure *</label>
+            <textarea value={testProcedure} onChange={e => setTestProcedure(e.target.value)} rows={3}
+              placeholder="e.g. Vouch to supporting documentation and confirm dual authorisation" style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
+              <button onClick={() => setShowNewTest(null)} style={cancelBtn}>Cancel</button>
+              <button onClick={() => createTest.mutate(showNewTest)} disabled={!testProcedure.trim() || createTest.isPending} style={submitBtn}>
+                {createTest.isPending ? "Adding…" : "Add Test"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRecordResult && (
+        <div style={modalOverlay}>
+          <div style={{ ...modalBox, width: 400 }}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Record Test Result</h3>
+            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl}>Result</label>
+              <select value={resultForm.result} onChange={e => setResultForm(f => ({ ...f, result: e.target.value }))} style={inp}>
+                <option value="PASS">Pass</option><option value="FAIL">Fail</option><option value="EXCEPTION">Exception</option>
+              </select>
+            </div>
+            <div style={{ marginBottom: 18 }}>
+              <label style={lbl}>Notes</label>
+              <textarea value={resultForm.notes} onChange={e => setResultForm(f => ({ ...f, notes: e.target.value }))} rows={3} style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button onClick={() => setShowRecordResult(null)} style={cancelBtn}>Cancel</button>
+              <button onClick={() => recordResult.mutate(showRecordResult)} disabled={recordResult.isPending} style={submitBtn}>
+                {recordResult.isPending ? "Saving…" : "Save Result"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRaiseException && (
+        <div style={modalOverlay}>
+          <div style={{ ...modalBox, width: 400 }}>
+            <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Raise Exception</h3>
+            <p style={{ fontSize: 11, color: "#94A3B8", marginBottom: 14 }}>Severity is independent of the engagement's risk level — assess it on its own terms.</p>
+            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl}>Description *</label>
+              <textarea value={exceptionForm.description} onChange={e => setExceptionForm(f => ({ ...f, description: e.target.value }))} rows={3} style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
+            </div>
+            <div style={{ marginBottom: 18 }}>
+              <label style={lbl}>Severity</label>
+              <select value={exceptionForm.severity} onChange={e => setExceptionForm(f => ({ ...f, severity: e.target.value }))} style={inp}>
+                <option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option><option value="CRITICAL">Critical</option>
+              </select>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button onClick={() => setShowRaiseException(null)} style={cancelBtn}>Cancel</button>
+              <button onClick={() => raiseException.mutate(showRaiseException)} disabled={!exceptionForm.description.trim() || raiseException.isPending} style={submitBtn}>
+                {raiseException.isPending ? "Raising…" : "Raise Exception"}
               </button>
             </div>
           </div>
