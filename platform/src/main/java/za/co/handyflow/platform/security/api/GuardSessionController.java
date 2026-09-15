@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.security.application.internal.DeviceSessionService;
 import za.co.handyflow.platform.security.application.internal.GuardLocationService;
 import za.co.handyflow.platform.security.domain.model.DeviceSession;
+import za.co.handyflow.platform.security.domain.model.ResourceCustody;
 import za.co.handyflow.platform.security.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -45,10 +46,10 @@ import java.util.UUID;
  * identity/authorization is resolved from device/session state inside the
  * service layer, not a Spring Security authority claim.
  * <p>
- * Resource custody (checkout/return) and checkpoint scanning are
- * deliberately NOT in this controller — tracked as the next piece of
- * GAP-01 to migrate, not silently folded in here without their own
- * review.
+ * Resource custody (checkout/return) is included below, completing the
+ * migration — checkpoint scanning was migrated separately in
+ * {@link GuardCheckpointController} since it lived on its own controller
+ * originally.
  */
 @Tag(name = "Guard - Sessions", description = "Guard-facing shift lifecycle and GPS location ping (mobile)")
 @RestController
@@ -113,5 +114,36 @@ public class GuardSessionController {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         guardLocationService.recordPing(tenantId, sessionId, req);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // ── Resource Custody ───────────────────────────────────────────────────────
+
+    @PostMapping("/{sessionId}/resources/checkout")
+    @Operation(
+            summary = "Check out a resource (radio, key, firearm, vehicle) — guard-facing",
+            description = "Optionally requires witnessedBy (a second guard's ID) for " +
+                    "high-risk items like firearms, per site configuration. Same posture as " +
+                    "the endpoint this mirrors.")
+    public ResponseEntity<ApiResponse<ResourceCustody>> checkoutResource(
+            @PathVariable UUID sessionId,
+            @Valid @RequestBody CheckoutResourceRequest req) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(
+                        sessionService.checkoutResource(tenantId, sessionId, req)));
+    }
+
+    @PostMapping("/resources/{custodyId}/return")
+    @Operation(
+            summary = "Return a checked-out resource — guard-facing",
+            description = "Records condition on return (GOOD/DAMAGED/MISSING). A session " +
+                    "cannot close while resources remain checked out unless resourcesReturned " +
+                    "is explicitly set on the close request.")
+    public ResponseEntity<ApiResponse<ResourceCustody>> returnResource(
+            @PathVariable UUID custodyId,
+            @Valid @RequestBody ReturnResourceRequest req) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(
+                sessionService.returnResource(tenantId, custodyId, req)));
     }
 }
