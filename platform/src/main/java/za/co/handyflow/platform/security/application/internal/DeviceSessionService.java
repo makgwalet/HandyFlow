@@ -300,4 +300,33 @@ public class DeviceSessionService {
                 s.getHandoverNotes(), s.getForcedCloseReason(),
                 shift != null ? shift.getSiteId() : null);
     }
+
+    /**
+     * GAP-07 fix support: resolves the CALLING guard's own current site
+     * from their open session/shift — never a free siteId parameter the
+     * caller supplies, per the mobile gap report's own suggested fix
+     * ("scoped to the guard's own site via their open DeviceSession, not
+     * a free siteId parameter"). findOpenByGuard() is not itself
+     * tenant-scoped at the query level, but guardId is already
+     * tenant-unique (a Guard record belongs to exactly one tenant), so
+     * this is safe without an extra tenant check — same reasoning
+     * already relied on implicitly everywhere else a bare guardId is
+     * used as a lookup key in this service.
+     */
+    @Transactional(readOnly = true)
+    public UUID resolveCurrentSiteForGuard(UUID guardId) {
+        DeviceSession session = sessionRepository.findOpenByGuard(guardId)
+                .orElseThrow(() -> new HandyFlowException(
+                        "No open session — clock in before accessing site-scoped data",
+                        HttpStatus.CONFLICT, "NO_OPEN_SESSION"));
+        if (session.getShiftId() == null) {
+            throw new HandyFlowException(
+                    "Your open session has no linked shift — no site to resolve",
+                    HttpStatus.CONFLICT, "NO_SHIFT");
+        }
+        return shiftRepository.findById(session.getShiftId())
+                .map(za.co.handyflow.platform.security.domain.model.Shift::getSiteId)
+                .orElseThrow(() -> new HandyFlowException(
+                        "Shift not found for your open session", HttpStatus.CONFLICT, "SHIFT_NOT_FOUND"));
+    }
 }

@@ -11,12 +11,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.security.application.internal.GateAccessService;
+import za.co.handyflow.platform.security.application.internal.DeviceSessionService;
+import za.co.handyflow.platform.security.dto.AccessPointResponse;
 import za.co.handyflow.platform.security.dto.GateRegisterEntryResponse;
 import za.co.handyflow.platform.security.dto.LogArrivalRequest;
 import za.co.handyflow.platform.security.dto.LogExitRequest;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
+import za.co.handyflow.platform.shared.TenantId;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -43,6 +47,45 @@ import java.util.UUID;
 public class GuardGateAccessController {
 
     private final GateAccessService gateAccessService;
+    private final DeviceSessionService deviceSessionService;
+
+    // ── GAP-07 fix: guard-facing reads ──────────────────────────────────────────
+    // A guard needs an accessPointId to log an arrival and needs to know
+    // who's on site to pick the right entry to close on exit — both reads
+    // only existed on the supervisor-facing GateAccessController
+    // (/api/v1/security/**, SECURITY_READ), same wrong-surface problem as
+    // everywhere else in this file, just on reads instead of writes.
+    // Scoped to the CALLING guard's own current site (resolved from their
+    // open session via DeviceSessionService.resolveCurrentSiteForGuard()),
+    // never a free siteId parameter — per the mobile gap report's own
+    // suggested fix, so a guard can't browse another site's access points
+    // or register just by changing a query parameter.
+
+    @GetMapping("/access-points")
+    @PreAuthorize("hasAuthority('SECURITY_GUARD')")
+    @Operation(
+            summary = "Access points at the calling guard's own current site — guard-facing",
+            description = "Site is resolved from the guard's own open session, not a caller-" +
+                    "supplied parameter. Fails with 409/NO_OPEN_SESSION if the guard isn't " +
+                    "clocked in.")
+    public ResponseEntity<ApiResponse<List<AccessPointResponse>>> getAccessPoints() {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        UUID guardId = TenantContext.getCurrentUserId();
+        UUID siteId = deviceSessionService.resolveCurrentSiteForGuard(guardId);
+        return ResponseEntity.ok(ApiResponse.success(gateAccessService.getAccessPoints(tenantId, siteId)));
+    }
+
+    @GetMapping("/on-site")
+    @PreAuthorize("hasAuthority('SECURITY_GUARD')")
+    @Operation(
+            summary = "Everyone currently on site at the calling guard's own current site — guard-facing",
+            description = "Same site-resolution posture as getAccessPoints() above.")
+    public ResponseEntity<ApiResponse<List<GateRegisterEntryResponse>>> getOnSite() {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        UUID guardId = TenantContext.getCurrentUserId();
+        UUID siteId = deviceSessionService.resolveCurrentSiteForGuard(guardId);
+        return ResponseEntity.ok(ApiResponse.success(gateAccessService.getOnSite(tenantId, siteId)));
+    }
 
     @PostMapping("/entries")
     @PreAuthorize("hasAuthority('SECURITY_GUARD')")
