@@ -51,6 +51,15 @@ public class ApBill {
     // Evidence
     @Column(name = "attachment_url")  private String attachmentUrl;
     @Column(name = "attachment_name") private String attachmentName;
+
+    // FIX (Supply Chain -> AP hand-off, product owner's own explicit
+    // design): null for the vast majority of bills, which are entered
+    // directly into AP. Set only when this bill was created from a
+    // matched ScSupplierInvoice — see that entity's own apBillId field
+    // for the reverse link, and ApFacade.createBillFromSupplyChainInvoice()
+    // for where both sides get set together, atomically.
+    @Column(name = "source_type")      private String sourceType;
+    @Column(name = "source_reference") private String sourceReference;
     @Column(name = "pop_url")         private String popUrl;
     @Column(name = "pop_name")        private String popName;
     @Column(name = "pop_uploaded_at") private Instant popUploadedAt;
@@ -110,6 +119,37 @@ public class ApBill {
         b.status         = "DRAFT";
         b.createdAt      = Instant.now();
         b.updatedAt      = Instant.now();
+        return b;
+    }
+
+    /**
+     * FIX (Supply Chain -> AP hand-off): a dedicated factory rather than
+     * widening the general create() signature above with two more
+     * parameters every other caller would have to pass null for — this
+     * is the specialized case (a bill created FROM a matched
+     * ScSupplierInvoice, not entered directly), so it gets its own
+     * entry point. Still starts at DRAFT — the hand-off does not
+     * auto-approve the bill; AP's own normal approval workflow takes it
+     * from here, matching the product owner's own "AP owns payment
+     * lifecycle from here" instruction exactly.
+     */
+    public static ApBill createFromSupplyChain(TenantId tenantId, UUID supplierId, String supplierName,
+                                               String billNumber, LocalDate billDate, LocalDate dueDate,
+                                               BigDecimal amount, BigDecimal vatAmount,
+                                               String sourceReference, UUID createdBy) {
+        // category deliberately "OTHER" — confirmed BillsTab.tsx/
+        // RecurringBillsTab.tsx's own fixed CATEGORIES list doesn't
+        // include anything for procurement-sourced bills, and inventing
+        // an unrecognized category string here would display oddly in
+        // the existing category badge/filter UI. "OTHER" is the
+        // established, already-supported fallback — a dedicated
+        // category can be added to that frontend list later if
+        // hand-off volume ever warrants visually distinguishing these.
+        ApBill b = create(tenantId, supplierId, supplierName, billNumber, billDate, dueDate,
+                "OTHER", "Supplier invoice via Supply Chain — " + sourceReference,
+                amount, vatAmount, null, null, null, createdBy);
+        b.sourceType      = "SUPPLY_CHAIN";
+        b.sourceReference = sourceReference;
         return b;
     }
 

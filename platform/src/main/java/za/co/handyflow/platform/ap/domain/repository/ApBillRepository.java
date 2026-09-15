@@ -26,6 +26,13 @@ public interface ApBillRepository extends JpaRepository<ApBill, UUID> {
 
     Optional<ApBill> findByIdAndTenantId(UUID id, TenantId tenantId);
 
+    // FIX (Supply Chain -> AP hand-off): idempotency guard —
+    // ApFacade.createBillFromSupplyChainInvoice() checks this first so a
+    // retried or re-triggered approval never creates a second ApBill for
+    // the same source invoice.
+    @Query("SELECT b FROM ApBill b WHERE b.tenantId = :tenantId AND b.sourceType = :sourceType AND b.sourceReference = :sourceReference")
+    Optional<ApBill> findBySource(TenantId tenantId, String sourceType, String sourceReference);
+
     @Query("""
         SELECT b FROM ApBill b
         WHERE b.tenantId = :tenantId

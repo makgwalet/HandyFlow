@@ -12,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.approvals.application.ApprovalFacade;
 import za.co.handyflow.platform.approvals.dto.ApprovalRequestResponse;
 import za.co.handyflow.platform.approvals.dto.ApprovalStepResponse;
+import za.co.handyflow.platform.ap.application.ApFacade;
+import za.co.handyflow.platform.ap.domain.model.ApBill;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.shared.TenantSequenceService;
@@ -44,6 +46,11 @@ public class ScmService {
     // NEW: backs supplier invoice attachments (upload/list/download/delete).
     private final ScSupplierInvoiceAttachmentRepository attachmentRepo;
     private final ScPoLineRepository          poLineRepo;
+    // FIX (Supply Chain -> AP hand-off, product owner's own explicit
+    // design decision): the bridge between ScSupplierInvoice and ApBill
+    // — see ApFacade.createBillFromSupplyChainInvoice()'s own doc
+    // comment for the fuller design.
+    private final ApFacade apFacade;
     private final ScSupplierItemRepository    supplierItemRepo;
     private final ScmNotificationService      notificationService;
     // NEW: backs generatePoPdf() below — same jdbc-based tenant-lookup
@@ -706,6 +713,21 @@ public class ScmService {
                         HttpStatus.NOT_FOUND, "NOT_FOUND"));
         inv.approve(approverId, approverName);
         log.info("[SCM] Supplier invoice {} approved by {}", inv.getInvoiceNumber(), approverName);
+
+        // FIX (Supply Chain -> AP hand-off, product owner's own explicit
+        // design): "Step 4 — Match approved... Step 5 — AP handoff" —
+        // the hand-off happens immediately, in the same transaction as
+        // approval, so there's never a window where an approved invoice
+        // exists without its corresponding AP bill. Starts the bill at
+        // DRAFT — AP's own normal approval workflow takes over from
+        // here, matching "AP owns payment lifecycle from here" exactly.
+        String supplierName = supplierRepo.findByTenantIdAndId(tenantId.getValue(), inv.getSupplierId())
+                .map(ScSupplier::getName).orElse("Unknown Supplier");
+        ApBill bill = apFacade.createBillFromSupplyChainInvoice(tenantId, inv.getSupplierId(), supplierName,
+                inv.getInvoiceNumber(), inv.getInvoiceDate(), inv.getDueDate(),
+                inv.getSubtotal(), inv.getVatAmount(), approverId);
+        inv.recordApBillHandOff(bill.getId());
+
         return invoiceRepo.save(inv);
     }
 
@@ -714,7 +736,17 @@ public class ScmService {
         ScSupplierInvoice inv = invoiceRepo.findByTenantIdAndId(tenantId.getValue(), id)
                 .orElseThrow(() -> new HandyFlowException("Invoice not found",
                         HttpStatus.NOT_FOUND, "NOT_FOUND"));
-        inv.markPaid(paymentRef);
+        try {
+            inv.markPaid(paymentRef);
+        } catch (IllegalStateException e) {
+            // FIX (Supply Chain -> AP hand-off): translates
+            // ScSupplierInvoice.markPaid()'s own new guard (refuses once
+            // apBillId is set) into a clean 409 rather than letting a raw
+            // IllegalStateException propagate — matching how every other
+            // domain-level state-machine violation in this codebase is
+            // surfaced to the caller.
+            throw new HandyFlowException(e.getMessage(), HttpStatus.CONFLICT, "ALREADY_HANDED_OFF");
+        }
         return invoiceRepo.save(inv);
     }
 

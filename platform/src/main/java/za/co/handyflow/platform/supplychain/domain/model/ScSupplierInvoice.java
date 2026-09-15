@@ -52,6 +52,17 @@ public class ScSupplierInvoice {
     @Column(name = "paid_at")           Instant paidAt;
     @Column(name = "payment_reference") String  paymentReference;
     @Column(name = "journal_entry_id")  UUID    journalEntryId;
+
+    // FIX (Supply Chain -> AP hand-off, product owner's own explicit
+    // design): set the moment this invoice is approved (three-way
+    // matched, cleared for payment) — see ApFacade
+    // .createBillFromSupplyChainInvoice()'s own doc comment for the
+    // fuller design. This field IS the "handed off" fact — markPaid()
+    // below refuses to run once it's set, since AP now owns payment for
+    // this invoice; paying it again here would be exactly the
+    // duplicate-liability risk the product owner explicitly warned
+    // against.
+    @Column(name = "ap_bill_id") UUID apBillId;
     String notes;
     @Column(name = "created_at", nullable = false) Instant createdAt;
     @Column(name = "updated_at", nullable = false) Instant updatedAt;
@@ -154,11 +165,34 @@ public class ScSupplierInvoice {
     }
 
     public void markPaid(String paymentReference) {
+        // FIX (Supply Chain -> AP hand-off): once this invoice has been
+        // handed off, AP owns payment — paying it again here would be
+        // exactly the duplicate-financial-liability risk the product
+        // owner explicitly warned against. This path is now only ever
+        // reachable for the (increasingly rare, pre-hand-off-design)
+        // case of an invoice approved and paid entirely within Supply
+        // Chain without ever going through AP.
+        if (apBillId != null)
+            throw new IllegalStateException(
+                    "This invoice has been handed off to AP (bill " + apBillId + ") — complete payment through Accounts Payable, not here");
         if (status != InvoiceStatus.APPROVED)
             throw new IllegalStateException("Only APPROVED invoices can be marked paid — current: " + status);
         status           = InvoiceStatus.PAID;
         paidAt           = Instant.now();
         this.paymentReference = paymentReference;
+        touch();
+    }
+
+    /**
+     * FIX (Supply Chain -> AP hand-off): called immediately after
+     * approve() succeeds, in the same transaction — see
+     * ScmService.approveSupplierInvoice()'s own comment. Setting this
+     * is what "handed off" means for this entity; nothing else changes
+     * about its own status (it stays APPROVED, it does not become PAID
+     * here — AP's own bill carries the payment status from now on).
+     */
+    public void recordApBillHandOff(UUID apBillId) {
+        this.apBillId = apBillId;
         touch();
     }
 
