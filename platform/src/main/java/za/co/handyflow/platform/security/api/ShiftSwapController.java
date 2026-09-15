@@ -40,7 +40,19 @@ import java.util.UUID;
  * rejectSwap are genuinely supervisor-only per this class's own
  * documentation — SECURITY_MANAGE alone. Reads get SECURITY_READ.
  * <p>
- * NOTE, not resolved here: this controller sits under
+ * RESOLVED (mobile gap report GAP-08): the open question below about
+ * whether guards can reach createSwapRequest/acceptSwap/cancelSwap has
+ * been answered — they couldn't, confirmed directly. Fixed in {@link
+ * GuardShiftSwapController} under /api/v1/guard/shifts/swaps, mirroring
+ * this controller's own create/accept/cancel logic unchanged (identity
+ * resolution and authority were already correct here, purely a routing
+ * fix). This controller is untouched and still owns approve/reject and
+ * the tenant-wide pending-swaps list, all genuinely supervisor-only.
+ * getSwapsByGuard() below also had no guard-reachable equivalent — see
+ * GuardShiftSwapController's own GET /my-swaps.
+ * <p>
+ * NOTE, historical — the open question that prompted the fix above:
+ * this controller sits under
  * /api/v1/security/shifts/swaps — the standard tenant-JWT surface, not
  * /api/v1/guard/** (GuardJwtFilter). If guards don't carry tenant JWTs
  * (confirmed true for the newer guard-auth architecture this session's
