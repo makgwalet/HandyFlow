@@ -31,6 +31,26 @@ public interface AgHealthEventRepository extends JpaRepository<AgHealthEvent, UU
     @Query("SELECT e FROM AgHealthEvent e WHERE e.nextDueDate IS NOT NULL AND e.nextDueDate <= :today AND e.reminderAcknowledged = false")
     List<AgHealthEvent> findDueAcrossTenants(LocalDate today);
 
+    // FIX (Agriculture GAP 5 — mobile gap report, "attention" endpoint):
+    // the farm-scoped read equivalent of the sweep above, backing the
+    // real GET /farms/{id}/attention endpoint the gap report asked for
+    // instead of the client-side "fetch every animal/group's health
+    // events and filter locally" workaround it documented. AgHealthEvent
+    // has no farmId of its own — scoped via a subquery through whichever
+    // of animalId/groupId is set, matching how every animal-or-group
+    // entity in this module is queried elsewhere.
+    @Query("""
+        SELECT e FROM AgHealthEvent e
+        WHERE e.tenantId = :tenantId
+        AND e.nextDueDate IS NOT NULL AND e.nextDueDate <= :today AND e.reminderAcknowledged = false
+        AND (
+            e.animalId IN (SELECT a.id FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.deletedAt IS NULL)
+            OR e.groupId IN (SELECT g.id FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.deletedAt IS NULL)
+        )
+        ORDER BY e.nextDueDate ASC
+        """)
+    List<AgHealthEvent> findDueForFarm(TenantId tenantId, UUID farmId, LocalDate today);
+
     // Backs AgCostReportingService — COALESCE so an animal/group with zero
     // health events returns 0, not null, keeping the arithmetic in the cost
     // service simple, mirroring VehicleServiceRepository.sumCostByVehicle().

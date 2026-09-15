@@ -27,4 +27,18 @@ public interface AgScoutingRecordRepository extends JpaRepository<AgScoutingReco
     // AgHealthEventRepository.findDueAcrossTenants() exactly.
     @Query("SELECT r FROM AgScoutingRecord r WHERE r.followUpDate IS NOT NULL AND r.followUpDate <= :today AND r.followUpAcknowledged = false")
     List<AgScoutingRecord> findFollowUpDueAcrossTenants(LocalDate today);
+
+    // FIX (Agriculture GAP 5 — mobile gap report, "attention" endpoint):
+    // farm-scoped equivalent of the sweep above, mirroring
+    // AgHealthEventRepository.findDueForFarm()'s own reasoning exactly —
+    // AgScoutingRecord has no farmId of its own, scoped via a subquery
+    // through cropCycleId -> AgCropCycle.farmId.
+    @Query("""
+        SELECT r FROM AgScoutingRecord r
+        WHERE r.tenantId = :tenantId
+        AND r.followUpDate IS NOT NULL AND r.followUpDate <= :today AND r.followUpAcknowledged = false
+        AND r.cropCycleId IN (SELECT c.id FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.farmId = :farmId AND c.deletedAt IS NULL)
+        ORDER BY r.followUpDate ASC
+        """)
+    List<AgScoutingRecord> findFollowUpDueForFarm(TenantId tenantId, UUID farmId, LocalDate today);
 }

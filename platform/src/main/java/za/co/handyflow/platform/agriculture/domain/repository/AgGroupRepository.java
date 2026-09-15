@@ -18,6 +18,10 @@ public interface AgGroupRepository extends JpaRepository<AgGroup, UUID> {
     @Query("SELECT g FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.deletedAt IS NULL ORDER BY g.batchNumber")
     Page<AgGroup> findAllActiveForFarm(TenantId tenantId, UUID farmId, Pageable pageable);
 
+    // FIX (Agriculture GAP 4 — mobile gap report, "Home/Today" summary).
+    @Query("SELECT COUNT(g) FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.deletedAt IS NULL")
+    long countActiveForFarm(TenantId tenantId, UUID farmId);
+
     @Query("SELECT g FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.status = :status AND g.deletedAt IS NULL ORDER BY g.batchNumber")
     Page<AgGroup> findByStatusForFarm(TenantId tenantId, UUID farmId, String status, Pageable pageable);
 

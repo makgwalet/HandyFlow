@@ -26,4 +26,14 @@ public interface AgInventoryItemRepository extends JpaRepository<AgInventoryItem
     @Query("SELECT i FROM AgInventoryItem i WHERE i.deletedAt IS NULL AND i.status = 'ACTIVE' " +
             "AND i.reorderLevel IS NOT NULL AND i.currentQuantity < i.reorderLevel")
     List<AgInventoryItem> findBelowReorderLevelAcrossTenants();
+
+    // FIX (Agriculture GAP 5 — mobile gap report, "attention" endpoint):
+    // farm-scoped equivalent of the sweep above. AgInventoryItem already
+    // has its own farmId, so this needed no join, unlike the health-event
+    // and scouting-record equivalents.
+    @Query("SELECT i FROM AgInventoryItem i WHERE i.tenantId = :tenantId AND i.farmId = :farmId " +
+            "AND i.deletedAt IS NULL AND i.status = 'ACTIVE' " +
+            "AND i.reorderLevel IS NOT NULL AND i.currentQuantity < i.reorderLevel " +
+            "ORDER BY i.itemName")
+    List<AgInventoryItem> findBelowReorderLevelForFarm(TenantId tenantId, UUID farmId);
 }

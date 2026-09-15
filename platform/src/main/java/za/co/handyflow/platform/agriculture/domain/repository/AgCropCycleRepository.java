@@ -28,6 +28,13 @@ public interface AgCropCycleRepository extends JpaRepository<AgCropCycle, UUID> 
     @Query("SELECT c FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.farmId = :farmId AND c.status = :status AND c.deletedAt IS NULL ORDER BY c.createdAt DESC")
     Page<AgCropCycle> findByStatusForFarm(TenantId tenantId, UUID farmId, String status, Pageable pageable);
 
+    // FIX (Agriculture GAP 4 — mobile gap report, "Home/Today" summary).
+    // "Active" here means still in the field — excludes the three
+    // terminal statuses (HARVESTED, FAILED, ABANDONED), matching this
+    // entity's own documented status list.
+    @Query("SELECT COUNT(c) FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.farmId = :farmId AND c.deletedAt IS NULL AND c.status NOT IN ('HARVESTED', 'FAILED', 'ABANDONED')")
+    long countActiveForFarm(TenantId tenantId, UUID farmId);
+
     @Query("SELECT c FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.seasonId = :seasonId AND c.deletedAt IS NULL ORDER BY c.createdAt DESC")
     Page<AgCropCycle> findAllActiveForSeason(TenantId tenantId, UUID seasonId, Pageable pageable);
 }

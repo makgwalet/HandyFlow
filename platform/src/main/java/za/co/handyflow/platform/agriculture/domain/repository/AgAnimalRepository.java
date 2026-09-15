@@ -18,6 +18,12 @@ public interface AgAnimalRepository extends JpaRepository<AgAnimal, UUID> {
     @Query("SELECT a FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.deletedAt IS NULL ORDER BY a.tagNumber")
     Page<AgAnimal> findAllActiveForFarm(TenantId tenantId, UUID farmId, Pageable pageable);
 
+    // FIX (Agriculture GAP 4 — mobile gap report, "Home/Today" summary):
+    // backs the animal-count tile — avoids pulling a full page just to
+    // count.
+    @Query("SELECT COUNT(a) FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.deletedAt IS NULL")
+    long countActiveForFarm(TenantId tenantId, UUID farmId);
+
     @Query("SELECT a FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.status = :status AND a.deletedAt IS NULL ORDER BY a.tagNumber")
     Page<AgAnimal> findByStatusForFarm(TenantId tenantId, UUID farmId, String status, Pageable pageable);
 

@@ -12,14 +12,18 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.agriculture.application.internal.AgFarmService;
+import za.co.handyflow.platform.agriculture.application.internal.AgDashboardService;
 import za.co.handyflow.platform.agriculture.dto.AssignManagerRequest;
+import za.co.handyflow.platform.agriculture.dto.AttentionItemResponse;
 import za.co.handyflow.platform.agriculture.dto.CreateFarmRequest;
 import za.co.handyflow.platform.agriculture.dto.FarmResponse;
+import za.co.handyflow.platform.agriculture.dto.FarmTodaySummaryResponse;
 import za.co.handyflow.platform.agriculture.dto.UpdateFarmRequest;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -29,6 +33,7 @@ import java.util.UUID;
 public class AgFarmController {
 
     private final AgFarmService farmService;
+    private final AgDashboardService dashboardService;
     private final FeatureGuard featureGuard;
 
     @GetMapping
@@ -48,6 +53,45 @@ public class AgFarmController {
         featureGuard.requireModule("agriculture");
         return ResponseEntity.ok(ApiResponse.success(
                 farmService.getFarm(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    // FIX (Agriculture GAP 4 — mobile gap report): the real endpoint the
+    // report's own §GAP 4 recommended over its documented client-side
+    // workaround ("compose it client-side... N requests and no
+    // server-side 'what changed today' filtering"). One round trip:
+    // active animal/group/crop-cycle counts plus the same attention list
+    // GET /attention returns on its own below.
+    @GetMapping("/{id}/today-summary")
+    @PreAuthorize("hasAuthority('AGRICULTURE_READ')")
+    @Operation(summary = "Home/Today dashboard summary — counts plus the attention list, one call",
+            description = "Deliberately counts-only for animals/groups/crop cycles, no " +
+                    "hectares-in-production figure this pass (see FarmTodaySummaryResponse's " +
+                    "own comment for why) — and no eggs/birds tiles, since Poultry is confirmed " +
+                    "out of scope for this build increment.")
+    public ResponseEntity<ApiResponse<FarmTodaySummaryResponse>> getTodaySummary(@PathVariable UUID id) {
+        featureGuard.requireModule("agriculture");
+        return ResponseEntity.ok(ApiResponse.success(
+                dashboardService.getTodaySummary(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    // FIX (Agriculture GAP 5 — mobile gap report): the real endpoint the
+    // report's own §GAP 5 recommended over its documented client-side
+    // workaround (fetching every animal/group's health events and every
+    // inventory item, then filtering locally). Combines overdue health-
+    // event reminders, overdue scouting follow-ups, and low-stock
+    // inventory into one ranked list — real data via the same underlying
+    // queries AgNotificationScheduler/AgCropNotificationScheduler already
+    // use for their own tenant-wide sweeps, just farm-scoped and pulled
+    // on demand instead of pushed once daily.
+    @GetMapping("/{id}/attention")
+    @PreAuthorize("hasAuthority('AGRICULTURE_READ')")
+    @Operation(summary = "What currently needs attention on this farm — ranked by severity",
+            description = "Overdue health-event reminders, overdue scouting follow-ups, and " +
+                    "low-stock inventory items, one ranked list.")
+    public ResponseEntity<ApiResponse<List<AttentionItemResponse>>> getAttention(@PathVariable UUID id) {
+        featureGuard.requireModule("agriculture");
+        return ResponseEntity.ok(ApiResponse.success(
+                dashboardService.getAttention(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @PostMapping
