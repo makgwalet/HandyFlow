@@ -297,6 +297,7 @@ public class DeviceSessionService {
                 shift != null ? shift.getStartAt() + " – " + shift.getEndAt() : null,
                 s.getStartedAt(), s.getEndedAt(),
                 s.isOpen(), s.durationMinutes(),
-                s.getHandoverNotes(), s.getForcedCloseReason());
+                s.getHandoverNotes(), s.getForcedCloseReason(),
+                shift != null ? shift.getSiteId() : null);
     }
 }
