@@ -22,9 +22,11 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * GuardLocationService — GPS ping ingestion (backend-only pass; no
- * "current locations for the map" read endpoint yet -- that's the next
- * stage of the real-GPS-map feature).
+ * GuardLocationService — GPS ping ingestion and the "current locations"
+ * read for the live map. getCurrentLocationsForSite() below closes the
+ * gap this class's own doc comment used to describe as the next stage
+ * of this feature — replaces LiveMapTab.tsx's fabricated,
+ * fixed-position placeholder with real data.
  *
  * Every ping does two things in one transaction:
  *   1. Append to security_guard_location_pings (history, via
@@ -109,5 +111,48 @@ public class GuardLocationService {
 
         log.debug("[Security] Location ping recorded guardId={} sessionId={} siteId={}",
                 guardId, sessionId, siteId);
+    }
+
+    /**
+     * FIX: the read side security_guard_current_location's own table
+     * comment described as "not yet built" — closes GAP-05 from the
+     * mobile gap report and replaces LiveMapTab.tsx's fabricated,
+     * fixed-position placeholder with real data. Raw JDBC, matching
+     * this table's own "no JPA entity" convention exactly (see this
+     * class's own top comment).
+     * <p>
+     * Deliberately returns every guard with a stored position for this
+     * site, not just the ones within LIVENESS_THRESHOLD_MINUTES —
+     * stale is computed and returned per-row instead, so the frontend
+     * can choose how to present a guard who's gone quiet (grey them out
+     * with a "last seen" time, for instance) rather than having them
+     * silently vanish from the map the moment they cross the 5-minute
+     * line, which would look like a bug, not a status.
+     */
+    @Transactional(readOnly = true)
+    public java.util.List<za.co.handyflow.platform.security.dto.CurrentLocationResponse> getCurrentLocationsForSite(
+            TenantId tenantId, UUID siteId) {
+        Instant cutoff = Instant.now().minus(java.time.Duration.ofMinutes(LIVENESS_THRESHOLD_MINUTES));
+        return jdbc.query("""
+                SELECT l.guard_id, g.first_name, g.last_name, l.shift_id, l.site_id,
+                       l.latitude, l.longitude, l.recorded_at
+                FROM security_guard_current_location l
+                JOIN security_guards g ON g.id = l.guard_id
+                WHERE l.tenant_id = ? AND l.site_id = ?
+                ORDER BY l.recorded_at DESC
+                """,
+                (rs, rowNum) -> {
+                    Instant recordedAt = rs.getTimestamp("recorded_at").toInstant();
+                    return new za.co.handyflow.platform.security.dto.CurrentLocationResponse(
+                            (UUID) rs.getObject("guard_id"),
+                            (rs.getString("first_name") + " " + rs.getString("last_name")).trim(),
+                            (UUID) rs.getObject("shift_id"),
+                            (UUID) rs.getObject("site_id"),
+                            rs.getBigDecimal("latitude"),
+                            rs.getBigDecimal("longitude"),
+                            recordedAt,
+                            recordedAt.isBefore(cutoff));
+                },
+                tenantId.getValue(), siteId);
     }
 }

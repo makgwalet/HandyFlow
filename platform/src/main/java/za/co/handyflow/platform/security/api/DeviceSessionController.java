@@ -178,12 +178,11 @@ public class DeviceSessionController {
             summary = "Record a GPS ping for the guard on this open session",
             description = """
             Called by the guard app roughly every 5 minutes while a session
-            is open (backend pass 1 of the real-GPS-map feature -- no read
-            endpoint for "current locations" exists yet). guardId, shiftId,
-            and siteId are all resolved server-side from the session/device,
-            never trusted from the request body, same posture as checkpoint
-            scanning. Fails with 400 SESSION_NOT_OPEN if the session is
-            closed or doesn't belong to this tenant.
+            is open. guardId, shiftId, and siteId are all resolved
+            server-side from the session/device, never trusted from the
+            request body, same posture as checkpoint scanning. Fails with
+            400 SESSION_NOT_OPEN if the session is closed or doesn't
+            belong to this tenant.
             """)
     public ResponseEntity<ApiResponse<Void>> recordLocationPing(
             @PathVariable UUID sessionId,
@@ -191,6 +190,28 @@ public class DeviceSessionController {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         guardLocationService.recordPing(tenantId, sessionId, req);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // FIX: the "current locations" read the Live Map has been missing —
+    // real data via GuardLocationService.getCurrentLocationsForSite(),
+    // replacing the frontend's own fabricated, fixed-position
+    // placeholder. Supervisor-facing (SECURITY_READ), unlike the ping
+    // endpoint above which is guard-facing — this is genuinely a
+    // different controller's-worth of concern living here only because
+    // GuardLocationService was already injected; absolute path since
+    // it doesn't fit this controller's own /sessions-scoped mapping.
+    @GetMapping("/api/v1/security/sites/{siteId}/guards/locations")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
+    @Operation(
+            summary = "Current live positions of every guard at a site — the live map's real data source",
+            description = "Every guard with a stored position for this site, each carrying its own " +
+                    "stale flag (older than 5 minutes since their last ping) so the caller can choose " +
+                    "how to present a guard who's gone quiet rather than having them silently vanish.")
+    public ResponseEntity<ApiResponse<java.util.List<za.co.handyflow.platform.security.dto.CurrentLocationResponse>>> getCurrentLocations(
+            @PathVariable UUID siteId) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(
+                guardLocationService.getCurrentLocationsForSite(tenantId, siteId)));
     }
 
     // ── Resource Custody ───────────────────────────────────────────────────────
