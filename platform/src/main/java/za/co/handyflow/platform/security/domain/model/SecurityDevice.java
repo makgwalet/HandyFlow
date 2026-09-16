@@ -47,6 +47,17 @@ public class SecurityDevice {
     @Column(name = "site_id")
     private UUID siteId;
 
+    // FIX (guard device lockdown, product owner's own explicit design):
+    // nullable — only set for PERSONAL_GUARD_DEVICE rows, giving genuine
+    // per-guard device HISTORY (multiple rows over time, each with its
+    // own status) rather than the single overwritable
+    // Guard.registeredDeviceId string this used to be the only record
+    // of. That field is left in place (still the fast lookup used at
+    // login) but this table is now the source of truth for "which
+    // device was this guard using when."
+    @Column(name = "guard_id")
+    private UUID guardId;
+
     @Column(name = "device_hardware_id", nullable = false, length = 200)
     private String deviceHardwareId;
 
@@ -94,6 +105,31 @@ public class SecurityDevice {
         return d;
     }
 
+    /**
+     * FIX (guard device lockdown): the enrollment/replacement path for a
+     * PERSONAL_GUARD_DEVICE — starts PENDING, not ACTIVE, matching the
+     * product owner's own device-state list. GuardAuthService.enroll()
+     * activates it immediately in the same flow (enrollment is already a
+     * supervisor-witnessed action, so there's no separate confirmation
+     * step needed there); the activation-code replacement flow is where
+     * PENDING genuinely holds — a code has been issued but not yet
+     * redeemed.
+     */
+    public static SecurityDevice createPendingForGuard(TenantId tenantId, UUID guardId,
+                                                        String deviceHardwareId, String deviceName) {
+        SecurityDevice d   = new SecurityDevice();
+        d.tenantId         = tenantId;
+        d.guardId          = guardId;
+        d.deviceHardwareId = deviceHardwareId;
+        d.deviceName       = deviceName;
+        d.deviceType       = DeviceType.PERSONAL_GUARD_DEVICE;
+        d.kioskModeEnabled = false;
+        d.status           = DeviceStatus.PENDING;
+        d.createdAt        = Instant.now();
+        d.updatedAt        = Instant.now();
+        return d;
+    }
+
     // ── Mutations ──────────────────────────────────────────────────────────────
 
     public void heartbeat(Integer batteryPct) {
@@ -102,8 +138,40 @@ public class SecurityDevice {
         this.updatedAt  = Instant.now();
     }
 
+    public void activate() {
+        this.status    = DeviceStatus.ACTIVE;
+        this.updatedAt = Instant.now();
+    }
+
     public void markLost() {
         this.status    = DeviceStatus.LOST;
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * FIX (guard device lockdown): the state a device moves to when a
+     * replacement is issued and redeemed — distinct from a plain revoke,
+     * so the history reads correctly ("this device was REPLACED on
+     * <date>", not just "revoked for no stated reason").
+     */
+    public void markReplaced() {
+        this.status    = DeviceStatus.REPLACED;
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * A supervisor pulling a device from service directly — lost phone
+     * reported by someone other than the guard, suspected compromise,
+     * employment ending, etc. Distinct from markReplaced(): this one has
+     * no new device on the other end of it yet.
+     */
+    public void revoke() {
+        this.status    = DeviceStatus.REVOKED;
+        this.updatedAt = Instant.now();
+    }
+
+    public void block() {
+        this.status    = DeviceStatus.BLOCKED;
         this.updatedAt = Instant.now();
     }
 
@@ -114,6 +182,16 @@ public class SecurityDevice {
 
     public boolean isActive() { return status == DeviceStatus.ACTIVE; }
 
+    /**
+     * FIX (guard device lockdown): what GuardAuthService.login() now
+     * checks before letting a device authenticate — REVOKED, BLOCKED,
+     * LOST, REPLACED, and DECOMMISSIONED are all "this device must not
+     * authenticate," for different underlying reasons, deliberately
+     * covered by a single check rather than enumerating them separately
+     * at every call site.
+     */
+    public boolean canAuthenticate() { return status == DeviceStatus.ACTIVE; }
+
     // ── Enums ──────────────────────────────────────────────────────────────────
 
     public enum DeviceType {
@@ -122,6 +200,6 @@ public class SecurityDevice {
     }
 
     public enum DeviceStatus {
-        ACTIVE, LOST, DECOMMISSIONED
+        PENDING, ACTIVE, REVOKED, LOST, BLOCKED, REPLACED, DECOMMISSIONED
     }
 }

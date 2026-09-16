@@ -14,6 +14,7 @@ import za.co.handyflow.platform.security.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -73,6 +74,32 @@ public class GuardAuthController {
             @Valid @RequestBody GuardLoginRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Login successful",
                 guardAuthService.login(req)));
+    }
+
+    // FIX (guard device lockdown, product owner's own explicit design):
+    // public for the same reason login() is — a guard who just lost
+    // their device has no session to authenticate with. Scoped entirely
+    // by the code itself (6-digit, single-use, 15-minute expiry), not by
+    // anything the caller supplies about who they are.
+    @PostMapping("/api/v1/auth/guard/activate-device")
+    @Operation(
+            summary = "Redeem a supervisor-issued device replacement code — guard-facing, public",
+            description = """
+            The guard enters/scans the 6-digit code their supervisor gave them
+            after initiating a device replacement. On success: the old device
+            is marked REPLACED, the new device is bound and ACTIVE, and every
+            existing session for this guard is revoked — same as a full
+            re-enrollment.
+
+            Add to Spring Security permitAll():
+                .requestMatchers("/api/v1/auth/guard/**").permitAll()
+            (already covers this path — same prefix as guard login.)
+            """)
+    public ResponseEntity<ApiResponse<GuardEnrollResponse>> activateDeviceReplacement(
+            @Valid @RequestBody ActivateDeviceReplacementRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Device activated",
+                guardAuthService.activateDeviceReplacement(
+                        req.code(), req.newDeviceHardwareId(), req.newDeviceName())));
     }
 
     // ── 2. GUARD SESSION — requires valid guard JWT ────────────────────────────
@@ -145,6 +172,38 @@ public class GuardAuthController {
         UUID supervisorId = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success("Guard enrolled",
                 guardAuthService.enroll(id, req, supervisorId)));
+    }
+
+    @PostMapping("/api/v1/security/guards/{id}/initiate-device-replacement")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @Operation(
+            summary = "Issue a device replacement code — supervisor-facing",
+            description = """
+            Generates a 6-digit, single-use code valid for 15 minutes. Read it
+            to the guard over the phone or show it as a QR — does not change
+            anything about the guard's current device until the code is
+            actually redeemed via POST /api/v1/auth/guard/activate-device, so
+            issuing a code the guard never uses cannot lock them out of their
+            existing, working phone.
+            """)
+    public ResponseEntity<ApiResponse<DeviceReplacementCodeResponse>> initiateDeviceReplacement(
+            @PathVariable UUID id) {
+        UUID supervisorId = TenantContext.getCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.success("Replacement code issued",
+                guardAuthService.initiateDeviceReplacement(id, supervisorId)));
+    }
+
+    @GetMapping("/api/v1/security/guards/{id}/devices")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
+    @Operation(
+            summary = "This guard's device history — supervisor-facing",
+            description = "Every device this guard has ever been bound to, newest first, " +
+                    "each with its own status — answers \"which device was this guard using " +
+                    "when this event occurred?\"")
+    public ResponseEntity<ApiResponse<List<za.co.handyflow.platform.security.domain.model.SecurityDevice>>> getDeviceHistory(
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                guardAuthService.getDeviceHistory(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @PostMapping("/api/v1/security/guards/{id}/revoke-tokens")

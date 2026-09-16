@@ -35,4 +35,15 @@ public interface SecurityDeviceRepository extends JpaRepository<SecurityDevice, 
         ORDER BY d.deviceName
         """)
     List<SecurityDevice> findAllByTenant(TenantId tenantId);
+
+    // FIX (guard device lockdown): backs the "which device was this
+    // guard using when" history view — every PERSONAL_GUARD_DEVICE row
+    // ever created for this guard, newest first, not just the current one.
+    @Query("""
+        SELECT d FROM SecurityDevice d
+        WHERE d.tenantId = :tenantId
+        AND d.guardId = :guardId
+        ORDER BY d.createdAt DESC
+        """)
+    List<SecurityDevice> findByGuard(TenantId tenantId, UUID guardId);
 }

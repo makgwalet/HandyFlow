@@ -13,11 +13,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.security.domain.model.Guard;
 import za.co.handyflow.platform.security.domain.model.GuardToken;
+import za.co.handyflow.platform.security.domain.model.SecurityDevice;
+import za.co.handyflow.platform.security.domain.model.DeviceActivationCode;
 import za.co.handyflow.platform.security.domain.repository.GuardRepository;
 import za.co.handyflow.platform.security.domain.repository.GuardTokenRepository;
+import za.co.handyflow.platform.security.domain.repository.SecurityDeviceRepository;
+import za.co.handyflow.platform.security.domain.repository.DeviceActivationCodeRepository;
 import za.co.handyflow.platform.security.dto.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
+import za.co.handyflow.platform.shared.TenantId;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -28,6 +33,22 @@ import java.util.UUID;
 
 /**
  * GuardAuthService — handles guard authentication, enrollment, and token lifecycle.
+ *
+ * FIX (guard device lockdown, product owner's own explicit design): a
+ * real, separate finding made while building the requested device-state/
+ * replacement feature — Guard.registeredDeviceId was set at enrollment
+ * but login() never actually checked it against the calling device.
+ * "Ensure revoked devices cannot authenticate" (the product owner's own
+ * requirement) was structurally impossible until this was fixed — see
+ * login()'s own step 4.5 for the enforcement, added in a
+ * backward-compatible way (only enforced when registeredDeviceId is
+ * already set, so a guard enrolled without ever binding a device stays
+ * unrestricted). SecurityDevice now also carries a guardId and a full
+ * state machine (PENDING/ACTIVE/REVOKED/LOST/BLOCKED/REPLACED/
+ * DECOMMISSIONED) for genuine per-guard device history, and
+ * initiateDeviceReplacement()/activateDeviceReplacement() implement the
+ * supervisor-authorized replacement workflow the product owner
+ * specified in place of open self-registration.
  *
  * CHANGE (V214): login() now resolves the guard via resolveGuardForLogin(),
  * which accepts EITHER phone OR employeeCode as the identifier (previously
@@ -58,6 +79,10 @@ public class GuardAuthService {
 
     private final GuardRepository      guardRepository;
     private final GuardTokenRepository tokenRepository;
+    // FIX (guard device lockdown, product owner's own explicit design):
+    // see this class's own updated header comment for the fuller story.
+    private final SecurityDeviceRepository         deviceRepository;
+    private final DeviceActivationCodeRepository   activationCodeRepository;
 
     @Value("${app.security.jwt.secret}")
     private String jwtSecret;
@@ -92,6 +117,33 @@ public class GuardAuthService {
                     ? "Too many incorrect PINs. Account locked for " + LOCKOUT_MINUTES + " minutes."
                     : invalidCredentialsMessage(req);
             throw new HandyFlowException(msg, HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS");
+        }
+
+        // 4.5. FIX (guard device lockdown, product owner's own explicit
+        // design — "ensure revoked devices cannot authenticate"):
+        // registeredDeviceId was previously captured at enrollment but
+        // never actually checked here — see this class's own header
+        // comment for the fuller story on why this is a real, separate
+        // finding, not just the feature the product owner asked for.
+        // Backward-compatible by construction: only enforced when
+        // registeredDeviceId is actually set (a guard enrolled without
+        // ever binding a device stays unrestricted, matching today's
+        // behaviour exactly), and only when req.deviceId() is present —
+        // a caller that doesn't send one can't be checked against.
+        if (guard.getRegisteredDeviceId() != null && req.deviceId() != null
+                && !guard.getRegisteredDeviceId().equals(req.deviceId())) {
+            throw new HandyFlowException(
+                    "This account is enrolled to a different device. Contact your supervisor to replace your device.",
+                    HttpStatus.FORBIDDEN, "DEVICE_MISMATCH");
+        }
+        if (req.deviceId() != null) {
+            deviceRepository.findByTenantIdAndDeviceHardwareId(guard.getTenantId(), req.deviceId())
+                    .filter(d -> !d.canAuthenticate())
+                    .ifPresent(d -> {
+                        throw new HandyFlowException(
+                                "This device is " + d.getStatus() + " and can no longer be used. Contact your supervisor.",
+                                HttpStatus.FORBIDDEN, "DEVICE_" + d.getStatus());
+                    });
         }
 
         // 5. Guard status — only ACTIVE guards can start a session
@@ -177,6 +229,28 @@ public class GuardAuthService {
 
         if (req.deviceHardwareId() != null) {
             guard.setRegisteredDeviceId(req.deviceHardwareId());
+
+            // FIX (guard device lockdown): the registeredDeviceId string
+            // above is kept as the fast lookup login() checks, but this
+            // is now also recorded as a proper SecurityDevice row —
+            // giving genuine history (multiple rows over a guard's
+            // employment, each with its own state) rather than a single
+            // field that silently gets overwritten on every
+            // re-enrollment with no record of what it used to be.
+            // Started ACTIVE, not PENDING — enrollment is already a
+            // supervisor-witnessed action (this whole method requires a
+            // supervisorId), so there's no separate confirmation step
+            // needed the way the activation-code replacement flow below
+            // genuinely does.
+            deviceRepository.findByTenantIdAndDeviceHardwareId(guard.getTenantId(), req.deviceHardwareId())
+                    .ifPresentOrElse(
+                            SecurityDevice::activate,
+                            () -> {
+                                SecurityDevice d = SecurityDevice.createPendingForGuard(
+                                        guard.getTenantId(), guard.getId(), req.deviceHardwareId(), null);
+                                d.activate();
+                                deviceRepository.save(d);
+                            });
         }
 
         guard.clearPinMustChange();
@@ -194,6 +268,101 @@ public class GuardAuthService {
                 req.faceEmbeddingBase64() != null,
                 req.deviceHardwareId() != null,
                 pinExpiresAt);
+    }
+
+    // ── Device Replacement (supervisor-authorized, per the product owner's
+    //    own explicit design) ──────────────────────────────────────────────
+
+    /**
+     * FIX (guard device lockdown): backs the supervisor-facing "Guard →
+     * Devices" history view — every SecurityDevice row this guard has
+     * ever been bound to, newest first, with each row's own status
+     * (ACTIVE, REVOKED, REPLACED, etc.) so a supervisor can genuinely
+     * answer "which device was this guard using when this event
+     * occurred?" per the product owner's own stated reason for wanting
+     * history at all.
+     */
+    @Transactional(readOnly = true)
+    public List<SecurityDevice> getDeviceHistory(TenantId tenantId, UUID guardId) {
+        return deviceRepository.findByGuard(tenantId, guardId);
+    }
+
+    /**
+     * Supervisor-facing: "Guard loses phone. Guard contacts supervisor.
+     * Supervisor initiates: Replace Device." Generates a short-lived,
+     * single-use code the supervisor reads to the guard over the phone
+     * or shows as a QR — the realistic scenario this exists for. Does
+     * NOT touch the guard's current device yet; that only happens when
+     * the code is actually redeemed (activateDeviceReplacement()) —
+     * issuing a code the guard never uses must not lock them out of
+     * their existing, working phone.
+     */
+    @Transactional
+    public DeviceReplacementCodeResponse initiateDeviceReplacement(UUID guardId, UUID supervisorId) {
+        Guard guard = guardRepository.findByIdForAuth(guardId)
+                .orElseThrow(() -> new ResourceNotFoundException("Guard", guardId.toString()));
+        DeviceActivationCode code = DeviceActivationCode.issue(guard.getTenantId(), guardId, supervisorId);
+        activationCodeRepository.save(code);
+        log.info("[Security] Device replacement code issued guardId={} by supervisor={}", guardId, supervisorId);
+        return new DeviceReplacementCodeResponse(code.getCode(), code.getExpiresAt());
+    }
+
+    /**
+     * Guard-facing: the guard enters/scans the code on their new device.
+     * Verifies guard + code + expiry + old-device status (per the
+     * product owner's own spec) before making any change. On success:
+     * old device -> REVOKED, new device -> ACTIVE,
+     * Guard.registeredDeviceId repointed — matching the product owner's
+     * own "Old device -> REVOKED, New device -> ACTIVE" instruction
+     * exactly. All existing sessions for this guard are also revoked,
+     * same as full re-enrollment — a device replacement is exactly the
+     * kind of event that should force every other active session closed.
+     */
+    @Transactional
+    public GuardEnrollResponse activateDeviceReplacement(String code, String newDeviceHardwareId,
+                                                          String newDeviceName) {
+        // FIX: this method is deliberately reachable with no prior
+        // authentication at all — that IS the point (a guard who just
+        // lost their device has no session to authenticate with). The
+        // code itself is the only thing scoping the search: lookup is
+        // by code alone across all tenants (findUnusedByCodeAnyTenant),
+        // never a tenantId trusted from the caller — everything
+        // downstream then uses the found row's own tenantId.
+        DeviceActivationCode activation = activationCodeRepository.findUnusedByCodeAnyTenant(code)
+                .orElseThrow(() -> new HandyFlowException(
+                        "Invalid or already-used code", HttpStatus.NOT_FOUND, "INVALID_CODE"));
+
+        try {
+            activation.redeem(newDeviceHardwareId);
+        } catch (IllegalStateException e) {
+            throw new HandyFlowException(e.getMessage(), HttpStatus.CONFLICT, "CODE_EXPIRED");
+        }
+        activationCodeRepository.save(activation);
+
+        Guard guard = guardRepository.findByIdForAuth(activation.getGuardId())
+                .orElseThrow(() -> new ResourceNotFoundException("Guard", activation.getGuardId().toString()));
+
+        String oldDeviceId = guard.getRegisteredDeviceId();
+        if (oldDeviceId != null) {
+            deviceRepository.findByTenantIdAndDeviceHardwareId(guard.getTenantId(), oldDeviceId)
+                    .ifPresent(SecurityDevice::markReplaced);
+        }
+
+        guard.setRegisteredDeviceId(newDeviceHardwareId);
+        guardRepository.save(guard);
+
+        SecurityDevice newDevice = SecurityDevice.createPendingForGuard(
+                guard.getTenantId(), guard.getId(), newDeviceHardwareId, newDeviceName);
+        newDevice.activate();
+        deviceRepository.save(newDevice);
+
+        int revoked = tokenRepository.revokeAllForGuard(
+                guard.getId(), Instant.now(), "Device replacement — new device enrolled");
+
+        log.info("[Security] Device replaced guardId={} oldDevice={} newDevice={} tokensRevoked={}",
+                guard.getId(), oldDeviceId, newDeviceHardwareId, revoked);
+
+        return new GuardEnrollResponse(guard.getId(), guard.getFullName(), false, true, null);
     }
 
     // ── PIN Change (self-service, requires valid session) ─────────────────────

@@ -101,6 +101,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
             new Limit("propportal:register", "/api/v1/property/portal/auth/register", 5, 60 * 60 * 1_000L),
             new Limit("propportal:login", "/api/v1/property/portal/auth/login", 10, 10 * 60 * 1_000L),
 
+            // FIX (guard device lockdown): a 6-digit code (1,000,000
+            // possibilities) is the sole scoping mechanism on this public
+            // endpoint — its 15-minute expiry is the primary defense, but
+            // rate limiting is a real secondary layer, tighter than a
+            // typical login limit since unlike a password this is a
+            // short, fixed-length numeric space genuinely worth slowing
+            // down further.
+            new Limit("guard:activate-device", "/api/v1/auth/guard/activate-device", 5, 15 * 60 * 1_000L),
+
             // NEW (identity module modernization): main-app invitation
             // acceptance — just made reachable via SecurityConfig's
             // permitAll() fix above. Same risk shape as
