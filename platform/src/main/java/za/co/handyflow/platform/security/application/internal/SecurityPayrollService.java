@@ -58,6 +58,10 @@ public class SecurityPayrollService {
     private final GuardRepository           guardRepository;
     private final GradeRateRepository       gradeRateRepository;
     private final BranchRepository          branchRepository;
+    // FIX: closes the confirmed AuditEvent coverage gap for Payroll —
+    // approving a period is a major financial event that previously
+    // had no generic audit trail entry at all.
+    private final za.co.handyflow.platform.security.domain.repository.AuditEventRepository auditRepository;
 
     // ── Period CRUD ────────────────────────────────────────────────────────────
 
@@ -124,6 +128,9 @@ public class SecurityPayrollService {
 
         period.approve(approvedBy, totalHours, totalCents);
         periodRepository.save(period);
+
+        writeAudit(tenantId, approvedBy, id, "APPROVED",
+                "{\"lineItemCount\":" + items.size() + ",\"totalCents\":" + totalCents + "}");
 
         log.info("[Payroll] Period approved id={} lines={} totalCents={}", id, items.size(), totalCents);
         return toResponse(period, items.size(), totalCents);
@@ -306,10 +313,11 @@ public class SecurityPayrollService {
     }
 
     @Transactional
-    public PayrollPeriodResponse markPaid(TenantId tenantId, UUID id) {
+    public PayrollPeriodResponse markPaid(TenantId tenantId, UUID id, UUID actorId) {
         PayrollPeriod period = findPeriod(tenantId, id);
         period.markPaid();
         periodRepository.save(period);
+        writeAudit(tenantId, actorId, id, "MARKED_PAID", null);
         log.info("[Payroll] Period marked PAID id={}", id);
         return toResponse(period,
                 lineItemRepository.findByPeriod(id).size(),
@@ -357,4 +365,15 @@ public class SecurityPayrollService {
     }
 
     private static String nvl(String s) { return s != null ? s : ""; }
+
+    // FIX: closes the confirmed AuditEvent coverage gap for Payroll.
+    // Mirrors ShiftService.writeAudit()'s own established helper
+    // pattern exactly, entityType "PAYROLL_PERIOD".
+    private void writeAudit(TenantId tenantId, UUID actorId, UUID periodId, String action, String metadataJson) {
+        auditRepository.save(za.co.handyflow.platform.security.domain.model.AuditEvent.record(
+                tenantId, actorId,
+                za.co.handyflow.platform.security.domain.model.AuditEvent.ActorType.USER,
+                "PAYROLL_PERIOD", periodId, action,
+                null, null, metadataJson));
+    }
 }

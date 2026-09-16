@@ -54,6 +54,11 @@ public class GuardService {
     private final GuardRepository         guardRepository;
     private final GuardDocumentRepository documentRepository;
     private final JdbcTemplate            jdbc;
+    // FIX: closes the confirmed AuditEvent coverage gap for Guard
+    // status changes and deletion — high-stakes lifecycle events
+    // (suspend, terminate, reactivate) with previously no generic
+    // audit trail entry at all.
+    private final za.co.handyflow.platform.security.domain.repository.AuditEventRepository auditRepository;
 
     // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -167,6 +172,9 @@ public class GuardService {
         guard.updateStatus(req.status(), req.note(), changedBy);
         guardRepository.save(guard);
 
+        writeAudit(tenantId, changedBy, id, "STATUS_CHANGED",
+                "{\"status\":\"" + req.status() + "\",\"note\":" + (req.note() != null ? "\"" + req.note().replace("\"", "\\\"") + "\"" : "null") + "}");
+
         log.info("[Security] Guard status changed guard={} status={} by={} tenant={}",
                 id, req.status(), changedBy, tenantId);
         return toResponse(guard);
@@ -177,6 +185,7 @@ public class GuardService {
         Guard guard = findActive(tenantId, id);
         guard.softDelete(deletedBy);
         guardRepository.save(guard);
+        writeAudit(tenantId, deletedBy, id, "DELETED", null);
         log.info("[Security] Soft-deleted guard={} by={} tenant={}", id, deletedBy, tenantId);
     }
 
@@ -433,5 +442,16 @@ public class GuardService {
                 g.getCpVettingTier(),
                 g.getBankName(), g.getBankAccountNumber(), g.getBankBranchCode()
         );
+    }
+
+    // FIX: closes the confirmed AuditEvent coverage gap for Guard.
+    // Mirrors ShiftService.writeAudit()'s own established helper
+    // pattern exactly, entityType "GUARD".
+    private void writeAudit(TenantId tenantId, UUID actorId, UUID guardId, String action, String metadataJson) {
+        auditRepository.save(za.co.handyflow.platform.security.domain.model.AuditEvent.record(
+                tenantId, actorId,
+                za.co.handyflow.platform.security.domain.model.AuditEvent.ActorType.USER,
+                "GUARD", guardId, action,
+                null, null, metadataJson));
     }
 }

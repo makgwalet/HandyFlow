@@ -81,7 +81,7 @@ public class PayrollController {
     @Operation(summary = "Mark an EXPORTED period as PAID")
     public ResponseEntity<ApiResponse<PayrollPeriodResponse>> markPaid(@PathVariable UUID id) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
-        return ResponseEntity.ok(ApiResponse.success(payrollService.markPaid(tenantId, id)));
+        return ResponseEntity.ok(ApiResponse.success(payrollService.markPaid(tenantId, id, TenantContext.getCurrentUserId())));
     }
 
     // ── Line items ─────────────────────────────────────────────────────────────
