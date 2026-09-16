@@ -136,4 +136,17 @@ public class GuardController {
         return ResponseEntity.ok(ApiResponse.success("Photo updated",
                 guardService.updatePhoto(TenantContext.getTenantIdAsObject(), id, body.get("photoBase64"))));
     }
+
+    // FIX: closes the confirmed "no structured banking fields" gap —
+    // payroll export needed manual cross-referencing without this.
+    @PostMapping("/{id}/bank-details")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @Operation(summary = "Set a guard's banking details for payroll")
+    public ResponseEntity<ApiResponse<GuardResponse>> updateBankDetails(
+            @PathVariable UUID id, @RequestBody za.co.handyflow.platform.security.dto.UpdateBankDetailsRequest req) {
+        featureGuard.requireModule("security");
+        return ResponseEntity.ok(ApiResponse.success("Bank details updated",
+                guardService.updateBankDetails(TenantContext.getTenantIdAsObject(), id,
+                        req.bankName(), req.bankAccountNumber(), req.bankBranchCode())));
+    }
 }

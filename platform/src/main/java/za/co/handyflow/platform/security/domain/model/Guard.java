@@ -118,6 +118,22 @@ public class Guard {
     @Column(name = "face_embedding", columnDefinition = "TEXT")
     private String faceEmbedding;
 
+    // FIX: closes a confirmed gap — payroll export needed manual
+    // cross-referencing to actually pay a guard since nothing here
+    // captured bank details. Matches PayEmployee's own field shape
+    // exactly (PayrollBureau module) — same South African branch-code
+    // convention, not IBAN/SWIFT, and the same "stored plainly, no
+    // special protection" posture that entity's own equivalent fields
+    // already have, not a new inconsistency introduced here.
+    @Column(name = "bank_name")
+    private String bankName;
+
+    @Column(name = "bank_account_number")
+    private String bankAccountNumber;
+
+    @Column(name = "bank_branch_code")
+    private String bankBranchCode;
+
     // ── Screening ──────────────────────────────────────────────────────────────
 
     @Column(name = "screening_status", length = 20)
@@ -333,6 +349,13 @@ public class Guard {
     public void setRegisteredDeviceId(String deviceId) {
         this.registeredDeviceId = deviceId;
         this.updatedAt          = Instant.now();
+    }
+
+    public void setBankDetails(String bankName, String bankAccountNumber, String bankBranchCode) {
+        this.bankName          = bankName;
+        this.bankAccountNumber = bankAccountNumber;
+        this.bankBranchCode    = bankBranchCode;
+        this.updatedAt         = Instant.now();
     }
 
     // ── Screening ──────────────────────────────────────────────────────────────

@@ -192,6 +192,19 @@ public class GuardService {
         return toResponse(guard);
     }
 
+    // FIX: closes the confirmed "no structured banking fields" gap.
+    // Dedicated update endpoint, matching updateStatus()/updatePhoto()'s
+    // own pattern above, rather than folding this into the general
+    // updateGuard() — banking details are typically added after a
+    // guard is already hired, not necessarily at initial creation.
+    public GuardResponse updateBankDetails(TenantId tenantId, UUID id,
+                                           String bankName, String bankAccountNumber, String bankBranchCode) {
+        Guard guard = findActive(tenantId, id);
+        guard.setBankDetails(bankName, bankAccountNumber, bankBranchCode);
+        guardRepository.save(guard);
+        return toResponse(guard);
+    }
+
     // ── V214: Employee code generation ─────────────────────────────────────────
 
     /**
@@ -417,7 +430,8 @@ public class GuardService {
                 g.getEmployeeCode(),
                 g.getEmergencyContactName(),
                 g.getEmergencyContactPhone(),
-                g.getCpVettingTier()
+                g.getCpVettingTier(),
+                g.getBankName(), g.getBankAccountNumber(), g.getBankBranchCode()
         );
     }
 }

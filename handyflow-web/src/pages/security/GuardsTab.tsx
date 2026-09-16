@@ -38,6 +38,7 @@ interface Guard {
   // FIX (Security P4 — VettingController): field always existed on the
   // backend entity but GuardResponse never exposed it until now.
   cpVettingTier: string | null
+  bankName: string | null; bankAccountNumber: string | null; bankBranchCode: string | null
 }
 
 interface GuardFormState {
@@ -400,6 +401,16 @@ export default function GuardsTab() {
     onError:   (e: any) => setApiError(e.response?.data?.message ?? "Failed to set CP vetting tier"),
   })
 
+  // FIX: closes the confirmed "no structured banking fields" gap —
+  // payroll export needed manual cross-referencing without these.
+  const [bankForm, setBankForm] = useState({ bankName: "", bankAccountNumber: "", bankBranchCode: "" })
+  const updateBankDetails = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: any }) =>
+      apiClient.post(`/api/v1/security/guards/${id}/bank-details`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["guards"] }),
+    onError:   (e: any) => setApiError(e.response?.data?.message ?? "Failed to save bank details"),
+  })
+
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   const closeAdd  = () => { setShowAdd(false);  setForm(EMPTY_FORM); setFieldErrors({}); setApiError(""); stopCamera(); setCapturedPhoto(null) }
@@ -412,6 +423,7 @@ export default function GuardsTab() {
               phone: g.phone ?? "", grade: g.grade, notes: g.notes ?? "",
               psiraExpiryDate: g.psiraExpiryDate ?? "" })
     setCapturedPhoto(g.photoUrl && g.photoUrl !== "PENDING_UPLOAD" ? g.photoUrl : null)
+    setBankForm({ bankName: g.bankName ?? "", bankAccountNumber: g.bankAccountNumber ?? "", bankBranchCode: g.bankBranchCode ?? "" })
     setFieldErrors({}); setApiError("")
   }
 
@@ -690,6 +702,31 @@ export default function GuardsTab() {
               </div>
             </div>
           )}
+
+          {/* FIX: closes the confirmed "no structured banking fields" gap —
+              payroll export needed manual cross-referencing without these.
+              Visible to any user who can already edit a guard (SECURITY_MANAGE)
+              — unlike the CP tier section above, this doesn't need the
+              special VIP_DETAIL_ACCESS gate. */}
+          <div style={{ marginTop: 12, padding: 16, background: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 10 }}>Banking Details (for payroll)</div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+              <input value={bankForm.bankName} onChange={e => setBankForm(f => ({ ...f, bankName: e.target.value }))}
+                placeholder="Bank name" style={{ flex: 1, padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none" }} />
+              <input value={bankForm.bankBranchCode} onChange={e => setBankForm(f => ({ ...f, bankBranchCode: e.target.value }))}
+                placeholder="Branch code" style={{ width: 120, padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none" }} />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input value={bankForm.bankAccountNumber} onChange={e => setBankForm(f => ({ ...f, bankAccountNumber: e.target.value }))}
+                placeholder="Account number" style={{ flex: 1, padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none" }} />
+              <button
+                onClick={() => updateBankDetails.mutate({ id: editing.id, body: bankForm })}
+                disabled={updateBankDetails.isPending}
+                style={{ padding: "9px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" as const }}>
+                {updateBankDetails.isPending ? "Saving…" : "Save Bank Details"}
+              </button>
+            </div>
+          </div>
           {apiError && <ErrBanner msg={apiError} />}
           <Footer onCancel={closeEdit} onSubmit={() => handleSubmit(true)} loading={updateGuard.isPending} label="Save Changes" />
         </Modal>

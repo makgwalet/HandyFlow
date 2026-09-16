@@ -41,5 +41,12 @@ public record GuardResponse(
         // be SET through the API but never SEEN again anywhere. Appended
         // at the end, matching this record's own established
         // convention (see the V214 employeeCode addition above).
-        String    cpVettingTier
+        String    cpVettingTier,
+        // FIX: closes the confirmed "no structured banking fields"
+        // gap — payroll export needed manual cross-referencing without
+        // these. Same append-at-the-end convention as cpVettingTier
+        // above.
+        String    bankName,
+        String    bankAccountNumber,
+        String    bankBranchCode
 ) {}
