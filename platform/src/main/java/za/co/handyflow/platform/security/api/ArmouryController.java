@@ -26,6 +26,13 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * DECISION (product owner, Armoury-in-Shield question): stays on this
+ * tenant-JWT surface only — deliberately not guard-facing. See
+ * ArmouryService's own class comment for the full reasoning; this
+ * class's own SECURITY_MANAGE/SECURITY_ADMIN gates below are the
+ * enforcement of that decision, not incidental to it.
+ */
 @Tag(name = "Security - Armoury")
 @RestController
 @RequestMapping("/api/v1/security/armoury")

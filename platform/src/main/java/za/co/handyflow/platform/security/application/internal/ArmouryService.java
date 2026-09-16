@@ -33,6 +33,34 @@ import java.util.UUID;
  *   4. Witness is a different guard from the one receiving the firearm
  *   5. Witness exists and belongs to the same tenant
  *
+ * DECISION (product owner, Armoury-in-Shield question): Armoury does
+ * NOT belong in the normal guard-facing Shield mobile app for V1,
+ * despite an earlier architecture doc listing it under Shield's own
+ * navigation. The product owner's own reasoning, verbatim: "The
+ * current authority model is telling you something important... I
+ * would not weaken that authorization model simply to make the mobile
+ * navigation match an architecture document. That would be backwards."
+ * issue()/returnFirearm() below require SECURITY_MANAGE — confirmed no
+ * guard token will ever carry it, by design (GuardAuthService issues
+ * only SECURITY_GUARD/SECURITY_SCAN) — and that stays exactly as it
+ * is; this comment exists so a future pass doesn't "fix" the mismatch
+ * by loosening this service's own authority checks to match a
+ * navigation mockup instead of the other way around.
+ * <p>
+ * If mobile armoury access is ever genuinely wanted: the product
+ * owner's own sketch is a person's Guard record carrying a separate,
+ * explicit ARMOURY_OPERATOR responsibility — "being a guard should
+ * never automatically grant armoury authority... someone may be Guard
+ * + Armoury Operator, but that must be explicitly authorized" — not a
+ * new elevated guard-login tier, and not a blanket loosening of
+ * SECURITY_MANAGE here. Not built — a future decision, not a gap in
+ * this pass.
+ * <p>
+ * For V1: Armoury stays reachable only through this controller's own
+ * tenant-JWT surface (the ordinary Security web app) — there is no
+ * guard-facing armoury controller anywhere in this codebase, confirmed
+ * directly, not assumed.
+ *
  * These are hard blocks, not advisory warnings (unlike GuardScreeningService's
  * checkScreeningGate) — firearm issue is the one place in this module where
  * the Firearms Control Act makes "supervisor can override" not a safe default.
