@@ -142,7 +142,7 @@ public class ArmouryController {
             @Valid @RequestBody IssueFirearmRequest req) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
-                armouryService.issue(tenantId, id, req)));
+                armouryService.issue(tenantId, id, req, TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/{id}/return")
@@ -153,7 +153,7 @@ public class ArmouryController {
             @Valid @RequestBody ReturnFirearmRequest req) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
-                armouryService.returnFirearm(tenantId, id, req)));
+                armouryService.returnFirearm(tenantId, id, req, TenantContext.getCurrentUserId())));
     }
 
     // ── History & Guard Queries ────────────────────────────────────────────────

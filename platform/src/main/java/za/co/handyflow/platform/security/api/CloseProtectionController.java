@@ -283,7 +283,7 @@ public class CloseProtectionController {
             @Valid @RequestBody IssueFirearmRequest req) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
-                cpService.issueFirearmForDetail(tenantId, id, assignmentId, armouryId, req)));
+                cpService.issueFirearmForDetail(tenantId, id, assignmentId, armouryId, req, TenantContext.getCurrentUserId())));
     }
 
     @GetMapping("/details/{id}/armoury")

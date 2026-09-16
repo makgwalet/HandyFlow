@@ -14,6 +14,7 @@ import za.co.handyflow.platform.security.domain.model.ArmouryLog;
 import za.co.handyflow.platform.security.domain.model.Guard;
 import za.co.handyflow.platform.security.domain.repository.ArmouryLogRepository;
 import za.co.handyflow.platform.security.domain.repository.ArmouryRepository;
+import za.co.handyflow.platform.security.domain.repository.AuditEventRepository;
 import za.co.handyflow.platform.security.domain.repository.GuardRepository;
 import za.co.handyflow.platform.security.dto.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
@@ -80,6 +81,16 @@ public class ArmouryService {
     private final ArmouryRepository    armouryRepository;
     private final ArmouryLogRepository logRepository;
     private final GuardRepository      guardRepository;
+    // FIX: closes the confirmed AuditEvent coverage gap for Armoury —
+    // ArmouryLog already records the detailed chain-of-custody entry
+    // (witness, condition notes) that drives isAvailableForIssue() and
+    // similar business logic; AuditEvent is the separate, generic,
+    // cross-entity activity trail (the same table ShiftService already
+    // writes to) — someone auditing "everything actor Y did" or
+    // "everything that happened in this tenant on date X" should see
+    // firearm issue/return there too, not only by knowing to check
+    // ArmouryLog specifically. Genuinely additive, not redundant.
+    private final AuditEventRepository auditRepository;
 
     // ── Register CRUD ──────────────────────────────────────────────────────────
 
@@ -178,7 +189,7 @@ public class ArmouryService {
      *   - witness is the same guard, doesn't exist, or isn't ACTIVE
      */
     @Transactional
-    public ArmouryResponse issue(TenantId tenantId, UUID armouryId, IssueFirearmRequest req) {
+    public ArmouryResponse issue(TenantId tenantId, UUID armouryId, IssueFirearmRequest req, UUID actorId) {
         Armoury firearm = findActive(tenantId, armouryId);
 
         if (firearm.isLicenseExpired()) {
@@ -236,6 +247,9 @@ public class ArmouryService {
         firearm.markIssued(req.guardId());
         armouryRepository.save(firearm);
 
+        writeAudit(tenantId, actorId, armouryId, "ISSUED",
+                "{\"guardId\":\"" + req.guardId() + "\",\"witnessedByGuardId\":\"" + req.witnessedByGuardId() + "\"}");
+
         log.info("[Security] Firearm issued serial={} guard={} witness={}",
                 firearm.getFirearmSerial(), req.guardId(), req.witnessedByGuardId());
 
@@ -247,7 +261,7 @@ public class ArmouryService {
      */
     @Transactional
     public ArmouryResponse returnFirearm(TenantId tenantId, UUID armouryId,
-                                         ReturnFirearmRequest req) {
+                                         ReturnFirearmRequest req, UUID actorId) {
         Armoury firearm = findActive(tenantId, armouryId);
 
         if (firearm.getStatus() != Armoury.ArmouryStatus.ISSUED) {
@@ -281,6 +295,9 @@ public class ArmouryService {
 
         firearm.markReturned();
         armouryRepository.save(firearm);
+
+        writeAudit(tenantId, actorId, armouryId, "RETURNED",
+                "{\"guardId\":\"" + holdingGuardId + "\",\"witnessedByGuardId\":\"" + req.witnessedByGuardId() + "\"}");
 
         log.info("[Security] Firearm returned serial={} byGuard={} witness={}",
                 firearm.getFirearmSerial(), holdingGuardId, req.witnessedByGuardId());
@@ -321,5 +338,16 @@ public class ArmouryService {
                 a.isLicenseExpired(), a.getAssignedGuardId(), guardName,
                 a.getStatus().name(), a.getLastServiceAt(), a.getNextServiceDueAt(),
                 a.getNotes(), a.getCreatedAt());
+    }
+
+    // FIX: closes the confirmed AuditEvent coverage gap for Armoury.
+    // Mirrors ShiftService.writeAudit()'s own established helper
+    // pattern exactly, entityType "ARMOURY".
+    private void writeAudit(TenantId tenantId, UUID actorId, UUID armouryId, String action, String metadataJson) {
+        auditRepository.save(za.co.handyflow.platform.security.domain.model.AuditEvent.record(
+                tenantId, actorId,
+                za.co.handyflow.platform.security.domain.model.AuditEvent.ActorType.USER,
+                "ARMOURY", armouryId, action,
+                null, null, metadataJson));
     }
 }

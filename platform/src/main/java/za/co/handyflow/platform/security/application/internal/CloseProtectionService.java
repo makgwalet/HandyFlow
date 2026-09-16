@@ -380,7 +380,7 @@ public class CloseProtectionService {
     @Transactional
     public ArmouryResponse issueFirearmForDetail(TenantId tenantId, UUID detailId,
                                                  UUID assignmentId, UUID armouryId,
-                                                 IssueFirearmRequest req) {
+                                                 IssueFirearmRequest req, UUID actorId) {
         findDetail(tenantId, detailId); // validates detail exists + belongs to tenant
 
         DetailAssignment assignment = assignmentRepository.findByTenantAndId(tenantId, assignmentId)
@@ -402,7 +402,7 @@ public class CloseProtectionService {
                     HttpStatus.BAD_REQUEST, "GUARD_MISMATCH");
         }
 
-        ArmouryResponse response = armouryService.issue(tenantId, armouryId, req);
+        ArmouryResponse response = armouryService.issue(tenantId, armouryId, req, actorId);
 
         // Link the log entry ArmouryService just created to this detail.
         // ArmouryService itself has no knowledge of CP details -- linking
