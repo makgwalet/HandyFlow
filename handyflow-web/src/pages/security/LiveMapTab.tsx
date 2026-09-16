@@ -1,13 +1,19 @@
 // src/pages/security/LiveMapTab.tsx
-// Changes from original:
-//   - Fetch last checkpoint scan per active shift via GET /shifts/{id}/scans
-//   - "Last checkpoint: —" replaced with real checkpoint name + time
-//   - 30s refetch for both shifts and scan data
+//
+// FIX: replaced the fabricated, fixed-position marker placeholder with
+// a real Leaflet map fed by the real GET /sites/{id}/guards/locations
+// endpoint — real GPS pings have been collected all along
+// (GuardLocationService.recordPing()); this closes the missing read
+// side, confirmed directly against security_guard_current_location's
+// own table comment before writing anything.
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Radio, MapPin, QrCode, Bluetooth, Navigation, Clock, Shield } from "lucide-react"
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
+import L from "leaflet"
+import "leaflet/dist/leaflet.css"
+import { Radio, MapPin, QrCode, Bluetooth, Navigation, Clock } from "lucide-react"
 
 const SCAN_TYPE_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   QR:       { label: "QR Code",    color: "#1D4ED8", icon: QrCode },
@@ -22,9 +28,42 @@ interface ScanLog {
   guardId: string; shiftId: string; scannedAt: string
   latitude: number | null; longitude: number | null; scanType: string
 }
+interface SiteOption { id: string; name: string }
+interface CurrentLocation {
+  guardId: string; guardName: string; shiftId: string | null; siteId: string
+  latitude: number; longitude: number; recordedAt: string; stale: boolean
+}
+
+// A branded div-icon rather than Leaflet's default marker images —
+// avoids the well-known Leaflet/Vite asset-path bundling issue
+// entirely, and matches the shield-in-a-circle look the original
+// placeholder already used.
+function guardIcon(stale: boolean, selected: boolean) {
+  const bg = stale ? "#94A3B8" : "#1B3A6B"
+  const ring = selected ? "0 0 0 4px rgba(13,148,136,0.35)" : "0 4px 12px rgba(27,58,107,0.4)"
+  return L.divIcon({
+    className: "",
+    html: `<div style="width:36px;height:36px;border-radius:50%;background:${bg};border:3px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:${ring}">
+             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+           </div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+    popupAnchor: [0, -18],
+  })
+}
 
 export default function LiveMapTab() {
   const [selectedGuard, setSelectedGuard] = useState<string | null>(null)
+  const [siteId, setSiteId] = useState<string>("")
+
+  const { data: sites = [] } = useQuery<SiteOption[]>({
+    queryKey: ["live-map-sites"],
+    queryFn: async () => {
+      const r = await apiClient.get("/api/v1/security/sites?size=100")
+      const p = r.data?.data ?? r.data
+      return (p?.content ?? p ?? []).map((s: any) => ({ id: s.id, name: s.name }))
+    },
+  })
 
   const { data: guards = [] } = useQuery<any[]>({
     queryKey: ["guards"],
@@ -47,7 +86,15 @@ export default function LiveMapTab() {
     refetchInterval: 30000,
   })
 
-  // Fetch last checkpoint scan for each active shift
+  // Real current positions — the fix itself. Refetches every 30s to
+  // stay reasonably live without hammering the endpoint on every render.
+  const { data: locations = [], isLoading: locationsLoading } = useQuery<CurrentLocation[]>({
+    queryKey: ["live-locations", siteId],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/sites/${siteId}/guards/locations`)).data.data ?? [],
+    enabled: !!siteId,
+    refetchInterval: 30000,
+  })
+
   const { data: shiftScans = {} } = useQuery<Record<string, ScanLog | null>>({
     queryKey: ["shift-scans", shifts.map((s: any) => s.id).join(",")],
     queryFn: async () => {
@@ -71,9 +118,18 @@ export default function LiveMapTab() {
   })
 
   const activeCount = shifts.length
+  const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })
+  const fmtRelative = (iso: string) => {
+    const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
+    return mins < 1 ? "just now" : `${mins} min ago`
+  }
 
-  const fmtTime = (iso: string) =>
-    new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })
+  // South Africa's rough centre as a sensible default when no guard has
+  // a position yet — not a made-up guard location, just a starting
+  // viewport with nothing plotted on it.
+  const center: [number, number] = locations.length > 0
+    ? [locations.reduce((s, l) => s + l.latitude, 0) / locations.length, locations.reduce((s, l) => s + l.longitude, 0) / locations.length]
+    : [-28.4793, 24.6727]
 
   return (
     <div>
@@ -88,7 +144,16 @@ export default function LiveMapTab() {
         </div>
       </div>
 
-      {/* Hardware support notice */}
+      <div style={{ marginBottom: 16, maxWidth: 320 }}>
+        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Site</label>
+        <select value={siteId} onChange={e => setSiteId(e.target.value)}
+          style={{ width: "100%", padding: "8px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, background: "#fff" }}>
+          <option value="">Select a site to view live positions…</option>
+          {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+      </div>
+
+      {/* Supported scan types */}
       <div style={{ marginBottom: 20, padding: "14px 18px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: "#1D4ED8", marginBottom: 6 }}>Supported scan types</div>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
@@ -102,60 +167,44 @@ export default function LiveMapTab() {
           ))}
         </div>
         <div style={{ marginTop: 8, fontSize: 12, color: "#64748B" }}>
-          Future: CAT phone app will send GPS pings every 5 minutes during active shifts. NFC tags and BLE beacons supported for indoor checkpoints.
+          GPS pings every ~5 minutes during active shifts. A pin greys out if a guard hasn't pinged in over 5 minutes.
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16 }}>
-        {/* Map placeholder */}
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden", minHeight: 500, position: "relative", background: "#F8FAFC" }}>
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, #EFF6FF 0%, #F0FDF4 50%, #FFFBEB 100%)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
-
-            {shifts.map((shift: any, i: number) => {
-              const positions = [
-                { top: "20%", left: "25%" }, { top: "45%", left: "60%" },
-                { top: "65%", left: "30%" }, { top: "30%", left: "70%" },
-              ]
-              const pos = positions[i % positions.length]
-              return (
-                <div key={shift.id} style={{ position: "absolute", ...pos, transform: "translate(-50%, -50%)", cursor: "pointer", zIndex: 2 }}
-                  onClick={() => setSelectedGuard(shift.guardId)}>
-                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1B3A6B", border: "3px solid #fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(27,58,107,0.4)" }}>
-                    <Shield size={16} color="#fff" />
-                  </div>
-                  <div style={{ position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)", marginTop: 4, background: "#1B3A6B", color: "#fff", borderRadius: 6, padding: "2px 8px", fontSize: 10, fontWeight: 600, whiteSpace: "nowrap" }}>
-                    Guard {i + 1}
-                  </div>
-                  <div style={{ position: "absolute", inset: -6, borderRadius: "50%", border: "2px solid #1B3A6B", opacity: 0.3 }} />
-                </div>
-              )
-            })}
-
-            {/* Map grid lines */}
-            <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.15 }}>
-              {Array.from({ length: 10 }, (_, i) => (
-                <g key={i}>
-                  <line x1={`${i * 10}%`} y1="0%" x2={`${i * 10}%`} y2="100%" stroke="#1B3A6B" strokeWidth="1" />
-                  <line x1="0%" y1={`${i * 10}%`} x2="100%" y2={`${i * 10}%`} stroke="#1B3A6B" strokeWidth="1" />
-                </g>
+        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden", minHeight: 500 }}>
+          {!siteId ? (
+            <div style={{ minHeight: 500, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 10, background: "#F8FAFC", color: "#94A3B8" }}>
+              <MapPin size={36} color="#CBD5E1" />
+              <div style={{ fontWeight: 600, color: "#475569" }}>Select a site above</div>
+            </div>
+          ) : locationsLoading ? (
+            <div style={{ minHeight: 500, display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8" }}>Loading positions…</div>
+          ) : locations.length === 0 ? (
+            <div style={{ minHeight: 500, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 10, background: "#F8FAFC", color: "#94A3B8" }}>
+              <MapPin size={36} color="#CBD5E1" />
+              <div style={{ fontWeight: 600, color: "#475569" }}>No guard positions yet at this site</div>
+              <div style={{ fontSize: 13 }}>Positions appear once a guard's app records a GPS ping during an open shift</div>
+            </div>
+          ) : (
+            <MapContainer center={center} zoom={13} style={{ height: 500, width: "100%" }}>
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              {locations.map(loc => (
+                <Marker key={loc.guardId} position={[loc.latitude, loc.longitude]}
+                  icon={guardIcon(loc.stale, selectedGuard === loc.guardId)}
+                  eventHandlers={{ click: () => setSelectedGuard(selectedGuard === loc.guardId ? null : loc.guardId) }}>
+                  <Popup>
+                    <strong>{loc.guardName}</strong><br />
+                    {loc.stale ? <span style={{ color: "#B45309" }}>Stale — </span> : null}
+                    Last ping {fmtRelative(loc.recordedAt)}
+                  </Popup>
+                </Marker>
               ))}
-            </svg>
-
-            {activeCount === 0 && (
-              <div style={{ textAlign: "center", color: "#94A3B8" }}>
-                <MapPin size={36} color="#CBD5E1" style={{ marginBottom: 10 }} />
-                <div style={{ fontWeight: 600, color: "#475569" }}>No active shifts</div>
-                <div style={{ fontSize: 13, marginTop: 4 }}>Guard positions will appear here during active shifts</div>
-              </div>
-            )}
-          </div>
-
-          {/* Map controls */}
-          <div style={{ position: "absolute", top: 16, right: 16, display: "flex", flexDirection: "column", gap: 6, zIndex: 3 }}>
-            {["+", "−", "⊕"].map(c => (
-              <button key={c} style={{ width: 32, height: 32, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 6, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>{c}</button>
-            ))}
-          </div>
+            </MapContainer>
+          )}
         </div>
 
         {/* Active guards list */}
@@ -170,6 +219,7 @@ export default function LiveMapTab() {
             shifts.map((shift: any, i: number) => {
               const guard   = guards.find((g: any) => g.id === shift.guardId)
               const lastScan: ScanLog | null = shiftScans[shift.id] ?? null
+              const loc = locations.find(l => l.guardId === shift.guardId)
 
               return (
                 <div key={shift.id}
@@ -180,7 +230,7 @@ export default function LiveMapTab() {
                       <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "#1D4ED8", fontSize: 13 }}>
                         {guard ? `${guard.firstName?.[0]}${guard.lastName?.[0]}` : "?"}
                       </div>
-                      <div style={{ position: "absolute", bottom: 0, right: 0, width: 10, height: 10, borderRadius: "50%", background: "#22C55E", border: "2px solid #fff" }} />
+                      <div style={{ position: "absolute", bottom: 0, right: 0, width: 10, height: 10, borderRadius: "50%", background: loc && !loc.stale ? "#22C55E" : "#CBD5E1", border: "2px solid #fff" }} />
                     </div>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 13, color: "#0F172A" }}>{guard?.fullName ?? `Guard ${i + 1}`}</div>
@@ -192,7 +242,10 @@ export default function LiveMapTab() {
                     Shift: {fmtTime(shift.startAt)} – {fmtTime(shift.endAt)}
                   </div>
 
-                  {/* Last checkpoint — now real data */}
+                  <div style={{ marginTop: 6, fontSize: 11, color: loc ? (loc.stale ? "#B45309" : "#166534") : "#94A3B8" }}>
+                    {loc ? `Position: ${fmtRelative(loc.recordedAt)}${loc.stale ? " (stale)" : ""}` : "No GPS ping yet"}
+                  </div>
+
                   <div style={{ marginTop: 8, padding: "6px 10px", background: "#F8FAFC", borderRadius: 6, fontSize: 11, color: "#64748B" }}>
                     {lastScan ? (
                       <span>
@@ -212,14 +265,6 @@ export default function LiveMapTab() {
               )
             })
           )}
-
-          {/* Coming soon notice */}
-          <div style={{ marginTop: 8, padding: "14px 16px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 10 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#92400E", marginBottom: 8 }}>Coming soon</div>
-            <div style={{ fontSize: 11, color: "#78350F", lineHeight: 1.6 }}>
-              CAT phone GPS tracking — guards on active shifts will show real-time positions updated every 5 minutes.
-            </div>
-          </div>
         </div>
       </div>
     </div>
