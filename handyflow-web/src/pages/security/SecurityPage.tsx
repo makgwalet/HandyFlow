@@ -4,10 +4,12 @@ import {
   Shield, MapPin, Clock, AlertTriangle, LayoutDashboard, Radio,
   Crosshair, Siren, Camera, FileBarChart, Tablet, Lock, Users,
   DollarSign, GitBranch, Key, DoorOpen, Route, RefreshCw, Repeat, ShieldCheck,
+  ClipboardList,
 } from "lucide-react"
 import SecurityDashboard  from "./SecurityDashboard"
 import GuardsTab          from "./GuardsTab"
 import SitesTab           from "./SitesTab"
+import PostOrdersTab      from "./PostOrdersTab"
 import GateAccessTab      from "./GateAccessTab"
 import PatrolRoutesTab    from "./PatrolRoutesTab"
 import RotationPatternsTab from "./RotationPatternsTab"
@@ -27,7 +29,7 @@ import BranchesTab        from "./BranchesTab"
 import PublicApiTab       from "./PublicApiTab"
 
 type Module  = "ops" | "cp" | "admin"
-type OpsTab  = "dashboard" | "guards" | "sites" | "gate-access" | "patrol-routes" | "rotation-patterns" | "shift-swaps" | "guard-screening" | "shifts" | "incidents" | "live" | "control-room" | "armoury" | "cctv" | "sessions" | "reports"
+type OpsTab  = "dashboard" | "guards" | "sites" | "post-orders" | "gate-access" | "patrol-routes" | "rotation-patterns" | "shift-swaps" | "guard-screening" | "shifts" | "incidents" | "live" | "control-room" | "armoury" | "cctv" | "sessions" | "reports"
 type CpTab   = "cp-overview"
 type ATab    = OpsTab | CpTab | "admin-overview" | "payroll" | "branches" | "public-api"
 
@@ -35,6 +37,7 @@ const OPS_TABS = [
   { id: "dashboard",    label: "Dashboard",    icon: LayoutDashboard },
   { id: "guards",       label: "Guards",       icon: Shield },
   { id: "sites",        label: "Sites",        icon: MapPin },
+  { id: "post-orders",  label: "Post Orders",  icon: ClipboardList },
   { id: "gate-access",  label: "Gate Access",  icon: DoorOpen },
   { id: "patrol-routes", label: "Patrol Routes", icon: Route },
   { id: "rotation-patterns", label: "Rotation Patterns", icon: RefreshCw },
@@ -141,6 +144,7 @@ export function SecurityPage() {
           {tab === "dashboard"     && <SecurityDashboard onNavigate={setTab as any} />}
           {tab === "guards"        && <GuardsTab />}
           {tab === "sites"         && <SitesTab />}
+          {tab === "post-orders"   && <PostOrdersTab />}
           {tab === "gate-access"   && <GateAccessTab />}
           {tab === "patrol-routes" && <PatrolRoutesTab />}
           {tab === "rotation-patterns" && <RotationPatternsTab />}
