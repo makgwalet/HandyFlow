@@ -12,5 +12,11 @@ public record CreateProfileRequest(
         @NotBlank String contactEmail,
         String contactPhone,
         java.math.BigDecimal defaultHourlyRate,
-        @Min(1) @Max(12) int yearEndMonth
+        @Min(1) @Max(12) int yearEndMonth,
+        // FIX: closes the confirmed "no address on file" gap.
+        String addressStreet,
+        String addressSuburb,
+        String addressCity,
+        String addressProvince,
+        String addressPostalCode
 ) {}

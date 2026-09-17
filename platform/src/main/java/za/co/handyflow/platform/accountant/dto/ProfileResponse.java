@@ -10,5 +10,11 @@ public record ProfileResponse(
         String contactPhone,
         java.math.BigDecimal defaultHourlyRate,
         int yearEndMonth,
-        java.time.Instant createdAt
+        java.time.Instant createdAt,
+        // FIX: closes the confirmed "no address on file" gap.
+        String addressStreet,
+        String addressSuburb,
+        String addressCity,
+        String addressProvince,
+        String addressPostalCode
 ) {}
