@@ -23,6 +23,12 @@ public record ClientResponse(
         String onboardingStatus,
         String contactEmail,
         String contactPhone,
+        // FIX: closes the confirmed "no address on file" gap.
+        String addressStreet,
+        String addressSuburb,
+        String addressCity,
+        String addressProvince,
+        String addressPostalCode,
         // Computed fields
         int openDeadlines,
         int overdueDeadlines,

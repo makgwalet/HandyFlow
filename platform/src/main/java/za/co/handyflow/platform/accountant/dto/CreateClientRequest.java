@@ -26,6 +26,12 @@ public record CreateClientRequest(
         @Min(1) @Max(12) int yearEndMonth,
         String contactEmail,
         String contactPhone,
+        // FIX: closes the confirmed "no address on file" gap.
+        String addressStreet,
+        String addressSuburb,
+        String addressCity,
+        String addressProvince,
+        String addressPostalCode,
         UUID crmCustomerId,
         boolean sendWelcomeEmail
 ) {

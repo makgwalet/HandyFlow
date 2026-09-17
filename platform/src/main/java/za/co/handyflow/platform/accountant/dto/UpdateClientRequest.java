@@ -13,6 +13,12 @@ public record UpdateClientRequest(
         @Min(1) @Max(12) Integer yearEndMonth,
         String contactEmail,
         String contactPhone,
-        String riskRating
+        String riskRating,
+        // FIX: closes the confirmed "no address on file" gap.
+        String addressStreet,
+        String addressSuburb,
+        String addressCity,
+        String addressProvince,
+        String addressPostalCode
 ) {
 }
