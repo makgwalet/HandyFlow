@@ -10,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.admin.application.internal.AdminReportingService;
 import za.co.handyflow.platform.admin.application.internal.AdminService;
+import za.co.handyflow.platform.admin.application.internal.AdminTenantDiagnosticService;
 import za.co.handyflow.platform.admin.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 
@@ -26,6 +27,7 @@ public class AdminController {
 
     private final AdminService adminService;
     private final AdminReportingService adminReportingService;
+    private final AdminTenantDiagnosticService adminTenantDiagnosticService;
 
     // ── Dashboard ─────────────────────────────────────────────────────────────
 
@@ -55,6 +57,14 @@ public class AdminController {
             @PathVariable String slugOrId) {
         return ResponseEntity.ok(ApiResponse.success(
                 adminService.getTenantDetail(slugOrId)));
+    }
+
+    @GetMapping("/tenants/{slugOrId}/diagnostics")
+    @Operation(summary = "Tenant health diagnostics — read-only checks for support triage")
+    public ResponseEntity<ApiResponse<List<TenantDiagnosticCheck>>> getTenantDiagnostics(
+            @PathVariable String slugOrId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                adminTenantDiagnosticService.getDiagnostics(slugOrId)));
     }
 
     @PostMapping("/tenants/extend-pilot")

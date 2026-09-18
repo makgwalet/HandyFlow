@@ -17,6 +17,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.shared.UserContext;
 import za.co.handyflow.platform.shared.VatRateProvider;
 import org.springframework.beans.factory.annotation.Value;
+import za.co.handyflow.platform.identity.TenantEmailBrandingFacade;
 import za.co.handyflow.platform.identity.TenantFacade;
 import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.EmailTemplates;
@@ -48,6 +49,7 @@ public class QuoteService {
     private final QuoteNumberGenerator quoteNumberGenerator;
     private final InvoiceNumberGenerator invoiceNumberGenerator;
     private final TenantFacade tenantFacade;
+    private final TenantEmailBrandingFacade tenantEmailBrandingFacade;
     private final EmailService emailService;
     private final InvoicePdfService invoicePdfService;
     private final QuotePdfService quotePdfService;
@@ -163,11 +165,13 @@ public class QuoteService {
                     byte[] pdfBytes = quotePdfService.generateQuotePdf(quote.getId(), tenantId);
                     String amount = "R " + String.format(java.util.Locale.US, "%,.2f", quote.getTotal());
                     String acceptUrl = frontendUrl + "/q/" + quote.getPublicAccessToken();
+                    String signatureHtml = tenantEmailBrandingFacade.renderSignatureHtml(tenantId);
                     emailService.sendWithAttachment(
                             clientEmail,
                             "Quote " + quote.getQuoteNumber() + " from " + tenant.companyName(),
                             EmailTemplates.quoteSentToClient(
-                                    clientName, quote.getQuoteNumber(), tenant.companyName(), amount, acceptUrl),
+                                    clientName, quote.getQuoteNumber(), tenant.companyName(), amount, acceptUrl,
+                                    signatureHtml),
                             quote.getQuoteNumber() + ".pdf",
                             pdfBytes
                     );

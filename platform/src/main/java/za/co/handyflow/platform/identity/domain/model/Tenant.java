@@ -95,6 +95,28 @@ public class Tenant extends AggregateRoot<Tenant> {
     @Column(name = "billing_phone")
     private String billingPhone;
 
+    // Short, stable, tenant-chosen code used as the tenant segment of every
+    // generated document number (e.g. "FPS" -> "FPS-INV-2026-000001"). See
+    // TenantNumberingEngine for how this is assigned/resolved and why it is
+    // deliberately NOT derived dynamically from `name` on every read (a
+    // company name can change; a document code, once numbering has started
+    // against it, must not).
+    @Column(name = "document_code", length = 8)
+    private String documentCode;
+
+    public void assignDocumentCode(String documentCode) {
+        // Only the engine calls this, and only when this tenant has none —
+        // see TenantNumberingEngine.resolveDocumentCode. Deliberately no
+        // "change code" path here: changing it after documents already
+        // carry the old code would make historical numbers misleading.
+        if (this.documentCode != null) {
+            throw new IllegalStateException(
+                    "Tenant " + getId() + " already has a document code (" + this.documentCode
+                            + "); document codes are immutable once assigned.");
+        }
+        this.documentCode = documentCode;
+    }
+
     // WHY a static factory method instead of a public constructor?
     // Factory methods have NAMES — "register" tells you the intent.
     // They can enforce business rules before the object exists.

@@ -85,10 +85,34 @@ public class JwtService {
         return full.isEmpty() ? "" : full;
     }
 
+    /**
+     * FIX (Admin Console gap analysis): this threw a NullPointerException
+     * for any token with no "permissions" claim at all — which is exactly
+     * the shape of the admin-impersonation JWT AdminAuthService.
+     * generateImpersonationToken() issues (it carries "role":"IMPERSONATION"
+     * and "readOnly":true, but never a "permissions" claim). Because
+     * JwtAuthFilter catches this broadly and just logs + falls through
+     * unauthenticated, the failure was silent: the entire "view tenant
+     * read-only" impersonation feature — despite a fully-built session
+     * table, audit log, and TOTP-gated superadmin login behind it —
+     * could never actually reach a business endpoint. This fix only makes
+     * the extraction null-safe (empty set instead of throwing); it does
+     * NOT yet make impersonation functionally useful, since every business
+     * endpoint requires a specific granted authority (e.g.
+     * "INVOICE_READ") and an empty set satisfies none of them — that
+     * still needs a real design decision (a dedicated read-only authority
+     * set, or a distinct authorization path for role=IMPERSONATION) rather
+     * than being guessed at here. See PLATFORM-ENGINES-PROGRESS.md.
+     */
     @SuppressWarnings("unchecked")
     public Set<String> extractPermissions(String token) {
-        return extractClaim(token, claims ->
-                Set.copyOf((java.util.List<String>) claims.get("permissions")));
+        return extractClaim(token, claims -> {
+            Object raw = claims.get("permissions");
+            if (raw == null) {
+                return Set.of();
+            }
+            return Set.copyOf((java.util.List<String>) raw);
+        });
     }
 
     public boolean isTokenValid(String token) {

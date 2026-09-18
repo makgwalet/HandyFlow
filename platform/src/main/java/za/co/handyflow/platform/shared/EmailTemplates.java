@@ -1220,7 +1220,24 @@ public class EmailTemplates {
     public static String quoteSentToClient(String clientName, String quoteNumber,
                                            String companyName, String amount,
                                            String acceptUrl) {
-        return wrap("""
+        return quoteSentToClient(clientName, quoteNumber, companyName, amount, acceptUrl, "");
+    }
+
+    /**
+     * Overload adding an optional tenant signature block (see
+     * TenantEmailBrandingFacade). Reference migration for the Email Engine
+     * initiative — see PLATFORM-ENGINES-PROGRESS.md for why this one
+     * template was migrated first and which ones remain. {@code
+     * signatureHtml} is expected pre-rendered and pre-escaped (by
+     * TenantEmailBrandingEngine) — this method only decides where it goes
+     * in the layout, it does not build or escape it itself. Passing ""
+     * (the facade's contract for "no signature configured") renders
+     * identically to the original 5-arg overload above.
+     */
+    public static String quoteSentToClient(String clientName, String quoteNumber,
+                                           String companyName, String amount,
+                                           String acceptUrl, String signatureHtml) {
+        return wrap(("""
             <p>Hi %s,</p>
             <p>Please find attached your quote from <strong>%s</strong>.</p>
             <div class="highlight">
@@ -1234,7 +1251,8 @@ public class EmailTemplates {
             """.formatted(
                 org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
                 org.springframework.web.util.HtmlUtils.htmlEscape(companyName),
-                quoteNumber, amount, acceptUrl));
+                quoteNumber, amount, acceptUrl))
+                + (signatureHtml != null ? signatureHtml : ""));
     }
 
     // ── Invoicing: quote expiring soon ─────────────────────────────────────────

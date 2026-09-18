@@ -11,4 +11,5 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
     Optional<Tenant> findByEmail(String email);
     boolean existsBySlug(String slug);
     boolean existsByEmail(String email);
+    boolean existsByDocumentCode(String documentCode);
 }

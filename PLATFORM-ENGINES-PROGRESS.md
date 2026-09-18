@@ -1,0 +1,279 @@
+# Platform Engines Initiative — Progress & Backlog
+
+Tracks the four-part platform-engines request: Tenant Numbering Engine, PDF
+skill, tenant-branded Email Engine, Admin/Support Console. See
+`HandyFlow_Complete_Gap_Analysis.md` for the pre-existing full module gap
+analysis this builds on (its "PDF Generation" and "Shared Notification
+Service" cross-cutting sections are the source for items 2 and 3 below).
+
+## 1. Tenant Numbering Engine — IN PROGRESS (reference migration complete)
+
+**Done:**
+- `V285__tenant_numbering_engine.sql` — adds `tenants.document_code`
+  (backfilled from name/slug), creates `tenant_numbering_config` for
+  per-tenant per-document-type overrides. Existing `tenant_number_sequences`
+  counters untouched — no reset, no gap, no renumbering of issued documents.
+- `Tenant.assignDocumentCode(...)` — immutable once set, by design (a
+  document code must outlive a company name change).
+- `TenantNumberingFacade` (public API, `identity` root package) +
+  `TenantNumberingEngine` (impl) + `TenantDocumentCodeResolver` (separate
+  bean so `REQUIRES_NEW` isn't silently dropped by self-invocation).
+- **Reference migration**: `InvoiceNumberGenerator`, `QuoteNumberGenerator`,
+  `CreditNoteNumberGenerator` (invoicing module) now call the facade instead
+  of `TenantSequenceService` directly. Output changes from `INV-00001` to
+  `FPS-INV-00001` (tenant code + type code); underlying `INVOICE` / `QUOTE` /
+  `CREDIT_NOTE` sequence counters are unaffected.
+- Unit tests: `TenantNumberingEngineTest` (formatting/fallback/override logic).
+
+**Real bug this fixes:** `InvoiceNumberGenerator` (invoicing),
+`BkNumberGenerator` (bookkeeping) and `FmNumberGenerator`
+(facilities-management) each keep an independent `INVOICE`/`INVOICE_SEQUENCE`
+counter and can each produce a document literally labelled `INV-00001` for
+an unrelated purpose. A tenant running more than one of those modules can
+have three different documents with the same visible number. Migrating a
+generator to the engine assigns it a distinct `DEFAULT_TYPE_CODES` entry,
+which removes the ambiguity for that generator's documents going forward.
+
+**NOT yet done — remaining generators to migrate** (same pattern as the
+invoicing three; each is a small, independently-verifiable change):
+
+| Module | Generator | Current prefix(es) | Suggested type code |
+|---|---|---|---|
+| bookkeeping | `BkNumberGenerator` | `CLI-`, `JE-`, `INV-` | `CINV` (avoid collision w/ invoicing `INV`) |
+| facilitiesmanagement | `FmNumberGenerator` | `CLI-`, `WO-`, `INV-` | `FMINV` |
+| facilities | `FacilityNumberGenerator` | `WO-` | `FWO` (avoid collision w/ facilitiesmanagement `WO`) |
+| hr | `EmployeeNumberGenerator`, `PayRunNumberGenerator` | `EMP-`, `PR-` | keep |
+| accounting | `JournalNumberGenerator` | `JE-` | keep, but check vs. bookkeeping `JE-` |
+| accountant | `FeeNoteNumberGenerator` | `FN-` | keep |
+| fuel | `ReceiptNumberGenerator` | `FDR-` | keep |
+| expenses | `ClaimNumberGenerator` | `EXP-` | keep |
+| events | `EventNumberGenerator` | `EVT-` | keep |
+| contracting | `ContractNumberGenerator` | `CTR-` | keep |
+| bookings | `BookingNumberGenerator` | `BK-` | keep |
+| collectionsagency | `CollAgencyNumberGenerator` | `CI` | keep |
+| debtcollection | `DebtCollectionNumberGenerator` | `DC-` | keep |
+| insurancebrokerage | `InsBrokNumberGenerator` | `IB-POL-`, `IB-CI-` | keep |
+| trainingprovider | `TrainProvNumberGenerator` | `CLI-`, `CRS-`, `CERT-`, `TPI-`, `DEL-` | check `CLI-`/`CRS-`/`CERT-` vs. `training` module |
+| training | `TrainingNumberGenerator` | `CRS-`, `CERT-` | check vs. `trainingprovider` |
+| legalcompliance | `LegalComplianceNumberGenerator` | `LM-`, `DSAR-` | keep |
+| warehousing | `WhseNumberGenerator` | `WHI` | keep |
+
+**Known limitations (not silently glossed over):**
+- Document codes backfilled by V285 are **not** checked for cross-tenant
+  uniqueness at migration time (a blocking migration must not fail on a data
+  collision). Two existing tenants can land on the same 4-letter code until
+  one of them next issues a document, at which point
+  `TenantDocumentCodeResolver` only prevents *new* collisions — it does not
+  retroactively rename an already-visible code. A one-off audit query to
+  find and manually resolve existing collisions is recommended before this
+  ships to production tenants.
+- No Settings UI yet for tenants to view/manage their `document_code` or
+  `tenant_numbering_config` rows — API/DB only right now.
+- `reset_policy = 'YEARLY'` is defined in the schema but not implemented in
+  `TenantNumberingEngine` (documented as a stub, not silently ignored).
+- **Not build/test-verified in this session** — this sandbox has no network
+  access to Maven Central, so `./mvnw compile` / `./mvnw test` could not be
+  run here. Manual review only (imports, brace balance, self-invocation
+  check). Run `./mvnw test -Dtest=TenantNumberingEngineTest` and
+  `./mvnw compile` locally before merging, plus the Modulith architecture
+  test (`./mvnw test -Dtest=*ModularityTest*` or equivalent) since a new
+  cross-module facade was added.
+
+## 2. PDF generation skill — DONE
+
+Created `.claude/skills/pdf-generation/SKILL.md`, matching the structure
+this project's own `README.md` says skills live under. Grounded entirely in
+what already exists in the codebase (not generic PDF advice):
+
+- **Library**: iText 7 is the real standard (confirmed in `pom.xml` comment
+  and dominant usage); OpenPDF (`com.lowagie`) is a legacy dependency used
+  only by `projects`/`tasks` — skill says don't start new work with it.
+- **Fonts**: `LiberationSans-{Regular,Bold}.ttf` already shipped under
+  `src/main/resources/fonts/`, loaded with `FORCE_EMBEDDED` + `WINANSI`.
+- **Brand colours**: `InvoicePdfService`'s palette (`NAVY #1B3A6B`,
+  `TEAL #0D9488`, etc.) is the *exact same* token set
+  `handyflow-web/README.md` documents for the frontend — skill tells future
+  PDF work to reuse these constants rather than inventing new hex values,
+  so PDFs and the web app stay visually consistent.
+- **Real gotcha documented**: `TenantDetails.logoUrl()` is stored as a
+  `data:` URI, not an HTTP(S) URL — confirmed in three separate files
+  (`PdfReportService`, `QuotePdfService`, `SecurityPdfBrandingHelper`),
+  each with the identical decode-first workaround. Skill captures the
+  pattern once so a fourth copy doesn't get written.
+- **Real gotcha found and documented**: several PDF generators
+  (`Emp201PdfGenerator`, `PayslipPdfGenerator`, `ApPdfGenerator`) format
+  Rand amounts via `NumberFormat.getInstance(new Locale("en","ZA"))`, which
+  renders the thousands separator as a non-breaking space — outside the
+  WinAnsi encoding used when embedding LiberationSans, so it can misrender.
+  The rest of the codebase's manual `"R " + String.format(Locale.US,
+  "%,.2f", ...)` pattern is the safe one; skill tells new code to use that
+  and flags (not silently fixes) the inconsistent files.
+- Points to `VatRateProvider` (shared) as the one legitimate VAT-rate
+  source, and to the new `TenantNumberingFacade` for any document number.
+- Points to `SecurityPdfBrandingHelper` as the one existing (module-local)
+  attempt at a reusable branded-header component, and to
+  `projects/api/PdfExportController.java` as the REST export convention to
+  reuse.
+- Lists the confirmed missing-PDF backlog from
+  `HandyFlow_Complete_Gap_Analysis.md` so it isn't duplicated across docs.
+
+**Not done as part of this**: actually extracting `SecurityPdfBrandingHelper`
+into a shared, cross-module `PdfBrandingEngine`. The skill explicitly says
+not to block ordinary feature work on that refactor, but also not to add a
+54th independent copy of the same header logic — left as tracked platform
+backlog, consistent with this codebase's own stated convention of only
+extracting shared code once a *third* consumer needs it (see that file's
+own doc comment).
+
+## 3. Tenant-branded Email Engine — IN PROGRESS (reference migration complete)
+
+**Real state found (more centralized than the original brief assumed):**
+`EmailService` + `EmailTemplates.java` (46 template methods, one shared
+`wrap()` header/footer) are already a genuine shared foundation — not
+scattered per-module email code as a first read of the brief might suggest.
+The real gap: `wrap()`'s header is unconditionally `"HandyFlow · Your
+Business Operating System"` — none of the 46 templates accept any tenant
+branding beyond an occasional name used inline in body copy — and **9
+files** (`AdminInvoiceService`, `PmNotificationService`,
+`ScmNotificationService`, `AccountingService`, `CreativeService`,
+`ContractExpiryScheduler`, `MarketingService`, `ApRemittanceEmailService`,
+`PosService`) build their own independent HTML wrapper instead of using
+`EmailTemplates.wrap()` at all — confirmed by
+`ScmNotificationService`'s own comment "same pattern as
+PmNotificationService", i.e. that duplication was already noticed and not
+fixed.
+
+**Done:**
+- `V286__tenant_email_signature.sql` — `tenant_email_signature` table,
+  **opt-in** (`enabled` defaults `false`): no existing tenant's email
+  changes in appearance until they configure and enable a signature.
+- `TenantEmailSignature` entity + repository (identity module).
+- `TenantEmailBrandingFacade` (public API) + `TenantEmailBrandingEngine`
+  impl — deliberately returns a plain, pre-escaped, pre-rendered HTML
+  `String` (never null, `""` when unconfigured) rather than a DTO, so
+  `EmailTemplates` — a pure static utility class with zero Spring/JPA
+  dependencies today — doesn't have to start depending on identity-module
+  types to use it.
+- **Reference migration**: `EmailTemplates.quoteSentToClient(...)` — the
+  real, customer-facing "quote sent" email in `QuoteService.sendQuote()` —
+  now has an additive 6-arg overload taking `signatureHtml`; the original
+  5-arg overload is kept and simply delegates with `""`, so nothing else
+  calling the old signature needed to change. `QuoteService` now injects
+  `TenantEmailBrandingFacade` and passes the rendered signature through.
+- Unit tests: `TenantEmailBrandingEngineTest` (enabled/disabled/missing row,
+  HTML escaping, blank-field omission) and
+  `EmailTemplatesQuoteSentToClientTest` (confirms the 5-arg and 6-arg-empty
+  paths render byte-identical output, and the 6-arg path appends/tolerates
+  null correctly).
+
+**NOT yet done — remaining backlog:**
+1. **`wrap()`'s own header still always says "HandyFlow"** — this migration
+   only adds a *signature block at the bottom* of one email. Making the
+   *header* tenant-aware (tenant name/logo instead of "HandyFlow · Your
+   Business Operating System") is a materially bigger change: it touches
+   the one shared function all 46 templates call, so every caller's visual
+   output changes at once. Recommended next step, but deliberately not
+   done in this pass without the ability to visually verify all 46 emails.
+2. **The other 45 `EmailTemplates` methods** don't yet accept a signature
+   parameter — migrate the highest-value customer-facing ones next
+   (invoice-issued, invoice-overdue, booking confirmation) using the exact
+   same additive-overload pattern as `quoteSentToClient`.
+3. **The 9 files with independent inline HTML** are unmigrated and
+   unaffected by this work — each needs its own reference migration onto
+   `EmailTemplates.wrap()` (or a documented reason it can't, e.g.
+   `ScmNotificationService`'s distinct amber "Supply Chain" accent colour
+   may be an intentional sub-brand, not simply an oversight — confirm with
+   product before merging its styling into the shared teal palette).
+4. **No `tenant_email_signature` Settings UI** yet — API/DB only.
+5. **No sender-identity-per-tenant** (`fromAddress`/`fromName` in
+   `EmailService` are still global, single values) and **no delivery
+   observability** (`email_messages` table from the original brief) — both
+   real, larger pieces of platform work, unstarted.
+6. **Not build/test-verified in this session** — same Maven Central network
+   limitation as deliverable 1. Run
+   `./mvnw test -Dtest=TenantEmailBrandingEngineTest,EmailTemplatesQuoteSentToClientTest`
+   and `./mvnw compile` locally, plus the Modulith architecture test (a new
+   cross-module facade was added, same as deliverable 1).
+
+## 4. Admin/Support Console enhancements — IN PROGRESS (real bug found + fixed; diagnostic engine shipped)
+
+**Real state found — much further along than the brief assumed:** the
+`admin` module already has tenant search, per-tenant detail (modules,
+users, MRR, recent audit events — `AdminService.getTenantDetail`), module
+activate/deactivate, discount management, a full TOTP-gated superadmin
+login flow, an audit log (`AdminAuditLog`), and — critically — an already
+fairly sophisticated **impersonation session** design
+(`AdminImpersonationSession`: admin, tenant, reason, IP, started/ended,
+15-minute expiry, a `readOnly: true` JWT claim). Section 17 and most of
+section 18 of the original brief describe things that already exist.
+
+**Real, previously-undiscovered bug found and fixed:** the impersonation
+JWT `AdminAuthService.generateImpersonationToken()` issues has no
+`"permissions"` claim (by design — it's meant to be read-only). But
+`JwtService.extractPermissions()` did:
+```java
+Set.copyOf((List<String>) claims.get("permissions"))
+```
+— which throws a `NullPointerException` when that claim is absent.
+`JwtAuthFilter` catches the exception broadly, logs it, and falls through
+*unauthenticated* rather than surfacing it. Net effect: **the entire "view
+tenant read-only" impersonation feature — despite the session tracking,
+audit log, and TOTP-gated login already built around it — could never
+actually reach a single business endpoint.** It fails silently, not loudly,
+so nothing in logs or tests flagged it as broken.
+
+**Fixed:** `extractPermissions` is now null-safe (empty set instead of
+throwing) — `JwtServiceTest` has a regression test built from the exact
+claim shape `generateImpersonationToken()` produces.
+
+**Deliberately NOT fixed further, and said so rather than guessing:** an
+empty permission set doesn't make impersonation *useful* — every business
+endpoint requires a specific granted authority (confirmed via
+`InvoiceController`: even `GET` endpoints require e.g. `INVOICE_READ`), so
+today's fix only changes the failure from "silent 401" to "correctly-denied
+403" on every request. Making impersonation actually let a superadmin
+*view* tenant data read-only requires a real design decision — e.g. a
+dedicated read-only authority set derived from the `permissions` table, or
+a distinct authorization path keyed on `role=IMPERSONATION` — that
+shouldn't be guessed at by pattern-matching permission names (the naming
+convention isn't fully consistent: `INVOICE_READ` vs `REPORT_VIEW`).
+Flagged as the top follow-up item for whoever owns platform security next.
+
+**Shipped: Tenant Diagnostic Engine** (`AdminTenantDiagnosticService`,
+`GET /api/v1/admin/tenants/{slugOrId}/diagnostics`) — per brief section 19.
+Scoped to checks against tables confirmed to actually exist (no
+job-execution-history or email-delivery-tracking table exists yet, so
+"failed scheduled jobs" / "email delivery status" checks from the brief's
+wishlist are NOT included — fabricating those against nonexistent data
+would be worse than not having them):
+- `TENANT_STATUS` (critical) — ACTIVE/TRIAL vs SUSPENDED/CANCELLED
+- `HAS_USERS` (critical) — at least one user account
+- `HAS_ACTIVE_MODULES` (critical) — at least one active module
+- `DOCUMENT_CODE` (informational) — ties in deliverable 1
+- `EMAIL_SIGNATURE` (informational) — ties in deliverable 3
+- `VAT_NUMBER`, `LOGO` (informational)
+
+Each check carries a `CRITICAL` vs `INFORMATIONAL` severity rather than
+collapsing into a single score, matching the brief's explicit instruction
+("not as a simplistic score... but as a technical diagnostic status").
+Unit tests (`AdminTenantDiagnosticServiceTest`) cover a healthy tenant, a
+suspended tenant, unconfigured opt-in items rendering as informational
+(not critical), and the not-found path.
+
+**NOT done — remaining backlog:**
+1. The impersonation read-only-authorization design gap above — the
+   highest-value real follow-up from this whole session.
+2. "Fix it for me" actions (brief section 20) — not started; each one
+   (resend verification email, retry failed email, regenerate PDF, etc.)
+   is its own small feature with its own blast radius and deserves its own
+   session rather than being rushed here.
+3. No frontend for the new diagnostics endpoint yet — API only.
+4. **Not build/test-verified in this session** — same Maven Central
+   limitation as the other three deliverables, and this one touches shared
+   JWT authentication code, so treat the `JwtService` change with extra
+   care: run `./mvnw test -Dtest=JwtServiceTest,AdminTenantDiagnosticServiceTest`
+   and the full `JwtAuthFilter`/`AdminJwtFilter`-adjacent test suite (if
+   any exists) locally before merging, not just the two new test files.
+
+---
+*Last updated by Claude — Admin Console: Tenant Diagnostic Engine + impersonation NPE fix.*
