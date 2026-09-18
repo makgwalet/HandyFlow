@@ -115,10 +115,12 @@ export default function ClientsTab({ onNavigate }: { onNavigate?: (tab: string, 
   const [showCreate, setCreate] = useState(false)
   const [error, setError]       = useState("")
 
-  const INIT = () => ({
+    const INIT = () => ({
     entityType: "PTY_LTD", tradingName: "", registeredName: "", registrationNumber: "",
     taxReferenceNumber: "", vatNumber: "", vatCategory: "", yearEndMonth: 2,
     contactEmail: "", contactPhone: "",
+    // FIX: closes the confirmed "no address on file" gap.
+    addressStreet: "", addressSuburb: "", addressCity: "", addressProvince: "", addressPostalCode: "",
     // NEW: closes the "clientOnboardingWelcome() never called" gap.
     // Defaults false, deliberately — see backend CreateClientRequest's
     // own comment for why this is opt-in, not opt-out.
@@ -486,6 +488,26 @@ export default function ClientsTab({ onNavigate }: { onNavigate?: (tab: string, 
               <div>
                 <label style={lbl}>Contact phone</label>
                 <input value={form.contactPhone} onChange={e => f("contactPhone", e.target.value)} style={inp} />
+              </div>
+              <div style={{ gridColumn: "1/-1" }}>
+                <label style={lbl}>Street address</label>
+                <input value={form.addressStreet} onChange={e => f("addressStreet", e.target.value)} style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Suburb</label>
+                <input value={form.addressSuburb} onChange={e => f("addressSuburb", e.target.value)} style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>City</label>
+                <input value={form.addressCity} onChange={e => f("addressCity", e.target.value)} style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Province</label>
+                <input value={form.addressProvince} onChange={e => f("addressProvince", e.target.value)} style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Postal code</label>
+                <input value={form.addressPostalCode} onChange={e => f("addressPostalCode", e.target.value)} style={inp} />
               </div>
             </div>
 

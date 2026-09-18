@@ -56,13 +56,16 @@ public class GuardController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('SECURITY_READ')")
-    @Operation(summary = "List all guards with optional name/PSiRA search")
+    @Operation(summary = "List all guards with optional name/PSiRA search, or filter to one branch")
     public ResponseEntity<ApiResponse<Page<GuardResponse>>> getGuards(
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) java.util.UUID branchId,
             @PageableDefault(size = 20) Pageable pageable) {
         featureGuard.requireModule("security");
         return ResponseEntity.ok(ApiResponse.success(
-                guardService.getGuards(TenantContext.getTenantIdAsObject(), search, pageable)));
+                branchId != null
+                        ? guardService.getGuardsByBranch(TenantContext.getTenantIdAsObject(), branchId, pageable)
+                        : guardService.getGuards(TenantContext.getTenantIdAsObject(), search, pageable)));
     }
 
     @GetMapping("/{id}")

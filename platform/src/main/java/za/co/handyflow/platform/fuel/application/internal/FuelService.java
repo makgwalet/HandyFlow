@@ -91,10 +91,27 @@ public class FuelService {
     @Transactional
     public TankResponse createTank(TenantId tenantId, CreateTankRequest req) {
         FuelTank tank = FuelTank.create(tenantId, req.name(), req.fuelType(),
-                req.capacityLitres(), req.location());
+                req.capacityLitres(), req.location(), req.lowThresholdPct());
         tankRepository.save(tank);
         log.info("Created fuel tank={} tenant={}", tank.getName(), tenantId);
         return toTankResponse(tank);
+    }
+
+    @Transactional
+    public TankResponse updateTank(TenantId tenantId, UUID id, UpdateTankRequest req) {
+        FuelTank tank = findActiveTank(tenantId, id);
+        tank.update(req.name(), req.fuelType(), req.capacityLitres(), req.location(), req.lowThresholdPct());
+        tankRepository.save(tank);
+        log.info("Updated fuel tank={} tenant={}", id, tenantId);
+        return toTankResponse(tank);
+    }
+
+    @Transactional
+    public void deactivateTank(TenantId tenantId, UUID id, UUID deactivatedBy) {
+        FuelTank tank = findActiveTank(tenantId, id);
+        tank.softDelete(deactivatedBy);
+        tankRepository.save(tank);
+        log.info("Deactivated fuel tank={} tenant={}", id, tenantId);
     }
 
     /**
@@ -585,7 +602,8 @@ public class FuelService {
     private TankResponse toTankResponse(FuelTank t) {
         return new TankResponse(t.getId(), t.getName(), t.getFuelType(),
                 t.getCapacityLitres(), t.getCurrentLitres(),
-                t.getFillPercentage(), t.isLow(), t.getLocation(), t.getCreatedAt());
+                t.getFillPercentage(), t.isLow(), t.getLocation(), t.getCreatedAt(),
+                t.getLowThresholdPct());
     }
 
     private SupplierResponse toSupplierResponse(FuelSupplier s) {

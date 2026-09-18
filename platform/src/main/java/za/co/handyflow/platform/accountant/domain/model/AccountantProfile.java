@@ -32,6 +32,11 @@ public class AccountantProfile {
     @Column(name = "vat_category")                          private String     vatCategory;
     @Column(name = "default_hourly_rate", nullable = false) private BigDecimal defaultHourlyRate;
     @Column(name = "year_end_month",      nullable = false) private int        yearEndMonth;
+    @Column(name = "address_street")                        private String     addressStreet;
+    @Column(name = "address_suburb")                         private String     addressSuburb;
+    @Column(name = "address_city")                           private String     addressCity;
+    @Column(name = "address_province")                       private String     addressProvince;
+    @Column(name = "address_postal_code")                    private String     addressPostalCode;
     @Column(name = "created_at",          updatable = false) private Instant   createdAt;
     @Column(name = "updated_at")                            private Instant    updatedAt;
 
@@ -51,6 +56,15 @@ public class AccountantProfile {
         p.createdAt        = Instant.now();
         p.updatedAt        = Instant.now();
         return p;
+    }
+
+    public void updateAddress(String street, String suburb, String city, String province, String postalCode) {
+        this.addressStreet     = street;
+        this.addressSuburb     = suburb;
+        this.addressCity       = city;
+        this.addressProvince   = province;
+        this.addressPostalCode = postalCode;
+        this.updatedAt         = Instant.now();
     }
 
     public void update(String firmName, String practiceNumber, String vatNumber,

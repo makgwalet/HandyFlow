@@ -40,6 +40,7 @@ export function AccountantPage() {
   const [profileForm, setProfileForm] = useState({
     firmName: "", practiceNumber: "", vatNumber: "",
     contactEmail: "", contactPhone: "", defaultHourlyRate: "850", yearEndMonth: "2",
+    addressStreet: "", addressSuburb: "", addressCity: "", addressProvince: "", addressPostalCode: "",
   })
   const pf = (k: string, v: string) => setProfileForm(p => ({ ...p, [k]: v }))
   const [profileError, setProfileError] = useState("")
@@ -91,6 +92,9 @@ export function AccountantPage() {
                 contactPhone: profile.contactPhone ?? "",
                 defaultHourlyRate: String(profile.defaultHourlyRate ?? "850"),
                 yearEndMonth: String(profile.yearEndMonth ?? "2"),
+                addressStreet: profile.addressStreet ?? "", addressSuburb: profile.addressSuburb ?? "",
+                addressCity: profile.addressCity ?? "", addressProvince: profile.addressProvince ?? "",
+                addressPostalCode: profile.addressPostalCode ?? "",
               })
             }
             setShowSetup(true)
@@ -198,11 +202,31 @@ export function AccountantPage() {
               </div>
               <div>
                 <label style={lbl}>Firm year-end month</label>
-                <select value={profileForm.yearEndMonth} onChange={e => pf("yearEndMonth", e.target.value)} style={{ ...inp, background: "#fff" }}>
+                                <select value={profileForm.yearEndMonth} onChange={e => pf("yearEndMonth", e.target.value)} style={{ ...inp, background: "#fff" }}>
                   {Array.from({ length: 12 }, (_, i) => (
                     <option key={i+1} value={i+1}>{new Date(0, i).toLocaleString("en", { month: "long" })}</option>
                   ))}
                 </select>
+              </div>
+              <div style={{ gridColumn: "1/-1" }}>
+                <label style={lbl}>Street address</label>
+                <input value={profileForm.addressStreet} onChange={e => pf("addressStreet", e.target.value)} style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Suburb</label>
+                <input value={profileForm.addressSuburb} onChange={e => pf("addressSuburb", e.target.value)} style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>City</label>
+                <input value={profileForm.addressCity} onChange={e => pf("addressCity", e.target.value)} style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Province</label>
+                <input value={profileForm.addressProvince} onChange={e => pf("addressProvince", e.target.value)} style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Postal code</label>
+                <input value={profileForm.addressPostalCode} onChange={e => pf("addressPostalCode", e.target.value)} style={inp} />
               </div>
             </div>
 
@@ -224,6 +248,11 @@ export function AccountantPage() {
                   contactPhone: profileForm.contactPhone || null,
                   defaultHourlyRate: parseFloat(profileForm.defaultHourlyRate),
                   yearEndMonth: parseInt(profileForm.yearEndMonth),
+                  addressStreet: profileForm.addressStreet || null,
+                  addressSuburb: profileForm.addressSuburb || null,
+                  addressCity: profileForm.addressCity || null,
+                  addressProvince: profileForm.addressProvince || null,
+                  addressPostalCode: profileForm.addressPostalCode || null,
                 })}
                 style={{ padding: "9px 22px", background: !profileForm.firmName ? "#94A3B8" : "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {saveProfile.isPending ? "Saving..." : "Save Profile"}

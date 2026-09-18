@@ -29,17 +29,13 @@ import java.time.format.DateTimeFormatter;
  * the Supply Chain module) — not iText7, see ScPoPdfGenerator's own
  * Javadoc for why (AGPL licensing).
  * <p>
- * DELIBERATELY NOT LABELLED "SARS-compliant tax invoice": a compliant VAT
- * tax invoice requires both the supplier's and the recipient's physical
- * address (SARS VAT Act requirements). Neither AccountantProfile nor
- * AccClient has any address field at all — confirmed by reading both
- * entities in full, not assumed. Rather than fabricate placeholder
- * addresses to make this look compliant, or silently omit a requirement
- * and call it a tax invoice anyway, this generates a "FEE NOTE" — an
- * honest name for what the data actually supports. A firm using this for
- * real SARS-compliant invoicing needs to add address fields to both
- * entities first; that's a real, separate piece of work, not something
- * this generator can paper over.
+ * STILL LABELLED "FEE NOTE", NOT "TAX INVOICE": address fields now exist
+ * on both entities (V283) and are rendered below, but a fully SARS-
+ * compliant VAT tax invoice has further requirements beyond an address
+ * (specific mandatory wording, a itemized VAT breakdown in a particular
+ * format) that this generator does not yet verify it meets. Relabelling
+ * this "TAX INVOICE" is a real, separate decision about full compliance,
+ * not something to flip silently now that one blocking gap is closed.
  * <p>
  * Also has no bank/EFT details section — AccountantProfile has no
  * banking fields either. The document tells the client to quote the
@@ -168,9 +164,10 @@ public class AccFeeNotePdfGenerator {
     }
 
     // ── From / To parties ───────────────────────────────────────────────────
-    // No address block for either party — confirmed neither
-    // AccountantProfile nor AccClient has an address field. See this
-    // class's own Javadoc for why that's not silently papered over.
+    // FIX: closes the address gap this class's own Javadoc used to flag
+    // explicitly — both entities now have address fields (V283).
+    // formatAddress() below builds one readable line, or returns null
+    // (never an empty/awkward line) when nothing is on file yet.
 
     private void addPartiesSection(Document doc, AccountantProfile profile, AccClient client) throws DocumentException {
         PdfPTable parties = new PdfPTable(2);
@@ -180,7 +177,9 @@ public class AccFeeNotePdfGenerator {
         parties.setSpacingAfter(14);
 
         parties.addCell(partyCell("FROM", profile.getFirmName(),
-                joinNonBlank(" \u00b7 ", profile.getContactEmail(), profile.getContactPhone())));
+                joinNonBlank(" \u00b7 ", profile.getContactEmail(), profile.getContactPhone()),
+                formatAddress(profile.getAddressStreet(), profile.getAddressSuburb(), profile.getAddressCity(),
+                        profile.getAddressProvince(), profile.getAddressPostalCode())));
 
         // FIX: previously showed registeredName in parentheses next to
         // the trading name — e.g. "FastPrint CC (2015/987654/23)".
@@ -201,9 +200,23 @@ public class AccFeeNotePdfGenerator {
                 client.getTaxReferenceNumber() != null ? "Tax Ref: " + client.getTaxReferenceNumber() : null);
         String contactLine = joinNonBlank(" \u00b7 ", client.getContactEmail(), client.getContactPhone());
 
-        parties.addCell(partyCell("TO", client.getTradingName(), legalNameLine, refLine, contactLine));
+        String addressLine = formatAddress(client.getAddressStreet(), client.getAddressSuburb(), client.getAddressCity(),
+                client.getAddressProvince(), client.getAddressPostalCode());
+        parties.addCell(partyCell("TO", client.getTradingName(), legalNameLine, refLine, contactLine, addressLine));
 
         doc.add(parties);
+    }
+
+    // FIX: closes the address gap. Street/suburb on one line, city and
+    // province+postal code on a second — a standard SA postal address
+    // layout, not a single run-on line. Returns null (not "") when
+    // every field is blank, matching partyCell()'s own "skip blank
+    // extraLines" convention rather than adding a visible empty line.
+    private String formatAddress(String street, String suburb, String city, String province, String postalCode) {
+        String line1 = joinNonBlank(", ", street, suburb);
+        String line2 = joinNonBlank(" ", city, joinNonBlank(", ", province, postalCode));
+        String combined = joinNonBlank("\n", line1.isBlank() ? null : line1, line2.isBlank() ? null : line2);
+        return combined.isBlank() ? null : combined;
     }
 
     private PdfPCell partyCell(String label, String name, String... extraLines) {

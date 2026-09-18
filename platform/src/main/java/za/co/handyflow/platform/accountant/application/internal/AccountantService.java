@@ -85,6 +85,8 @@ public class AccountantService {
                 req.registeredName(), req.registrationNumber(), req.taxReferenceNumber(),
                 req.vatNumber(), req.vatCategory(), req.yearEndMonth(),
                 req.contactEmail(), req.contactPhone());
+        client.updateAddress(req.addressStreet(), req.addressSuburb(), req.addressCity(),
+                req.addressProvince(), req.addressPostalCode());
         clientRepo.save(client);
         log.info("Created acc_client={} entity={} tenant={}", client.getTradingName(), client.getEntityType(), tenantId);
 
@@ -110,6 +112,11 @@ public class AccountantService {
     public ClientResponse updateClient(TenantId tenantId, UUID clientId, UpdateClientRequest req) {
         AccClient client = findActive(tenantId, clientId);
         if (req.riskRating() != null) client.updateRisk(req.riskRating());
+        if (req.addressStreet() != null || req.addressSuburb() != null || req.addressCity() != null
+                || req.addressProvince() != null || req.addressPostalCode() != null) {
+            client.updateAddress(req.addressStreet(), req.addressSuburb(), req.addressCity(),
+                    req.addressProvince(), req.addressPostalCode());
+        }
         clientRepo.save(client);
         return toClientResponse(client, tenantId);
     }
@@ -834,6 +841,8 @@ public class AccountantService {
                 c.getVatCategory(), c.getYearEndMonth(), c.getRiskRating(),
                 c.isFicaCompleted(), c.isSarsAgentAppointed(), c.getTcsPin(), c.getTcsPinExpiry(),
                 c.getOnboardingStatus(), c.getContactEmail(), c.getContactPhone(),
+                c.getAddressStreet(), c.getAddressSuburb(), c.getAddressCity(),
+                c.getAddressProvince(), c.getAddressPostalCode(),
                 open, overdue, wip != null ? wip : BigDecimal.ZERO, outstanding, c.getCreatedAt(),
                 c.isClientDeadlineRemindersEnabled());
     }
@@ -1036,6 +1045,8 @@ public class AccountantService {
                     req.contactEmail(), req.contactPhone(),
                     req.defaultHourlyRate(), req.yearEndMonth());
         }
+        profile.updateAddress(req.addressStreet(), req.addressSuburb(), req.addressCity(),
+                req.addressProvince(), req.addressPostalCode());
         profileRepo.save(profile);
         return toProfileResponse(profile);
     }
@@ -1044,6 +1055,8 @@ public class AccountantService {
         return new ProfileResponse(p.getId(), p.getFirmName(), p.getPracticeNumber(),
                 p.getRegistrationNumber(), p.getVatNumber(), p.getContactEmail(),
                 p.getContactPhone(), p.getDefaultHourlyRate(), p.getYearEndMonth(),
-                p.getCreatedAt());
+                p.getCreatedAt(),
+                p.getAddressStreet(), p.getAddressSuburb(), p.getAddressCity(),
+                p.getAddressProvince(), p.getAddressPostalCode());
     }
 }

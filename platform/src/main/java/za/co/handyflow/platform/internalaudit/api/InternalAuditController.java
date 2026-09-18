@@ -422,10 +422,38 @@ public class InternalAuditController {
 
     @PostMapping("/findings/{id}/reopen")
     @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
-    public ResponseEntity<ApiResponse<FindingResponse>> reopenFinding(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<FindingResponse>> reopenFinding(
+            @PathVariable UUID id, @Valid @RequestBody ReopenFindingRequest req) {
         featureGuard.requireModule("internal-audit");
         return ResponseEntity.ok(ApiResponse.success(
-                auditService.reopenFinding(TenantContext.getTenantIdAsObject(), id)));
+                auditService.reopenFinding(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    // FIX: closes the confirmed "no internal-audit engine reachable by
+    // an external auditor" gap. AUDIT_ADMIN, matching closeFinding()'s
+    // own tier immediately above — sharing is at least as consequential
+    // as closing, arguably more so given it exposes data externally.
+    @PostMapping("/findings/{id}/share-externally")
+    @PreAuthorize("hasAuthority('AUDIT_ADMIN')")
+    @Operation(summary = "Share a CLOSED finding with this business's external auditor",
+            description = "Requires the acting user to hold Head of Internal Audit on this finding's own " +
+                    "engagement — a tenant-wide AUDIT_ADMIN permission alone is not sufficient.")
+    public ResponseEntity<ApiResponse<FindingResponse>> shareFindingExternally(
+            @PathVariable UUID id, @Valid @RequestBody ShareFindingRequest req) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.shareFindingExternally(TenantContext.getTenantIdAsObject(), id, req,
+                        TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/findings/{id}/withdraw-sharing")
+    @PreAuthorize("hasAuthority('AUDIT_MANAGE')")
+    @Operation(summary = "Withdraw a previously-shared finding from external auditor visibility")
+    public ResponseEntity<ApiResponse<FindingResponse>> withdrawExternalSharing(@PathVariable UUID id) {
+        featureGuard.requireModule("internal-audit");
+        return ResponseEntity.ok(ApiResponse.success(
+                auditService.withdrawExternalSharing(TenantContext.getTenantIdAsObject(), id,
+                        TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/engagements/{id}/report/submit")

@@ -9,6 +9,7 @@ interface Tank {
   id: string; name: string; fuelType: string
   capacityLitres: number; currentLitres: number
   fillPercentage: number; low: boolean; location: string; createdAt: string
+  lowThresholdPct: number | null
 }
 interface Supplier { id: string; name: string }
 interface DipReading {
@@ -73,6 +74,27 @@ export default function TanksTab() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["tanks"] }); setShowAdd(false); setTankForm({ name: "", fuelType: "DIESEL", capacityLitres: "", location: "", lowThresholdPct: "20" }); setError("") },
     onError: (e: any) => setError(e.response?.data?.message ?? "Failed to create tank"),
   })
+
+    const [showEdit, setShowEdit] = useState<Tank | null>(null)
+  const [editForm, setEditForm] = useState({ name: "", fuelType: "DIESEL", capacityLitres: "", location: "", lowThresholdPct: "20" })
+
+  const updateTank = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: any }) => apiClient.put(`/api/v1/fuel/tanks/${id}`, body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tanks"] }); setShowEdit(null); setError("") },
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to update tank"),
+  })
+
+  const deactivateTank = useMutation({
+    mutationFn: (id: string) => apiClient.post(`/api/v1/fuel/tanks/${id}/deactivate`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tanks"] }),
+    onError: (e: any) => setError(e.response?.data?.message ?? "Failed to deactivate tank"),
+  })
+
+  const openEdit = (tank: Tank) => {
+    setEditForm({ name: tank.name, fuelType: tank.fuelType, capacityLitres: String(tank.capacityLitres), location: tank.location || "", lowThresholdPct: tank.lowThresholdPct != null ? String(tank.lowThresholdPct) : "20" })
+    setError("")
+    setShowEdit(tank)
+  }
 
   const receiveFuel = useMutation({
     mutationFn: ({ tankId, body }: { tankId: string; body: any }) =>
@@ -216,7 +238,7 @@ export default function TanksTab() {
                         </span>
                       )}
                     </div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <button onClick={() => openReceive(tank)}
                         style={{ background: "#0D9488", color: "#fff", border: "none", borderRadius: 7, padding: "6px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                         + Receive
@@ -224,6 +246,14 @@ export default function TanksTab() {
                       <button onClick={() => { setShowDip(tank); setDipForm({ actualLitres: String(tank.currentLitres), readBy: "", notes: "" }); setError("") }}
                         style={{ background: "#fff", color: "#475569", border: "1px solid #E2E8F0", borderRadius: 7, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>
                         Dip Reading
+                      </button>
+                      <button onClick={() => openEdit(tank)}
+                        style={{ background: "#fff", color: "#475569", border: "1px solid #E2E8F0", borderRadius: 7, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>
+                        Edit
+                      </button>
+                      <button onClick={() => { if (window.confirm(`Deactivate ${tank.name}? It will no longer appear in tank lists.`)) deactivateTank.mutate(tank.id) }}
+                        style={{ background: "#fff", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 7, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>
+                        Deactivate
                       </button>
                       <button onClick={() => setExpanded(isOpen ? null : tank.id)}
                         style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
@@ -337,9 +367,46 @@ export default function TanksTab() {
           </div>
           {error && <ErrBanner msg={error} />}
           <MFoot onCancel={() => { setShowAdd(false); setError("") }}
-            onSubmit={() => createTank.mutate({ name: tankForm.name, fuelType: tankForm.fuelType, capacityLitres: Number(tankForm.capacityLitres), location: tankForm.location || null })}
+                onSubmit={() => createTank.mutate({ name: tankForm.name, fuelType: tankForm.fuelType, capacityLitres: Number(tankForm.capacityLitres), location: tankForm.location || null, lowThresholdPct: tankForm.lowThresholdPct ? Number(tankForm.lowThresholdPct) : null })}
             loading={createTank.isPending} label="Create Tank"
             disabled={!tankForm.name || !tankForm.capacityLitres} />
+        </Overlay>
+      )}
+
+      
+      {/* Edit Tank Modal */}
+      {showEdit && (
+        <Overlay onClose={() => { setShowEdit(null); setError("") }}>
+          <MHead title={`Edit Tank — ${showEdit.name}`} onClose={() => { setShowEdit(null); setError("") }} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={lbl}>Tank Name *</label>
+              <input autoFocus value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>Fuel Type</label>
+              <select value={editForm.fuelType} onChange={e => setEditForm(f => ({ ...f, fuelType: e.target.value }))} style={sel}>
+                {["DIESEL","PETROL","PARAFFIN","GAS","OTHER"].map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={lbl}>Capacity (litres) *</label>
+              <input type="number" value={editForm.capacityLitres} onChange={e => setEditForm(f => ({ ...f, capacityLitres: e.target.value }))} style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>Location</label>
+              <input value={editForm.location} onChange={e => setEditForm(f => ({ ...f, location: e.target.value }))} style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>Low threshold (%)</label>
+              <input type="number" value={editForm.lowThresholdPct} onChange={e => setEditForm(f => ({ ...f, lowThresholdPct: e.target.value }))} style={inp} />
+            </div>
+          </div>
+          {error && <ErrBanner msg={error} />}
+          <MFoot onCancel={() => { setShowEdit(null); setError("") }}
+            onSubmit={() => updateTank.mutate({ id: showEdit.id, body: { name: editForm.name, fuelType: editForm.fuelType, capacityLitres: Number(editForm.capacityLitres), location: editForm.location || null, lowThresholdPct: editForm.lowThresholdPct ? Number(editForm.lowThresholdPct) : null } })}
+            loading={updateTank.isPending} label="Save Changes"
+            disabled={!editForm.name || !editForm.capacityLitres} />
         </Overlay>
       )}
 

@@ -51,12 +51,15 @@ public class SiteController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('SECURITY_READ')")
-    @Operation(summary = "List all active sites — checkpoints not included in list view")
+    @Operation(summary = "List all active sites, or filter to one branch — checkpoints not included in list view")
     public ResponseEntity<ApiResponse<Page<SiteResponse>>> getSites(
+            @RequestParam(required = false) UUID branchId,
             @PageableDefault(size = 20) Pageable pageable) {
         featureGuard.requireModule("security");
         return ResponseEntity.ok(ApiResponse.success(
-                siteService.getSites(TenantContext.getTenantIdAsObject(), pageable)));
+                branchId != null
+                        ? siteService.getSitesByBranch(TenantContext.getTenantIdAsObject(), branchId, pageable)
+                        : siteService.getSites(TenantContext.getTenantIdAsObject(), pageable)));
     }
 
     @GetMapping("/{id}")

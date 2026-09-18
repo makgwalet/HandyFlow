@@ -1,11 +1,13 @@
 package za.co.handyflow.platform.fuel.dto;
 import jakarta.validation.constraints.NotBlank; import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
-public record CreateTankRequest(
+
+// FIX: closes the confirmed "no tank edit" gap. Deliberately does not
+// include currentLitres — stock level changes only through
+// receiveFuel()/dispatchFuel()/completeDelivery(), never a direct edit,
+// same posture as every other stock-tracked entity in this codebase.
+public record UpdateTankRequest(
         @NotBlank String name, @NotBlank String fuelType,
         @NotNull BigDecimal capacityLitres, String location,
-        // FIX: closes the confirmed "lowThresholdPct silently dropped"
-        // gap. Nullable/optional — null means "use the 20% platform
-        // default", matching FuelTank.isLow()'s own fallback exactly.
         BigDecimal lowThresholdPct
 ) {}

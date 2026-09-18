@@ -47,6 +47,8 @@ public class FuelTank {
     private String location;
     private String notes;
 
+    private BigDecimal lowThresholdPct;
+
     @Column(nullable = false)
     private boolean active = true;
 
@@ -66,18 +68,33 @@ public class FuelTank {
     private Long version;
 
     public static FuelTank create(TenantId tenantId, String name, String fuelType,
-                                  BigDecimal capacityLitres, String location) {
+                                  BigDecimal capacityLitres, String location,
+                                  BigDecimal lowThresholdPct) {
         FuelTank t = new FuelTank();
-        t.tenantId       = tenantId;
-        t.name           = name.trim();
-        t.fuelType       = fuelType.toUpperCase();
-        t.capacityLitres = capacityLitres;
-        t.currentLitres  = BigDecimal.ZERO;
-        t.location       = location;
-        t.active         = true;
-        t.createdAt      = Instant.now();
-        t.updatedAt      = Instant.now();
+        t.tenantId        = tenantId;
+        t.name            = name.trim();
+        t.fuelType        = fuelType.toUpperCase();
+        t.capacityLitres  = capacityLitres;
+        t.currentLitres   = BigDecimal.ZERO;
+        t.location        = location;
+        t.lowThresholdPct = lowThresholdPct;
+        t.active          = true;
+        t.createdAt       = Instant.now();
+        t.updatedAt       = Instant.now();
         return t;
+    }
+
+    // FIX: closes the confirmed "no tank edit" gap — a tank's name,
+    // fuel type, capacity, location, and low-stock threshold could
+    // previously only ever be set once, at creation.
+    public void update(String name, String fuelType, BigDecimal capacityLitres,
+                       String location, BigDecimal lowThresholdPct) {
+        this.name            = name.trim();
+        this.fuelType        = fuelType.toUpperCase();
+        this.capacityLitres  = capacityLitres;
+        this.location        = location;
+        this.lowThresholdPct = lowThresholdPct;
+        this.updatedAt       = Instant.now();
     }
 
     // FIX (fuel cost/margin engine, agreed design): now takes the
@@ -128,8 +145,11 @@ public class FuelTank {
     }
 
     public boolean isLow() {
-        // WHY 20%? Industry standard low-fuel alert threshold
-        return getFillPercentage().compareTo(new BigDecimal("20")) <= 0;
+        // FIX: uses this tank's own lowThresholdPct when set — WHY 20%
+        // as the fallback? Industry standard low-fuel alert threshold,
+        // kept as the default for tanks with no override.
+        BigDecimal threshold = lowThresholdPct != null ? lowThresholdPct : new BigDecimal("20");
+        return getFillPercentage().compareTo(threshold) <= 0;
     }
 
     public void softDelete(UUID deletedByUserId) {

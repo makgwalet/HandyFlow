@@ -62,6 +62,20 @@ public class GuardService {
 
     // ── Queries ───────────────────────────────────────────────────────────────
 
+    // FIX: closes part of the confirmed "branch-level query scoping"
+    // gap. Uses GuardRepository.findAllActiveByBranch() — already
+    // existed, fully working, never called from anywhere until now.
+    // Opt-in only (an explicit branchId the caller supplies), not
+    // automatic resolution of the acting user's own branch scope —
+    // that piece depends on a table (security_branch_assignments)
+    // this session could not confirm actually exists, and guessing
+    // wrong there risks breaking the whole application at startup,
+    // not just leaving a feature unbuilt.
+    @Transactional(readOnly = true)
+    public Page<GuardResponse> getGuardsByBranch(TenantId tenantId, UUID branchId, Pageable pageable) {
+        return guardRepository.findAllActiveByBranch(tenantId, branchId, pageable).map(this::toResponse);
+    }
+
     @Transactional(readOnly = true)
     public Page<GuardResponse> getGuards(TenantId tenantId, String search, Pageable pageable) {
         var page = (search == null || search.isBlank())

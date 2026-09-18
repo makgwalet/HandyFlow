@@ -40,6 +40,18 @@ public class SiteService {
         return siteRepository.findAllActive(tenantId, pageable).map(this::toResponse);
     }
 
+    // FIX: closes part of the confirmed "branch-level query scoping"
+    // gap. Uses SiteRepository.findAllActiveByBranch() — already
+    // existed, fully working, never called from anywhere until now.
+    // Opt-in only, same reasoning as GuardService.getGuardsByBranch()'s
+    // own comment — automatic resolution of the acting user's own
+    // branch scope depends on a table this session could not confirm
+    // actually exists.
+    @Transactional(readOnly = true)
+    public Page<SiteResponse> getSitesByBranch(TenantId tenantId, UUID branchId, Pageable pageable) {
+        return siteRepository.findAllActiveByBranch(tenantId, branchId, pageable).map(this::toResponse);
+    }
+
     @Transactional(readOnly = true)
     public SiteResponse getSite(TenantId tenantId, UUID id) {
         return siteRepository.findActiveByIdWithCheckpoints(tenantId, id)

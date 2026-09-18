@@ -98,6 +98,23 @@ public class FuelTankController {
                         fuelService.createTank(TenantContext.getTenantIdAsObject(), request)));
     }
 
+    @PutMapping("/tanks/{id}")
+    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    public ResponseEntity<ApiResponse<TankResponse>> updateTank(
+            @PathVariable UUID id, @Valid @RequestBody UpdateTankRequest request) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Tank updated",
+                fuelService.updateTank(TenantContext.getTenantIdAsObject(), id, request)));
+    }
+
+    @PostMapping("/tanks/{id}/deactivate")
+    @PreAuthorize("hasAuthority('FUEL_MANAGE')")
+    public ResponseEntity<ApiResponse<Void>> deactivateTank(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        fuelService.deactivateTank(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
     @GetMapping("/tanks/{id}/reorder-suggestion")
     @PreAuthorize("hasAuthority('FUEL_READ')")
     @Operation(summary = "Pre-fill data for a 'Receive stock' reorder — suggested quantity and last supplier")

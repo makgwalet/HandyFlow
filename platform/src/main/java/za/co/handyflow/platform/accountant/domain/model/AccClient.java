@@ -56,6 +56,11 @@ public class AccClient {
     @Column(name = "linked_tenant_id")               private UUID linkedTenantId;
     @Column(name = "contact_email")                  private String contactEmail;
     @Column(name = "contact_phone")                  private String contactPhone;
+    @Column(name = "address_street")                 private String addressStreet;
+    @Column(name = "address_suburb")                 private String addressSuburb;
+    @Column(name = "address_city")                   private String addressCity;
+    @Column(name = "address_province")               private String addressProvince;
+    @Column(name = "address_postal_code")            private String addressPostalCode;
     @Column(name = "active")                         private boolean active = true;
     @Column(name = "deleted_at")                     private Instant deletedAt;
     @Column(name = "created_at", updatable = false)  private Instant createdAt;
@@ -87,6 +92,15 @@ public class AccClient {
     public void updateRisk(String riskRating) {
         this.riskRating = riskRating;
         this.updatedAt  = Instant.now();
+    }
+
+    public void updateAddress(String street, String suburb, String city, String province, String postalCode) {
+        this.addressStreet     = street;
+        this.addressSuburb     = suburb;
+        this.addressCity       = city;
+        this.addressProvince   = province;
+        this.addressPostalCode = postalCode;
+        this.updatedAt         = Instant.now();
     }
 
     public void markFicaComplete() {
