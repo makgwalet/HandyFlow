@@ -2,6 +2,7 @@ package za.co.handyflow.platform.facilitiesmanagement.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import za.co.handyflow.platform.identity.TenantNumberingFacade;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.shared.TenantSequenceService;
 
@@ -13,6 +14,11 @@ import za.co.handyflow.platform.shared.TenantSequenceService;
  * technicians and vendors don't need generated numbers, matching
  * {@code FacilityNumberGenerator}'s own established convention: a site is
  * identified by name, an asset by its own user-supplied {@code assetTag}.
+ * <p>
+ * MIGRATED (invoice only): see BkNumberGenerator's Javadoc — same
+ * collision, same fix. Default type code "FMINV" distinguishes this
+ * module's client invoices from invoicing's own "INV" and bookkeeping's
+ * "CINV".
  */
 @Component
 @RequiredArgsConstructor
@@ -23,6 +29,7 @@ public class FmNumberGenerator {
     private static final String INVOICE_SEQUENCE = "FM_INVOICE";
 
     private final TenantSequenceService sequenceService;
+    private final TenantNumberingFacade numberingFacade;
 
     public String nextClientCode(TenantId tenantId) {
         long seq = sequenceService.nextValue(tenantId, CLIENT_SEQUENCE);
@@ -35,7 +42,6 @@ public class FmNumberGenerator {
     }
 
     public String nextInvoiceNumber(TenantId tenantId) {
-        long seq = sequenceService.nextValue(tenantId, INVOICE_SEQUENCE);
-        return "INV-%05d".formatted(seq);
+        return numberingFacade.next(tenantId, INVOICE_SEQUENCE, "FMINV");
     }
 }

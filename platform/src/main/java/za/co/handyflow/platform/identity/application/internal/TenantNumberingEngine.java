@@ -55,10 +55,16 @@ class TenantNumberingEngine implements TenantNumberingFacade {
             Map.entry("INVOICE", "INV"),          // invoicing module — tenant's own sales invoices
             Map.entry("QUOTE", "QT"),
             Map.entry("CREDIT_NOTE", "CN")
-            // Additional entries added as each remaining generator (bookkeeping
-            // INVOICE_SEQUENCE -> "CINV", facilitiesmanagement INVOICE_SEQUENCE
-            // -> "FMINV", etc.) is migrated — see gap matrix backlog. Until then
-            // those modules keep calling TenantSequenceService directly and are
+            // Bookkeeping's and facilitiesmanagement's own invoice generators
+            // are migrated too (see BkNumberGenerator / FmNumberGenerator),
+            // but their sequence names are "BK_INVOICE" / "FM_INVOICE", not
+            // "INVOICE" — already distinct, so they don't need an entry here.
+            // Each passes its own default type code ("CINV" / "FMINV")
+            // straight to next(), which is exactly the fallback path this
+            // map exists to support for exactly this reason: a module can
+            // migrate without this engine needing to know about it in
+            // advance. Remaining un-migrated generators (see gap matrix
+            // backlog) keep calling TenantSequenceService directly and are
             // unaffected by this engine.
     );
 

@@ -34,14 +34,45 @@ have three different documents with the same visible number. Migrating a
 generator to the engine assigns it a distinct `DEFAULT_TYPE_CODES` entry,
 which removes the ambiguity for that generator's documents going forward.
 
-**NOT yet done — remaining generators to migrate** (same pattern as the
-invoicing three; each is a small, independently-verifiable change):
+**DONE — the three-way `INV-` collision itself is now fixed:**
+- `BkNumberGenerator.nextInvoiceNumber` → migrated, default type code `CINV`.
+- `FmNumberGenerator.nextInvoiceNumber` → migrated, default type code `FMINV`.
+- Confirmed this needed no change to `TenantNumberingEngine`'s
+  `DEFAULT_TYPE_CODES` map: `BK_INVOICE`/`FM_INVOICE` are already distinct
+  sequence names, so each generator's own caller-supplied default type code
+  (`CINV`/`FMINV`) is what the engine's fallback path uses — exactly the
+  scenario that fallback was designed for.
+- `nextClientCode`/`nextEntryNumber`/`nextWorkOrderNumber` on both classes
+  are **left unmigrated on purpose** — see next item.
+
+**DELIBERATELY NOT migrated — `FacilityNumberGenerator` (facilities
+module), and the remaining `CLI-`/`JE-`/`WO-` sequences on the two classes
+above:**
+- `facilities`' `package-info.java` declares
+  `allowedDependencies = {"shared", "billing", "evidence", "notifications"}`
+  — **`identity` is not in that list.** Migrating `FacilityNumberGenerator`
+  to `TenantNumberingFacade` would require adding `identity` to that
+  module's declared Modulith boundary, which is a real architectural
+  decision in its own right, not something that should happen as a side
+  effect of a numbering fix. Left as-is; the `WO-` collision between
+  `facilities` and `facilitiesmanagement` (suggested fix: `FWO`) is
+  therefore **still live** — flagged here rather than silently resolved by
+  quietly expanding a module boundary.
+- Same reasoning is why `nextClientCode` (`CLI-`, shared by bookkeeping,
+  facilitiesmanagement, and `TrainProvNumberGenerator`) and `nextEntryNumber`
+  (`JE-`) weren't touched this pass — worth a second look, but each is a
+  separate, smaller collision than the `INV-` one that was the actual
+  reason this engine got built, and doing all of them at once risks the
+  same "large, unverified, all-at-once rewrite" this whole initiative has
+  been avoiding.
+
+**Remaining generators not yet assessed for collisions or migrated**
+(same pattern as the ones above; each is a small, independently-verifiable
+change once each module's `allowedDependencies` is confirmed to include
+`identity`):
 
 | Module | Generator | Current prefix(es) | Suggested type code |
 |---|---|---|---|
-| bookkeeping | `BkNumberGenerator` | `CLI-`, `JE-`, `INV-` | `CINV` (avoid collision w/ invoicing `INV`) |
-| facilitiesmanagement | `FmNumberGenerator` | `CLI-`, `WO-`, `INV-` | `FMINV` |
-| facilities | `FacilityNumberGenerator` | `WO-` | `FWO` (avoid collision w/ facilitiesmanagement `WO`) |
 | hr | `EmployeeNumberGenerator`, `PayRunNumberGenerator` | `EMP-`, `PR-` | keep |
 | accounting | `JournalNumberGenerator` | `JE-` | keep, but check vs. bookkeeping `JE-` |
 | accountant | `FeeNoteNumberGenerator` | `FN-` | keep |
@@ -276,4 +307,4 @@ suspended tenant, unconfigured opt-in items rendering as informational
    any exists) locally before merging, not just the two new test files.
 
 ---
-*Last updated by Claude — Admin Console: Tenant Diagnostic Engine + impersonation NPE fix.*
+*Last updated by Claude — migrated BkNumberGenerator/FmNumberGenerator invoice numbers, fixing the actual INV- collision the engine was built for; documented why FacilityNumberGenerator was deliberately left alone (module boundary).*
