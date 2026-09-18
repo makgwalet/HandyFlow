@@ -84,10 +84,35 @@ change once each module's `allowedDependencies` is confirmed to include
 | collectionsagency | `CollAgencyNumberGenerator` | `CI` | keep |
 | debtcollection | `DebtCollectionNumberGenerator` | `DC-` | keep |
 | insurancebrokerage | `InsBrokNumberGenerator` | `IB-POL-`, `IB-CI-` | keep |
-| trainingprovider | `TrainProvNumberGenerator` | `CLI-`, `CRS-`, `CERT-`, `TPI-`, `DEL-` | check `CLI-`/`CRS-`/`CERT-` vs. `training` module |
-| training | `TrainingNumberGenerator` | `CRS-`, `CERT-` | check vs. `trainingprovider` |
 | legalcompliance | `LegalComplianceNumberGenerator` | `LM-`, `DSAR-` | keep |
 | warehousing | `WhseNumberGenerator` | `WHI` | keep |
+
+**DONE — `trainingprovider` vs `training` `CRS-`/`CERT-` collision, resolved
+from one side:**
+- `TrainProvNumberGenerator.nextCourseCode`/`nextCertificateNumber` →
+  migrated, type codes `TPCRS`/`TPCERT` (matching the `TP` family
+  `nextInvoiceNumber` already established with `TPI`).
+- `training`'s own `TrainingNumberGenerator` was **not** touched — same
+  reason as `facilities`: its `package-info.java` allowedDependencies
+  doesn't include `identity`. Not needed here, though: since
+  `trainingprovider`'s output is now
+  `{tenantCode}-TPCRS-00001`/`{tenantCode}-TPCERT-00001`,
+  `training`'s unchanged `CRS-00001`/`CERT-00001` is already
+  unambiguous against it — this collision is fully resolved without
+  needing to touch `training`'s boundary.
+- `nextClientCode` (`CLI-`) and `nextDelegateNumber` (`DEL-`) on
+  `TrainProvNumberGenerator` left unmigrated — `CLI-` is the same
+  many-module collision already deprioritized elsewhere in this doc;
+  `DEL-` isn't shared with any other generator.
+
+**Module-boundary decision still open** — two generators now blocked on
+it, not just one: `FacilityNumberGenerator` (`facilities`) for the
+`facilities`/`facilitiesmanagement` `WO-` collision, and (were `training`
+ever to need its own numbers to carry tenant identity, not just be
+disambiguated from `trainingprovider`) `TrainingNumberGenerator`. Whoever
+owns the Modulith boundary declarations should decide whether `identity`
+gets added to `facilities` and `training`'s `allowedDependencies`, or
+whether these stay on plain `TenantSequenceService` indefinitely.
 
 **Known limitations (not silently glossed over):**
 - Document codes backfilled by V285 are **not** checked for cross-tenant
@@ -307,4 +332,4 @@ suspended tenant, unconfigured opt-in items rendering as informational
    any exists) locally before merging, not just the two new test files.
 
 ---
-*Last updated by Claude — migrated BkNumberGenerator/FmNumberGenerator invoice numbers, fixing the actual INV- collision the engine was built for; documented why FacilityNumberGenerator was deliberately left alone (module boundary).*
+*Last updated by Claude — migrated trainingprovider's CRS-/CERT- codes, resolving the training/trainingprovider collision without touching training's module boundary.*
