@@ -223,23 +223,42 @@ fixed.
   null correctly).
 
 **NOT yet done — remaining backlog:**
-1. **`wrap()`'s own header still always says "HandyFlow"** — this migration
-   only adds a *signature block at the bottom* of one email. Making the
-   *header* tenant-aware (tenant name/logo instead of "HandyFlow · Your
-   Business Operating System") is a materially bigger change: it touches
-   the one shared function all 46 templates call, so every caller's visual
-   output changes at once. Recommended next step, but deliberately not
-   done in this pass without the ability to visually verify all 46 emails.
+1. ~~`wrap()`'s own header still always says "HandyFlow"~~ — **DONE, this
+   session.** Rather than editing `wrap()` itself (which would change all
+   46 templates' output in one unverified pass — the exact risk this item
+   originally flagged), added a separate `wrapForTenant(content,
+   tenantCompanyName)` method: same styling, but the header `<h1>` shows
+   the tenant's own (HTML-escaped) company name instead of "HandyFlow",
+   and the footer now reads "Sent by {tenant} · Powered by HandyFlow" —
+   crediting both rather than hiding the platform entirely, a deliberate
+   choice (see the method's own Javadoc) rather than an oversight.
+   `quoteSentToClient` (both overloads, since the 5-arg one delegates to
+   the 6-arg) is the first template migrated to it — same
+   reference-migration discipline as everything else in this initiative.
+   Text-only header for this pass; embedding the tenant's logo (a
+   `data:` URI — see the PDF skill's documented gotcha) into every
+   outbound email is a separate decision (size, spam-filter behaviour of
+   large inline images) deliberately left for later.
+   `EmailTemplatesQuoteSentToClientTest` updated: confirms the header now
+   shows the tenant name, confirms the company name is escaped, and — a
+   real behavioural change worth calling out — **the 5-arg overload's
+   output is no longer byte-identical to before this change**, since it
+   delegates to the now-branded 6-arg overload. It's still identical to
+   the 6-arg-with-empty-signature output, which is the invariant that
+   actually matters. The other 45 templates are still on plain `wrap()`
+   and unaffected — this is one template's header, not a global change.
 2. **The other 45 `EmailTemplates` methods** don't yet accept a signature
-   parameter — migrate the highest-value customer-facing ones next
-   (invoice-issued, invoice-overdue, booking confirmation) using the exact
-   same additive-overload pattern as `quoteSentToClient`.
+   parameter or use `wrapForTenant` — migrate the highest-value customer-facing
+   ones next (invoice-issued, invoice-overdue, booking confirmation) using
+   the exact same additive-overload + `wrapForTenant` pattern as
+   `quoteSentToClient`.
 3. **The 9 files with independent inline HTML** are unmigrated and
    unaffected by this work — each needs its own reference migration onto
-   `EmailTemplates.wrap()` (or a documented reason it can't, e.g.
-   `ScmNotificationService`'s distinct amber "Supply Chain" accent colour
-   may be an intentional sub-brand, not simply an oversight — confirm with
-   product before merging its styling into the shared teal palette).
+   `EmailTemplates.wrap()`/`wrapForTenant()` (or a documented reason it
+   can't, e.g. `ScmNotificationService`'s distinct amber "Supply Chain"
+   accent colour may be an intentional sub-brand, not simply an oversight
+   — confirm with product before merging its styling into the shared teal
+   palette).
 4. **No `tenant_email_signature` Settings UI** yet — API/DB only.
 5. **No sender-identity-per-tenant** (`fromAddress`/`fromName` in
    `EmailService` are still global, single values) and **no delivery
@@ -248,6 +267,7 @@ fixed.
 6. **Not build/test-verified in this session** — same Maven Central network
    limitation as deliverable 1. Run
    `./mvnw test -Dtest=TenantEmailBrandingEngineTest,EmailTemplatesQuoteSentToClientTest`
+
    and `./mvnw compile` locally, plus the Modulith architecture test (a new
    cross-module facade was added, same as deliverable 1).
 
@@ -362,4 +382,4 @@ suspended tenant, unconfigured opt-in items rendering as informational
    its backfill — check the review query above.
 
 ---
-*Last updated by Claude — fixed the impersonation read-only-authorization gap for real: permissions claim (V287 + is_read_only) and the TenantContext.getCurrentUserId() crash on the impersonation subject.*
+*Last updated by Claude — added wrapForTenant() and migrated quoteSentToClient's header off "HandyFlow" onto the tenant's own company name, without touching wrap() or the other 45 templates.*

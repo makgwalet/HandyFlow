@@ -68,6 +68,94 @@ public class EmailTemplates {
 
     // ── Existing templates (unchanged) ────────────────────────────────────────
 
+    /**
+     * Tenant-branded variant of {@code wrap()} — header shows the tenant's
+     * own company name instead of "HandyFlow", footer credits both ("Sent
+     * by {tenant} · Powered by HandyFlow"). Deliberately a SEPARATE method,
+     * not a change to {@code wrap()} itself: {@code wrap()} is called by
+     * all 46 template methods in this class, so changing it directly would
+     * change every one of their visual outputs in a single, unverified
+     * pass. This variant exists so a template can be migrated to it one at
+     * a time — same reference-migration pattern as
+     * {@code quoteSentToClient}'s signature parameter — leaving the other
+     * 45 templates' appearance untouched until each is deliberately moved
+     * over. See PLATFORM-ENGINES-PROGRESS.md for which templates use this
+     * today and which are still on {@code wrap()}.
+     * <p>
+     * Text-only header (no logo) for this first pass — a tenant's logo is
+     * stored as a {@code data:} URI (see the PDF skill's documented
+     * gotcha) and embedding untrusted image data into every outbound email
+     * is a separate decision (size, deliverability/spam-filter behaviour
+     * of large inline images) from the text-branding change this method
+     * makes. {@code tenantCompanyName} is escaped — it's tenant-entered
+     * data, same as every other tenant-supplied string already escaped
+     * elsewhere in this class.
+     */
+    private static String wrapForTenant(String content, String tenantCompanyName) {
+        String safeCompanyName = org.springframework.web.util.HtmlUtils.htmlEscape(tenantCompanyName);
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="UTF-8">
+              <style>
+                body { font-family: 'Inter', Arial, sans-serif; background: #F1F5F9; margin: 0; padding: 0; }
+                .container { max-width: 560px; margin: 40px auto; background: white;
+                             border-radius: 12px; overflow: hidden;
+                             box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+                .header { background: #1B3A6B; padding: 28px 32px; }
+                .header h1 { color: white; margin: 0; font-size: 20px; font-weight: 700; }
+                .header p { color: rgba(255,255,255,0.7); margin: 4px 0 0; font-size: 13px; }
+                .body { padding: 32px; }
+                .body p { color: #374151; line-height: 1.6; font-size: 14px; margin: 0 0 16px; }
+                .highlight { background: #F0F9FF; border-left: 3px solid #0D9488;
+                             padding: 14px 16px; border-radius: 0 8px 8px 0; margin: 20px 0; }
+                .highlight p { margin: 0; color: #0369A1; font-weight: 500; }
+                .highlight-amber { background: #FFFBEB; border-left: 3px solid #D97706;
+                             padding: 14px 16px; border-radius: 0 8px 8px 0; margin: 20px 0; }
+                .highlight-amber p { margin: 0; color: #92400E; font-weight: 500; }
+                .highlight-red { background: #FEF2F2; border-left: 3px solid #DC2626;
+                             padding: 14px 16px; border-radius: 0 8px 8px 0; margin: 20px 0; }
+                .highlight-red p { margin: 0; color: #991B1B; font-weight: 500; }
+                .highlight-green { background: #F0FDF4; border-left: 3px solid #16A34A;
+                             padding: 14px 16px; border-radius: 0 8px 8px 0; margin: 20px 0; }
+                .highlight-green p { margin: 0; color: #166534; font-weight: 500; }
+                .btn { display: inline-block; background: #1B3A6B; color: white !important;
+                       text-decoration: none; padding: 12px 24px; border-radius: 8px;
+                       font-weight: 600; font-size: 14px; margin: 8px 0; }
+                .btn-teal  { background: #0D9488; }
+                .btn-green { background: #16A34A; }
+                .btn-red   { background: #DC2626; }
+                .party-row { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px;
+                             padding: 12px 16px; margin: 6px 0; }
+                .party-row .name { font-weight: 600; color: #0F172A; font-size: 14px; }
+                .party-row .role { color: #64748B; font-size: 12px; margin-top: 2px; }
+                .legal { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px;
+                         padding: 12px 16px; margin-top: 24px; }
+                .legal p { color: #94A3B8; font-size: 11px; margin: 0; line-height: 1.7; }
+                .footer { background: #F8FAFC; padding: 20px 32px; border-top: 1px solid #E2E8F0; }
+                .footer p { color: #94A3B8; font-size: 12px; margin: 0; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <h1>%s</h1>
+                </div>
+                <div class="body">
+                  %s
+                </div>
+                <div class="footer">
+                  <p>Sent by %s &middot; Powered by
+                     <a href="https://handyflow.co.za" style="color:#0D9488;">HandyFlow</a></p>
+                </div>
+              </div>
+            </body>
+            </html>
+            """.formatted(safeCompanyName, content, safeCompanyName);
+    }
+
+
     // ── Auth ─────────────────────────────────────────────────────────────────
 
     // NEW: previously a bare, unstyled inline HTML string built directly in
@@ -1230,14 +1318,20 @@ public class EmailTemplates {
      * template was migrated first and which ones remain. {@code
      * signatureHtml} is expected pre-rendered and pre-escaped (by
      * TenantEmailBrandingEngine) — this method only decides where it goes
-     * in the layout, it does not build or escape it itself. Passing ""
-     * (the facade's contract for "no signature configured") renders
-     * identically to the original 5-arg overload above.
+     * in the layout, it does not build or escape it itself.
+     * <p>
+     * Also moved from wrap() to wrapForTenant() here — the customer now
+     * sees the tenant's own company name in the email header instead of
+     * "HandyFlow", regardless of whether a signature was configured. This
+     * means the 5-arg and 6-arg-with-empty-signature outputs are no
+     * longer byte-identical (see EmailTemplatesQuoteSentToClientTest,
+     * updated) — both are still tenant-branded now, they just differ by
+     * the signature block.
      */
     public static String quoteSentToClient(String clientName, String quoteNumber,
                                            String companyName, String amount,
                                            String acceptUrl, String signatureHtml) {
-        return wrap(("""
+        return wrapForTenant(("""
             <p>Hi %s,</p>
             <p>Please find attached your quote from <strong>%s</strong>.</p>
             <div class="highlight">
@@ -1252,7 +1346,7 @@ public class EmailTemplates {
                 org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
                 org.springframework.web.util.HtmlUtils.htmlEscape(companyName),
                 quoteNumber, amount, acceptUrl))
-                + (signatureHtml != null ? signatureHtml : ""));
+                + (signatureHtml != null ? signatureHtml : ""), companyName);
     }
 
     // ── Invoicing: quote expiring soon ─────────────────────────────────────────
