@@ -230,7 +230,10 @@ public class EmailTemplates {
             <p><strong>%s</strong> has invited you to join <strong>%s</strong> on HandyFlow, as <strong>%s</strong>.</p>
             <p><a href="%s" class="btn">Accept invitation</a></p>
             <p>This link expires in <strong>72 hours</strong>.</p>
-            """.formatted(firstName, invitedByName, companyName, roleName, link));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(firstName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(invitedByName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(companyName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(roleName), link));
     }
 
     // NEW: previously PasswordResetService.resetPassword() completed a
@@ -266,7 +269,7 @@ public class EmailTemplates {
             <p>To restore access immediately, please settle your outstanding balance.
                Your data has not been deleted and will be fully available again as soon
                as payment is received.</p>
-            """.formatted(tenantName, gracePeriodDaysUsed));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(tenantName), gracePeriodDaysUsed));
     }
 
     // NEW: SubscriptionService.changePlan() previously had no notification
@@ -288,7 +291,8 @@ public class EmailTemplates {
             </div>
             <p>This takes effect immediately — no action needed on your part.</p>
             <a href="https://app.handyflow.co.za/billing" class="btn">View your plan</a>
-            """.formatted(tenantName, changeWord, oldPlanName, newPlanName, highlightClass, newPriceRands));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(tenantName),
+                changeWord, oldPlanName, newPlanName, highlightClass, newPriceRands));
     }
 
     public static String quoteExpiry(String firstName, String quoteNumber,
@@ -305,7 +309,8 @@ public class EmailTemplates {
             <p style="margin-top:24px; color:#94A3B8; font-size:13px;">
               Quotes expire 30 days after creation. Convert to invoice to lock in the deal.
             </p>
-            """.formatted(firstName, quoteNumber, customerName, amount, frontendUrl));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(firstName), quoteNumber,
+                org.springframework.web.util.HtmlUtils.htmlEscape(customerName), amount, frontendUrl));
     }
 
     public static String pilotCountdown(String firstName, int daysRemaining,
@@ -342,7 +347,8 @@ public class EmailTemplates {
             </div>
             <p>Download the SARS-compliant PDF invoice and send it to your client.</p>
             <a href="%s/invoices" class="btn">View Invoice</a>
-            """.formatted(firstName, invoiceNumber, customerName, amount, frontendUrl));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(firstName), invoiceNumber,
+                org.springframework.web.util.HtmlUtils.htmlEscape(customerName), amount, frontendUrl));
     }
 
     // ── Contracting — signing invitation ─────────────────────────────────────
@@ -783,7 +789,8 @@ public class EmailTemplates {
               <p>Late submission of VAT201 attracts a 10%% penalty + interest at repo + 6.5%%.
                  EMP201 late submission attracts 10%% plus a further 200%% penalty on outstanding PAYE.</p>
             </div>
-            """.formatted(urgency, deadlineType, clientName, period, dueDate, daysUntilDue));
+            """.formatted(urgency, deadlineType,
+                org.springframework.web.util.HtmlUtils.htmlEscape(clientName), period, dueDate, daysUntilDue));
     }
 
     /**
@@ -817,7 +824,8 @@ public class EmailTemplates {
             <p>Please send us any outstanding documents or information in good time so we can
                complete this on your behalf before the deadline.</p>
             <p>If you have any questions, please don't hesitate to contact %s.</p>
-            """.formatted(friendlyType, urgency, dueDate, daysUntilDue, firmName));
+            """.formatted(friendlyType, urgency, dueDate, daysUntilDue,
+                org.springframework.web.util.HtmlUtils.htmlEscape(firmName)));
     }
 
     /**
@@ -865,7 +873,8 @@ public class EmailTemplates {
             <p>A lapsed TCS PIN can delay SARS-related processes for this client (tender applications,
                good-standing verification, etc.). Please follow up to renew it before expiry.</p>
             <a href="#" class="btn">Open HandyFlow</a>
-            """.formatted(urgency, clientName, expiryDate, daysUntilExpiry));
+            """.formatted(urgency, org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
+                expiryDate, daysUntilExpiry));
     }
 
     /**
@@ -896,7 +905,9 @@ public class EmailTemplates {
             <p>An expired FICA document can affect this client's compliance standing.
                Please follow up to obtain a renewed copy before expiry.</p>
             <a href="#" class="btn">Open HandyFlow</a>
-            """.formatted(urgency, clientName, friendlyType, fileName, expiryDate, daysUntilExpiry));
+            """.formatted(urgency, org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
+                friendlyType, org.springframework.web.util.HtmlUtils.htmlEscape(fileName),
+                expiryDate, daysUntilExpiry));
     }
 
     /**
@@ -920,7 +931,8 @@ public class EmailTemplates {
             </p>
             <p style="color:#94A3B8;font-size:13px;">This invite link expires in 7 days.
                If you weren't expecting this invitation, you can safely ignore this email.</p>
-            """.formatted(clientName, firmName, acceptUrl));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(firmName), acceptUrl));
     }
 
     /**

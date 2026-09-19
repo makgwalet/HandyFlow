@@ -73,4 +73,51 @@ class EmailTemplatesEscapingTest {
         assertThat(html).doesNotContain(PAYLOAD);
         assertThat(html).contains(ESCAPED);
     }
+
+    // ── Second batch: found while verifying the 10 candidates flagged in the
+    // previous pass as unverified. Of those 10, 5 were false positives
+    // (userInvitation, accountSuspended, planChanged, quoteExpiry,
+    // invoiceGenerated already escape correctly) and 5 were real, same bug.
+
+    @Test
+    @DisplayName("taxDeadlineReminder escapes clientName")
+    void taxDeadlineReminder_escapesClientName() {
+        String html = EmailTemplates.taxDeadlineReminder(
+                PAYLOAD, "VAT201", "2026-02-28", 5, 2026, 1);
+        assertThat(html).doesNotContain(PAYLOAD);
+        assertThat(html).contains(ESCAPED);
+    }
+
+    @Test
+    @DisplayName("clientDeadlineReminder escapes firmName")
+    void clientDeadlineReminder_escapesFirmName() {
+        String html = EmailTemplates.clientDeadlineReminder(PAYLOAD, "VAT201", "2026-02-28", 5);
+        assertThat(html).doesNotContain(PAYLOAD);
+        assertThat(html).contains(ESCAPED);
+    }
+
+    @Test
+    @DisplayName("tcsPinExpiryReminder escapes clientName")
+    void tcsPinExpiryReminder_escapesClientName() {
+        String html = EmailTemplates.tcsPinExpiryReminder(PAYLOAD, "2026-02-28", 5);
+        assertThat(html).doesNotContain(PAYLOAD);
+        assertThat(html).contains(ESCAPED);
+    }
+
+    @Test
+    @DisplayName("ficaDocumentExpiryReminder escapes clientName and fileName")
+    void ficaDocumentExpiryReminder_escapesNames() {
+        String html = EmailTemplates.ficaDocumentExpiryReminder(
+                PAYLOAD, "ID_COPY", PAYLOAD, "2026-02-28", 5);
+        assertThat(html).doesNotContain(PAYLOAD);
+        assertThat(html).contains(ESCAPED);
+    }
+
+    @Test
+    @DisplayName("portalInvite escapes clientName and firmName")
+    void portalInvite_escapesNames() {
+        String html = EmailTemplates.portalInvite(PAYLOAD, PAYLOAD, "https://example.com/invite");
+        assertThat(html).doesNotContain(PAYLOAD);
+        assertThat(html).contains(ESCAPED);
+    }
 }

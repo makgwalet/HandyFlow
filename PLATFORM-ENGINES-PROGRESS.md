@@ -245,19 +245,26 @@ Confirmed by direct code read and fixed:
 
 `EmailTemplatesEscapingTest` covers all five with a `<script>` payload.
 
-**NOT verified — candidates found by a crude automated scan, not
-individually confirmed:** `userInvitation`, `accountSuspended`,
-`planChanged`, `quoteExpiry`, `invoiceGenerated`, `taxDeadlineReminder`,
-`clientDeadlineReminder`, `tcsPinExpiryReminder`,
-`ficaDocumentExpiryReminder`, `portalInvite`. The scan (grep for a
-name-like parameter appearing in a method's body with no `htmlEscape`
-call anywhere in that body) has a real false-positive rate — nested
-braces inside the CSS blocks embedded in some templates confuse a simple
-method-boundary heuristic, and it already produced one false positive
-(`quoteSentToClient`, which does escape correctly). Each of these needs
-the same direct-code-read confirmation the five fixed ones got before
-being trusted either way — don't assume this list is exhaustive or that
-everything on it is actually broken.
+**All 10 candidates from that scan now verified by direct code read —
+5 false positives, 5 more real bugs, all fixed:**
+- **Already safe (false positives — the scan's method-boundary heuristic
+  breaks on nested CSS braces):** `userInvitation`, `accountSuspended`,
+  `planChanged` (`tenantName` escaped; `oldPlanName`/`newPlanName` are not,
+  but those come from a fixed internal plan catalogue, not free text —
+  not treated as a bug), `quoteExpiry`, `invoiceGenerated`.
+- **Real, fixed this pass:** `taxDeadlineReminder` (`clientName`),
+  `clientDeadlineReminder` (`firmName`), `tcsPinExpiryReminder`
+  (`clientName`), `ficaDocumentExpiryReminder` (`clientName`, `fileName`),
+  `portalInvite` (`clientName`, `firmName`). Same fix pattern as the first
+  five, same argument order preserved — only the escaping changed.
+  `EmailTemplatesEscapingTest` extended to cover all five.
+
+That's 10 real unescaped-interpolation bugs found and fixed across this
+file in total (the original 5 plus these 5), all confirmed by reading the
+actual code rather than trusting the scan. No further automated scanning
+of this file was done — the remaining ~30 templates not yet mentioned
+anywhere in this doc haven't been checked either way and shouldn't be
+assumed safe.
 
 **NOT yet done — remaining backlog:**
 1. ~~`wrap()`'s own header still always says "HandyFlow"~~ — **DONE, this
@@ -419,4 +426,4 @@ suspended tenant, unconfigured opt-in items rendering as informational
    its backfill — check the review query above.
 
 ---
-*Last updated by Claude — found and fixed 5 real HTML-escaping bugs in EmailTemplates (unescaped names in customer-facing emails); documented 10 more unverified candidates from an imperfect automated scan.*
+*Last updated by Claude — verified all 10 previously-unverified escaping candidates (5 false positives, 5 real bugs fixed); 10 total escaping bugs found and fixed in EmailTemplates this session.*
