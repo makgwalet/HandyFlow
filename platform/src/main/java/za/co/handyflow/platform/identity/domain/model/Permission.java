@@ -27,6 +27,15 @@ public class Permission {
 
     private String description;
 
+    /**
+     * Whether this permission only grants read access — see migration
+     * V287 for the full rationale (backs admin impersonation's read-only
+     * authority set). Defaults false; only permissions explicitly marked
+     * true are ever granted to an impersonation session.
+     */
+    @Column(name = "is_read_only", nullable = false)
+    private boolean readOnly = false;
+
     public static Permission of(String name, String description) {
         Permission p = new Permission();
         p.name = name.toUpperCase().trim();

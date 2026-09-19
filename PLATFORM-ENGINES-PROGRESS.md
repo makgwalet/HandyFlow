@@ -282,18 +282,41 @@ so nothing in logs or tests flagged it as broken.
 throwing) — `JwtServiceTest` has a regression test built from the exact
 claim shape `generateImpersonationToken()` produces.
 
-**Deliberately NOT fixed further, and said so rather than guessing:** an
-empty permission set doesn't make impersonation *useful* — every business
-endpoint requires a specific granted authority (confirmed via
-`InvoiceController`: even `GET` endpoints require e.g. `INVOICE_READ`), so
-today's fix only changes the failure from "silent 401" to "correctly-denied
-403" on every request. Making impersonation actually let a superadmin
-*view* tenant data read-only requires a real design decision — e.g. a
-dedicated read-only authority set derived from the `permissions` table, or
-a distinct authorization path keyed on `role=IMPERSONATION` — that
-shouldn't be guessed at by pattern-matching permission names (the naming
-convention isn't fully consistent: `INVOICE_READ` vs `REPORT_VIEW`).
-Flagged as the top follow-up item for whoever owns platform security next.
+**Follow-up (this session): the read-only-authorization design gap above
+is now fixed, not just flagged.** Two real bugs were involved, not one:
+
+1. **No permissions claim at all** (the NPE above) — fixed earlier.
+2. **A second, previously-undiscovered bug found while designing the fix
+   for #1's follow-on**: `TenantContext.getCurrentUserId()` does
+   `UUID.fromString(id)`, and the impersonation token's subject is the
+   literal string `"IMPERSONATION"` — not a user UUID, because there is no
+   real user. Even after #1's fix, the *first* line of code anywhere in a
+   request that called `getCurrentUserId()` during an impersonation
+   session threw a raw, confusing parse exception. **Fixed**:
+   `JwtService.isImpersonation(token)` (new), `JwtAuthFilter` now sets
+   `TenantContext.setImpersonation(...)`, and `getCurrentUserId()` checks
+   that flag first and throws a clear, intentional
+   `IllegalStateException` ("no real user — this is a read-only support
+   impersonation session") instead of a raw UUID-parse failure.
+   `TenantContextTest` covers both the normal and impersonation paths.
+
+**Fixed properly, not by guessing at permission names:** the impersonation
+JWT now carries a real `"permissions"` claim, built from
+`SELECT name FROM permissions WHERE is_read_only = true` — migration
+`V287` adds that column to `permissions` (`Permission.readOnly`,
+`PermissionRepository.findByReadOnlyTrue()`), backfilled by suffix
+(`_READ` / `_VIEW` — the two patterns actually confirmed to exist in this
+codebase, including in `Permission.java`'s own doc comment) and
+explicitly documented as a **heuristic requiring human review**, not a
+guarantee — the migration's own comment tells whoever owns this to run
+`SELECT name FROM permissions WHERE is_read_only = true ORDER BY name`
+and confirm nothing on that list can mutate data before impersonation is
+relied on for real tenant support. `AdminAuthService.generateImpersonationToken`
+reads that list via `JdbcTemplate` (not a `PermissionRepository` import —
+`admin`'s `package-info.java` `allowedDependencies` is `{"shared"}` only,
+same Modulith-boundary discipline as every other cross-module read in
+this module). `AdminAuthServiceImpersonationTest` confirms the token
+actually carries the real permission names end to end.
 
 **Shipped: Tenant Diagnostic Engine** (`AdminTenantDiagnosticService`,
 `GET /api/v1/admin/tenants/{slugOrId}/diagnostics`) — per brief section 19.
@@ -317,19 +340,26 @@ suspended tenant, unconfigured opt-in items rendering as informational
 (not critical), and the not-found path.
 
 **NOT done — remaining backlog:**
-1. The impersonation read-only-authorization design gap above — the
-   highest-value real follow-up from this whole session.
-2. "Fix it for me" actions (brief section 20) — not started; each one
+1. **The `V287` backfill needs a human review pass before production use**
+   — see above. This is the one item in this whole session where I'm
+   explicitly saying "don't trust the default, go check it" rather than
+   shipping something I'm confident is correct outright.
+2. No UI for toggling a permission's `is_read_only` flag yet — direct SQL
+   only. A support engineer noticing a permission is mis-flagged today has
+   to fix it with `UPDATE permissions SET is_read_only = ... WHERE name = ...`.
+3. "Fix it for me" actions (brief section 20) — not started; each one
    (resend verification email, retry failed email, regenerate PDF, etc.)
    is its own small feature with its own blast radius and deserves its own
    session rather than being rushed here.
-3. No frontend for the new diagnostics endpoint yet — API only.
-4. **Not build/test-verified in this session** — same Maven Central
-   limitation as the other three deliverables, and this one touches shared
-   JWT authentication code, so treat the `JwtService` change with extra
-   care: run `./mvnw test -Dtest=JwtServiceTest,AdminTenantDiagnosticServiceTest`
-   and the full `JwtAuthFilter`/`AdminJwtFilter`-adjacent test suite (if
-   any exists) locally before merging, not just the two new test files.
+4. No frontend for the new diagnostics endpoint yet — API only.
+5. **Not build/test-verified in this session** — same Maven Central
+   limitation as the other deliverables, and this one touches shared JWT
+   authentication and TenantContext, used everywhere — treat it with the
+   most care of anything in this whole initiative. Run
+   `./mvnw test -Dtest=JwtServiceTest,TenantContextTest,AdminAuthServiceImpersonationTest,AdminTenantDiagnosticServiceTest`
+   first, then the full suite, before merging. The `V287` migration itself
+   also needs to actually run against a real database before anyone trusts
+   its backfill — check the review query above.
 
 ---
-*Last updated by Claude — migrated trainingprovider's CRS-/CERT- codes, resolving the training/trainingprovider collision without touching training's module boundary.*
+*Last updated by Claude — fixed the impersonation read-only-authorization gap for real: permissions claim (V287 + is_read_only) and the TenantContext.getCurrentUserId() crash on the impersonation subject.*

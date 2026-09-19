@@ -86,6 +86,22 @@ public class JwtService {
     }
 
     /**
+     * True for an admin-impersonation token (AdminAuthService.
+     * generateImpersonationToken — subject "IMPERSONATION", claim
+     * "role": "IMPERSONATION"). JwtAuthFilter uses this to tell
+     * TenantContext the current request has no real tenant user behind
+     * it, so TenantContext.getCurrentUserId() can fail with a clear,
+     * intentional message instead of a raw UUID-parse exception — the
+     * subject of this token is literally the string "IMPERSONATION",
+     * not a user UUID, precisely because no real user is impersonating
+     * anyone; it's read-only support access.
+     */
+    public boolean isImpersonation(String token) {
+        String role = extractClaim(token, claims -> claims.get("role", String.class));
+        return "IMPERSONATION".equals(role);
+    }
+
+    /**
      * FIX (Admin Console gap analysis): this threw a NullPointerException
      * for any token with no "permissions" claim at all — which is exactly
      * the shape of the admin-impersonation JWT AdminAuthService.

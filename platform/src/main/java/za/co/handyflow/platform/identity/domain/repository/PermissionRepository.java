@@ -14,4 +14,10 @@ public interface PermissionRepository extends JpaRepository<Permission, UUID> {
 
     /** Fetch a specific set of permissions by name — used when setting up default roles. */
     List<Permission> findByNameIn(Set<String> names);
+
+    /**
+     * The authority set granted to an admin support impersonation token —
+     * see migration V287 and AdminAuthService.generateImpersonationToken.
+     */
+    List<Permission> findByReadOnlyTrue();
 }

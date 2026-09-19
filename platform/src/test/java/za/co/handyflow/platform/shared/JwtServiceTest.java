@@ -50,6 +50,22 @@ class JwtServiceTest {
         assertThat(permissions).containsExactlyInAnyOrder("INVOICE_READ", "INVOICE_CREATE");
     }
 
+    @Test
+    @DisplayName("isImpersonation is true for an impersonation-shaped token")
+    void isImpersonation_impersonationToken_returnsTrue() {
+        assertThat(jwtService.isImpersonation(tokenWithoutPermissionsClaim())).isTrue();
+    }
+
+    @Test
+    @DisplayName("isImpersonation is false for a normal user token")
+    void isImpersonation_normalToken_returnsFalse() {
+        String token = jwtService.generateToken(
+                UUID.randomUUID(), UUID.randomUUID(), "user@example.com", "Jane", "Doe",
+                Set.of("INVOICE_READ"));
+
+        assertThat(jwtService.isImpersonation(token)).isFalse();
+    }
+
     /** Same claim shape as AdminAuthService.generateImpersonationToken() — no "permissions" claim. */
     private String tokenWithoutPermissionsClaim() {
         SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));

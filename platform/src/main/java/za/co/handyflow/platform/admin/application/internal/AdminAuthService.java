@@ -29,6 +29,7 @@ public class AdminAuthService {
     private final AdminAuditLogRepository          auditRepo;
     private final AdminImpersonationSessionRepository impersonationRepo;
     private final PasswordEncoder                  passwordEncoder;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     @Value("${app.security.jwt.secret}")
     private String jwtSecret;
@@ -205,10 +206,31 @@ public class AdminAuthService {
                 .claim("sessionId", sessionId.toString())
                 .claim("role", "IMPERSONATION")
                 .claim("readOnly", true)
+                // FIX: previously carried no "permissions" claim at all, which
+                // (a) crashed JwtService.extractPermissions with an NPE, and
+                // (b) even once that was fixed to return an empty set, meant
+                // every @PreAuthorize("hasAuthority(...)") check denied the
+                // request — a superadmin using "view as tenant" could
+                // authenticate but see nothing. Grant exactly the
+                // permissions explicitly marked read-only (see migration
+                // V287) — this is the whole reason that flag exists.
+                .claim("permissions", readOnlyPermissionNames())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + IMPERSONATION_TOKEN_EXPIRY_MS))
                 .signWith(key)
                 .compact();
+    }
+
+    /**
+     * Raw JdbcTemplate, not a PermissionRepository import — this module's
+     * package-info.java allowedDependencies is {@code {"shared"}} only,
+     * same as every other cross-module data access in this class
+     * (AdminService/AdminTenantDiagnosticService use the same pattern):
+     * admin reaches into other modules' data via SQL against the shared
+     * database, not by depending on their internal Java types.
+     */
+    private java.util.List<String> readOnlyPermissionNames() {
+        return jdbc.queryForList("SELECT name FROM permissions WHERE is_read_only = true", String.class);
     }
 
     private AdminUser validatePartialToken(String token) {

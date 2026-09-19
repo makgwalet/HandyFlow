@@ -46,9 +46,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     String userId   = jwtService.extractUserId(jwt);
                     String tenantId = jwtService.extractTenantId(jwt);
                     Set<String> permissions = jwtService.extractPermissions(jwt);
+                    boolean impersonation = jwtService.isImpersonation(jwt);
 
                     TenantContext.setTenantId(tenantId);
                     TenantContext.setUserId(userId);
+                    TenantContext.setImpersonation(impersonation);
                     // BUG-004 fix: populate USER_NAME so getCurrentUserName()
                     // returns a real display name, not the UUID fallback.
                     String displayName = jwtService.extractName(jwt);

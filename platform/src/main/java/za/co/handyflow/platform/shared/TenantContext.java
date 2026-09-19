@@ -16,10 +16,20 @@ public class TenantContext {
     private static final ThreadLocal<String> TENANT_ID = new ThreadLocal<>();
     private static final ThreadLocal<String> USER_ID   = new ThreadLocal<>();
     private static final ThreadLocal<String> USER_NAME = new ThreadLocal<>();
+    private static final ThreadLocal<Boolean> IMPERSONATION = new ThreadLocal<>();
 
     public static void setTenantId(String tenantId) { TENANT_ID.set(tenantId); }
     public static void setUserId(String userId)      { USER_ID.set(userId); }
     public static void setUserName(String userName)  { USER_NAME.set(userName); }
+
+    /**
+     * Set by JwtAuthFilter (via JwtService.isImpersonation) for an admin
+     * read-only support session — see getCurrentUserId()'s Javadoc for why
+     * this exists.
+     */
+    public static void setImpersonation(boolean impersonation) { IMPERSONATION.set(impersonation); }
+
+    public static boolean isImpersonation() { return Boolean.TRUE.equals(IMPERSONATION.get()); }
 
     public static String getTenantId() { return TENANT_ID.get(); }
     public static String getUserId()   { return USER_ID.get(); }
@@ -33,7 +43,25 @@ public class TenantContext {
         return TenantId.of(id);
     }
 
+    /**
+     * FIX: an admin impersonation session has no real tenant user behind
+     * it — its JWT subject is the literal string "IMPERSONATION", not a
+     * UUID (see AdminAuthService.generateImpersonationToken). Before this
+     * fix, any code calling this during an impersonation session hit a
+     * raw UUID.fromString parse failure with no useful message — the
+     * impersonation check here turns that into a clear, intentional
+     * error instead, so a caller (and whoever reads the resulting log or
+     * error response) can tell "this operation needs a real user and
+     * isn't available during read-only support access" apart from "the
+     * user ID in context is corrupted".
+     */
     public static UUID getCurrentUserId() {
+        if (isImpersonation()) {
+            throw new IllegalStateException(
+                    "No real user in context — this is a read-only admin support impersonation "
+                            + "session (see AdminAuthService), which has no tenant user identity to attribute "
+                            + "this operation to.");
+        }
         String id = USER_ID.get();
         if (id == null) throw new IllegalStateException("No user ID in context");
         return UUID.fromString(id);
@@ -61,5 +89,6 @@ public class TenantContext {
         TENANT_ID.remove();
         USER_ID.remove();
         USER_NAME.remove();
+        IMPERSONATION.remove();
     }
 }
