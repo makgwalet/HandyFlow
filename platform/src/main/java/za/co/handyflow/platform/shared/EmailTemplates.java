@@ -179,7 +179,7 @@ public class EmailTemplates {
             <p>This link expires in <strong>15 minutes</strong>.</p>
             <p>If you didn't request this, you can safely ignore this email.
                Your password has not been changed.</p>
-            """.formatted(firstName, resetLink));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(firstName), resetLink));
     }
 
     // NEW: previously AuthService.register() fired zero emails at all —
@@ -250,7 +250,7 @@ public class EmailTemplates {
                  If you did <strong>not</strong> request this change, please contact support
                  immediately — someone else may have access to your account.</p>
             </div>
-            """.formatted(firstName));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(firstName)));
     }
 
     // NEW: replaces SubscriptionService.notifySuspended()'s previous
@@ -332,7 +332,8 @@ public class EmailTemplates {
             <p style="margin-top:24px; color:#94A3B8; font-size:13px;">
               Questions? Reply to this email and we'll help you choose the right plan.
             </p>
-            """.formatted(firstName, urgency, daysRemaining, planName, frontendUrl));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(firstName),
+                urgency, daysRemaining, planName, frontendUrl));
     }
 
     public static String invoiceGenerated(String firstName, String invoiceNumber,
@@ -391,7 +392,8 @@ public class EmailTemplates {
                  and Transactions Act 25 of 2002 (Section 13). Your IP address, device information,
                  and phone number will be recorded in the contract audit trail.</p>
             </div>
-            """.formatted(partyName, contractType, contractTitle, contractNumber,
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(partyName),
+                contractType, contractTitle, contractNumber,
                 signingUrl, signingUrl, signingUrl));
     }
 
@@ -427,7 +429,8 @@ public class EmailTemplates {
                  The signing audit trail, including timestamps, IP addresses, and OTP verification
                  records, is stored in HandyFlow for the duration of the contract.</p>
             </div>
-            """.formatted(partyName, contractTitle, contractNumber, signedAt, frontendUrl));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(partyName),
+                contractTitle, contractNumber, signedAt, frontendUrl));
     }
 
     // ── Contracting — contract terminated ────────────────────────────────────
@@ -468,7 +471,8 @@ public class EmailTemplates {
             <p>A copy of the contract, including its signing audit trail up to the point
                of termination, is attached to this email for your records.</p>
             <a href="%s/contracts" class="btn btn-red">View in HandyFlow</a>
-            """.formatted(partyName, contractTitle, contractNumber, terminatedAt, reasonBlock, frontendUrl));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(partyName),
+                contractTitle, contractNumber, terminatedAt, reasonBlock, frontendUrl));
     }
 
     // ── Contracting — party declined ─────────────────────────────────────────
@@ -498,7 +502,8 @@ public class EmailTemplates {
             <p>You may contact the party to discuss their concerns, amend the contract,
                and resend for signing.</p>
             <a href="%s/contracts" class="btn btn-red">View Contract</a>
-            """.formatted(ownerName, partyName, contractTitle, contractNumber,
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(ownerName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(partyName), contractTitle, contractNumber,
                 reasonBlock, frontendUrl));
     }
 
@@ -535,7 +540,8 @@ public class EmailTemplates {
             <p>Review the request and either update the contract and resend, or respond via the
                comment thread in HandyFlow.</p>
             <a href="%s/contracts" class="btn">View Contract &amp; Comments</a>
-            """.formatted(ownerName, partyName, contractTitle, contractNumber,
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(ownerName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(partyName), contractTitle, contractNumber,
                 clauseLine,
                 org.springframework.web.util.HtmlUtils.htmlEscape(commentText),
                 frontendUrl));
@@ -591,7 +597,7 @@ public class EmailTemplates {
             <div class="legal">
               <p>Your electronic signature is legally binding under the ECT Act 25 of 2002 (Section 13).</p>
             </div>
-            """.formatted(partyName, contractTitle, contractNumber,
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(partyName), contractTitle, contractNumber,
                 signingUrl, signingUrl, signingUrl));
     }
 
@@ -611,7 +617,8 @@ public class EmailTemplates {
               </p>
             </div>
             <p>Please ensure your first payment is made on time. Contact your landlord if you have any queries.</p>
-            """.formatted(lesseeName, propertyName, unitNumber,
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(lesseeName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(propertyName), unitNumber,
                 startDate, endDate, monthlyRent, ordinal(paymentDay)));
     }
 
@@ -624,7 +631,8 @@ public class EmailTemplates {
             </div>
             <p>Please ensure the unit is vacated and keys returned as per the agreed date.
                Your deposit refund will be processed after the move-out inspection.</p>
-            """.formatted(lesseeName, reason != null ? reason : "As per lease agreement"));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(lesseeName),
+                reason != null ? org.springframework.web.util.HtmlUtils.htmlEscape(reason) : "As per lease agreement"));
     }
 
     public static String leaseRenewed(String lesseeName, String newEndDate, String newRent) {
@@ -636,7 +644,7 @@ public class EmailTemplates {
                  New monthly rent: <strong>R%s</strong></p>
             </div>
             <p>Your payment day remains unchanged. Thank you for renewing.</p>
-            """.formatted(lesseeName, newEndDate, newRent));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(lesseeName), newEndDate, newRent));
     }
 
     // NEW: no lease-expiry warning existed at all before — a tenant had no
@@ -657,7 +665,8 @@ public class EmailTemplates {
             <p>If you'd like to discuss renewing your lease, please contact your landlord
                as soon as possible. If no arrangement is made, the lease will end on the
                date above.</p>
-            """.formatted(lesseeName, cssClass, propertyName, unitNumber, endDate, daysRemaining));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(lesseeName), cssClass,
+                org.springframework.web.util.HtmlUtils.htmlEscape(propertyName), unitNumber, endDate, daysRemaining));
     }
 
     // NEW: staff/landlord-facing counterpart — sent to the tenant's own
@@ -679,7 +688,8 @@ public class EmailTemplates {
             </div>
             <p>Log in to HandyFlow to renew the lease, apply an escalation, or begin the
                move-out process if it won't be renewed.</p>
-            """.formatted(cssClass, propertyName, unitNumber, lesseeName, endDate, daysRemaining));
+            """.formatted(cssClass, org.springframework.web.util.HtmlUtils.htmlEscape(propertyName), unitNumber,
+                org.springframework.web.util.HtmlUtils.htmlEscape(lesseeName), endDate, daysRemaining));
     }
 
     public static String rentEscalation(String lesseeName, String oldRent,
@@ -692,7 +702,7 @@ public class EmailTemplates {
                  Effective from: <strong>%s</strong></p>
             </div>
             <p>Please update your payment instructions accordingly. Contact your landlord if you have any queries.</p>
-            """.formatted(lesseeName, oldRent, newRent, effectiveDate));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(lesseeName), oldRent, newRent, effectiveDate));
     }
 
     public static String rentReceipt(String lesseeName, String amount,
@@ -709,7 +719,7 @@ public class EmailTemplates {
                  Paid: %s%s</p>
             </div>
             <p>Thank you for your payment.</p>
-            """.formatted(lesseeName, amount, period, paidDate, refLine));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(lesseeName), amount, period, paidDate, refLine));
     }
 
     // NEW: previously a payment that only partially covered what was owed
@@ -735,7 +745,7 @@ public class EmailTemplates {
             </div>
             <p>Thank you for your payment. Please arrange payment of the remaining balance
                as soon as possible.</p>
-            """.formatted(lesseeName, amountPaid, period, paidDate, refLine, balance));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(lesseeName), amountPaid, period, paidDate, refLine, balance));
     }
 
     public static String rentOverdueReminder(String lesseeName, String amount,
@@ -750,7 +760,7 @@ public class EmailTemplates {
             </div>
             <p>Please make payment as soon as possible to avoid penalties.
                If you have already paid, please send your proof of payment to your landlord.</p>
-            """.formatted(lesseeName, amount, period, daysOverdue));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(lesseeName), amount, period, daysOverdue));
     }
 
     private static String ordinal(int n) {
@@ -849,11 +859,12 @@ public class EmailTemplates {
             %s
             <p>Please send these through at your earliest convenience. If you have any questions,
                please don't hesitate to contact %s.</p>
-            """.formatted(firmName, description, itemsHtml,
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(firmName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(description), itemsHtml,
                 dueDate != null
                         ? "<div class=\"highlight-amber\"><p>Due by: <strong>" + dueDate + "</strong></p></div>"
                         : "",
-                firmName));
+                org.springframework.web.util.HtmlUtils.htmlEscape(firmName)));
     }
 
     /**

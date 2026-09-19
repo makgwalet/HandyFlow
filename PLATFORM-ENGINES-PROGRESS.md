@@ -260,11 +260,49 @@ Confirmed by direct code read and fixed:
   `EmailTemplatesEscapingTest` extended to cover all five.
 
 That's 10 real unescaped-interpolation bugs found and fixed across this
-file in total (the original 5 plus these 5), all confirmed by reading the
-actual code rather than trusting the scan. No further automated scanning
-of this file was done — the remaining ~30 templates not yet mentioned
-anywhere in this doc haven't been checked either way and shouldn't be
-assumed safe.
+file (the original 5 plus these 5), all confirmed by reading the actual
+code rather than trusting the scan.
+
+**Then went further: a wider manual scan of every `public static String`
+method in this file** (not just the two batches above) turned up **19
+more** of the same bug, spanning three modules:
+- **Auth (3):** `passwordReset` (`firstName`), `passwordChanged`
+  (`firstName`), `pilotCountdown` (`firstName`).
+- **Contracting (6):** `contractSigningInvitation`, `contractFullyExecuted`,
+  `contractTerminated` (all `partyName`), `contractDeclined`,
+  `contractAmendmentRequested` (both `ownerName` + `partyName`),
+  `contractSigningTurnNotification` (`partyName`).
+- **Property/lease (9):** `leaseCreated`, `leaseTerminated` (also fixed
+  its `reason` param, same category of bug though outside the original
+  name-list), `leaseRenewed`, `leaseExpiringTenant`, `leaseExpiringLandlord`
+  (all `lesseeName`, most also `propertyName`), `rentEscalation`,
+  `rentReceipt`, `rentPartialPayment`, `rentOverdueReminder` (all
+  `lesseeName`).
+- **Accountant (1):** `documentRequestCreated` (`firmName`, and its
+  `description` param, same reasoning as `leaseTerminated`'s `reason`).
+
+Every one of these 19 was individually verified against its exact
+`.formatted(...)` argument list before and after the fix, to confirm the
+count and order didn't shift — only the escaping changed. Re-ran the
+detection script after all fixes: it now reports exactly 2 remaining
+"hits", both confirmed false positives — `documentRequestCreated`'s
+`clientName` parameter is genuinely unused anywhere in that method's
+template (dead parameter, not a bug), and `quoteSentToClient`'s 5-arg
+overload delegates safely to its already-escaped 6-arg sibling.
+
+`EmailTemplatesEscapingTest` now covers all 29 fixes (10 + 19) with the
+same `<script>` payload pattern.
+
+**29 real, confirmed, fixed HTML-escaping bugs in this file, total, this
+session.** No further automated scanning was done beyond this pass — the
+remaining ~15 methods in this file not mentioned anywhere in this doc
+haven't been checked either way and shouldn't be assumed safe, though the
+name-parameter list this scan searched for (`clientName`, `companyName`,
+`firmName`, `tenantName`, `partyName`, `ownerName`, `lesseeName`,
+`invitedByName`, `firstName`, `customerName`, `fileName`,
+`propertyName`) is a reasonable guess at coverage, not a guarantee —
+a method using a differently-named parameter for the same kind of data
+would not have been caught by this method.
 
 **NOT yet done — remaining backlog:**
 1. ~~`wrap()`'s own header still always says "HandyFlow"~~ — **DONE, this
@@ -426,4 +464,4 @@ suspended tenant, unconfigured opt-in items rendering as informational
    its backfill — check the review query above.
 
 ---
-*Last updated by Claude — verified all 10 previously-unverified escaping candidates (5 false positives, 5 real bugs fixed); 10 total escaping bugs found and fixed in EmailTemplates this session.*
+*Last updated by Claude — wider manual scan found 19 more HTML-escaping bugs (auth/contracting/property-lease modules); 29 total fixed in EmailTemplates this session.*
