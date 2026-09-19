@@ -222,6 +222,43 @@ fixed.
   paths render byte-identical output, and the 6-arg path appends/tolerates
   null correctly).
 
+**Found and fixed, this session — a real, systemic bug independent of the
+header work above:** while migrating more templates, a broader look at
+this file turned up several methods interpolating a client/company/first
+name directly into HTML with **no escaping at all** — unlike the
+established pattern (`quoteSentToClient` and most of this file already
+escape tenant-entered strings). A maliciously- or carelessly-named
+client/contact/company record would render as live HTML in a real
+customer's inbox — content-injection / phishing-enablement, not a
+cosmetic gap.
+
+Confirmed by direct code read and fixed:
+- `feeNote` — `clientName`
+- `paymentReceived` — `clientName`
+- `clientOnboardingWelcome` — `clientName`, `firmName`
+- `invoiceGeneratedWithPdf` — `companyName`, `customerName` (this one
+  doesn't use `wrap()`/`wrapForTenant()` at all — it's a fully standalone
+  table-based HTML document with its own tenant-branded header, which is
+  *why* it stood out: the header already showed `companyName` correctly,
+  just unescaped)
+- `registrationConfirmation` — `firstName`, `companyName`
+
+`EmailTemplatesEscapingTest` covers all five with a `<script>` payload.
+
+**NOT verified — candidates found by a crude automated scan, not
+individually confirmed:** `userInvitation`, `accountSuspended`,
+`planChanged`, `quoteExpiry`, `invoiceGenerated`, `taxDeadlineReminder`,
+`clientDeadlineReminder`, `tcsPinExpiryReminder`,
+`ficaDocumentExpiryReminder`, `portalInvite`. The scan (grep for a
+name-like parameter appearing in a method's body with no `htmlEscape`
+call anywhere in that body) has a real false-positive rate — nested
+braces inside the CSS blocks embedded in some templates confuse a simple
+method-boundary heuristic, and it already produced one false positive
+(`quoteSentToClient`, which does escape correctly). Each of these needs
+the same direct-code-read confirmation the five fixed ones got before
+being trusted either way — don't assume this list is exhaustive or that
+everything on it is actually broken.
+
 **NOT yet done — remaining backlog:**
 1. ~~`wrap()`'s own header still always says "HandyFlow"~~ — **DONE, this
    session.** Rather than editing `wrap()` itself (which would change all
@@ -382,4 +419,4 @@ suspended tenant, unconfigured opt-in items rendering as informational
    its backfill — check the review query above.
 
 ---
-*Last updated by Claude — added wrapForTenant() and migrated quoteSentToClient's header off "HandyFlow" onto the tenant's own company name, without touching wrap() or the other 45 templates.*
+*Last updated by Claude — found and fixed 5 real HTML-escaping bugs in EmailTemplates (unescaped names in customer-facing emails); documented 10 more unverified candidates from an imperfect automated scan.*

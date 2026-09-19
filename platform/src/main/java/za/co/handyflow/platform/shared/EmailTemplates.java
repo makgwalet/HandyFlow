@@ -214,7 +214,9 @@ public class EmailTemplates {
                &bull; Add your team under Settings &rarr; Users<br/>
                &bull; Add your first customer<br/>
                &bull; Explore the modules you signed up for</p>
-            """.formatted(firstName, companyName, slug, modulesList, verifyLink));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(firstName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(companyName),
+                slug, modulesList, verifyLink));
     }
 
     // NEW: replaces UserManagementService.inviteUser()'s previous bare
@@ -937,7 +939,8 @@ public class EmailTemplates {
             <p>Please make payment by the due date. Bank details will be provided on the attached invoice.
                Quote the invoice number as your payment reference.</p>
             <a href="#" class="btn btn-teal">View Invoice</a>
-            """.formatted(clientName, invoiceNumber, amount, dueDate));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
+                invoiceNumber, amount, dueDate));
     }
 
     /**
@@ -957,7 +960,8 @@ public class EmailTemplates {
                  Payment date: <strong>%s</strong></p>
             </div>
             <p>No further action is needed on this invoice. Please keep this email for your records.</p>
-            """.formatted(clientName, invoiceNumber, totalAmount, paymentDate));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
+                invoiceNumber, totalAmount, paymentDate));
     }
 
     /**
@@ -975,7 +979,8 @@ public class EmailTemplates {
                  &bull; Bank account details for EFT payments</p>
             </div>
             <p>For any queries, please contact us at <a href="mailto:%s">%s</a>.</p>
-            """.formatted(clientName, firmName, contactEmail, contactEmail));
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(clientName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(firmName), contactEmail, contactEmail));
     }
 
     public static String invoiceGeneratedWithPdf(
@@ -1072,10 +1077,10 @@ public class EmailTemplates {
             </body>
             </html>
             """.formatted(
-                companyName,          // header company name
-                customerName,         // "Hi {customer}"
+                org.springframework.web.util.HtmlUtils.htmlEscape(companyName),   // header company name
+                org.springframework.web.util.HtmlUtils.htmlEscape(customerName),  // "Hi {customer}"
                 invoiceNumber,        // invoice number in card
-                customerName,         // customer name in card
+                org.springframework.web.util.HtmlUtils.htmlEscape(customerName),  // customer name in card
                 amount,               // amount in card
                 invoiceNumber         // attachment filename reminder
         );
