@@ -394,16 +394,51 @@ would not have been caught by this method.
    inbox) — **not fixed this session**, flagged for its own pass since it
    sits outside what this backlog item was actually about.
 
-   Remaining 6 (of the original 9, now that `AdminInvoiceService`,
-   `ContractExpiryScheduler` are migrated and `PosService` is
-   reclassified as out of scope): `PmNotificationService`,
-   `ScmNotificationService`, `AccountingService`, `CreativeService`,
-   `MarketingService`, `ApRemittanceEmailService` (escaping fixed, still
-   blocked on the boundary question for real migration) — each needs its
-   own reference migration (or a documented reason it can't, e.g.
-   `ScmNotificationService`'s distinct amber "Supply Chain" accent colour
-   may be an intentional sub-brand, not simply an oversight — confirm
-   with product before merging its styling into the shared teal palette).
+   **`AccountingService` — checked, deliberately NOT migrated; 6
+   escaping bugs fixed in place.** Its 4 templates (`vatReminderEmail`,
+   `overdueArEmail`, `lowBalanceEmail`, `vatOverdueEmail`) each use a
+   distinct severity colour — purple, red, red, dark-red — that doesn't
+   exist anywhere in `wrap()`'s single navy design. That's real
+   at-a-glance-in-an-inbox severity signalling (a VAT reminder reads as
+   informational, a VAT-overdue escalation reads as urgent, purely from
+   colour before the recipient even opens it), not incidental CSS
+   duplication — forcing all 4 into one shared header would be a design
+   regression, not a cleanup, so left as-is. Confirmed `accounting`'s own
+   `allowedDependencies` DOES include `identity` (unlike most of the
+   others checked this session), so this one isn't blocked by a module
+   boundary — it's blocked by an actual design difference worth a
+   product decision. Fixed 6 confirmed unescaped fields across the 4
+   methods: `company` (all 4), `customerName` (in the aging table),
+   `bankName` and `accountName` (in the low-balance table) — same bug
+   category as the 34 already found. All 4 methods widened
+   `private` → package-private for direct test access.
+   `AccountingServiceEscapingTest` covers all 4.
+
+   **`ScmNotificationService` — confirmed genuinely intentional
+   sub-brand, NOT migrated; 1 real bug fixed centrally.** Its explicit
+   `HandyFlow · Supply Chain` amber eyebrow label in the header confirms
+   what was only a guess before — this is a deliberate sub-brand, not an
+   oversight, so left unmigrated (matches the caution already on record).
+   `supplychain`'s own `allowedDependencies` also includes `identity`
+   (confirmed, so this isn't blocked by a boundary either — it's a real
+   design choice). While checking it, found its own `kv(key, value)`
+   helper already escaped `key` via its own hand-rolled `esc()` but never
+   escaped `value` — exactly where the real risk is: `supplierName`, a
+   free-text `"Reason"` field, and `"Approved By"` are genuinely
+   user-entered strings passed through it at 6 of `kv()`'s 14 call sites
+   in this file (checked every one — none passes a pre-built HTML
+   fragment as `value`, so escaping centrally in `kv()` itself is safe
+   for all of them). One fix protects every current and future call
+   site, rather than fixing each of the 14 individually. `kv()` widened
+   to package-private; `ScmNotificationServiceEscapingTest` covers it.
+
+   Remaining 4 (of the original 9): `PmNotificationService`,
+   `CreativeService`, `MarketingService`, `ApRemittanceEmailService`
+   (escaping already fixed, migration itself still blocked on the
+   `identity`-boundary question) — each still needs the same
+   check-then-decide treatment: read the actual template, check the
+   module's `allowedDependencies`, and only migrate if doing so doesn't
+   lose real branding or design information.
 4. **No `tenant_email_signature` Settings UI** yet — API/DB only.
 5. **No sender-identity-per-tenant** (`fromAddress`/`fromName` in
    `EmailService` are still global, single values) and **no delivery
@@ -527,4 +562,4 @@ suspended tenant, unconfigured opt-in items rendering as informational
    its backfill — check the review query above.
 
 ---
-*Last updated by Claude — migrated ContractExpiryScheduler onto a shared template; fixed escaping in ApRemittanceEmailService in place (blocked from full migration by a module-boundary gap); excluded PosService from this backlog item (it's a receipt, not an email) while flagging its own separate escaping gap; 34 total escaping bugs fixed in this session across all files touched.*
+*Last updated by Claude — checked AccountingService and ScmNotificationService: both have genuine design reasons not to migrate onto wrap()/wrapForTenant() (confirmed, not guessed), but both had real escaping bugs fixed in place (7 more this session, 41 total). ScmNotificationService's amber "Supply Chain" branding confirmed intentional, not a guess.*

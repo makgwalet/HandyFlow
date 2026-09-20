@@ -1068,7 +1068,7 @@ public class AccountingService {
 
     // ── Email templates ───────────────────────────────────────────────────────
 
-    private String vatReminderEmail(String company, LocalDate periodEnd, BigDecimal estimatedVat) {
+    String vatReminderEmail(String company, LocalDate periodEnd, BigDecimal estimatedVat) {
         return """
             <!DOCTYPE html>
             <html><body style="font-family:Arial,sans-serif;color:#0F172A;max-width:600px;margin:0 auto;padding:20px">
@@ -1086,11 +1086,12 @@ public class AccountingService {
                 <p style="font-size:13px;color:#64748B">Log in to HandyFlow to review your VAT201 and close the period before the due date.</p>
               </div>
             </body></html>
-            """.formatted(company, periodEnd.format(DateTimeFormatter.ofPattern("d MMMM yyyy")),
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(company),
+                periodEnd.format(DateTimeFormatter.ofPattern("d MMMM yyyy")),
                 fmtAmount(estimatedVat));
     }
 
-    private String overdueArEmail(String company, AgingReportResponse aging,
+    String overdueArEmail(String company, AgingReportResponse aging,
                                   long overdueCount, BigDecimal overdueTotal) {
         StringBuilder rows = new StringBuilder();
         aging.lines().stream()
@@ -1102,7 +1103,9 @@ public class AccountingService {
                                 + "<td style='padding:8px;border-bottom:1px solid #F1F5F9;text-align:right;color:#DC2626;font-weight:600'>%s</td>"
                                 + "<td style='padding:8px;border-bottom:1px solid #F1F5F9;text-align:center'>"
                                 + "<span style='background:#FEF2F2;color:#DC2626;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700'>%s</span></td></tr>",
-                        l.invoiceNumber(), l.customerName(), fmtAmount(l.balance()), l.bucket())));
+                        l.invoiceNumber(),
+                        org.springframework.web.util.HtmlUtils.htmlEscape(l.customerName()),
+                        fmtAmount(l.balance()), l.bucket())));
 
         return """
             <!DOCTYPE html>
@@ -1127,7 +1130,8 @@ public class AccountingService {
                 <p style="font-size:13px;color:#64748B">Log in to HandyFlow to view the full AR Aging report and follow up with customers.</p>
               </div>
             </body></html>
-            """.formatted(company, overdueCount, overdueCount == 1 ? "" : "s",
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(company),
+                overdueCount, overdueCount == 1 ? "" : "s",
                 fmtAmount(overdueTotal), rows);
     }
 
@@ -1165,14 +1169,15 @@ public class AccountingService {
                 recipientEmail, periodEnd, daysOverdue);
     }
 
-    private String lowBalanceEmail(String company, List<AccBankAccount> lowAccounts) {
+    String lowBalanceEmail(String company, List<AccBankAccount> lowAccounts) {
         StringBuilder rows = new StringBuilder();
         for (AccBankAccount b : lowAccounts) {
             rows.append(String.format(
                     "<tr><td style='padding:8px;border-bottom:1px solid #F1F5F9'>%s — %s</td>"
                             + "<td style='padding:8px;border-bottom:1px solid #F1F5F9;text-align:right;color:#DC2626;font-weight:600'>%s</td>"
                             + "<td style='padding:8px;border-bottom:1px solid #F1F5F9;text-align:right;color:#64748B'>%s</td></tr>",
-                    b.getBankName(), b.getAccountName(),
+                    org.springframework.web.util.HtmlUtils.htmlEscape(b.getBankName()),
+                    org.springframework.web.util.HtmlUtils.htmlEscape(b.getAccountName()),
                     fmtAmount(b.getCurrentBalance()), fmtAmount(b.getLowBalanceThreshold())));
         }
 
@@ -1198,10 +1203,11 @@ public class AccountingService {
                 <p style="font-size:13px;color:#64748B">This will keep sending daily until the balance is back above the threshold, or you change/clear the threshold on that account.</p>
               </div>
             </body></html>
-            """.formatted(company, lowAccounts.size() == 1 ? " is" : "s are", rows);
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(company),
+                lowAccounts.size() == 1 ? " is" : "s are", rows);
     }
 
-    private String vatOverdueEmail(String company, LocalDate periodEnd, long daysOverdue) {
+    String vatOverdueEmail(String company, LocalDate periodEnd, long daysOverdue) {
         return """
             <!DOCTYPE html>
             <html><body style="font-family:Arial,sans-serif;color:#0F172A;max-width:600px;margin:0 auto;padding:20px">
@@ -1215,7 +1221,8 @@ public class AccountingService {
                 <p style="font-size:13px;color:#64748B">Missing a SARS VAT201 deadline can carry real penalties. Log in to HandyFlow, review and close this period, and submit as soon as possible. This reminder will repeat daily until the period is closed.</p>
               </div>
             </body></html>
-            """.formatted(company, periodEnd.format(DateTimeFormatter.ofPattern("d MMMM yyyy")),
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(company),
+                periodEnd.format(DateTimeFormatter.ofPattern("d MMMM yyyy")),
                 daysOverdue, daysOverdue == 1 ? "" : "s");
     }
 

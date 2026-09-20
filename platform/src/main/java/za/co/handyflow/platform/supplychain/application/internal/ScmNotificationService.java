@@ -356,11 +356,23 @@ public class ScmNotificationService {
             </body></html>""";
     }
 
-    private static String kv(String key, String value) {
+    // FIX: this already escaped `key` via esc() but never escaped `value` —
+    // and value is exactly where the real risk is: supplierName, a
+    // free-text "Reason" field, and "Approved By" are all genuinely
+    // user-entered strings passed straight through at 6 of this method's
+    // 14 call sites in this file (confirmed by reading every one — none
+    // passes a pre-built HTML fragment as value, so escaping centrally
+    // here is safe for all of them, current and future). Same bug
+    // category, same fix, as the 34 already found and fixed in
+    // EmailTemplates this session — just a different file with its own
+    // hand-rolled escaping helper instead of Spring's HtmlUtils.
+    // package-private (not private) so ScmNotificationServiceEscapingTest,
+    // in the same package, can exercise it directly.
+    static String kv(String key, String value) {
         return "<table style='width:100%;border-collapse:collapse;margin:10px 0'><tr>" +
                 "<td style='font-size:12px;color:#94A3B8;font-weight:600;text-transform:uppercase;" +
                 "letter-spacing:0.04em;padding:5px 0;width:130px;vertical-align:top'>" + esc(key) + "</td>" +
-                "<td style='font-size:14px;color:#0F172A;font-weight:600;padding:5px 0 5px 12px'>" + value + "</td>" +
+                "<td style='font-size:14px;color:#0F172A;font-weight:600;padding:5px 0 5px 12px'>" + esc(value) + "</td>" +
                 "</tr></table>";
     }
 
