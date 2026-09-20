@@ -71,6 +71,7 @@ class CrmFacadeImpl implements CrmFacade {
                         c.getEmail(),
                         c.getPhone(),
                         c.getTaxNumber(),
+                        c.getAddress(),
                         c.getCustomerType(),
                         c.getStatus()
                 ));
@@ -101,6 +102,7 @@ class CrmFacadeImpl implements CrmFacade {
                         c.getEmail(),
                         c.getPhone(),
                         c.getTaxNumber(),
+                        c.getAddress(),
                         c.getCustomerType(),
                         c.getStatus()
                 ))

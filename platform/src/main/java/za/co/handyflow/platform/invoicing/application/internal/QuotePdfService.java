@@ -213,6 +213,28 @@ public class QuotePdfService {
                 quotedTo.add(bodyLine(quote.getWalkinClientEmail(), regular));
             if (quote.getWalkinClientPhone() != null)
                 quotedTo.add(bodyLine(quote.getWalkinClientPhone(), regular));
+        } else {
+            // FIX: previously fetched nothing for a real CRM customer at all —
+            // confirmed via a real quote PDF showing "QUOTED TO / <name>" with
+            // no email, phone, or VAT number, while the equivalent invoice for
+            // the same customer (InvoicePdfService, which DOES fetch CRM
+            // details) showed all three. Same fetch-and-render pattern as
+            // InvoicePdfService's BILL TO block, including the customer's
+            // address (see CustomerSummary — address was recently added
+            // there for the same reason taxNumber already was: SARS full tax
+            // invoice / quote requirements need it, and the data already
+            // existed in Customer.address, it just never reached this DTO).
+            try {
+                crmFacade.findCustomerById(tenantId, quote.getCustomerId())
+                        .ifPresent(c -> {
+                            if (c.address() != null && !c.address().isEmpty())
+                                quotedTo.add(addressLine(c.address(), regular));
+                            if (c.email() != null) quotedTo.add(bodyLine(c.email(), regular));
+                            if (c.phone() != null) quotedTo.add(bodyLine(c.phone(), regular));
+                            if (c.taxNumber() != null)
+                                quotedTo.add(bodyLine("VAT: " + c.taxNumber(), regular));
+                        });
+            } catch (Exception ignored) {}
         }
 
         // QUOTE DETAILS

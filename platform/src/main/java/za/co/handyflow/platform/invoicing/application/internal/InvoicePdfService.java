@@ -262,6 +262,8 @@ public class InvoicePdfService {
             try {
                 crmFacade.findCustomerById(tenantId, invoice.getCustomerId())
                         .ifPresent(c -> {
+                            if (c.address() != null && !c.address().isEmpty())
+                                billTo.add(addressLine(c.address(), regular));
                             if (c.email() != null) billTo.add(bodyLine(c.email(), regular));
                             if (c.phone() != null) billTo.add(bodyLine(c.phone(), regular));
                             if (c.taxNumber() != null)

@@ -3,6 +3,7 @@ package za.co.handyflow.platform.crm;
 import za.co.handyflow.platform.crm.domain.model.CustomerStatus;
 import za.co.handyflow.platform.crm.domain.model.CustomerType;
 
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -23,6 +24,17 @@ import java.util.UUID;
  * WHY include taxNumber in the summary?
  * The Invoicing module needs the VAT number to generate a legally
  * compliant SA invoice.  Without it, the invoice is non-compliant.
+ *
+ * WHY include address?
+ * Same reasoning as taxNumber, confirmed by a real invoice: SARS full
+ * tax invoice requirements (above the R5,000 threshold) need the
+ * recipient's address too, not just their VAT number. Customer.address
+ * was already captured (Map<String,String>, JSONB — street/suburb/city/
+ * postalCode keys, same shape InvoicePdfService's addressLine() helper
+ * already expects for the tenant's own FROM-block address) but never
+ * made it into this DTO, so it silently never reached the BILL TO block
+ * despite the data existing. Nullable — a customer may not have an
+ * address on file yet, and the PDF renders fine either way.
  */
 public record CustomerSummary(
         UUID id,
@@ -30,6 +42,7 @@ public record CustomerSummary(
         String email,
         String phone,
         String taxNumber,
+        Map<String, String> address,
         CustomerType customerType,
         CustomerStatus status
 ) {
