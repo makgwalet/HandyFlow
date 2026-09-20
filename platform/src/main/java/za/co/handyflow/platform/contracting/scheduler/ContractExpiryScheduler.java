@@ -151,7 +151,8 @@ public class ContractExpiryScheduler {
         String endDate = c.getEndDate() != null ? c.getEndDate().format(DATE_FMT) : "unknown";
         String subject = "Contract expiring in " + daysLeft + " day" + (daysLeft == 1 ? "" : "s")
                 + ": " + c.getTitle();
-        String body = buildRenewalBody(c.getTitle(), c.getContractNumber(), endDate, daysLeft);
+        String body = za.co.handyflow.platform.shared.EmailTemplates.contractRenewalReminder(
+                c.getTitle(), c.getContractNumber(), daysLeft, endDate);
 
         boolean anySent = false;
         for (ContractParty p : parties) {
@@ -169,23 +170,5 @@ public class ContractExpiryScheduler {
                     + "email address — nobody was actually notified", c.getContractNumber(), daysLeft);
         }
         return anySent;
-    }
-
-    private String buildRenewalBody(String title, String number, String endDate, int daysLeft) {
-        String urgency = daysLeft <= 7 ? "is expiring very soon" : "is coming up for renewal";
-        return """
-            <!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:560px;margin:40px auto;">
-            <div style="background:#1B3A6B;padding:20px 28px;border-radius:12px 12px 0 0;">
-              <h1 style="color:white;margin:0;font-size:18px;">HandyFlow</h1>
-            </div>
-            <div style="background:white;padding:28px;border:1px solid #E2E8F0;border-radius:0 0 12px 12px;">
-              <p style="color:#374151;font-size:14px;">Your contract <strong>%s</strong> (%s) %s.</p>
-              <div style="background:#FEF3C7;border-left:3px solid #D97706;padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0;">
-                <p style="margin:0;color:#92400E;font-weight:600;">Expires in <strong>%d day%s</strong> — on %s</p>
-              </div>
-              <p style="color:#374151;font-size:14px;">Log into HandyFlow to review renewal options or create a new contract.</p>
-            </div>
-            </body></html>
-            """.formatted(title, number, urgency, daysLeft, daysLeft == 1 ? "" : "s", endDate);
     }
 }

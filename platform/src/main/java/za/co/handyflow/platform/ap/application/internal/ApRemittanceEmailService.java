@@ -94,7 +94,10 @@ public class ApRemittanceEmailService {
         return email;
     }
 
-    private String remittanceEmailBody(String supplierName, BigDecimal amount, String paymentRef) {
+    // package-private (not private) so ApRemittanceEmailServiceEscapingTest,
+    // in the same package, can exercise it directly without needing to mock
+    // every dependency sendBillRemittance/sendBatchRemittance pull in.
+    String remittanceEmailBody(String supplierName, BigDecimal amount, String paymentRef) {
         return """
             <!DOCTYPE html>
             <html><body style="font-family:Arial,sans-serif;color:#0F172A;max-width:600px;margin:0 auto;padding:20px">
@@ -109,8 +112,9 @@ public class ApRemittanceEmailService {
               </div>
             </body></html>
             """.formatted(
-                supplierName,
+                org.springframework.web.util.HtmlUtils.htmlEscape(supplierName),
                 amount != null ? " of R " + amount : "",
-                paymentRef != null ? "<p style=\"font-size:13px;color:#64748B\">Payment reference: " + paymentRef + "</p>" : "");
+                paymentRef != null ? "<p style=\"font-size:13px;color:#64748B\">Payment reference: "
+                        + org.springframework.web.util.HtmlUtils.htmlEscape(paymentRef) + "</p>" : "");
     }
 }

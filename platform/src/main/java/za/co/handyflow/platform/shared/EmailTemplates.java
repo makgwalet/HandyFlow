@@ -643,6 +643,34 @@ public class EmailTemplates {
                 signingUrl, signingUrl, signingUrl));
     }
 
+    /**
+     * MIGRATED from ContractExpiryScheduler.buildRenewalBody — one of the
+     * 9 files with independent inline email HTML flagged in
+     * PLATFORM-ENGINES-PROGRESS.md. Safe to migrate onto plain wrap(),
+     * not wrapForTenant(): the original already showed a literal
+     * "HandyFlow" header (matching wrap()'s own), so this changes zero
+     * branding — just deduplicates ~15 lines of hand-copied CSS and fixes
+     * two unescaped fields (title, contractNumber — both free text set
+     * by whoever created the contract). contracting's own
+     * package-info.java allowedDependencies doesn't include identity
+     * (same boundary gap as facilities/training), so unlike
+     * quoteSentToClient this one can't become tenant-branded without that
+     * being resolved first — tracked, not silently worked around.
+     */
+    public static String contractRenewalReminder(String title, String number,
+                                                  int daysLeft, String endDate) {
+        String urgency = daysLeft <= 7 ? "is expiring very soon" : "is coming up for renewal";
+        return wrap("""
+            <p>Your contract <strong>%s</strong> (%s) %s.</p>
+            <div class="highlight-amber">
+              <p>Expires in <strong>%d day%s</strong> &mdash; on %s</p>
+            </div>
+            <p>Log into HandyFlow to review renewal options or create a new contract.</p>
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(title),
+                org.springframework.web.util.HtmlUtils.htmlEscape(number),
+                urgency, daysLeft, daysLeft == 1 ? "" : "s", endDate));
+    }
+
     // ── Property / Lease notifications ────────────────────────────────────────
 
     public static String leaseCreated(String lesseeName, String propertyName,

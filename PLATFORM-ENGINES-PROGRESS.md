@@ -348,14 +348,62 @@ would not have been caught by this method.
    process (30th escaping bug this session — same category as the other
    29, just found later). `EmailTemplatesSubscriptionInvoiceTest` covers
    both content and escaping.
-   Remaining 8: `PmNotificationService`, `ScmNotificationService`,
-   `AccountingService`, `CreativeService`, `ContractExpiryScheduler`,
-   `MarketingService`, `ApRemittanceEmailService`, `PosService` — each
-   needs its own reference migration (or a documented reason it can't,
-   e.g. `ScmNotificationService`'s distinct amber "Supply Chain" accent
-   colour may be an intentional sub-brand, not simply an oversight —
-   confirm with product before merging its styling into the shared teal
-   palette).
+
+   **`ContractExpiryScheduler` — also DONE, this session.** New
+   `EmailTemplates.contractRenewalReminder(...)`, built on plain `wrap()`
+   — safe here because the original already showed a literal "HandyFlow"
+   header identical to `wrap()`'s own, so migrating it changes zero
+   branding, only deduplicates ~15 lines of CSS. Fixed two more unescaped
+   fields (`title`, `contractNumber` — 31st and 32nd escaping bugs this
+   session) in the process. `contracting`'s own `package-info.java`
+   `allowedDependencies` doesn't include `identity` (same boundary gap as
+   `facilities`/`training`), so this one couldn't become properly
+   tenant-branded even though it probably should be (a contract belongs
+   to the tenant, not HandyFlow) — tracked as a real, not-yet-resolved
+   gap, not silently worked around. `EmailTemplatesContractRenewalReminderTest`
+   covers content, pluralisation, and escaping.
+
+   **`ApRemittanceEmailService` — partially addressed, deliberately NOT
+   migrated onto a shared template.** Same `identity`-boundary gap as
+   `ContractExpiryScheduler` (confirmed: `ap`'s `allowedDependencies` is
+   `{"shared", "notifications", "accounting", "approvals"}`, no
+   `identity`) — but this one's original document is genuinely brand
+   *neutral* today (no "HandyFlow" text at all, just a plain navy
+   "Remittance Advice" header), unlike `ContractExpiryScheduler`'s. Since
+   it can't be given the tenant's own name without the boundary change,
+   forcing it onto `wrap()` would have actively **added** unwanted
+   HandyFlow branding that isn't there today — a real regression, not a
+   neutral migration. Left its own inline HTML in place, but fixed the
+   confirmed real bug that doesn't depend on the boundary question: two
+   unescaped fields, `supplierName` and `paymentRef` (33rd and 34th
+   escaping bugs this session). Method visibility widened from `private`
+   to package-private so `ApRemittanceEmailServiceEscapingTest` can
+   exercise it directly without mocking the full send pipeline.
+
+   **`PosService` — excluded from this backlog item entirely, not just
+   deferred.** Its `buildHtmlReceipt(...)` isn't an email at all — it's a
+   printable POS receipt (monospace font, 300px width, meant for a
+   terminal print pipeline), a fundamentally different document type that
+   `wrap()`'s branded-email layout would actively break if forced onto
+   it. Real gap still worth flagging separately, though, found while
+   checking this: `tenantName`/`tenantAddress`/`tenantPhone` are appended
+   via raw `StringBuilder.append(...)` with **no escaping at all** — same
+   bug category as everywhere else, different mechanism (string
+   concatenation, not `.formatted()`), different risk profile (rendered
+   in the POS terminal's own browser session, not emailed to an outside
+   inbox) — **not fixed this session**, flagged for its own pass since it
+   sits outside what this backlog item was actually about.
+
+   Remaining 6 (of the original 9, now that `AdminInvoiceService`,
+   `ContractExpiryScheduler` are migrated and `PosService` is
+   reclassified as out of scope): `PmNotificationService`,
+   `ScmNotificationService`, `AccountingService`, `CreativeService`,
+   `MarketingService`, `ApRemittanceEmailService` (escaping fixed, still
+   blocked on the boundary question for real migration) — each needs its
+   own reference migration (or a documented reason it can't, e.g.
+   `ScmNotificationService`'s distinct amber "Supply Chain" accent colour
+   may be an intentional sub-brand, not simply an oversight — confirm
+   with product before merging its styling into the shared teal palette).
 4. **No `tenant_email_signature` Settings UI** yet — API/DB only.
 5. **No sender-identity-per-tenant** (`fromAddress`/`fromName` in
    `EmailService` are still global, single values) and **no delivery
@@ -479,4 +527,4 @@ suspended tenant, unconfigured opt-in items rendering as informational
    its backfill — check the review query above.
 
 ---
-*Last updated by Claude — migrated AdminInvoiceService (1 of 9 independent-inline-HTML files) onto a new EmailTemplates.subscriptionInvoiceEmail template; fixed one more unescaped-name bug found in the process (30th this session).*
+*Last updated by Claude — migrated ContractExpiryScheduler onto a shared template; fixed escaping in ApRemittanceEmailService in place (blocked from full migration by a module-boundary gap); excluded PosService from this backlog item (it's a receipt, not an email) while flagging its own separate escaping gap; 34 total escaping bugs fixed in this session across all files touched.*
