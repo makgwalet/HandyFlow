@@ -295,6 +295,48 @@ public class EmailTemplates {
                 changeWord, oldPlanName, newPlanName, highlightClass, newPriceRands));
     }
 
+    /**
+     * HandyFlow's own subscription-invoice email — billing a HandyFlow
+     * tenant for their platform subscription. Deliberately built on
+     * wrap(), not wrapForTenant(): HandyFlow genuinely is the sender
+     * here, unlike every other template in this class where a tenant is
+     * billing their own customer.
+     * <p>
+     * MIGRATED from AdminInvoiceService.tenantInvoiceEmail — that method
+     * carried its own full copy of wrap()'s ~20-line CSS block (one of
+     * the 9 files with independent inline email HTML flagged in
+     * PLATFORM-ENGINES-PROGRESS.md), plus an unescaped tenantName (same
+     * category of bug as the 29 already fixed elsewhere in this file —
+     * a HandyFlow subscriber's own tenant name, entered at signup, is
+     * exactly as untrusted as a CRM contact's name). The original had a
+     * parameterized header subtitle ("Tax Invoice — {periodLabel}")
+     * that wrap()'s fixed header can't reproduce — moved that
+     * information into the body's .highlight box instead (the same
+     * place every other template in this file already puts
+     * document-specific details), so nothing is lost.
+     */
+    public static String subscriptionInvoiceEmail(String tenantName, String invoiceNumber,
+                                                   String periodLabel, String totalAmount) {
+        return wrap("""
+            <p>Hi %s,</p>
+            <p>Please find your HandyFlow subscription invoice for <strong>%s</strong> below.</p>
+            <div class="highlight">
+              <p>Invoice <strong>%s</strong> &nbsp;&middot;&nbsp; Period: <strong>%s</strong>
+                 &nbsp;&middot;&nbsp; Total due: <strong>%s</strong></p>
+            </div>
+            <p>Payment terms: 30 days from invoice date. Please use your invoice number
+               <strong>%s</strong> as the payment reference when making your EFT payment.</p>
+            <p><strong>Banking details:</strong><br/>
+               Bank: First National Bank<br/>
+               Account: HandyFlow (Pty) Ltd<br/>
+               Acc No: 62012345678 &nbsp;|&nbsp; Branch: 250655<br/>
+               Reference: %s</p>
+            <p>Questions? Reply to this email or contact
+               <a href="mailto:billing@handyflow.co.za" style="color:#0D9488;">billing@handyflow.co.za</a></p>
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(tenantName),
+                periodLabel, invoiceNumber, periodLabel, totalAmount, invoiceNumber, invoiceNumber));
+    }
+
     public static String quoteExpiry(String firstName, String quoteNumber,
                                      String customerName, String amount,
                                      String frontendUrl) {

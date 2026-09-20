@@ -183,8 +183,8 @@ public class AdminInvoiceService {
         BigDecimal total    = (BigDecimal) inv.get("total");
 
         // Send email (PDF is large — link to portal rather than attach for now)
-        String html = tenantInvoiceEmail(tenantName, invoiceNum, periodLabel,
-                "R " + ZAR.format(total));
+        String html = za.co.handyflow.platform.shared.EmailTemplates.subscriptionInvoiceEmail(
+                tenantName, invoiceNum, periodLabel, "R " + ZAR.format(total));
         emailService.send(email,
                 "HandyFlow Invoice " + invoiceNum + " — " + periodLabel, html);
 
@@ -543,66 +543,6 @@ public class AdminInvoiceService {
                 .setTextAlignment(TextAlignment.RIGHT)
                 .add(vp).setPadding(6);
         t.addCell(lCell).addCell(vCell);
-    }
-
-    // ── Email template ────────────────────────────────────────────────────────
-
-    private String tenantInvoiceEmail(String tenantName, String invoiceNumber,
-                                      String periodLabel, String totalAmount) {
-        return """
-            <!DOCTYPE html><html><head><meta charset="UTF-8">
-            <style>
-              body { font-family: 'Inter', Arial, sans-serif; background: #F1F5F9; margin: 0; padding: 0; }
-              .container { max-width: 560px; margin: 40px auto; background: white;
-                           border-radius: 12px; overflow: hidden;
-                           box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-              .header { background: #1B3A6B; padding: 28px 32px; }
-              .header h1 { color: white; margin: 0; font-size: 20px; font-weight: 700; }
-              .header p { color: rgba(255,255,255,0.7); margin: 4px 0 0; font-size: 13px; }
-              .body { padding: 32px; }
-              .body p { color: #374151; line-height: 1.6; font-size: 14px; margin: 0 0 16px; }
-              .invoice-box { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px;
-                             padding: 20px 24px; margin: 20px 0; }
-              .invoice-box .row { display: flex; justify-content: space-between;
-                                   padding: 6px 0; font-size: 13px; }
-              .invoice-box .row.total { border-top: 1px solid #E2E8F0; margin-top: 8px;
-                                        padding-top: 12px; font-weight: 700; font-size: 15px;
-                                        color: #1B3A6B; }
-              .footer { background: #F8FAFC; padding: 20px 32px; border-top: 1px solid #E2E8F0; }
-              .footer p { color: #94A3B8; font-size: 12px; margin: 0; }
-            </style></head><body>
-            <div class="container">
-              <div class="header">
-                <h1>HandyFlow</h1>
-                <p>Tax Invoice — %s</p>
-              </div>
-              <div class="body">
-                <p>Hi %s,</p>
-                <p>Please find your HandyFlow subscription invoice for <strong>%s</strong> below.</p>
-                <div class="invoice-box">
-                  <div class="row"><span>Invoice number</span><strong>%s</strong></div>
-                  <div class="row"><span>Billing period</span><span>%s</span></div>
-                  <div class="row"><span>Payment terms</span><span>30 days from invoice date</span></div>
-                  <div class="row total"><span>Total due (incl. VAT)</span><span>%s</span></div>
-                </div>
-                <p>Please use your invoice number <strong>%s</strong> as the payment reference when making your EFT payment.</p>
-                <p><strong>Banking details:</strong><br>
-                   Bank: First National Bank<br>
-                   Account: HandyFlow (Pty) Ltd<br>
-                   Acc No: 62012345678 &nbsp;|&nbsp; Branch: 250655<br>
-                   Reference: %s</p>
-                <p>Questions? Reply to this email or contact <a href="mailto:billing@handyflow.co.za" style="color:#0D9488;">billing@handyflow.co.za</a></p>
-              </div>
-              <div class="footer">
-                <p>HandyFlow (Pty) Ltd &middot; VAT Reg 4560000001 &middot;
-                   <a href="https://handyflow.co.za" style="color:#0D9488;">handyflow.co.za</a></p>
-              </div>
-            </div>
-            </body></html>
-            """.formatted(
-                periodLabel, tenantName, periodLabel,
-                invoiceNumber, periodLabel, totalAmount,
-                invoiceNumber, invoiceNumber);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

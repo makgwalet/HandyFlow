@@ -334,12 +334,27 @@ would not have been caught by this method.
    ones next (invoice-issued, invoice-overdue, booking confirmation) using
    the exact same additive-overload + `wrapForTenant` pattern as
    `quoteSentToClient`.
-3. **The 9 files with independent inline HTML** are unmigrated and
-   unaffected by this work — each needs its own reference migration onto
-   `EmailTemplates.wrap()`/`wrapForTenant()` (or a documented reason it
-   can't, e.g. `ScmNotificationService`'s distinct amber "Supply Chain"
-   accent colour may be an intentional sub-brand, not simply an oversight
-   — confirm with product before merging its styling into the shared teal
+3. **1 of the 9 files with independent inline HTML migrated, 8 remain:**
+   `AdminInvoiceService` — done, this session. New
+   `EmailTemplates.subscriptionInvoiceEmail(...)`, built on `wrap()` (not
+   `wrapForTenant()` — this is the one template in this whole initiative
+   where plain HandyFlow branding is *correct*: it's HandyFlow's own
+   subscription invoice to a tenant, not a tenant billing their customer).
+   The original inline template had a parameterized header subtitle
+   ("Tax Invoice — {period}") that `wrap()`'s fixed header can't
+   reproduce — moved into the body's `.highlight` box instead, the same
+   place every other template already puts document-specific details, so
+   nothing was lost. Also fixed an unescaped `tenantName` found in the
+   process (30th escaping bug this session — same category as the other
+   29, just found later). `EmailTemplatesSubscriptionInvoiceTest` covers
+   both content and escaping.
+   Remaining 8: `PmNotificationService`, `ScmNotificationService`,
+   `AccountingService`, `CreativeService`, `ContractExpiryScheduler`,
+   `MarketingService`, `ApRemittanceEmailService`, `PosService` — each
+   needs its own reference migration (or a documented reason it can't,
+   e.g. `ScmNotificationService`'s distinct amber "Supply Chain" accent
+   colour may be an intentional sub-brand, not simply an oversight —
+   confirm with product before merging its styling into the shared teal
    palette).
 4. **No `tenant_email_signature` Settings UI** yet — API/DB only.
 5. **No sender-identity-per-tenant** (`fromAddress`/`fromName` in
@@ -464,4 +479,4 @@ suspended tenant, unconfigured opt-in items rendering as informational
    its backfill — check the review query above.
 
 ---
-*Last updated by Claude — wider manual scan found 19 more HTML-escaping bugs (auth/contracting/property-lease modules); 29 total fixed in EmailTemplates this session.*
+*Last updated by Claude — migrated AdminInvoiceService (1 of 9 independent-inline-HTML files) onto a new EmailTemplates.subscriptionInvoiceEmail template; fixed one more unescaped-name bug found in the process (30th this session).*
