@@ -531,9 +531,9 @@ public class MarketingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Campaign", id.toString()));
     }
 
-    private String buildUnsubscribeConfirmationEmail(String tenantName, String name) {
+    String buildUnsubscribeConfirmationEmail(String tenantName, String name) {
         String greeting = name != null && !name.isBlank()
-                ? "Hi " + name.split(" ")[0] + "," : "Hi,";
+                ? "Hi " + org.springframework.web.util.HtmlUtils.htmlEscape(name.split(" ")[0]) + "," : "Hi,";
         return """
             <!DOCTYPE html><html><head><meta charset="UTF-8"></head>
             <body style="font-family:Arial,sans-serif;background:#F1F5F9;margin:0;padding:0;">
@@ -554,7 +554,8 @@ public class MarketingService {
                 </div>
               </div>
             </body></html>
-            """.formatted(greeting, tenantName, tenantName);
+            """.formatted(greeting, org.springframework.web.util.HtmlUtils.htmlEscape(tenantName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(tenantName));
     }
 
     private String personalise(String template, MktContactPreference pref,
@@ -568,16 +569,30 @@ public class MarketingService {
      *                          recipient-per-campaign, and the subject line
      *                          has no links or pixel to inject into.
      */
-    private String personalise(String template, MktContactPreference pref,
+    // package-private (not private) so MarketingServiceEscapingTest, in
+    // the same package, can exercise it directly.
+    String personalise(String template, MktContactPreference pref,
                                String tenantName, boolean isBody, UUID campaignContactId) {
         if (template == null) return "";
         String firstName      = pref.getName() != null ? pref.getName().split(" ")[0] : "there";
         String unsubscribeUrl = unsubscribeBaseUrl() + pref.getUnsubscribeToken();
+        // FIX: this substituted {{first_name}}/{{name}}/{{email}}/
+        // {{company_name}} directly into the HTML template with no
+        // escaping at all -- and unlike most fields found elsewhere this
+        // session, a marketing contact's own name is very plausibly
+        // self-entered through a public signup form, not just typed by
+        // trusted business staff. Every campaign send runs every
+        // recipient's data through this one function, so this was the
+        // widest blast radius of any escaping bug found this session.
+        // unsubscribeUrl is deliberately NOT escaped -- it's a URL going
+        // into an href attribute, not text content, and HTML-escaping a
+        // URL would double-encode it and risk breaking the link.
         String result = template
-                .replace("{{first_name}}",    firstName)
-                .replace("{{name}}",          pref.getName() != null ? pref.getName() : "")
-                .replace("{{email}}",         pref.getEmail())
-                .replace("{{company_name}}",  tenantName)
+                .replace("{{first_name}}",    org.springframework.web.util.HtmlUtils.htmlEscape(firstName))
+                .replace("{{name}}",          org.springframework.web.util.HtmlUtils.htmlEscape(
+                        pref.getName() != null ? pref.getName() : ""))
+                .replace("{{email}}",         org.springframework.web.util.HtmlUtils.htmlEscape(pref.getEmail()))
+                .replace("{{company_name}}",  org.springframework.web.util.HtmlUtils.htmlEscape(tenantName))
                 .replace("{{unsubscribe_url}}", unsubscribeUrl);
 
         if (isBody) {

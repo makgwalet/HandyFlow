@@ -847,7 +847,7 @@ public class CreativeService {
         }
     }
 
-    private String buildRejectionNotificationEmail(String jobTitle, int versionNumber, String reason) {
+    String buildRejectionNotificationEmail(String jobTitle, int versionNumber, String reason) {
         String reasonHtml = reason != null && !reason.isBlank()
                 ? org.springframework.web.util.HtmlUtils.htmlEscape(reason)
                 : "No specific reason was provided.";
@@ -872,7 +872,7 @@ public class CreativeService {
                 </div>
               </div>
             </body></html>
-            """.formatted(jobTitle, versionNumber, reasonHtml);
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(jobTitle), versionNumber, reasonHtml);
     }
 
     private String buildProofViewedEmail(String jobTitle, int versionNumber, String clientName) {
@@ -908,7 +908,7 @@ public class CreativeService {
                         + org.springframework.web.util.HtmlUtils.htmlEscape(tenantName) + " directly.");
     }
 
-    private String buildUnapprovedReminderEmail(String tenantName, String jobTitle, int versionNumber, String approvalUrl) {
+    String buildUnapprovedReminderEmail(String tenantName, String jobTitle, int versionNumber, String approvalUrl) {
         return """
             <!DOCTYPE html><html><head><meta charset="UTF-8"></head>
             <body style="font-family:Arial,sans-serif;background:#F1F5F9;margin:0;padding:0;">
@@ -930,7 +930,8 @@ public class CreativeService {
                 </div>
               </div>
             </body></html>
-            """.formatted(tenantName, jobTitle, versionNumber, approvalUrl);
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(tenantName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(jobTitle), versionNumber, approvalUrl);
     }
 
     private String buildOverdueAlertEmail(String jobTitle, LocalDate dueDate) {
@@ -959,11 +960,11 @@ public class CreativeService {
             """.formatted(heading, bodyLine1, bodyLine2);
     }
 
-    private String buildApprovalEmail(String tenantName, CreProof proof,
+    String buildApprovalEmail(String tenantName, CreProof proof,
                                       String approvalUrl, String customMessage) {
         String msg = customMessage != null && !customMessage.isBlank()
                 ? "<p style=\"background:#FFFBEB;border-left:3px solid #D97706;padding:12px 16px;border-radius:0 8px 8px 0;\">"
-                + customMessage + "</p>" : "";
+                + org.springframework.web.util.HtmlUtils.htmlEscape(customMessage) + "</p>" : "";
         return """
             <!DOCTYPE html><html><head><meta charset="UTF-8"></head>
             <body style="font-family:Arial,sans-serif;background:#F1F5F9;margin:0;padding:0;">
@@ -1000,8 +1001,8 @@ public class CreativeService {
                 </div>
               </div>
             </body></html>
-            """.formatted(tenantName, proof.getVersionNumber(), msg,
-                approvalUrl, approvalUrl, approvalUrl, tenantName);
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(tenantName), proof.getVersionNumber(), msg,
+                approvalUrl, approvalUrl, approvalUrl, org.springframework.web.util.HtmlUtils.htmlEscape(tenantName));
     }
 
     /**
@@ -1023,11 +1024,11 @@ public class CreativeService {
         emailService.send(approverEmail, subject, html);
     }
 
-    private String buildApproverEmail(String tenantName, CreProof proof, String approverName, int stepOrder,
+    String buildApproverEmail(String tenantName, CreProof proof, String approverName, int stepOrder,
                                       ApprovalRule.ApprovalMode mode, String approvalUrl, String customMessage) {
         String msg = customMessage != null && !customMessage.isBlank()
                 ? "<p style=\"background:#FFFBEB;border-left:3px solid #D97706;padding:12px 16px;border-radius:0 8px 8px 0;\">"
-                + customMessage + "</p>" : "";
+                + org.springframework.web.util.HtmlUtils.htmlEscape(customMessage) + "</p>" : "";
         String chainNote = mode == ApprovalRule.ApprovalMode.SEQUENTIAL
                 ? "<p style=\"color:#64748B;font-size:13px;\">You are approver " + stepOrder
                 + " in this review chain — the proof is ready for you now.</p>"
@@ -1064,8 +1065,9 @@ public class CreativeService {
                 </div>
               </div>
             </body></html>
-            """.formatted(tenantName, approverName, proof.getVersionNumber(),
-                chainNote, msg, approvalUrl, tenantName);
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(tenantName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(approverName), proof.getVersionNumber(),
+                chainNote, msg, approvalUrl, org.springframework.web.util.HtmlUtils.htmlEscape(tenantName));
     }
 
     private JobResponse toJobResponse(CreJob j) {

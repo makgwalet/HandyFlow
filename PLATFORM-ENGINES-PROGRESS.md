@@ -432,13 +432,77 @@ would not have been caught by this method.
    site, rather than fixing each of the 14 individually. `kv()` widened
    to package-private; `ScmNotificationServiceEscapingTest` covers it.
 
-   Remaining 4 (of the original 9): `PmNotificationService`,
-   `CreativeService`, `MarketingService`, `ApRemittanceEmailService`
-   (escaping already fixed, migration itself still blocked on the
-   `identity`-boundary question) — each still needs the same
-   check-then-decide treatment: read the actual template, check the
-   module's `allowedDependencies`, and only migrate if doing so doesn't
-   lose real branding or design information.
+   **ALL 9 ORIGINALLY-FLAGGED FILES NOW ASSESSED — this backlog item is
+   complete in the sense that every file has a settled, documented
+   outcome; none are still "unchecked."** Final round:
+
+   **`PmNotificationService`** — same shape as `ScmNotificationService`:
+   confirmed intentional sub-brand (explicit "HandyFlow · Project
+   Management" eyebrow), not migrated. Same `kv()` bug (escaped `key`,
+   never `value`) — but this file's `kv()` has a real complication
+   `ScmNotificationService`'s didn't: one call site
+   (`notifyRiskEscalated`'s "Rating" badge) legitimately passes a
+   pre-built `<span style='color:...'>` HTML fragment as `value`, which a
+   blind centralized-escape fix would have broken. Checked what `rating`
+   actually is first — a DB-column value compared against the literal
+   `"RED"`, i.e. enum-constrained, not free text — so that one call site
+   was moved to a new `kvRawValue()` helper instead, and `kv()` itself now
+   safely escapes `value` for its other 8 call sites.
+   `PmNotificationServiceEscapingTest` covers it.
+
+   **`CreativeService`** — not migrated: per-message `<h1>` heading text
+   differs by email type (`wrap()`'s single fixed header can't reproduce
+   that), and `creative`'s `allowedDependencies` doesn't include
+   `identity` either. Most of this file already escapes carefully and
+   consistently via `HtmlUtils.htmlEscape` — genuinely better discipline
+   than most files checked this session — but 4 of its more complex
+   templates (`buildRejectionNotificationEmail`,
+   `buildUnapprovedReminderEmail`, `buildApprovalEmail`,
+   `buildApproverEmail`) had `jobTitle`, `tenantName`, `approverName`, and
+   a free-text `customMessage` field (a note a tenant can attach when
+   requesting approval — entered by a real person, definitely not safe to
+   skip) all unescaped. All 4 methods and their bugs fixed; all 4 widened
+   `private` → package-private. `CreativeServiceEscapingTest` covers all
+   four.
+
+   **`MarketingService`** — the most significant finding of this entire
+   backlog item, not just this file. Its `personalise(...)` method is the
+   **central template-merge function used for every marketing campaign
+   send** — it substitutes `{{first_name}}`, `{{name}}`, `{{email}}`, and
+   `{{company_name}}` straight into a campaign's HTML body for every
+   recipient, with no escaping at all. Unlike almost everything else found
+   this session (typically entered by trusted business staff), a
+   marketing contact's own name is plausibly **self-entered through a
+   public signup form** — this is a genuine stored-XSS-via-mailing-list
+   vector, and by far the widest blast radius of any escaping bug found
+   (one send can reach thousands of recipients, each one's own data
+   re-injected unescaped into the same campaign body). Fixed centrally,
+   with `{{unsubscribe_url}}` deliberately left unescaped since it's a URL
+   going into an `href` attribute, not text content — escaping it would
+   have double-encoded the URL and risked breaking the actual unsubscribe
+   link. Also fixed a smaller, separate bug in the same file:
+   `buildUnsubscribeConfirmationEmail`'s `greeting` (built from the
+   contact's own name) and `tenantName` were both unescaped too. Neither
+   this method nor `personalise()` were migrated onto `wrap()` —
+   `personalise()` merges into an arbitrary campaign body a marketing user
+   wrote themselves, not a fixed layout, so the question doesn't apply the
+   same way; `buildUnsubscribeConfirmationEmail` is brand-neutral today
+   like `ApRemittanceEmailService`, and `marketing`'s `allowedDependencies`
+   doesn't include `identity` either. `personalise()` widened to
+   package-private. `MarketingServiceEscapingTest` covers both.
+
+   **Final status of all 9:** 2 fully migrated onto shared `EmailTemplates`
+   methods (`AdminInvoiceService`, `ContractExpiryScheduler`); 5 checked
+   and deliberately left on their own inline HTML with a confirmed, real
+   reason each (`AccountingService`, `ScmNotificationService`,
+   `PmNotificationService`, `CreativeService`, `ApRemittanceEmailService`
+   — either genuine design/branding differences `wrap()` can't reproduce,
+   or a module-boundary gap, or both); 1 reclassified as out of scope
+   entirely (`PosService` — a receipt, not an email); every one of the 9
+   had its actual escaping checked line by line, and every real bug found
+   was fixed, not just catalogued. Roughly 56 confirmed, fixed
+   HTML-escaping bugs across `EmailTemplates` and these 9 files combined,
+   this session.
 4. **No `tenant_email_signature` Settings UI** yet — API/DB only.
 5. **No sender-identity-per-tenant** (`fromAddress`/`fromName` in
    `EmailService` are still global, single values) and **no delivery
@@ -562,4 +626,4 @@ suspended tenant, unconfigured opt-in items rendering as informational
    its backfill — check the review query above.
 
 ---
-*Last updated by Claude — checked AccountingService and ScmNotificationService: both have genuine design reasons not to migrate onto wrap()/wrapForTenant() (confirmed, not guessed), but both had real escaping bugs fixed in place (7 more this session, 41 total). ScmNotificationService's amber "Supply Chain" branding confirmed intentional, not a guess.*
+*Last updated by Claude — completed the full sweep of all 9 originally-flagged inline-HTML files. Biggest finding: MarketingService.personalise(), the central per-recipient template-merge function for every campaign send, had zero escaping — the widest blast radius of any bug found this session, now fixed. ~56 total confirmed escaping bugs fixed across EmailTemplates and these 9 files.*

@@ -89,7 +89,7 @@ public class PmNotificationService {
                         "<p>A risk on <strong>" + esc(projectName) + "</strong> has been rated " +
                                 "<strong style='color:" + colour + "'>" + rating + "</strong>.</p>" +
                                 kv("Risk",   riskTitle) +
-                                kv("Rating", "<span style='color:" + colour + ";font-weight:700'>" + rating + "</span>") +
+                                kvRawValue("Rating", "<span style='color:" + colour + ";font-weight:700'>" + rating + "</span>") +
                                 "<p>Log in to review the risk register and update mitigation actions.</p>"));
     }
 
@@ -186,12 +186,38 @@ public class PmNotificationService {
             </body></html>""";
     }
 
-    private static String kv(String key, String value) {
+    // FIX: escaped key via esc() but never value -- and value is exactly
+    // where the real risk is: coNumber, approvedBy, milestoneTitle,
+    // riskTitle, rfiNumber, rfiTitle, respondedBy are all genuinely
+    // user-entered strings passed through it. Checked every one of this
+    // file's 9 call sites before centralizing this fix -- 8 are plain
+    // text and safe to escape here; the 9th (notifyRiskEscalated's
+    // "Rating" badge) deliberately builds its own <span> markup and
+    // bypasses this helper entirely rather than going through it, since
+    // `rating` there is a DB-column-constrained value ("RED"/"AMBER"),
+    // not free text, and escaping would have broken its colour styling.
+    // package-private (not private) so PmNotificationServiceEscapingTest,
+    // in the same package, can exercise it directly.
+    static String kv(String key, String value) {
         return "<table style='width:100%;border-collapse:collapse;margin:10px 0'><tr>" +
                 "<td style='font-size:12px;color:#94A3B8;font-weight:600;text-transform:uppercase;" +
                 "letter-spacing:0.04em;padding:5px 0;width:130px;vertical-align:top'>" + esc(key) + "</td>" +
                 "<td style='font-size:14px;color:#0F172A;font-weight:600;padding:5px 0 5px 12px;" +
-                "vertical-align:top'>" + value + "</td>" +
+                "vertical-align:top'>" + esc(value) + "</td>" +
+                "</tr></table>";
+    }
+
+    /**
+     * Same layout as kv(), for the one call site (notifyRiskEscalated's
+     * "Rating" row) that legitimately needs to pass through pre-built
+     * HTML instead of plain text — see kv()'s own comment for why.
+     */
+    private static String kvRawValue(String key, String rawHtmlValue) {
+        return "<table style='width:100%;border-collapse:collapse;margin:10px 0'><tr>" +
+                "<td style='font-size:12px;color:#94A3B8;font-weight:600;text-transform:uppercase;" +
+                "letter-spacing:0.04em;padding:5px 0;width:130px;vertical-align:top'>" + esc(key) + "</td>" +
+                "<td style='font-size:14px;color:#0F172A;font-weight:600;padding:5px 0 5px 12px;" +
+                "vertical-align:top'>" + rawHtmlValue + "</td>" +
                 "</tr></table>";
     }
 
