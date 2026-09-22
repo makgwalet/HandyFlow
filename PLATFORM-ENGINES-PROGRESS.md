@@ -105,14 +105,23 @@ from one side:**
   many-module collision already deprioritized elsewhere in this doc;
   `DEL-` isn't shared with any other generator.
 
-**Module-boundary decision still open** — two generators now blocked on
-it, not just one: `FacilityNumberGenerator` (`facilities`) for the
-`facilities`/`facilitiesmanagement` `WO-` collision, and (were `training`
-ever to need its own numbers to carry tenant identity, not just be
-disambiguated from `trainingprovider`) `TrainingNumberGenerator`. Whoever
-owns the Modulith boundary declarations should decide whether `identity`
-gets added to `facilities` and `training`'s `allowedDependencies`, or
-whether these stay on plain `TenantSequenceService` indefinitely.
+**Module-boundary decision — RESOLVED, `facilities` side actioned.** The
+business decision was made (see strategic roadmap backlog, Part 0,
+Decision 2 — "tenant branding is a platform capability, not a
+module-by-module exception," which settles the same underlying "can
+`identity` be added to a module's boundary for this kind of reason"
+question this numbering collision was also blocked on). `facilities`'
+`allowedDependencies` now includes `identity`, and
+`FacilityNumberGenerator.nextWorkOrderNumber` is migrated — same
+resolution pattern as `trainingprovider`/`training`: this side moves to
+a tenant-prefixed, distinctly-coded format (`{tenantCode}-FWO-00001`),
+which fully disambiguates against `facilitiesmanagement`'s unchanged
+plain `WO-00001` without needing to touch that module at all.
+`TrainingNumberGenerator` remains unmigrated — lower priority, since (as
+already noted) the `training`/`trainingprovider` collision itself was
+already fully resolved from the `trainingprovider` side alone; migrating
+`TrainingNumberGenerator` would only be about giving `training`'s own
+numbers tenant-identity branding, not fixing a live collision.
 
 **Known limitations (not silently glossed over):**
 - Document codes backfilled by V285 are **not** checked for cross-tenant
@@ -363,22 +372,29 @@ would not have been caught by this method.
    gap, not silently worked around. `EmailTemplatesContractRenewalReminderTest`
    covers content, pluralisation, and escaping.
 
-   **`ApRemittanceEmailService` — partially addressed, deliberately NOT
-   migrated onto a shared template.** Same `identity`-boundary gap as
-   `ContractExpiryScheduler` (confirmed: `ap`'s `allowedDependencies` is
-   `{"shared", "notifications", "accounting", "approvals"}`, no
-   `identity`) — but this one's original document is genuinely brand
-   *neutral* today (no "HandyFlow" text at all, just a plain navy
-   "Remittance Advice" header), unlike `ContractExpiryScheduler`'s. Since
-   it can't be given the tenant's own name without the boundary change,
-   forcing it onto `wrap()` would have actively **added** unwanted
-   HandyFlow branding that isn't there today — a real regression, not a
-   neutral migration. Left its own inline HTML in place, but fixed the
-   confirmed real bug that doesn't depend on the boundary question: two
-   unescaped fields, `supplierName` and `paymentRef` (33rd and 34th
-   escaping bugs this session). Method visibility widened from `private`
-   to package-private so `ApRemittanceEmailServiceEscapingTest` can
-   exercise it directly without mocking the full send pipeline.
+   **`ApRemittanceEmailService` — UPDATE: now fully migrated, this
+   session, once the boundary question was resolved.** Originally left
+   with escaping fixed in place but its own inline HTML retained, because
+   `ap`'s `allowedDependencies` didn't include `identity` and this
+   document was genuinely brand-*neutral* (no "HandyFlow" text at all,
+   just a plain navy "Remittance Advice" header) — forcing it onto
+   `wrap()` at the time would have actively added unwanted branding that
+   wasn't there. With the business decision made (strategic roadmap
+   backlog, Part 0, Decision 2 — tenant branding is a platform
+   capability), `ap`'s boundary now includes `identity`,
+   `ApRemittanceEmailService` injects `TenantFacade`, and the email is
+   built via a new `EmailTemplates.remittanceAdvice(...)` (built on
+   `wrapForTenant()`, correctly — this is the tenant's own AP department
+   paying a supplier). Falls back to a generic "Your Supplier" label
+   rather than throwing if the tenant's profile is incomplete — a missing
+   company name shouldn't block a supplier from being paid and told about
+   it. `ApRemittanceEmailService`'s own duplicated inline HTML is deleted
+   entirely, not just left with escaping patched — the file is off the
+   "9 files with independent inline HTML" list for good, not partially.
+   `EmailTemplatesRemittanceAdviceTest` covers the template directly;
+   `ApRemittanceEmailServiceTest` (replacing the old
+   `ApRemittanceEmailServiceEscapingTest`, whose target method no longer
+   exists) covers the tenant-name resolution and its fallback.
 
    **`PosService` — excluded from this backlog item entirely, not just
    deferred.** Its `buildHtmlReceipt(...)` isn't an email at all — it's a
@@ -486,18 +502,23 @@ would not have been caught by this method.
    this method nor `personalise()` were migrated onto `wrap()` —
    `personalise()` merges into an arbitrary campaign body a marketing user
    wrote themselves, not a fixed layout, so the question doesn't apply the
-   same way; `buildUnsubscribeConfirmationEmail` is brand-neutral today
-   like `ApRemittanceEmailService`, and `marketing`'s `allowedDependencies`
-   doesn't include `identity` either. `personalise()` widened to
-   package-private. `MarketingServiceEscapingTest` covers both.
+   same way; `buildUnsubscribeConfirmationEmail` is brand-neutral today,
+   and `marketing`'s `allowedDependencies` doesn't include `identity`
+   either — the same boundary gap `ap` had until it was resolved (see
+   below), still open here. `personalise()` widened to package-private.
+   `MarketingServiceEscapingTest` covers both.
 
-   **Final status of all 9:** 2 fully migrated onto shared `EmailTemplates`
-   methods (`AdminInvoiceService`, `ContractExpiryScheduler`); 5 checked
-   and deliberately left on their own inline HTML with a confirmed, real
+   **Final status of all 9 — UPDATE, `ApRemittanceEmailService` migrated
+   once the boundary decision was resolved (see above):** 3 fully
+   migrated onto shared `EmailTemplates` methods (`AdminInvoiceService`,
+   `ContractExpiryScheduler`, `ApRemittanceEmailService`); 4 checked and
+   deliberately left on their own inline HTML with a confirmed, real
    reason each (`AccountingService`, `ScmNotificationService`,
-   `PmNotificationService`, `CreativeService`, `ApRemittanceEmailService`
+   `PmNotificationService`, `CreativeService`
    — either genuine design/branding differences `wrap()` can't reproduce,
-   or a module-boundary gap, or both); 1 reclassified as out of scope
+   or a module-boundary gap, or both — `marketing`'s `buildUnsubscribeConfirmationEmail`
+   is the remaining brand-neutral, boundary-blocked case, same shape
+   `ApRemittanceEmailService` used to be); 1 reclassified as out of scope
    entirely (`PosService` — a receipt, not an email); every one of the 9
    had its actual escaping checked line by line, and every real bug found
    was fixed, not just catalogued. Roughly 56 confirmed, fixed
@@ -687,4 +708,4 @@ suspended tenant, unconfigured opt-in items rendering as informational
    its backfill — check the review query above.
 
 ---
-*Last updated by Claude — shipped the permission read-only toggle admin action (list + patch, audited); investigated "fix it for me" actions broadly and found a genuine structural blocker (admin's module boundary can't reach other modules' business logic), documented with two concrete options rather than worked around.*
+*Last updated by Claude — the "start with the easy ones" pass: with tenant branding now a resolved business decision (strategic roadmap backlog, Part 0, Decision 2), widened `ap` and `facilities`' module boundaries and completed the two numbering/branding fixes that were blocked purely on that decision — `ApRemittanceEmailService` is now properly tenant-branded and off the inline-HTML list for good; `FacilityNumberGenerator` now resolves its `WO-` collision with `facilitiesmanagement`.*

@@ -337,6 +337,36 @@ public class EmailTemplates {
                 periodLabel, invoiceNumber, periodLabel, totalAmount, invoiceNumber, invoiceNumber));
     }
 
+    /**
+     * MIGRATED from ApRemittanceEmailService's own inline HTML (one of the
+     * 9 files flagged in PLATFORM-ENGINES-PROGRESS.md) — previously
+     * couldn't be tenant-branded at all, since ap's package-info.java
+     * didn't allow depending on identity; now that tenant branding is a
+     * resolved platform decision (see the strategic roadmap backlog,
+     * Part 0, Decision 2), ap's boundary was widened specifically for
+     * this, and this method replaces that file's own duplicated CSS
+     * entirely. Built on wrapForTenant() — correctly, since a remittance
+     * advice is the tenant's own AP department paying a supplier, not a
+     * HandyFlow document.
+     */
+    public static String remittanceAdvice(String tenantCompanyName, String supplierName,
+                                          java.math.BigDecimal amount, String paymentRef) {
+        return wrapForTenant("""
+            <p>Dear %s,</p>
+            <p>Please find attached the remittance advice confirming payment%s.</p>
+            %s
+            <p style="color:#64748B;font-size:13px;">If you have any questions about this payment,
+               please contact us directly.</p>
+            """.formatted(
+                org.springframework.web.util.HtmlUtils.htmlEscape(supplierName),
+                amount != null ? " of R " + amount : "",
+                paymentRef != null
+                        ? "<p style=\"color:#64748B;font-size:13px;\">Payment reference: "
+                            + org.springframework.web.util.HtmlUtils.htmlEscape(paymentRef) + "</p>"
+                        : ""),
+                tenantCompanyName);
+    }
+
     public static String quoteExpiry(String firstName, String quoteNumber,
                                      String customerName, String amount,
                                      String frontendUrl) {

@@ -10,12 +10,14 @@ import za.co.handyflow.platform.ap.domain.model.ApEftBatch;
 import za.co.handyflow.platform.ap.domain.repository.ApBillRepository;
 import za.co.handyflow.platform.ap.domain.repository.ApEftBatchRepository;
 import za.co.handyflow.platform.ap.domain.repository.ApSupplierBankingRepository;
+import za.co.handyflow.platform.identity.TenantFacade;
+import za.co.handyflow.platform.identity.TenantDetails;
+import za.co.handyflow.platform.shared.EmailTemplates;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
-import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
@@ -29,6 +31,15 @@ import java.util.UUID;
  * recipient email comes from: ApSupplierBanking, keyed by supplier name —
  * this is what was missing, not the PDF or email machinery, both of
  * which already worked.
+ * <p>
+ * FIX: previously built its own inline HTML with no tenant branding at
+ * all (ap's package-info.java didn't allow depending on identity). Now
+ * that tenant branding is a resolved platform decision (strategic
+ * roadmap backlog, Part 0, Decision 2), ap's boundary was widened
+ * specifically for this and the email body is built via
+ * EmailTemplates.remittanceAdvice(...), correctly tenant-branded — this
+ * is the tenant's own AP department paying a supplier, not a HandyFlow
+ * document.
  */
 @Slf4j
 @Service
@@ -40,6 +51,7 @@ public class ApRemittanceEmailService {
     private final ApSupplierBankingRepository supplierBankingRepo;
     private final ApPdfGenerator              pdfGenerator;
     private final EmailService                emailService;
+    private final TenantFacade                tenantFacade;
 
     @Transactional(readOnly = true)
     public void sendBillRemittance(TenantId tenantId, UUID billId) {
@@ -53,7 +65,8 @@ public class ApRemittanceEmailService {
         byte[] pdf = pdfGenerator.generateBillRemittance(tenantId, billId);
 
         String subject = "Remittance Advice — " + bill.getBillNumber();
-        String body = remittanceEmailBody(bill.getSupplierName(), bill.getTotalAmount(), bill.getPaymentRef());
+        String body = EmailTemplates.remittanceAdvice(
+                tenantCompanyName(tenantId), bill.getSupplierName(), bill.getTotalAmount(), bill.getPaymentRef());
         emailService.sendWithAttachment(email, subject, body, "remittance-advice.pdf", pdf);
 
         log.info("Sent remittance email for bill={} to={}", billId, email);
@@ -71,10 +84,22 @@ public class ApRemittanceEmailService {
         byte[] pdf = pdfGenerator.generateBatchRemittance(tenantId, batchId, supplierName);
 
         String subject = "Remittance Advice — Batch " + batch.getBatchNumber();
-        String body = remittanceEmailBody(supplierName, null, batch.getPaymentRef());
+        String body = EmailTemplates.remittanceAdvice(
+                tenantCompanyName(tenantId), supplierName, null, batch.getPaymentRef());
         emailService.sendWithAttachment(email, subject, body, "remittance-advice.pdf", pdf);
 
         log.info("Sent batch remittance email for batch={} supplier={} to={}", batchId, supplierName, email);
+    }
+
+    // Falls back to a generic label rather than throwing — a missing/
+    // incomplete tenant profile shouldn't block a supplier from actually
+    // getting paid and being told about it; unlike resolveSupplierEmail
+    // below, there's a sensible degraded behaviour here.
+    private String tenantCompanyName(TenantId tenantId) {
+        return tenantFacade.findTenantDetails(tenantId)
+                .map(TenantDetails::companyName)
+                .filter(name -> name != null && !name.isBlank())
+                .orElse("Your Supplier");
     }
 
     // Deliberately narrow: a missing email is a real, actionable gap
@@ -92,29 +117,5 @@ public class ApRemittanceEmailService {
                     HttpStatus.BAD_REQUEST, "SUPPLIER_EMAIL_NOT_CONFIGURED");
         }
         return email;
-    }
-
-    // package-private (not private) so ApRemittanceEmailServiceEscapingTest,
-    // in the same package, can exercise it directly without needing to mock
-    // every dependency sendBillRemittance/sendBatchRemittance pull in.
-    String remittanceEmailBody(String supplierName, BigDecimal amount, String paymentRef) {
-        return """
-            <!DOCTYPE html>
-            <html><body style="font-family:Arial,sans-serif;color:#0F172A;max-width:600px;margin:0 auto;padding:20px">
-              <div style="background:#1B3A6B;padding:24px;border-radius:8px 8px 0 0">
-                <h1 style="color:white;margin:0;font-size:20px">Remittance Advice</h1>
-              </div>
-              <div style="background:#F8FAFC;padding:24px;border-radius:0 0 8px 8px">
-                <p style="font-size:15px">Dear %s,</p>
-                <p style="font-size:14px;color:#374151">Please find attached the remittance advice confirming payment%s.</p>
-                %s
-                <p style="font-size:13px;color:#64748B;margin-top:20px">If you have any questions about this payment, please contact us directly.</p>
-              </div>
-            </body></html>
-            """.formatted(
-                org.springframework.web.util.HtmlUtils.htmlEscape(supplierName),
-                amount != null ? " of R " + amount : "",
-                paymentRef != null ? "<p style=\"font-size:13px;color:#64748B\">Payment reference: "
-                        + org.springframework.web.util.HtmlUtils.htmlEscape(paymentRef) + "</p>" : "");
     }
 }

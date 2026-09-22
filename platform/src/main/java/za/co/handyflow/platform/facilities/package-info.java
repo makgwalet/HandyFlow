@@ -65,9 +65,16 @@
  * the kind of attachment {@code EvidenceFacade} already exists for),
  * {@code notifications} (PPM-due, work-order, and compliance-expiry
  * alerts, matching every other module's own daily-sweep scheduler
- * pattern).
+ * pattern), {@code identity} (added specifically for
+ * {@code TenantNumberingFacade} — this module's work-order numbers
+ * collided with {@code facilitiesmanagement}'s own {@code WO-} numbers,
+ * a real, previously-identified collision left deliberately unfixed
+ * pending a business decision on whether module boundaries could be
+ * widened for this reason at all; now resolved — see
+ * FacilityNumberGenerator's own Javadoc and the strategic roadmap
+ * backlog, Part 0, Decision 2).
  */
-@ApplicationModule(allowedDependencies = {"shared", "billing", "evidence", "notifications"})
+@ApplicationModule(allowedDependencies = {"shared", "identity", "billing", "evidence", "notifications"})
 package za.co.handyflow.platform.facilities;
 
 import org.springframework.modulith.ApplicationModule;
