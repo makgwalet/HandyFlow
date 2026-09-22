@@ -67,6 +67,26 @@ public class AdminController {
                 adminTenantDiagnosticService.getDiagnostics(slugOrId)));
     }
 
+    // ── Permission read-only flags (V287) ───────────────────────────────────
+
+    @GetMapping("/permissions")
+    @Operation(summary = "List every permission and whether it's flagged read-only "
+            + "(the authority set granted to admin impersonation sessions — see migration V287)")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> listPermissions() {
+        return ResponseEntity.ok(ApiResponse.success(adminService.listPermissions()));
+    }
+
+    @PatchMapping("/permissions/{name}/read-only")
+    @Operation(summary = "Set whether a permission is granted to admin impersonation sessions")
+    public ResponseEntity<ApiResponse<Void>> setPermissionReadOnly(
+            @PathVariable String name,
+            @Valid @RequestBody SetPermissionReadOnlyRequest req,
+            HttpServletRequest http) {
+        adminService.setPermissionReadOnly(getAdminId(), getAdminEmail(), name, req.readOnly(), getIp(http));
+        return ResponseEntity.ok(ApiResponse.success(
+                "Permission " + name + " read-only set to " + req.readOnly(), null));
+    }
+
     @PostMapping("/tenants/extend-pilot")
     @Operation(summary = "Extend pilot period for a tenant by N days")
     public ResponseEntity<ApiResponse<Void>> extendPilot(

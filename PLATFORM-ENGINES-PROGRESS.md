@@ -608,13 +608,74 @@ suspended tenant, unconfigured opt-in items rendering as informational
    — see above. This is the one item in this whole session where I'm
    explicitly saying "don't trust the default, go check it" rather than
    shipping something I'm confident is correct outright.
-2. No UI for toggling a permission's `is_read_only` flag yet — direct SQL
-   only. A support engineer noticing a permission is mis-flagged today has
-   to fix it with `UPDATE permissions SET is_read_only = ... WHERE name = ...`.
-3. "Fix it for me" actions (brief section 20) — not started; each one
-   (resend verification email, retry failed email, regenerate PDF, etc.)
-   is its own small feature with its own blast radius and deserves its own
-   session rather than being rushed here.
+2. **DONE, this session.** Added `GET /api/v1/admin/permissions` (lists
+   every permission with its `is_read_only` flag) and
+   `PATCH /api/v1/admin/permissions/{name}/read-only` (toggles it, with
+   an audit log entry — same `audit(...)` pattern every other admin
+   write action in this class already uses). This is exactly the kind of
+   action that doesn't hit the "fix it for me" structural blocker
+   documented in the next item: `is_read_only` is a plain column with no
+   invariants beyond itself, so a direct `JdbcTemplate` read/patch is the
+   right amount of machinery here, unlike an action that needs another
+   module's actual business logic. `AdminServicePermissionsTest` covers
+   both endpoints' service methods, including the not-found case.
+3. **"Fix it for me" actions (brief section 20) — investigated this
+   session, not implemented, for a real structural reason rather than
+   just being skipped.** Checked several concrete candidates
+   (resend-verification-email, regenerate PDF, unlock user — this
+   codebase has no account-lockout mechanism at all, so that one doesn't
+   even apply) and found the same blocker every time: a genuine "fix it
+   for me" action needs to trigger real business logic in another
+   module — `EmailVerificationService.createToken(...)` for a resend,
+   `InvoicePdfService`'s actual generation path for a regenerate — not
+   just read or patch a row with SQL the way `AdminTenantDiagnosticService`
+   and the rest of this admin work do. `admin`'s own
+   `package-info.java allowedDependencies` is `{"shared"}` only — no
+   `identity`, no `invoicing`, nothing. That's fine for reads (this
+   session's `AdminTenantDiagnosticService` and everything else in
+   `AdminAuthService`/`AdminService` already reach other modules' *data*
+   via `JdbcTemplate`, deliberately, as documented throughout this
+   session) but it structurally can't support *actions* that need to run
+   another module's actual business logic — reimplementing
+   `EmailVerificationToken`'s expiry/invariant logic in raw SQL inside
+   `admin` to route around this would be duplicating, and risking
+   diverging from, the real logic, which is exactly the kind of shortcut
+   this whole session has been deliberately avoiding.
+
+   This isn't a one-off case (like the earlier `facilities`/`training`/
+   `contracting` numbering or branding gaps, each blocking one field on
+   one email) — it's structural to this entire backlog category, since
+   nearly every plausible "fix it for me" action needs a write into
+   some other module's real domain logic. Two real options, not
+   something to pick unilaterally given the blast radius of an admin
+   tool that can trigger writes across every module:
+   - **Widen `admin`'s `allowedDependencies`** to include whichever
+     modules a given action needs (e.g. `identity` for verification
+     resends), and call the module's already-public facade
+     (`TenantNumberingFacade`, `TenantEmailBrandingFacade`, or a new
+     small facade following the same pattern, e.g. an
+     `EmailVerificationFacade`) the same way any other module does.
+     Simplest, most consistent with this session's existing patterns,
+     but does mean `admin` — already the one module in this codebase
+     that legitimately crosses every other module's boundary for
+     support purposes — starts doing so at the Java level for writes,
+     not just JDBC reads.
+   - **Keep `admin` decoupled and route actions through HTTP instead** —
+     the Admin Console frontend calls a normal tenant-facing endpoint
+     using the same impersonation-token mechanism this session's
+     impersonation fix already established, rather than the backend's
+     `admin` module calling another module's Java API directly. Keeps
+     the Modulith boundary completely untouched, but means "fix it for
+     me" actions only work for whatever the impersonation token's
+     read-only-or-not-yet-decided authority set actually permits — and
+     today that's read-only by design (see the impersonation section
+     above), so this option is blocked on that same authority-design
+     decision being resolved first, for actions that need to write.
+
+   No code changed for this item — flagging the real blocker clearly and
+   concretely, with two named options, is worth more here than a partial
+   implementation that either quietly widens a module boundary or
+   reimplements another module's business rules in raw SQL.
 4. No frontend for the new diagnostics endpoint yet — API only.
 5. **Not build/test-verified in this session** — same Maven Central
    limitation as the other deliverables, and this one touches shared JWT
@@ -626,4 +687,4 @@ suspended tenant, unconfigured opt-in items rendering as informational
    its backfill — check the review query above.
 
 ---
-*Last updated by Claude — completed the full sweep of all 9 originally-flagged inline-HTML files. Biggest finding: MarketingService.personalise(), the central per-recipient template-merge function for every campaign send, had zero escaping — the widest blast radius of any bug found this session, now fixed. ~56 total confirmed escaping bugs fixed across EmailTemplates and these 9 files.*
+*Last updated by Claude — shipped the permission read-only toggle admin action (list + patch, audited); investigated "fix it for me" actions broadly and found a genuine structural blocker (admin's module boundary can't reach other modules' business logic), documented with two concrete options rather than worked around.*

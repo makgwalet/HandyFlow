@@ -669,6 +669,44 @@ public class AdminService {
                 targetType, targetId, targetName, details, ip));
     }
 
+    // ── Permission read-only flags (V287) ───────────────────────────────────
+    //
+    // FIX (Admin Console gap analysis, "fix it for me" actions): the V287
+    // migration that backs admin-impersonation's read-only authority set
+    // deliberately shipped as a heuristic backfill needing human review
+    // (see that migration's own comment), but there was no way to actually
+    // DO that review short of a support engineer running raw
+    // "UPDATE permissions SET is_read_only = ... WHERE name = ..." by hand.
+    // Unlike most of the "fix it for me" actions considered this session
+    // (resend-verification-email, regenerate-PDF), this one needed no
+    // business logic from another module at all — is_read_only is a plain
+    // column with no invariants beyond itself, so a direct JdbcTemplate
+    // read/patch here is exactly the right amount of machinery, matching
+    // every other admin action in this class.
+
+    public List<Map<String, Object>> listPermissions() {
+        return jdbc.queryForList("""
+            SELECT name, description, is_read_only
+            FROM permissions
+            ORDER BY name
+            """);
+    }
+
+    @Transactional
+    public void setPermissionReadOnly(UUID adminId, String adminEmail, String permissionName,
+                                      boolean readOnly, String ipAddress) {
+        int updated = jdbc.update(
+                "UPDATE permissions SET is_read_only = ? WHERE name = ?", readOnly, permissionName);
+
+        if (updated == 0) throw new HandyFlowException(
+                "No permission found named: " + permissionName,
+                HttpStatus.NOT_FOUND, "NOT_FOUND");
+
+        audit(adminId, adminEmail, "SET_PERMISSION_READ_ONLY", "PERMISSION", permissionName, permissionName,
+                "{\"readOnly\":" + readOnly + "}", ipAddress);
+        log.info("Admin {} set permission {} is_read_only={}", adminEmail, permissionName, readOnly);
+    }
+
     private long count(String sql, Object... args) {
         try {
             Long result = jdbc.queryForObject(sql, Long.class, args);
