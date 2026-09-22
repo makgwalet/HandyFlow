@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.crm.CrmFacade;
 import za.co.handyflow.platform.crm.CustomerSummary;
+import za.co.handyflow.platform.identity.TenantDetails;
+import za.co.handyflow.platform.identity.TenantFacade;
 import za.co.handyflow.platform.marketing.domain.model.*;
 import za.co.handyflow.platform.marketing.domain.repository.*;
 import za.co.handyflow.platform.marketing.dto.*;
@@ -40,6 +42,7 @@ public class MarketingService {
     private final EmailService                   emailService;
     private final JdbcTemplate                   jdbc;
     private final CrmFacade                      crmFacade;
+    private final TenantFacade                   tenantFacade;
 
     // FIX: was `private static final String UNSUBSCRIBE_BASE_URL =
     // "https://app.handyflow.co.za/unsubscribe/"` — hardcoded to production
@@ -421,7 +424,7 @@ public class MarketingService {
             try {
                 String tenantName = fetchTenantName(pref.getTenantId());
                 emailService.send(pref.getEmail(), "You've been unsubscribed",
-                        buildUnsubscribeConfirmationEmail(tenantName, pref.getName()));
+                        EmailTemplates.unsubscribeConfirmation(tenantName, pref.getName()));
             } catch (Exception e) {
                 log.error("Failed to send unsubscribe confirmation to={}: {}",
                         pref.getEmail(), e.getMessage(), e);
@@ -529,33 +532,6 @@ public class MarketingService {
     private MktCampaign findCampaign(TenantId tenantId, UUID id) {
         return campaignRepo.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Campaign", id.toString()));
-    }
-
-    String buildUnsubscribeConfirmationEmail(String tenantName, String name) {
-        String greeting = name != null && !name.isBlank()
-                ? "Hi " + org.springframework.web.util.HtmlUtils.htmlEscape(name.split(" ")[0]) + "," : "Hi,";
-        return """
-            <!DOCTYPE html><html><head><meta charset="UTF-8"></head>
-            <body style="font-family:Arial,sans-serif;background:#F1F5F9;margin:0;padding:0;">
-              <div style="max-width:520px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
-                <div style="background:#0D9488;padding:24px 28px;">
-                  <h1 style="color:#fff;margin:0;font-size:18px">You've been unsubscribed</h1>
-                </div>
-                <div style="padding:28px;">
-                  <p style="color:#374151;font-size:14px;line-height:1.6">%s</p>
-                  <p style="color:#374151;font-size:14px;line-height:1.6">
-                    You've been removed from %s's marketing email list and will no longer receive
-                    promotional emails. This doesn't affect any transactional emails related to
-                    services you've requested.
-                  </p>
-                  <p style="color:#94A3B8;font-size:12px;line-height:1.6;margin-top:20px;">
-                    If this was a mistake, or you'd like to opt back in, please contact %s directly.
-                  </p>
-                </div>
-              </div>
-            </body></html>
-            """.formatted(greeting, org.springframework.web.util.HtmlUtils.htmlEscape(tenantName),
-                org.springframework.web.util.HtmlUtils.htmlEscape(tenantName));
     }
 
     private String personalise(String template, MktContactPreference pref,
@@ -701,11 +677,28 @@ public class MarketingService {
         } catch (Exception e) { return 0; }
     }
 
-    private String fetchTenantName(TenantId tenantId) {
-        try {
-            return jdbc.queryForObject("SELECT name FROM tenants WHERE id = ?",
-                    String.class, tenantId.getValue());
-        } catch (Exception e) { return "HandyFlow"; }
+    // FIX: previously queried `tenants` directly via raw JdbcTemplate
+    // (marketing's package-info.java didn't allow depending on identity)
+    // AND, worse, fell back to the literal string "HandyFlow" on any
+    // failure or missing tenant — silently substituting HandyFlow's own
+    // brand for the tenant's on a campaign email the tenant's own
+    // customers receive. That's exactly the anti-pattern flagged as a
+    // hard platform rule in the PDF Engine proposal (never silently fall
+    // back from tenant branding to HandyFlow branding) and now fixed
+    // here too: uses TenantFacade (identity now an allowed dependency —
+    // same fix already applied to ap for ApRemittanceEmailService) and
+    // falls back to a neutral, non-branded label instead. This feeds
+    // BOTH buildUnsubscribeConfirmationEmail below AND personalise()'s
+    // {{company_name}} substitution used in every marketing campaign
+    // send — so this was a live bug affecting real campaign content, not
+    // just the unsubscribe confirmation.
+    // Package-private (not private) so MarketingServiceFetchTenantNameTest,
+    // in the same package, can exercise this directly.
+    String fetchTenantName(TenantId tenantId) {
+        return tenantFacade.findTenantDetails(tenantId)
+                .map(TenantDetails::companyName)
+                .filter(name -> name != null && !name.isBlank())
+                .orElse("Our Team");
     }
 
     private CampaignResponse toCampaignResponse(MktCampaign c) {

@@ -496,30 +496,48 @@ would not have been caught by this method.
    with `{{unsubscribe_url}}` deliberately left unescaped since it's a URL
    going into an `href` attribute, not text content — escaping it would
    have double-encoded the URL and risked breaking the actual unsubscribe
-   link. Also fixed a smaller, separate bug in the same file:
-   `buildUnsubscribeConfirmationEmail`'s `greeting` (built from the
-   contact's own name) and `tenantName` were both unescaped too. Neither
-   this method nor `personalise()` were migrated onto `wrap()` —
-   `personalise()` merges into an arbitrary campaign body a marketing user
-   wrote themselves, not a fixed layout, so the question doesn't apply the
-   same way; `buildUnsubscribeConfirmationEmail` is brand-neutral today,
-   and `marketing`'s `allowedDependencies` doesn't include `identity`
-   either — the same boundary gap `ap` had until it was resolved (see
-   below), still open here. `personalise()` widened to package-private.
-   `MarketingServiceEscapingTest` covers both.
+   link. `personalise()` widened to package-private.
 
-   **Final status of all 9 — UPDATE, `ApRemittanceEmailService` migrated
-   once the boundary decision was resolved (see above):** 3 fully
-   migrated onto shared `EmailTemplates` methods (`AdminInvoiceService`,
-   `ContractExpiryScheduler`, `ApRemittanceEmailService`); 4 checked and
+   **UPDATE — `buildUnsubscribeConfirmationEmail` migrated, once the
+   boundary decision was resolved.** Originally left brand-neutral with
+   just its escaping fixed (`greeting`, built from the contact's own
+   name, and `tenantName` were both unescaped), because `marketing`'s
+   `allowedDependencies` didn't include `identity` — the same gap `ap`
+   had. Now that the boundary decision is resolved (strategic roadmap
+   backlog, Part 0, Decision 2), `marketing`'s boundary was widened, and
+   this is now `EmailTemplates.unsubscribeConfirmation(...)`, built
+   correctly on `wrapForTenant()`. `MarketingService`'s own duplicated
+   inline HTML for this email is deleted entirely.
+   <p>
+   **A second, more consequential bug found while making this fix**:
+   `fetchTenantName(...)` — the helper both this email and
+   `personalise()`'s `{{company_name}}` substitution depend on — fell
+   back to the **literal string `"HandyFlow"`** on any failure or missing
+   tenant. That's a live instance of exactly the anti-pattern flagged as
+   a hard platform rule in the PDF Engine proposal ("never silently fall
+   back from tenant branding to HandyFlow branding"), and it was already
+   affecting real campaign content, not just the unsubscribe
+   confirmation — any tenant with an incomplete profile, or any transient
+   lookup failure, would have had HandyFlow's own name silently
+   substituted into their customers' marketing emails. Fixed: now uses
+   `TenantFacade` and falls back to a neutral, non-branded label
+   ("Our Team") instead. `MarketingServiceEscapingTest` covers both the
+   original escaping fixes and this fallback fix;
+   `EmailTemplatesUnsubscribeConfirmationTest` covers the migrated
+   template directly.
+
+   **Final status of all 9 — UPDATE, both `ApRemittanceEmailService` and
+   `MarketingService` migrated once the boundary decision was
+   resolved:** 4 fully migrated onto shared `EmailTemplates` methods
+   (`AdminInvoiceService`, `ContractExpiryScheduler`,
+   `ApRemittanceEmailService`, `MarketingService`); 3 checked and
    deliberately left on their own inline HTML with a confirmed, real
-   reason each (`AccountingService`, `ScmNotificationService`,
-   `PmNotificationService`, `CreativeService`
-   — either genuine design/branding differences `wrap()` can't reproduce,
-   or a module-boundary gap, or both — `marketing`'s `buildUnsubscribeConfirmationEmail`
-   is the remaining brand-neutral, boundary-blocked case, same shape
-   `ApRemittanceEmailService` used to be); 1 reclassified as out of scope
-   entirely (`PosService` — a receipt, not an email); every one of the 9
+   design reason each (`AccountingService`, `ScmNotificationService`,
+   `PmNotificationService`, `CreativeService` — genuine branding/design
+   differences `wrap()` can't reproduce, not boundary gaps — every
+   remaining `identity`-boundary gap found this session is now
+   resolved); 1 reclassified as out of scope entirely (`PosService` — a
+   receipt, not an email); every one of the 9
    had its actual escaping checked line by line, and every real bug found
    was fixed, not just catalogued. Roughly 56 confirmed, fixed
    HTML-escaping bugs across `EmailTemplates` and these 9 files combined,
@@ -708,4 +726,4 @@ suspended tenant, unconfigured opt-in items rendering as informational
    its backfill — check the review query above.
 
 ---
-*Last updated by Claude — the "start with the easy ones" pass: with tenant branding now a resolved business decision (strategic roadmap backlog, Part 0, Decision 2), widened `ap` and `facilities`' module boundaries and completed the two numbering/branding fixes that were blocked purely on that decision — `ApRemittanceEmailService` is now properly tenant-branded and off the inline-HTML list for good; `FacilityNumberGenerator` now resolves its `WO-` collision with `facilitiesmanagement`.*
+*Last updated by Claude — resolved the marketing boundary gap: ApRemittanceEmailService and MarketingService's unsubscribe email are both now properly tenant-branded, and every identity-boundary gap flagged this session is closed. Also found and fixed a more consequential bug in the process: MarketingService.fetchTenantName() silently fell back to the literal string "HandyFlow" on any failure — a live instance of the exact anti-pattern flagged as a hard rule in the PDF Engine proposal, already affecting real campaign content via personalise()'s {{company_name}} substitution, not just the unsubscribe email.*

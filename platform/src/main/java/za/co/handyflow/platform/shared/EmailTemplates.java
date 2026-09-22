@@ -367,6 +367,37 @@ public class EmailTemplates {
                 tenantCompanyName);
     }
 
+    /**
+     * MIGRATED from MarketingService's own inline HTML (one of the 9
+     * files flagged in PLATFORM-ENGINES-PROGRESS.md) — previously
+     * couldn't be tenant-branded, same boundary gap as
+     * ApRemittanceEmailService, now resolved the same way (marketing's
+     * package-info.java widened to allow identity). Built on
+     * wrapForTenant(), correctly — this is a confirmation sent from the
+     * tenant's own marketing list. The original had "You've been
+     * unsubscribed" as its header text, which wrapForTenant()'s fixed
+     * (company-name) header can't reproduce — moved into the body as the
+     * lead line instead, the same relocation pattern already used for
+     * ContractExpiryScheduler's migration.
+     */
+    public static String unsubscribeConfirmation(String tenantCompanyName, String contactName) {
+        String greeting = contactName != null && !contactName.isBlank()
+                ? "Hi " + org.springframework.web.util.HtmlUtils.htmlEscape(contactName.split(" ")[0]) + ","
+                : "Hi,";
+        return wrapForTenant("""
+            <p><strong>You've been unsubscribed.</strong></p>
+            <p>%s</p>
+            <p>You've been removed from %s's marketing email list and will no longer receive
+               promotional emails. This doesn't affect any transactional emails related to
+               services you've requested.</p>
+            <p style="color:#94A3B8;font-size:12px;">
+               If this was a mistake, or you'd like to opt back in, please contact %s directly.</p>
+            """.formatted(greeting,
+                org.springframework.web.util.HtmlUtils.htmlEscape(tenantCompanyName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(tenantCompanyName)),
+                tenantCompanyName);
+    }
+
     public static String quoteExpiry(String firstName, String quoteNumber,
                                      String customerName, String amount,
                                      String frontendUrl) {

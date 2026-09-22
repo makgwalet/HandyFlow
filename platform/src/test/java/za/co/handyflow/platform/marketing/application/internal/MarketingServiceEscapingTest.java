@@ -7,6 +7,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import za.co.handyflow.platform.crm.CrmFacade;
+import za.co.handyflow.platform.identity.TenantDetails;
+import za.co.handyflow.platform.identity.TenantFacade;
 import za.co.handyflow.platform.marketing.domain.model.MktContactPreference;
 import za.co.handyflow.platform.marketing.domain.repository.MktCampaignContactRepository;
 import za.co.handyflow.platform.marketing.domain.repository.MktCampaignRepository;
@@ -16,9 +18,11 @@ import za.co.handyflow.platform.marketing.domain.repository.MktTemplateRepositor
 import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 /**
  * Regression test for MarketingService.personalise() — the widest blast
@@ -28,10 +32,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  * this fix. Unlike most fields found elsewhere this session (typically
  * entered by trusted business staff), a marketing contact's own name is
  * plausibly self-entered through a public signup form -- a genuine
- * stored-XSS-via-mailing-list vector. Also covers
- * buildUnsubscribeConfirmationEmail's separate, smaller escaping gap
- * (greeting built from the contact's own name, and tenantName) found in
- * the same file.
+ * stored-XSS-via-mailing-list vector.
+ * <p>
+ * buildUnsubscribeConfirmationEmail's own escaping bug and its migration
+ * onto EmailTemplates.unsubscribeConfirmation() are covered in
+ * EmailTemplatesUnsubscribeConfirmationTest instead — that method is now
+ * public and directly testable, no need to go through MarketingService at
+ * all. This class covers fetchTenantName's own fix instead: previously
+ * fell back to the literal "HandyFlow" on any failure or missing tenant —
+ * silently substituting HandyFlow's own brand for the tenant's, on a
+ * campaign email the tenant's own customers receive.
  */
 @ExtendWith(MockitoExtension.class)
 class MarketingServiceEscapingTest {
@@ -44,13 +54,19 @@ class MarketingServiceEscapingTest {
     @Mock private EmailService emailService;
     @Mock private JdbcTemplate jdbc;
     @Mock private CrmFacade crmFacade;
+    @Mock private TenantFacade tenantFacade;
 
     private static final String PAYLOAD = "<script>alert(1)</script>";
     private static final String ESCAPED = "&lt;script&gt;alert(1)&lt;/script&gt;";
 
     private MarketingService service() {
         return new MarketingService(preferenceRepo, templateRepo, campaignRepo,
-                campaignContactRepo, sendQueueRepo, emailService, jdbc, crmFacade);
+                campaignContactRepo, sendQueueRepo, emailService, jdbc, crmFacade, tenantFacade);
+    }
+
+    private static TenantDetails detailsWithCompanyName(String name) {
+        return new TenantDetails(UUID.randomUUID(), name, "acme", null, null,
+                null, null, null, null, null, null, null, null, null, null);
     }
 
     @Test
@@ -95,10 +111,25 @@ class MarketingServiceEscapingTest {
     }
 
     @Test
-    @DisplayName("buildUnsubscribeConfirmationEmail escapes the contact's name and tenantName")
-    void buildUnsubscribeConfirmationEmail_escapesNames() {
-        String html = service().buildUnsubscribeConfirmationEmail(PAYLOAD, PAYLOAD);
-        assertThat(html).doesNotContain(PAYLOAD);
-        assertThat(html).contains(ESCAPED);
+    @DisplayName("fetchTenantName returns the tenant's real company name")
+    void fetchTenantName_returnsRealName() {
+        TenantId tenantId = TenantId.generate();
+        when(tenantFacade.findTenantDetails(tenantId))
+                .thenReturn(Optional.of(detailsWithCompanyName("Acme Ltd")));
+
+        assertThat(service().fetchTenantName(tenantId)).isEqualTo("Acme Ltd");
+    }
+
+    @Test
+    @DisplayName("fetchTenantName falls back to a neutral label, never 'HandyFlow', when the tenant is missing")
+    void fetchTenantName_missingTenant_fallsBackNeutrally() {
+        TenantId tenantId = TenantId.generate();
+        when(tenantFacade.findTenantDetails(tenantId)).thenReturn(Optional.empty());
+
+        String result = service().fetchTenantName(tenantId);
+
+        assertThat(result).isNotEqualTo("HandyFlow");
+        assertThat(result).isEqualTo("Our Team");
     }
 }
+
