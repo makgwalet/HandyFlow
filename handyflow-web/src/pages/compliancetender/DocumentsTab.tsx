@@ -14,6 +14,7 @@ interface Doc {
   id: string; registrationId: string | null; documentType: string; evidenceId: string
   issueDate: string | null; expiryDate: string | null; verified: boolean; verifiedAt: string | null; createdAt: string
 }
+interface RegistrationOption { id: string; authority: string; registrationType: string }
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
 const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
@@ -24,15 +25,29 @@ export default function DocumentsTab() {
   const canAdmin = usePermission("COMPLIANCE_ADMIN")
 
   const [documentType, setDocumentType] = useState("")
+  const [registrationId, setRegistrationId] = useState("")
   const [issueDate, setIssueDate] = useState("")
   const [expiryDate, setExpiryDate] = useState("")
   const [file, setFile] = useState<File | null>(null)
   const [apiError, setApiError] = useState("")
+  const [filterRegistration, setFilterRegistration] = useState("ALL")
 
   const { data: documents = [], isLoading } = useQuery<Doc[]>({
     queryKey: ["ct-documents"],
     queryFn: async () => unwrap(await apiClient.get("/api/v1/compliance/documents")),
   })
+
+  // Reuses the same /registrations/all endpoint RegistrationsTab already
+  // calls — just for the picker/filter labels here, no CRUD of its own.
+  const { data: registrations = [] } = useQuery<RegistrationOption[]>({
+    queryKey: ["ct-registrations", "ALL"],
+    queryFn: async () => unwrap(await apiClient.get("/api/v1/compliance/registrations/all")),
+  })
+  const registrationLabel = (id: string | null) => {
+    if (!id) return null
+    const r = registrations.find(reg => reg.id === id)
+    return r ? `${r.authority} — ${r.registrationType}` : "Registration (details unavailable)"
+  }
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["ct-documents"] })
 
@@ -40,12 +55,13 @@ export default function DocumentsTab() {
     mutationFn: () => {
       const fd = new FormData()
       fd.append("documentType", documentType)
+      if (registrationId) fd.append("registrationId", registrationId)
       if (issueDate) fd.append("issueDate", issueDate)
       if (expiryDate) fd.append("expiryDate", expiryDate)
       fd.append("file", file as File)
       return apiClient.post("/api/v1/compliance/documents", fd, { headers: { "Content-Type": "multipart/form-data" } })
     },
-    onSuccess: () => { invalidate(); setDocumentType(""); setIssueDate(""); setExpiryDate(""); setFile(null); setApiError("") },
+    onSuccess: () => { invalidate(); setDocumentType(""); setRegistrationId(""); setIssueDate(""); setExpiryDate(""); setFile(null); setApiError("") },
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to upload document"),
   })
 
@@ -72,6 +88,13 @@ export default function DocumentsTab() {
               <input value={documentType} onChange={e => setDocumentType(e.target.value)} placeholder="e.g. Tax Clearance Certificate" style={{ ...inp, width: 220 }} />
             </div>
             <div>
+              <label style={lbl}>Linked registration</label>
+              <select value={registrationId} onChange={e => setRegistrationId(e.target.value)} style={{ ...inp, width: 200, background: "#fff" }}>
+                <option value="">— None —</option>
+                {registrations.map(r => <option key={r.id} value={r.id}>{r.authority} — {r.registrationType}</option>)}
+              </select>
+            </div>
+            <div>
               <label style={lbl}>Issue date</label>
               <input type="date" value={issueDate} onChange={e => setIssueDate(e.target.value)} style={inp} />
             </div>
@@ -92,6 +115,28 @@ export default function DocumentsTab() {
         </div>
       )}
 
+      {registrations.length > 0 && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+          <button onClick={() => setFilterRegistration("ALL")}
+            style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterRegistration === "ALL" ? 600 : 400,
+              background: filterRegistration === "ALL" ? "#0369A1" : "#F1F5F9", color: filterRegistration === "ALL" ? "#fff" : "#64748B" }}>
+            All
+          </button>
+          <button onClick={() => setFilterRegistration("UNLINKED")}
+            style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterRegistration === "UNLINKED" ? 600 : 400,
+              background: filterRegistration === "UNLINKED" ? "#0369A1" : "#F1F5F9", color: filterRegistration === "UNLINKED" ? "#fff" : "#64748B" }}>
+            Not linked
+          </button>
+          {registrations.map(r => (
+            <button key={r.id} onClick={() => setFilterRegistration(r.id)}
+              style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterRegistration === r.id ? 600 : 400,
+                background: filterRegistration === r.id ? "#0369A1" : "#F1F5F9", color: filterRegistration === r.id ? "#fff" : "#64748B" }}>
+              {r.authority} — {r.registrationType}
+            </button>
+          ))}
+        </div>
+      )}
+
       {isLoading ? (
         <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading documents...</div>
       ) : documents.length === 0 ? (
@@ -101,7 +146,9 @@ export default function DocumentsTab() {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {documents.map(d => (
+          {documents
+            .filter(d => filterRegistration === "ALL" || (filterRegistration === "UNLINKED" ? !d.registrationId : d.registrationId === filterRegistration))
+            .map(d => (
             <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px", background: "#fff" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 8, background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -111,6 +158,7 @@ export default function DocumentsTab() {
                   <div style={{ fontWeight: 600, fontSize: 13, color: "#0F172A" }}>{d.documentType}</div>
                   <div style={{ fontSize: 11, color: "#94A3B8" }}>
                     {d.issueDate ? `Issued ${fmtDate(d.issueDate)}` : ""}{d.expiryDate ? ` · Expires ${fmtDate(d.expiryDate)}` : ""}
+                    {registrationLabel(d.registrationId) ? ` · ${registrationLabel(d.registrationId)}` : ""}
                   </div>
                 </div>
               </div>
