@@ -327,7 +327,19 @@ public enum NotificationType {
     TASK_ASSIGNED(INFO, Set.of(IN_APP, EMAIL)),
     TASK_COMMENT_ADDED(INFO, Set.of(IN_APP)),
     TASK_DUE_SOON(INFO, Set.of(IN_APP, EMAIL)),
-    TASK_OVERDUE(WARNING, Set.of(IN_APP, EMAIL));
+    TASK_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
+
+    // ── Business Compliance & Tender (compliancetender module, Phase 1) ─────
+    // Same tier split as FACILITY_COMPLIANCE_EXPIRING/EXPIRED and
+    // PSIRA_EXPIRED/EXPIRING_SOON above — CRITICAL once actually expired
+    // (a live regulatory gap, not just a warning), WARNING while there's
+    // still time to renew. COMPLIANCE_DEADLINE_DUE covers deadlines not
+    // tied to any one registration's own expiry (e.g. an annual return
+    // filing date) — see ComplianceDeadline's own Javadoc for why that's a
+    // separate concept from a registration's expiryDate.
+    COMPLIANCE_REGISTRATION_EXPIRING(WARNING, Set.of(IN_APP, EMAIL)),
+    COMPLIANCE_REGISTRATION_EXPIRED(CRITICAL, Set.of(IN_APP, EMAIL)),
+    COMPLIANCE_DEADLINE_DUE(WARNING, Set.of(IN_APP, EMAIL));
 
     private final NotificationSeverity defaultSeverity;
     private final Set<NotificationChannel> defaultChannels;

@@ -72,12 +72,15 @@ public class ComplianceDocument {
     @Version
     private Long version;
 
-    public static ComplianceDocument create(TenantId tenantId, UUID registrationId, String documentType,
+    public static ComplianceDocument create(UUID id, TenantId tenantId, UUID registrationId, String documentType,
                                              UUID evidenceId, LocalDate issueDate, LocalDate expiryDate,
                                              UUID createdBy) {
         if (evidenceId == null)
             throw new IllegalArgumentException("evidenceId is required — attach the file via EvidenceFacade first");
         ComplianceDocument d = new ComplianceDocument();
+        if (id != null) d.id = id; // caller-supplied when the id must exist before evidence is attached
+                                    // (see ComplianceDocumentService.upload) — otherwise the field
+                                    // initializer's own UUID.randomUUID() is used
         d.tenantId = tenantId;
         d.registrationId = registrationId;
         d.documentType = documentType;
@@ -89,6 +92,12 @@ public class ComplianceDocument {
         d.updatedAt = Instant.now();
         d.updatedBy = createdBy;
         return d;
+    }
+
+    public static ComplianceDocument create(TenantId tenantId, UUID registrationId, String documentType,
+                                             UUID evidenceId, LocalDate issueDate, LocalDate expiryDate,
+                                             UUID createdBy) {
+        return create(null, tenantId, registrationId, documentType, evidenceId, issueDate, expiryDate, createdBy);
     }
 
     /**
