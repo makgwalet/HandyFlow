@@ -47,12 +47,27 @@
  *       same {@code NotificationService} + {@code TenantAdminRecipients}
  *       pipeline {@code security.PsiraComplianceScheduler} already uses,
  *       not a new delivery mechanism.</li>
+ *   <li>{@code hr} — added in Phase 2 for {@code HrFacade.findEmployeeById}/
+ *       {@code employeeExists}, backing {@code TenderPersonnel}'s
+ *       reference-not-copy link to an actual HR employee record for a
+ *       tender's key-personnel section. Confirmed against the real
+ *       {@code HrFacade} before adding this — it exists and exposes
+ *       exactly what's needed (a by-id lookup, not a full employee list,
+ *       which is all a reference needs).</li>
  * </ul>
- * Later phases add {@code projects}, {@code hr}, {@code fleet},
- * {@code accounting}, {@code supplychain} — deliberately not declared
- * yet, added when the tender-integration phase actually needs them.
+ * Confirmed, concrete blockers for the rest of Phase 2's cross-module
+ * reference plan, NOT worked around: {@code projects} and {@code fleet}
+ * have no public facade at all yet (checked directly — neither module
+ * exposes an {@code application}-package facade the way {@code hr} and
+ * {@code accounting} do), so project-experience and equipment references
+ * aren't buildable until one exists. {@code accounting} DOES have a
+ * facade ({@code AccountingFacade}), but it's journal-entry/chart-of-
+ * accounts focused — it has no method exposing turnover, revenue, or a
+ * P&amp;L summary, which is what a tender's financial-requirements
+ * section would actually need. Its existence doesn't mean the reference
+ * is ready; what it exposes matters more than whether it exists.
  */
-@ApplicationModule(allowedDependencies = {"shared", "identity", "evidence", "billing", "notifications"})
+@ApplicationModule(allowedDependencies = {"shared", "identity", "evidence", "billing", "notifications", "hr"})
 package za.co.handyflow.platform.compliancetender;
 
 import org.springframework.modulith.ApplicationModule;

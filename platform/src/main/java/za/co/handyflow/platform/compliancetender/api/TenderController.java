@@ -13,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.compliancetender.application.internal.TenderService;
+import za.co.handyflow.platform.compliancetender.application.internal.TenderPersonnelService;
 import za.co.handyflow.platform.compliancetender.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -27,6 +28,7 @@ import java.util.UUID;
 public class TenderController {
 
     private final TenderService tenderService;
+    private final TenderPersonnelService personnelService;
     private final FeatureGuard featureGuard;
 
     @GetMapping
@@ -103,5 +105,35 @@ public class TenderController {
         return ResponseEntity.ok(ApiResponse.success("Requirement status updated",
                 tenderService.updateRequirementStatus(TenantContext.getTenantIdAsObject(), requirementId, request,
                         TenantContext.getCurrentUserId())));
+    }
+
+    // ── Personnel — referenced from HR, not copied ──────────────────────────
+
+    @GetMapping("/{id}/personnel")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_READ','COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
+    @Operation(summary = "Key personnel for this tender — names/details are looked up live from HR, never duplicated")
+    public ResponseEntity<ApiResponse<List<TenderPersonnelResponse>>> getPersonnel(@PathVariable UUID id) {
+        featureGuard.requireModule("compliancetender");
+        return ResponseEntity.ok(ApiResponse.success(
+                personnelService.getPersonnel(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/{id}/personnel")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
+    @Operation(summary = "Reference an existing HR employee as key personnel for this tender")
+    public ResponseEntity<ApiResponse<TenderPersonnelResponse>> addPersonnel(
+            @PathVariable UUID id, @Valid @RequestBody AddTenderPersonnelRequest request) {
+        featureGuard.requireModule("compliancetender");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Personnel added",
+                personnelService.addPersonnel(TenantContext.getTenantIdAsObject(), id, request,
+                        TenantContext.getCurrentUserId())));
+    }
+
+    @DeleteMapping("/personnel/{personnelId}")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> removePersonnel(@PathVariable UUID personnelId) {
+        featureGuard.requireModule("compliancetender");
+        personnelService.removePersonnel(TenantContext.getTenantIdAsObject(), personnelId);
+        return ResponseEntity.ok(ApiResponse.success("Personnel removed", null));
     }
 }
