@@ -15,6 +15,7 @@ import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.compliancetender.application.internal.TenderService;
 import za.co.handyflow.platform.compliancetender.application.internal.TenderPersonnelService;
 import za.co.handyflow.platform.compliancetender.application.internal.TenderSnapshotService;
+import za.co.handyflow.platform.compliancetender.application.internal.TenderPdfService;
 import za.co.handyflow.platform.compliancetender.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -31,6 +32,7 @@ public class TenderController {
     private final TenderService tenderService;
     private final TenderPersonnelService personnelService;
     private final TenderSnapshotService snapshotService;
+    private final TenderPdfService pdfService;
     private final FeatureGuard featureGuard;
 
     @GetMapping
@@ -157,5 +159,22 @@ public class TenderController {
         featureGuard.requireModule("compliancetender");
         return ResponseEntity.ok(ApiResponse.success(
                 snapshotService.getSnapshot(TenantContext.getTenantIdAsObject(), snapshotId)));
+    }
+
+    // ── PDF export ────────────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/export")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_READ','COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
+    @Operation(summary = "Tender Summary PDF — current live state (requirement matrix + key personnel)")
+    public ResponseEntity<byte[]> exportPdf(@PathVariable UUID id) {
+        featureGuard.requireModule("compliancetender");
+        byte[] pdf = pdfService.generateTenderSummaryPdf(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"tender-summary-" + id + ".pdf\"")
+                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
+                .contentLength(pdf.length)
+                .body(pdf);
     }
 }
