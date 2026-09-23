@@ -14,6 +14,7 @@ import {
   Landmark,
   Handshake,
   Warehouse,
+  ClipboardCheck,
 } from 'lucide-react'
 import { apiClient } from '../../api/client'
 import { useAuthStore } from '../../store/auth.store'
@@ -64,6 +65,7 @@ const MODULE_REGISTRY: Record<string, AppTile> = {
   collectionsagency: { key: 'collectionsagency', name: 'Collections Agency', description: 'Client portfolios, placement & trust ledger', icon: Handshake, bg: '#F5F3FF', iconColor: '#5B21B6', route: '/collections-agency' },
   warehousing: { key: 'warehousing', name: 'Warehousing', description: '3PL stock, shipments & billing', icon: Warehouse, bg: '#F0FDFA', iconColor: '#0F766E', route: '/warehousing' },
   legalcompliance: { key: 'legalcompliance', name: 'Legal & Compliance', description: 'Obligations, litigation & POPIA', icon: Scale, bg: '#E0E7FF', iconColor: '#4338CA', route: '/legalcompliance' },
+  compliancetender: { key: 'compliancetender', name: 'Business Compliance & Tender', description: 'CIPC, SARS, PSIRA registrations & tender workspace', icon: ClipboardCheck, bg: '#E0F2FE', iconColor: '#0369A1', route: '/compliancetender' },
   debtcollection: { key: 'debtcollection',  name: 'Debt Collection', description: 'Cases, contact trail & payment plans', icon: Landmark, bg: '#FFEDD5', iconColor: '#9A3412', route: '/debtcollection',
 
 },

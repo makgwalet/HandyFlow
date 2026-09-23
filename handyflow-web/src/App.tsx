@@ -96,6 +96,8 @@ import { AuditorPortalAcceptInvitePage } from "./pages/auditor-portal/AuditorPor
 import { AuditorPortalHomePage } from "./pages/auditor-portal/AuditorPortalHomePage"
 import { AuditorPortalTenantDetailPage } from "./pages/auditor-portal/AuditorPortalTenantDetailPage"
 import { LegalCompliancePage } from "./pages/legalcompliance/LegalCompliancePage"
+import CompliancePage from "./pages/compliancetender/CompliancePage"
+import TenderDetailPage from "./pages/compliancetender/TenderDetailPage"
 import { DebtCollectionPage } from "./pages/debtcollection/DebtCollectionPage"
 import { CollectionsAgencyPage } from "./pages/collectionsagency/CollectionsAgencyPage"
 import { CollAgencyPortalAcceptInvitePage } from "./pages/collectionsagency-portal/CollAgencyPortalAcceptInvitePage"
@@ -304,6 +306,8 @@ export default function App() {
             <Route path="/recurring"              element={<InvoicingPage />} />
             <Route path="/supply-chain"           element={<SupplyChainPage />} />
             <Route path="/legalcompliance"        element={<LegalCompliancePage />} />
+            <Route path="/compliancetender"              element={<CompliancePage />} />
+            <Route path="/compliancetender/tenders/:id"  element={<TenderDetailPage />} />
             <Route path="/debtcollection" element={<DebtCollectionPage />} />
             <Route path="/recruitment-agency" element={<RecruitmentAgencyPage />} />
             <Route path="/collections-agency" element={<CollectionsAgencyPage />} />
