@@ -31,6 +31,7 @@ public class TenderService {
     private final TenderRepository tenderRepository;
     private final TenderRequirementRepository requirementRepository;
     private final TenantNumberingFacade numberingFacade;
+    private final TenderSnapshotService snapshotService;
 
     @Transactional(readOnly = true)
     public Page<TenderResponse> getTenders(TenantId tenantId, String status, Pageable pageable) {
@@ -59,6 +60,15 @@ public class TenderService {
         tender.transitionTo(req.newStatus(), updatedBy);
         tenderRepository.save(tender);
         log.info("Tender transitioned id={} newStatus={} tenant={}", id, req.newStatus(), tenantId);
+
+        // A snapshot is captured automatically, not left as a separate step a
+        // caller could forget — "submitted with no record of what was
+        // submitted" would defeat the entire reason TenderSnapshotService
+        // exists. See TenderSubmissionSnapshot's own Javadoc.
+        if ("SUBMITTED".equals(req.newStatus())) {
+            snapshotService.captureSnapshot(tenantId, id, updatedBy);
+        }
+
         return toResponse(tender);
     }
 

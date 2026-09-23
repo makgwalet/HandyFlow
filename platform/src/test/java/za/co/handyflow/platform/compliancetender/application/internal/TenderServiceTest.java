@@ -28,9 +28,10 @@ class TenderServiceTest {
     @Mock private TenderRepository tenderRepository;
     @Mock private TenderRequirementRepository requirementRepository;
     @Mock private TenantNumberingFacade numberingFacade;
+    @Mock private TenderSnapshotService snapshotService;
 
     private TenderService service() {
-        return new TenderService(tenderRepository, requirementRepository, numberingFacade);
+        return new TenderService(tenderRepository, requirementRepository, numberingFacade, snapshotService);
     }
 
     private static final TenantId TENANT = TenantId.generate();
@@ -75,5 +76,34 @@ class TenderServiceTest {
         // DRAFT -> SUBMITTED is not a valid jump; the entity's own rule should surface here unchanged
         assertThatThrownBy(() -> service().transition(TENANT, tenderId, req, USER))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("a successful transition to SUBMITTED automatically captures a snapshot")
+    void transition_toSubmitted_capturesSnapshotAutomatically() {
+        UUID tenderId = UUID.randomUUID();
+        Tender tender = Tender.create(TENANT, "TND-00001", "Test Tender", null, null,
+                null, null, null, null, null, null, USER);
+        tender.transitionTo("IN_PREPARATION", USER);
+        tender.transitionTo("INTERNAL_REVIEW", USER);
+        tender.transitionTo("READY_TO_SUBMIT", USER);
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(tender));
+
+        service().transition(TENANT, tenderId, new TransitionTenderRequest("SUBMITTED"), USER);
+
+        org.mockito.Mockito.verify(snapshotService).captureSnapshot(TENANT, tenderId, USER);
+    }
+
+    @Test
+    @DisplayName("a transition that is NOT to SUBMITTED never triggers a snapshot")
+    void transition_notToSubmitted_doesNotCaptureSnapshot() {
+        UUID tenderId = UUID.randomUUID();
+        Tender tender = Tender.create(TENANT, "TND-00001", "Test Tender", null, null,
+                null, null, null, null, null, null, USER);
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(tender));
+
+        service().transition(TENANT, tenderId, new TransitionTenderRequest("IN_PREPARATION"), USER);
+
+        org.mockito.Mockito.verifyNoInteractions(snapshotService);
     }
 }
