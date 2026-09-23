@@ -28,6 +28,7 @@ interface Tender {
   awardedValue: number | null; submittedAt: string | null
 }
 interface Requirement { id: string; description: string; source: string; status: string }
+interface TrackedRequirement { id: string; code: string; name: string; evidenceType: string | null }
 interface Personnel { id: string; employeeId: string; role: string; employeeFound: boolean; employeeFullName: string | null; employeeNumber: string | null }
 interface Snapshot { id: string; snapshotNumber: number; submittedAt: string; data: any }
 
@@ -86,6 +87,7 @@ export default function TenderDetailPage() {
   const [awardedValue, setAwardedValue] = useState("")
   const [newRequirement, setNewRequirement] = useState("")
   const [newRequirementSource, setNewRequirementSource] = useState("MANUAL")
+  const [pickedRequirementId, setPickedRequirementId] = useState("")
   const [pickedEmployee, setPickedEmployee] = useState<EmployeeOption | null>(null)
   const [personnelRole, setPersonnelRole] = useState("")
   const [snapshotsOpen, setSnapshotsOpen] = useState(false)
@@ -116,6 +118,15 @@ export default function TenderDetailPage() {
     enabled: !!id && snapshotsOpen,
   })
 
+  // The tracked requirement catalogue (ComplianceRequirementController) —
+  // lets "Add requirement" optionally link to an existing definition
+  // instead of always being free text. Small, tenant-wide list (current
+  // version per code only), safe to fetch unconditionally.
+  const { data: trackedRequirements = [] } = useQuery<TrackedRequirement[]>({
+    queryKey: ["ct-tracked-requirements"],
+    queryFn: async () => unwrap(await apiClient.get("/api/v1/compliance/requirements")),
+  })
+
   const invalidateTender = () => qc.invalidateQueries({ queryKey: ["ct-tender", id] })
 
   const transition = useMutation({
@@ -135,9 +146,10 @@ export default function TenderDetailPage() {
 
   const addRequirement = useMutation({
     mutationFn: () => apiClient.post(`/api/v1/compliance/tenders/${id}/requirements`, {
-      description: newRequirement, source: newRequirementSource, complianceRequirementId: null,
+      description: newRequirement, source: newRequirementSource,
+      complianceRequirementId: pickedRequirementId || null,
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ct-tender-requirements", id] }); setNewRequirement("") },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ct-tender-requirements", id] }); setNewRequirement(""); setPickedRequirementId(""); setNewRequirementSource("MANUAL") },
   })
 
   const updateRequirementStatus = useMutation({
@@ -254,15 +266,31 @@ export default function TenderDetailPage() {
           </div>
         )}
         {canManage && (
-          <div style={{ display: "flex", gap: 8 }}>
-            <input value={newRequirement} onChange={e => setNewRequirement(e.target.value)} placeholder="e.g. Valid CSD registration" style={{ ...inp, flex: 2 }} />
-            <select value={newRequirementSource} onChange={e => setNewRequirementSource(e.target.value)} style={{ ...inp, flex: 1 }}>
-              {["COMPLIANCE", "PROJECTS", "HR", "FLEET", "ACCOUNTING", "MANUAL"].map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <button onClick={() => newRequirement.trim() && addRequirement.mutate()} disabled={!newRequirement.trim() || addRequirement.isPending}
-              style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 14px", background: !newRequirement.trim() ? "#CBD5E1" : "#0369A1", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: !newRequirement.trim() ? "not-allowed" : "pointer" }}>
-              <Plus size={13} /> Add
-            </button>
+          <div>
+            {trackedRequirements.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <select value={pickedRequirementId} onChange={e => {
+                  const reqId = e.target.value
+                  setPickedRequirementId(reqId)
+                  const tracked = trackedRequirements.find(t => t.id === reqId)
+                  if (tracked) { setNewRequirement(tracked.name); setNewRequirementSource("COMPLIANCE") }
+                }} style={{ ...inp, width: "100%", background: "#fff" }}>
+                  <option value="">— Add from tracked requirements, or type a custom one below —</option>
+                  {trackedRequirements.map(t => <option key={t.id} value={t.id}>{t.code} — {t.name}</option>)}
+                </select>
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <input value={newRequirement} onChange={e => { setNewRequirement(e.target.value); setPickedRequirementId("") }} placeholder="e.g. Valid CSD registration" style={{ ...inp, flex: 2 }} />
+              <select value={newRequirementSource} onChange={e => setNewRequirementSource(e.target.value)} style={{ ...inp, flex: 1 }} disabled={!!pickedRequirementId}>
+                {["COMPLIANCE", "PROJECTS", "HR", "FLEET", "ACCOUNTING", "MANUAL"].map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <button onClick={() => newRequirement.trim() && addRequirement.mutate()} disabled={!newRequirement.trim() || addRequirement.isPending}
+                style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 14px", background: !newRequirement.trim() ? "#CBD5E1" : "#0369A1", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: !newRequirement.trim() ? "not-allowed" : "pointer" }}>
+                <Plus size={13} /> Add
+              </button>
+            </div>
+            {pickedRequirementId && <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>Linked to the tracked requirement — clearing the text above will unlink it.</div>}
           </div>
         )}
       </Section>

@@ -22,4 +22,9 @@ public interface ComplianceRequirementRepository extends JpaRepository<Complianc
     @Query("SELECT r FROM ComplianceRequirement r WHERE r.tenantId = :#{#tenantId.value} AND r.code = :code " +
            "ORDER BY r.requirementVersion DESC LIMIT 1")
     Optional<ComplianceRequirement> findLatestByCode(@Param("tenantId") TenantId tenantId, @Param("code") String code);
+
+    /** Every version ever recorded for one code, most recent first — the audit trail behind ComplianceRequirement's own versioning design. */
+    @Query("SELECT r FROM ComplianceRequirement r WHERE r.tenantId = :#{#tenantId.value} AND r.code = :code " +
+           "ORDER BY r.requirementVersion DESC")
+    List<ComplianceRequirement> findAllVersionsByCode(@Param("tenantId") TenantId tenantId, @Param("code") String code);
 }
