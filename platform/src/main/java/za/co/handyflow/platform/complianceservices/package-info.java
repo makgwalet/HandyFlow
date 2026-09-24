@@ -11,28 +11,45 @@
  * already used for {@code ApFacade.createBillFromSupplyChainInvoice}
  * (Supply Chain owns matching/approval, AP owns the resulting bill).
  * <p>
- * NOT started yet — see the strategic roadmap backlog, Part 6, for an
- * open design question this module's first real implementation needs
- * to settle first: whether a "client company" here is an extension of
- * CRM's {@code Customer} (reusing {@code CustomerType}) or a dedicated
- * {@code ComplianceClient} entity that references a CRM customer when
- * one exists without requiring one. This package-info.java exists to
- * declare the module boundary and reserve the name — not to imply
- * Phase 1 work has started here.
+ * Phase 1 — DONE: {@code ComplianceClient} (the client company itself)
+ * and its CRUD, resolving the design question below. Deliberately just
+ * the client entity for now, not client-specific compliance/tender
+ * tracking — running compliancetender's engine per-client, rather than
+ * per-tenant the way it works today, is a separate, larger data-model
+ * decision for a later phase.
  * <p>
- * allowedDependencies, Phase 1 (once real work starts):
+ * The open design question is RESOLVED: a dedicated {@code ComplianceClient}
+ * entity that OPTIONALLY references an existing CRM customer via
+ * {@code crmCustomerId} (a reference, not a copy — enriched with live
+ * CRM data at read time, the same pattern {@code TenderPersonnel}
+ * established for HR employee references in {@code compliancetender}),
+ * rather than extending {@code crm.Customer} directly. See
+ * {@code ComplianceClient}'s own Javadoc for the full reasoning.
+ * <p>
+ * allowedDependencies, Phase 1 — narrowed to what's actually used, not
+ * what a later phase will need. Checked before finalizing: neither
+ * {@code ComplianceClient} nor its service/controller import a single
+ * type from {@code identity} or {@code compliancetender} — no numbering
+ * was needed for a client record, and there's no per-client compliance
+ * tracking yet for the engine to operate on. Declaring them now would
+ * repeat exactly the mistake this session kept finding and correcting
+ * elsewhere: a module boundary opened for a reason that doesn't match
+ * what's actually built. Both get added back in the phase that actually
+ * needs them — the same incremental discipline
+ * {@code compliancetender}'s own package-info.java used for its first
+ * boundary declaration:
  * <ul>
  *   <li>{@code shared} — baseline.</li>
- *   <li>{@code identity} — same reasons as {@code compliancetender}
- *       (numbering, tenant details).</li>
- *   <li>{@code compliancetender} — the engine this module operates a
- *       second, multi-client model on top of.</li>
- *   <li>{@code crm} — pending the open design question above; needed
- *       either way for at least optionally referencing an existing CRM
- *       customer as a client company.</li>
+ *   <li>{@code crm} — {@code CrmFacade.findCustomerById}/{@code customerExists}
+ *       backing {@code ComplianceClient}'s optional reference to an
+ *       existing CRM customer.</li>
  * </ul>
+ * Later phase, when client-specific compliance/tender tracking is
+ * actually built: {@code identity} (numbering, tenant details) and
+ * {@code compliancetender} (the engine this module will operate a
+ * second, multi-client model on top of).
  */
-@ApplicationModule(allowedDependencies = {"shared", "identity", "compliancetender", "crm"})
+@ApplicationModule(allowedDependencies = {"shared", "crm"})
 package za.co.handyflow.platform.complianceservices;
 
 import org.springframework.modulith.ApplicationModule;
