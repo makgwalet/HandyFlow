@@ -68,8 +68,20 @@ public class AdminController {
     }
 
     // ── Permission read-only flags (V287) ───────────────────────────────────
+    // Own path, not /permissions — that collided with
+    // AdminLookupController#getAllPermissions() (both on GET
+    // /api/v1/admin/permissions), a genuine startup-blocking ambiguous-
+    // mapping error caught by a real `mvn spring-boot:run` against a real
+    // database, not something either sandbox testing or a green `mvn test`
+    // run surfaces (Spring MVC only detects a route collision at actual
+    // application-context startup). The two are legitimately different
+    // endpoints for different purposes — this one exists specifically for
+    // reviewing/toggling the read-only flag (id, description, is_read_only
+    // return shape below; the lookup one returns id, name, description for
+    // a module-creation permission picker) — so the fix is disambiguating
+    // the path, not merging or removing either.
 
-    @GetMapping("/permissions")
+    @GetMapping("/permissions/read-only-flags")
     @Operation(summary = "List every permission and whether it's flagged read-only "
             + "(the authority set granted to admin impersonation sessions — see migration V287)")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> listPermissions() {
