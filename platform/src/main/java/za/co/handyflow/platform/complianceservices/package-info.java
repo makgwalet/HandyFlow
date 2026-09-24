@@ -43,13 +43,20 @@
  *   <li>{@code crm} — {@code CrmFacade.findCustomerById}/{@code customerExists}
  *       backing {@code ComplianceClient}'s optional reference to an
  *       existing CRM customer.</li>
+ *   <li>{@code evidence} — added in Phase 3, for
+ *       {@code EvidenceFacade}, backing {@code ClientComplianceDocument}
+ *       the same way {@code compliancetender}'s own
+ *       {@code ComplianceDocument} already uses it — confirmed reused
+ *       directly rather than a second document-storage engine invented
+ *       for this module.</li>
  * </ul>
- * Later phase, when client-specific compliance/tender tracking is
- * actually built: {@code identity} (numbering, tenant details) and
+ * Later phase, when client-specific TENDER tracking is actually built:
+ * {@code identity} (numbering, tenant details) and
  * {@code compliancetender} (the engine this module will operate a
- * second, multi-client model on top of).
+ * second, multi-client model on top of) — still not needed by anything
+ * built so far, including Phase 3's documents/deadlines.
  */
-@ApplicationModule(allowedDependencies = {"shared", "crm"})
+@ApplicationModule(allowedDependencies = {"shared", "crm", "evidence"})
 package za.co.handyflow.platform.complianceservices;
 
 import org.springframework.modulith.ApplicationModule;
