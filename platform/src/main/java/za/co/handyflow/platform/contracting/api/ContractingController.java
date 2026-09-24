@@ -135,7 +135,7 @@ public class ContractingController {
     }
 
     @PostMapping("/{id}/parties/{partyId}/request-otp")
-    @PreAuthorize("hasAnyAuthority('USER_READ','USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
     @Operation(summary = "Send OTP to party's phone — enforces signing order, rate-limited 3/10min")
     public ResponseEntity<ApiResponse<PartyResponse>> requestOtp(
             @PathVariable UUID id, @PathVariable UUID partyId) {
@@ -186,7 +186,7 @@ public class ContractingController {
     // ("null = posted by internal HandyFlow user") — the entity/schema was
     // ready, just had no service method or endpoint using that pathway.
     @PostMapping("/{id}/comments")
-    @PreAuthorize("hasAnyAuthority('USER_READ','USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
     @Operation(summary = "Post a comment or amendment request as internal staff — visible to all parties and owner")
     public ResponseEntity<ApiResponse<CommentView>> addComment(
             @PathVariable UUID id,

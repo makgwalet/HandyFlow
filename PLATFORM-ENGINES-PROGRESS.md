@@ -728,5 +728,63 @@ suspended tenant, unconfigured opt-in items rendering as informational
    also needs to actually run against a real database before anyone trusts
    its backfill — check the review query above.
 
+5. **DONE — the `V287` review actually happened, against real production
+   data, and found a genuine security gap.** Ran
+   `SELECT name FROM permissions WHERE is_read_only = true ORDER BY name`
+   against the real database (43 rows) and checked every one of them
+   against the actual controller methods it gates, not just its name.
+
+   **Found and fixed**: `USER_READ` — correctly read-only everywhere
+   else it's used — was the *sole* permission gating every one of
+   `BookingsController`'s 22 endpoints, reads and writes alike (create/
+   update/delete services and staff, the entire booking lifecycle).
+   Because `AdminAuthService.generateImpersonationToken()` grants an
+   impersonation session every permission where `is_read_only = TRUE`,
+   this meant a support engineer impersonating any user with
+   `USER_READ` could actually create, modify, confirm, cancel, and
+   delete bookings — directly contradicting impersonation's own
+   explicit read-only guarantee (the token even carries a
+   `readOnly: true` claim asserting this can't happen). Fixed:
+   `V299__bookings_permission_triad.sql` adds `BOOKINGS_READ`/
+   `MANAGE`/`ADMIN`, and `BookingsController` now uses the correct one
+   per endpoint (split precisely by HTTP method via a script, not by
+   hand across 22 near-identical annotation lines, then verified line
+   by line against the actual mapping — GET→READ, POST/PUT→MANAGE,
+   DELETE→ADMIN, the same convention every other module in this
+   codebase already follows).
+
+   **A real behaviour change, not just additive** — anyone relying on
+   `USER_READ` alone to use bookings loses that access the moment this
+   ships, unless the roles that need it are explicitly granted
+   `BOOKINGS_READ`/`MANAGE`/`ADMIN` first. The migration deliberately
+   does not guess who that should be. A review query
+   (`role-grant-check.sql`, delivered alongside this update) finds
+   every role currently holding `USER_READ`, for whoever owns rollout
+   to work through before deploying.
+
+   **A second, smaller instance of the same bug**: two endpoints in
+   `ContractingController` (`request-otp`, `/comments`) used
+   `hasAnyAuthority('USER_READ','USER_UPDATE')` — the exact pairing
+   the file's own *read* endpoints correctly use — when every other
+   write endpoint in the same file already correctly used
+   `hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')`. Fixed by
+   matching the pattern already used six times elsewhere in the same
+   file, not inventing anything new.
+
+   **One more found, deliberately NOT fixed**: `CLINIC_READ` gates
+   `POST /appointments/{id}/video-room` (joining/creating a video
+   consultation room) — a real side effect behind a read-only
+   permission, but lower severity (video-room creation isn't a data
+   mutation with lasting consequences the way cancelling a booking or
+   commenting on a contract is) and not chased down to a root-cause fix
+   in this pass. Flagged for whoever picks it up next.
+
+   **Also flagged, not touched**: `GET /api/v1/bookings/available-slots`
+   has no `@PreAuthorize` at all. Left alone deliberately — it may be
+   an intentional public "check availability" endpoint for a customer-
+   facing booking widget, and adding a permission check without
+   knowing that would risk breaking a real feature. A product decision
+   for whoever owns bookings, not something to guess here.
+
 ---
-*Last updated by Claude — built the support-action framework (Decision 1's implementation, not just the decision): `SupportAction` published interface in `shared`, `SupportActionService` dispatcher in `admin` (module boundary confirmed unchanged, still exactly `{"shared"}`), and the reference action, `ResendVerificationEmailAction`, living in `identity` where the real logic already was. Found a third architectural option neither of the two this session had previously narrowed the blocker to — resolves it without widening `admin`'s boundary and without depending on the impersonation-authority decision.*
+*Last updated by Claude — ran the V287 permission-backfill review against real production data (43 read-only-classified permissions) and found a genuine security gap: USER_READ, correctly read-only everywhere else, was the sole permission gating all 22 endpoints of BookingsController including every write — and because impersonation grants every read-only-classified permission, this meant impersonating a USER_READ-holding user granted real booking-management write access, contradicting impersonation's own explicit read-only guarantee. Fixed with a new BOOKINGS_READ/MANAGE/ADMIN triad, split precisely per endpoint by HTTP method. Also fixed a smaller instance of the identical bug in ContractingController (two endpoints using the wrong permission pair when the rest of the same file already used the correct one), and flagged two more findings (CLINIC_READ gating a POST, and a bookings endpoint with no authorization at all) without guessing at fixes that need product input.*

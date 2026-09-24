@@ -32,7 +32,7 @@ public class BookingsController {
     // ── Services ──────────────────────────────────────────────────────────────
 
     @GetMapping("/services")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_READ')")
     @Operation(summary = "List all active booking services")
     public ResponseEntity<ApiResponse<List<ServiceResponse>>> getServices() {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -40,7 +40,7 @@ public class BookingsController {
     }
 
     @PostMapping("/services")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_MANAGE')")
     @Operation(summary = "Create a new bookable service")
     public ResponseEntity<ApiResponse<ServiceResponse>> createService(
             @Valid @RequestBody CreateServiceRequest req) {
@@ -49,7 +49,7 @@ public class BookingsController {
     }
 
     @PutMapping("/services/{id}")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_MANAGE')")
     @Operation(summary = "Update a booking service")
     public ResponseEntity<ApiResponse<ServiceResponse>> updateService(
             @PathVariable UUID id,
@@ -61,7 +61,7 @@ public class BookingsController {
     // ── Staff ─────────────────────────────────────────────────────────────────
 
     @GetMapping("/staff")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_READ')")
     @Operation(summary = "List all active booking staff")
     public ResponseEntity<ApiResponse<List<StaffResponse>>> getStaff() {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -69,7 +69,7 @@ public class BookingsController {
     }
 
     @PostMapping("/staff")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_MANAGE')")
     @Operation(summary = "Add a staff member for bookings")
     public ResponseEntity<ApiResponse<StaffResponse>> createStaff(
             @Valid @RequestBody CreateStaffRequest req) {
@@ -80,7 +80,7 @@ public class BookingsController {
     // ── Availability ──────────────────────────────────────────────────────────
 
     @PostMapping("/availability")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_MANAGE')")
     @Operation(summary = "Set working hours for a staff member or the whole business")
     public ResponseEntity<ApiResponse<Void>> setAvailability(
             @Valid @RequestBody SetAvailabilityRequest req) {
@@ -89,7 +89,7 @@ public class BookingsController {
     }
 
     @PostMapping("/blocks")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_MANAGE')")
     @Operation(summary = "Block time — lunch, holiday, leave")
     public ResponseEntity<ApiResponse<Void>> addBlock(
             @Valid @RequestBody AddBlockRequest req) {
@@ -113,7 +113,7 @@ public class BookingsController {
     // ── Bookings ──────────────────────────────────────────────────────────────
 
     @GetMapping
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_READ')")
     @Operation(summary = "List bookings with optional status, date, date range, staff and search filters",
             description = "Use `date` for single-day filtering (BookingsTab). Use `dateFrom`+`dateTo` for week-range filtering (CalendarTab). `date` takes precedence over `dateFrom`/`dateTo` if both are supplied.")
     public ResponseEntity<ApiResponse<Page<BookingResponse>>> getBookings(
@@ -133,7 +133,7 @@ public class BookingsController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_READ')")
     @Operation(summary = "Get booking detail")
     public ResponseEntity<ApiResponse<BookingResponse>> getBooking(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -141,7 +141,7 @@ public class BookingsController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_MANAGE')")
     @Operation(summary = "Create a new booking — checks slot availability and lead time automatically")
     public ResponseEntity<ApiResponse<BookingResponse>> createBooking(
             @Valid @RequestBody CreateBookingRequest req) {
@@ -150,7 +150,7 @@ public class BookingsController {
     }
 
     @PostMapping("/{id}/confirm")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_MANAGE')")
     @Operation(summary = "Confirm a pending booking")
     public ResponseEntity<ApiResponse<BookingResponse>> confirm(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Booking confirmed",
@@ -158,7 +158,7 @@ public class BookingsController {
     }
 
     @PostMapping("/{id}/start")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_MANAGE')")
     @Operation(summary = "Mark booking as in progress")
     public ResponseEntity<ApiResponse<BookingResponse>> start(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Booking started",
@@ -166,7 +166,7 @@ public class BookingsController {
     }
 
     @PostMapping("/{id}/complete")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_MANAGE')")
     @Operation(summary = "Complete a booking")
     public ResponseEntity<ApiResponse<BookingResponse>> complete(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Booking completed",
@@ -174,7 +174,7 @@ public class BookingsController {
     }
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_MANAGE')")
     @Operation(summary = "Cancel a booking")
     public ResponseEntity<ApiResponse<BookingResponse>> cancel(
             @PathVariable UUID id,
@@ -185,7 +185,7 @@ public class BookingsController {
     }
 
     @PostMapping("/{id}/no-show")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_MANAGE')")
     @Operation(summary = "Mark a booking as no-show")
     public ResponseEntity<ApiResponse<BookingResponse>> noShow(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Marked as no-show",
@@ -202,7 +202,7 @@ public class BookingsController {
      * POST /{id}/reschedule reads as "perform the reschedule action on booking {id}".
      */
     @PostMapping("/{id}/reschedule")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_MANAGE')")
     @Operation(summary = "Reschedule a booking to a new date/time — preserves booking number and history")
     public ResponseEntity<ApiResponse<BookingResponse>> reschedule(
             @PathVariable UUID id,
@@ -213,7 +213,7 @@ public class BookingsController {
     }
 
     @GetMapping(value = "/{id}/confirmation.pdf", produces = "application/pdf")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_READ')")
     @Operation(summary = "Download booking confirmation as PDF",
             description = "Re-downloadable confirmation PDF. Same content as the email attachment.")
     public void downloadConfirmationPdf(
@@ -230,7 +230,7 @@ public class BookingsController {
     }
 
     @PutMapping("/staff/{id}")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_MANAGE')")
     @Operation(summary = "Update a staff member's name, email or phone")
     public ResponseEntity<ApiResponse<StaffResponse>> updateStaff(
             @PathVariable UUID id,
@@ -240,7 +240,7 @@ public class BookingsController {
     }
 
     @DeleteMapping("/staff/{id}")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_ADMIN')")
     @Operation(summary = "Deactivate a staff member")
     public ResponseEntity<ApiResponse<Void>> deactivateStaff(@PathVariable UUID id) {
         bookingsService.deactivateStaff(TenantContext.getTenantIdAsObject(), id);
@@ -248,7 +248,7 @@ public class BookingsController {
     }
 
     @DeleteMapping("/services/{id}")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_ADMIN')")
     @Operation(summary = "Soft-delete a booking service")
     public ResponseEntity<ApiResponse<Void>> deleteService(@PathVariable UUID id) {
         bookingsService.deleteService(TenantContext.getTenantIdAsObject(), id);
@@ -256,7 +256,7 @@ public class BookingsController {
     }
 
     @GetMapping("/services/{id}/staff")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_READ')")
     @Operation(summary = "Get staff members assigned to a service")
     public ResponseEntity<ApiResponse<List<UUID>>> getServiceStaff(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -264,7 +264,7 @@ public class BookingsController {
     }
 
     @PutMapping("/services/{id}/staff")
-    @PreAuthorize("hasAuthority('USER_READ')")
+    @PreAuthorize("hasAuthority('BOOKINGS_MANAGE')")
     @Operation(summary = "Set which staff members can perform this service")
     public ResponseEntity<ApiResponse<Void>> setServiceStaff(
             @PathVariable UUID id,
