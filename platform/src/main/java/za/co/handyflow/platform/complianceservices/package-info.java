@@ -49,14 +49,24 @@
  *       {@code ComplianceDocument} already uses it — confirmed reused
  *       directly rather than a second document-storage engine invented
  *       for this module.</li>
+ *   <li>{@code identity} — added in Phase 5, for
+ *       {@code TenantNumberingFacade}, backing {@code ClientTender}'s
+ *       own tender numbers the same way {@code compliancetender.Tender}
+ *       already uses it.</li>
  * </ul>
- * Later phase, when client-specific TENDER tracking is actually built:
- * {@code identity} (numbering, tenant details) and
- * {@code compliancetender} (the engine this module will operate a
- * second, multi-client model on top of) — still not needed by anything
- * built so far, including Phase 3's documents/deadlines.
+ * {@code compliancetender} itself is still NOT a dependency, and turns
+ * out not to be needed even for client-scoped tenders — the parallel-
+ * entity architecture decided in Part 8 of the strategic roadmap backlog
+ * means {@code ClientTender} is its own entity, never referencing a
+ * single type from {@code compliancetender}'s own Java code. The
+ * original Phase 1 scoping expected this module would eventually depend
+ * on {@code compliancetender} as "the engine this module operates a
+ * second model on top of" — that expectation turned out to be wrong once
+ * the actual data-model decision was made, and the dependency is
+ * correctly never declared rather than added speculatively to match a
+ * plan that didn't hold up.
  */
-@ApplicationModule(allowedDependencies = {"shared", "crm", "evidence"})
+@ApplicationModule(allowedDependencies = {"shared", "crm", "evidence", "identity"})
 package za.co.handyflow.platform.complianceservices;
 
 import org.springframework.modulith.ApplicationModule;
