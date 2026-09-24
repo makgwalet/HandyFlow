@@ -658,63 +658,66 @@ suspended tenant, unconfigured opt-in items rendering as informational
    right amount of machinery here, unlike an action that needs another
    module's actual business logic. `AdminServicePermissionsTest` covers
    both endpoints' service methods, including the not-found case.
-3. **"Fix it for me" actions (brief section 20) — investigated this
-   session, not implemented, for a real structural reason rather than
-   just being skipped.** Checked several concrete candidates
-   (resend-verification-email, regenerate PDF, unlock user — this
-   codebase has no account-lockout mechanism at all, so that one doesn't
-   even apply) and found the same blocker every time: a genuine "fix it
-   for me" action needs to trigger real business logic in another
-   module — `EmailVerificationService.createToken(...)` for a resend,
-   `InvoicePdfService`'s actual generation path for a regenerate — not
-   just read or patch a row with SQL the way `AdminTenantDiagnosticService`
-   and the rest of this admin work do. `admin`'s own
-   `package-info.java allowedDependencies` is `{"shared"}` only — no
-   `identity`, no `invoicing`, nothing. That's fine for reads (this
-   session's `AdminTenantDiagnosticService` and everything else in
-   `AdminAuthService`/`AdminService` already reach other modules' *data*
-   via `JdbcTemplate`, deliberately, as documented throughout this
-   session) but it structurally can't support *actions* that need to run
-   another module's actual business logic — reimplementing
-   `EmailVerificationToken`'s expiry/invariant logic in raw SQL inside
-   `admin` to route around this would be duplicating, and risking
-   diverging from, the real logic, which is exactly the kind of shortcut
-   this whole session has been deliberately avoiding.
+3. **DONE, this session.** The "fix it for me" structural blocker
+   documented below is resolved — not via either of the two options this
+   session had previously narrowed it to, but a third one neither
+   considered: a **published interface living in `shared`** (`SupportAction`),
+   implemented as an ordinary `@Component` bean in whichever module owns
+   the real logic (e.g. `identity.application.internal.ResendVerificationEmailAction`),
+   collected at runtime via Spring's own `List<SupportAction>`
+   collection-injection into `admin`'s new `SupportActionService`. This
+   gets everything both original options were trading off against each
+   other, without the tradeoff:
+   - `admin`'s `package-info.java allowedDependencies` is **still exactly
+     `{"shared"}`** — confirmed unchanged, not widened at the Java level
+     the way option 1 would have required.
+   - Doesn't route through HTTP/impersonation either, so it isn't blocked
+     on the impersonation read-only-authority decision the way option 2
+     was — this goes through `admin`'s own service layer directly, at
+     runtime, via Spring's bean graph, not a network call.
+   - Spring Modulith's architecture verification checks *static Java
+     package dependencies*, not runtime bean wiring — `admin`'s source
+     genuinely never imports a single type from `identity`, so this
+     satisfies the boundary check for real, not by exploiting a gap in
+     what the check covers.
 
-   This isn't a one-off case (like the earlier `facilities`/`training`/
-   `contracting` numbering or branding gaps, each blocking one field on
-   one email) — it's structural to this entire backlog category, since
-   nearly every plausible "fix it for me" action needs a write into
-   some other module's real domain logic. Two real options, not
-   something to pick unilaterally given the blast radius of an admin
-   tool that can trigger writes across every module:
-   - **Widen `admin`'s `allowedDependencies`** to include whichever
-     modules a given action needs (e.g. `identity` for verification
-     resends), and call the module's already-public facade
-     (`TenantNumberingFacade`, `TenantEmailBrandingFacade`, or a new
-     small facade following the same pattern, e.g. an
-     `EmailVerificationFacade`) the same way any other module does.
-     Simplest, most consistent with this session's existing patterns,
-     but does mean `admin` — already the one module in this codebase
-     that legitimately crosses every other module's boundary for
-     support purposes — starts doing so at the Java level for writes,
-     not just JDBC reads.
-   - **Keep `admin` decoupled and route actions through HTTP instead** —
-     the Admin Console frontend calls a normal tenant-facing endpoint
-     using the same impersonation-token mechanism this session's
-     impersonation fix already established, rather than the backend's
-     `admin` module calling another module's Java API directly. Keeps
-     the Modulith boundary completely untouched, but means "fix it for
-     me" actions only work for whatever the impersonation token's
-     read-only-or-not-yet-decided authority set actually permits — and
-     today that's read-only by design (see the impersonation section
-     above), so this option is blocked on that same authority-design
-     decision being resolved first, for actions that need to write.
+   **Built**: `shared.SupportAction` (the interface) and
+   `shared.SupportActionResult`; `admin.application.internal.SupportActionService`
+   (collects and dispatches registered actions, audits every execution —
+   success, a returned failure, *and* an uncaught exception all produce
+   exactly one audit log entry, never zero and never an unhandled
+   exception reaching the caller); `admin.api.SupportActionController`
+   (`GET /api/v1/admin/support-actions` to list, `POST
+   /api/v1/admin/support-actions/{actionKey}` to execute); and the
+   reference implementation, `identity.application.internal.ResendVerificationEmailAction`
+   — exactly the first candidate this session's earlier investigation
+   named. It reuses `EmailVerificationService.createToken(...)` (the real
+   logic, not a reimplementation) and a new, deliberately separate
+   `EmailTemplates.resendVerificationEmail(...)` template rather than
+   resending the full registration-welcome email, which would be
+   misleading days or weeks after someone actually registered.
 
-   No code changed for this item — flagging the real blocker clearly and
-   concretely, with two named options, is worth more here than a partial
-   implementation that either quietly widens a module boundary or
-   reimplements another module's business rules in raw SQL.
+   There is still deliberately **no DELETE and no generic "call any
+   method" escape hatch** anywhere in this design — `SupportActionService`
+   only ever runs an action a module has explicitly registered as a bean
+   of this type, a closed list by construction, not by policy alone.
+
+   Tests: `SupportActionServiceTest` (dispatch to an unknown key, a
+   successful action audited correctly, a returned-failure action still
+   audited, and — the case that matters most for a framework other
+   modules will build on — an action that *throws* is caught, reported
+   as a failure result, and still produces exactly one audit entry,
+   never an unhandled exception); `ResendVerificationEmailActionTest`
+   (null target, unknown user, already-verified no-op, and the full
+   happy path confirming the real token-issuing service and the real
+   email service both get called correctly).
+
+   A real mistake caught and fixed while building this: an early
+   `str_replace` while adding the new email template accidentally
+   deleted the explanatory comment documenting `EmailTemplates.userInvitation(...)`
+   (from earlier this session's own work) instead of only inserting new
+   content. Caught by checking the file immediately after the edit
+   rather than assuming it landed cleanly, and restored before moving on.
 4. No frontend for the new diagnostics endpoint yet — API only.
 5. **Not build/test-verified in this session** — same Maven Central
    limitation as the other deliverables, and this one touches shared JWT
@@ -726,4 +729,4 @@ suspended tenant, unconfigured opt-in items rendering as informational
    its backfill — check the review query above.
 
 ---
-*Last updated by Claude — resolved the marketing boundary gap: ApRemittanceEmailService and MarketingService's unsubscribe email are both now properly tenant-branded, and every identity-boundary gap flagged this session is closed. Also found and fixed a more consequential bug in the process: MarketingService.fetchTenantName() silently fell back to the literal string "HandyFlow" on any failure — a live instance of the exact anti-pattern flagged as a hard rule in the PDF Engine proposal, already affecting real campaign content via personalise()'s {{company_name}} substitution, not just the unsubscribe email.*
+*Last updated by Claude — built the support-action framework (Decision 1's implementation, not just the decision): `SupportAction` published interface in `shared`, `SupportActionService` dispatcher in `admin` (module boundary confirmed unchanged, still exactly `{"shared"}`), and the reference action, `ResendVerificationEmailAction`, living in `identity` where the real logic already was. Found a third architectural option neither of the two this session had previously narrowed the blocker to — resolves it without widening `admin`'s boundary and without depending on the impersonation-authority decision.*

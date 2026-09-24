@@ -219,6 +219,21 @@ public class EmailTemplates {
                 slug, modulesList, verifyLink));
     }
 
+    // Purpose-built for the support-action framework's ResendVerificationEmailAction
+    // — deliberately NOT reusing registrationConfirmation() above for a resend.
+    // That template is the full "welcome to HandyFlow" onboarding email (company
+    // slug, module list, getting-started tips); resending all of that days or
+    // weeks after someone actually registered would be misleading, not helpful.
+    // This is just what a resend should be: a short, honest "here's a new link."
+    public static String resendVerificationEmail(String firstName, String verifyLink) {
+        return wrap("""
+            <p>Hi %s,</p>
+            <p>Here's a new link to verify your email address for your HandyFlow account.</p>
+            <p><a href="%s" class="btn">Verify your email address</a></p>
+            <p style="color:#94A3B8;font-size:12px;">If you didn't request this, you can safely ignore this email.</p>
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(firstName), verifyLink));
+    }
+
     // NEW: replaces UserManagementService.inviteUser()'s previous bare
     // inline HTML — confirmed it was missing the company name, inviter
     // name, and role name entirely, even though role.getName() was sitting
