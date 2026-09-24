@@ -28,11 +28,10 @@ import java.util.UUID;
  * and mixing the two prefixes in one tenant's number sequence would be
  * confusing to whoever reads them later.
  * <p>
- * Deliberately does NOT yet capture a submission snapshot on reaching
- * SUBMITTED, unlike compliancetender.TenderService's own
- * TenderSnapshotService integration — that's real, separate work for a
- * later phase, not assumed complete here just because the tenant-scoped
- * version has it.
+ * Snapshot capture on reaching SUBMITTED is now wired in, the same
+ * "automatic, not a separate step a caller could forget" way
+ * compliancetender.TenderService's own transition() calls
+ * TenderSnapshotService.
  */
 @Slf4j
 @Service
@@ -43,6 +42,7 @@ public class ClientTenderService {
     private final ClientTenderRequirementRepository requirementRepository;
     private final ComplianceClientRepository clientRepository;
     private final TenantNumberingFacade numberingFacade;
+    private final ClientTenderSnapshotService snapshotService;
 
     @Transactional(readOnly = true)
     public Page<ClientTenderResponse> getTenders(TenantId tenantId, UUID clientId, String status, Pageable pageable) {
@@ -73,6 +73,11 @@ public class ClientTenderService {
         tender.transitionTo(req.newStatus(), updatedBy);
         tenderRepository.save(tender);
         log.info("Client tender transitioned id={} newStatus={} tenant={}", id, req.newStatus(), tenantId);
+
+        if ("SUBMITTED".equals(req.newStatus())) {
+            snapshotService.captureSnapshot(tenantId, id, updatedBy);
+        }
+
         return toResponse(tender);
     }
 

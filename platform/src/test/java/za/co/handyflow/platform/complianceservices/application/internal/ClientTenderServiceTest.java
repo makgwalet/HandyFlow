@@ -36,9 +36,10 @@ class ClientTenderServiceTest {
     @Mock private ClientTenderRequirementRepository requirementRepository;
     @Mock private ComplianceClientRepository clientRepository;
     @Mock private TenantNumberingFacade numberingFacade;
+    @Mock private ClientTenderSnapshotService snapshotService;
 
     private ClientTenderService service() {
-        return new ClientTenderService(tenderRepository, requirementRepository, clientRepository, numberingFacade);
+        return new ClientTenderService(tenderRepository, requirementRepository, clientRepository, numberingFacade, snapshotService);
     }
 
     private static final TenantId TENANT = TenantId.generate();
@@ -87,5 +88,36 @@ class ClientTenderServiceTest {
 
         assertThatThrownBy(() -> service().transition(TENANT, tenderId, req, USER))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("a successful transition to SUBMITTED automatically captures a snapshot")
+    void transition_toSubmitted_capturesSnapshotAutomatically() {
+        UUID tenderId = UUID.randomUUID();
+        UUID clientId = UUID.randomUUID();
+        ClientTender tender = ClientTender.create(TENANT, clientId, "CTND-00001", "Test Tender", null, null,
+                null, null, null, null, null, null, USER);
+        tender.transitionTo("IN_PREPARATION", USER);
+        tender.transitionTo("INTERNAL_REVIEW", USER);
+        tender.transitionTo("READY_TO_SUBMIT", USER);
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(tender));
+
+        service().transition(TENANT, tenderId, new TransitionClientTenderRequest("SUBMITTED"), USER);
+
+        org.mockito.Mockito.verify(snapshotService).captureSnapshot(TENANT, tenderId, USER);
+    }
+
+    @Test
+    @DisplayName("a transition that is NOT to SUBMITTED never triggers a snapshot")
+    void transition_notToSubmitted_doesNotCaptureSnapshot() {
+        UUID tenderId = UUID.randomUUID();
+        UUID clientId = UUID.randomUUID();
+        ClientTender tender = ClientTender.create(TENANT, clientId, "CTND-00001", "Test Tender", null, null,
+                null, null, null, null, null, null, USER);
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(tender));
+
+        service().transition(TENANT, tenderId, new TransitionClientTenderRequest("IN_PREPARATION"), USER);
+
+        org.mockito.Mockito.verifyNoInteractions(snapshotService);
     }
 }

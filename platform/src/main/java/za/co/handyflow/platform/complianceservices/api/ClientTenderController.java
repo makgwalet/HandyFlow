@@ -13,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.complianceservices.application.internal.ClientTenderService;
+import za.co.handyflow.platform.complianceservices.application.internal.ClientTenderSnapshotService;
 import za.co.handyflow.platform.complianceservices.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -27,6 +28,7 @@ import java.util.UUID;
 public class ClientTenderController {
 
     private final ClientTenderService tenderService;
+    private final ClientTenderSnapshotService snapshotService;
     private final FeatureGuard featureGuard;
 
     @GetMapping("/clients/{clientId}/tenders")
@@ -100,5 +102,23 @@ public class ClientTenderController {
         return ResponseEntity.ok(ApiResponse.success("Requirement status updated",
                 tenderService.updateRequirementStatus(TenantContext.getTenantIdAsObject(), requirementId, request,
                         TenantContext.getCurrentUserId())));
+    }
+
+    @GetMapping("/tenders/{id}/snapshots")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_SERVICES_READ','COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')")
+    @Operation(summary = "Every frozen submission record for this tender, most recent first")
+    public ResponseEntity<ApiResponse<List<ClientTenderSnapshotResponse>>> getSnapshots(@PathVariable UUID id) {
+        featureGuard.requireModule("complianceservices");
+        return ResponseEntity.ok(ApiResponse.success(
+                snapshotService.getSnapshots(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/tenders/snapshots/{snapshotId}")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_SERVICES_READ','COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')")
+    @Operation(summary = "Exactly what was submitted — a frozen record, never affected by later changes")
+    public ResponseEntity<ApiResponse<ClientTenderSnapshotResponse>> getSnapshot(@PathVariable UUID snapshotId) {
+        featureGuard.requireModule("complianceservices");
+        return ResponseEntity.ok(ApiResponse.success(
+                snapshotService.getSnapshot(TenantContext.getTenantIdAsObject(), snapshotId)));
     }
 }
