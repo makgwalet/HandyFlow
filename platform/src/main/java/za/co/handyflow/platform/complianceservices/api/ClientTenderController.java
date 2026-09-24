@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.complianceservices.application.internal.ClientTenderService;
 import za.co.handyflow.platform.complianceservices.application.internal.ClientTenderSnapshotService;
+import za.co.handyflow.platform.complianceservices.application.internal.ClientTenderPersonnelService;
 import za.co.handyflow.platform.complianceservices.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -29,6 +30,7 @@ public class ClientTenderController {
 
     private final ClientTenderService tenderService;
     private final ClientTenderSnapshotService snapshotService;
+    private final ClientTenderPersonnelService personnelService;
     private final FeatureGuard featureGuard;
 
     @GetMapping("/clients/{clientId}/tenders")
@@ -120,5 +122,35 @@ public class ClientTenderController {
         featureGuard.requireModule("complianceservices");
         return ResponseEntity.ok(ApiResponse.success(
                 snapshotService.getSnapshot(TenantContext.getTenantIdAsObject(), snapshotId)));
+    }
+
+    // ── Personnel — referenced from THIS TENANT's own HR, not the client ────
+
+    @GetMapping("/tenders/{id}/personnel")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_SERVICES_READ','COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')")
+    @Operation(summary = "Key personnel put forward on this client's tender — this tenant's own staff, looked up live from HR")
+    public ResponseEntity<ApiResponse<List<ClientTenderPersonnelResponse>>> getPersonnel(@PathVariable UUID id) {
+        featureGuard.requireModule("complianceservices");
+        return ResponseEntity.ok(ApiResponse.success(
+                personnelService.getPersonnel(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/tenders/{id}/personnel")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')")
+    @Operation(summary = "Reference an existing HR employee as key personnel for this client's tender")
+    public ResponseEntity<ApiResponse<ClientTenderPersonnelResponse>> addPersonnel(
+            @PathVariable UUID id, @Valid @RequestBody AddClientTenderPersonnelRequest request) {
+        featureGuard.requireModule("complianceservices");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Personnel added",
+                personnelService.addPersonnel(TenantContext.getTenantIdAsObject(), id, request,
+                        TenantContext.getCurrentUserId())));
+    }
+
+    @DeleteMapping("/tenders/personnel/{personnelId}")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> removePersonnel(@PathVariable UUID personnelId) {
+        featureGuard.requireModule("complianceservices");
+        personnelService.removePersonnel(TenantContext.getTenantIdAsObject(), personnelId);
+        return ResponseEntity.ok(ApiResponse.success("Personnel removed", null));
     }
 }

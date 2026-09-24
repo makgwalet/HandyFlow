@@ -53,6 +53,15 @@
  *       {@code TenantNumberingFacade}, backing {@code ClientTender}'s
  *       own tender numbers the same way {@code compliancetender.Tender}
  *       already uses it.</li>
+ *   <li>{@code hr} — added in Phase 7, for {@code HrFacade}, resolving
+ *       the personnel-reference question Phase 5 left open: a
+ *       client-scoped tender's key personnel are the SERVICE PROVIDER's
+ *       own staff put forward on the client's behalf — the same
+ *       real-world shape as an accounting practice using its own
+ *       qualified people's credentials to help a client win a bid — not
+ *       a separate, client-tracked personnel concept. See
+ *       {@code ClientTenderPersonnel}'s own Javadoc for the full
+ *       reasoning behind this decision.</li>
  * </ul>
  * {@code compliancetender} itself is still NOT a dependency, and turns
  * out not to be needed even for client-scoped tenders — the parallel-
@@ -66,7 +75,7 @@
  * correctly never declared rather than added speculatively to match a
  * plan that didn't hold up.
  */
-@ApplicationModule(allowedDependencies = {"shared", "crm", "evidence", "identity"})
+@ApplicationModule(allowedDependencies = {"shared", "crm", "evidence", "identity", "hr"})
 package za.co.handyflow.platform.complianceservices;
 
 import org.springframework.modulith.ApplicationModule;
