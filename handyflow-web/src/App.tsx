@@ -98,6 +98,9 @@ import { AuditorPortalTenantDetailPage } from "./pages/auditor-portal/AuditorPor
 import { LegalCompliancePage } from "./pages/legalcompliance/LegalCompliancePage"
 import CompliancePage from "./pages/compliancetender/CompliancePage"
 import TenderDetailPage from "./pages/compliancetender/TenderDetailPage"
+import ComplianceServicesPage from "./pages/complianceservices/ComplianceServicesPage"
+import ClientDetailPage from "./pages/complianceservices/ClientDetailPage"
+import ClientTenderDetailPage from "./pages/complianceservices/ClientTenderDetailPage"
 import { DebtCollectionPage } from "./pages/debtcollection/DebtCollectionPage"
 import { CollectionsAgencyPage } from "./pages/collectionsagency/CollectionsAgencyPage"
 import { CollAgencyPortalAcceptInvitePage } from "./pages/collectionsagency-portal/CollAgencyPortalAcceptInvitePage"
@@ -308,6 +311,9 @@ export default function App() {
             <Route path="/legalcompliance"        element={<LegalCompliancePage />} />
             <Route path="/compliancetender"              element={<CompliancePage />} />
             <Route path="/compliancetender/tenders/:id"  element={<TenderDetailPage />} />
+            <Route path="/complianceservices"                          element={<ComplianceServicesPage />} />
+            <Route path="/complianceservices/clients/:clientId"        element={<ClientDetailPage />} />
+            <Route path="/complianceservices/tenders/:id"              element={<ClientTenderDetailPage />} />
             <Route path="/debtcollection" element={<DebtCollectionPage />} />
             <Route path="/recruitment-agency" element={<RecruitmentAgencyPage />} />
             <Route path="/collections-agency" element={<CollectionsAgencyPage />} />

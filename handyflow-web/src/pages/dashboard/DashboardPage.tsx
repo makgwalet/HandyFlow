@@ -66,6 +66,7 @@ const MODULE_REGISTRY: Record<string, AppTile> = {
   warehousing: { key: 'warehousing', name: 'Warehousing', description: '3PL stock, shipments & billing', icon: Warehouse, bg: '#F0FDFA', iconColor: '#0F766E', route: '/warehousing' },
   legalcompliance: { key: 'legalcompliance', name: 'Legal & Compliance', description: 'Obligations, litigation & POPIA', icon: Scale, bg: '#E0E7FF', iconColor: '#4338CA', route: '/legalcompliance' },
   compliancetender: { key: 'compliancetender', name: 'Business Compliance & Tender', description: 'CIPC, SARS, PSIRA registrations & tender workspace', icon: ClipboardCheck, bg: '#E0F2FE', iconColor: '#0369A1', route: '/compliancetender' },
+  complianceservices: { key: 'complianceservices', name: 'Compliance Services', description: 'Manage compliance and tender work for your client companies', icon: Building2, bg: '#ECFDF5', iconColor: '#065F46', route: '/complianceservices' },
   debtcollection: { key: 'debtcollection',  name: 'Debt Collection', description: 'Cases, contact trail & payment plans', icon: Landmark, bg: '#FFEDD5', iconColor: '#9A3412', route: '/debtcollection',
 
 },
