@@ -15,6 +15,7 @@ import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.complianceservices.application.internal.ClientTenderService;
 import za.co.handyflow.platform.complianceservices.application.internal.ClientTenderSnapshotService;
 import za.co.handyflow.platform.complianceservices.application.internal.ClientTenderPersonnelService;
+import za.co.handyflow.platform.complianceservices.application.internal.ClientTenderPdfService;
 import za.co.handyflow.platform.complianceservices.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -31,6 +32,7 @@ public class ClientTenderController {
     private final ClientTenderService tenderService;
     private final ClientTenderSnapshotService snapshotService;
     private final ClientTenderPersonnelService personnelService;
+    private final ClientTenderPdfService pdfService;
     private final FeatureGuard featureGuard;
 
     @GetMapping("/clients/{clientId}/tenders")
@@ -152,5 +154,22 @@ public class ClientTenderController {
         featureGuard.requireModule("complianceservices");
         personnelService.removePersonnel(TenantContext.getTenantIdAsObject(), personnelId);
         return ResponseEntity.ok(ApiResponse.success("Personnel removed", null));
+    }
+
+    // ── PDF export ────────────────────────────────────────────────────────────
+
+    @GetMapping("/tenders/{id}/export")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_SERVICES_READ','COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')")
+    @Operation(summary = "Tender Summary PDF for this client — current live state (requirement matrix + key personnel)")
+    public ResponseEntity<byte[]> exportPdf(@PathVariable UUID id) {
+        featureGuard.requireModule("complianceservices");
+        byte[] pdf = pdfService.generateTenderSummaryPdf(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"client-tender-summary-" + id + ".pdf\"")
+                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
+                .contentLength(pdf.length)
+                .body(pdf);
     }
 }

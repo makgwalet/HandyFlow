@@ -21,13 +21,10 @@ import java.util.UUID;
  * rather than overwriting, for the identical reason — a tender can
  * genuinely be resubmitted after CLARIFICATION.
  * <p>
- * Captures less than the tenant-scoped version does today: no personnel
- * section, because {@code ClientTender} itself doesn't have one yet (see
- * {@code ClientTenderService}'s own Javadoc for the open design question
- * behind that). {@code ClientTenderSnapshotData} only has a tender-
- * fields-plus-requirements shape for now; adding a personnel section
- * here is exactly the kind of change that should follow the design
- * decision, not anticipate it.
+ * Now captures a personnel section too — added once the
+ * personnel-reference design question was resolved (see
+ * {@code ClientTenderPersonnel}'s own Javadoc), the same way
+ * {@code compliancetender.TenderSubmissionSnapshot} already does.
  */
 @Entity
 @Table(name = "client_tender_submission_snapshots")
