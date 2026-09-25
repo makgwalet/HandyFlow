@@ -10,11 +10,11 @@ const fmtR = (n: number | null | undefined) => n != null ? `R ${Number(n).toLoca
 const daysUntil = (date: string) => Math.ceil((new Date(date).getTime() - Date.now()) / 86400000)
 
 const STATUS_CFG: Record<string, { color: string; bg: string; label: string }> = {
-  AVAILABLE:   { color: "#166534", bg: "#DCFCE7", label: "Available"   },
-  ON_TRIP:     { color: "#1D4ED8", bg: "#EFF6FF", label: "On Trip"     },
-  MAINTENANCE: { color: "#D97706", bg: "#FFFBEB", label: "Maintenance" },
-  BREAKDOWN:   { color: "#DC2626", bg: "#FEF2F2", label: "Breakdown"   },
-  RETIRED:     { color: "#94A3B8", bg: "#F8FAFC", label: "Retired"     },
+  AVAILABLE:   { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", label: "Available"   },
+  ON_TRIP:     { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", label: "On Trip"     },
+  MAINTENANCE: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", label: "Maintenance" },
+  BREAKDOWN:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", label: "Breakdown"   },
+  RETIRED:     { color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)", label: "Retired"     },
 }
 
 const VEHICLE_ICONS: Record<string, string> = {
@@ -27,7 +27,7 @@ interface CostSummary {
   totalKm: number; costPerKm: number | null
 }
 
-export default function FleetDashboard({ onNavigate }: { onNavigate: (t: any) => void }) {
+export default function FleetDashboard({ onNavigate }: { onNavigate: (section: string) => void }) {
   const { data: vehicles = [] } = useQuery({
     queryKey: ["fleet-vehicles"],
     queryFn: async () => unwrap(await apiClient.get("/api/v1/fleet/vehicles?size=200")),
@@ -55,10 +55,10 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (t: any) =>
   })
 
   const kpis = [
-    { label: "Total fleet",    value: vs.length,                                               color: "#1B3A6B", bg: "#EFF6FF", icon: Car,           tab: "vehicles" },
-    { label: "On trip now",    value: activeTrips.length,                                       color: "#1D4ED8", bg: "#EFF6FF", icon: Route,         tab: "trips" },
-    { label: "Service due",    value: vs.filter((v: any) => v.dueForService).length,            color: "#D97706", bg: "#FFFBEB", icon: Wrench,        tab: "services" },
-    { label: "Expiring soon",  value: expiring30.length,                                        color: expiring30.length > 0 ? "#DC2626" : "#166534", bg: expiring30.length > 0 ? "#FEF2F2" : "#DCFCE7", icon: AlertTriangle, tab: "compliance" },
+    { label: "Total fleet",    value: vs.length,                                               color: "var(--hf-primary-text)", bg: "var(--hf-info-soft)", icon: Car,           tab: "vehicles" },
+    { label: "On trip now",    value: activeTrips.length,                                       color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", icon: Route,         tab: "trips" },
+    { label: "Service due",    value: vs.filter((v: any) => v.dueForService).length,            color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", icon: Wrench,        tab: "services" },
+    { label: "Expiring soon",  value: expiring30.length,                                        color: expiring30.length > 0 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)", bg: expiring30.length > 0 ? "var(--hf-danger-soft)" : "var(--hf-success-soft-strong)", icon: AlertTriangle, tab: "compliance" },
   ]
 
   const totalKmThisMonth = ts
@@ -77,7 +77,7 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (t: any) =>
             onMouseLeave={e => (e.currentTarget.style.boxShadow = "none")}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: k.color, textTransform: "uppercase" as const }}>{k.label}</div>
-              <k.icon size={16} color={k.color} />
+              <k.icon size={16} style={{ color: k.color }} />
             </div>
             <div style={{ fontSize: 28, fontWeight: 800, color: k.color }}>{k.value}</div>
           </div>
@@ -95,7 +95,7 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (t: any) =>
 
           {vs.length === 0 ? (
             <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed var(--hf-border)", borderRadius: 12, color: "var(--hf-text-faint)" }}>
-              <Car size={32} color="#CBD5E1" style={{ marginBottom: 10 }} />
+              <Car size={32} style={{ color: 'var(--hf-text-disabled)', marginBottom: 10 }} />
               <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No vehicles registered</div>
               <button onClick={() => onNavigate("vehicles")} style={{ marginTop: 12, padding: "7px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
                 Register vehicle
@@ -109,7 +109,7 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (t: any) =>
                 const svcPct = Math.min(100, (kmUsed / (v.serviceIntervalKm || 10000)) * 100)
                 const activeTrip = activeTrips.find((t: any) => t.vehicleId === v.id)
                 return (
-                  <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", border: `1px solid ${v.status === "BREAKDOWN" ? "#FECACA" : "#E2E8F0"}`, borderRadius: 10, background: "var(--hf-surface)" }}>
+                  <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", border: `1px solid ${v.status === "BREAKDOWN" ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 10, background: "var(--hf-surface)" }}>
                     <div style={{ fontSize: 22, width: 36, textAlign: "center" as const, flexShrink: 0 }}>{VEHICLE_ICONS[v.vehicleType] ?? "🚘"}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
@@ -142,7 +142,7 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (t: any) =>
             <div style={{ marginTop: 24 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <TrendingUp size={15} color="#0F172A" />
+                  <TrendingUp size={15} style={{ color: 'var(--hf-text)' }} />
                   <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Cost per KM</span>
                 </div>
                 <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>Most expensive first · all-time</span>
@@ -198,7 +198,7 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (t: any) =>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 10 }}>Compliance Alerts</div>
             {expiring30.length === 0 ? (
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--hf-success-text-strong)" }}>
-                <CheckCircle size={14} color="#166534" /> All documents current
+                <CheckCircle size={14} style={{ color: 'var(--hf-success-text-strong)' }} /> All documents current
               </div>
             ) : expiring30.slice(0, 4).map((v: any) => {
               const earliest = [
@@ -233,11 +233,11 @@ export default function FleetDashboard({ onNavigate }: { onNavigate: (t: any) =>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 10 }}>Quick actions</div>
             {[
-              { label: "Register vehicle",  tab: "vehicles",   color: "#1B3A6B" },
-              { label: "Register driver",   tab: "drivers",    color: "#7C3AED" },
-              { label: "Start trip",        tab: "trips",      color: "#0D9488" },
-              { label: "Log fuel fill-up",  tab: "fuel",       color: "#D97706" },
-              { label: "Record service",    tab: "services",   color: "#1D4ED8" },
+              { label: "Register vehicle",  tab: "vehicles",   color: "var(--hf-primary-text)" },
+              { label: "Register driver",   tab: "drivers",    color: "var(--hf-violet-text)" },
+              { label: "Start trip",        tab: "trips",      color: "var(--hf-accent-text)" },
+              { label: "Log fuel fill-up",  tab: "fuel",       color: "var(--hf-warning-text)" },
+              { label: "Record service",    tab: "services",   color: "var(--hf-info-text)" },
             ].map(a => (
               <button key={a.label} onClick={() => onNavigate(a.tab)}
                 style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left" as const, display: "flex", alignItems: "center", justifyContent: "space-between" }}>

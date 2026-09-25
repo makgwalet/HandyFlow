@@ -284,7 +284,7 @@ export default function App() {
             <Route path="/internal-audit" element={<InternalAuditPage />} />
             <Route path="/earthmoving" element={<EarthMovingPage />} />
             <Route path="/property"    element={<PropertyPage />} />
- <Route path="/fleet"       element={<FleetPage />} />
+ <Route path="/fleet/:section?" element={<FleetPage />} />
             <Route path="/bookings"    element={<BookingsPage />} />
             <Route path="/accounting"  element={<AccountingPage />} />
             <Route path="/settings"    element={<SettingsPage />} />

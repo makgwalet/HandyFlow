@@ -28,14 +28,14 @@ interface Trip {
 }
 
 const STATUS_CFG: Record<string, { color: string; bg: string; label: string }> = {
-  ACTIVE:    { color: "#166534", bg: "#DCFCE7", label: "Active"    },
-  COMPLETED: { color: "#0D9488", bg: "#F0FDF4", label: "Completed" },
-  CANCELLED: { color: "#94A3B8", bg: "#F8FAFC", label: "Cancelled" },
+  ACTIVE:    { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", label: "Active"    },
+  COMPLETED: { color: "var(--hf-accent-text)", bg: "var(--hf-success-soft)", label: "Completed" },
+  CANCELLED: { color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)", label: "Cancelled" },
 }
 
 const TYPE_CFG: Record<string, { color: string; bg: string; icon: React.ElementType; label: string }> = {
-  BUSINESS: { color: "#1D4ED8", bg: "#EFF6FF", icon: Briefcase, label: "Business" },
-  PRIVATE:  { color: "#7C3AED", bg: "#F5F3FF", icon: Home,      label: "Private"  },
+  BUSINESS: { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", icon: Briefcase, label: "Business" },
+  PRIVATE:  { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", icon: Home,      label: "Private"  },
 }
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
@@ -159,16 +159,16 @@ export default function TripsTab() {
   const selectedVehicle = (vehicles as Vehicle[]).find(v => v.id === startForm.vehicleId)
 
   const stats = [
-    { label: "Total trips",      value: trips.length,                                                         color: "#1B3A6B" },
-    { label: "Active now",       value: trips.filter(t => t.status === "ACTIVE").length,                      color: "#166534" },
-    { label: "Total km",         value: `${trips.filter(t => t.status === "COMPLETED").reduce((s, t) => s + (t.distanceKm ?? 0), 0).toLocaleString()} km`, color: "#0D9488" },
-    { label: "Business trips",   value: trips.filter(t => (t.tripType ?? "BUSINESS") === "BUSINESS" && t.status === "COMPLETED").length, color: "#1D4ED8" },
+    { label: "Total trips",      value: trips.length,                                                         color: "var(--hf-primary-text)" },
+    { label: "Active now",       value: trips.filter(t => t.status === "ACTIVE").length,                      color: "var(--hf-success-text-strong)" },
+    { label: "Total km",         value: `${trips.filter(t => t.status === "COMPLETED").reduce((s, t) => s + (t.distanceKm ?? 0), 0).toLocaleString()} km`, color: "var(--hf-accent-text)" },
+    { label: "Business trips",   value: trips.filter(t => (t.tripType ?? "BUSINESS") === "BUSINESS" && t.status === "COMPLETED").length, color: "var(--hf-info-text)" },
   ]
 
   const inp = (k: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
-    border: `1.5px solid ${fieldErrors[k] ? "#DC2626" : "#E2E8F0"}`,
-    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "#FFF5F5" : "#fff", outline: "none",
+    border: `1.5px solid ${fieldErrors[k] ? "var(--hf-danger)" : "var(--hf-border)"}`,
+    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
 
   return (
@@ -189,7 +189,7 @@ export default function TripsTab() {
       {/* ── Logbook export panel ─────────────────────────────────────────── */}
       <div style={{ marginBottom: 22, padding: "16px 18px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-          <FileDown size={16} color="#1B3A6B" />
+          <FileDown size={16} style={{ color: 'var(--hf-primary-text)' }} />
           <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Export SARS Logbook</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto auto", gap: 10, alignItems: "end" }}>
@@ -268,10 +268,10 @@ export default function TripsTab() {
             const TypeIcon = typeCfg.icon
             const vehicle  = vehicleMap[trip.vehicleId]
             return (
-              <div key={trip.id} style={{ background: "var(--hf-surface)", border: `1px solid ${trip.status === "ACTIVE" ? "#86EFAC" : "#E2E8F0"}`, borderLeft: `4px solid ${cfg.color}`, borderRadius: 10, padding: "14px 18px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+              <div key={trip.id} style={{ background: "var(--hf-surface)", border: `1px solid ${trip.status === "ACTIVE" ? "var(--hf-success-border)" : "var(--hf-border)"}`, borderLeft: `4px solid ${cfg.color}`, borderRadius: 10, padding: "14px 18px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", gap: 12, flex: 1 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 9, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Route size={18} color={cfg.color} />
+                    <Route size={18} style={{ color: cfg.color }} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
@@ -354,8 +354,8 @@ export default function TripsTab() {
                     const Icon = cfg.icon
                     return (
                       <button key={t} onClick={() => setStartForm(f => ({ ...f, tripType: t }))}
-                        style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px", border: `2px solid ${startForm.tripType === t ? cfg.color : "#E2E8F0"}`, borderRadius: 8, cursor: "pointer", background: startForm.tripType === t ? cfg.bg : "var(--hf-surface)" }}>
-                        <Icon size={14} color={startForm.tripType === t ? cfg.color : "#94A3B8"} />
+                        style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px", border: `2px solid ${startForm.tripType === t ? cfg.color : "var(--hf-border)"}`, borderRadius: 8, cursor: "pointer", background: startForm.tripType === t ? cfg.bg : "var(--hf-surface)" }}>
+                        <Icon size={14} style={{ color: startForm.tripType === t ? cfg.color : "var(--hf-text-faint)" }} />
                         <span style={{ fontSize: 13, fontWeight: 600, color: startForm.tripType === t ? cfg.color : "var(--hf-text-muted)" }}>{cfg.label}</span>
                       </button>
                     )
@@ -468,4 +468,4 @@ export default function TripsTab() {
 }
 
 const omit2 = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }

@@ -58,7 +58,7 @@ export default function ComplianceTab() {
         <div style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>{title} ({vList.length})</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {vList.map(v => (
-            <div key={v.id} style={{ border: `1px solid ${color === "#DC2626" ? "#FECACA" : color === "#D97706" ? "#FDE68A" : "#E2E8F0"}`, borderRadius: 12, padding: "16px 20px", background: "var(--hf-surface)" }}>
+            <div key={v.id} style={{ border: `1px solid ${color === "var(--hf-danger-text)" ? "var(--hf-danger-border)" : color === "var(--hf-warning-text)" ? "var(--hf-warning-border)" : "var(--hf-border)"}`, borderRadius: 12, padding: "16px 20px", background: "var(--hf-surface)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
                 <div style={{ fontSize: 24 }}>{ICONS[v.vehicleType] ?? "🚘"}</div>
                 <div>
@@ -99,7 +99,7 @@ export default function ComplianceTab() {
         <>
           {(expired.length === 0 && critical.length === 0 && warning.length === 0) && (
             <div style={{ marginBottom: 20, padding: "16px 20px", background: "var(--hf-success-soft-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 12, display: "flex", alignItems: "center", gap: 12 }}>
-              <CheckCircle size={22} color="#166534" />
+              <CheckCircle size={22} style={{ color: 'var(--hf-success-text-strong)' }} />
               <div>
                 <div style={{ fontWeight: 700, color: "var(--hf-success-text-strong)" }}>All documents current</div>
                 <div style={{ fontSize: 13, color: "var(--hf-success-text-strong)" }}>No licences, roadworthy certificates, or insurance policies are expiring within 30 days.</div>
@@ -107,10 +107,10 @@ export default function ComplianceTab() {
             </div>
           )}
 
-          <AlertGroup title="Expired"          vList={expired}  color="#DC2626" />
-          <AlertGroup title="Expiring this week" vList={critical} color="#DC2626" />
-          <AlertGroup title="Expiring this month" vList={warning} color="#D97706" />
-          <AlertGroup title="Expiring within 60 days" vList={upcoming} color="#64748B" />
+          <AlertGroup title="Expired"          vList={expired}  color="var(--hf-danger-text)" />
+          <AlertGroup title="Expiring this week" vList={critical} color="var(--hf-danger-text)" />
+          <AlertGroup title="Expiring this month" vList={warning} color="var(--hf-warning-text)" />
+          <AlertGroup title="Expiring within 60 days" vList={upcoming} color="var(--hf-text-muted)" />
 
           {current.length > 0 && (
             <div style={{ marginTop: 20 }}>
@@ -120,7 +120,7 @@ export default function ComplianceTab() {
                   <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", borderRadius: 8 }}>
                     <span style={{ fontSize: 16 }}>{ICONS[v.vehicleType] ?? "🚘"}</span>
                     <span style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-success-text-strong)" }}>{v.registration}</span>
-                    <CheckCircle size={13} color="#166534" />
+                    <CheckCircle size={13} style={{ color: 'var(--hf-success-text-strong)' }} />
                   </div>
                 ))}
               </div>

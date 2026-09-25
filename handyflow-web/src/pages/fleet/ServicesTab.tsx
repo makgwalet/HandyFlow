@@ -10,15 +10,15 @@ const fmtR    = (n: any) => n != null ? `R ${Number(n).toLocaleString("en-ZA", {
 
 const SERVICE_TYPES = ["SERVICE","REPAIR","TYRE","BATTERY","BRAKES","ELECTRICAL","BODYWORK","INSPECTION","OTHER"]
 const TYPE_CFG: Record<string, { color: string; bg: string }> = {
-  SERVICE:    { color: "#166534", bg: "#DCFCE7" },
-  REPAIR:     { color: "#DC2626", bg: "#FEF2F2" },
-  TYRE:       { color: "#D97706", bg: "#FFFBEB" },
-  BATTERY:    { color: "#7C3AED", bg: "#F3E8FF" },
-  BRAKES:     { color: "#1D4ED8", bg: "#EFF6FF" },
-  ELECTRICAL: { color: "#0D9488", bg: "#F0FDF4" },
-  BODYWORK:   { color: "#EA580C", bg: "#FFF7ED" },
-  INSPECTION: { color: "#0369A1", bg: "#F0F9FF" },
-  OTHER:      { color: "#64748B", bg: "#F8FAFC" },
+  SERVICE:    { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+  REPAIR:     { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
+  TYRE:       { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+  BATTERY:    { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft-strong)" },
+  BRAKES:     { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+  ELECTRICAL: { color: "var(--hf-accent-text)", bg: "var(--hf-success-soft)" },
+  BODYWORK:   { color: "var(--hf-orange-text)", bg: "var(--hf-orange-soft)" },
+  INSPECTION: { color: "var(--hf-sky-text-strong)", bg: "var(--hf-sky-soft)" },
+  OTHER:      { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)" },
 }
 
 const EMPTY_FORM = {
@@ -63,15 +63,15 @@ export default function ServicesTab() {
   const totalCost = (services as any[]).reduce((s, r) => s + Number(r.cost ?? 0), 0)
   const serviceAlerts = (vehicles as any[]).filter(v => v.dueForService)
 
-  const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, outline: "none" }
-  const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+  const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, outline: "none" }
+  const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
 
   return (
     <div>
       {/* Service due alert */}
       {serviceAlerts.length > 0 && (
         <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
-          <AlertTriangle size={17} color="#D97706" style={{ flexShrink: 0 }} />
+          <AlertTriangle size={17} style={{ color: 'var(--hf-warning-text)', flexShrink: 0 }} />
           <div>
             <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-warning-text)" }}>Service Due — {serviceAlerts.length} vehicle{serviceAlerts.length !== 1 ? "s" : ""}</div>
             <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>{serviceAlerts.map((v: any) => v.registration).join(", ")}</div>
@@ -130,7 +130,7 @@ export default function ServicesTab() {
               <div key={s.id} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div style={{ display: "flex", gap: 12 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 9, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Wrench size={18} color={cfg.color} />
+                    <Wrench size={18} style={{ color: cfg.color }} />
                   </div>
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>

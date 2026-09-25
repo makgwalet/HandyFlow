@@ -21,11 +21,11 @@ interface Vehicle {
 interface Driver { id: string; firstName: string; lastName: string; status: string }
 
 const STATUS_CFG: Record<string, { color: string; bg: string; border: string; label: string; icon: React.ElementType }> = {
-  AVAILABLE:   { color: "#166534", bg: "#DCFCE7", border: "#86EFAC",  label: "Available",   icon: CheckCircle  },
-  ON_TRIP:     { color: "#1D4ED8", bg: "#EFF6FF", border: "#BFDBFE",  label: "On Trip",     icon: Car          },
-  MAINTENANCE: { color: "#D97706", bg: "#FFFBEB", border: "#FDE68A",  label: "Maintenance", icon: Wrench       },
-  BREAKDOWN:   { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA",  label: "Breakdown",   icon: AlertTriangle },
-  RETIRED:     { color: "#94A3B8", bg: "#F8FAFC", border: "#E2E8F0",  label: "Retired",     icon: Clock        },
+  AVAILABLE:   { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", border: "var(--hf-success-border)",  label: "Available",   icon: CheckCircle  },
+  ON_TRIP:     { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", border: "var(--hf-info-border)",  label: "On Trip",     icon: Car          },
+  MAINTENANCE: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)",  label: "Maintenance", icon: Wrench       },
+  BREAKDOWN:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)",  label: "Breakdown",   icon: AlertTriangle },
+  RETIRED:     { color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)",  label: "Retired",     icon: Clock        },
 }
 
 const STATUS_DESC: Record<string, string> = {
@@ -115,17 +115,17 @@ export default function VehiclesTab() {
   const filtered = (vehicles as Vehicle[]).filter(v => filterStatus === "ALL" || v.status === filterStatus)
 
   const stats = [
-    { label: "Total",       value: vehicles.length,                                              color: "#1B3A6B" },
-    { label: "Available",   value: vehicles.filter(v => v.status === "AVAILABLE").length,        color: "#166534" },
-    { label: "On Trip",     value: vehicles.filter(v => v.status === "ON_TRIP").length,          color: "#1D4ED8" },
-    { label: "Svc Due",     value: vehicles.filter(v => v.dueForService).length,                 color: "#D97706" },
-    { label: "Breakdown",   value: vehicles.filter(v => v.status === "BREAKDOWN").length,        color: "#DC2626" },
+    { label: "Total",       value: vehicles.length,                                              color: "var(--hf-primary-text)" },
+    { label: "Available",   value: vehicles.filter(v => v.status === "AVAILABLE").length,        color: "var(--hf-success-text-strong)" },
+    { label: "On Trip",     value: vehicles.filter(v => v.status === "ON_TRIP").length,          color: "var(--hf-info-text)" },
+    { label: "Svc Due",     value: vehicles.filter(v => v.dueForService).length,                 color: "var(--hf-warning-text)" },
+    { label: "Breakdown",   value: vehicles.filter(v => v.status === "BREAKDOWN").length,        color: "var(--hf-danger-text)" },
   ]
 
   const inp = (k: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
-    border: `1.5px solid ${fieldErrors[k] ? "#DC2626" : "#E2E8F0"}`,
-    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "#FFF5F5" : "#fff", outline: "none",
+    border: `1.5px solid ${fieldErrors[k] ? "var(--hf-danger)" : "var(--hf-border)"}`,
+    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
     <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
@@ -186,7 +186,7 @@ export default function VehiclesTab() {
             const hasExpiry = v.licenceExpiringSoon || v.roadworthyExpiringSoon
 
             return (
-              <div key={v.id} style={{ border: `1px solid ${v.status === "BREAKDOWN" ? "#FECACA" : "#E2E8F0"}`, borderRadius: 12, overflow: "hidden" }}>
+              <div key={v.id} style={{ border: `1px solid ${v.status === "BREAKDOWN" ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 12, overflow: "hidden" }}>
                 <div style={{ padding: "16px 20px", background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                     <div style={{ width: 48, height: 48, borderRadius: 12, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>
@@ -392,13 +392,13 @@ export default function VehiclesTab() {
               const cfg = STATUS_CFG[s]; const Icon = cfg.icon; const sel = newStatus === s
               return (
                 <button key={s} onClick={() => setNewStatus(s)}
-                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `2px solid ${sel ? cfg.color : "#E2E8F0"}`, borderRadius: 10, cursor: "pointer", background: sel ? cfg.bg : "var(--hf-surface)", textAlign: "left" as const, width: "100%" }}>
-                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: `${cfg.color}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={15} color={cfg.color} /></div>
+                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `2px solid ${sel ? cfg.color : "var(--hf-border)"}`, borderRadius: 10, cursor: "pointer", background: sel ? cfg.bg : "var(--hf-surface)", textAlign: "left" as const, width: "100%" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: `color-mix(in srgb, ${cfg.color} 9%, transparent)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={15} style={{ color: cfg.color }} /></div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, color: sel ? cfg.color : "var(--hf-text)" }}>{cfg.label}</div>
                     <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{STATUS_DESC[s]}</div>
                   </div>
-                  {sel && <CheckCircle size={16} color={cfg.color} />}
+                  {sel && <CheckCircle size={16} style={{ color: cfg.color }} />}
                 </button>
               )
             })}
@@ -513,4 +513,4 @@ function ErrBanner({ msg }: { msg: string }) {
   return <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{msg}</div>
 }
 const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }

@@ -97,6 +97,12 @@ Correction to the original analysis: its per-module "tab counts" were file count
 - Colours: 58 -> 0 hex. Fuel-type colours use the `-text` tokens (identical light values, lighter in dark mode, which also works for bars, dots and chart lines).
 - The hand-drawn price chart's SVG `fill`/`stroke` attributes moved into `style` so tokens resolve; point rings use the surface colour so they still read as a gap in dark mode.
 
+### Fleet ✅
+- Routed sections `/fleet/:section`: Overview (Dashboard); Fleet (Vehicles, Drivers); Operations (Logbook, Service History, Fuel Log); Compliance.
+- Colours: 70 -> 0 hex. Three config-fed icons moved to `style`, which unblocked the codemod for three files.
+- Compliance alert groups compare their `color` prop to pick a border; the props and the comparisons were converted to the same token strings together so the check still matches.
+- No double-unwrap sites.
+
 
 ## Bug found during Phase 2 review: double-unwrapped API responses
 

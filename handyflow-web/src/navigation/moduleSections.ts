@@ -13,7 +13,7 @@ import {
   AlertTriangle, Camera, ClipboardList, Clock, Crosshair, DoorOpen, FileBarChart,
   GitBranch, Key, LayoutDashboard, Lock, MapPin, Radio, RefreshCw, Repeat, Route,
   Shield, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
-  Droplets, ArrowDownToLine, Fuel, Truck, Users, TrendingUp,
+  Droplets, ArrowDownToLine, Fuel, Truck, Users, TrendingUp, Car, Wrench,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -154,7 +154,34 @@ export const FUEL_SECTIONS: ModuleSections = {
   ],
 }
 
-const REGISTRY: ModuleSections[] = [SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS]
+export const FLEET_SECTIONS: ModuleSections = {
+  moduleKey: 'fleet',
+  basePath: '/fleet',
+  title: 'Fleet',
+  icon: Car,
+  defaultSection: 'dashboard',
+  groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+    {
+      label: 'Fleet',
+      sections: [
+        { id: 'vehicles', label: 'Vehicles', icon: Car },
+        { id: 'drivers', label: 'Drivers', icon: Users },
+      ],
+    },
+    {
+      label: 'Operations',
+      sections: [
+        { id: 'trips', label: 'Logbook', icon: Route },
+        { id: 'services', label: 'Service History', icon: Wrench },
+        { id: 'fuel', label: 'Fuel Log', icon: Fuel },
+      ],
+    },
+    { label: 'Compliance', sections: [{ id: 'compliance', label: 'Compliance', icon: Shield }] },
+  ],
+}
+
+const REGISTRY: ModuleSections[] = [SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FLEET_SECTIONS]
 
 /** Groups with sections the user may not see removed (and empty groups dropped). */
 export function visibleGroups(config: ModuleSections, permissions: readonly string[]): ModuleSectionGroup[] {
