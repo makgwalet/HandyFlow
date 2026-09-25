@@ -273,7 +273,7 @@ export default function TanksTab() {
                     </div>
                     <div style={{ height: 10, background: "var(--hf-surface-sunken)", borderRadius: 99, overflow: "hidden" }}>
                       <div style={{ height: "100%", borderRadius: 99, width: `${pct}%`,
-                        background: tank.low ? "linear-gradient(90deg, var(--hf-danger), color-mix(in srgb, var(--hf-danger) 60%, white))" : `linear-gradient(90deg,${cfg.color},color-mix(in srgb, ${cfg.color} 53%, transparent))`,
+                        background: tank.low ? "linear-gradient(90deg, var(--hf-danger), color-mix(in srgb, var(--hf-danger) 60%, var(--hf-surface)))" : `linear-gradient(90deg,${cfg.color},color-mix(in srgb, ${cfg.color} 53%, transparent))`,
                         transition: "width 0.5s ease" }} />
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>

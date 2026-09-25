@@ -132,7 +132,7 @@ export default function JournalEntriesTab() {
           </p>
         </div>
         <button onClick={() => { setShowCreate(true); setError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-primary)", color: "white",
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)",
             border: "none", borderRadius: 9, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={14} /> New Journal Entry
         </button>
@@ -145,7 +145,7 @@ export default function JournalEntriesTab() {
             style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
               cursor: "pointer", border: "none",
               background: statusFilter === s ? "var(--hf-primary)" : "var(--hf-surface-sunken)",
-              color:      statusFilter === s ? "white"   : "var(--hf-text-muted)" }}>
+              color:      statusFilter === s ? "var(--hf-text-on-solid)"   : "var(--hf-text-muted)" }}>
             {s === "ALL" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
           </button>
         ))}
@@ -164,7 +164,7 @@ export default function JournalEntriesTab() {
       )}
 
       {/* Table */}
-      <div style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
         {isLoading ? (
           <div style={{ padding: 60, textAlign: "center", color: "var(--hf-text-faint)" }}>Loading journal entries...</div>
         ) : journals.length === 0 ? (
@@ -190,13 +190,13 @@ export default function JournalEntriesTab() {
                     <tr key={j.id}
                       onClick={() => setExpanded(isExp ? null : j.id)}
                       style={{ borderBottom: "1px solid var(--hf-border-subtle)", cursor: "pointer",
-                        background: isExp ? "var(--hf-surface-muted)" : "white" }}
+                        background: isExp ? "var(--hf-surface-muted)" : "var(--hf-surface)" }}
                       onMouseEnter={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = "var(--hf-surface-muted)" }}
-                      onMouseLeave={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = "white" }}>
+                      onMouseLeave={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = "var(--hf-surface)" }}>
                       <td style={{ padding: "12px 14px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 700, color: "var(--hf-primary-text)" }}>{j.entryNumber}</span>
-                          {isExp ? <ChevronUp size={12} color="#94A3B8" /> : <ChevronDown size={12} color="#94A3B8" />}
+                          {isExp ? <ChevronUp size={12} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={12} style={{ color: 'var(--hf-text-faint)' }} />}
                         </div>
                         <span style={{ fontSize: 10, color: "var(--hf-text-faint)" }}>{j.entryType}</span>
                       </td>
@@ -291,7 +291,7 @@ export default function JournalEntriesTab() {
       {showCreate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex",
           alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "white", borderRadius: 16, padding: 28, width: 700, maxHeight: "90vh",
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 700, maxHeight: "90vh",
             overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>New Journal Entry</h3>
@@ -358,7 +358,7 @@ export default function JournalEntriesTab() {
                       placeholder="0.00" style={{ ...inp, fontSize: 12, ...(isMixed ? { borderColor: "var(--hf-danger-border)", background: "var(--hf-danger-soft)" } : {}) }} />
                     <button onClick={() => removeLine(l.tempId)} disabled={lines.length <= 2}
                       style={{ background: "none", border: "none", cursor: lines.length <= 2 ? "not-allowed" : "pointer",
-                        color: lines.length <= 2 ? "var(--hf-text-disabled)" : "#FDA4AF", padding: 4, borderRadius: 6, display: "flex" }}>
+                        color: lines.length <= 2 ? "var(--hf-text-disabled)" : "color-mix(in srgb, var(--hf-danger-text) 50%, var(--hf-surface))", padding: 4, borderRadius: 6, display: "flex" }}>
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -404,14 +404,14 @@ export default function JournalEntriesTab() {
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button onClick={() => setShowCreate(false)}
                 style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9,
-                  background: "white", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>
+                  background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>
                 Cancel
               </button>
               <button disabled={create.isPending || !balanced || !form.description}
                 onClick={() => create.mutate()}
                 style={{ padding: "9px 20px", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700,
                   background: balanced && form.description ? "var(--hf-primary)" : "var(--hf-surface-strong)",
-                  color: balanced && form.description ? "white" : "var(--hf-text-faint)",
+                  color: balanced && form.description ? "var(--hf-text-on-solid)" : "var(--hf-text-faint)",
                   cursor: balanced && form.description ? "pointer" : "not-allowed" }}>
                 {create.isPending ? "Creating..." : "Create Journal Entry"}
               </button>
@@ -424,7 +424,7 @@ export default function JournalEntriesTab() {
       {reverseTarget && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex",
           alignItems: "center", justifyContent: "center", zIndex: 1001, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "white", borderRadius: 16, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700 }}>Reverse Journal Entry</h3>
             <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: "0 0 20px" }}>
               Creates an equal-and-opposite posted journal entry. The original will be marked REVERSED.
@@ -443,13 +443,13 @@ export default function JournalEntriesTab() {
             )}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button onClick={() => { setReverseTarget(null); setError("") }}
-                style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "white", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>
+                style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>
                 Cancel
               </button>
               <button disabled={reverse.isPending}
                 onClick={() => reverse.mutate({ id: reverseTarget.id, date: reversalDate })}
                 style={{ padding: "9px 20px", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700,
-                  background: "var(--hf-warning)", color: "white", cursor: "pointer" }}>
+                  background: "var(--hf-warning)", color: "var(--hf-text-on-solid)", cursor: "pointer" }}>
                 {reverse.isPending ? "Reversing..." : "Confirm Reversal"}
               </button>
             </div>

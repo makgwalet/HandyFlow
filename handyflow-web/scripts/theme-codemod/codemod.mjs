@@ -44,8 +44,10 @@ const ROLE_BY_PROP = new Map([
       'outline', 'outlineColor', 'selectedBorder', 'boxShadow'].map(p => [p, 'bd']),
 ])
 
-const HEX_RE = /#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g
+// Hex colours, plus the named colour `white` (treated exactly as #FFFFFF).
+const HEX_RE = /#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b|(?<![\w-])white(?![\w-])/g
 const normHex = h => {
+  if (h.toLowerCase() === 'white') return '#FFFFFF'
   const u = h.toUpperCase()
   return u.length === 4 ? '#' + [...u.slice(1)].map(c => c + c).join('') : u
 }

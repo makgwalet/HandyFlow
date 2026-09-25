@@ -120,7 +120,7 @@ export default function FuelDashboard({ onNavigate }: { onNavigate: (section: st
                     </div>
                     <div style={{ height: 8, background: "var(--hf-surface-sunken)", borderRadius: 99, overflow: "hidden" }}>
                       <div style={{ height: "100%", width: `${pct}%`, borderRadius: 99,
-                        background: tank.low ? "linear-gradient(90deg, var(--hf-danger), color-mix(in srgb, var(--hf-danger) 60%, white))" : `linear-gradient(90deg,${color},color-mix(in srgb, ${color} 53%, transparent))`,
+                        background: tank.low ? "linear-gradient(90deg, var(--hf-danger), color-mix(in srgb, var(--hf-danger) 60%, var(--hf-surface)))" : `linear-gradient(90deg,${color},color-mix(in srgb, ${color} 53%, transparent))`,
                         transition: "width 0.5s" }} />
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>

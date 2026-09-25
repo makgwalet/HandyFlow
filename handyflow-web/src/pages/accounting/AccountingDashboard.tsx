@@ -16,8 +16,11 @@ interface AgingReport {
 
 const fmtR = (n: number) => `R ${(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 const fmtRFull = (n: number) => `R ${(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
-const TEAL = "#0D9488"; const NAVY = "#1B3A6B"; const RED = "#DC2626"
-const GREEN = "#166534"; const AMBER = "#D97706"; const PURPLE = "#7C3AED"
+// Theme tokens (light values unchanged). Used for text, bars and chart
+// strokes; the lighter dark-mode values also read well on dark surfaces.
+// SVG usage goes through style={{ fill/stroke }}, where CSS variables resolve.
+const TEAL = "var(--hf-accent-text)"; const NAVY = "var(--hf-primary-text)"; const RED = "var(--hf-danger-text)"
+const GREEN = "var(--hf-success-text-strong)"; const AMBER = "var(--hf-warning-text)"; const PURPLE = "var(--hf-violet-text)"
 
 const downloadPdf = async (url: string, filename: string) => {
   try {
@@ -76,17 +79,17 @@ function LineChartSvg({ data }: { data: MonthlySummary[] }) {
   return (
     <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible" }}>
       {zero && <line x1={PAD} y1={zero} x2={W - PAD} y2={zero}
-        stroke="#E2E8F0" strokeWidth={1} strokeDasharray="4 3" />}
-      <path d={path} fill="none" stroke={NAVY} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+        strokeWidth={1} strokeDasharray="4 3" style={{ stroke: "var(--hf-border)" }} />}
+      <path d={path} fill="none" style={{ stroke: NAVY }} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
       {pts.map((p, i) => (
         <g key={i}>
-          <circle cx={p.x} cy={p.y} r={4} fill={NAVY} />
+          <circle cx={p.x} cy={p.y} r={4} style={{ fill: NAVY }} />
           <title>{p.label}: {fmtRFull(p.v)}</title>
         </g>
       ))}
       {pts.map((p, i) => (
         <text key={i} x={p.x} y={H - 2} textAnchor="middle"
-          fontSize={9} fill="#94A3B8">{p.label}</text>
+          fontSize={9} style={{ fill: "var(--hf-text-faint)" }}>{p.label}</text>
       ))}
     </svg>
   )
@@ -108,14 +111,14 @@ function DonutChart({ revenue, expenses }: { revenue: number; expenses: number }
 
   return (
     <svg width={160} height={160} viewBox="0 0 160 160">
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#F1F5F9" strokeWidth={22} />
+      <circle cx={cx} cy={cy} r={r} fill="none" style={{ stroke: "var(--hf-surface-sunken)" }} strokeWidth={22} />
       {revenue > 0 && (
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke={TEAL} strokeWidth={22}
+        <circle cx={cx} cy={cy} r={r} fill="none" style={{ stroke: TEAL }} strokeWidth={22}
           strokeDasharray={`${revDash} ${circ}`} strokeDashoffset={circ / 4}
           strokeLinecap="round" />
       )}
       {expenses > 0 && (
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke={RED} strokeWidth={22}
+        <circle cx={cx} cy={cy} r={r} fill="none" style={{ stroke: RED }} strokeWidth={22}
           strokeDasharray={`${expDash} ${circ}`}
           strokeDashoffset={circ / 4 - expOffset * 1}
           strokeLinecap="round" />
@@ -162,7 +165,7 @@ export default function DashboardTab() {
           { label: "Net Profit",            value: fmtR(netProfit),          sub: `${margin}% margin`,         color: netProfit >= 0 ? GREEN : RED, icon: <DollarSign size={18} /> },
           { label: "Outstanding AR",        value: fmtR(aging?.total ?? 0),  sub: `${aging?.lines?.length ?? 0} invoices`, color: AMBER, icon: <AlertTriangle size={18} /> },
         ].map(k => (
-          <div key={k.label} style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 18 }}>
+          <div key={k.label} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 18 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{k.label}</div>
               <div style={{ color: k.color, opacity: 0.6 }}>{k.icon}</div>
@@ -177,7 +180,7 @@ export default function DashboardTab() {
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 24 }}>
 
         {/* Bar chart */}
-        <div style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 20 }}>
+        <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Revenue vs Expenses — Last 6 Months</div>
             <div style={{ display: "flex", gap: 14 }}>
@@ -193,7 +196,7 @@ export default function DashboardTab() {
         </div>
 
         {/* Line chart */}
-        <div style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 20 }}>
+        <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 20 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)", marginBottom: 16 }}>Net Profit Trend</div>
           <LineChartSvg data={monthly} />
           {monthly.length > 0 && (
@@ -211,7 +214,7 @@ export default function DashboardTab() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
 
         {/* Donut + legend */}
-        <div style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 20 }}>
+        <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 20 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)", marginBottom: 16 }}>
             Revenue vs Expenses Split (6 months)
           </div>
@@ -239,7 +242,7 @@ export default function DashboardTab() {
         </div>
 
         {/* PDF Downloads */}
-        <div style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 20 }}>
+        <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 20 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)", marginBottom: 4 }}>Download Reports</div>
           <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginBottom: 16 }}>Year to date: {yearStart} to {today}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

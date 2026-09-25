@@ -77,14 +77,14 @@ export default function VatReturnsTab() {
           </p>
         </div>
         <button onClick={() => { setShowCreate(true); setError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-violet)", color: "white",
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-violet)", color: "var(--hf-text-on-solid)",
             border: "none", borderRadius: 9, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={14} /> New VAT Period
         </button>
       </div>
 
       {/* VAT201 Calculator */}
-      <div style={{ background: "white", border: "1px solid var(--hf-violet-border)", borderRadius: 12,
+      <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-violet-border)", borderRadius: 12,
         padding: 20, marginBottom: 20 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-violet-text)", marginBottom: 12 }}>
           VAT201 Calculator
@@ -100,7 +100,7 @@ export default function VatReturnsTab() {
           </div>
           <button disabled={!vatFrom || !vatTo || vatLoading}
             onClick={() => runVat201()}
-            style={{ padding: "8px 18px", background: "var(--hf-violet)", color: "white",
+            style={{ padding: "8px 18px", background: "var(--hf-violet)", color: "var(--hf-text-on-solid)",
               border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
             {vatLoading ? "Calculating..." : "Calculate VAT201"}
           </button>
@@ -139,7 +139,7 @@ export default function VatReturnsTab() {
             </div>
             <button disabled={attach.isPending} onClick={() => attach.mutate(openPeriod.id)}
               style={{ padding: "7px 14px", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 700,
-                background: "var(--hf-violet)", color: "white", cursor: "pointer", whiteSpace: "nowrap" as const }}>
+                background: "var(--hf-violet)", color: "var(--hf-text-on-solid)", cursor: "pointer", whiteSpace: "nowrap" as const }}>
               {attach.isPending ? "Attaching..." : "Attach to open period"}
             </button>
           </div>
@@ -157,7 +157,7 @@ export default function VatReturnsTab() {
       </div>
 
       {/* VAT Periods */}
-      <div style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
         <div style={{ padding: "12px 20px", background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border-subtle)" }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)" }}>VAT Periods</span>
         </div>
@@ -181,7 +181,7 @@ export default function VatReturnsTab() {
                 return (
                   <tr key={p.id} style={{ borderBottom: "1px solid var(--hf-border-subtle)" }}
                     onMouseEnter={e => (e.currentTarget.style.background = "var(--hf-surface-muted)")}
-                    onMouseLeave={e => (e.currentTarget.style.background = "white")}>
+                    onMouseLeave={e => (e.currentTarget.style.background = "var(--hf-surface)")}>
                     <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>
                       {fmtDt(p.periodStart)} – {fmtDt(p.periodEnd)}
                     </td>
@@ -215,7 +215,7 @@ export default function VatReturnsTab() {
       {showCreate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex",
           alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "white", borderRadius: 16, padding: 28, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>New VAT Period</h3>
               <button onClick={() => setShowCreate(false)}
@@ -243,11 +243,11 @@ export default function VatReturnsTab() {
             )}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button onClick={() => setShowCreate(false)}
-                style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "white", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
+                style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button disabled={create.isPending || !form.periodStart || !form.periodEnd}
                 onClick={() => create.mutate()}
                 style={{ padding: "9px 20px", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700,
-                  background: "var(--hf-violet)", color: "white", cursor: "pointer" }}>
+                  background: "var(--hf-violet)", color: "var(--hf-text-on-solid)", cursor: "pointer" }}>
                 {create.isPending ? "Creating..." : "Create Period"}
               </button>
             </div>

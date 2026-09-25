@@ -11,18 +11,18 @@ interface Account {
 }
 
 const TYPE_COLOR: Record<string, { bg: string; color: string }> = {
-  ASSET:     { bg: "#EFF6FF", color: "#1D4ED8" },
-  LIABILITY: { bg: "#FEF2F2", color: "#DC2626" },
-  EQUITY:    { bg: "#F3E8FF", color: "#7C3AED" },
-  INCOME:    { bg: "#F0FDF4", color: "#166534" },
-  EXPENSE:   { bg: "#FEF3C7", color: "#92400E" },
+  ASSET:     { bg: "var(--hf-info-soft)", color: "var(--hf-info-text)" },
+  LIABILITY: { bg: "var(--hf-danger-soft)", color: "var(--hf-danger-text)" },
+  EQUITY:    { bg: "var(--hf-violet-soft-strong)", color: "var(--hf-violet-text)" },
+  INCOME:    { bg: "var(--hf-success-soft)", color: "var(--hf-success-text-strong)" },
+  EXPENSE:   { bg: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text-deep)" },
 }
 
 const fmtR = (n: number) =>
   n == null ? "—" : `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
 
 const inp: React.CSSProperties = {
-  width: "100%", padding: "8px 12px", border: "1.5px solid #E2E8F0",
+  width: "100%", padding: "8px 12px", border: "1.5px solid var(--hf-border)",
   borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box",
 }
 
@@ -82,7 +82,7 @@ export default function ChartOfAccountsTab() {
           })}
         </div>
         <button onClick={() => { setShowCreate(true); setError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-accent)", color: "white",
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-accent)", color: "var(--hf-text-on-solid)",
             border: "none", borderRadius: 9, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginLeft: 12 }}>
           <Plus size={14} /> Add Account
         </button>
@@ -94,10 +94,10 @@ export default function ChartOfAccountsTab() {
           if (accs.length === 0) return null
           const c = TYPE_COLOR[type]
           return (
-            <div key={type} style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
+            <div key={type} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
               <div style={{ background: c.bg, padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <BookOpen size={14} color={c.color} />
+                  <BookOpen size={14} style={{ color: c.color }} />
                   <span style={{ fontSize: 13, fontWeight: 700, color: c.color }}>{type}</span>
                   <span style={{ fontSize: 12, color: c.color, opacity: 0.7 }}>({accs.length} accounts)</span>
                 </div>
@@ -119,7 +119,7 @@ export default function ChartOfAccountsTab() {
                     <tr key={acc.id}
                       style={{ borderBottom: i < accs.length - 1 ? "1px solid var(--hf-border-subtle)" : "none" }}
                       onMouseEnter={e => (e.currentTarget.style.background = "var(--hf-surface-muted)")}
-                      onMouseLeave={e => (e.currentTarget.style.background = "white")}>
+                      onMouseLeave={e => (e.currentTarget.style.background = "var(--hf-surface)")}>
                       <td style={{ padding: "10px 16px" }}>
                         <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 600, color: c.color }}>
                           {acc.accountCode}
@@ -153,7 +153,7 @@ export default function ChartOfAccountsTab() {
       {showCreate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex",
           alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "white", borderRadius: 16, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Add Custom Account</h3>
               <button onClick={() => setShowCreate(false)}
@@ -183,8 +183,8 @@ export default function ChartOfAccountsTab() {
                   return (
                     <button key={t} type="button" onClick={() => setForm(f => ({ ...f, accountType: t }))}
                       style={{ flex: 1, padding: "7px 8px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                        border: `1.5px solid ${active ? c.color : "#E2E8F0"}`,
-                        background: active ? c.bg : "white", color: active ? c.color : "var(--hf-text-faint)" }}>
+                        border: `1.5px solid ${active ? c.color : "var(--hf-border)"}`,
+                        background: active ? c.bg : "var(--hf-surface)", color: active ? c.color : "var(--hf-text-faint)" }}>
                       {t}
                     </button>
                   )
@@ -206,11 +206,11 @@ export default function ChartOfAccountsTab() {
             )}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button onClick={() => setShowCreate(false)}
-                style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "white", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
+                style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button disabled={createAccount.isPending || !form.accountCode || !form.accountName}
                 onClick={() => createAccount.mutate()}
                 style={{ padding: "9px 20px", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700,
-                  background: "var(--hf-accent)", color: "white", cursor: "pointer",
+                  background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", cursor: "pointer",
                   opacity: (!form.accountCode || !form.accountName) ? 0.5 : 1 }}>
                 {createAccount.isPending ? "Creating..." : "Create Account"}
               </button>

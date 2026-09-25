@@ -286,7 +286,7 @@ export default function App() {
             <Route path="/property"    element={<PropertyPage />} />
  <Route path="/fleet/:section?" element={<FleetPage />} />
             <Route path="/bookings"    element={<BookingsPage />} />
-            <Route path="/accounting"  element={<AccountingPage />} />
+            <Route path="/accounting/:section?" element={<AccountingPage />} />
             <Route path="/settings"    element={<SettingsPage />} />
             <Route path="/hr"          element={<HrPage />} />
             <Route path="/clinic"      element={<ClinicPage />} />

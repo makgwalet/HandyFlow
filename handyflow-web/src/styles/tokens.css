@@ -120,6 +120,14 @@
   --hf-indigo-soft: #eef2ff;
   --hf-indigo-border: #c7d2fe;
 
+  /* Positive/negative figures on coloured cards.
+     on-solid: on a brand/solid fill that stays dark in both themes.
+     on-inverse: on --hf-inverse-surface, which flips light/dark. */
+  --hf-success-on-solid: #4ade80;
+  --hf-danger-on-solid: #f87171;
+  --hf-success-on-inverse: #4ade80;
+  --hf-danger-on-inverse: #f87171;
+
   /* Shape (consumed by the Phase 1 customizer) */
   --hf-radius-sm: 6px;
   --hf-radius: 10px;
@@ -215,4 +223,7 @@
   --hf-indigo-text: #818cf8;
   --hf-indigo-soft: rgba(129, 140, 248, 0.1);
   --hf-indigo-border: rgba(129, 140, 248, 0.32);
+
+  --hf-success-on-inverse: #15803d;
+  --hf-danger-on-inverse: #b91c1c;
 }

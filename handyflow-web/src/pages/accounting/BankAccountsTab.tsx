@@ -192,7 +192,7 @@ export default function BankAccountsTab() {
           </p>
         </div>
         <button onClick={() => { setShowCreate(true); setError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-primary)", color: "white",
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)",
             border: "none", borderRadius: 9, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={14} /> Add Bank Account
         </button>
@@ -201,7 +201,7 @@ export default function BankAccountsTab() {
       {isLoading ? (
         <div style={{ padding: 60, textAlign: "center", color: "var(--hf-text-faint)" }}>Loading bank accounts...</div>
       ) : accounts.length === 0 ? (
-        <div style={{ padding: 60, textAlign: "center", color: "var(--hf-text-faint)", background: "white",
+        <div style={{ padding: 60, textAlign: "center", color: "var(--hf-text-faint)", background: "var(--hf-surface)",
           border: "1px solid var(--hf-border)", borderRadius: 12 }}>
           No bank accounts yet — add one to start tracking your cash position.
         </div>
@@ -217,13 +217,13 @@ export default function BankAccountsTab() {
                   <div style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", marginBottom: 3 }}>
                     {acc.bankName} · {acc.accountType} · {acc.currency}
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "white" }}>{acc.accountName}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "var(--hf-text-on-solid)" }}>{acc.accountName}</div>
                   <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{acc.accountNumber}</div>
                 </div>
                 <span style={{ fontSize: 10, background: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.8)",
                   padding: "3px 8px", borderRadius: 10 }}>{acc.accountType}</span>
               </div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: acc.currentBalance >= 0 ? "#4ADE80" : "#F87171" }}>
+              <div style={{ fontSize: 24, fontWeight: 800, color: acc.currentBalance >= 0 ? "var(--hf-success-on-solid)" : "var(--hf-danger-on-solid)" }}>
                 {fmtR(acc.currentBalance)}
               </div>
               <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>Current balance · click to view transactions</div>
@@ -236,12 +236,12 @@ export default function BankAccountsTab() {
       {showTx && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex",
           justifyContent: "flex-end", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "white", width: 560, height: "100%", overflowY: "auto",
+          <div style={{ background: "var(--hf-surface)", width: 560, height: "100%", overflowY: "auto",
             boxShadow: "-4px 0 24px rgba(0,0,0,0.12)" }}>
             <div style={{ background: "var(--hf-primary)", padding: "20px 24px", display: "flex",
               justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "white" }}>{showTx.accountName}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "var(--hf-text-on-solid)" }}>{showTx.accountName}</div>
                 <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>{showTx.bankName} · {showTx.accountNumber}</div>
               </div>
               <button onClick={() => setShowTx(null)}
@@ -271,12 +271,12 @@ export default function BankAccountsTab() {
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => { setShowImport(true); setError(""); setImportResult(null) }}
-                  style={{ display: "flex", alignItems: "center", gap: 5, background: "white", color: "var(--hf-primary-text)",
+                  style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-surface)", color: "var(--hf-primary-text)",
                     border: "1.5px solid var(--hf-primary)", borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                   <Upload size={12} /> Import CSV
                 </button>
                 <button onClick={() => { setShowAddTx(true); setError("") }}
-                  style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-accent)", color: "white",
+                  style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-accent)", color: "var(--hf-text-on-solid)",
                     border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                   <Plus size={12} /> Add Transaction
                 </button>
@@ -286,7 +286,7 @@ export default function BankAccountsTab() {
             {showTx.lowBalanceThreshold != null && showTx.currentBalance < showTx.lowBalanceThreshold && (
               <div style={{ padding: "10px 20px", background: "var(--hf-danger-soft)", borderBottom: "1px solid var(--hf-danger-border)",
                 display: "flex", alignItems: "center", gap: 8 }}>
-                <BellRing size={13} color="#DC2626" />
+                <BellRing size={13} style={{ color: 'var(--hf-danger-text)' }} />
                 <span style={{ fontSize: 12, color: "var(--hf-danger-text)" }}>
                   <strong>Below threshold.</strong> A daily alert email will keep sending until the balance recovers or the threshold is changed.
                 </span>
@@ -307,11 +307,11 @@ export default function BankAccountsTab() {
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                   <button onClick={() => setShowThreshold(false)}
                     style={{ padding: "7px 14px", border: "1px solid var(--hf-border)", borderRadius: 7,
-                      background: "white", fontSize: 12, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
+                      background: "var(--hf-surface)", fontSize: 12, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
                   <button disabled={setThreshold.isPending}
                     onClick={() => setThreshold.mutate()}
                     style={{ padding: "7px 14px", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600,
-                      background: "var(--hf-violet)", color: "white", cursor: "pointer" }}>
+                      background: "var(--hf-violet)", color: "var(--hf-text-on-solid)", cursor: "pointer" }}>
                     {setThreshold.isPending ? "Saving..." : "Save"}
                   </button>
                 </div>
@@ -327,7 +327,7 @@ export default function BankAccountsTab() {
                 </div>
                 <button onClick={() => { setShowLinkAccount(true); setError("") }}
                   style={{ padding: "6px 12px", border: "1.5px solid var(--hf-warning-text-deep)", borderRadius: 7,
-                    background: "white", fontSize: 11, fontWeight: 700, color: "var(--hf-warning-text-deep)", cursor: "pointer",
+                    background: "var(--hf-surface)", fontSize: 11, fontWeight: 700, color: "var(--hf-warning-text-deep)", cursor: "pointer",
                     whiteSpace: "nowrap" as const, marginLeft: 12 }}>
                   Link now
                 </button>
@@ -352,11 +352,11 @@ export default function BankAccountsTab() {
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                   <button onClick={() => { setShowLinkAccount(false); setLinkAccountId("") }}
                     style={{ padding: "7px 14px", border: "1px solid var(--hf-border)", borderRadius: 7,
-                      background: "white", fontSize: 12, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
+                      background: "var(--hf-surface)", fontSize: 12, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
                   <button disabled={!linkAccountId || linkAccount.isPending}
                     onClick={() => linkAccount.mutate()}
                     style={{ padding: "7px 14px", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600,
-                      background: "var(--hf-warning-text-deep)", color: "white", cursor: "pointer", opacity: !linkAccountId ? 0.5 : 1 }}>
+                      background: "var(--hf-warning-text-deep)", color: "var(--hf-text-on-solid)", cursor: "pointer", opacity: !linkAccountId ? 0.5 : 1 }}>
                     {linkAccount.isPending ? "Linking..." : "Link account"}
                   </button>
                 </div>
@@ -382,11 +382,11 @@ export default function BankAccountsTab() {
                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                       <button onClick={() => { setShowImport(false); setImportFileName(""); setImportCsvBase64("") }}
                         style={{ padding: "7px 14px", border: "1px solid var(--hf-border)", borderRadius: 7,
-                          background: "white", fontSize: 12, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
+                          background: "var(--hf-surface)", fontSize: 12, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
                       <button disabled={!importCsvBase64 || importTx.isPending}
                         onClick={() => importTx.mutate()}
                         style={{ padding: "7px 14px", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600,
-                          background: "var(--hf-primary)", color: "white", cursor: "pointer",
+                          background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", cursor: "pointer",
                           opacity: !importCsvBase64 ? 0.5 : 1 }}>
                         {importTx.isPending ? "Importing..." : `Import ${importFileName || "file"}`}
                       </button>
@@ -419,7 +419,7 @@ export default function BankAccountsTab() {
                     <div style={{ display: "flex", justifyContent: "flex-end" }}>
                       <button onClick={() => { setShowImport(false); setImportResult(null) }}
                         style={{ padding: "7px 14px", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600,
-                          background: "var(--hf-primary)", color: "white", cursor: "pointer" }}>Done</button>
+                          background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", cursor: "pointer" }}>Done</button>
                     </div>
                   </>
                 )}
@@ -470,11 +470,11 @@ export default function BankAccountsTab() {
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                   <button onClick={() => setShowAddTx(false)}
                     style={{ padding: "7px 14px", border: "1px solid var(--hf-border)", borderRadius: 7,
-                      background: "white", fontSize: 12, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
+                      background: "var(--hf-surface)", fontSize: 12, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
                   <button disabled={addTx.isPending || !txForm.description || !txForm.amount}
                     onClick={() => addTx.mutate()}
                     style={{ padding: "7px 14px", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600,
-                      background: "var(--hf-accent)", color: "white", cursor: "pointer" }}>
+                      background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", cursor: "pointer" }}>
                     {addTx.isPending ? "Saving..." : "Record Transaction"}
                   </button>
                 </div>
@@ -494,8 +494,8 @@ export default function BankAccountsTab() {
                       justifyContent: "center",
                       background: tx.transactionType === "CREDIT" ? "var(--hf-success-soft)" : "var(--hf-danger-soft)" }}>
                       {tx.transactionType === "CREDIT"
-                        ? <TrendingUp size={14} color="#166534" />
-                        : <TrendingDown size={14} color="#DC2626" />}
+                        ? <TrendingUp size={14} style={{ color: 'var(--hf-success-text-strong)' }} />
+                        : <TrendingDown size={14} style={{ color: 'var(--hf-danger-text)' }} />}
                     </div>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{tx.description}</div>
@@ -538,7 +538,7 @@ export default function BankAccountsTab() {
       {reconcileTx && showTx && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex",
           alignItems: "center", justifyContent: "center", zIndex: 1100, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "white", borderRadius: 16, padding: 24, width: 520, maxHeight: "80vh",
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 24, width: 520, maxHeight: "80vh",
             overflowY: "auto" as const, boxShadow: "0 20px 60px rgba(0,0,0,0.25)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
               <div>
@@ -558,13 +558,13 @@ export default function BankAccountsTab() {
               <button onClick={() => setReconcileMode("match")}
                 style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer",
                   background: reconcileMode === "match" ? "var(--hf-violet)" : "var(--hf-surface-sunken)",
-                  color: reconcileMode === "match" ? "white" : "var(--hf-text-muted)" }}>
+                  color: reconcileMode === "match" ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
                 <Link2 size={12} style={{ marginRight: 5, verticalAlign: -2 }} />Match existing
               </button>
               <button onClick={() => setReconcileMode("new")}
                 style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer",
                   background: reconcileMode === "new" ? "var(--hf-violet)" : "var(--hf-surface-sunken)",
-                  color: reconcileMode === "new" ? "white" : "var(--hf-text-muted)" }}>
+                  color: reconcileMode === "new" ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
                 <FilePlus2 size={12} style={{ marginRight: 5, verticalAlign: -2 }} />Create new journal
               </button>
             </div>
@@ -593,8 +593,8 @@ export default function BankAccountsTab() {
                   {matchCandidates.map(c => (
                     <div key={c.journalLineId}
                       style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                        padding: "10px 12px", border: `1.5px solid ${c.exactMatch ? "#86EFAC" : "#E2E8F0"}`,
-                        background: c.exactMatch ? "var(--hf-success-soft)" : "white", borderRadius: 9 }}>
+                        padding: "10px 12px", border: `1.5px solid ${c.exactMatch ? "var(--hf-success-border)" : "var(--hf-border)"}`,
+                        background: c.exactMatch ? "var(--hf-success-soft)" : "var(--hf-surface)", borderRadius: 9 }}>
                       <div>
                         <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text)", display: "flex", alignItems: "center", gap: 6 }}>
                           {c.journalEntryNumber}
@@ -606,7 +606,7 @@ export default function BankAccountsTab() {
                       <button disabled={reconcileExisting.isPending}
                         onClick={() => reconcileExisting.mutate(c.journalLineId)}
                         style={{ padding: "6px 12px", border: "none", borderRadius: 7, fontSize: 11, fontWeight: 600,
-                          background: "var(--hf-success-solid-strong)", color: "white", cursor: "pointer" }}>
+                          background: "var(--hf-success-solid-strong)", color: "var(--hf-text-on-solid)", cursor: "pointer" }}>
                         Link
                       </button>
                     </div>
@@ -637,7 +637,7 @@ export default function BankAccountsTab() {
                   <button disabled={!newJournalAccountId || reconcileNew.isPending}
                     onClick={() => reconcileNew.mutate()}
                     style={{ padding: "8px 16px", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                      background: "var(--hf-success-solid-strong)", color: "white", cursor: "pointer", opacity: !newJournalAccountId ? 0.5 : 1 }}>
+                      background: "var(--hf-success-solid-strong)", color: "var(--hf-text-on-solid)", cursor: "pointer", opacity: !newJournalAccountId ? 0.5 : 1 }}>
                     {reconcileNew.isPending ? "Creating..." : "Create journal & reconcile"}
                   </button>
                 </div>
@@ -651,7 +651,7 @@ export default function BankAccountsTab() {
       {showCreate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex",
           alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "white", borderRadius: 16, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Add Bank Account</h3>
               <button onClick={() => setShowCreate(false)}
@@ -685,11 +685,11 @@ export default function BankAccountsTab() {
             )}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setShowCreate(false)}
-                style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "white", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
+                style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button disabled={createAccount.isPending || !bankForm.bankName || !bankForm.accountName || !bankForm.accountNumber}
                 onClick={() => createAccount.mutate()}
                 style={{ padding: "9px 20px", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700,
-                  background: "var(--hf-primary)", color: "white", cursor: "pointer" }}>
+                  background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", cursor: "pointer" }}>
                 {createAccount.isPending ? "Adding..." : "Add Account"}
               </button>
             </div>

@@ -74,7 +74,7 @@ export default function ReportsTab() {
   return (
     <div>
       {/* Controls */}
-      <div style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12,
+      <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12,
         padding: 20, marginBottom: 20, display: "flex", gap: 16, alignItems: "flex-end", flexWrap: "wrap" }}>
         {/* Report type picker */}
         <div>
@@ -88,7 +88,7 @@ export default function ReportsTab() {
                   style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
                     borderRadius: 9, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer",
                     background: reportType === k ? c.color : "var(--hf-surface-sunken)",
-                    color:      reportType === k ? "white"  : "var(--hf-text-muted)" }}>
+                    color:      reportType === k ? "var(--hf-text-on-solid)"  : "var(--hf-text-muted)" }}>
                   <I size={13} />{c.label}
                 </button>
               )
@@ -104,7 +104,7 @@ export default function ReportsTab() {
           <input type="date" value={to} onChange={e => { setTo(e.target.value); setRun(false) }} style={inp} />
         </div>
         <button onClick={handleRun}
-          style={{ padding: "8px 20px", background: config.color, color: "white", border: "none",
+          style={{ padding: "8px 20px", background: config.color, color: "var(--hf-text-on-solid)", border: "none",
             borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
           Run Report
         </button>
@@ -114,14 +114,14 @@ export default function ReportsTab() {
       {isError   && <div style={{ padding: 60, textAlign: "center", color: "var(--hf-danger-text)" }}>Failed to load report — check your date range.</div>}
 
       {report && !isLoading && (
-        <div style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {/* Report header */}
           <div style={{ background: config.color, padding: "20px 28px", display: "flex",
             justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Icon size={18} color="white" />
-                <span style={{ fontSize: 18, fontWeight: 800, color: "white" }}>{config.label}</span>
+                <Icon size={18} style={{ color: "var(--hf-text-on-solid)" }} />
+                <span style={{ fontSize: 18, fontWeight: 800, color: "var(--hf-text-on-solid)" }}>{config.label}</span>
               </div>
               <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", marginTop: 3 }}>
                 {new Date(report.fromDate).toLocaleDateString("en-ZA")} to {new Date(report.toDate).toLocaleDateString("en-ZA")}
@@ -131,7 +131,7 @@ export default function ReportsTab() {
               <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginBottom: 2 }}>
                 {reportType === "profit-and-loss" ? "Net Profit" : reportType === "trial-balance" ? "Net Difference" : "Liabilities + Equity"}
               </div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: report.netResult >= 0 ? "#4ADE80" : "#F87171" }}>
+              <div style={{ fontSize: 24, fontWeight: 800, color: report.netResult >= 0 ? "var(--hf-success-on-solid)" : "var(--hf-danger-on-solid)" }}>
                 {fmtR(report.netResult)}
               </div>
             </div>
@@ -163,7 +163,7 @@ export default function ReportsTab() {
                       <tr key={i} style={{ borderBottom: "1px solid var(--hf-border-subtle)", cursor: "pointer" }}
                         onClick={() => setDrillCode(line.accountCode)}
                         onMouseEnter={e => (e.currentTarget.style.background = "var(--hf-surface-muted)")}
-                        onMouseLeave={e => (e.currentTarget.style.background = "white")}>
+                        onMouseLeave={e => (e.currentTarget.style.background = "var(--hf-surface)")}>
                         <td style={{ padding: "10px 28px", fontFamily: "monospace", fontSize: 12, color: "var(--hf-text-muted)" }}>{line.accountCode}</td>
                         <td style={{ padding: "10px 0", fontSize: 13, color: "var(--hf-text-secondary)" }}>{line.accountName}</td>
                         <td style={{ padding: "10px 28px 10px 0", textAlign: "right", fontSize: 13, fontWeight: 600,
@@ -197,7 +197,7 @@ export default function ReportsTab() {
                         borderBottom: "1px solid var(--hf-border-subtle)", cursor: "pointer" }}
                       onClick={() => setDrillCode(line.accountCode)}
                       onMouseEnter={e => (e.currentTarget.style.background = "var(--hf-surface-muted)")}
-                      onMouseLeave={e => (e.currentTarget.style.background = "white")}>
+                      onMouseLeave={e => (e.currentTarget.style.background = "var(--hf-surface)")}>
                       <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
                         <span style={{ fontFamily: "monospace", fontSize: 12, color: "var(--hf-text-faint)", minWidth: 50 }}>{line.accountCode}</span>
                         <span style={{ fontSize: 13, color: "var(--hf-text-secondary)" }}>{line.accountName}</span>
@@ -206,7 +206,7 @@ export default function ReportsTab() {
                         <span style={{ fontSize: 13, fontWeight: 600, color: line.amount >= 0 ? "var(--hf-text)" : "var(--hf-danger-text)" }}>
                           {fmtR(line.amount)}
                         </span>
-                        <ChevronRight size={13} color="#CBD5E1" />
+                        <ChevronRight size={13} style={{ color: 'var(--hf-text-disabled)' }} />
                       </div>
                     </div>
                   ))}
@@ -223,9 +223,9 @@ export default function ReportsTab() {
       )}
 
       {!run && !isLoading && (
-        <div style={{ padding: 60, textAlign: "center", color: "var(--hf-text-faint)", background: "white",
+        <div style={{ padding: 60, textAlign: "center", color: "var(--hf-text-faint)", background: "var(--hf-surface)",
           border: "1px solid var(--hf-border)", borderRadius: 12 }}>
-          <BarChart2 size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
+          <BarChart2 size={36} style={{ color: 'var(--hf-text-disabled)', marginBottom: 12 }} />
           <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)", marginBottom: 4 }}>Select a report and date range</div>
           <div style={{ fontSize: 13 }}>Click Run Report to generate your financial statement.</div>
         </div>
@@ -235,11 +235,11 @@ export default function ReportsTab() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex",
           alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}
           onClick={() => setDrillCode(null)}>
-          <div style={{ background: "white", borderRadius: 16, width: 640, maxHeight: "82vh",
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, width: 640, maxHeight: "82vh",
             overflowY: "auto" as const, boxShadow: "0 20px 60px rgba(0,0,0,0.25)" }}
             onClick={e => e.stopPropagation()}>
             <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--hf-border-subtle)",
-              display: "flex", justifyContent: "space-between", alignItems: "flex-start", position: "sticky" as const, top: 0, background: "white" }}>
+              display: "flex", justifyContent: "space-between", alignItems: "flex-start", position: "sticky" as const, top: 0, background: "var(--hf-surface)" }}>
               <div>
                 <div style={{ fontSize: 11, color: "var(--hf-text-faint)", fontFamily: "monospace", marginBottom: 2 }}>{drillCode}</div>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{drillDown?.accountName ?? "Loading..."}</h3>

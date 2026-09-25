@@ -103,6 +103,18 @@ Correction to the original analysis: its per-module "tab counts" were file count
 - Compliance alert groups compare their `color` prop to pick a border; the props and the comparisons were converted to the same token strings together so the check still matches.
 - No double-unwrap sites.
 
+### Shared: `SectionedModulePage` (components/shell)
+- One component now handles routed sections for Fuel, Fleet and Accounting: redirect for unknown/forbidden sections, breadcrumbs header, remount-per-section panel. New modules should use it (Security keeps its own because of its legacy id aliases; Agriculture because of its farm drill-down).
+
+### Codemod: named colour `white`
+- `codemod.mjs` now treats `white` exactly like `#FFFFFF` (text -> on-solid, background/border -> surface). 343 named colours existed app-wide; the four modules migrated earlier had none left except two of my own gradient fades, now fading toward the surface colour.
+- New tokens for positive/negative figures on coloured cards: `--hf-success-on-solid` / `--hf-danger-on-solid` (card stays dark in both themes) and `--hf-success-on-inverse` / `--hf-danger-on-inverse` (card flips with the theme).
+
+### Accounting ✅
+- Routed sections `/accounting/:section`: Overview (Dashboard); Books (Chart of Accounts, Journal Entries, Bank Accounts); Reporting (Reports, AR / AP Aging); Tax (VAT Returns).
+- Colours: 25 hex + 57 named -> 0. Dashboard SVG chart attributes moved to `style`.
+- No double-unwrap sites. Removed an unused import (fixes a pre-existing type error).
+
 
 ## Bug found during Phase 2 review: double-unwrapped API responses
 

@@ -1,83 +1,30 @@
 // src/pages/accounting/AccountingPage.tsx
-import { useState } from "react"
-import {
-  BookOpen, GitBranch, Landmark, BarChart2,
-  FileText, Users, LayoutDashboard,
-} from "lucide-react"
+//
+// Sections are routes (/accounting/:section) with navigation in the sidebar
+// (see navigation/moduleSections.ts and components/shell/SectionedModulePage).
 import ChartOfAccountsTab from "./ChartOfAccountsTab"
 import JournalEntriesTab from "./JournalEntriesTab"
 import BankAccountsTab from "./BankAccountsTab"
 import ReportsTab from "./ReportsTab"
 import VatReturnsTab from "./VatReturnsTab"
 import AgingTab from "./AgingTab"
-import AccountantDashboard from "../accountant/AccountantDashboard"
 import DashboardTab from "./AccountingDashboard"
-
-
-type Tab = "dashboard" | "accounts" | "journal" | "bank" | "reports" | "vat" | "aging"
-
-const tabs = [
-  { id: "dashboard" as Tab, label: "Dashboard",         icon: LayoutDashboard },
-  { id: "accounts"  as Tab, label: "Chart of Accounts", icon: BookOpen },
-  { id: "journal"   as Tab, label: "Journal Entries",   icon: GitBranch },
-  { id: "bank"      as Tab, label: "Bank Accounts",     icon: Landmark },
-  { id: "reports"   as Tab, label: "Reports",           icon: BarChart2 },
-  { id: "vat"       as Tab, label: "VAT Returns",       icon: FileText },
-  { id: "aging"     as Tab, label: "AR / AP Aging",     icon: Users },
-]
+import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
+import { ACCOUNTING_SECTIONS } from "../../navigation/moduleSections"
 
 export function AccountingPage() {
-  const [activeTab, setActiveTab] = useState<Tab>("dashboard")
-
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--hf-text)", margin: "0 0 4px" }}>
-          Accounting & Finance
-        </h1>
-        <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0 }}>
-          Double-entry bookkeeping, VAT, bank accounts and financial reports
-        </p>
-      </div>
-
-      <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: 24 }}>
-        {/* Tab bar */}
-        <div style={{
-          display: "flex", gap: 2, flexWrap: "wrap",
-          borderBottom: "1px solid var(--hf-border)",
-          marginBottom: 28, overflowX: "auto",
-        }}>
-          {tabs.map(tab => {
-            const Icon = tab.icon
-            const active = activeTab === tab.id
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 7, whiteSpace: "nowrap",
-                  padding: "10px 16px", background: "none", border: "none",
-                  borderBottom: active ? "2px solid var(--hf-accent)" : "2px solid transparent",
-                  color: active ? "var(--hf-accent-text)" : "var(--hf-text-muted)",
-                  fontWeight: active ? 600 : 400,
-                  fontSize: 13, cursor: "pointer",
-                  marginBottom: -1, transition: "all 0.15s",
-                }}
-              >
-                <Icon size={14} />{tab.label}
-              </button>
-            )
-          })}
-        </div>
-
-        {activeTab === "dashboard" && <DashboardTab />}
-        {activeTab === "accounts"  && <ChartOfAccountsTab />}
-        {activeTab === "journal"   && <JournalEntriesTab />}
-        {activeTab === "bank"      && <BankAccountsTab />}
-        {activeTab === "reports"   && <ReportsTab />}
-        {activeTab === "vat"       && <VatReturnsTab />}
-        {activeTab === "aging"     && <AgingTab />}
-      </div>
-    </div>
+    <SectionedModulePage config={ACCOUNTING_SECTIONS} render={id => {
+      switch (id) {
+        case "dashboard": return <DashboardTab />
+        case "accounts":  return <ChartOfAccountsTab />
+        case "journal":   return <JournalEntriesTab />
+        case "bank":      return <BankAccountsTab />
+        case "reports":   return <ReportsTab />
+        case "vat":       return <VatReturnsTab />
+        case "aging":     return <AgingTab />
+        default:          return null
+      }
+    }} />
   )
 }
