@@ -7,14 +7,10 @@
 // grid, and the user pins the handful they actually use to the topbar.
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Grid3x3, Search, Pin, PinOff, X } from 'lucide-react'
+import { Grid3x3, Search, Pin } from 'lucide-react'
 
-export interface ModuleNavItem {
-  key: string
-  icon: React.ElementType
-  label: string
-  route: string
-}
+import type { ModuleNavItem } from '../../navigation/modules'
+export type { ModuleNavItem }
 
 interface ModuleSwitcherProps {
   modules: ModuleNavItem[]
@@ -42,25 +38,33 @@ export function ModuleSwitcher({ modules, pinnedKeys, onTogglePin, currentPath }
     if (open) setTimeout(() => searchRef.current?.focus(), 50)
   }, [open])
 
+  // Ctrl/Cmd+K opens the switcher from anywhere; Escape closes it.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setOpen(o => !o) }
+      else if (e.key === 'Escape') { setOpen(false); setSearch('') }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
+
   const filtered = modules.filter(m => m.label.toLowerCase().includes(search.toLowerCase()))
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button onClick={() => setOpen(o => !o)}
-        title="All modules"
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: open ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.08)',
-          border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8,
-          width: 30, height: 30, cursor: 'pointer', color: 'white', flexShrink: 0,
-        }}>
-        <Grid3x3 size={15} />
+        className="hf-switcher-trigger" aria-expanded={open} aria-haspopup="dialog"
+        title="Find a module (Ctrl+K)">
+        <Search size={15} />
+        <span className="hf-switcher-label">Find a module…</span>
+        <kbd className="hf-switcher-kbd">Ctrl K</kbd>
+        <Grid3x3 size={15} className="hf-switcher-grid" />
       </button>
 
       {open && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 8px)', left: 0, width: 360,
-          background: 'white', border: '1px solid var(--hf-border)', borderRadius: 14,
+          background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14,
           boxShadow: '0 12px 40px rgba(0,0,0,0.18)', zIndex: 300, overflow: 'hidden',
         }}>
           <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--hf-border-subtle)' }}>

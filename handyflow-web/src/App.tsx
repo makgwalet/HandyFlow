@@ -11,7 +11,7 @@ import { QuoteDetailPage }              from "./pages/quotes/QuoteDetailPage"
 import { CataloguePage }                from "./pages/catalogue/CataloguePage"
 import { BillingPage }                  from "./pages/billing/BillingPage"
 import { SecurityPage }                 from "./pages/security/SecurityPage"
-import { ModuleLayout }                 from "./components/layout/ModuleLayout"
+import { AppShell }                     from "./components/shell/AppShell"
 import { useAuthStore }                 from "./store/auth.store"
 // NEW: closes "not added to App.tsx, redirects to saas".
 import { usePortalAuthStore }           from "./store/portalAuth.store"
@@ -85,7 +85,7 @@ import { BookingAgencyPortalLoginPage } from "./pages/booking-agency-portal/Book
 // NEW: the shared "needs attention" board — Stage 1 of the Financial
 // Control & Assurance plan. Cross-module, tenant-wide, not scoped to
 // any one module the way most routes below are — lives inside
-// ModuleLayout like every other staff page (needs the nav bar and
+// AppShell like every other staff page (needs the nav bar and
 // ProtectedRoute), but isn't itself a subscribable module.
 import { ControlExceptionsPage } from "./pages/control-exceptions/ControlExceptionsPage"
 // NEW: Stage 3 — external auditor portal. Same four-page shape as
@@ -270,8 +270,8 @@ export default function App() {
           <Route path="/careers/:tenantSlug"                element={<CareersListPage />} />
           <Route path="/careers/:tenantSlug/:jobSlug"       element={<JobApplyPage />} />
 
-          {/* All module pages — inside ModuleLayout so the nav bar appears */}
-          <Route element={<ProtectedRoute><ModuleLayout /></ProtectedRoute>}>
+          {/* All module pages — inside AppShell (sidebar + top bar) */}
+          <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
             <Route path="/customers"   element={<CustomersPage />} />
             <Route path="/quotes"      element={<InvoicingPage />} />
             <Route path="/invoices"    element={<InvoicingPage />} />
