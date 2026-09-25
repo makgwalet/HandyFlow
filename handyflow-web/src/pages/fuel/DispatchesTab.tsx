@@ -47,7 +47,7 @@ export default function DispatchesTab() {
   const [expandedApprovalId, setExpandedApprovalId] = useState<string | null>(null)
   const approvalStatusQuery = useQuery<any>({
     queryKey: ["dispatch-approval-status", expandedApprovalId],
-    queryFn: async () => (await apiClient.get(`/api/v1/fuel/dispatches/${expandedApprovalId}/approval-status`)).data?.data,
+    queryFn: async () => (await apiClient.get(`/api/v1/fuel/dispatches/${expandedApprovalId}/approval-status`)).data,
     enabled: !!expandedApprovalId,
   })
 

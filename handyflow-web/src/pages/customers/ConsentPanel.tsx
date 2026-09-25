@@ -66,7 +66,7 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['consent', customerId] })
 
-  const { data, isLoading, isError } = useQuery<{ data: ConsentRecord }>({
+  const { data, isLoading, isError } = useQuery<ConsentRecord>({
     queryKey: ['consent', customerId],
     queryFn: () => apiClient.get(`/api/v1/crm/customers/${customerId}/consent`).then(r => r.data),
     retry: false, // 404 = no consent yet — expected, not an error
@@ -100,7 +100,7 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
     onError: (e: any) => setFormError(e?.response?.data?.message ?? 'Failed to record review'),
   })
 
-  const consent = data?.data
+  const consent = data
   const hasConsent   = !!consent && !consent.withdrawnAt
   const isWithdrawn  = !!consent && !!consent.withdrawnAt
   const isExpired    = consent?.retentionExpiresAt

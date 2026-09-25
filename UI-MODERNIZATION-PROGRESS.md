@@ -87,5 +87,10 @@ App-wide dry run of step 1: 67 alpha sites and 566 icon props across 224 files.
 
 - Fixed: `uiPreferencesApi` (caused the "Query data cannot be undefined" console error, so preferences never loaded from the server).
 - Fixed in Security (21 sites, each endpoint's return type confirmed in its controller): live map guard positions; post-order history (also removed a duplicate request), acknowledgements, site posts, site contacts; close-protection evidence, armoury logs, advance surveys, vetting history, declined principals; patrol routes, patrol rounds, site detail on the patrol page; guard screening history and gate status; on-site register, gate evidence, site-access report; rotation assignments.
-- Still to check (same pattern, endpoints not yet verified): bookings 8, customers 4, pos 2, property 1, fuel 1.
+- Fixed in other modules (endpoints verified, none paged):
+  - Bookings (8): service and staff lists when creating a booking, available slots, staff-to-service assignments (Staff tab and booking form), availability staff list.
+  - Customers (4): customer communications, follow-ups, POPIA consent, and lead stage panels. Consent previously always looked "not recorded", which could lead to duplicate consent records.
+  - POS (2): current cash session lookups, which always looked like "no open session".
+  - Fuel (1): dispatch approval status. Property (1): lease portal-access grants.
+- Not fixed, different problem: `customers/ImportModal.tsx` posts to `/api/v1/crm/customers/import` and polls `/import/{jobId}`, but no such endpoints exist in the backend. Customer import cannot work until they are built.
 - The widespread `r.data?.data ?? r.data` form is harmless (it falls back to the payload) and is left alone.

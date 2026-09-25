@@ -49,7 +49,7 @@ export default function StaffTab() {
       const all = await Promise.all(
         services.map(async (svc) => {
           const res = await apiClient.get(`/api/v1/bookings/services/${svc.id}/staff`)
-          const ids: string[] = res.data?.data ?? []
+          const ids: string[] = res.data ?? []
           return ids.includes(skillsFor.id) ? svc.id : null
         })
       )
@@ -98,7 +98,7 @@ export default function StaffTab() {
       // For each service, set its staff list (add or remove this staff member)
       await Promise.all(services.map(async (svc) => {
         const currentRes = await apiClient.get(`/api/v1/bookings/services/${svc.id}/staff`)
-        const current: string[] = currentRes.data?.data ?? []
+        const current: string[] = currentRes.data ?? []
         const shouldInclude = serviceIds.includes(svc.id)
         const alreadyIn = current.includes(staffId)
         if (shouldInclude && !alreadyIn) {

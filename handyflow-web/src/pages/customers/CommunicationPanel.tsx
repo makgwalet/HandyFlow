@@ -52,12 +52,12 @@ export function CommunicationPanel({ customerId }: { customerId: string }) {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['communications', customerId] })
 
-  const { data, isLoading } = useQuery<{ data: Communication[] }>({
+  const { data, isLoading } = useQuery<Communication[]>({
     queryKey: ['communications', customerId],
     queryFn: () => apiClient.get(`/api/v1/crm/customers/${customerId}/communications`).then(r => r.data),
   })
 
-  const communications = data?.data ?? []
+  const communications = data ?? []
 
   const logMutation = useMutation({
     mutationFn: () =>

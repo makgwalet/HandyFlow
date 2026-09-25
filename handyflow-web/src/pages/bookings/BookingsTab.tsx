@@ -100,12 +100,12 @@ export default function BookingsTab() {
 
   const { data: services = [] } = useQuery<Service[]>({
     queryKey: ["booking-services"],
-    queryFn: async () => (await apiClient.get("/api/v1/bookings/services")).data?.data ?? [],
+    queryFn: async () => (await apiClient.get("/api/v1/bookings/services")).data ?? [],
   })
 
   const { data: staff = [] } = useQuery<Staff[]>({
     queryKey: ["booking-staff"],
-    queryFn: async () => (await apiClient.get("/api/v1/bookings/staff")).data?.data ?? [],
+    queryFn: async () => (await apiClient.get("/api/v1/bookings/staff")).data ?? [],
   })
 
   const { data: slots = [] } = useQuery<Slot[]>({
@@ -114,7 +114,7 @@ export default function BookingsTab() {
       if (!form.serviceId || !form.bookingDate) return []
       const p = new URLSearchParams({ serviceId: form.serviceId, date: form.bookingDate })
       if (form.staffId) p.set("staffId", form.staffId)
-      return (await apiClient.get(`/api/v1/bookings/available-slots?${p}`)).data?.data ?? []
+      return (await apiClient.get(`/api/v1/bookings/available-slots?${p}`)).data ?? []
     },
     enabled: !!form.serviceId && !!form.bookingDate,
   })
@@ -126,7 +126,7 @@ export default function BookingsTab() {
     queryFn: async () => {
       if (!form.serviceId) return staff
       const res = await apiClient.get(`/api/v1/bookings/services/${form.serviceId}/staff`)
-      const assigned: string[] = res.data?.data ?? []
+      const assigned: string[] = res.data ?? []
       // If service has no assignments yet, return all staff
       if (assigned.length === 0) return staff
       return staff.filter((s: Staff) => assigned.includes(s.id))
@@ -141,7 +141,7 @@ export default function BookingsTab() {
       if (!selected?.serviceId || !rescheduleForm.newDate) return []
       const p = new URLSearchParams({ serviceId: selected.serviceId, date: rescheduleForm.newDate })
       if (selected.staffId) p.set("staffId", selected.staffId)
-      return (await apiClient.get(`/api/v1/bookings/available-slots?${p}`)).data?.data ?? []
+      return (await apiClient.get(`/api/v1/bookings/available-slots?${p}`)).data ?? []
     },
     enabled: !!selected?.serviceId && !!rescheduleForm.newDate,
   })

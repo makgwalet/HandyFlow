@@ -55,12 +55,12 @@ export function FollowUpPanel({ customerId }: { customerId: string }) {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['followups', customerId] })
 
-  const { data, isLoading } = useQuery<{ data: FollowUp[] }>({
+  const { data, isLoading } = useQuery<FollowUp[]>({
     queryKey: ['followups', customerId],
     queryFn: () => apiClient.get(`/api/v1/crm/customers/${customerId}/followups`).then(r => r.data),
   })
 
-  const followUps = data?.data ?? []
+  const followUps = data ?? []
   const pending    = followUps.filter(f => !f.completed)
   const completed  = followUps.filter(f => f.completed)
   const overdueCount = pending.filter(f => f.overdue).length

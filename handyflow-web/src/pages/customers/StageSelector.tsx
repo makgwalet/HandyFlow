@@ -29,7 +29,7 @@ const STAGE_ORDER: Stage[] = ['NEW', 'CONTACTED', 'QUALIFIED', 'WON', 'LOST']
 export function StageSelector({ customerId, customerType }: { customerId: string; customerType: string }) {
   const qc = useQueryClient()
 
-  const { data } = useQuery<{ data: StageData }>({
+  const { data } = useQuery<StageData>({
     queryKey: ['lead-stage', customerId],
     queryFn: () => apiClient.get(`/api/v1/crm/customers/${customerId}/stage`).then(r => r.data),
     enabled: customerType === 'LEAD',
@@ -42,7 +42,7 @@ export function StageSelector({ customerId, customerType }: { customerId: string
 
   if (customerType !== 'LEAD') return null
 
-  const currentStage = data?.data?.stage
+  const currentStage = data?.stage
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '4px 0 12px' }}>

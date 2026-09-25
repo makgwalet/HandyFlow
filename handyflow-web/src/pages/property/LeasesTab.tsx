@@ -100,7 +100,7 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
 
   const portalGrantsQuery = useQuery<any[]>({
     queryKey: ["prop-portal-grants", showPortal?.id],
-    queryFn: async () => (await apiClient.get(`/api/v1/property/leases/${showPortal.id}/portal-access`)).data?.data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/property/leases/${showPortal.id}/portal-access`)).data ?? [],
     enabled: !!showPortal,
   })
   const invitePortal = useMutation({

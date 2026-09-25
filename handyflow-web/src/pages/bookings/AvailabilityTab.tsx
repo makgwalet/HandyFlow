@@ -45,7 +45,7 @@ export default function AvailabilityTab() {
 
   const { data: staff = [] } = useQuery<any[]>({
     queryKey: ["booking-staff"],
-    queryFn: async () => (await apiClient.get("/api/v1/bookings/staff")).data?.data ?? [],
+    queryFn: async () => (await apiClient.get("/api/v1/bookings/staff")).data ?? [],
   })
 
   const setAvailability = useMutation({

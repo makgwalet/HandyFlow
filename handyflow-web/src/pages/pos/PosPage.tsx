@@ -494,7 +494,7 @@ export function PosPage() {
     queryFn: async () => {
       try {
         const r = await apiClient.get('/api/v1/pos/cash-sessions/current')
-        return r.data?.data ?? null
+        return r.data ?? null
       } catch {
         return null
       }
@@ -567,7 +567,7 @@ export function PosPage() {
         // Fetch existing session in background and update banner via .then()
         apiClient.get('/api/v1/pos/cash-sessions/current')
           .then(r => {
-            const existing = r.data?.data ?? null
+            const existing = r.data ?? null
             if (existing?.id) {
               setLocalSession(existing)
               qc.setQueryData(['pos-session'], existing)
