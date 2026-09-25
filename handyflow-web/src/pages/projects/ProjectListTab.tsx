@@ -30,11 +30,11 @@ const STATUS_LABEL: Record<string,string> = {
   ON_HOLD:'On Hold', COMPLETED:'Completed', CANCELLED:'Cancelled',
 }
 const STATUS_BADGE: Record<string,{bg:string;color:string}> = {
-  PLANNING:  {bg:'#F1F5F9',color:'#475569'},
-  ACTIVE:    {bg:'#DBEAFE',color:'#1D4ED8'},
-  ON_HOLD:   {bg:'#FEF3C7',color:'#92400E'},
-  COMPLETED: {bg:'#DCFCE7',color:'#166534'},
-  CANCELLED: {bg:'#FEE2E2',color:'#DC2626'},
+  PLANNING:  {bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)'},
+  ACTIVE:    {bg:'var(--hf-info-soft-strong)',color:'var(--hf-info-text)'},
+  ON_HOLD:   {bg:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)'},
+  COMPLETED: {bg:'var(--hf-success-soft-strong)',color:'var(--hf-success-text-strong)'},
+  CANCELLED: {bg:'var(--hf-danger-soft-strong)',color:'var(--hf-danger-text)'},
 }
 const HEALTH_DOT: Record<string,string> = { GREEN:'#16A34A', AMBER:'#D97706', RED:'#DC2626' }
 const HEALTH_LABEL: Record<string,string> = { GREEN:'On Track', AMBER:'Watch', RED:'At Risk' }
@@ -78,9 +78,9 @@ export function ProjectListTab({ onOpen }: { onOpen:(id:string)=>void }) {
               style={{
                 padding:'5px 13px', borderRadius:20, fontSize:12, cursor:'pointer',
                 fontWeight:  statusFilter===s ? 700 : 400,
-                border:      statusFilter===s ? '1.5px solid #1B3A6B' : '1px solid #E2E8F0',
-                background:  statusFilter===s ? '#EFF6FF' : '#fff',
-                color:       statusFilter===s ? '#1B3A6B' : '#64748B',
+                border:      statusFilter===s ? '1.5px solid var(--hf-primary)' : '1px solid var(--hf-border)',
+                background:  statusFilter===s ? 'var(--hf-info-soft)' : 'var(--hf-surface)',
+                color:       statusFilter===s ? 'var(--hf-primary-text)' : 'var(--hf-text-muted)',
               }}>
               {STATUS_LABEL[s]}
             </button>
@@ -95,13 +95,13 @@ export function ProjectListTab({ onOpen }: { onOpen:(id:string)=>void }) {
               value={search} onChange={e=>setSearch(e.target.value)}
               placeholder="Search projects…"
               style={{
-                padding:'7px 12px 7px 30px', border:'1px solid #E2E8F0', borderRadius:8,
-                fontSize:13, outline:'none', background:'#fff', width:200,
+                padding:'7px 12px 7px 30px', border:'1px solid var(--hf-border)', borderRadius:8,
+                fontSize:13, outline:'none', background:'var(--hf-surface)', width:200,
               }}
             />
           </div>
           <button onClick={()=>setShowCreate(true)}
-            style={{display:'flex',alignItems:'center',gap:5,padding:'7px 14px',background:'#1B3A6B',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
+            style={{display:'flex',alignItems:'center',gap:5,padding:'7px 14px',background:'var(--hf-primary)',color:'var(--hf-text-on-solid)',border:'none',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
             <Plus size={14}/> New Project
           </button>
         </div>
@@ -109,13 +109,13 @@ export function ProjectListTab({ onOpen }: { onOpen:(id:string)=>void }) {
 
       {/* Table */}
       {isLoading ? (
-        <div style={{padding:40,textAlign:'center',color:'#94A3B8'}}>Loading…</div>
+        <div style={{padding:40,textAlign:'center',color:'var(--hf-text-faint)'}}>Loading…</div>
       ) : isError ? (
-        <div style={{padding:40,textAlign:'center',color:'#DC2626',fontSize:13}}>Failed to load projects</div>
+        <div style={{padding:40,textAlign:'center',color:'var(--hf-danger-text)',fontSize:13}}>Failed to load projects</div>
       ) : filtered.length === 0 ? (
-        <div style={{textAlign:'center',padding:'60px 20px',color:'#94A3B8'}}>
+        <div style={{textAlign:'center',padding:'60px 20px',color:'var(--hf-text-faint)'}}>
           <FolderOpen size={40} style={{marginBottom:12,opacity:.3}}/>
-          <div style={{fontWeight:600,color:'#475569',marginBottom:4}}>
+          <div style={{fontWeight:600,color:'var(--hf-text-tertiary)',marginBottom:4}}>
             {search ? `No projects matching "${search}"` : 'No projects'}
           </div>
           <div style={{fontSize:13}}>
@@ -123,14 +123,14 @@ export function ProjectListTab({ onOpen }: { onOpen:(id:string)=>void }) {
           </div>
         </div>
       ) : (
-        <div style={{border:'1px solid #E2E8F0',borderRadius:12,overflow:'hidden'}}>
+        <div style={{border:'1px solid var(--hf-border)',borderRadius:12,overflow:'hidden'}}>
           <table style={{width:'100%',borderCollapse:'collapse'}}>
             <thead>
-              <tr style={{background:'#F8FAFC'}}>
+              <tr style={{background:'var(--hf-surface-muted)'}}>
                 {['#','Project','Client','Status','Health','Budget','End Date','Tasks','Risks'].map(h=>(
                   <th key={h} style={{
                     padding:'10px 14px', textAlign:'left', fontSize:11, fontWeight:700,
-                    color:'#94A3B8', textTransform:'uppercase', letterSpacing:'0.04em',
+                    color:'var(--hf-text-faint)', textTransform:'uppercase', letterSpacing:'0.04em',
                     whiteSpace:'nowrap',
                   }}>{h}</th>
                 ))}
@@ -147,31 +147,31 @@ export function ProjectListTab({ onOpen }: { onOpen:(id:string)=>void }) {
                   <tr key={p.id}
                     onClick={()=>onOpen(p.id)}
                     style={{
-                      borderTop:'1px solid #F1F5F9',
-                      background: i%2===0 ? '#fff' : '#FAFAFA',
+                      borderTop:'1px solid var(--hf-border-subtle)',
+                      background: i%2===0 ? 'var(--hf-surface)' : 'var(--hf-surface-muted)',
                       cursor:'pointer',
                       transition:'background 0.1s',
                     }}
                     onMouseEnter={e=>(e.currentTarget.style.background='#F0F7FF')}
-                    onMouseLeave={e=>(e.currentTarget.style.background=i%2===0?'#fff':'#FAFAFA')}
+                    onMouseLeave={e=>(e.currentTarget.style.background=i%2===0?'var(--hf-surface)':'var(--hf-surface-muted)')}
                   >
                     {/* Project number */}
-                    <td style={{padding:'11px 14px',fontSize:11,color:'#94A3B8',fontWeight:600,whiteSpace:'nowrap'}}>
+                    <td style={{padding:'11px 14px',fontSize:11,color:'var(--hf-text-faint)',fontWeight:600,whiteSpace:'nowrap'}}>
                       {p.projectNumber}
                     </td>
 
                     {/* Name */}
                     <td style={{padding:'11px 14px',maxWidth:240}}>
-                      <div style={{fontSize:13,fontWeight:600,color:'#0F172A',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                      <div style={{fontSize:13,fontWeight:600,color:'var(--hf-text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                         {p.name}
                       </div>
                       {p.projectManagerName && (
-                        <div style={{fontSize:11,color:'#94A3B8',marginTop:2}}>PM: {p.projectManagerName}</div>
+                        <div style={{fontSize:11,color:'var(--hf-text-faint)',marginTop:2}}>PM: {p.projectManagerName}</div>
                       )}
                     </td>
 
                     {/* Client */}
-                    <td style={{padding:'11px 14px',fontSize:12,color:'#64748B',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    <td style={{padding:'11px 14px',fontSize:12,color:'var(--hf-text-muted)',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                       {p.clientName ?? '—'}
                     </td>
 
@@ -192,37 +192,37 @@ export function ProjectListTab({ onOpen }: { onOpen:(id:string)=>void }) {
 
                     {/* Budget with utilisation bar */}
                     <td style={{padding:'11px 14px',minWidth:140}}>
-                      <div style={{fontSize:12,color:'#0F172A',fontWeight:600,marginBottom:4,whiteSpace:'nowrap'}}>
-                        {fmtR(p.budgetSpent)} <span style={{color:'#94A3B8',fontWeight:400}}>/ {fmtR(p.budgetTotal)}</span>
+                      <div style={{fontSize:12,color:'var(--hf-text)',fontWeight:600,marginBottom:4,whiteSpace:'nowrap'}}>
+                        {fmtR(p.budgetSpent)} <span style={{color:'var(--hf-text-faint)',fontWeight:400}}>/ {fmtR(p.budgetTotal)}</span>
                       </div>
-                      <div style={{height:4,background:'#F1F5F9',borderRadius:2}}>
+                      <div style={{height:4,background:'var(--hf-surface-sunken)',borderRadius:2}}>
                         <div style={{
                           height:'100%',borderRadius:2,
                           width:`${spentPct}%`,
-                          background: spentPct>100?'#EF4444':spentPct>85?'#F59E0B':'#22C55E',
+                          background: spentPct>100?'var(--hf-danger)':spentPct>85?'var(--hf-warning)':'var(--hf-success)',
                         }}/>
                       </div>
                     </td>
 
                     {/* End date */}
-                    <td style={{padding:'11px 14px',fontSize:12,color:'#64748B',whiteSpace:'nowrap'}}>
+                    <td style={{padding:'11px 14px',fontSize:12,color:'var(--hf-text-muted)',whiteSpace:'nowrap'}}>
                       {fmtDate(p.endDate)}
                     </td>
 
                     {/* Tasks progress */}
-                    <td style={{padding:'11px 14px',fontSize:12,color:'#64748B',whiteSpace:'nowrap'}}>
+                    <td style={{padding:'11px 14px',fontSize:12,color:'var(--hf-text-muted)',whiteSpace:'nowrap'}}>
                       {p.completedTaskCount}/{p.taskCount}
-                      <span style={{color:'#94A3B8',marginLeft:4}}>({taskPct}%)</span>
+                      <span style={{color:'var(--hf-text-faint)',marginLeft:4}}>({taskPct}%)</span>
                     </td>
 
                     {/* Open risks */}
                     <td style={{padding:'11px 14px'}}>
                       {p.openRiskCount > 0 ? (
-                        <div style={{display:'flex',alignItems:'center',gap:4,color:'#DC2626',fontSize:12,fontWeight:600}}>
+                        <div style={{display:'flex',alignItems:'center',gap:4,color:'var(--hf-danger-text)',fontSize:12,fontWeight:600}}>
                           <AlertTriangle size={12}/>{p.openRiskCount}
                         </div>
                       ) : (
-                        <span style={{fontSize:12,color:'#94A3B8'}}>—</span>
+                        <span style={{fontSize:12,color:'var(--hf-text-faint)'}}>—</span>
                       )}
                     </td>
                   </tr>
@@ -232,7 +232,7 @@ export function ProjectListTab({ onOpen }: { onOpen:(id:string)=>void }) {
           </table>
 
           {/* Footer count */}
-          <div style={{padding:'10px 16px',borderTop:'1px solid #F1F5F9',background:'#F8FAFC',fontSize:12,color:'#94A3B8'}}>
+          <div style={{padding:'10px 16px',borderTop:'1px solid var(--hf-border-subtle)',background:'var(--hf-surface-muted)',fontSize:12,color:'var(--hf-text-faint)'}}>
             {filtered.length} project{filtered.length!==1?'s':''}
             {search && ` matching "${search}"`}
           </div>

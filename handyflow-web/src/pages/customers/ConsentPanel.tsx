@@ -127,7 +127,7 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
   return (
     <div style={{
       marginTop: 16, paddingTop: 16,
-      borderTop: '1px solid #F1F5F9',
+      borderTop: '1px solid var(--hf-border-subtle)',
     }}>
       {/* Section header — no longer a toggle; this panel lives in its own tab now */}
       <div style={{
@@ -141,28 +141,28 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
               ? <ShieldOff size={13} color="#EA580C" />
               : <Shield size={13} color="#94A3B8" />
           }
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8',
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)',
                          textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             POPIA Consent
           </span>
           {hasConsent && (
             <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px',
-                           background: '#F0FDF4', color: '#16A34A',
-                           border: '1px solid #BBF7D0', borderRadius: 20 }}>
+                           background: 'var(--hf-success-soft)', color: 'var(--hf-success-text)',
+                           border: '1px solid var(--hf-success-border-subtle)', borderRadius: 20 }}>
               Active{isExpired ? ' — review required' : ''}
             </span>
           )}
           {isWithdrawn && (
             <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px',
-                           background: '#FFF7ED', color: '#EA580C',
-                           border: '1px solid #FED7AA', borderRadius: 20 }}>
+                           background: 'var(--hf-orange-soft)', color: 'var(--hf-orange-text)',
+                           border: '1px solid var(--hf-orange-border)', borderRadius: 20 }}>
               Withdrawn
             </span>
           )}
           {!consent && !isLoading && !isError && (
             <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px',
-                           background: '#F8FAFC', color: '#94A3B8',
-                           border: '1px solid #E2E8F0', borderRadius: 20 }}>
+                           background: 'var(--hf-surface-muted)', color: 'var(--hf-text-faint)',
+                           border: '1px solid var(--hf-border)', borderRadius: 20 }}>
               Not recorded
             </span>
           )}
@@ -172,7 +172,7 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
       {/* Content — always rendered now (was behind {expanded && ...}) */}
       <div>
           {isLoading && (
-            <p style={{ fontSize: 12, color: '#94A3B8', margin: 0 }}>Loading…</p>
+            <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: 0 }}>Loading…</p>
           )}
 
           {/* Active consent details */}
@@ -197,10 +197,10 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
               )}
               {isExpired && !consent.lastReviewedAt && (
                 <div style={{
-                  marginTop: 8, padding: '8px 10px', background: '#FFF7ED',
-                  border: '1px solid #FED7AA', borderRadius: 8,
+                  marginTop: 8, padding: '8px 10px', background: 'var(--hf-orange-soft)',
+                  border: '1px solid var(--hf-orange-border)', borderRadius: 8,
                 }}>
-                  <p style={{ fontSize: 11.5, color: '#9A3412', margin: '0 0 6px', lineHeight: 1.4 }}>
+                  <p style={{ fontSize: 11.5, color: 'var(--hf-orange-text-strong)', margin: '0 0 6px', lineHeight: 1.4 }}>
                     Retention period has expired. Review whether this record still needs
                     to be kept (e.g. an outstanding invoice) or should be deleted.
                   </p>
@@ -219,10 +219,10 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
                   banner forever, which would look like nothing happened. */}
               {isExpired && consent.lastReviewedAt && (
                 <div style={{
-                  marginTop: 8, padding: '8px 10px', background: '#F8FAFC',
-                  border: '1px solid #E2E8F0', borderRadius: 8,
+                  marginTop: 8, padding: '8px 10px', background: 'var(--hf-surface-muted)',
+                  border: '1px solid var(--hf-border)', borderRadius: 8,
                 }}>
-                  <p style={{ fontSize: 11.5, color: '#64748B', margin: '0 0 6px', lineHeight: 1.4 }}>
+                  <p style={{ fontSize: 11.5, color: 'var(--hf-text-muted)', margin: '0 0 6px', lineHeight: 1.4 }}>
                     Reviewed {fmtDate(consent.lastReviewedAt)} — retention is still past expiry.
                     Extend it or withdraw consent if the data no longer needs to be kept.
                   </p>
@@ -237,8 +237,8 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
               <button
                 onClick={() => { setShowWithdraw(true); setFormError('') }}
                 style={{
-                  marginTop: 10, fontSize: 12, color: '#EA580C', background: 'none',
-                  border: '1px solid #FED7AA', borderRadius: 6, padding: '5px 10px',
+                  marginTop: 10, fontSize: 12, color: 'var(--hf-orange-text)', background: 'none',
+                  border: '1px solid var(--hf-orange-border)', borderRadius: 6, padding: '5px 10px',
                   cursor: 'pointer',
                 }}>
                 Withdraw consent
@@ -255,8 +255,8 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
               <button
                 onClick={() => { setShowRecord(true); setFormError('') }}
                 style={{
-                  marginTop: 10, fontSize: 12, color: '#1D4ED8', background: 'none',
-                  border: '1px solid #BFDBFE', borderRadius: 6, padding: '5px 10px',
+                  marginTop: 10, fontSize: 12, color: 'var(--hf-info-text)', background: 'none',
+                  border: '1px solid var(--hf-info-border)', borderRadius: 6, padding: '5px 10px',
                   cursor: 'pointer',
                 }}>
                 Record new consent
@@ -267,15 +267,15 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
           {/* No consent yet */}
           {!consent && !isLoading && !showRecord && (
             <div>
-              <p style={{ fontSize: 12, color: '#64748B', margin: '0 0 10px', lineHeight: 1.5 }}>
+              <p style={{ fontSize: 12, color: 'var(--hf-text-muted)', margin: '0 0 10px', lineHeight: 1.5 }}>
                 No consent record exists for this customer.
                 Record a lawful basis for processing their personal information (POPIA Section 11).
               </p>
               <button
                 onClick={() => { setShowRecord(true); setFormError('') }}
                 style={{
-                  fontSize: 12, color: '#1D4ED8', background: '#EFF6FF',
-                  border: '1px solid #BFDBFE', borderRadius: 6, padding: '5px 10px',
+                  fontSize: 12, color: 'var(--hf-info-text)', background: 'var(--hf-info-soft)',
+                  border: '1px solid var(--hf-info-border)', borderRadius: 6, padding: '5px 10px',
                   cursor: 'pointer',
                 }}>
                 Record consent
@@ -286,8 +286,8 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
           {/* Withdraw form */}
           {showWithdraw && (
             <div style={{ marginTop: 8 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
-                Withdrawal reason <span style={{ color: '#DC2626' }}>*</span>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--hf-text-secondary)', display: 'block', marginBottom: 4 }}>
+                Withdrawal reason <span style={{ color: 'var(--hf-danger-text)' }}>*</span>
               </label>
               <textarea
                 value={withdrawReason}
@@ -296,7 +296,7 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
                 rows={2}
                 style={{
                   width: '100%', padding: '8px 10px', fontSize: 13,
-                  border: '1.5px solid #E2E8F0', borderRadius: 8,
+                  border: '1.5px solid var(--hf-border)', borderRadius: 8,
                   fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box',
                 }}
               />
@@ -371,8 +371,8 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
 function ConsentDetail({ label, value, warn = false }: { label: string; value: string; warn?: boolean }) {
   return (
     <div style={{ display: 'flex', gap: 8, marginBottom: 4, fontSize: 12 }}>
-      <span style={{ color: '#94A3B8', minWidth: 120, flexShrink: 0 }}>{label}</span>
-      <span style={{ color: warn ? '#EA580C' : '#0F172A', fontWeight: warn ? 600 : 400 }}>{value}</span>
+      <span style={{ color: 'var(--hf-text-faint)', minWidth: 120, flexShrink: 0 }}>{label}</span>
+      <span style={{ color: warn ? 'var(--hf-orange-text)' : 'var(--hf-text)', fontWeight: warn ? 600 : 400 }}>{value}</span>
     </div>
   )
 }
@@ -380,7 +380,7 @@ function ConsentDetail({ label, value, warn = false }: { label: string; value: s
 function FormRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 8 }}>
-      <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 3 }}>
+      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--hf-text-secondary)', display: 'block', marginBottom: 3 }}>
         {label}
       </label>
       {children}
@@ -390,7 +390,7 @@ function FormRow({ label, children }: { label: string; children: React.ReactNode
 
 function ErrLine({ msg }: { msg: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, fontSize: 12, color: '#DC2626' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, fontSize: 12, color: 'var(--hf-danger-text)' }}>
       <AlertCircle size={11} />{msg}
     </div>
   )
@@ -398,13 +398,13 @@ function ErrLine({ msg }: { msg: string }) {
 
 const selectStyle: React.CSSProperties = {
   width: '100%', padding: '6px 10px', fontSize: 13,
-  border: '1.5px solid #E2E8F0', borderRadius: 6,
+  border: '1.5px solid var(--hf-border)', borderRadius: 6,
   fontFamily: 'inherit', background: 'white',
 }
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '6px 10px', fontSize: 13,
-  border: '1.5px solid #E2E8F0', borderRadius: 6,
+  border: '1.5px solid var(--hf-border)', borderRadius: 6,
   fontFamily: 'inherit', boxSizing: 'border-box',
 }
 

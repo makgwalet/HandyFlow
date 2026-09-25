@@ -44,20 +44,20 @@ function CompleteModal({ enrollment, onClose }: { enrollment: EnrollmentResponse
   })
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 380 }}>
-        <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", margin: "0 0 4px" }}>Record outcome</p>
-        <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 18px" }}>{enrollment.delegateNameSnapshot}</p>
-        <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5, display: "block" }}>Score (optional)</label>
-        <input type="number" step="0.01" style={{ width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, boxSizing: "border-box" }} value={score} onChange={e => setScore(e.target.value)} />
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 380 }}>
+        <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: "0 0 4px" }}>Record outcome</p>
+        <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "0 0 18px" }}>{enrollment.delegateNameSnapshot}</p>
+        <label style={{ fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5, display: "block" }}>Score (optional)</label>
+        <input type="number" step="0.01" style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box" }} value={score} onChange={e => setScore(e.target.value)} />
         <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-          <button onClick={() => setPassed(true)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: passed ? `1.5px solid ${TRAINPROV_ACCENT}` : "1px solid #E2E8F0", background: passed ? "#FFFBEB" : "#fff", color: passed ? TRAINPROV_ACCENT : "#64748B", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Passed</button>
-          <button onClick={() => setPassed(false)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: !passed ? "1.5px solid #DC2626" : "1px solid #E2E8F0", background: !passed ? "#FEF2F2" : "#fff", color: !passed ? "#DC2626" : "#64748B", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Failed</button>
+          <button onClick={() => setPassed(true)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: passed ? `1.5px solid ${TRAINPROV_ACCENT}` : "1px solid var(--hf-border)", background: passed ? "var(--hf-warning-soft)" : "var(--hf-surface)", color: passed ? TRAINPROV_ACCENT : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Passed</button>
+          <button onClick={() => setPassed(false)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: !passed ? "1.5px solid var(--hf-danger)" : "1px solid var(--hf-border)", background: !passed ? "var(--hf-danger-soft)" : "var(--hf-surface)", color: !passed ? "var(--hf-danger-text)" : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Failed</button>
         </div>
-        {save.isError && <p style={{ color: "#DC2626", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not record outcome"}</p>}
+        {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not record outcome"}</p>}
         <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+          <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
           <button onClick={() => save.mutate()} disabled={save.isPending}
-            style={{ flex: 2, padding: "10px", borderRadius: 8, border: "none", background: TRAINPROV_ACCENT, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: save.isPending ? 0.6 : 1 }}>
+            style={{ flex: 2, padding: "10px", borderRadius: 8, border: "none", background: TRAINPROV_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: save.isPending ? 0.6 : 1 }}>
             {save.isPending ? "Saving…" : "Record outcome"}
           </button>
         </div>
@@ -100,9 +100,9 @@ export default function TrainProvEnrollmentsTab({ clientId }: { clientId: string
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <p style={{ fontSize: 13, color: "#94A3B8", margin: 0 }}>{enrollments.length} enrollment{enrollments.length === 1 ? "" : "s"}</p>
+        <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0 }}>{enrollments.length} enrollment{enrollments.length === 1 ? "" : "s"}</p>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-          style={{ padding: "6px 10px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, fontFamily: "inherit" }}>
+          style={{ padding: "6px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12, fontFamily: "inherit" }}>
           <option value="">All statuses</option>
           <option value="ENROLLED">Enrolled</option>
           <option value="ATTENDED">Attended</option>
@@ -113,36 +113,36 @@ export default function TrainProvEnrollmentsTab({ clientId }: { clientId: string
         </select>
       </div>
 
-      <p style={{ fontSize: 11.5, color: "#94A3B8", margin: "0 0 14px" }}>
+      <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: "0 0 14px" }}>
         New enrollments are created from a session's own detail page (Sessions tab), where a delegate is enrolled into that specific session.
       </p>
 
       {isLoading ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p>
       ) : enrollments.length === 0 ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>No enrollments yet.</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No enrollments yet.</p>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {enrollments.map((e, i) => (
-            <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9" }}>
+            <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", margin: 0 }}>{e.delegateNameSnapshot}</p>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: `${STATUS_COLORS[e.status] ?? "#94A3B8"}18`, color: STATUS_COLORS[e.status] ?? "#94A3B8" }}>{e.status.replace("_", " ")}</span>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)", margin: 0 }}>{e.delegateNameSnapshot}</p>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: `${STATUS_COLORS[e.status] ?? "#94A3B8"}18`, color: STATUS_COLORS[e.status] ?? "var(--hf-text-faint)" }}>{e.status.replace("_", " ")}</span>
                   {e.invoiced && (
-                    <span title="Already invoiced — cancel is blocked; issuing a credit note isn't implemented in this build" style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, color: "#D97706" }}>
+                    <span title="Already invoiced — cancel is blocked; issuing a credit note isn't implemented in this build" style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, color: "var(--hf-warning-text)" }}>
                       <ReceiptText size={11} /> INVOICED
                     </span>
                   )}
-                  {e.score != null && <span style={{ fontSize: 11, color: "#94A3B8" }}>Score: {e.score}</span>}
+                  {e.score != null && <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>Score: {e.score}</span>}
                 </div>
-                <p style={{ fontSize: 11, color: "#94A3B8", margin: "2px 0 0" }}>Session {e.sessionId.slice(0, 8)} · Enrolled {e.enrolledAt.slice(0, 10)}</p>
+                <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: "2px 0 0" }}>Session {e.sessionId.slice(0, 8)} · Enrolled {e.enrolledAt.slice(0, 10)}</p>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 {e.status === "ENROLLED" && (
                   <>
                     <button onClick={() => markAttended.mutate(e.id)} style={btnStyle}><Check size={12} /> Attended</button>
-                    <button onClick={() => markNoShow.mutate(e.id)} style={{ ...btnStyle, color: "#DC2626" }}><XIcon size={12} /> No-show</button>
+                    <button onClick={() => markNoShow.mutate(e.id)} style={{ ...btnStyle, color: "var(--hf-danger-text)" }}><XIcon size={12} /> No-show</button>
                   </>
                 )}
                 {(e.status === "ENROLLED" || e.status === "ATTENDED") && (
@@ -157,7 +157,7 @@ export default function TrainProvEnrollmentsTab({ clientId }: { clientId: string
                 )}
                 {e.status === "COMPLETED" && e.passed && (
                   <button onClick={() => issueCertificate.mutate(e.id)} disabled={issueCertificate.isPending}
-                    style={{ ...btnStyle, color: "#D97706", opacity: issueCertificate.isPending ? 0.6 : 1 }}>
+                    style={{ ...btnStyle, color: "var(--hf-warning-text)", opacity: issueCertificate.isPending ? 0.6 : 1 }}>
                     <Award size={12} /> Issue certificate
                   </button>
                 )}

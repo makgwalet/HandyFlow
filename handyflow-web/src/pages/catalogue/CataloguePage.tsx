@@ -35,10 +35,10 @@ const EMPTY_ERRORS: Record<string, string> = {}
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const inp: React.CSSProperties = {
-  width: '100%', padding: '10px 12px', border: '1.5px solid #E2E8F0', borderRadius: 9,
-  fontSize: 14, color: '#0F172A', outline: 'none', boxSizing: 'border-box', background: 'white',
+  width: '100%', padding: '10px 12px', border: '1.5px solid var(--hf-border)', borderRadius: 9,
+  fontSize: 14, color: 'var(--hf-text)', outline: 'none', boxSizing: 'border-box', background: 'white',
 }
-const inpErr: React.CSSProperties = { ...inp, borderColor: '#DC2626', background: '#FFF5F5' }
+const inpErr: React.CSSProperties = { ...inp, borderColor: 'var(--hf-danger)', background: 'var(--hf-danger-soft)' }
 const sel: React.CSSProperties = {
   ...inp, appearance: 'none',
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
@@ -50,9 +50,9 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, backdropFilter: 'blur(2px)' }}>
       <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 500, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', overflow: 'hidden', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0F172A' }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: 4, display: 'flex' }}><X size={18} /></button>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--hf-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--hf-text)' }}>{title}</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', padding: 4, display: 'flex' }}><X size={18} /></button>
         </div>
         <div style={{ padding: 24, overflowY: 'auto' }}>{children}</div>
       </div>
@@ -64,12 +64,12 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 function Field({ label, required, error, children }: { label: string; required?: boolean; error?: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-        {label}{required && <span style={{ color: '#DC2626', marginLeft: 2 }}>*</span>}
+      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        {label}{required && <span style={{ color: 'var(--hf-danger-text)', marginLeft: 2 }}>*</span>}
       </label>
       {children}
       {error && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#DC2626', marginTop: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--hf-danger-text)', marginTop: 4 }}>
           <AlertCircle size={12} color="#DC2626" />{error}
         </div>
       )}
@@ -105,9 +105,9 @@ function UnitSelect({ value, onChange, hasError }: { value: string; onChange: (v
           ...inp,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           cursor: 'pointer', textAlign: 'left',
-          ...(hasError ? { borderColor: '#DC2626', background: '#FFF5F5' } : {}),
+          ...(hasError ? { borderColor: 'var(--hf-danger)', background: 'var(--hf-danger-soft)' } : {}),
         }}>
-        <span style={{ color: value ? '#0F172A' : '#94A3B8' }}>{value || 'Select unit...'}</span>
+        <span style={{ color: value ? 'var(--hf-text)' : 'var(--hf-text-faint)' }}>{value || 'Select unit...'}</span>
         <ChevronDown size={14} color="#94A3B8" />
       </button>
 
@@ -115,11 +115,11 @@ function UnitSelect({ value, onChange, hasError }: { value: string; onChange: (v
       {open && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 999,
-          background: 'white', border: '1.5px solid #E2E8F0', borderRadius: 10,
+          background: 'white', border: '1.5px solid var(--hf-border)', borderRadius: 10,
           boxShadow: '0 8px 30px rgba(0,0,0,0.12)', overflow: 'hidden',
         }}>
           {/* Search inside dropdown */}
-          <div style={{ padding: '10px 12px', borderBottom: '1px solid #F1F5F9' }}>
+          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--hf-border-subtle)' }}>
             <div style={{ position: 'relative' }}>
               <Search size={13} color="#94A3B8" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
               <input
@@ -135,11 +135,11 @@ function UnitSelect({ value, onChange, hasError }: { value: string; onChange: (v
           {/* Options list */}
           <div style={{ maxHeight: 240, overflowY: 'auto' }}>
             {filteredGroups.length === 0 ? (
-              <div style={{ padding: '16px', textAlign: 'center', fontSize: 13, color: '#94A3B8' }}>No units match</div>
+              <div style={{ padding: '16px', textAlign: 'center', fontSize: 13, color: 'var(--hf-text-faint)' }}>No units match</div>
             ) : (
               filteredGroups.map(group => (
                 <div key={group.group}>
-                  <div style={{ padding: '6px 12px 4px', fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.06em', background: '#F8FAFC' }}>
+                  <div style={{ padding: '6px 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', background: 'var(--hf-surface-muted)' }}>
                     {group.group}
                   </div>
                   {group.options.map(unit => (
@@ -148,11 +148,11 @@ function UnitSelect({ value, onChange, hasError }: { value: string; onChange: (v
                       onClick={() => { onChange(unit); setOpen(false); setQuery('') }}
                       style={{
                         padding: '9px 14px', fontSize: 14, cursor: 'pointer',
-                        background: unit === value ? '#EFF6FF' : 'white',
-                        color: unit === value ? '#1D4ED8' : '#0F172A',
+                        background: unit === value ? 'var(--hf-info-soft)' : 'white',
+                        color: unit === value ? 'var(--hf-info-text)' : 'var(--hf-text)',
                         fontWeight: unit === value ? 600 : 400,
                       }}
-                      onMouseEnter={e => { if (unit !== value) (e.currentTarget as HTMLElement).style.background = '#F8FAFC' }}
+                      onMouseEnter={e => { if (unit !== value) (e.currentTarget as HTMLElement).style.background = 'var(--hf-surface-muted)' }}
                       onMouseLeave={e => { if (unit !== value) (e.currentTarget as HTMLElement).style.background = 'white' }}
                     >
                       {unit}
@@ -179,27 +179,27 @@ function DeleteModal({
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, backdropFilter: 'blur(2px)' }}>
       <div style={{ background: 'white', borderRadius: 18, padding: 32, width: 420, boxShadow: '0 24px 64px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-        <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#FFF7ED', border: '2px solid #FED7AA', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+        <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--hf-orange-soft)', border: '2px solid var(--hf-orange-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
           <AlertTriangle size={24} color="#EA580C" strokeWidth={2} />
         </div>
-        <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: '#0F172A' }}>{title}</h3>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 40, padding: '7px 16px', margin: '10px 0' }}>
+        <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: 'var(--hf-text)' }}>{title}</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 40, padding: '7px 16px', margin: '10px 0' }}>
           {badgeIcon}
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>{badge}</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--hf-text)' }}>{badge}</span>
         </div>
-        <div style={{ margin: '0 0 16px', fontSize: 13, color: '#64748B', lineHeight: 1.7 }}>{description}</div>
+        <div style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--hf-text-muted)', lineHeight: 1.7 }}>{description}</div>
         {error && (
-          <div style={{ width: '100%', marginBottom: 16, padding: '10px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: '100%', marginBottom: 16, padding: '10px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <AlertCircle size={15} color="#DC2626" style={{ flexShrink: 0 }} />{error}
           </div>
         )}
         <div style={{ display: 'flex', gap: 10, width: '100%' }}>
           <button onClick={onCancel} disabled={isPending}
-            style={{ flex: 1, padding: '11px', border: '1.5px solid #E2E8F0', borderRadius: 10, background: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#374151' }}>
+            style={{ flex: 1, padding: '11px', border: '1.5px solid var(--hf-border)', borderRadius: 10, background: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
             Cancel
           </button>
           <button onClick={onConfirm} disabled={isPending}
-            style={{ flex: 1, padding: '11px', border: 'none', borderRadius: 10, background: isPending ? '#93A8C9' : '#1B3A6B', color: 'white', fontSize: 14, fontWeight: 700, cursor: isPending ? 'not-allowed' : 'pointer' }}>
+            style={{ flex: 1, padding: '11px', border: 'none', borderRadius: 10, background: isPending ? '#93A8C9' : 'var(--hf-primary)', color: 'white', fontSize: 14, fontWeight: 700, cursor: isPending ? 'not-allowed' : 'pointer' }}>
             {isPending ? 'Deleting...' : 'Yes, Delete'}
           </button>
         </div>
@@ -271,17 +271,17 @@ function CategoryMenu({ cat, onEdit, onDelete }: { cat: Category; onEdit: () => 
     <div ref={ref} style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
       <button
         onClick={() => setOpen(o => !o)}
-        style={{ padding: '4px 6px', background: 'none', border: '1px solid #E2E8F0', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#94A3B8' }}>
+        style={{ padding: '4px 6px', background: 'none', border: '1px solid var(--hf-border)', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--hf-text-faint)' }}>
         <MoreVertical size={14} />
       </button>
       {open && (
-        <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', background: 'white', border: '1px solid #E2E8F0', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 100, minWidth: 140, overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', background: 'white', border: '1px solid var(--hf-border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 100, minWidth: 140, overflow: 'hidden' }}>
           <button onClick={() => { onEdit(); setOpen(false) }}
-            style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, color: '#374151', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left' }}>
+            style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'var(--hf-text-secondary)', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left' }}>
             <Pencil size={13} color="#1D4ED8" /> Edit category
           </button>
           <button onClick={() => { onDelete(); setOpen(false) }}
-            style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left', borderTop: '1px solid #FEF2F2' }}>
+            style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'var(--hf-danger-text)', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left', borderTop: '1px solid var(--hf-danger-border)' }}>
             <Trash2 size={13} color="#DC2626" /> Delete category
           </button>
         </div>
@@ -471,16 +471,16 @@ export function CataloguePage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', margin: '0 0 4px', letterSpacing: '-0.4px' }}>Catalogue</h1>
-          <p style={{ fontSize: 13, color: '#94A3B8', margin: 0 }}>Manage your products and services</p>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 4px', letterSpacing: '-0.4px' }}>Catalogue</h1>
+          <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0 }}>Manage your products and services</p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={() => { setShowCatModal(true); setCatError(''); setCatFieldErrors(EMPTY_ERRORS) }}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', background: 'white', border: '1px solid #E2E8F0', borderRadius: 9, fontSize: 13, fontWeight: 600, color: '#374151', cursor: 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', background: 'white', border: '1px solid var(--hf-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
             <Tag size={15} /> Add category
           </button>
           <button onClick={() => { setShowItemModal(true); setItemError(''); setItemFieldErrors(EMPTY_ERRORS) }}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', background: '#1B3A6B', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'white', cursor: 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', background: 'var(--hf-primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'white', cursor: 'pointer' }}>
             <Plus size={15} /> Add item
           </button>
         </div>
@@ -496,17 +496,17 @@ export function CataloguePage() {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 28 }}>
         {[
-          { label: 'Total items', value: items.length, color: '#EFF6FF', iconColor: '#2563EB', icon: Package },
-          { label: 'Categories',  value: categories.length, color: '#F0FDF4', iconColor: '#16A34A', icon: Tag },
-          { label: 'Avg price', value: items.length ? `R ${Math.round(items.reduce((s, i) => s + i.defaultPrice, 0) / items.length).toLocaleString()}` : 'R 0', color: '#FEFCE8', iconColor: '#CA8A04', icon: Package },
+          { label: 'Total items', value: items.length, color: 'var(--hf-info-soft)', iconColor: 'var(--hf-info-text)', icon: Package },
+          { label: 'Categories',  value: categories.length, color: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text)', icon: Tag },
+          { label: 'Avg price', value: items.length ? `R ${Math.round(items.reduce((s, i) => s + i.defaultPrice, 0) / items.length).toLocaleString()}` : 'R 0', color: 'var(--hf-warning-soft)', iconColor: 'var(--hf-warning-text)', icon: Package },
         ].map(s => (
-          <div key={s.label} style={{ background: 'white', border: '1px solid #E8EDF5', borderRadius: 12, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div key={s.label} style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 12, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <p style={{ fontSize: 11, color: '#94A3B8', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</p>
-              <p style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: 0 }}>{s.value}</p>
+              <p style={{ fontSize: 11, color: 'var(--hf-text-faint)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</p>
+              <p style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>{s.value}</p>
             </div>
             <div style={{ width: 40, height: 40, borderRadius: 10, background: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <s.icon size={18} color={s.iconColor} />
+              <s.icon size={18} style={{ color: s.iconColor }} />
             </div>
           </div>
         ))}
@@ -514,19 +514,19 @@ export function CataloguePage() {
 
       {/* Content */}
       {categories.length === 0 && items.length === 0 ? (
-        <div style={{ background: 'white', border: '1px solid #E8EDF5', borderRadius: 16, padding: '60px 24px', textAlign: 'center' }}>
+        <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: '60px 24px', textAlign: 'center' }}>
           <Package size={40} color="#CBD5E1" style={{ marginBottom: 12 }} />
-          <p style={{ fontSize: 16, fontWeight: 700, color: '#64748B', margin: '0 0 6px' }}>No items yet</p>
-          <p style={{ fontSize: 13, color: '#94A3B8', margin: 0 }}>Create a category and start adding your products and services</p>
+          <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--hf-text-muted)', margin: '0 0 6px' }}>No items yet</p>
+          <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0 }}>Create a category and start adding your products and services</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
           {/* Uncategorised */}
           {filtered.filter(i => !i.categoryName).length > 0 && (
-            <div style={{ background: 'white', border: '1px solid #E8EDF5', borderRadius: 14, overflow: 'hidden' }}>
-              <div style={{ padding: '12px 20px', background: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Uncategorised</span>
+            <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 14, overflow: 'hidden' }}>
+              <div style={{ padding: '12px 20px', background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border-subtle)' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Uncategorised</span>
               </div>
               <ItemTable items={filtered.filter(i => !i.categoryName)} onEdit={openEditItem} onDelete={item => { setDeleteItem(item); setDeleteItemError('') }} />
             </div>
@@ -537,32 +537,32 @@ export function CataloguePage() {
             const catItems = filtered.filter(i => i.categoryName === cat.name)
             const expanded = expandedCats.has(cat.id)
             return (
-              <div key={cat.id} style={{ background: 'white', border: '1px solid #E8EDF5', borderRadius: 14, overflow: 'hidden' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', cursor: 'pointer', background: expanded ? '#FAFBFF' : 'white' }}
+              <div key={cat.id} style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 14, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', cursor: 'pointer', background: expanded ? 'var(--hf-surface-muted)' : 'white' }}
                   onClick={() => toggleCat(cat.id)}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: '#F3E8FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--hf-violet-soft-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <Tag size={15} color="#7C3AED" />
                     </div>
                     <div>
-                      <p style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', margin: 0 }}>{cat.name}</p>
-                      {cat.description && <p style={{ fontSize: 12, color: '#94A3B8', margin: 0 }}>{cat.description}</p>}
+                      <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--hf-text)', margin: 0 }}>{cat.name}</p>
+                      {cat.description && <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: 0 }}>{cat.description}</p>}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 12, color: '#94A3B8', fontWeight: 500 }}>{catItems.length} items</span>
+                    <span style={{ fontSize: 12, color: 'var(--hf-text-faint)', fontWeight: 500 }}>{catItems.length} items</span>
                     <CategoryMenu cat={cat} onEdit={() => openEditCat(cat)} onDelete={() => { setDeleteCat(cat); setDeleteCatError('') }} />
                     {expanded ? <ChevronUp size={16} color="#94A3B8" /> : <ChevronDown size={16} color="#94A3B8" />}
                   </div>
                 </div>
                 {expanded && catItems.length > 0 && (
-                  <div style={{ borderTop: '1px solid #F1F5F9' }}>
+                  <div style={{ borderTop: '1px solid var(--hf-border-subtle)' }}>
                     <ItemTable items={catItems} onEdit={openEditItem} onDelete={item => { setDeleteItem(item); setDeleteItemError('') }} />
                   </div>
                 )}
                 {expanded && catItems.length === 0 && (
-                  <div style={{ padding: '20px 24px', borderTop: '1px solid #F1F5F9', textAlign: 'center' }}>
-                    <p style={{ fontSize: 13, color: '#94A3B8', margin: 0 }}>No items in this category yet</p>
+                  <div style={{ padding: '20px 24px', borderTop: '1px solid var(--hf-border-subtle)', textAlign: 'center' }}>
+                    <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0 }}>No items in this category yet</p>
                   </div>
                 )}
               </div>
@@ -585,9 +585,9 @@ export function CataloguePage() {
           {catError && <ErrorBanner message={catError} />}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button onClick={() => { setShowCatModal(false); setCatForm(EMPTY_CAT_FORM); setCatError('') }}
-              style={{ padding: '9px 16px', background: 'white', border: '1px solid #E2E8F0', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151' }}>Cancel</button>
+              style={{ padding: '9px 16px', background: 'white', border: '1px solid var(--hf-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>Cancel</button>
             <button onClick={submitCreateCat} disabled={createCatMutation.isPending}
-              style={{ padding: '9px 18px', background: '#1B3A6B', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'white', cursor: 'pointer' }}>
+              style={{ padding: '9px 18px', background: 'var(--hf-primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'white', cursor: 'pointer' }}>
               {createCatMutation.isPending ? 'Creating...' : 'Create category'}
             </button>
           </div>
@@ -608,9 +608,9 @@ export function CataloguePage() {
           {editCatError && <ErrorBanner message={editCatError} />}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button onClick={() => { setEditCat(null); setEditCatError('') }}
-              style={{ padding: '9px 16px', background: 'white', border: '1px solid #E2E8F0', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151' }}>Cancel</button>
+              style={{ padding: '9px 16px', background: 'white', border: '1px solid var(--hf-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>Cancel</button>
             <button onClick={submitEditCat} disabled={updateCatMutation.isPending}
-              style={{ padding: '9px 18px', background: '#1B3A6B', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'white', cursor: 'pointer' }}>
+              style={{ padding: '9px 18px', background: 'var(--hf-primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'white', cursor: 'pointer' }}>
               {updateCatMutation.isPending ? 'Saving...' : 'Save changes'}
             </button>
           </div>
@@ -624,9 +624,9 @@ export function CataloguePage() {
           {itemError && <ErrorBanner message={itemError} />}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button onClick={() => { setShowItemModal(false); setItemForm(EMPTY_ITEM_FORM); setItemError('') }}
-              style={{ padding: '9px 16px', background: 'white', border: '1px solid #E2E8F0', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151' }}>Cancel</button>
+              style={{ padding: '9px 16px', background: 'white', border: '1px solid var(--hf-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>Cancel</button>
             <button onClick={submitCreateItem} disabled={createItemMutation.isPending}
-              style={{ padding: '9px 18px', background: '#1B3A6B', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'white', cursor: 'pointer' }}>
+              style={{ padding: '9px 18px', background: 'var(--hf-primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'white', cursor: 'pointer' }}>
               {createItemMutation.isPending ? 'Creating...' : 'Create item'}
             </button>
           </div>
@@ -640,9 +640,9 @@ export function CataloguePage() {
           {editError && <ErrorBanner message={editError} />}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button onClick={() => { setEditItem(null); setEditError('') }}
-              style={{ padding: '9px 16px', background: 'white', border: '1px solid #E2E8F0', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151' }}>Cancel</button>
+              style={{ padding: '9px 16px', background: 'white', border: '1px solid var(--hf-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>Cancel</button>
             <button onClick={submitEditItem} disabled={updateItemMutation.isPending}
-              style={{ padding: '9px 18px', background: '#1B3A6B', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'white', cursor: 'pointer' }}>
+              style={{ padding: '9px 18px', background: 'var(--hf-primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'white', cursor: 'pointer' }}>
               {updateItemMutation.isPending ? 'Saving...' : 'Save changes'}
             </button>
           </div>
@@ -673,7 +673,7 @@ export function CataloguePage() {
             catItemCount(deleteCat.name) > 0 ? (
               <>
                 This will permanently delete <strong>{deleteCat.name}</strong> and all{' '}
-                <strong style={{ color: '#DC2626' }}>{catItemCount(deleteCat.name)} item{catItemCount(deleteCat.name) !== 1 ? 's' : ''}</strong> inside it.
+                <strong style={{ color: 'var(--hf-danger-text)' }}>{catItemCount(deleteCat.name)} item{catItemCount(deleteCat.name) !== 1 ? 's' : ''}</strong> inside it.
                 <br />This action <strong>cannot be undone</strong>.
               </>
             ) : (
@@ -697,34 +697,34 @@ function ItemTable({ items, onEdit, onDelete }: {
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
       <thead>
-        <tr style={{ background: '#F8FAFC' }}>
+        <tr style={{ background: 'var(--hf-surface-muted)' }}>
           {['Name', 'Unit', 'Default price', 'VAT', ''].map(h => (
-            <th key={h} style={{ padding: '10px 20px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+            <th key={h} style={{ padding: '10px 20px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
           ))}
         </tr>
       </thead>
       <tbody>
         {items.map((item, i) => (
-          <tr key={item.id} style={{ borderTop: i === 0 ? 'none' : '1px solid #F1F5F9' }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#FAFBFF')}
+          <tr key={item.id} style={{ borderTop: i === 0 ? 'none' : '1px solid var(--hf-border-subtle)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--hf-surface-muted)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
             <td style={{ padding: '12px 20px' }}>
-              <p style={{ fontSize: 14, fontWeight: 600, color: '#0F172A', margin: 0 }}>{item.name}</p>
-              {item.description && <p style={{ fontSize: 12, color: '#94A3B8', margin: '2px 0 0' }}>{item.description}</p>}
+              <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--hf-text)', margin: 0 }}>{item.name}</p>
+              {item.description && <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: '2px 0 0' }}>{item.description}</p>}
             </td>
-            <td style={{ padding: '12px 20px', fontSize: 13, color: '#64748B' }}>{item.unit}</td>
-            <td style={{ padding: '12px 20px', fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
+            <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--hf-text-muted)' }}>{item.unit}</td>
+            <td style={{ padding: '12px 20px', fontSize: 14, fontWeight: 700, color: 'var(--hf-text)' }}>
               R {Number(item.defaultPrice).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
             </td>
-            <td style={{ padding: '12px 20px', fontSize: 13, color: '#64748B' }}>{item.vatRate}%</td>
+            <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--hf-text-muted)' }}>{item.vatRate}%</td>
             <td style={{ padding: '12px 20px', textAlign: 'right' }}>
               <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                 <button onClick={() => onEdit(item)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 7, fontSize: 12, color: '#1D4ED8', cursor: 'pointer', fontWeight: 500 }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: 'var(--hf-info-soft)', border: '1px solid var(--hf-info-border)', borderRadius: 7, fontSize: 12, color: 'var(--hf-info-text)', cursor: 'pointer', fontWeight: 500 }}>
                   <Pencil size={12} /> Edit
                 </button>
                 <button onClick={() => onDelete(item)}
-                  style={{ padding: '5px 8px', background: 'none', border: '1px solid #E2E8F0', borderRadius: 7, cursor: 'pointer', color: '#94A3B8', display: 'flex' }}>
+                  style={{ padding: '5px 8px', background: 'none', border: '1px solid var(--hf-border)', borderRadius: 7, cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}>
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -739,7 +739,7 @@ function ItemTable({ items, onEdit, onDelete }: {
 // ── Error Banner ──────────────────────────────────────────────────────────────
 function ErrorBanner({ message }: { message: string }) {
   return (
-    <div style={{ marginBottom: 16, padding: '10px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div style={{ marginBottom: 16, padding: '10px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)', display: 'flex', alignItems: 'center', gap: 8 }}>
       <AlertCircle size={15} color="#DC2626" style={{ flexShrink: 0 }} />{message}
     </div>
   )

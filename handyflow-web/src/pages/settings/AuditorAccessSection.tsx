@@ -57,7 +57,7 @@ export function AuditorAccessSection() {
         Give an external auditor or accountant a read-only login to review your evidence and control exceptions directly.
       </p>
 
-      <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, padding: 16, marginBottom: 20 }}>
+      <div style={{ background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: 16, marginBottom: 20 }}>
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
           <div style={{ flex: 1 }}>
             <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 4 }}>Auditor's email</label>
@@ -72,9 +72,9 @@ export function AuditorAccessSection() {
               style={{ width: "100%", padding: "8px 10px", border: `1.5px solid ${BORDER}`, borderRadius: 6, fontSize: 13, boxSizing: "border-box" as const }} />
           </div>
         </div>
-        {error && <div style={{ padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, fontSize: 12.5, color: "#DC2626", marginBottom: 10 }}>{error}</div>}
+        {error && <div style={{ padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 12.5, color: "var(--hf-danger-text)", marginBottom: 10 }}>{error}</div>}
         <button onClick={handleInvite} disabled={inviting}
-          style={{ padding: "7px 14px", background: NAVY, color: "#fff", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+          style={{ padding: "7px 14px", background: NAVY, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
           {inviting ? "Sending…" : "Send Invite"}
         </button>
       </div>
@@ -82,11 +82,11 @@ export function AuditorAccessSection() {
       {loading ? (
         <div style={{ color: FAINT, fontSize: 13 }}>Loading…</div>
       ) : grants.length === 0 ? (
-        <div style={{ padding: 24, textAlign: "center" as const, color: FAINT, fontSize: 13, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
+        <div style={{ padding: 24, textAlign: "center" as const, color: FAINT, fontSize: 13, background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
           No auditors invited yet.
         </div>
       ) : (
-        <table style={{ width: "100%", borderCollapse: "collapse" as const, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" as const, background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
           <thead>
             <tr style={{ background: CANVAS }}>
               {["Email", "Status", "Invited", ""].map(h => (
@@ -100,8 +100,8 @@ export function AuditorAccessSection() {
                 <td style={{ padding: "8px 12px", fontSize: 12.5, color: INK }}>{g.inviteEmail}</td>
                 <td style={{ padding: "8px 12px", fontSize: 12.5 }}>
                   <span style={{
-                    background: g.status === "ACTIVE" ? "#DCFCE7" : g.status === "REVOKED" ? "#FEF2F2" : "#FFFBEB",
-                    color: g.status === "ACTIVE" ? "#166534" : g.status === "REVOKED" ? "#DC2626" : "#D97706",
+                    background: g.status === "ACTIVE" ? "var(--hf-success-soft-strong)" : g.status === "REVOKED" ? "var(--hf-danger-soft)" : "var(--hf-warning-soft)",
+                    color: g.status === "ACTIVE" ? "var(--hf-success-text-strong)" : g.status === "REVOKED" ? "var(--hf-danger-text)" : "var(--hf-warning-text)",
                     padding: "2px 8px", borderRadius: 20, fontSize: 10.5, fontWeight: 700,
                   }}>{g.status}</span>
                 </td>
@@ -111,7 +111,7 @@ export function AuditorAccessSection() {
                 <td style={{ padding: "8px 12px" }}>
                   {g.status !== "REVOKED" && (
                     <button onClick={() => handleRevoke(g.id)} disabled={revokingId === g.id}
-                      style={{ padding: "6px 12px", background: "#fff", color: "#DC2626", border: "1px solid #DC2626", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                      style={{ padding: "6px 12px", background: "var(--hf-surface)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger)", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                       {revokingId === g.id ? "…" : "Revoke"}
                     </button>
                   )}

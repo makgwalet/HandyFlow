@@ -135,13 +135,13 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
         <div>
-          <div style={{fontSize:15,fontWeight:700,color:"#0F172A"}}>Lab results</div>
+          <div style={{fontSize:15,fontWeight:700,color:"var(--hf-text)"}}>Lab results</div>
           <div style={{fontSize:12,color:GRAY,marginTop:2}}>
             {(labs as LabResult[]).length} result{(labs as LabResult[]).length!==1?"s":""} on file
           </div>
         </div>
         <button onClick={()=>{setShowUpload(true);setUploadError("")}}
-          style={{display:"flex",alignItems:"center",gap:6,background:NAVY,color:"#fff",border:"none",borderRadius:9,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+          style={{display:"flex",alignItems:"center",gap:6,background:NAVY,color:"var(--hf-text-on-solid)",border:"none",borderRadius:9,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
           <Upload size={14}/> Upload result
         </button>
       </div>
@@ -150,7 +150,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
       : (labs as LabResult[]).length===0 ? (
         <div style={{textAlign:"center",padding:"60px 20px",color:GRAY,border:`1px dashed ${BORDER}`,borderRadius:12}}>
           <FlaskConical size={36} style={{marginBottom:12,opacity:0.4}}/>
-          <div style={{fontWeight:600,color:"#475569",fontSize:15}}>No lab results on file</div>
+          <div style={{fontWeight:600,color:"var(--hf-text-tertiary)",fontSize:15}}>No lab results on file</div>
           <div style={{fontSize:13,marginTop:4}}>Upload results from Ampath, Lancet, Pathcare or any lab to attach them to this patient record.</div>
         </div>
       ) : (
@@ -163,22 +163,22 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
             const isInterpreting = interpreting===lab.id
 
             return (
-              <div key={lab.id} style={{border:`1px solid ${s.border}`,borderLeft:`4px solid ${s.color}`,borderRadius:10,overflow:"hidden",background:"#fff"}}>
+              <div key={lab.id} style={{border:`1px solid ${s.border}`,borderLeft:`4px solid ${s.color}`,borderRadius:10,overflow:"hidden",background:"var(--hf-surface)"}}>
                 {/* Header */}
                 <div onClick={()=>setExpanded(isOpen?null:lab.id)}
-                  style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 18px",cursor:"pointer",background:isOpen?LIGHT:"#fff"}}>
+                  style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 18px",cursor:"pointer",background:isOpen?LIGHT:"var(--hf-surface)"}}>
                   <div style={{flex:1}}>
                     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
                       <FlaskConical size={14} color={s.color}/>
-                      <span style={{fontWeight:700,fontSize:14,color:"#0F172A"}}>{lab.pdfFilename||`${lab.source} result`}</span>
+                      <span style={{fontWeight:700,fontSize:14,color:"var(--hf-text)"}}>{lab.pdfFilename||`${lab.source} result`}</span>
                       <span style={{background:s.bg,color:s.color,padding:"1px 7px",borderRadius:20,fontSize:11,fontWeight:700,border:`1px solid ${s.border}`}}>{lab.status}</span>
                       {abnormal.length>0 && (
-                        <span style={{background:"#FEF2F2",color:RED,padding:"1px 7px",borderRadius:20,fontSize:11,fontWeight:700,border:"1px solid #FECACA"}}>
+                        <span style={{background:"var(--hf-danger-soft)",color:RED,padding:"1px 7px",borderRadius:20,fontSize:11,fontWeight:700,border:"1px solid var(--hf-danger-border)"}}>
                           {abnormal.length} abnormal
                         </span>
                       )}
                       {lab.consultationId && (
-                        <span style={{background:"#DCFCE7",color:GREEN,padding:"1px 7px",borderRadius:20,fontSize:11,fontWeight:700}}>Filed</span>
+                        <span style={{background:"var(--hf-success-soft-strong)",color:GREEN,padding:"1px 7px",borderRadius:20,fontSize:11,fontWeight:700}}>Filed</span>
                       )}
                     </div>
                     <div style={{fontSize:12,color:GRAY}}>
@@ -227,7 +227,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
 
                 {/* Expanded */}
                 {isOpen && (
-                  <div style={{borderTop:`1px solid ${BORDER}`,padding:"16px 18px",background:"#FAFAFA"}}>
+                  <div style={{borderTop:`1px solid ${BORDER}`,padding:"16px 18px",background:"var(--hf-surface-muted)"}}>
 
                     {/* Markers table */}
                     {markers.length>0 && (
@@ -246,9 +246,9 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                               {markers.map((m,i)=>{
                                 const flag = m.flag && m.flag!=="NORMAL" ? FLAG_CFG[m.flag] : null
                                 return (
-                                  <tr key={i} style={{borderTop:i>0?`1px solid #F1F5F9`:"none",background:flag?"#FFFBEB":"#fff"}}>
-                                    <td style={{padding:"8px 12px",fontSize:13,fontWeight:600,color:"#0F172A"}}>{m.marker}</td>
-                                    <td style={{padding:"8px 12px",fontSize:13,fontWeight:flag?700:400,color:flag?flag.color:"#0F172A"}}>{m.value}</td>
+                                  <tr key={i} style={{borderTop:i>0?`1px solid var(--hf-border-subtle)`:"none",background:flag?"var(--hf-warning-soft)":"var(--hf-surface)"}}>
+                                    <td style={{padding:"8px 12px",fontSize:13,fontWeight:600,color:"var(--hf-text)"}}>{m.marker}</td>
+                                    <td style={{padding:"8px 12px",fontSize:13,fontWeight:flag?700:400,color:flag?flag.color:"var(--hf-text)"}}>{m.value}</td>
                                     <td style={{padding:"8px 12px",fontSize:12,color:GRAY}}>{m.unit||"—"}</td>
                                     <td style={{padding:"8px 12px",fontSize:12,color:GRAY}}>{m.refRange||"—"}</td>
                                     <td style={{padding:"8px 12px"}}>
@@ -275,7 +275,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                         </div>
                         <button onClick={()=>interpretWithClaude(lab)} disabled={isInterpreting}
                           style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",
-                            background:isInterpreting?"#F1F5F9":"#F5F3FF",
+                            background:isInterpreting?"var(--hf-surface-sunken)":"var(--hf-violet-soft)",
                             color:isInterpreting?GRAY:PURPLE,
                             border:`1px solid ${isInterpreting?BORDER:"#DDD6FE"}`,
                             borderRadius:7,fontSize:12,fontWeight:600,cursor:isInterpreting?"wait":"pointer"}}>
@@ -286,11 +286,11 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                         </button>
                       </div>
                       {lab.interpretation ? (
-                        <div style={{padding:"12px 14px",background:"#F0FDF4",border:"1px solid #86EFAC",borderRadius:8,fontSize:13,color:"#0F172A",lineHeight:1.6}}>
+                        <div style={{padding:"12px 14px",background:"var(--hf-success-soft)",border:"1px solid var(--hf-success-border)",borderRadius:8,fontSize:13,color:"var(--hf-text)",lineHeight:1.6}}>
                           <span style={{fontWeight:700,color:TEAL}}>Claude: </span>{lab.interpretation}
                         </div>
                       ) : interpretError[lab.id] ? (
-                        <div style={{padding:"10px 14px",background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,fontSize:12,color:RED,display:"flex",alignItems:"center",gap:6}}>
+                        <div style={{padding:"10px 14px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:12,color:RED,display:"flex",alignItems:"center",gap:6}}>
                           <AlertCircle size={13}/>{interpretError[lab.id]}
                         </div>
                       ) : (
@@ -304,13 +304,13 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                     <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
                       {lab.status==="UNREVIEWED" && (
                         <button onClick={()=>markReviewed.mutate(lab.id)} disabled={markReviewed.isPending}
-                          style={{display:"flex",alignItems:"center",gap:5,padding:"6px 14px",background:"#FFFBEB",color:AMBER,border:"1px solid #FDE68A",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                          style={{display:"flex",alignItems:"center",gap:5,padding:"6px 14px",background:"var(--hf-warning-soft)",color:AMBER,border:"1px solid var(--hf-warning-border)",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer"}}>
                           <Eye size={12}/> Mark reviewed
                         </button>
                       )}
                       {lab.status!=="FILED" && (
                         <button onClick={()=>setShowFile(lab.id)}
-                          style={{display:"flex",alignItems:"center",gap:5,padding:"6px 14px",background:"#F0FDF4",color:GREEN,border:"1px solid #86EFAC",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                          style={{display:"flex",alignItems:"center",gap:5,padding:"6px 14px",background:"var(--hf-success-soft)",color:GREEN,border:"1px solid var(--hf-success-border)",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer"}}>
                           <FileText size={12}/> File to consultation
                         </button>
                       )}
@@ -326,9 +326,9 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
       {/* ── File to consultation modal ─────────────────────────────────────── */}
       {showFile && (
         <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1200,backdropFilter:"blur(3px)"}}>
-          <div style={{background:"#fff",borderRadius:16,padding:28,width:480,boxShadow:"0 24px 64px rgba(0,0,0,0.22)"}}>
+          <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:480,boxShadow:"0 24px 64px rgba(0,0,0,0.22)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <h3 style={{margin:0,fontSize:16,fontWeight:700,color:"#0F172A"}}>File to consultation</h3>
+              <h3 style={{margin:0,fontSize:16,fontWeight:700,color:"var(--hf-text)"}}>File to consultation</h3>
               <button onClick={()=>setShowFile(null)} style={{background:"none",border:"none",cursor:"pointer",color:GRAY,display:"flex"}}><X size={18}/></button>
             </div>
             <p style={{fontSize:13,color:GRAY,marginBottom:16}}>Link this lab result to a consultation so it appears in the patient's history.</p>
@@ -338,16 +338,16 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                 : (consultations as Consultation[]).sort((a,b)=>b.consultedAt.localeCompare(a.consultedAt)).map(c=>(
                   <button key={c.id} onClick={()=>fileResult.mutate({id:showFile!,consultationId:c.id})}
                     disabled={fileResult.isPending}
-                    style={{padding:"12px 14px",border:`1px solid ${BORDER}`,borderRadius:8,background:"#fff",cursor:"pointer",textAlign:"left" as const}}
+                    style={{padding:"12px 14px",border:`1px solid ${BORDER}`,borderRadius:8,background:"var(--hf-surface)",cursor:"pointer",textAlign:"left" as const}}
                     onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background=LIGHT}
-                    onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background="#fff"}>
-                    <div style={{fontWeight:600,fontSize:13,color:"#0F172A"}}>{c.chiefComplaint}</div>
+                    onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background="var(--hf-surface)"}>
+                    <div style={{fontWeight:600,fontSize:13,color:"var(--hf-text)"}}>{c.chiefComplaint}</div>
                     <div style={{fontSize:11,color:GRAY,marginTop:2}}>{fmtDT(c.consultedAt)}</div>
                   </button>
                 ))}
             </div>
             <div style={{display:"flex",justifyContent:"flex-end",marginTop:16}}>
-              <button onClick={()=>setShowFile(null)} style={{padding:"8px 16px",border:`1px solid ${BORDER}`,borderRadius:8,background:"#fff",fontSize:13,cursor:"pointer",color:"#374151"}}>Cancel</button>
+              <button onClick={()=>setShowFile(null)} style={{padding:"8px 16px",border:`1px solid ${BORDER}`,borderRadius:8,background:"var(--hf-surface)",fontSize:13,cursor:"pointer",color:"var(--hf-text-secondary)"}}>Cancel</button>
             </div>
           </div>
         </div>
@@ -356,9 +356,9 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
       {/* ── Upload modal ─────────────────────────────────────────────────────── */}
       {showUpload && (
         <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1200,backdropFilter:"blur(3px)"}}>
-          <div style={{background:"#fff",borderRadius:16,padding:28,width:520,boxShadow:"0 24px 64px rgba(0,0,0,0.22)"}}>
+          <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:520,boxShadow:"0 24px 64px rgba(0,0,0,0.22)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"#0F172A"}}>Upload lab result</h3>
+              <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"var(--hf-text)"}}>Upload lab result</h3>
               <button onClick={()=>setShowUpload(false)} style={{background:"none",border:"none",cursor:"pointer",color:GRAY,display:"flex"}}><X size={20}/></button>
             </div>
 
@@ -369,7 +369,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                   {["AMPATH","LANCET","PATHCARE","VERMAAK","EMAIL","MANUAL"].map(s=>(
                     <button key={s} onClick={()=>setUploadForm(f=>({...f,source:s}))}
                       style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${uploadForm.source===s?TEAL:BORDER}`,
-                        background:uploadForm.source===s?"#F0FDF4":"#fff",
+                        background:uploadForm.source===s?"var(--hf-success-soft)":"var(--hf-surface)",
                         color:uploadForm.source===s?TEAL:GRAY,
                         fontSize:12,fontWeight:uploadForm.source===s?700:400,cursor:"pointer"}}>
                       {s}
@@ -396,7 +396,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                   onClick={()=>fileRef.current?.click()}>
                   <Upload size={22} color={GRAY} style={{marginBottom:6}}/>
                   <div style={{fontSize:13,color:GRAY}}>Click to select PDF</div>
-                  <div style={{fontSize:11,color:"#94A3B8",marginTop:3}}>Ampath, Lancet, Pathcare reports · PDF only</div>
+                  <div style={{fontSize:11,color:"var(--hf-text-faint)",marginTop:3}}>Ampath, Lancet, Pathcare reports · PDF only</div>
                   <input ref={fileRef} type="file" accept=".pdf" style={{display:"none"}}
                     onChange={e=>{ const f=e.target.files?.[0]; if(f) setUploadFile(f) }}/>
                 </div>
@@ -414,7 +414,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
             </div>
 
             {uploadError && (
-              <div style={{marginTop:10,padding:"8px 12px",background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,fontSize:13,color:RED,display:"flex",alignItems:"center",gap:6}}>
+              <div style={{marginTop:10,padding:"8px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:RED,display:"flex",alignItems:"center",gap:6}}>
                 <AlertCircle size={13}/>{uploadError}
               </div>
             )}

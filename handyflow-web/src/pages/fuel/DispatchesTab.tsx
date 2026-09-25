@@ -103,21 +103,21 @@ export default function DispatchesTab() {
     months.push(d.toISOString().slice(0, 7))
   }
 
-  const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }
-  const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+  const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }
+  const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
 
   return (
     <div>
       {/* Stats */}
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {[
-          { label: "Total dispatches",  value: filtered.length,                           color: "#1B3A6B" },
-          { label: "Total litres out",  value: `${totalLitres.toLocaleString()} L`,       color: "#DC2626" },
-          { label: "Unique recipients", value: new Set(filtered.map(d => d.recipientName)).size, color: "#0D9488" },
+          { label: "Total dispatches",  value: filtered.length,                           color: "var(--hf-primary-text)" },
+          { label: "Total litres out",  value: `${totalLitres.toLocaleString()} L`,       color: "var(--hf-danger-text)" },
+          { label: "Unique recipients", value: new Set(filtered.map(d => d.recipientName)).size, color: "var(--hf-accent-text)" },
         ].map(s => (
-          <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
+          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{s.label}</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -128,145 +128,145 @@ export default function DispatchesTab() {
           {months.map(m => (
             <button key={m} onClick={() => setFilterMonth(m)}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterMonth === m ? 600 : 400,
-                background: filterMonth === m ? "#1B3A6B" : "#F1F5F9",
-                color: filterMonth === m ? "#fff" : "#64748B" }}>
+                background: filterMonth === m ? "var(--hf-primary)" : "var(--hf-surface-sunken)",
+                color: filterMonth === m ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
               {new Date(m + "-01").toLocaleDateString("en-ZA", { month: "short", year: "numeric" })}
             </button>
           ))}
         </div>
         <button onClick={() => { setShowDispatch(true); setError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Dispatch Fuel
         </button>
       </div>
 
       {/* Log / Rollup toggle */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-        <div style={{ display: "flex", gap: 2, background: "#F1F5F9", borderRadius: 8, padding: 3, width: "fit-content" }}>
+        <div style={{ display: "flex", gap: 2, background: "var(--hf-surface-sunken)", borderRadius: 8, padding: 3, width: "fit-content" }}>
           {([
             { key: "log", label: "Log", icon: List },
             { key: "rollup", label: "By Vehicle / Cost Center", icon: BarChart3 },
           ] as const).map(v => (
             <button key={v.key} onClick={() => setView(v.key)}
               style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700,
-                background: view === v.key ? "#fff" : "transparent", color: view === v.key ? "#1B3A6B" : "#64748B",
+                background: view === v.key ? "var(--hf-surface)" : "transparent", color: view === v.key ? "var(--hf-primary-text)" : "var(--hf-text-muted)",
                 boxShadow: view === v.key ? "0 1px 2px rgba(0,0,0,0.08)" : "none" }}>
               <v.icon size={13} /> {v.label}
             </button>
           ))}
         </div>
         <button onClick={downloadUsageReport}
-          style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 600, color: "#0D9488", cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 600, color: "var(--hf-accent-text)", cursor: "pointer" }}>
           <Download size={13} /> Download usage report (PDF)
         </button>
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Fuel size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No dispatches for this period</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No dispatches for this period</div>
         </div>
       ) : view === "rollup" ? (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
-              <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
+              <tr style={{ background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border)" }}>
                 {["Vehicle / Recipient","Dispatches","Total Litres","Total Cost","Last Dispatch"].map(h => (
-                  <th key={h} style={{ padding: "11px 14px", textAlign: "left", fontWeight: 700, fontSize: 11, color: "#64748B", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
+                  <th key={h} style={{ padding: "11px 14px", textAlign: "left", fontWeight: 700, fontSize: 11, color: "var(--hf-text-muted)", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {rollup.map((r, i) => (
-                <tr key={r.label} style={{ borderBottom: i < rollup.length - 1 ? "1px solid #F1F5F9" : "none", background: "#fff" }}>
-                  <td style={{ padding: "12px 14px", fontWeight: 600, color: r.label === "Unassigned" ? "#94A3B8" : "#0F172A" }}>{r.label}</td>
-                  <td style={{ padding: "12px 14px", color: "#475569" }}>{r.count}</td>
-                  <td style={{ padding: "12px 14px", fontWeight: 700, color: "#DC2626" }}>{r.litres.toLocaleString()} L</td>
-                  <td style={{ padding: "12px 14px", fontWeight: 700, color: "#0F172A" }}>
+                <tr key={r.label} style={{ borderBottom: i < rollup.length - 1 ? "1px solid var(--hf-border-subtle)" : "none", background: "var(--hf-surface)" }}>
+                  <td style={{ padding: "12px 14px", fontWeight: 600, color: r.label === "Unassigned" ? "var(--hf-text-faint)" : "var(--hf-text)" }}>{r.label}</td>
+                  <td style={{ padding: "12px 14px", color: "var(--hf-text-tertiary)" }}>{r.count}</td>
+                  <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--hf-danger-text)" }}>{r.litres.toLocaleString()} L</td>
+                  <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--hf-text)" }}>
                     {fmtRTotal(r.cost)}
-                    {r.hasUnpriced && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 400, color: "#94A3B8" }}>(partial — some dispatches unpriced)</span>}
+                    {r.hasUnpriced && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 400, color: "var(--hf-text-faint)" }}>(partial — some dispatches unpriced)</span>}
                   </td>
-                  <td style={{ padding: "12px 14px", color: "#64748B", fontSize: 12, whiteSpace: "nowrap" }}>{fmtDate(r.lastDispatchedAt)}</td>
+                  <td style={{ padding: "12px 14px", color: "var(--hf-text-muted)", fontSize: 12, whiteSpace: "nowrap" }}>{fmtDate(r.lastDispatchedAt)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr style={{ background: "#F8FAFC", borderTop: "2px solid #E2E8F0" }}>
-                <td style={{ padding: "12px 14px", fontWeight: 700, color: "#0F172A" }}>Total</td>
-                <td style={{ padding: "12px 14px", fontWeight: 700, color: "#0F172A" }}>{filtered.length}</td>
-                <td style={{ padding: "12px 14px", fontWeight: 700, color: "#DC2626" }}>{totalLitres.toLocaleString()} L</td>
-                <td style={{ padding: "12px 14px", fontWeight: 700, color: "#0F172A" }}>{fmtRTotal(rollup.reduce((s, r) => s + r.cost, 0))}</td>
+              <tr style={{ background: "var(--hf-surface-muted)", borderTop: "2px solid var(--hf-border)" }}>
+                <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--hf-text)" }}>Total</td>
+                <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--hf-text)" }}>{filtered.length}</td>
+                <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--hf-danger-text)" }}>{totalLitres.toLocaleString()} L</td>
+                <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--hf-text)" }}>{fmtRTotal(rollup.reduce((s, r) => s + r.cost, 0))}</td>
                 <td />
               </tr>
             </tfoot>
           </table>
         </div>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
-              <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
+              <tr style={{ background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border)" }}>
                 {["Recipient","Litres","Level Change","Price/L","Authorised By","Odometer / Hours","Date & Time","Review"].map(h => (
-                  <th key={h} style={{ padding: "11px 14px", textAlign: "left", fontWeight: 700, fontSize: 11, color: "#64748B", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
+                  <th key={h} style={{ padding: "11px 14px", textAlign: "left", fontWeight: 700, fontSize: 11, color: "var(--hf-text-muted)", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtered.map((d, i) => (
                 <Fragment key={d.id}>
-                <tr style={{ borderBottom: expandedApprovalId === d.id || i < filtered.length - 1 ? "1px solid #F1F5F9" : "none", background: "#fff" }}>
+                <tr style={{ borderBottom: expandedApprovalId === d.id || i < filtered.length - 1 ? "1px solid var(--hf-border-subtle)" : "none", background: "var(--hf-surface)" }}>
                   <td style={{ padding: "12px 14px" }}>
-                    <div style={{ fontWeight: 600, color: "#0F172A" }}>{d.recipientName || "—"}</div>
+                    <div style={{ fontWeight: 600, color: "var(--hf-text)" }}>{d.recipientName || "—"}</div>
                   </td>
-                  <td style={{ padding: "12px 14px", fontWeight: 700, color: "#DC2626", whiteSpace: "nowrap" }}>
+                  <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--hf-danger-text)", whiteSpace: "nowrap" }}>
                     −{Number(d.litresDispensed).toLocaleString()} L
                   </td>
-                  <td style={{ padding: "12px 14px", fontSize: 12, color: "#475569", whiteSpace: "nowrap" }}>
+                  <td style={{ padding: "12px 14px", fontSize: 12, color: "var(--hf-text-tertiary)", whiteSpace: "nowrap" }}>
                     {d.levelBefore != null ? `${Number(d.levelBefore).toLocaleString()} L` : "—"}
-                    <span style={{ margin: "0 5px", color: "#CBD5E1" }}>→</span>
-                    {d.levelAfter != null ? <strong style={{ color: "#0D9488" }}>{Number(d.levelAfter).toLocaleString()} L</strong> : "—"}
+                    <span style={{ margin: "0 5px", color: "var(--hf-text-disabled)" }}>→</span>
+                    {d.levelAfter != null ? <strong style={{ color: "var(--hf-accent-text)" }}>{Number(d.levelAfter).toLocaleString()} L</strong> : "—"}
                   </td>
-                  <td style={{ padding: "12px 14px", color: "#475569" }}>{d.pricePerLitre ? `R ${Number(d.pricePerLitre).toFixed(4)}` : "—"}</td>
-                  <td style={{ padding: "12px 14px", color: "#475569" }}>{d.authorisedBy || "—"}</td>
-                  <td style={{ padding: "12px 14px", fontSize: 12, color: "#64748B" }}>
+                  <td style={{ padding: "12px 14px", color: "var(--hf-text-tertiary)" }}>{d.pricePerLitre ? `R ${Number(d.pricePerLitre).toFixed(4)}` : "—"}</td>
+                  <td style={{ padding: "12px 14px", color: "var(--hf-text-tertiary)" }}>{d.authorisedBy || "—"}</td>
+                  <td style={{ padding: "12px 14px", fontSize: 12, color: "var(--hf-text-muted)" }}>
                     {d.odometerReading ? `${Number(d.odometerReading).toLocaleString()} km` : ""}
                     {d.hoursReading ? ` ${Number(d.hoursReading).toFixed(1)} hrs` : ""}
                     {!d.odometerReading && !d.hoursReading ? "—" : ""}
                   </td>
-                  <td style={{ padding: "12px 14px", color: "#64748B", fontSize: 12, whiteSpace: "nowrap" }}>
+                  <td style={{ padding: "12px 14px", color: "var(--hf-text-muted)", fontSize: 12, whiteSpace: "nowrap" }}>
                     {fmtDate(d.dispatchedAt)}<br />
-                    <span style={{ color: "#94A3B8" }}>{fmtTime(d.dispatchedAt)}</span>
+                    <span style={{ color: "var(--hf-text-faint)" }}>{fmtTime(d.dispatchedAt)}</span>
                   </td>
                   <td style={{ padding: "12px 14px" }}>
                     <button onClick={() => setExpandedApprovalId(expandedApprovalId === d.id ? null : d.id)}
-                      style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", cursor: "pointer", whiteSpace: "nowrap" }}>
+                      style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", cursor: "pointer", whiteSpace: "nowrap" }}>
                       {expandedApprovalId === d.id ? "Hide" : "Status"}
                     </button>
                   </td>
                 </tr>
                 {expandedApprovalId === d.id && (
-                  <tr style={{ borderBottom: i < filtered.length - 1 ? "1px solid #F1F5F9" : "none" }}>
-                    <td colSpan={8} style={{ padding: "10px 14px", background: "#F8FAFC" }}>
+                  <tr style={{ borderBottom: i < filtered.length - 1 ? "1px solid var(--hf-border-subtle)" : "none" }}>
+                    <td colSpan={8} style={{ padding: "10px 14px", background: "var(--hf-surface-muted)" }}>
                       {approvalStatusQuery.isLoading ? (
-                        <span style={{ fontSize: 12, color: "#94A3B8" }}>Loading…</span>
+                        <span style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Loading…</span>
                       ) : !approvalStatusQuery.data ? (
-                        <span style={{ fontSize: 12, color: "#94A3B8" }}>No review record — auto-approved (no review rule configured for this tenant).</span>
+                        <span style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>No review record — auto-approved (no review rule configured for this tenant).</span>
                       ) : (
                         <div>
                           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: approvalStatusQuery.data.steps?.length ? 8 : 0 }}>
                             <span style={{
                               fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20,
-                              background: approvalStatusQuery.data.status === "APPROVED" ? "#DCFCE7" : approvalStatusQuery.data.status === "REJECTED" ? "#FEF2F2" : "#FFFBEB",
-                              color: approvalStatusQuery.data.status === "APPROVED" ? "#166534" : approvalStatusQuery.data.status === "REJECTED" ? "#DC2626" : "#B45309",
+                              background: approvalStatusQuery.data.status === "APPROVED" ? "var(--hf-success-soft-strong)" : approvalStatusQuery.data.status === "REJECTED" ? "var(--hf-danger-soft)" : "var(--hf-warning-soft)",
+                              color: approvalStatusQuery.data.status === "APPROVED" ? "var(--hf-success-text-strong)" : approvalStatusQuery.data.status === "REJECTED" ? "var(--hf-danger-text)" : "var(--hf-warning-text-strong)",
                             }}>{approvalStatusQuery.data.status}</span>
-                            {approvalStatusQuery.data.approvalMode && <span style={{ fontSize: 11, color: "#94A3B8" }}>{approvalStatusQuery.data.approvalMode.replace(/_/g, " ")}</span>}
+                            {approvalStatusQuery.data.approvalMode && <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{approvalStatusQuery.data.approvalMode.replace(/_/g, " ")}</span>}
                           </div>
                           {(approvalStatusQuery.data.steps ?? []).map((s: any) => (
-                            <div key={s.id} style={{ fontSize: 12, color: "#475569", padding: "3px 0" }}>
-                              Step {s.stepOrder + 1}: <strong>{s.approverName ?? s.approverValue}</strong> — <span style={{ color: s.status === "APPROVED" ? "#166534" : s.status === "REJECTED" ? "#DC2626" : "#94A3B8" }}>{s.status}</span>
-                              {s.comment && <span style={{ color: "#94A3B8" }}> — "{s.comment}"</span>}
+                            <div key={s.id} style={{ fontSize: 12, color: "var(--hf-text-tertiary)", padding: "3px 0" }}>
+                              Step {s.stepOrder + 1}: <strong>{s.approverName ?? s.approverValue}</strong> — <span style={{ color: s.status === "APPROVED" ? "var(--hf-success-text-strong)" : s.status === "REJECTED" ? "var(--hf-danger-text)" : "var(--hf-text-faint)" }}>{s.status}</span>
+                              {s.comment && <span style={{ color: "var(--hf-text-faint)" }}> — "{s.comment}"</span>}
                             </div>
                           ))}
                         </div>
@@ -284,16 +284,16 @@ export default function DispatchesTab() {
       {/* Dispatch Modal */}
       {showDispatch && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 560, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 560, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Dispatch Fuel</h3>
-              <button onClick={() => { setShowDispatch(false); setError("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Dispatch Fuel</h3>
+              <button onClick={() => { setShowDispatch(false); setError("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label style={lbl}>Source Tank *</label>
-                <select value={form.tankId} onChange={e => setForm(f => ({ ...f, tankId: e.target.value }))} style={{ ...inp, background: "#fff" }}>
+                <select value={form.tankId} onChange={e => setForm(f => ({ ...f, tankId: e.target.value }))} style={{ ...inp, background: "var(--hf-surface)" }}>
                   <option value="">Select tank...</option>
                   {(tanks as any[]).map(t => <option key={t.id} value={t.id}>{t.name} — {Number(t.currentLitres).toLocaleString()} L available ({t.fuelType})</option>)}
                 </select>
@@ -327,7 +327,7 @@ export default function DispatchesTab() {
               </div>
 
               {selectedTank && form.litresDispensed && (
-                <div style={{ padding: "10px 14px", background: Number(form.litresDispensed) > Number(selectedTank.currentLitres) ? "#FEF2F2" : "#F0FDF4", border: `1px solid ${Number(form.litresDispensed) > Number(selectedTank.currentLitres) ? "#FECACA" : "#BBF7D0"}`, borderRadius: 8, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8, color: Number(form.litresDispensed) > Number(selectedTank.currentLitres) ? "#DC2626" : "#166534" }}>
+                <div style={{ padding: "10px 14px", background: Number(form.litresDispensed) > Number(selectedTank.currentLitres) ? "var(--hf-danger-soft)" : "var(--hf-success-soft)", border: `1px solid ${Number(form.litresDispensed) > Number(selectedTank.currentLitres) ? "#FECACA" : "#BBF7D0"}`, borderRadius: 8, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8, color: Number(form.litresDispensed) > Number(selectedTank.currentLitres) ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)" }}>
                   {Number(form.litresDispensed) > Number(selectedTank.currentLitres)
                     ? <><AlertTriangle size={14} /> Insufficient stock — available: {Number(selectedTank.currentLitres).toLocaleString()} L</>
                     : <>After dispatch: {(Number(selectedTank.currentLitres) - Number(form.litresDispensed)).toLocaleString()} L remaining</>}
@@ -335,14 +335,14 @@ export default function DispatchesTab() {
               )}
             </div>
 
-            {error && <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{error}</div>}
+            {error && <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{error}</div>}
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-              <button onClick={() => { setShowDispatch(false); setError("") }} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
+              <button onClick={() => { setShowDispatch(false); setError("") }} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button
                 onClick={() => dispatchFuel.mutate({ tankId: form.tankId, body: { litresDispensed: Number(form.litresDispensed), pricePerLitre: form.pricePerLitre ? Number(form.pricePerLitre) : null, dispatchedAt: new Date().toISOString(), recipientName: form.recipientName || null, authorisedBy: form.authorisedBy || null, odometerReading: form.odometerReading ? Number(form.odometerReading) : null, hoursReading: form.hoursReading ? Number(form.hoursReading) : null, notes: form.notes || null } })}
                 disabled={!form.tankId || !form.litresDispensed || !form.recipientName || Number(form.litresDispensed) > Number(selectedTank?.currentLitres ?? 0) || dispatchFuel.isPending}
-                style={{ padding: "9px 22px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {dispatchFuel.isPending ? "Dispatching..." : "Dispatch Fuel"}
               </button>
             </div>

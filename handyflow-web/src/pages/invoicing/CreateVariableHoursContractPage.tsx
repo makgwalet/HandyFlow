@@ -10,24 +10,24 @@ import { apiClient } from '../../api/client'
 interface Customer { id: string; name: string; email: string }
 
 const inp: React.CSSProperties = {
-  width: '100%', padding: '10px 14px', border: '1.5px solid #E2E8F0',
-  borderRadius: 10, fontSize: 14, color: '#0F172A', outline: 'none',
+  width: '100%', padding: '10px 14px', border: '1.5px solid var(--hf-border)',
+  borderRadius: 10, fontSize: 14, color: 'var(--hf-text)', outline: 'none',
   boxSizing: 'border-box', background: 'white',
 }
-const inpErr: React.CSSProperties = { ...inp, borderColor: '#DC2626', background: '#FFF5F5' }
+const inpErr: React.CSSProperties = { ...inp, borderColor: 'var(--hf-danger)', background: 'var(--hf-danger-soft)' }
 
 function Field({ label, required, error, hint, children }: {
   label: string; required?: boolean; error?: string; hint?: string; children: React.ReactNode
 }) {
   return (
     <div style={{ marginBottom: 18 }}>
-      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-        {label}{required && <span style={{ color: '#DC2626', marginLeft: 2 }}>*</span>}
+      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--hf-text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        {label}{required && <span style={{ color: 'var(--hf-danger-text)', marginLeft: 2 }}>*</span>}
       </label>
       {children}
-      {hint  && <p style={{ fontSize: 11, color: '#94A3B8', margin: '4px 0 0' }}>{hint}</p>}
+      {hint  && <p style={{ fontSize: 11, color: 'var(--hf-text-faint)', margin: '4px 0 0' }}>{hint}</p>}
       {error && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#DC2626', marginTop: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--hf-danger-text)', marginTop: 4 }}>
           <AlertCircle size={12} />{error}
         </div>
       )}
@@ -131,17 +131,17 @@ export function CreateVariableHoursContractPage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
         <button onClick={() => navigate('/recurring')}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', border: '1px solid #E2E8F0', borderRadius: 9, padding: '7px 12px', fontSize: 13, fontWeight: 600, color: '#374151', cursor: 'pointer' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', border: '1px solid var(--hf-border)', borderRadius: 9, padding: '7px 12px', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
           <ArrowLeft size={15} /> Back
         </button>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: 0 }}>New Variable-Hours Contract</h1>
-          <p style={{ fontSize: 12, color: '#94A3B8', margin: 0 }}>Machine hire billed on actual hours worked, with a minimum-hours (take-or-pay) clause per cycle</p>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>New Variable-Hours Contract</h1>
+          <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: 0 }}>Machine hire billed on actual hours worked, with a minimum-hours (take-or-pay) clause per cycle</p>
         </div>
       </div>
 
       {submitError && (
-        <div style={{ marginBottom: 20, padding: '12px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, fontSize: 13, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ marginBottom: 20, padding: '12px 16px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 10, fontSize: 13, color: 'var(--hf-danger-text)', display: 'flex', alignItems: 'center', gap: 10 }}>
           <AlertCircle size={16} style={{ flexShrink: 0 }} />{submitError}
         </div>
       )}
@@ -152,18 +152,18 @@ export function CreateVariableHoursContractPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* Client card */}
-          <div style={{ background: 'white', border: '1px solid #E8EDF5', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', margin: '0 0 18px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Client</p>
+          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', margin: '0 0 18px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Client</p>
 
             <div style={{ marginBottom: 18 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Client type</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--hf-text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Client type</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 {([['existing', Users, 'Saved customer'], ['walkin', UserPlus, 'Walk-in client']] as const).map(([type, Icon, label]) => (
                   <button key={type} onClick={() => setClientType(type)}
                     style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px', borderRadius: 10,
-                      border: clientType === type ? '2px solid #D97706' : '1.5px solid #E2E8F0',
-                      background: clientType === type ? '#FFFBEB' : 'white',
-                      color: clientType === type ? '#D97706' : '#64748B',
+                      border: clientType === type ? '2px solid var(--hf-warning)' : '1.5px solid var(--hf-border)',
+                      background: clientType === type ? 'var(--hf-warning-soft)' : 'white',
+                      color: clientType === type ? 'var(--hf-warning-text)' : 'var(--hf-text-muted)',
                       fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
                     <Icon size={15} />{label}
                   </button>
@@ -183,8 +183,8 @@ export function CreateVariableHoursContractPage() {
                 </div>
               </Field>
             ) : (
-              <div style={{ background: '#F8FAFC', borderRadius: 10, padding: 16, border: '1px solid #E2E8F0', marginBottom: 18 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.05em', marginBottom: 12 }}>WALK-IN CLIENT DETAILS</div>
+              <div style={{ background: 'var(--hf-surface-muted)', borderRadius: 10, padding: 16, border: '1px solid var(--hf-border)', marginBottom: 18 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-faint)', letterSpacing: '0.05em', marginBottom: 12 }}>WALK-IN CLIENT DETAILS</div>
                 <Field label="Name" required error={errors.walkinName}>
                   <input style={errors.walkinName ? inpErr : inp} value={walkinName}
                     onChange={e => { setWalkinName(e.target.value); setErrors(f => { const n = { ...f }; delete n.walkinName; return n }) }}
@@ -215,10 +215,10 @@ export function CreateVariableHoursContractPage() {
           </div>
 
           {/* Billing terms card */}
-          <div style={{ background: 'white', border: '1px solid #E8EDF5', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
               <Gauge size={16} color="#D97706" />
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Billing Terms</p>
+              <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Billing Terms</p>
             </div>
 
             <Field label="Billing cycle" required>
@@ -227,9 +227,9 @@ export function CreateVariableHoursContractPage() {
                   <button key={f.value} onClick={() => setFrequency(f.value)}
                     title={f.hint}
                     style={{ flex: 1, padding: '9px 10px', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                      border: frequency === f.value ? '2px solid #D97706' : '1.5px solid #E2E8F0',
-                      background: frequency === f.value ? '#FFFBEB' : 'white',
-                      color: frequency === f.value ? '#D97706' : '#64748B' }}>
+                      border: frequency === f.value ? '2px solid var(--hf-warning)' : '1.5px solid var(--hf-border)',
+                      background: frequency === f.value ? 'var(--hf-warning-soft)' : 'white',
+                      color: frequency === f.value ? 'var(--hf-warning-text)' : 'var(--hf-text-muted)' }}>
                     {f.label}
                   </button>
                 ))}
@@ -274,13 +274,13 @@ export function CreateVariableHoursContractPage() {
 
             {/* Live preview */}
             {rate > 0 && minHrs >= 0 && (
-              <div style={{ marginTop: 8, background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: '14px 18px' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#D97706', letterSpacing: '0.05em', marginBottom: 10 }}>MINIMUM CYCLE BILLING (TAKE-OR-PAY FLOOR)</div>
+              <div style={{ marginTop: 8, background: 'var(--hf-warning-soft)', border: '1px solid var(--hf-warning-border)', borderRadius: 10, padding: '14px 18px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-warning-text)', letterSpacing: '0.05em', marginBottom: 10 }}>MINIMUM CYCLE BILLING (TAKE-OR-PAY FLOOR)</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ fontSize: 12, color: '#92400E' }}>
+                  <div style={{ fontSize: 12, color: 'var(--hf-warning-text-deep)' }}>
                     Even at 0h worked, each cycle bills at least {minHrs}h × {fmtR(rate)} = {fmtR(minimumCycleAmount)} + VAT {fmtR(minimumCycleVat)}
                   </div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#92400E', whiteSpace: 'nowrap', marginLeft: 12 }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--hf-warning-text-deep)', whiteSpace: 'nowrap', marginLeft: 12 }}>
                     {fmtR(minimumCycleAmount + minimumCycleVat)}
                   </div>
                 </div>
@@ -291,8 +291,8 @@ export function CreateVariableHoursContractPage() {
 
         {/* Right — summary & submit */}
         <div style={{ position: 'sticky', top: 80 }}>
-          <div style={{ background: 'white', border: '1px solid #E8EDF5', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Summary</p>
+          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Summary</p>
 
             {[['Rate/hr', rate > 0 ? fmtR(rate) : '—'],
               ['Minimum hrs/cycle', minimumHours ? `${minHrs}h` : '—'],
@@ -300,26 +300,26 @@ export function CreateVariableHoursContractPage() {
               ['Contracted total', contractedTotalHours ? `${contractedTotalHours}h` : 'Not set'],
             ].map(([l, v]) => (
               <div key={l} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 13, color: '#64748B' }}>{l}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#0F172A' }}>{v}</span>
+                <span style={{ fontSize: 13, color: 'var(--hf-text-muted)' }}>{l}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-text)' }}>{v}</span>
               </div>
             ))}
 
-            <div style={{ height: 1, background: '#F1F5F9', margin: '12px 0' }} />
+            <div style={{ height: 1, background: 'var(--hf-surface-sunken)', margin: '12px 0' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Minimum per cycle</span>
-              <span style={{ fontSize: 20, fontWeight: 800, color: '#D97706' }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--hf-text)' }}>Minimum per cycle</span>
+              <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--hf-warning-text)' }}>
                 {rate > 0 ? fmtR(minimumCycleAmount + minimumCycleVat) : '—'}
               </span>
             </div>
 
-            <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#166534', marginBottom: 16 }}>
+            <div style={{ background: 'var(--hf-success-soft)', border: '1px solid var(--hf-success-border-subtle)', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: 'var(--hf-success-text-strong)', marginBottom: 16 }}>
               No invoice is created yet — an operator logs actual hours each cycle from the Recurring tab, and the invoice generates then.
             </div>
 
             <button onClick={handleSubmit} disabled={create.isPending}
               style={{ width: '100%', padding: 12, border: 'none', borderRadius: 10,
-                background: create.isPending ? '#FCD34D' : '#D97706',
+                background: create.isPending ? '#FCD34D' : 'var(--hf-warning)',
                 color: 'white', fontSize: 14, fontWeight: 700,
                 cursor: create.isPending ? 'not-allowed' : 'pointer' }}>
               {create.isPending ? 'Creating...' : 'Create variable-hours contract'}
@@ -327,7 +327,7 @@ export function CreateVariableHoursContractPage() {
 
             <div style={{ marginTop: 10 }}>
               {Object.values(errors).map((e, i) => (
-                <p key={i} style={{ fontSize: 11, color: '#DC2626', margin: '2px 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <p key={i} style={{ fontSize: 11, color: 'var(--hf-danger-text)', margin: '2px 0', display: 'flex', alignItems: 'center', gap: 4 }}>
                   <AlertCircle size={11} />{e}
                 </p>
               ))}

@@ -37,7 +37,7 @@ export function ForgotPasswordPage() {
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-            <div style={{ width: 38, height: 38, background: '#0D9488', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 38, height: 38, background: 'var(--hf-accent)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Building2 size={19} color="white" strokeWidth={2.5} />
             </div>
             <span style={{ fontSize: 20, fontWeight: 800, color: 'white', letterSpacing: '-0.5px' }}>HandyFlow</span>
@@ -47,8 +47,8 @@ export function ForgotPasswordPage() {
         <div style={{ background: 'white', borderRadius: 20, padding: 32, boxShadow: '0 24px 80px rgba(0,0,0,0.3)' }}>
           {!sent ? (
             <>
-              <h2 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: '0 0 6px' }}>Reset your password</h2>
-              <p style={{ fontSize: 14, color: '#64748B', margin: '0 0 24px', lineHeight: 1.5 }}>
+              <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 6px' }}>Reset your password</h2>
+              <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', margin: '0 0 24px', lineHeight: 1.5 }}>
                 Enter your company slug and work email — we'll send a reset link if we find a match.
               </p>
 
@@ -63,22 +63,22 @@ export function ForgotPasswordPage() {
                 </Field>
 
                 {error && (
-                  <div style={{ padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>{error}</div>
+                  <div style={{ padding: '10px 14px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>
                 )}
 
                 <button type="submit" disabled={submit.isPending}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#1B3A6B', color: '#fff', border: 'none', borderRadius: 10, padding: '13px 24px', fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: submit.isPending ? 0.7 : 1 }}>
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 10, padding: '13px 24px', fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: submit.isPending ? 0.7 : 1 }}>
                   <Mail size={16} /> {submit.isPending ? 'Sending…' : 'Send reset link'}
                 </button>
               </form>
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: '8px 0' }}>
-              <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--hf-success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
                 <CheckCircle2 size={26} color="#0D9488" />
               </div>
-              <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', margin: '0 0 8px' }}>Check your email</h2>
-              <p style={{ fontSize: 14, color: '#64748B', lineHeight: 1.6, margin: '0 0 4px' }}>
+              <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 8px' }}>Check your email</h2>
+              <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', lineHeight: 1.6, margin: '0 0 4px' }}>
                 If an account matches <strong>{email}</strong> at <strong>{tenantSlug}</strong>, a reset link is on its way.
               </p>
               {/* FIX: was "30 minutes" — didn't match reality. Confirmed
@@ -87,11 +87,11 @@ export function ForgotPasswordPage() {
                   genuinely lives for 1 hour, same as the email itself
                   already correctly says. This was the one of the two that
                   was wrong. */}
-              <p style={{ fontSize: 13, color: '#94A3B8', margin: 0 }}>The link expires in 15 minutes.</p>
+              <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0 }}>The link expires in 15 minutes.</p>
             </div>
           )}
 
-          <a href="/login" style={{ marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13, color: '#1B3A6B', fontWeight: 600, textDecoration: 'none' }}>
+          <a href="/login" style={{ marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13, color: 'var(--hf-primary-text)', fontWeight: 600, textDecoration: 'none' }}>
             <ChevronLeft size={14} /> Back to sign in
           </a>
         </div>
@@ -103,19 +103,19 @@ export function ForgotPasswordPage() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>{label}</label>
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 6 }}>{label}</label>
       {children}
     </div>
   )
 }
 
 const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '11px 14px', border: '1.5px solid #E2E8F0',
-  borderRadius: 10, fontSize: 14, boxSizing: 'border-box' as const, background: '#fff', color: '#0F172A',
+  width: '100%', padding: '11px 14px', border: '1.5px solid var(--hf-border)',
+  borderRadius: 10, fontSize: 14, boxSizing: 'border-box' as const, background: 'var(--hf-surface)', color: 'var(--hf-text)',
 }
 const pageStyle: React.CSSProperties = {
   minHeight: '100vh',
-  background: 'linear-gradient(135deg, #0F172A 0%, #1B3A6B 50%, #0D9488 100%)',
+  background: 'linear-gradient(135deg, var(--hf-inverse-surface) 0%, var(--hf-primary) 50%, var(--hf-accent) 100%)',
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   padding: '24px 16px', fontFamily: "'Inter', system-ui, sans-serif",
 }

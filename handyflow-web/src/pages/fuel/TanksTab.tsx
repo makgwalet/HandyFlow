@@ -173,20 +173,20 @@ export default function TanksTab() {
           { label: "Total stock",    value: `${totalStock.toLocaleString()} L`,      color: "#1D4ED8" },
           { label: "Low tanks",      value: lowCount,                                color: lowCount > 0 ? "#DC2626" : "#94A3B8" },
         ].map(s => (
-          <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
+          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{s.label}</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       {/* Low stock alert */}
       {lowCount > 0 && (
-        <div style={{ marginBottom: 18, padding: "12px 16px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
           <AlertTriangle size={17} color="#DC2626" style={{ flexShrink: 0 }} />
           <div>
-            <div style={{ fontWeight: 700, fontSize: 13, color: "#DC2626" }}>Low Stock</div>
-            <div style={{ fontSize: 12, color: "#B91C1C" }}>{(tanks as Tank[]).filter(t => t.low).map(t => `${t.name} (${Number(t.currentLitres).toLocaleString()} L)`).join(", ")} — receive stock soon</div>
+            <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-danger-text)" }}>Low Stock</div>
+            <div style={{ fontSize: 12, color: "var(--hf-danger-text-strong)" }}>{(tanks as Tank[]).filter(t => t.low).map(t => `${t.name} (${Number(t.currentLitres).toLocaleString()} L)`).join(", ")} — receive stock soon</div>
           </div>
         </div>
       )}
@@ -194,17 +194,17 @@ export default function TanksTab() {
       {/* Toolbar */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
         <button onClick={() => { setShowAdd(true); setError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 7, background: "#0D9488", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Add Tank
         </button>
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading tanks...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading tanks...</div>
       ) : (tanks as Tank[]).length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Droplets size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No tanks registered</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No tanks registered</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -217,46 +217,46 @@ export default function TanksTab() {
 
             return (
               <div key={tank.id} style={{ border: `1px solid ${tank.low ? "#FECACA" : "#E2E8F0"}`, borderRadius: 12, overflow: "hidden" }}>
-                <div style={{ padding: "18px 20px", background: "#fff" }}>
+                <div style={{ padding: "18px 20px", background: "var(--hf-surface)" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <div style={{ width: 42, height: 42, borderRadius: 10, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                         <Droplets size={20} color={cfg.color} />
                       </div>
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{tank.name}</div>
-                        <div style={{ fontSize: 12, color: "#94A3B8" }}>{tank.fuelType}{tank.location ? ` · ${tank.location}` : ""}</div>
+                        <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{tank.name}</div>
+                        <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>{tank.fuelType}{tank.location ? ` · ${tank.location}` : ""}</div>
                       </div>
                       {tank.low && (
-                        <span style={{ display: "flex", alignItems: "center", gap: 4, background: "#FEF2F2", color: "#DC2626", padding: "3px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: 4, background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", padding: "3px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
                           <AlertTriangle size={10} /> LOW
                         </span>
                       )}
                       {negDip && isOpen && (
-                        <span style={{ display: "flex", alignItems: "center", gap: 4, background: "#FFF7ED", color: "#EA580C", padding: "3px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: 4, background: "var(--hf-orange-soft)", color: "var(--hf-orange-text)", padding: "3px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
                           <AlertCircle size={10} /> VARIANCE
                         </span>
                       )}
                     </div>
                                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <button onClick={() => openReceive(tank)}
-                        style={{ background: "#0D9488", color: "#fff", border: "none", borderRadius: 7, padding: "6px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                        style={{ background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, padding: "6px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                         + Receive
                       </button>
                       <button onClick={() => { setShowDip(tank); setDipForm({ actualLitres: String(tank.currentLitres), readBy: "", notes: "" }); setError("") }}
-                        style={{ background: "#fff", color: "#475569", border: "1px solid #E2E8F0", borderRadius: 7, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>
+                        style={{ background: "var(--hf-surface)", color: "var(--hf-text-tertiary)", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>
                         Dip Reading
                       </button>
                       <button onClick={() => openEdit(tank)}
-                        style={{ background: "#fff", color: "#475569", border: "1px solid #E2E8F0", borderRadius: 7, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>
+                        style={{ background: "var(--hf-surface)", color: "var(--hf-text-tertiary)", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>
                         Edit
                       </button>
                       <button onClick={() => { if (window.confirm(`Deactivate ${tank.name}? It will no longer appear in tank lists.`)) deactivateTank.mutate(tank.id) }}
-                        style={{ background: "#fff", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 7, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>
+                        style={{ background: "var(--hf-surface)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>
                         Deactivate
                       </button>
                       <button onClick={() => setExpanded(isOpen ? null : tank.id)}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}>
                         {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                       </button>
                     </div>
@@ -265,32 +265,32 @@ export default function TanksTab() {
                   {/* Fill bar */}
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                      <span style={{ fontSize: 13, color: "#475569", fontWeight: 500 }}>
+                      <span style={{ fontSize: 13, color: "var(--hf-text-tertiary)", fontWeight: 500 }}>
                         {Number(tank.currentLitres).toLocaleString()} L
-                        <span style={{ color: "#94A3B8", fontWeight: 400 }}> / {Number(tank.capacityLitres).toLocaleString()} L</span>
+                        <span style={{ color: "var(--hf-text-faint)", fontWeight: 400 }}> / {Number(tank.capacityLitres).toLocaleString()} L</span>
                       </span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: tank.low ? "#DC2626" : cfg.color }}>{pct.toFixed(1)}%</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: tank.low ? "var(--hf-danger-text)" : cfg.color }}>{pct.toFixed(1)}%</span>
                     </div>
-                    <div style={{ height: 10, background: "#F1F5F9", borderRadius: 99, overflow: "hidden" }}>
+                    <div style={{ height: 10, background: "var(--hf-surface-sunken)", borderRadius: 99, overflow: "hidden" }}>
                       <div style={{ height: "100%", borderRadius: 99, width: `${pct}%`,
                         background: tank.low ? "linear-gradient(90deg,#DC2626,#F87171)" : `linear-gradient(90deg,${cfg.color},${cfg.color}88)`,
                         transition: "width 0.5s ease" }} />
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94A3B8", marginTop: 4 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>
                       <span>Available space: {(Number(tank.capacityLitres) - Number(tank.currentLitres)).toLocaleString()} L</span>
-                      {tank.low && <span style={{ color: "#DC2626" }}>Below threshold</span>}
+                      {tank.low && <span style={{ color: "var(--hf-danger-text)" }}>Below threshold</span>}
                     </div>
                     {(() => {
                       const f = forecastByTank[tank.id]
                       if (!f) return null
                       if (!f.hasSufficientData) {
-                        return <div style={{ fontSize: 11, color: "#CBD5E1", marginTop: 6 }}>Not enough recent dispatch activity to forecast usage</div>
+                        return <div style={{ fontSize: 11, color: "var(--hf-text-disabled)", marginTop: 6 }}>Not enough recent dispatch activity to forecast usage</div>
                       }
                       const urgent = f.daysUntilEmpty != null && f.daysUntilEmpty <= 14
                       return (
-                        <div style={{ fontSize: 11, color: urgent ? "#D97706" : "#64748B", marginTop: 6, fontWeight: urgent ? 700 : 400 }}>
+                        <div style={{ fontSize: 11, color: urgent ? "var(--hf-warning-text)" : "var(--hf-text-muted)", marginTop: 6, fontWeight: urgent ? 700 : 400 }}>
                           ~{f.daysUntilEmpty} day{f.daysUntilEmpty === 1 ? "" : "s"} until empty at current usage
-                          <span style={{ color: "#94A3B8", fontWeight: 400 }}> ({Number(f.avgDailyLitres).toFixed(0)} L/day avg, last {f.lookbackDays}d)</span>
+                          <span style={{ color: "var(--hf-text-faint)", fontWeight: 400 }}> ({Number(f.avgDailyLitres).toFixed(0)} L/day avg, last {f.lookbackDays}d)</span>
                         </div>
                       )
                     })()}
@@ -299,31 +299,31 @@ export default function TanksTab() {
 
                 {/* Expanded — dip reading history */}
                 {isOpen && (
-                  <div style={{ borderTop: "1px solid #F1F5F9", padding: "16px 20px", background: "#F8FAFC" }}>
+                  <div style={{ borderTop: "1px solid var(--hf-border-subtle)", padding: "16px 20px", background: "var(--hf-surface-muted)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>Dip Reading History</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>Dip Reading History</div>
                       <button onClick={() => downloadReconciliationReport(tank)}
-                        style={{ display: "flex", alignItems: "center", gap: 5, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 7, padding: "5px 10px", fontSize: 12, fontWeight: 600, color: "#0D9488", cursor: "pointer" }}>
+                        style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "5px 10px", fontSize: 12, fontWeight: 600, color: "var(--hf-accent-text)", cursor: "pointer" }}>
                         <Download size={12} /> Reconciliation report (PDF)
                       </button>
                     </div>
                     {dipHistory.isLoading ? (
-                      <div style={{ fontSize: 13, color: "#94A3B8" }}>Loading...</div>
+                      <div style={{ fontSize: 13, color: "var(--hf-text-faint)" }}>Loading...</div>
                     ) : dips.length === 0 ? (
-                      <div style={{ fontSize: 13, color: "#94A3B8" }}>No dip readings recorded yet.</div>
+                      <div style={{ fontSize: 13, color: "var(--hf-text-faint)" }}>No dip readings recorded yet.</div>
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         {dips.map(d => (
-                          <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "8px 12px", background: d.hasNegativeVariance ? "#FEF2F2" : "#fff", border: `1px solid ${d.hasNegativeVariance ? "#FECACA" : "#E2E8F0"}`, borderRadius: 8, fontSize: 13 }}>
+                          <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "8px 12px", background: d.hasNegativeVariance ? "var(--hf-danger-soft)" : "var(--hf-surface)", border: `1px solid ${d.hasNegativeVariance ? "#FECACA" : "#E2E8F0"}`, borderRadius: 8, fontSize: 13 }}>
                             <div style={{ flex: 1 }}>
-                              <span style={{ fontWeight: 600, color: "#0F172A" }}>{Number(d.actualLitres).toLocaleString()} L actual</span>
-                              <span style={{ color: "#94A3B8", marginLeft: 8 }}>vs {Number(d.calculatedLitres).toLocaleString()} L system</span>
+                              <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{Number(d.actualLitres).toLocaleString()} L actual</span>
+                              <span style={{ color: "var(--hf-text-faint)", marginLeft: 8 }}>vs {Number(d.calculatedLitres).toLocaleString()} L system</span>
                             </div>
-                            <div style={{ fontWeight: 700, color: d.hasNegativeVariance ? "#DC2626" : "#166534" }}>
+                            <div style={{ fontWeight: 700, color: d.hasNegativeVariance ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)" }}>
                               {d.hasNegativeVariance ? "−" : "+"}{Math.abs(Number(d.varianceLitres)).toFixed(1)} L
                             </div>
-                            {d.hasNegativeVariance && <span style={{ fontSize: 10, fontWeight: 700, background: "#FEF2F2", color: "#DC2626", padding: "1px 7px", borderRadius: 20 }}>INVESTIGATE</span>}
-                            <div style={{ fontSize: 11, color: "#94A3B8" }}>{fmtDate(d.readAt)}{d.readBy ? ` · ${d.readBy}` : ""}</div>
+                            {d.hasNegativeVariance && <span style={{ fontSize: 10, fontWeight: 700, background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", padding: "1px 7px", borderRadius: 20 }}>INVESTIGATE</span>}
+                            <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{fmtDate(d.readAt)}{d.readBy ? ` · ${d.readBy}` : ""}</div>
                           </div>
                         ))}
                       </div>
@@ -362,7 +362,7 @@ export default function TanksTab() {
             <div>
               <label style={lbl}>Low threshold (%)</label>
               <input type="number" value={tankForm.lowThresholdPct} onChange={e => setTankForm(f => ({ ...f, lowThresholdPct: e.target.value }))} placeholder="20" style={inp} />
-              <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 3 }}>Alert when level falls below this percentage</div>
+              <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 3 }}>Alert when level falls below this percentage</div>
             </div>
           </div>
           {error && <ErrBanner msg={error} />}
@@ -415,11 +415,11 @@ export default function TanksTab() {
         <Overlay onClose={() => { setShowReceive(null); setError("") }}>
           <MHead title={`Receive Fuel — ${showReceive.name}`} onClose={() => { setShowReceive(null); setError("") }} />
           {prefilled && (
-            <div style={{ marginBottom: 14, padding: "10px 14px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, fontSize: 12, color: "#166534" }}>
+            <div style={{ marginBottom: 14, padding: "10px 14px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border-subtle)", borderRadius: 8, fontSize: 12, color: "var(--hf-success-text-strong)" }}>
               Pre-filled to top up to capacity{receiveForm.supplierId ? ", using the last supplier for this tank" : ""} — feel free to adjust.
             </div>
           )}
-          <div style={{ marginBottom: 14, padding: "10px 14px", background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 8, fontSize: 13, color: "#0369A1" }}>
+          <div style={{ marginBottom: 14, padding: "10px 14px", background: "var(--hf-sky-soft)", border: "1px solid var(--hf-sky-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-sky-text-strong)" }}>
             Available space: <strong>{(Number(showReceive.capacityLitres) - Number(showReceive.currentLitres)).toLocaleString()} L</strong>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -448,7 +448,7 @@ export default function TanksTab() {
             </div>
           </div>
           {receiveForm.litresReceived && receiveForm.pricePerLitre && (
-            <div style={{ marginTop: 12, padding: "10px 14px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, fontSize: 13, color: "#166534", fontWeight: 600 }}>
+            <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border-subtle)", borderRadius: 8, fontSize: 13, color: "var(--hf-success-text-strong)", fontWeight: 600 }}>
               Total cost: {fmtR(Number(receiveForm.litresReceived) * Number(receiveForm.pricePerLitre))}
             </div>
           )}
@@ -464,10 +464,10 @@ export default function TanksTab() {
       {showDip && (
         <Overlay onClose={() => { setShowDip(null); setError("") }}>
           <MHead title={`Dip Reading — ${showDip.name}`} onClose={() => { setShowDip(null); setError("") }} />
-          <div style={{ marginBottom: 16, padding: "12px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13 }}>
+          <div style={{ marginBottom: 16, padding: "12px 14px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13 }}>
             System level: <strong>{Number(showDip.currentLitres).toLocaleString()} L</strong>
             {dipForm.actualLitres && (
-              <> &nbsp;·&nbsp; Variance: <strong style={{ color: Number(dipForm.actualLitres) < Number(showDip.currentLitres) ? "#DC2626" : "#166534" }}>
+              <> &nbsp;·&nbsp; Variance: <strong style={{ color: Number(dipForm.actualLitres) < Number(showDip.currentLitres) ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)" }}>
                 {(Number(showDip.currentLitres) - Number(dipForm.actualLitres)).toFixed(1)} L
                 {Number(dipForm.actualLitres) < Number(showDip.currentLitres) && " — negative variance, investigate"}
               </strong></>
@@ -501,16 +501,16 @@ export default function TanksTab() {
 function Overlay({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 560, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 560, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>
     </div>
   )
 }
 function MHead({ title, onClose }: { title: string; onClose: () => void }) {
-  return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button></div>
+  return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button></div>
 }
 function MFoot({ onCancel, onSubmit, loading, label, disabled = false }: { onCancel: () => void; onSubmit: () => void; loading: boolean; label: string; disabled?: boolean }) {
-  return <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}><button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button><button onClick={onSubmit} disabled={loading || disabled} style={{ padding: "9px 22px", background: loading || disabled ? "#94A3B8" : "#0D9488", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || disabled ? "not-allowed" : "pointer" }}>{loading ? "Saving..." : label}</button></div>
+  return <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}><button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button><button onClick={onSubmit} disabled={loading || disabled} style={{ padding: "9px 22px", background: loading || disabled ? "var(--hf-text-faint)" : "var(--hf-accent)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || disabled ? "not-allowed" : "pointer" }}>{loading ? "Saving..." : label}</button></div>
 }
 function ErrBanner({ msg }: { msg: string }) {
-  return <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{msg}</div>
+  return <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{msg}</div>
 }

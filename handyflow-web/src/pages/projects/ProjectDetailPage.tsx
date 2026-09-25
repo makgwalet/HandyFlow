@@ -25,9 +25,9 @@ type TabKey = 'overview'|'gantt'|'tasks'|'resources'|'budget'|'risks'|'documents
 
 const HEALTH_DOT: Record<string, string> = { GREEN:'#16A34A', AMBER:'#D97706', RED:'#DC2626' }
 const STATUS_LABEL: Record<string, { bg:string; color:string }> = {
-  PLANNING:{bg:'#F1F5F9',color:'#475569'}, ACTIVE:{bg:'#DBEAFE',color:'#1D4ED8'},
-  ON_HOLD:{bg:'#FEF3C7',color:'#92400E'}, COMPLETED:{bg:'#DCFCE7',color:'#166534'},
-  CANCELLED:{bg:'#FEF2F2',color:'#DC2626'},
+  PLANNING:{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)'}, ACTIVE:{bg:'var(--hf-info-soft-strong)',color:'var(--hf-info-text)'},
+  ON_HOLD:{bg:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)'}, COMPLETED:{bg:'var(--hf-success-soft-strong)',color:'var(--hf-success-text-strong)'},
+  CANCELLED:{bg:'var(--hf-danger-soft)',color:'var(--hf-danger-text)'},
 }
 
 export function ProjectDetailPage() {
@@ -48,8 +48,8 @@ export function ProjectDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pm-project', id] }),
   })
 
-  if (isLoading) return <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8', fontFamily: "'Inter',sans-serif" }}>Loading…</div>
-  if (!project) return <div style={{ padding: 60, textAlign: 'center', color: '#DC2626', fontFamily: "'Inter',sans-serif" }}>Project not found</div>
+  if (isLoading) return <div style={{ padding: 60, textAlign: 'center', color: 'var(--hf-text-faint)', fontFamily: "'Inter',sans-serif" }}>Loading…</div>
+  if (!project) return <div style={{ padding: 60, textAlign: 'center', color: 'var(--hf-danger-text)', fontFamily: "'Inter',sans-serif" }}>Project not found</div>
 
   const st = STATUS_LABEL[project.status] ?? STATUS_LABEL.PLANNING
 
@@ -68,21 +68,21 @@ export function ProjectDetailPage() {
     <div style={{ fontFamily: "'Inter',system-ui,sans-serif" }}>
       {/* Project header */}
       <div style={{ marginBottom: 20 }}>
-        <button onClick={() => nav('/projects')} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', fontSize: 13, marginBottom: 10, padding: 0 }}>
+        <button onClick={() => nav('/projects')} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-muted)', fontSize: 13, marginBottom: 10, padding: 0 }}>
           <ChevronLeft size={15} /> All Projects
         </button>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-              <span style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600 }}>{project.projectNumber}</span>
+              <span style={{ fontSize: 11, color: 'var(--hf-text-faint)', fontWeight: 600 }}>{project.projectNumber}</span>
               <span style={{ background: st.bg, color: st.color, fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>{project.status.replace('_',' ')}</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: HEALTH_DOT[project.health] }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: HEALTH_DOT[project.health], display: 'inline-block' }} />
                 {project.health}
               </span>
             </div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', margin: '0 0 4px' }}>{project.name}</h1>
-            <div style={{ fontSize: 13, color: '#64748B' }}>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 4px' }}>{project.name}</h1>
+            <div style={{ fontSize: 13, color: 'var(--hf-text-muted)' }}>
               {project.clientName && <span>{project.clientName} · </span>}
               {project.projectManagerName && <span>PM: {project.projectManagerName} · </span>}
               {project.siteAddress && <span>{project.siteAddress}</span>}
@@ -104,7 +104,7 @@ export function ProjectDetailPage() {
             )}
             {project.clientPortalToken && (
               <button onClick={() => window.open(`/projects/portal/${project.clientPortalToken}`, '_blank')}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 12, cursor: 'pointer', color: '#64748B' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, cursor: 'pointer', color: 'var(--hf-text-muted)' }}>
                 <ExternalLink size={13} /> Client Portal
               </button>
             )}
@@ -113,13 +113,13 @@ export function ProjectDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid #E2E8F0', marginBottom: 24 }}>
+      <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid var(--hf-border)', marginBottom: 24 }}>
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '9px 14px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, fontWeight: tab === t.key ? 700 : 500, color: tab === t.key ? '#1B3A6B' : '#64748B', borderBottom: tab === t.key ? '2px solid #1B3A6B' : '2px solid transparent', marginBottom: -1 }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '9px 14px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, fontWeight: tab === t.key ? 700 : 500, color: tab === t.key ? 'var(--hf-primary-text)' : 'var(--hf-text-muted)', borderBottom: tab === t.key ? '2px solid var(--hf-primary)' : '2px solid transparent', marginBottom: -1 }}>
             <t.icon size={14} />{t.label}
             {t.key === 'risks' && project.openRiskCount > 0 && (
-              <span style={{ marginLeft: 4, background: '#FEF2F2', color: '#DC2626', fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 10 }}>{project.openRiskCount}</span>
+              <span style={{ marginLeft: 4, background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 10 }}>{project.openRiskCount}</span>
             )}
           </button>
         ))}

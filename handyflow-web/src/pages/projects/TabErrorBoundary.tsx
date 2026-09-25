@@ -58,16 +58,16 @@ export class TabErrorBoundary extends React.Component<Props, State> {
         padding: '60px 24px', textAlign: 'center',
       }}>
         <div style={{
-          width: 56, height: 56, borderRadius: '50%', background: '#FEF2F2',
+          width: 56, height: 56, borderRadius: '50%', background: 'var(--hf-danger-soft)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16,
         }}>
           <AlertTriangle size={26} color="#DC2626" />
         </div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--hf-text)', marginBottom: 6 }}>
           This tab ran into a problem
         </div>
         <div style={{
-          fontSize: 13, color: '#64748B', marginBottom: 20,
+          fontSize: 13, color: 'var(--hf-text-muted)', marginBottom: 20,
           maxWidth: 420, lineHeight: 1.6,
         }}>
           {msg}
@@ -76,7 +76,7 @@ export class TabErrorBoundary extends React.Component<Props, State> {
           onClick={this.handleReset}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            padding: '8px 16px', background: '#1B3A6B', color: '#fff',
+            padding: '8px 16px', background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)',
             border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
           }}
         >
@@ -84,9 +84,9 @@ export class TabErrorBoundary extends React.Component<Props, State> {
         </button>
         {process.env.NODE_ENV === 'development' && (
           <details style={{ marginTop: 20, textAlign: 'left', maxWidth: 600, width: '100%' }}>
-            <summary style={{ fontSize: 12, color: '#94A3B8', cursor: 'pointer' }}>Stack trace</summary>
+            <summary style={{ fontSize: 12, color: 'var(--hf-text-faint)', cursor: 'pointer' }}>Stack trace</summary>
             <pre style={{
-              fontSize: 11, color: '#DC2626', background: '#FEF2F2',
+              fontSize: 11, color: 'var(--hf-danger-text)', background: 'var(--hf-danger-soft)',
               padding: 12, borderRadius: 8, overflowX: 'auto', marginTop: 8,
               whiteSpace: 'pre-wrap', wordBreak: 'break-all',
             }}>

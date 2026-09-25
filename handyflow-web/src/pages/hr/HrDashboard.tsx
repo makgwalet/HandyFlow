@@ -67,13 +67,13 @@ export default function HrDashboard({ onNavigate }: { onNavigate: (t: any) => vo
 
       {/* Pending leave alert */}
       {pendingLeave.length > 0 && (
-        <div style={{ marginBottom: 22, padding: "14px 18px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 10, display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ marginBottom: 22, padding: "14px 18px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 12 }}>
           <AlertTriangle size={17} color="#D97706" style={{ flexShrink: 0 }} />
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, color: "#D97706" }}>{pendingLeave.length} Leave Request{pendingLeave.length > 1 ? "s" : ""} Awaiting Approval</div>
-            <div style={{ fontSize: 12, color: "#92400E" }}>{pendingLeave.slice(0, 3).map((l: any) => `${l.employeeName} — ${l.leaveType}`).join(" · ")}</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-warning-text)" }}>{pendingLeave.length} Leave Request{pendingLeave.length > 1 ? "s" : ""} Awaiting Approval</div>
+            <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>{pendingLeave.slice(0, 3).map((l: any) => `${l.employeeName} — ${l.leaveType}`).join(" · ")}</div>
           </div>
-          <button onClick={() => onNavigate("leave")} style={{ padding: "6px 14px", background: "#D97706", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
+          <button onClick={() => onNavigate("leave")} style={{ padding: "6px 14px", background: "var(--hf-warning)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
             Review
           </button>
         </div>
@@ -84,13 +84,13 @@ export default function HrDashboard({ onNavigate }: { onNavigate: (t: any) => vo
           {/* Department breakdown */}
           <div style={{ marginBottom: 22 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Headcount by Department</span>
-              <button onClick={() => onNavigate("employees")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#1B3A6B", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Headcount by Department</span>
+              <button onClick={() => onNavigate("employees")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-primary-text)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
                 View all <ArrowRight size={13} />
               </button>
             </div>
             {depts.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "30px 20px", border: "1px dashed #E2E8F0", borderRadius: 10, color: "#94A3B8", fontSize: 13 }}>No employees registered yet</div>
+              <div style={{ textAlign: "center", padding: "30px 20px", border: "1px dashed var(--hf-border)", borderRadius: 10, color: "var(--hf-text-faint)", fontSize: 13 }}>No employees registered yet</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {depts.map(([dept, count], i) => {
@@ -98,8 +98,8 @@ export default function HrDashboard({ onNavigate }: { onNavigate: (t: any) => vo
                   const color = DEPT_COLORS[i % DEPT_COLORS.length]
                   return (
                     <div key={dept} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{ width: 120, fontSize: 13, fontWeight: 600, color: "#374151", flexShrink: 0 }}>{dept}</div>
-                      <div style={{ flex: 1, height: 8, background: "#F1F5F9", borderRadius: 99, overflow: "hidden" }}>
+                      <div style={{ width: 120, fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", flexShrink: 0 }}>{dept}</div>
+                      <div style={{ flex: 1, height: 8, background: "var(--hf-surface-sunken)", borderRadius: 99, overflow: "hidden" }}>
                         <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 99, transition: "width 0.5s" }} />
                       </div>
                       <div style={{ width: 60, textAlign: "right" as const, fontSize: 13, fontWeight: 700, color, flexShrink: 0 }}>{count} ({pct}%)</div>
@@ -113,13 +113,13 @@ export default function HrDashboard({ onNavigate }: { onNavigate: (t: any) => vo
           {/* Recent leave requests */}
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Recent Leave Requests</span>
-              <button onClick={() => onNavigate("leave")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#1B3A6B", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Recent Leave Requests</span>
+              <button onClick={() => onNavigate("leave")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-primary-text)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
                 Manage <ArrowRight size={13} />
               </button>
             </div>
             {leaves.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "30px 20px", border: "1px dashed #E2E8F0", borderRadius: 10, color: "#94A3B8", fontSize: 13 }}>No leave requests</div>
+              <div style={{ textAlign: "center", padding: "30px 20px", border: "1px dashed var(--hf-border)", borderRadius: 10, color: "var(--hf-text-faint)", fontSize: 13 }}>No leave requests</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {leaves.slice(0, 5).map((l: any) => {
@@ -130,10 +130,10 @@ export default function HrDashboard({ onNavigate }: { onNavigate: (t: any) => vo
                   }
                   const cfg = statusCfg[l.status] ?? statusCfg.PENDING
                   return (
-                    <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", border: "1px solid #E2E8F0", borderRadius: 8, background: "#fff" }}>
+                    <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)" }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: "#0F172A" }}>{l.employeeName}</div>
-                        <div style={{ fontSize: 12, color: "#64748B" }}>{l.leaveType} · {fmtDate(l.startDate)} → {fmtDate(l.endDate)} · {l.daysRequested} days</div>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: "var(--hf-text)" }}>{l.employeeName}</div>
+                        <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{l.leaveType} · {fmtDate(l.startDate)} → {fmtDate(l.endDate)} · {l.daysRequested} days</div>
                       </div>
                       <span style={{ background: cfg.bg, color: cfg.color, padding: "2px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{l.status}</span>
                     </div>
@@ -147,7 +147,7 @@ export default function HrDashboard({ onNavigate }: { onNavigate: (t: any) => vo
         {/* Sidebar */}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* Last pay run summary */}
-          <div style={{ background: "#1B3A6B", borderRadius: 12, padding: 20, color: "#fff" }}>
+          <div style={{ background: "var(--hf-primary)", borderRadius: 12, padding: 20, color: "var(--hf-text-on-solid)" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 14, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>
               {lastPayRun ? `Last Pay Run · ${lastPayRun.payRunNumber}` : "No Pay Runs Yet"}
             </div>
@@ -160,31 +160,31 @@ export default function HrDashboard({ onNavigate }: { onNavigate: (t: any) => vo
             ].map(s => (
               <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
                 <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)" }}>{s.label}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{s.value}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text-on-solid)" }}>{s.value}</span>
               </div>
             )) : (
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Process your first pay run to see payroll summaries here.</div>
             )}
-            <button onClick={() => onNavigate("payroll")} style={{ marginTop: 14, width: "100%", padding: "8px", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 7, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer" }}>
+            <button onClick={() => onNavigate("payroll")} style={{ marginTop: 14, width: "100%", padding: "8px", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 7, fontSize: 12, fontWeight: 600, color: "var(--hf-text-on-solid)", cursor: "pointer" }}>
               {lastPayRun ? "View payroll →" : "Start payroll →"}
             </button>
           </div>
 
           {/* Employment type breakdown */}
-          <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 12 }}>Employment Types</div>
+          <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 12 }}>Employment Types</div>
             {Object.entries(typeMap).map(([type, count]) => (
-              <div key={type} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #F1F5F9", fontSize: 13 }}>
-                <span style={{ color: "#475569" }}>{type.replace("_", " ")}</span>
-                <span style={{ fontWeight: 700, color: "#1B3A6B" }}>{count}</span>
+              <div key={type} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--hf-border-subtle)", fontSize: 13 }}>
+                <span style={{ color: "var(--hf-text-tertiary)" }}>{type.replace("_", " ")}</span>
+                <span style={{ fontWeight: 700, color: "var(--hf-primary-text)" }}>{count}</span>
               </div>
             ))}
-            {Object.keys(typeMap).length === 0 && <div style={{ fontSize: 13, color: "#94A3B8" }}>No employees yet</div>}
+            {Object.keys(typeMap).length === 0 && <div style={{ fontSize: 13, color: "var(--hf-text-faint)" }}>No employees yet</div>}
           </div>
 
           {/* Quick actions */}
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 10 }}>Quick actions</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 10 }}>Quick actions</div>
             {[
               { label: "Add employee",       tab: "employees",    color: "#1B3A6B" },
               { label: "Approve leave",      tab: "leave",        color: "#D97706" },
@@ -192,7 +192,7 @@ export default function HrDashboard({ onNavigate }: { onNavigate: (t: any) => vo
               { label: "Download EMP201",    tab: "sars",         color: "#7C3AED" },
             ].map(a => (
               <button key={a.label} onClick={() => onNavigate(a.tab)}
-                style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left" as const, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left" as const, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 {a.label} <ArrowRight size={13} />
               </button>
             ))}

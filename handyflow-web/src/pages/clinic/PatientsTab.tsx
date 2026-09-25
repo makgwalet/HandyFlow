@@ -52,9 +52,9 @@ const fmtDT = (iso?: string) => iso
   : "—"
 
 const ACCOUNT_BADGE: Record<string,{label:string;bg:string;color:string}> = {
-  INDIVIDUAL: {label:"Individual", bg:"#EFF6FF", color:"#1D4ED8"},
-  PRINCIPAL:  {label:"Principal",  bg:"#F0FDF4", color:"#166534"},
-  DEPENDANT:  {label:"Dependant",  bg:"#F5F3FF", color:"#7C3AED"},
+  INDIVIDUAL: {label:"Individual", bg:"var(--hf-info-soft)", color:"var(--hf-info-text)"},
+  PRINCIPAL:  {label:"Principal",  bg:"var(--hf-success-soft)", color:"var(--hf-success-text-strong)"},
+  DEPENDANT:  {label:"Dependant",  bg:"var(--hf-violet-soft)", color:"var(--hf-violet-text)"},
 }
 
 const GENDERS = ["MALE","FEMALE","NON_BINARY","PREFER_NOT_TO_SAY"]
@@ -186,10 +186,10 @@ export default function PatientsTab({ onOpenPatient }: Props) {
   const inp = (key: string): React.CSSProperties => ({
     width:"100%", padding:"9px 12px", boxSizing:"border-box" as const,
     border:`1.5px solid ${fieldErrors[key]?"#DC2626":"#E2E8F0"}`,
-    borderRadius:8, fontSize:14, background:fieldErrors[key]?"#FFF5F5":"#fff", outline:"none",
+    borderRadius:8, fontSize:14, background:fieldErrors[key]?"var(--hf-danger-soft)":"var(--hf-surface)", outline:"none",
   })
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
-    <div style={{ display:"flex", alignItems:"center", gap:4, fontSize:12, color:"#DC2626", marginTop:4 }}>
+    <div style={{ display:"flex", alignItems:"center", gap:4, fontSize:12, color:"var(--hf-danger-text)", marginTop:4 }}>
       <AlertCircle size={12}/>{fieldErrors[k]}
     </div>
   ) : null
@@ -199,20 +199,20 @@ export default function PatientsTab({ onOpenPatient }: Props) {
       {/* ── Toolbar ─────────────────────────────────────────────────────── */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, gap:10 }}>
         <div style={{ position:"relative", flex:1, maxWidth:440 }}>
-          <Search size={14} style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", color:"#94A3B8" }}/>
+          <Search size={14} style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", color:"var(--hf-text-faint)" }}/>
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search name, ID number, phone — finds dependants too..."
-            style={{ padding:"9px 12px 9px 34px", border:"1px solid #E2E8F0", borderRadius:9,
+            style={{ padding:"9px 12px 9px 34px", border:"1px solid var(--hf-border)", borderRadius:9,
               fontSize:13, width:"100%", outline:"none", boxSizing:"border-box" as const }}/>
         </div>
         <div style={{ display:"flex", gap:8 }}>
-          <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:13, color:"#64748B", cursor:"pointer", userSelect:"none" }}>
+          <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:13, color:"var(--hf-text-muted)", cursor:"pointer", userSelect:"none" }}>
             <input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}
-              style={{ accentColor:"#1B3A6B" }}/>
+              style={{ accentColor:"var(--hf-primary)" }}/>
             Show archived
           </label>
           <button onClick={() => { setShowCreate(true); setForm({...EMPTY}); setDependants([]); setFieldErrors({}); setApiError("") }}
-            style={{ display:"flex", alignItems:"center", gap:7, background:"#1B3A6B", color:"#fff",
+            style={{ display:"flex", alignItems:"center", gap:7, background:"var(--hf-primary)", color:"var(--hf-text-on-solid)",
               border:"none", borderRadius:9, padding:"9px 18px", fontSize:14, fontWeight:600,
               cursor:"pointer", whiteSpace:"nowrap" }}>
             <Plus size={15}/> Register patient
@@ -222,40 +222,40 @@ export default function PatientsTab({ onOpenPatient }: Props) {
 
       {/* ── Stats ───────────────────────────────────────────────────────── */}
       <div style={{ display:"flex", gap:12, marginBottom:16 }}>
-        <div style={{ background:"#F8FAFC", border:"1px solid #E2E8F0", borderRadius:10, padding:"8px 18px" }}>
-          <div style={{ fontSize:18, fontWeight:700, color:"#1B3A6B" }}>{totalElements}</div>
-          <div style={{ fontSize:11, color:"#64748B" }}>Total patients</div>
+        <div style={{ background:"var(--hf-surface-muted)", border:"1px solid var(--hf-border)", borderRadius:10, padding:"8px 18px" }}>
+          <div style={{ fontSize:18, fontWeight:700, color:"var(--hf-primary-text)" }}>{totalElements}</div>
+          <div style={{ fontSize:11, color:"var(--hf-text-muted)" }}>Total patients</div>
         </div>
-        <div style={{ background:"#F8FAFC", border:"1px solid #E2E8F0", borderRadius:10, padding:"8px 18px" }}>
-          <div style={{ fontSize:18, fontWeight:700, color:"#0D9488" }}>{patients.length}</div>
-          <div style={{ fontSize:11, color:"#64748B" }}>This page</div>
+        <div style={{ background:"var(--hf-surface-muted)", border:"1px solid var(--hf-border)", borderRadius:10, padding:"8px 18px" }}>
+          <div style={{ fontSize:18, fontWeight:700, color:"var(--hf-accent-text)" }}>{patients.length}</div>
+          <div style={{ fontSize:11, color:"var(--hf-text-muted)" }}>This page</div>
         </div>
         <div style={{ flex:1 }}/>
-        <div style={{ fontSize:12, color:"#94A3B8", alignSelf:"center" }}>
+        <div style={{ fontSize:12, color:"var(--hf-text-faint)", alignSelf:"center" }}>
           Click any row to open patient file
         </div>
       </div>
 
       {/* ── Table ───────────────────────────────────────────────────────── */}
       {isLoading ? (
-        <div style={{ textAlign:"center", padding:40, color:"#94A3B8" }}>Loading patients...</div>
+        <div style={{ textAlign:"center", padding:40, color:"var(--hf-text-faint)" }}>Loading patients...</div>
       ) : patients.length === 0 ? (
-        <div style={{ textAlign:"center", padding:"60px 20px", color:"#94A3B8",
-          border:"1px dashed #E2E8F0", borderRadius:12 }}>
+        <div style={{ textAlign:"center", padding:"60px 20px", color:"var(--hf-text-faint)",
+          border:"1px dashed var(--hf-border)", borderRadius:12 }}>
           <User size={36} style={{ marginBottom:12, opacity:0.4 }}/>
-          <div style={{ fontWeight:600, color:"#475569" }}>
+          <div style={{ fontWeight:600, color:"var(--hf-text-tertiary)" }}>
             {debouncedSearch ? `No patients matching "${debouncedSearch}"` : "No patients registered yet"}
           </div>
         </div>
       ) : (
-        <div style={{ border:"1px solid #E2E8F0", borderRadius:12, overflow:"hidden",
+        <div style={{ border:"1px solid var(--hf-border)", borderRadius:12, overflow:"hidden",
           opacity: isPreviousData ? 0.6 : 1, transition:"opacity 0.15s" }}>
           <table style={{ width:"100%", borderCollapse:"collapse" }}>
             <thead>
-              <tr style={{ background:"#F8FAFC", borderBottom:"1px solid #E2E8F0" }}>
+              <tr style={{ background:"var(--hf-surface-muted)", borderBottom:"1px solid var(--hf-border)" }}>
                 {["Patient","DOB / Age","Contact","Account","Last visit",""].map(h => (
                   <th key={h} style={{ padding:"10px 16px", textAlign:"left", fontSize:11,
-                    fontWeight:700, color:"#64748B", letterSpacing:"0.05em" }}>{h}</th>
+                    fontWeight:700, color:"var(--hf-text-muted)", letterSpacing:"0.05em" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -267,16 +267,16 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                 return (
                   <tr key={p.id}
                     onClick={() => onOpenPatient(p)}
-                    style={{ borderBottom: i<patients.length-1?"1px solid #F1F5F9":"none",
+                    style={{ borderBottom: i<patients.length-1?"1px solid var(--hf-border-subtle)":"none",
                       cursor:"pointer", opacity: isArchived ? 0.55 : 1 }}
-                    onMouseEnter={e => (e.currentTarget.style.background="#F0FDF4")}
+                    onMouseEnter={e => (e.currentTarget.style.background="var(--hf-success-soft)")}
                     onMouseLeave={e => (e.currentTarget.style.background="")}>
 
                     {/* Patient name + ID */}
                     <td style={{ padding:"11px 16px" }}>
                       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                         <div style={{ width:34, height:34, borderRadius:"50%",
-                          background: p.accountType==="PRINCIPAL"?"#DCFCE7":p.accountType==="DEPENDANT"?"#F5F3FF":"#F0FDF4",
+                          background: p.accountType==="PRINCIPAL"?"var(--hf-success-soft-strong)":p.accountType==="DEPENDANT"?"var(--hf-violet-soft)":"var(--hf-success-soft)",
                           border:`2px solid ${p.accountType==="PRINCIPAL"?"#86EFAC":p.accountType==="DEPENDANT"?"#DDD6FE":"#86EFAC"}`,
                           display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                           <span style={{ fontSize:12, fontWeight:700, color:badge.color }}>
@@ -285,18 +285,18 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                         </div>
                         <div>
                           <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                            <span style={{ fontWeight:700, fontSize:14, color:"#0F172A" }}>{p.fullName}</span>
-                            {isArchived && <span style={{ fontSize:10, fontWeight:700, background:"#F1F5F9", color:"#64748B", padding:"1px 6px", borderRadius:20 }}>ARCHIVED</span>}
+                            <span style={{ fontWeight:700, fontSize:14, color:"var(--hf-text)" }}>{p.fullName}</span>
+                            {isArchived && <span style={{ fontSize:10, fontWeight:700, background:"var(--hf-surface-sunken)", color:"var(--hf-text-muted)", padding:"1px 6px", borderRadius:20 }}>ARCHIVED</span>}
                           </div>
                           {/* Dependant link shown below name */}
                           {p.accountType==="DEPENDANT" && p.principalName && (
-                            <div style={{ display:"flex", alignItems:"center", gap:4, fontSize:11, color:"#7C3AED", marginTop:1 }}>
+                            <div style={{ display:"flex", alignItems:"center", gap:4, fontSize:11, color:"var(--hf-violet-text)", marginTop:1 }}>
                               <Link size={10}/>
                               {p.relationship?.toLowerCase()||"dependant"} of {p.principalName}
                             </div>
                           )}
                           {p.idNumber && (
-                            <div style={{ fontSize:11, color:"#94A3B8" }}>{p.idNumber}</div>
+                            <div style={{ fontSize:11, color:"var(--hf-text-faint)" }}>{p.idNumber}</div>
                           )}
                         </div>
                       </div>
@@ -304,15 +304,15 @@ export default function PatientsTab({ onOpenPatient }: Props) {
 
                     {/* DOB */}
                     <td style={{ padding:"11px 16px", fontSize:13 }}>
-                      <div style={{ color:"#475569" }}>{info?.dob ?? (p.dateOfBirth ?? "—")}</div>
-                      {info && <div style={{ fontSize:11, color:"#94A3B8" }}>{info.age} yrs · {info.gender}</div>}
+                      <div style={{ color:"var(--hf-text-tertiary)" }}>{info?.dob ?? (p.dateOfBirth ?? "—")}</div>
+                      {info && <div style={{ fontSize:11, color:"var(--hf-text-faint)" }}>{info.age} yrs · {info.gender}</div>}
                     </td>
 
                     {/* Contact */}
                     <td style={{ padding:"11px 16px" }}>
-                      {p.phone && <div style={{ display:"flex", alignItems:"center", gap:4, fontSize:12, color:"#64748B" }}><Phone size={11} color="#94A3B8"/>{p.phone}</div>}
-                      {p.email && <div style={{ display:"flex", alignItems:"center", gap:4, fontSize:11, color:"#94A3B8" }}><Mail size={11} color="#CBD5E1"/>{p.email}</div>}
-                      {!p.phone && !p.email && <span style={{ color:"#CBD5E1" }}>—</span>}
+                      {p.phone && <div style={{ display:"flex", alignItems:"center", gap:4, fontSize:12, color:"var(--hf-text-muted)" }}><Phone size={11} color="#94A3B8"/>{p.phone}</div>}
+                      {p.email && <div style={{ display:"flex", alignItems:"center", gap:4, fontSize:11, color:"var(--hf-text-faint)" }}><Mail size={11} color="#CBD5E1"/>{p.email}</div>}
+                      {!p.phone && !p.email && <span style={{ color:"var(--hf-text-disabled)" }}>—</span>}
                     </td>
 
                     {/* Account type badge */}
@@ -322,8 +322,8 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                     </td>
 
                     {/* Last visit */}
-                    <td style={{ padding:"11px 16px", fontSize:12, color:"#64748B" }}>
-                      {p.lastVisitAt ? fmtDT(p.lastVisitAt) : <span style={{ color:"#CBD5E1" }}>No visits</span>}
+                    <td style={{ padding:"11px 16px", fontSize:12, color:"var(--hf-text-muted)" }}>
+                      {p.lastVisitAt ? fmtDT(p.lastVisitAt) : <span style={{ color:"var(--hf-text-disabled)" }}>No visits</span>}
                     </td>
 
                     <td style={{ padding:"11px 16px" }}><ChevronRight size={16} color="#CBD5E1"/></td>
@@ -338,13 +338,13 @@ export default function PatientsTab({ onOpenPatient }: Props) {
       {/* ── Pagination ──────────────────────────────────────────────────── */}
       {totalPages > 1 && (
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:16 }}>
-          <div style={{ fontSize:13, color:"#64748B" }}>
+          <div style={{ fontSize:13, color:"var(--hf-text-muted)" }}>
             Page {page+1} of {totalPages} · {totalElements} patients
           </div>
           <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
             <button onClick={() => setPage(p=>Math.max(0,p-1))} disabled={page===0}
-              style={{ padding:"6px 12px", border:"1px solid #E2E8F0", borderRadius:7, background:"#fff",
-                cursor:page===0?"not-allowed":"pointer", color:page===0?"#CBD5E1":"#374151",
+              style={{ padding:"6px 12px", border:"1px solid var(--hf-border)", borderRadius:7, background:"var(--hf-surface)",
+                cursor:page===0?"not-allowed":"pointer", color:page===0?"var(--hf-text-disabled)":"var(--hf-text-secondary)",
                 display:"flex", alignItems:"center", gap:4, fontSize:13 }}>
               <ChevronLeft size={14}/> Prev
             </button>
@@ -355,8 +355,8 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                 const pg = start + i
                 return (
                   <button key={pg} onClick={() => setPage(pg)}
-                    style={{ width:34, height:34, border:"1px solid #E2E8F0", borderRadius:7,
-                      background:pg===page?"#1B3A6B":"#fff", color:pg===page?"#fff":"#374151",
+                    style={{ width:34, height:34, border:"1px solid var(--hf-border)", borderRadius:7,
+                      background:pg===page?"var(--hf-primary)":"var(--hf-surface)", color:pg===page?"var(--hf-text-on-solid)":"var(--hf-text-secondary)",
                       cursor:"pointer", fontSize:13, fontWeight:pg===page?700:400 }}>
                     {pg+1}
                   </button>
@@ -364,8 +364,8 @@ export default function PatientsTab({ onOpenPatient }: Props) {
               })
             })()}
             <button onClick={() => setPage(p=>Math.min(totalPages-1,p+1))} disabled={page>=totalPages-1}
-              style={{ padding:"6px 12px", border:"1px solid #E2E8F0", borderRadius:7, background:"#fff",
-                cursor:page>=totalPages-1?"not-allowed":"pointer", color:page>=totalPages-1?"#CBD5E1":"#374151",
+              style={{ padding:"6px 12px", border:"1px solid var(--hf-border)", borderRadius:7, background:"var(--hf-surface)",
+                cursor:page>=totalPages-1?"not-allowed":"pointer", color:page>=totalPages-1?"var(--hf-text-disabled)":"var(--hf-text-secondary)",
                 display:"flex", alignItems:"center", gap:4, fontSize:13 }}>
               Next <ChevronRight size={14}/>
             </button>
@@ -378,18 +378,18 @@ export default function PatientsTab({ onOpenPatient }: Props) {
         <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.55)",
           display:"flex", alignItems:"center", justifyContent:"center",
           zIndex:1000, backdropFilter:"blur(3px)" }}>
-          <div style={{ background:"#fff", borderRadius:16, width:660, maxHeight:"92vh",
+          <div style={{ background:"var(--hf-surface)", borderRadius:16, width:660, maxHeight:"92vh",
             overflowY:"auto", boxShadow:"0 24px 64px rgba(0,0,0,0.22)" }}>
 
             {/* Header */}
-            <div style={{ padding:"24px 28px 0", borderBottom:"1px solid #F1F5F9" }}>
+            <div style={{ padding:"24px 28px 0", borderBottom:"1px solid var(--hf-border-subtle)" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
                 <div>
-                  <h3 style={{ margin:"0 0 3px", fontSize:18, fontWeight:700, color:"#0F172A" }}>Register patient</h3>
-                  <p style={{ margin:0, fontSize:12, color:"#94A3B8" }}>SA ID auto-fills DOB, age and gender</p>
+                  <h3 style={{ margin:"0 0 3px", fontSize:18, fontWeight:700, color:"var(--hf-text)" }}>Register patient</h3>
+                  <p style={{ margin:0, fontSize:12, color:"var(--hf-text-faint)" }}>SA ID auto-fills DOB, age and gender</p>
                 </div>
                 <button onClick={() => setShowCreate(false)}
-                  style={{ background:"none", border:"none", cursor:"pointer", color:"#94A3B8", display:"flex" }}>
+                  style={{ background:"none", border:"none", cursor:"pointer", color:"var(--hf-text-faint)", display:"flex" }}>
                   <X size={20}/>
                 </button>
               </div>
@@ -399,8 +399,8 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                   <button key={t} onClick={() => setRegType(t)}
                     style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 16px",
                       borderRadius:8, border:`2px solid ${regType===t?"#1B3A6B":"#E2E8F0"}`,
-                      background:regType===t?"#EFF6FF":"#fff",
-                      color:regType===t?"#1B3A6B":"#64748B",
+                      background:regType===t?"var(--hf-info-soft)":"var(--hf-surface)",
+                      color:regType===t?"var(--hf-primary-text)":"var(--hf-text-muted)",
                       fontWeight:regType===t?600:400, fontSize:13, cursor:"pointer" }}>
                     {t==="individual" ? <User size={14}/> : <Users size={14}/>}
                     {t==="individual" ? "Individual account" : "Family account"}
@@ -420,13 +420,13 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                 <Sect title="Dependants — children, parents, grandparents, spouse">
                   {dependants.map((dep, idx) => (
                     <div key={idx} style={{ marginBottom:14, padding:"14px 16px",
-                      background:"#F8FAFC", border:"1px solid #E2E8F0", borderRadius:10, position:"relative" }}>
+                      background:"var(--hf-surface-muted)", border:"1px solid var(--hf-border)", borderRadius:10, position:"relative" }}>
                       <button onClick={() => setDependants(d=>d.filter((_,i)=>i!==idx))}
                         style={{ position:"absolute", top:10, right:10, background:"none",
-                          border:"none", cursor:"pointer", color:"#94A3B8", display:"flex" }}>
+                          border:"none", cursor:"pointer", color:"var(--hf-text-faint)", display:"flex" }}>
                         <X size={14}/>
                       </button>
-                      <div style={{ fontSize:12, fontWeight:600, color:"#64748B", marginBottom:10 }}>
+                      <div style={{ fontSize:12, fontWeight:600, color:"var(--hf-text-muted)", marginBottom:10 }}>
                         Dependant {idx+1}
                       </div>
                       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
@@ -452,7 +452,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                         <div>
                           <label style={lbl}>Relationship to principal</label>
                           <select value={dep.relationship} onChange={e=>updateDep(idx,"relationship",e.target.value)}
-                            style={{ ...flatInp, background:"#fff" }}>
+                            style={{ ...flatInp, background:"var(--hf-surface)" }}>
                             {RELATIONSHIPS.map(r=><option key={r} value={r}>{r.charAt(0)+r.slice(1).toLowerCase()}</option>)}
                           </select>
                         </div>
@@ -462,7 +462,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                         </div>
                         <div>
                           <label style={lbl}>Gender</label>
-                          <select value={dep.gender} onChange={e=>updateDep(idx,"gender",e.target.value)} style={{ ...flatInp, background:"#fff" }}>
+                          <select value={dep.gender} onChange={e=>updateDep(idx,"gender",e.target.value)} style={{ ...flatInp, background:"var(--hf-surface)" }}>
                             <option value="">Select...</option>
                             {GENDERS.map(g=><option key={g} value={g}>{g.replace("_"," ")}</option>)}
                           </select>
@@ -476,16 +476,16 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                   ))}
                   <button onClick={() => setDependants(d=>[...d, EMPTY_DEP()])}
                     style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px",
-                      border:"1px dashed #CBD5E1", borderRadius:8, background:"#F8FAFC",
-                      color:"#64748B", fontSize:13, cursor:"pointer" }}>
+                      border:"1px dashed var(--hf-border-strong)", borderRadius:8, background:"var(--hf-surface-muted)",
+                      color:"var(--hf-text-muted)", fontSize:13, cursor:"pointer" }}>
                     <Plus size={14}/> Add dependant
                   </button>
                 </Sect>
               )}
 
               {apiError && (
-                <div style={{ marginBottom:14, padding:"10px 12px", background:"#FEF2F2",
-                  border:"1px solid #FECACA", borderRadius:8, fontSize:13, color:"#DC2626",
+                <div style={{ marginBottom:14, padding:"10px 12px", background:"var(--hf-danger-soft)",
+                  border:"1px solid var(--hf-danger-border)", borderRadius:8, fontSize:13, color:"var(--hf-danger-text)",
                   display:"flex", alignItems:"center", gap:8 }}>
                   <AlertCircle size={14}/>{apiError}
                 </div>
@@ -493,13 +493,13 @@ export default function PatientsTab({ onOpenPatient }: Props) {
 
               <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
                 <button onClick={() => setShowCreate(false)}
-                  style={{ padding:"9px 18px", border:"1px solid #E2E8F0", borderRadius:9,
-                    background:"#fff", fontSize:14, cursor:"pointer", color:"#374151" }}>
+                  style={{ padding:"9px 18px", border:"1px solid var(--hf-border)", borderRadius:9,
+                    background:"var(--hf-surface)", fontSize:14, cursor:"pointer", color:"var(--hf-text-secondary)" }}>
                   Cancel
                 </button>
                 <button onClick={handleRegister} disabled={createPatient.isPending}
-                  style={{ display:"flex", alignItems:"center", gap:7, background:"#1B3A6B",
-                    color:"#fff", border:"none", borderRadius:9, padding:"9px 20px",
+                  style={{ display:"flex", alignItems:"center", gap:7, background:"var(--hf-primary)",
+                    color:"var(--hf-text-on-solid)", border:"none", borderRadius:9, padding:"9px 20px",
                     fontSize:14, fontWeight:600, cursor:"pointer" }}>
                   {createPatient.isPending ? "Registering..." :
                     regType==="family" && dependants.length>0
@@ -537,8 +537,8 @@ function PersonForm({ form, onChange, errors, idInfo, FErr, inp }: { form: Perso
           onChange={e=>onChange("idNumber",e.target.value.replace(/\D/g,"").slice(0,13))}
           placeholder="8501015026083" inputMode="numeric" style={inp("idNumber")}/>
         {form.idNumber?.length===13 && idInfo && (
-          <div style={{ marginTop:6, padding:"7px 12px", background:"#F0FDF4",
-            border:"1px solid #86EFAC", borderRadius:7, fontSize:12, color:"#166534",
+          <div style={{ marginTop:6, padding:"7px 12px", background:"var(--hf-success-soft)",
+            border:"1px solid var(--hf-success-border)", borderRadius:7, fontSize:12, color:"var(--hf-success-text-strong)",
             display:"flex", gap:16 }}>
             <span>✓ Valid</span><span>DOB: {idInfo.dob}</span>
             <span>Age: {idInfo.age}</span><span>{idInfo.gender}</span>
@@ -551,7 +551,7 @@ function PersonForm({ form, onChange, errors, idInfo, FErr, inp }: { form: Perso
       </div>
       <div>
         <label style={lbl}>Gender</label>
-        <select value={form.gender} onChange={e=>onChange("gender",e.target.value)} style={{ ...inp("gender"), background:"#fff" }}>
+        <select value={form.gender} onChange={e=>onChange("gender",e.target.value)} style={{ ...inp("gender"), background:"var(--hf-surface)" }}>
           <option value="">Select...</option>
           {GENDERS.map(g=><option key={g} value={g}>{g.replace("_"," ")}</option>)}
         </select>
@@ -581,13 +581,13 @@ function PersonForm({ form, onChange, errors, idInfo, FErr, inp }: { form: Perso
 function Sect({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom:20 }}>
-      <div style={{ fontSize:10, fontWeight:700, color:"#94A3B8", letterSpacing:"0.07em",
+      <div style={{ fontSize:10, fontWeight:700, color:"var(--hf-text-faint)", letterSpacing:"0.07em",
         textTransform:"uppercase" as const, marginBottom:12, paddingBottom:8,
-        borderBottom:"1px solid #F1F5F9" }}>{title}</div>
+        borderBottom:"1px solid var(--hf-border-subtle)" }}>{title}</div>
       {children}
     </div>
   )
 }
 
-const lbl: React.CSSProperties = { display:"block", fontSize:13, fontWeight:600, color:"#374151", marginBottom:5 }
-const flatInp: React.CSSProperties = { width:"100%", padding:"8px 11px", boxSizing:"border-box" as const, border:"1.5px solid #E2E8F0", borderRadius:8, fontSize:13, outline:"none", background:"#fff" }
+const lbl: React.CSSProperties = { display:"block", fontSize:13, fontWeight:600, color:"var(--hf-text-secondary)", marginBottom:5 }
+const flatInp: React.CSSProperties = { width:"100%", padding:"8px 11px", boxSizing:"border-box" as const, border:"1.5px solid var(--hf-border)", borderRadius:8, fontSize:13, outline:"none", background:"var(--hf-surface)" }

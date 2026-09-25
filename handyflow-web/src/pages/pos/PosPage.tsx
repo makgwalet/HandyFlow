@@ -222,7 +222,7 @@ const modalBox = (w = 480): React.CSSProperties => ({
 
 const modalHeader = (title: string, onClose: () => void) => (
   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0F172A' }}>{title}</h3>
+    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--hf-text)' }}>{title}</h3>
     <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
       <X size={18} color="#94A3B8" />
     </button>
@@ -231,7 +231,7 @@ const modalHeader = (title: string, onClose: () => void) => (
 
 const ErrMsg = ({ msg }: { msg: string }) =>
   msg ? (
-    <div style={{ marginTop: 10, padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>
+    <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>
       {msg}
     </div>
   ) : null
@@ -294,26 +294,26 @@ function CatalogueCombo({
           width: '100%', padding: '9px 12px',
           border: `1px solid ${open ? '#1B3A6B' : '#E2E8F0'}`,
           borderRadius: 8, fontSize: 13, boxSizing: 'border-box' as const,
-          background: '#fff', cursor: 'pointer',
+          background: 'var(--hf-surface)', cursor: 'pointer',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          color: selected ? '#0F172A' : '#94A3B8',
+          color: selected ? 'var(--hf-text)' : 'var(--hf-text-faint)',
           userSelect: 'none' as const,
         }}
       >
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, flex: 1 }}>
           {selected ? selected.name : placeholder}
         </span>
-        <span style={{ fontSize: 10, color: '#94A3B8', marginLeft: 6, flexShrink: 0 }}>▼</span>
+        <span style={{ fontSize: 10, color: 'var(--hf-text-faint)', marginLeft: 6, flexShrink: 0 }}>▼</span>
       </div>
 
       {open && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
-          background: '#fff', border: '1px solid #E2E8F0', borderRadius: 10,
+          background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 10,
           boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 300,
           maxHeight: 280, display: 'flex', flexDirection: 'column',
         }}>
-          <div style={{ padding: '8px 10px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
+          <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--hf-border-subtle)', flexShrink: 0 }}>
             <input
               autoFocus
               value={query}
@@ -322,14 +322,14 @@ function CatalogueCombo({
               onClick={e => e.stopPropagation()}
               style={{
                 width: '100%', padding: '6px 10px',
-                border: '1px solid #E2E8F0', borderRadius: 6,
+                border: '1px solid var(--hf-border)', borderRadius: 6,
                 fontSize: 12, outline: 'none', boxSizing: 'border-box' as const,
               }}
             />
           </div>
           <div style={{ overflowY: 'auto' as const, flex: 1 }}>
             {filtered.length === 0 ? (
-              <div style={{ padding: '14px 12px', fontSize: 12, color: '#94A3B8', textAlign: 'center' as const }}>
+              <div style={{ padding: '14px 12px', fontSize: 12, color: 'var(--hf-text-faint)', textAlign: 'center' as const }}>
                 No items match "{query}"
               </div>
             ) : (
@@ -339,7 +339,7 @@ function CatalogueCombo({
                     <div style={{
                       padding: '4px 12px 2px',
                       fontSize: 10, fontWeight: 700,
-                      color: '#94A3B8', background: '#F8FAFC',
+                      color: 'var(--hf-text-faint)', background: 'var(--hf-surface-muted)',
                       letterSpacing: '0.07em',
                       textTransform: 'uppercase' as const,
                       position: 'sticky' as const, top: 0,
@@ -358,23 +358,23 @@ function CatalogueCombo({
                       }}
                       style={{
                         padding: '9px 12px', cursor: 'pointer',
-                        background: item.id === value ? '#EFF6FF' : 'transparent',
+                        background: item.id === value ? 'var(--hf-info-soft)' : 'transparent',
                         fontSize: 13,
                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                         transition: 'background 0.08s',
                       }}
                       onMouseEnter={e => {
                         if (item.id !== value)
-                          (e.currentTarget as HTMLElement).style.background = '#F0FDF4'
+                          (e.currentTarget as HTMLElement).style.background = 'var(--hf-success-soft)'
                       }}
                       onMouseLeave={e => {
                         if (item.id !== value)
                           (e.currentTarget as HTMLElement).style.background = 'transparent'
                       }}
                     >
-                      <span style={{ color: '#0F172A' }}>{item.name}</span>
+                      <span style={{ color: 'var(--hf-text)' }}>{item.name}</span>
                       {item.defaultPrice != null && (
-                        <span style={{ fontSize: 11, color: '#0D9488', fontWeight: 600, marginLeft: 8, flexShrink: 0 }}>
+                        <span style={{ fontSize: 11, color: 'var(--hf-accent-text)', fontWeight: 600, marginLeft: 8, flexShrink: 0 }}>
                           R {Number(item.defaultPrice).toFixed(2)}
                         </span>
                       )}
@@ -765,10 +765,10 @@ export function PosPage() {
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: '0 0 2px' }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 2px' }}>
             POS & Stock
           </h1>
-          <p style={{ fontSize: 12, color: '#94A3B8', margin: 0 }}>
+          <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: 0 }}>
             Point of sale · Inventory · Purchase orders
           </p>
         </div>
@@ -789,7 +789,7 @@ export function PosPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 20 }}>
         {STATS.map(({ label, value, color, Icon }) => (
           <div key={label} style={{
-            background: '#fff', border: '1px solid #E2E8F0',
+            background: 'var(--hf-surface)', border: '1px solid var(--hf-border)',
             borderRadius: 12, padding: '14px 16px',
             display: 'flex', alignItems: 'flex-start', gap: 10,
           }}>
@@ -805,25 +805,25 @@ export function PosPage() {
                 fontSize: typeof value === 'string' ? 15 : 22,
                 fontWeight: 800, color, lineHeight: 1.1,
               }}>{value}</div>
-              <div style={{ fontSize: 10, color: '#94A3B8', marginTop: 2 }}>{label}</div>
+              <div style={{ fontSize: 10, color: 'var(--hf-text-faint)', marginTop: 2 }}>{label}</div>
             </div>
           </div>
         ))}
       </div>
 
       {/* ── Main card ───────────────────────────────────────────────────────── */}
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 14, padding: 24 }}>
+      <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, padding: 24 }}>
 
         {/* Cash session banner */}
         {localSession === 'loading' ? null : localSession == null ? (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '10px 16px', background: '#FFFBEB',
-            border: '1px solid #FDE68A', borderRadius: 10, marginBottom: 16,
+            padding: '10px 16px', background: 'var(--hf-warning-soft)',
+            border: '1px solid var(--hf-warning-border)', borderRadius: 10, marginBottom: 16,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <AlertTriangle size={14} color="#D97706" />
-              <span style={{ fontSize: 13, color: '#92400E', fontWeight: 500 }}>
+              <span style={{ fontSize: 13, color: 'var(--hf-warning-text-deep)', fontWeight: 500 }}>
                 No cash session open — CASH sales are blocked.
               </span>
             </div>
@@ -836,15 +836,15 @@ export function PosPage() {
         ) : (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '10px 16px', background: '#F0FDF4',
-            border: '1px solid #86EFAC', borderRadius: 10, marginBottom: 16,
+            padding: '10px 16px', background: 'var(--hf-success-soft)',
+            border: '1px solid var(--hf-success-border)', borderRadius: 10, marginBottom: 16,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <CheckCircle size={14} color="#166534" />
-              <span style={{ fontSize: 13, color: '#166534', fontWeight: 600 }}>
+              <span style={{ fontSize: 13, color: 'var(--hf-success-text-strong)', fontWeight: 600 }}>
                 Session {(localSession as CashSession).sessionNumber}
               </span>
-              <span style={{ fontSize: 12, color: '#166534', opacity: 0.7 }}>
+              <span style={{ fontSize: 12, color: 'var(--hf-success-text-strong)', opacity: 0.7 }}>
                 · Float {fmtR((localSession as CashSession).openingFloat)}
                 · {(localSession as CashSession).transactionCount} txns
                 · {fmtR((localSession as CashSession).totalSales)} total
@@ -859,7 +859,7 @@ export function PosPage() {
         )}
 
         {/* Tab bar */}
-        <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid #E2E8F0', marginBottom: 22 }}>
+        <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid var(--hf-border)', marginBottom: 22 }}>
           {([
             { id: 'sell',         label: 'POS Terminal',    Icon: ShoppingCart },
             { id: 'stock',        label: 'Stock',           Icon: Package      },
@@ -869,8 +869,8 @@ export function PosPage() {
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '9px 16px', background: 'none', border: 'none',
-              borderBottom: tab === t.id ? '2px solid #0D9488' : '2px solid transparent',
-              color: tab === t.id ? '#0D9488' : '#64748B',
+              borderBottom: tab === t.id ? '2px solid var(--hf-accent)' : '2px solid transparent',
+              color: tab === t.id ? 'var(--hf-accent-text)' : 'var(--hf-text-muted)',
               fontWeight: tab === t.id ? 700 : 400,
               fontSize: 13, cursor: 'pointer', marginBottom: -1,
             }}>
@@ -892,7 +892,7 @@ export function PosPage() {
                 <div style={{ flex: 1, position: 'relative' }}>
                   <Search size={13} style={{
                     position: 'absolute', left: 10, top: '50%',
-                    transform: 'translateY(-50%)', color: '#94A3B8',
+                    transform: 'translateY(-50%)', color: 'var(--hf-text-faint)',
                   }} />
                   <input
                     value={itemSearch}
@@ -921,30 +921,30 @@ export function PosPage() {
                     key={item.id}
                     onClick={() => addToCart(item)}
                     style={{
-                      padding: 12, border: '1px solid #E2E8F0',
-                      borderRadius: 10, background: '#fff',
+                      padding: 12, border: '1px solid var(--hf-border)',
+                      borderRadius: 10, background: 'var(--hf-surface)',
                       cursor: 'pointer', textAlign: 'left', transition: 'all 0.12s',
                     }}
                     onMouseEnter={e => {
                       const el = e.currentTarget as HTMLButtonElement
-                      el.style.borderColor = '#0D9488'
-                      el.style.background  = '#F0FDF4'
+                      el.style.borderColor = 'var(--hf-accent)'
+                      el.style.background  = 'var(--hf-success-soft)'
                     }}
                     onMouseLeave={e => {
                       const el = e.currentTarget as HTMLButtonElement
-                      el.style.borderColor = '#E2E8F0'
-                      el.style.background  = '#fff'
+                      el.style.borderColor = 'var(--hf-border)'
+                      el.style.background  = 'var(--hf-surface)'
                     }}
                   >
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', marginBottom: 3, lineHeight: 1.3 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', marginBottom: 3, lineHeight: 1.3 }}>
                       {item.itemName}
                     </div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: '#0D9488' }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--hf-accent-text)' }}>
                       {fmtR(item.sellingPrice)}
                     </div>
                     <div style={{
                       fontSize: 10, marginTop: 2,
-                      color: item.lowStock ? '#DC2626' : '#94A3B8',
+                      color: item.lowStock ? 'var(--hf-danger-text)' : 'var(--hf-text-faint)',
                       fontWeight: item.lowStock ? 700 : 400,
                     }}>
                       {item.lowStock ? `⚠ Low: ${item.availableQty}` : `Stock: ${item.availableQty}`}
@@ -953,9 +953,9 @@ export function PosPage() {
                 ))}
 
                 {visibleStock.filter(s => s.availableQty > 0).length === 0 && (
-                  <div style={{ gridColumn: '1/-1', padding: '50px 0', textAlign: 'center', color: '#CBD5E1' }}>
+                  <div style={{ gridColumn: '1/-1', padding: '50px 0', textAlign: 'center', color: 'var(--hf-text-disabled)' }}>
                     <Package size={30} style={{ marginBottom: 10, opacity: 0.3 }} />
-                    <div style={{ fontSize: 13, color: '#94A3B8', fontWeight: 500 }}>
+                    <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', fontWeight: 500 }}>
                       {itemSearch ? 'No match found' : 'No stock items yet — add some in the Stock tab'}
                     </div>
                   </div>
@@ -965,13 +965,13 @@ export function PosPage() {
 
             {/* Right — cart panel */}
             <div style={{
-              border: '1px solid #E2E8F0', borderRadius: 12,
+              border: '1px solid var(--hf-border)', borderRadius: 12,
               padding: 16, display: 'flex', flexDirection: 'column',
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Current Sale</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--hf-text)' }}>Current Sale</span>
                 {cart.length > 0 && (
-                  <button onClick={() => setCart([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', fontSize: 12 }}>
+                  <button onClick={() => setCart([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', fontSize: 12 }}>
                     Clear
                   </button>
                 )}
@@ -980,22 +980,22 @@ export function PosPage() {
               {/* Cart items */}
               <div style={{ flex: 1, marginBottom: 12, minHeight: 80 }}>
                 {cart.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '40px 0', color: '#CBD5E1' }}>
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--hf-text-disabled)' }}>
                     <ShoppingCart size={26} style={{ marginBottom: 8, opacity: 0.3 }} />
                     <div style={{ fontSize: 12 }}>Tap items or scan barcode</div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {cart.map(item => (
-                      <div key={item.catalogueItemId} style={{ background: '#F8FAFC', borderRadius: 8, padding: '10px 12px' }}>
+                      <div key={item.catalogueItemId} style={{ background: 'var(--hf-surface-muted)', borderRadius: 8, padding: '10px 12px' }}>
                         {/* Item row */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: '#0F172A', flex: 1, marginRight: 6 }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--hf-text)', flex: 1, marginRight: 6 }}>
                             {item.itemName}
                           </span>
                           <button
                             onClick={() => removeFromCart(item.catalogueItemId)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#CBD5E1', padding: 0 }}>
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-disabled)', padding: 0 }}>
                             <X size={11} />
                           </button>
                         </div>
@@ -1003,7 +1003,7 @@ export function PosPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <button
                             onClick={() => updateQty(item.catalogueItemId, item.qty - 1)}
-                            style={{ width: 22, height: 22, borderRadius: 4, border: '1px solid #E2E8F0', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            style={{ width: 22, height: 22, borderRadius: 4, border: '1px solid var(--hf-border)', background: 'var(--hf-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Minus size={10} />
                           </button>
                           <span style={{ fontSize: 13, fontWeight: 700, minWidth: 20, textAlign: 'center' }}>
@@ -1011,28 +1011,28 @@ export function PosPage() {
                           </span>
                           <button
                             onClick={() => updateQty(item.catalogueItemId, item.qty + 1)}
-                            style={{ width: 22, height: 22, borderRadius: 4, border: '1px solid #E2E8F0', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            style={{ width: 22, height: 22, borderRadius: 4, border: '1px solid var(--hf-border)', background: 'var(--hf-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Plus size={10} />
                           </button>
-                          <span style={{ fontSize: 11, color: '#94A3B8', flex: 1, textAlign: 'right' }}>
+                          <span style={{ fontSize: 11, color: 'var(--hf-text-faint)', flex: 1, textAlign: 'right' }}>
                             @ {fmtR(item.unitPrice)}
                           </span>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', minWidth: 65, textAlign: 'right' }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--hf-text)', minWidth: 65, textAlign: 'right' }}>
                             {fmtR(item.unitPrice * item.qty * (1 - item.discountPct / 100))}
                           </span>
                         </div>
                         {/* Per-item discount */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5 }}>
-                          <span style={{ fontSize: 10, color: '#94A3B8' }}>Disc %</span>
+                          <span style={{ fontSize: 10, color: 'var(--hf-text-faint)' }}>Disc %</span>
                           <input
                             type="number" min="0" max="100"
                             value={item.discountPct || ''}
                             onChange={e => updateDiscount(item.catalogueItemId, Number(e.target.value))}
                             placeholder="0"
-                            style={{ width: 50, padding: '2px 6px', border: '1px solid #E2E8F0', borderRadius: 4, fontSize: 11, textAlign: 'center', background: '#fff' }}
+                            style={{ width: 50, padding: '2px 6px', border: '1px solid var(--hf-border)', borderRadius: 4, fontSize: 11, textAlign: 'center', background: 'var(--hf-surface)' }}
                           />
                           {item.discountPct > 0 && (
-                            <span style={{ fontSize: 10, color: '#0D9488' }}>
+                            <span style={{ fontSize: 10, color: 'var(--hf-accent-text)' }}>
                               − {fmtR(item.unitPrice * item.qty * item.discountPct / 100)}
                             </span>
                           )}
@@ -1045,19 +1045,19 @@ export function PosPage() {
 
               {/* Totals */}
               {cart.length > 0 && (
-                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: 10, marginBottom: 10 }}>
+                <div style={{ borderTop: '1px solid var(--hf-border-subtle)', paddingTop: 10, marginBottom: 10 }}>
                   {totals.discount > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#0D9488', marginBottom: 2 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--hf-accent-text)', marginBottom: 2 }}>
                       <span>Discount</span><span>− {fmtR(totals.discount)}</span>
                     </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748B', marginBottom: 2 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 2 }}>
                     <span>Subtotal (excl. VAT)</span><span>{fmtR(totals.subtotal - totals.discount)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748B', marginBottom: 7 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 7 }}>
                     <span>VAT (15%)</span><span>{fmtR(totals.vat)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: '#0F172A', borderTop: '1px solid #E2E8F0', paddingTop: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: 'var(--hf-text)', borderTop: '1px solid var(--hf-border)', paddingTop: 8 }}>
                     <span>Total</span><span>{fmtR(totals.total)}</span>
                   </div>
                 </div>
@@ -1078,8 +1078,8 @@ export function PosPage() {
                       border: `1px solid ${payment === m ? '#1B3A6B' : '#E2E8F0'}`,
                       borderRadius: 7, fontSize: 11,
                       fontWeight: payment === m ? 700 : 400,
-                      background: payment === m ? '#1B3A6B' : '#fff',
-                      color: payment === m ? '#fff' : '#475569',
+                      background: payment === m ? 'var(--hf-primary)' : 'var(--hf-surface)',
+                      color: payment === m ? 'var(--hf-text-on-solid)' : 'var(--hf-text-tertiary)',
                       cursor: 'pointer',
                     }}>
                       {m}
@@ -1108,14 +1108,14 @@ export function PosPage() {
                   />
                 )}
                 {change !== null && change >= 0 && (
-                  <div style={{ padding: '8px 12px', background: '#DCFCE7', borderRadius: 8, fontSize: 14, fontWeight: 700, color: '#166534', textAlign: 'center' }}>
+                  <div style={{ padding: '8px 12px', background: 'var(--hf-success-soft-strong)', borderRadius: 8, fontSize: 14, fontWeight: 700, color: 'var(--hf-success-text-strong)', textAlign: 'center' }}>
                     Change: {fmtR(change)}
                   </div>
                 )}
               </div>
 
               {saleErr && (
-                <div style={{ color: '#DC2626', fontSize: 12, marginBottom: 8, padding: '6px 10px', background: '#FEF2F2', borderRadius: 6 }}>
+                <div style={{ color: 'var(--hf-danger-text)', fontSize: 12, marginBottom: 8, padding: '6px 10px', background: 'var(--hf-danger-soft)', borderRadius: 6 }}>
                   {saleErr}
                 </div>
               )}
@@ -1135,8 +1135,8 @@ export function PosPage() {
                   })),
                 })}
                 style={{
-                  background: canCharge ? '#0D9488' : '#94A3B8',
-                  color: '#fff', border: 'none', borderRadius: 10,
+                  background: canCharge ? 'var(--hf-accent)' : 'var(--hf-text-faint)',
+                  color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 10,
                   padding: '13px', fontSize: 15, fontWeight: 800,
                   cursor: canCharge ? 'pointer' : 'not-allowed', width: '100%',
                 }}>
@@ -1154,7 +1154,7 @@ export function PosPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <div style={{ display: 'flex', gap: 8 }}>
                 {(summary?.lowStockItems ?? 0) > 0 && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#FEF2F2', color: '#DC2626', padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
                     <AlertTriangle size={11} /> {summary.lowStockItems} low stock
                   </span>
                 )}
@@ -1165,15 +1165,15 @@ export function PosPage() {
             </div>
 
             {stockLoading ? (
-              <div style={{ textAlign: 'center', padding: 40, color: '#94A3B8' }}>Loading…</div>
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--hf-text-faint)' }}>Loading…</div>
             ) : stock.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '50px 0', color: '#94A3B8' }}>
+              <div style={{ textAlign: 'center', padding: '50px 0', color: 'var(--hf-text-faint)' }}>
                 <Package size={34} style={{ marginBottom: 12, opacity: 0.3 }} />
-                <div style={{ fontWeight: 600, color: '#475569' }}>No stock items yet</div>
+                <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No stock items yet</div>
                 <div style={{ fontSize: 12, marginTop: 3 }}>Add catalogue items to start tracking inventory.</div>
               </div>
             ) : (
-              <div style={{ border: '1px solid #E2E8F0', borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ border: '1px solid var(--hf-border)', borderRadius: 10, overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr>
@@ -1184,28 +1184,28 @@ export function PosPage() {
                   </thead>
                   <tbody>
                     {stock.map((s, i) => (
-                      <tr key={s.id} style={{ background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
+                      <tr key={s.id} style={{ background: i % 2 === 0 ? 'var(--hf-surface)' : 'var(--hf-surface-muted)' }}>
                         <td style={TD}>
-                          <div style={{ fontWeight: 600, fontSize: 13, color: '#0F172A' }}>{s.itemName}</div>
-                          {s.sku && <div style={{ fontSize: 10, color: '#94A3B8' }}>SKU: {s.sku}</div>}
+                          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--hf-text)' }}>{s.itemName}</div>
+                          {s.sku && <div style={{ fontSize: 10, color: 'var(--hf-text-faint)' }}>SKU: {s.sku}</div>}
                         </td>
                         <td style={TD}>
-                          <span style={{ fontWeight: 800, fontSize: 15, color: s.lowStock ? '#DC2626' : '#0F172A' }}>
+                          <span style={{ fontWeight: 800, fontSize: 15, color: s.lowStock ? 'var(--hf-danger-text)' : 'var(--hf-text)' }}>
                             {s.availableQty}
                           </span>
                         </td>
-                        <td style={TD}><span style={{ fontSize: 12, color: '#64748B' }}>{s.qtyOnHand}</span></td>
-                        <td style={TD}><span style={{ fontSize: 12, color: '#64748B' }}>{s.reorderLevel}</span></td>
-                        <td style={TD}><span style={{ fontSize: 12, color: '#64748B' }}>{fmtR(s.costPrice)}</span></td>
-                        <td style={TD}><span style={{ fontWeight: 700, color: '#0D9488' }}>{fmtR(s.sellingPrice)}</span></td>
-                        <td style={TD}><span style={{ fontSize: 11, color: '#94A3B8' }}>{s.location || '—'}</span></td>
+                        <td style={TD}><span style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>{s.qtyOnHand}</span></td>
+                        <td style={TD}><span style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>{s.reorderLevel}</span></td>
+                        <td style={TD}><span style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>{fmtR(s.costPrice)}</span></td>
+                        <td style={TD}><span style={{ fontWeight: 700, color: 'var(--hf-accent-text)' }}>{fmtR(s.sellingPrice)}</span></td>
+                        <td style={TD}><span style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{s.location || '—'}</span></td>
                         <td style={TD}>
                           {s.lowStock ? (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 3, background: '#FEF2F2', color: '#DC2626', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, width: 'fit-content' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, width: 'fit-content' }}>
                               <AlertTriangle size={9} /> LOW
                             </span>
                           ) : (
-                            <span style={{ background: '#DCFCE7', color: '#166534', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600 }}>
+                            <span style={{ background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600 }}>
                               OK
                             </span>
                           )}
@@ -1225,37 +1225,37 @@ export function PosPage() {
         {tab === 'transactions' && (
           <div>
             {transactions.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '50px 0', color: '#94A3B8' }}>
+              <div style={{ textAlign: 'center', padding: '50px 0', color: 'var(--hf-text-faint)' }}>
                 <Receipt size={34} style={{ marginBottom: 12, opacity: 0.3 }} />
-                <div style={{ fontWeight: 600, color: '#475569' }}>No transactions yet</div>
+                <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No transactions yet</div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {transactions.map(t => {
                   const open = expandedTxn === t.id
                   return (
-                    <div key={t.id} style={{ border: '1px solid #E2E8F0', borderRadius: 10, overflow: 'hidden' }}>
+                    <div key={t.id} style={{ border: '1px solid var(--hf-border)', borderRadius: 10, overflow: 'hidden' }}>
                       {/* Row header */}
                       <div
                         onClick={() => setExpanded(open ? null : t.id)}
-                        style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', cursor: 'pointer', background: open ? '#F8FAFC' : '#fff', gap: 12 }}>
+                        style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', cursor: 'pointer', background: open ? 'var(--hf-surface-muted)' : 'var(--hf-surface)', gap: 12 }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 2 }}>
-                            <span style={{ fontWeight: 700, fontSize: 13, color: '#0F172A' }}>{t.transactionNumber}</span>
+                            <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)' }}>{t.transactionNumber}</span>
                             <StatusBadge status={t.status} />
-                            <span style={{ fontSize: 10, color: '#64748B', background: '#F1F5F9', padding: '1px 6px', borderRadius: 20 }}>
+                            <span style={{ fontSize: 10, color: 'var(--hf-text-muted)', background: 'var(--hf-surface-sunken)', padding: '1px 6px', borderRadius: 20 }}>
                               {t.paymentMethod}
                             </span>
                           </div>
-                          <div style={{ fontSize: 11, color: '#94A3B8' }}>
+                          <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>
                             {t.customerName || 'Walk-in'} · {t.servedByName || '—'} · {fmtDate(t.createdAt)}
                             {t.cashSessionNumber && <> · {t.cashSessionNumber}</>}
                           </div>
                         </div>
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <div style={{ fontWeight: 800, fontSize: 15, color: '#0F172A' }}>{fmtR(t.totalAmount)}</div>
+                          <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--hf-text)' }}>{fmtR(t.totalAmount)}</div>
                           {(t.changeGiven ?? 0) > 0 && (
-                            <div style={{ fontSize: 10, color: '#0D9488' }}>Chg: {fmtR(t.changeGiven)}</div>
+                            <div style={{ fontSize: 10, color: 'var(--hf-accent-text)' }}>Chg: {fmtR(t.changeGiven)}</div>
                           )}
                         </div>
                         <ChevronDown size={14} color="#94A3B8" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }} />
@@ -1263,13 +1263,13 @@ export function PosPage() {
 
                       {/* Expanded detail */}
                       {open && (
-                        <div style={{ borderTop: '1px solid #F1F5F9', padding: '12px 16px', background: '#FAFAFA' }}>
+                        <div style={{ borderTop: '1px solid var(--hf-border-subtle)', padding: '12px 16px', background: 'var(--hf-surface-muted)' }}>
                           {t.items?.length > 0 && (
                             <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
                               <thead>
                                 <tr>
                                   {['Item', 'Qty', 'Unit Price', 'Disc %', 'VAT', 'Total'].map(h => (
-                                    <th key={h} style={{ ...TH, padding: '5px 10px', background: '#F1F5F9' }}>{h}</th>
+                                    <th key={h} style={{ ...TH, padding: '5px 10px', background: 'var(--hf-surface-sunken)' }}>{h}</th>
                                   ))}
                                 </tr>
                               </thead>
@@ -1279,7 +1279,7 @@ export function PosPage() {
                                     <td style={{ ...TD, padding: '5px 10px' }}>{li.itemName}</td>
                                     <td style={{ ...TD, padding: '5px 10px' }}>{li.qty}</td>
                                     <td style={{ ...TD, padding: '5px 10px' }}>{fmtR(li.unitPrice)}</td>
-                                    <td style={{ ...TD, padding: '5px 10px', color: '#0D9488' }}>{li.discountPct > 0 ? `${li.discountPct}%` : '—'}</td>
+                                    <td style={{ ...TD, padding: '5px 10px', color: 'var(--hf-accent-text)' }}>{li.discountPct > 0 ? `${li.discountPct}%` : '—'}</td>
                                     <td style={{ ...TD, padding: '5px 10px' }}>{fmtR(li.vatAmount)}</td>
                                     <td style={{ ...TD, padding: '5px 10px', fontWeight: 700 }}>{fmtR(li.lineTotal)}</td>
                                   </tr>
@@ -1294,7 +1294,7 @@ export function PosPage() {
                             {t.status === 'COMPLETED' && (
                               <button
                                 onClick={() => { setShowRefund(t); setRefundLines({}); setRefundReason(''); setErrMsg('') }}
-                                style={{ ...btnSecondary, fontSize: 12, color: '#D97706', borderColor: '#FDE68A' }}>
+                                style={{ ...btnSecondary, fontSize: 12, color: 'var(--hf-warning-text)', borderColor: 'var(--hf-warning-border)' }}>
                                 <RotateCcw size={13} /> Refund
                               </button>
                             )}
@@ -1321,39 +1321,39 @@ export function PosPage() {
             </div>
 
             {purchaseOrders.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '50px 0', color: '#94A3B8' }}>
+              <div style={{ textAlign: 'center', padding: '50px 0', color: 'var(--hf-text-faint)' }}>
                 <Truck size={34} style={{ marginBottom: 12, opacity: 0.3 }} />
-                <div style={{ fontWeight: 600, color: '#475569' }}>No purchase orders yet</div>
+                <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No purchase orders yet</div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {purchaseOrders.map(po => (
-                  <div key={po.id} style={{ border: '1px solid #E2E8F0', borderRadius: 10, padding: '14px 16px' }}>
+                  <div key={po.id} style={{ border: '1px solid var(--hf-border)', borderRadius: 10, padding: '14px 16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
                           <span style={{ fontWeight: 700, fontSize: 13 }}>{po.orderNumber}</span>
                           <StatusBadge status={po.status} />
                         </div>
-                        <div style={{ fontSize: 12, color: '#64748B' }}>
+                        <div style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>
                           {po.supplierName} · Ordered {fmtDateShort(po.orderDate)}
                           {po.expectedDate && ` · Expected ${fmtDateShort(po.expectedDate)}`}
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontWeight: 800, fontSize: 15 }}>{fmtR(po.totalAmount)}</div>
-                        <div style={{ fontSize: 10, color: '#94A3B8' }}>incl. VAT</div>
+                        <div style={{ fontSize: 10, color: 'var(--hf-text-faint)' }}>incl. VAT</div>
                       </div>
                     </div>
 
                     {/* PO lines */}
-                    <div style={{ background: '#F8FAFC', borderRadius: 7, padding: '8px 12px', marginBottom: 10 }}>
+                    <div style={{ background: 'var(--hf-surface-muted)', borderRadius: 7, padding: '8px 12px', marginBottom: 10 }}>
                       {po.items?.map(li => (
-                        <div key={li.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', color: '#374151' }}>
+                        <div key={li.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', color: 'var(--hf-text-secondary)' }}>
                           <span>{li.itemName}</span>
-                          <span style={{ color: '#64748B' }}>
+                          <span style={{ color: 'var(--hf-text-muted)' }}>
                             {li.qtyReceived}/{li.qtyOrdered} received
-                            {li.fullyReceived && <span style={{ color: '#166534', marginLeft: 5, fontWeight: 700 }}>✓</span>}
+                            {li.fullyReceived && <span style={{ color: 'var(--hf-success-text-strong)', marginLeft: 5, fontWeight: 700 }}>✓</span>}
                           </span>
                         </div>
                       ))}
@@ -1414,7 +1414,7 @@ export function PosPage() {
             {cashModal === 'close' && (
               <>
                 {localSession && localSession !== 'loading' && (
-                  <div style={{ marginBottom: 14, padding: '12px 14px', background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 8, fontSize: 13 }}>
+                  <div style={{ marginBottom: 14, padding: '12px 14px', background: 'var(--hf-success-soft)', border: '1px solid var(--hf-success-border)', borderRadius: 8, fontSize: 13 }}>
                     {[
                       ['Session',            (localSession as CashSession).sessionNumber],
                       ['Opening float',      fmtR((localSession as CashSession).openingFloat)],
@@ -1422,7 +1422,7 @@ export function PosPage() {
                       ['Expected in drawer', fmtR(((localSession as CashSession).openingFloat ?? 0) + ((localSession as CashSession).expectedCash ?? 0))],
                     ].map(([l, v]) => (
                       <div key={l} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                        <span style={{ color: '#374151' }}>{l}</span>
+                        <span style={{ color: 'var(--hf-text-secondary)' }}>{l}</span>
                         <span style={{ fontWeight: 600 }}>{v}</span>
                       </div>
                     ))}
@@ -1440,7 +1440,7 @@ export function PosPage() {
                     const expected = (ls.openingFloat ?? 0) + (ls.expectedCash ?? 0)
                     const variance = Number(closeFloat) - expected
                     return (
-                      <div style={{ marginTop: 6, padding: '7px 12px', background: variance >= 0 ? '#F0FDF4' : '#FEF2F2', borderRadius: 7, fontSize: 13, fontWeight: 700, color: variance >= 0 ? '#166534' : '#DC2626' }}>
+                      <div style={{ marginTop: 6, padding: '7px 12px', background: variance >= 0 ? 'var(--hf-success-soft)' : 'var(--hf-danger-soft)', borderRadius: 7, fontSize: 13, fontWeight: 700, color: variance >= 0 ? 'var(--hf-success-text-strong)' : 'var(--hf-danger-text)' }}>
                         Variance: {variance >= 0 ? '+' : ''}{fmtR(variance)} ({variance >= 0 ? 'surplus' : 'short'})
                       </div>
                     )
@@ -1532,10 +1532,10 @@ export function PosPage() {
             {modalHeader(`Receive Stock — ${showReceive.orderNumber}`, () => setShowReceive(null))}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
               {showReceive.items?.filter(li => !li.fullyReceived).map(li => (
-                <div key={li.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#F8FAFC', borderRadius: 8 }}>
+                <div key={li.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--hf-surface-muted)', borderRadius: 8 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{li.itemName}</div>
-                    <div style={{ fontSize: 11, color: '#94A3B8' }}>
+                    <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>
                       Ordered: {li.qtyOrdered} · Received so far: {li.qtyReceived}
                     </div>
                   </div>
@@ -1594,7 +1594,7 @@ export function PosPage() {
               </div>
             </div>
 
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Line Items</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-secondary)', marginBottom: 8 }}>Line Items</div>
             {poLines.map((line, idx) => (
               <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 8, marginBottom: 8, alignItems: 'end' }}>
                 <div>
@@ -1657,15 +1657,15 @@ export function PosPage() {
         <div style={MODAL_BG}>
           <div style={modalBox(520)}>
             {modalHeader(`Refund — ${showRefund.transactionNumber}`, () => setShowRefund(null))}
-            <div style={{ marginBottom: 12, padding: '9px 12px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, fontSize: 12, color: '#92400E' }}>
+            <div style={{ marginBottom: 12, padding: '9px 12px', background: 'var(--hf-warning-soft)', border: '1px solid var(--hf-warning-border)', borderRadius: 8, fontSize: 12, color: 'var(--hf-warning-text-deep)' }}>
               Enter the quantity to refund per item. Leave blank to use the full original quantity. Refunded stock is returned to inventory automatically.
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
               {showRefund.items?.map(li => (
-                <div key={li.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#F8FAFC', borderRadius: 8 }}>
+                <div key={li.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--hf-surface-muted)', borderRadius: 8 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{li.itemName}</div>
-                    <div style={{ fontSize: 11, color: '#94A3B8' }}>Sold qty: {li.qty} · {fmtR(li.lineTotal)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>Sold qty: {li.qty} · {fmtR(li.lineTotal)}</div>
                   </div>
                   <div>
                     <label style={lbl}>Qty to refund</label>
@@ -1712,26 +1712,26 @@ export function PosPage() {
           <div style={modalBox(420)}>
             {modalHeader(`Receipt — ${showReceipt.transactionNumber}`, () => setShowReceipt(null))}
             {receiptLoading || !receiptData ? (
-              <div style={{ padding: '40px 20px', textAlign: 'center' as const, color: '#94A3B8' }}>Loading receipt…</div>
+              <div style={{ padding: '40px 20px', textAlign: 'center' as const, color: 'var(--hf-text-faint)' }}>Loading receipt…</div>
             ) : (
-              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 10, padding: 16, fontFamily: 'monospace', fontSize: 12, lineHeight: 1.9 }}>
+              <div style={{ background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 10, padding: 16, fontFamily: 'monospace', fontSize: 12, lineHeight: 1.9 }}>
                 {/* FIX: was a hardcoded "HandyFlow" — now the tenant's real
                     name, plus address/VAT number when available. */}
                 <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{receiptData.tenantName}</div>
                 {receiptData.tenantAddress && (
-                  <div style={{ textAlign: 'center', color: '#64748B', fontSize: 10 }}>{receiptData.tenantAddress}</div>
+                  <div style={{ textAlign: 'center', color: 'var(--hf-text-muted)', fontSize: 10 }}>{receiptData.tenantAddress}</div>
                 )}
                 {receiptData.tenantVatNumber && (
-                  <div style={{ textAlign: 'center', color: '#64748B', fontSize: 10 }}>VAT: {receiptData.tenantVatNumber}</div>
+                  <div style={{ textAlign: 'center', color: 'var(--hf-text-muted)', fontSize: 10 }}>VAT: {receiptData.tenantVatNumber}</div>
                 )}
-                <div style={{ textAlign: 'center', color: '#64748B', fontSize: 10, marginBottom: 10, marginTop: 2 }}>ECTA-compliant electronic receipt</div>
-                <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: 8, marginBottom: 8 }}>
+                <div style={{ textAlign: 'center', color: 'var(--hf-text-muted)', fontSize: 10, marginBottom: 10, marginTop: 2 }}>ECTA-compliant electronic receipt</div>
+                <div style={{ borderTop: '1px dashed var(--hf-border-strong)', paddingTop: 8, marginBottom: 8 }}>
                   <div>TXN: {receiptData.transactionNumber}</div>
                   <div>Date: {fmtDate(receiptData.createdAt)}</div>
                   {receiptData.cashierName && <div>Cashier: {receiptData.cashierName}</div>}
                   {receiptData.customerName && <div>Customer: {receiptData.customerName}</div>}
                 </div>
-                <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: 8, marginBottom: 8 }}>
+                <div style={{ borderTop: '1px dashed var(--hf-border-strong)', paddingTop: 8, marginBottom: 8 }}>
                   {receiptData.items?.map((li: any, i: number) => (
                     <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span>{li.itemName} ×{li.qty}</span>
@@ -1741,23 +1741,23 @@ export function PosPage() {
                 </div>
                 {/* NEW: the subtotal/discount/VAT breakdown was completely
                     absent before — only a flat TOTAL was ever shown. */}
-                <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                <div style={{ borderTop: '1px dashed var(--hf-border-strong)', paddingTop: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--hf-text-muted)' }}>
                     <span>Subtotal</span><span>{fmtR(receiptData.subtotal)}</span>
                   </div>
                   {(receiptData.discountAmount ?? 0) > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--hf-text-muted)' }}>
                       <span>Discount</span><span>-{fmtR(receiptData.discountAmount)}</span>
                     </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--hf-text-muted)' }}>
                     <span>VAT</span><span>{fmtR(receiptData.vatAmount)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--hf-text-muted)' }}>
                     <span>Payment</span><span>{receiptData.paymentMethod}</span>
                   </div>
                   {(receiptData.changeGiven ?? 0) > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--hf-text-muted)' }}>
                       <span>Change</span><span>{fmtR(receiptData.changeGiven)}</span>
                     </div>
                   )}
@@ -1782,18 +1782,18 @@ export function PosPage() {
         <div style={MODAL_BG}>
           <div style={modalBox(460)}>
             {modalHeader('POS Settings', () => setShowSettings(false))}
-            <p style={{ fontSize: 12, color: '#64748B', marginBottom: 16 }}>
+            <p style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 16 }}>
               A till closing over or under these amounts notifies admins.
               Small variances are ignored as counting rounding.
             </p>
 
             {settingsLoading || !settingsForm ? (
-              <div style={{ textAlign: 'center', padding: 30, color: '#94A3B8' }}>
+              <div style={{ textAlign: 'center', padding: 30, color: 'var(--hf-text-faint)' }}>
                 Loading…
               </div>
             ) : (
               <>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#374151', marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-secondary)', marginBottom: 8 }}>
                   No alert if variance is within
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
@@ -1821,7 +1821,7 @@ export function PosPage() {
                   </div>
                 </div>
 
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#374151', marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-secondary)', marginBottom: 8 }}>
                   Escalate to urgent beyond
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
@@ -1848,7 +1848,7 @@ export function PosPage() {
                     />
                   </div>
                 </div>
-                <div style={{ fontSize: 10, color: '#94A3B8', marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: 'var(--hf-text-faint)', marginBottom: 10 }}>
                   Whichever is greater applies — e.g. R20 and 1% means a small
                   till uses the flat R20 floor, a bigger till uses 1% instead.
                 </div>
@@ -1858,7 +1858,7 @@ export function PosPage() {
             <ErrMsg msg={errMsg} />
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', marginTop: 12 }}>
               {settingsSaved && (
-                <span style={{ fontSize: 12, color: '#166534', marginRight: 'auto' }}>Saved ✓</span>
+                <span style={{ fontSize: 12, color: 'var(--hf-success-text-strong)', marginRight: 'auto' }}>Saved ✓</span>
               )}
               <button onClick={() => setShowSettings(false)} style={btnCancel}>Close</button>
               <button

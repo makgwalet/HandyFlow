@@ -28,7 +28,7 @@ const today   = new Date().toISOString().split("T")[0]
 function Skeleton({ w = "100%", h = 18, mb = 0 }: { w?: string | number; h?: number; mb?: number }) {
   return (
     <div style={{
-      width: w, height: h, background: "#F1F5F9", borderRadius: 6,
+      width: w, height: h, background: "var(--hf-surface-sunken)", borderRadius: 6,
       marginBottom: mb, animation: "pulse 1.5s ease-in-out infinite",
     }} />
   )
@@ -106,11 +106,11 @@ export default function BookingsDashboard({ onNavigate }: { onNavigate: (tab: an
           <div
             key={k.label}
             onClick={() => onNavigate("bookings")}
-            style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: "16px 20px", cursor: "pointer" }}
+            style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "16px 20px", cursor: "pointer" }}
             onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)")}
             onMouseLeave={e => (e.currentTarget.style.boxShadow = "none")}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase" }}>{k.label}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--hf-text-faint)", textTransform: "uppercase" }}>{k.label}</div>
               <k.icon size={15} color={k.color} />
             </div>
             {loadingToday
@@ -126,12 +126,12 @@ export default function BookingsDashboard({ onNavigate }: { onNavigate: (tab: an
         {/* ── Today's schedule ─────────────────────────────────────────── */}
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>
               Today — {new Date().toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long" })}
             </span>
             <button
               onClick={() => onNavigate("calendar")}
-              style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#0D9488", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+              style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-accent-text)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
               View calendar <ArrowRight size={13} />
             </button>
           </div>
@@ -139,19 +139,19 @@ export default function BookingsDashboard({ onNavigate }: { onNavigate: (tab: an
           {loadingToday ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {[1, 2, 3].map(i => (
-                <div key={i} style={{ padding: "14px 16px", border: "1px solid #E2E8F0", borderRadius: 10 }}>
+                <div key={i} style={{ padding: "14px 16px", border: "1px solid var(--hf-border)", borderRadius: 10 }}>
                   <Skeleton h={14} w="40%" mb={8} />
                   <Skeleton h={12} w="60%" />
                 </div>
               ))}
             </div>
           ) : todayBookings.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", border: "1px dashed #E2E8F0", borderRadius: 12 }}>
+            <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)", border: "1px dashed var(--hf-border)", borderRadius: 12 }}>
               <Calendar size={32} color="#CBD5E1" style={{ marginBottom: 10 }} />
-              <div style={{ fontWeight: 600, color: "#475569" }}>No bookings today</div>
+              <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No bookings today</div>
               <button
                 onClick={() => onNavigate("bookings")}
-                style={{ marginTop: 12, padding: "7px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
+                style={{ marginTop: 12, padding: "7px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
                 Create booking
               </button>
             </div>
@@ -162,22 +162,22 @@ export default function BookingsDashboard({ onNavigate }: { onNavigate: (tab: an
                 .map((b: any) => {
                   const ss = STATUS_STYLE[b.status] ?? STATUS_STYLE.PENDING
                   return (
-                    <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", border: "1px solid #E2E8F0", borderRadius: 10, background: "#fff" }}>
+                    <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", border: "1px solid var(--hf-border)", borderRadius: 10, background: "var(--hf-surface)" }}>
                       <div style={{ textAlign: "center", minWidth: 56 }}>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: "#0F172A" }}>{fmtTime(b.startTime)}</div>
-                        <div style={{ fontSize: 10, color: "#94A3B8" }}>{fmtTime(b.endTime)}</div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: "var(--hf-text)" }}>{fmtTime(b.startTime)}</div>
+                        <div style={{ fontSize: 10, color: "var(--hf-text-faint)" }}>{fmtTime(b.endTime)}</div>
                       </div>
                       <div style={{ width: 3, height: 40, borderRadius: 2, background: ss.color, flexShrink: 0 }} />
                       <div style={{ flex: 1 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                          <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{b.clientName}</span>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{b.clientName}</span>
                           <span style={{ fontSize: 11, fontWeight: 600, background: ss.bg, color: ss.color, padding: "1px 8px", borderRadius: 20 }}>{ss.label}</span>
                         </div>
-                        <div style={{ fontSize: 12, color: "#64748B" }}>
+                        <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>
                           {b.serviceName}{b.staffName ? ` · ${b.staffName}` : ""}
                         </div>
                       </div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1B3A6B" }}>{fmtR(b.price)}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-primary-text)" }}>{fmtR(b.price)}</div>
                     </div>
                   )
                 })}
@@ -190,7 +190,7 @@ export default function BookingsDashboard({ onNavigate }: { onNavigate: (tab: an
 
           {/* Next booking highlight */}
           {upcoming && (
-            <div style={{ background: "#1B3A6B", borderRadius: 12, padding: 20, color: "#fff" }}>
+            <div style={{ background: "var(--hf-primary)", borderRadius: 12, padding: 20, color: "var(--hf-text-on-solid)" }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.6)", marginBottom: 8, textTransform: "uppercase" }}>Next up</div>
               <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{upcoming.clientName}</div>
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", marginBottom: 12 }}>{upcoming.serviceName}</div>
@@ -206,15 +206,15 @@ export default function BookingsDashboard({ onNavigate }: { onNavigate: (tab: an
           )}
 
           {/* Summary stats */}
-          <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: 18 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 14 }}>All time</div>
+          <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 18 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 14 }}>All time</div>
             {[
               { label: "Total completed", value: completedTotal ?? "—", color: "#166534" },
               { label: "No-show rate",    value: `${noShowRate}%`,       color: parseFloat(noShowRate) > 10 ? "#DC2626" : "#166534" },
               { label: "Total bookings",  value: totalBookings ?? "—",   color: "#1B3A6B" },
             ].map(s => (
-              <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #F1F5F9" }}>
-                <span style={{ fontSize: 13, color: "#64748B" }}>{s.label}</span>
+              <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--hf-border-subtle)" }}>
+                <span style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>{s.label}</span>
                 <span style={{ fontSize: 14, fontWeight: 700, color: s.color }}>{s.value}</span>
               </div>
             ))}
@@ -222,7 +222,7 @@ export default function BookingsDashboard({ onNavigate }: { onNavigate: (tab: an
 
           {/* Quick actions */}
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 10 }}>Quick actions</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 10 }}>Quick actions</div>
             {[
               { label: "New booking",      tab: "bookings",     color: "#1B3A6B" },
               { label: "Manage services",  tab: "services",     color: "#0D9488" },
@@ -231,7 +231,7 @@ export default function BookingsDashboard({ onNavigate }: { onNavigate: (tab: an
               <button
                 key={a.label}
                 onClick={() => onNavigate(a.tab)}
-                style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 {a.label} <ArrowRight size={13} />
               </button>
             ))}

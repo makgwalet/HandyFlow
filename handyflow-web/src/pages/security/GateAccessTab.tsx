@@ -206,8 +206,8 @@ export default function GateAccessTab() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0F172A" }}>Gate Access & Registry</h2>
-          <div style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>Access points, visitor/contractor/delivery log, and the site access report</div>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "var(--hf-text)" }}>Gate Access & Registry</h2>
+          <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginTop: 2 }}>Access points, visitor/contractor/delivery log, and the site access report</div>
         </div>
         <div style={{ minWidth: 220 }}>
           <select value={siteId} onChange={e => setSiteId(e.target.value)} style={inp}>
@@ -218,58 +218,58 @@ export default function GateAccessTab() {
       </div>
 
       {!siteId ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>
           <DoorOpen size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
           <div>Select a site to view its gate access configuration and registry.</div>
         </div>
       ) : (
         <>
           {/* Sub-nav */}
-          <div style={{ display: "flex", gap: 6, marginBottom: 16, borderBottom: "1px solid #E2E8F0" }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 16, borderBottom: "1px solid var(--hf-border)" }}>
             {SUB_TABS.map(t => {
               const Icon = t.icon; const active = subTab === t.id
               return (
                 <button key={t.id} onClick={() => setSubTab(t.id)}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 14px", background: "none", border: "none", borderBottom: active ? "2px solid #1B3A6B" : "2px solid transparent", color: active ? "#1B3A6B" : "#64748B", fontWeight: active ? 700 : 500, fontSize: 13, cursor: "pointer" }}>
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 14px", background: "none", border: "none", borderBottom: active ? "2px solid var(--hf-primary)" : "2px solid transparent", color: active ? "var(--hf-primary-text)" : "var(--hf-text-muted)", fontWeight: active ? 700 : 500, fontSize: 13, cursor: "pointer" }}>
                   <Icon size={14} /> {t.label}
                 </button>
               )
             })}
           </div>
 
-          {error && <div style={{ padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#DC2626", fontSize: 13, marginBottom: 14 }}>{error}</div>}
+          {error && <div style={{ padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, color: "var(--hf-danger-text)", fontSize: 13, marginBottom: 14 }}>{error}</div>}
 
           {/* ── Access Points ── */}
           {subTab === "access-points" && (
             <div>
               <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-                <button onClick={openApNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                <button onClick={openApNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                   <Plus size={14} /> Add Access Point
                 </button>
               </div>
               {apLoading ? (
-                <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>Loading…</div>
+                <div style={{ textAlign: "center", padding: 30, color: "var(--hf-text-faint)" }}>Loading…</div>
               ) : accessPoints.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+                <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>
                   No access points registered for this site yet.
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {accessPoints.map(ap => (
-                    <div key={ap.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px", opacity: ap.active ? 1 : 0.6 }}>
+                    <div key={ap.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px", opacity: ap.active ? 1 : 0.6 }}>
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{ap.name}</div>
-                        {ap.description && <div style={{ fontSize: 12, color: "#94A3B8" }}>{ap.description}</div>}
+                        <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{ap.name}</div>
+                        {ap.description && <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>{ap.description}</div>}
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: ap.active ? "#DCFCE7" : "#F8FAFC", color: ap.active ? "#166534" : "#94A3B8" }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: ap.active ? "var(--hf-success-soft-strong)" : "var(--hf-surface-muted)", color: ap.active ? "var(--hf-success-text-strong)" : "var(--hf-text-faint)" }}>
                           {ap.active ? "Active" : "Inactive"}
                         </span>
-                        <button onClick={() => openApEdit(ap)} title="Edit" style={{ padding: "6px 8px", background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 7, cursor: "pointer", color: "#0369A1" }}><Edit2 size={13} /></button>
+                        <button onClick={() => openApEdit(ap)} title="Edit" style={{ padding: "6px 8px", background: "var(--hf-sky-soft)", border: "1px solid var(--hf-sky-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-sky-text-strong)" }}><Edit2 size={13} /></button>
                         {ap.active ? (
-                          <button onClick={() => deactivateAp.mutate(ap.id)} title="Deactivate" style={{ padding: "6px 8px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, cursor: "pointer", color: "#DC2626" }}><Ban size={13} /></button>
+                          <button onClick={() => deactivateAp.mutate(ap.id)} title="Deactivate" style={{ padding: "6px 8px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-danger-text)" }}><Ban size={13} /></button>
                         ) : (
-                          <button onClick={() => reactivateAp.mutate(ap.id)} title="Reactivate" style={{ padding: "6px 8px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 7, cursor: "pointer", color: "#166534" }}><RotateCcw size={13} /></button>
+                          <button onClick={() => reactivateAp.mutate(ap.id)} title="Reactivate" style={{ padding: "6px 8px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-success-text-strong)" }}><RotateCcw size={13} /></button>
                         )}
                       </div>
                     </div>
@@ -283,9 +283,9 @@ export default function GateAccessTab() {
           {subTab === "on-site" && (
             <div>
               {onSiteLoading ? (
-                <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>Loading…</div>
+                <div style={{ textAlign: "center", padding: 30, color: "var(--hf-text-faint)" }}>Loading…</div>
               ) : onSite.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+                <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>
                   Nobody currently on site.
                 </div>
               ) : (
@@ -310,9 +310,9 @@ export default function GateAccessTab() {
                 </div>
               </div>
               {logLoading ? (
-                <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>Loading…</div>
+                <div style={{ textAlign: "center", padding: 30, color: "var(--hf-text-faint)" }}>Loading…</div>
               ) : !gateLog?.content?.length ? (
-                <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+                <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>
                   No gate entries in this date range.
                 </div>
               ) : (
@@ -320,7 +320,7 @@ export default function GateAccessTab() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {gateLog.content.map(e => <GateEntryRow key={e.id} entry={e} onEvidence={() => setEvidenceFor(e)} />)}
                   </div>
-                  <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 10 }}>{gateLog.totalElements} total entries in range (showing first 50)</div>
+                  <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 10 }}>{gateLog.totalElements} total entries in range (showing first 50)</div>
                 </>
               )}
             </div>
@@ -335,13 +335,13 @@ export default function GateAccessTab() {
                   <input type="month" value={reportMonth} onChange={e => setReportMonth(e.target.value)} style={inp} />
                 </div>
                 {report && (
-                  <button onClick={downloadReportPdf} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#F0F9FF", color: "#0369A1", border: "1px solid #BAE6FD", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                  <button onClick={downloadReportPdf} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "var(--hf-sky-soft)", color: "var(--hf-sky-text-strong)", border: "1px solid var(--hf-sky-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                     <Download size={14} /> Download PDF
                   </button>
                 )}
               </div>
               {reportLoading ? (
-                <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>Loading…</div>
+                <div style={{ textAlign: "center", padding: 30, color: "var(--hf-text-faint)" }}>Loading…</div>
               ) : report ? (
                 <>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 20 }}>
@@ -355,14 +355,14 @@ export default function GateAccessTab() {
                       const cfg = ENTRY_TYPE_CFG[e.entryType] ?? ENTRY_TYPE_CFG.OTHER
                       const sc = STATUS_CFG[e.status] ?? STATUS_CFG.DEPARTED
                       return (
-                        <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: "10px 14px", fontSize: 13 }}>
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "10px 14px", fontSize: 13 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                             <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
-                            <span style={{ fontWeight: 600, color: "#0F172A" }}>{e.personName}</span>
-                            {e.company && <span style={{ color: "#94A3B8" }}>· {e.company}</span>}
-                            {e.vehicleRegistration && <span style={{ color: "#94A3B8" }}>· {e.vehicleRegistration}</span>}
+                            <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{e.personName}</span>
+                            {e.company && <span style={{ color: "var(--hf-text-faint)" }}>· {e.company}</span>}
+                            {e.vehicleRegistration && <span style={{ color: "var(--hf-text-faint)" }}>· {e.vehicleRegistration}</span>}
                           </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#94A3B8", fontSize: 12 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--hf-text-faint)", fontSize: 12 }}>
                             <span>{e.accessPointName}</span>
                             <span>{fmtDateTime(e.loggedInAt)} → {fmtDateTime(e.loggedOutAt)}</span>
                             <span style={{ color: sc.color, fontWeight: 600 }}>{sc.label}</span>
@@ -373,7 +373,7 @@ export default function GateAccessTab() {
                   </div>
                 </>
               ) : (
-                <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8" }}>No data for this period.</div>
+                <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)" }}>No data for this period.</div>
               )}
             </div>
           )}
@@ -383,10 +383,10 @@ export default function GateAccessTab() {
       {/* Access Point create/edit modal */}
       {showApForm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: 26, width: 440 }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 26, width: 440 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0F172A" }}>{showApForm === "new" ? "Add Access Point" : "Edit Access Point"}</h3>
-              <button onClick={() => setShowApForm(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={18} /></button>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>{showApForm === "new" ? "Add Access Point" : "Edit Access Point"}</h3>
+              <button onClick={() => setShowApForm(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}><X size={18} /></button>
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Name *</label>
@@ -412,27 +412,27 @@ export default function GateAccessTab() {
       {/* Evidence viewer modal */}
       {evidenceFor && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: 26, width: 480, maxHeight: "80vh", overflowY: "auto" as const }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 26, width: 480, maxHeight: "80vh", overflowY: "auto" as const }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Evidence — {evidenceFor.personName}</h3>
-              <button onClick={() => setEvidenceFor(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={18} /></button>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Evidence — {evidenceFor.personName}</h3>
+              <button onClick={() => setEvidenceFor(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}><X size={18} /></button>
             </div>
             {evidenceLoading ? (
-              <div style={{ textAlign: "center", padding: 20, color: "#94A3B8" }}>Loading…</div>
+              <div style={{ textAlign: "center", padding: 20, color: "var(--hf-text-faint)" }}>Loading…</div>
             ) : evidence.length === 0 ? (
-              <div style={{ textAlign: "center", padding: 20, color: "#94A3B8", fontSize: 13 }}>No evidence attached to this entry.</div>
+              <div style={{ textAlign: "center", padding: 20, color: "var(--hf-text-faint)", fontSize: 13 }}>No evidence attached to this entry.</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {evidence.map(ev => (
-                  <div key={ev.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8 }}>
+                  <div key={ev.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <Paperclip size={15} style={{ color: "#94A3B8" }} />
+                      <Paperclip size={15} style={{ color: "var(--hf-text-faint)" }} />
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{ev.fileName}</div>
-                        <div style={{ fontSize: 11, color: "#94A3B8" }}>{ev.evidenceType} · {ev.uploadedByName}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)" }}>{ev.fileName}</div>
+                        <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{ev.evidenceType} · {ev.uploadedByName}</div>
                       </div>
                     </div>
-                    <button onClick={() => downloadEvidence(ev)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 7, cursor: "pointer", color: "#0369A1", fontSize: 12, fontWeight: 600 }}>
+                    <button onClick={() => downloadEvidence(ev)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-sky-soft)", border: "1px solid var(--hf-sky-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-sky-text-strong)", fontSize: 12, fontWeight: 600 }}>
                       <Download size={13} /> Download
                     </button>
                   </div>
@@ -451,17 +451,17 @@ function GateEntryRow({ entry, onEvidence }: { entry: GateEntry; onEvidence: () 
   const sc = STATUS_CFG[entry.status] ?? STATUS_CFG.DEPARTED
   const Icon = cfg.icon
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", border: `1px solid ${entry.status === "OVERSTAYED" ? "#FECACA" : "#E2E8F0"}`, borderRadius: 10, padding: "12px 16px" }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--hf-surface)", border: `1px solid ${entry.status === "OVERSTAYED" ? "#FECACA" : "#E2E8F0"}`, borderRadius: 10, padding: "12px 16px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ width: 36, height: 36, borderRadius: 9, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <Icon size={16} color={cfg.color} />
         </div>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{entry.personName}</span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{entry.personName}</span>
             <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
           </div>
-          <div style={{ fontSize: 12, color: "#94A3B8" }}>
+          <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>
             {entry.company && <>{entry.company} · </>}
             {entry.vehicleRegistration && <>{entry.vehicleRegistration} · </>}
             {entry.accessPointName} · {fmtDateTime(entry.loggedInAt)}
@@ -471,7 +471,7 @@ function GateEntryRow({ entry, onEvidence }: { entry: GateEntry; onEvidence: () 
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}>{sc.label}</span>
-        <button onClick={onEvidence} title="View evidence" style={{ padding: "6px 8px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, cursor: "pointer", color: "#64748B" }}>
+        <button onClick={onEvidence} title="View evidence" style={{ padding: "6px 8px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-text-muted)" }}>
           <Paperclip size={13} />
         </button>
       </div>
@@ -481,9 +481,9 @@ function GateEntryRow({ entry, onEvidence }: { entry: GateEntry; onEvidence: () 
 
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10, padding: "14px 16px" }}>
+    <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "14px 16px" }}>
       <div style={{ fontSize: 22, fontWeight: 800, color }}>{value}</div>
-      <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>{label}</div>
+      <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 2 }}>{label}</div>
     </div>
   )
 }

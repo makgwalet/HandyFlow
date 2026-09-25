@@ -70,7 +70,7 @@ export default function AgAnimalsTab({ farmId, onSelectAnimal }: { farmId: strin
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <p style={{ fontSize: 13, color: "#64748B", margin: 0 }}>{animals.length} animal{animals.length === 1 ? "" : "s"}.</p>
+          <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: 0 }}>{animals.length} animal{animals.length === 1 ? "" : "s"}.</p>
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ ...inp, width: 140 }}>
             <option value="">All statuses</option>
             <option value="ACTIVE">ACTIVE</option><option value="SOLD">SOLD</option>
@@ -81,7 +81,7 @@ export default function AgAnimalsTab({ farmId, onSelectAnimal }: { farmId: strin
       </div>
 
       {showCreate && (
-        <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
             <div><label style={lbl}>Species</label>
               <select value={speciesId} onChange={e => setSpeciesId(e.target.value)} style={inp}>
@@ -107,17 +107,17 @@ export default function AgAnimalsTab({ farmId, onSelectAnimal }: { farmId: strin
         </div>
       )}
 
-      {isLoading ? <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p> :
-        animals.length === 0 ? <p style={{ color: "#94A3B8", fontSize: 13 }}>No animals registered yet.</p> : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+      {isLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p> :
+        animals.length === 0 ? <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No animals registered yet.</p> : (
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {animals.map((a, i) => (
             <div key={a.id} onClick={() => onSelectAnimal(a)}
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9", cursor: "pointer" }}>
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)", cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <PawPrint size={15} color={AG_ACCENT} />
                 <div>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", margin: 0 }}>{a.tagNumber}{a.name ? ` — ${a.name}` : ""}</p>
-                  <p style={{ fontSize: 11, color: "#94A3B8", margin: 0 }}>{a.breed ?? "—"} · {a.sex}{a.currentWeightKg ? ` · ${a.currentWeightKg} kg` : ""}</p>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{a.tagNumber}{a.name ? ` — ${a.name}` : ""}</p>
+                  <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>{a.breed ?? "—"} · {a.sex}{a.currentWeightKg ? ` · ${a.currentWeightKg} kg` : ""}</p>
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -132,7 +132,7 @@ export default function AgAnimalsTab({ farmId, onSelectAnimal }: { farmId: strin
   )
 }
 
-const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#374151", marginBottom: 4, display: "block" }
-const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12.5, boxSizing: "border-box" }
-const btnPrimary: React.CSSProperties = { display: "inline-flex", alignItems: "center", padding: "8px 14px", borderRadius: 8, border: "none", background: AG_ACCENT, color: "#fff", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
-const btnGhost: React.CSSProperties = { padding: "8px 14px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }
+const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4, display: "block" }
+const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12.5, boxSizing: "border-box" }
+const btnPrimary: React.CSSProperties = { display: "inline-flex", alignItems: "center", padding: "8px 14px", borderRadius: 8, border: "none", background: AG_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
+const btnGhost: React.CSSProperties = { padding: "8px 14px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }

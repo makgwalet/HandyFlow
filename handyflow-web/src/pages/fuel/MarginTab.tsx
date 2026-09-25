@@ -36,7 +36,7 @@ const fmtDate = (s: string) => new Date(s).toLocaleDateString("en-ZA", { day: "n
 const todayStr = () => new Date().toISOString().slice(0, 10)
 const monthStartStr = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10) }
 
-const inp: React.CSSProperties = { padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none", background: "#fff" }
+const inp: React.CSSProperties = { padding: "8px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", background: "var(--hf-surface)" }
 
 export default function MarginTab() {
   const [from, setFrom] = useState(monthStartStr())
@@ -56,23 +56,23 @@ export default function MarginTab() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0F172A" }}>Cost & Margin</h2>
-          <div style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>Weighted-average cost, snapshotted at time of sale — visible to those with fuel margin access only</div>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--hf-text)" }}>Cost & Margin</h2>
+          <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginTop: 2 }}>Weighted-average cost, snapshotted at time of sale — visible to those with fuel margin access only</div>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
-          <div><label style={{ display: "block", fontSize: 11, color: "#94A3B8", marginBottom: 3 }}>From</label><input type="date" value={from} onChange={e => setFrom(e.target.value)} style={inp} /></div>
-          <div><label style={{ display: "block", fontSize: 11, color: "#94A3B8", marginBottom: 3 }}>To</label><input type="date" value={to} onChange={e => setTo(e.target.value)} style={inp} /></div>
+          <div><label style={{ display: "block", fontSize: 11, color: "var(--hf-text-faint)", marginBottom: 3 }}>From</label><input type="date" value={from} onChange={e => setFrom(e.target.value)} style={inp} /></div>
+          <div><label style={{ display: "block", fontSize: 11, color: "var(--hf-text-faint)", marginBottom: 3 }}>To</label><input type="date" value={to} onChange={e => setTo(e.target.value)} style={inp} /></div>
         </div>
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading…</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading…</div>
       ) : !report ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>No data for this period.</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>No data for this period.</div>
       ) : (
         <>
           {report.transactionsWithoutCostData > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, color: "#B45309", fontSize: 13, marginBottom: 18 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 8, color: "var(--hf-warning-text-strong)", fontSize: 13, marginBottom: 18 }}>
               <AlertCircle size={15} />
               {report.transactionsWithoutCostData} transaction{report.transactionsWithoutCostData !== 1 ? "s" : ""} in this period {report.transactionsWithoutCostData !== 1 ? "have" : "has"} no cost data (predates cost tracking, or the tank had no purchase history yet) — excluded from the totals below.
             </div>
@@ -85,26 +85,26 @@ export default function MarginTab() {
             <StatCard label="Internal Fleet Cost" value={fmtR(report.totalInternalCost)} sub={`${report.totalInternalLitres.toLocaleString()} L`} icon={Truck} color="#64748B" bg="#F1F5F9" />
           </div>
 
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase" as const, letterSpacing: 0.4, marginBottom: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase" as const, letterSpacing: 0.4, marginBottom: 10 }}>
             Transactions — {report.lines.length}
           </div>
           {report.lines.length === 0 ? (
-            <div style={{ textAlign: "center", padding: 30, color: "#94A3B8", border: "1px solid #E2E8F0", borderRadius: 12 }}>No deliveries or dispatches in this period.</div>
+            <div style={{ textAlign: "center", padding: 30, color: "var(--hf-text-faint)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>No deliveries or dispatches in this period.</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {report.lines.map(l => (
-                <div key={l.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13 }}>
+                <div key={l.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     {l.sourceType === "DELIVERY" ? <Truck size={14} color="#1B3A6B" /> : <Fuel size={14} color="#0D9488" />}
                     <div>
-                      <span style={{ fontWeight: 600, color: "#0F172A" }}>{l.recipientLabel || "—"}</span>
-                      <span style={{ color: "#94A3B8", marginLeft: 8 }}>{l.litres.toLocaleString()} L · {fmtDate(l.occurredAt)}</span>
+                      <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{l.recipientLabel || "—"}</span>
+                      <span style={{ color: "var(--hf-text-faint)", marginLeft: 8 }}>{l.litres.toLocaleString()} L · {fmtDate(l.occurredAt)}</span>
                     </div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 16, color: "#94A3B8" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 16, color: "var(--hf-text-faint)" }}>
                     <span>Rev: {fmtR(l.revenue)}</span>
                     <span>Cost: {fmtR(l.cost)}</span>
-                    <span style={{ fontWeight: 700, color: l.margin == null ? "#94A3B8" : l.margin >= 0 ? "#166534" : "#DC2626", minWidth: 90, textAlign: "right" as const }}>
+                    <span style={{ fontWeight: 700, color: l.margin == null ? "var(--hf-text-faint)" : l.margin >= 0 ? "var(--hf-success-text-strong)" : "var(--hf-danger-text)", minWidth: 90, textAlign: "right" as const }}>
                       {l.margin == null ? "No revenue" : `${fmtR(l.margin)} (${fmtPct(l.marginPercent)})`}
                     </span>
                   </div>
@@ -120,15 +120,15 @@ export default function MarginTab() {
 
 function StatCard({ label, value, sub, icon: Icon, color, bg }: { label: string; value: string; sub?: string; icon: any; color: string; bg: string }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: "16px 18px" }}>
+    <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "16px 18px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <div style={{ width: 28, height: 28, borderRadius: 8, background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Icon size={14} color={color} />
         </div>
-        <span style={{ fontSize: 12, color: "#94A3B8", fontWeight: 600 }}>{label}</span>
+        <span style={{ fontSize: 12, color: "var(--hf-text-faint)", fontWeight: 600 }}>{label}</span>
       </div>
-      <div style={{ fontSize: 20, fontWeight: 800, color: "#0F172A" }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>{sub}</div>}
+      <div style={{ fontSize: 20, fontWeight: 800, color: "var(--hf-text)" }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 2 }}>{sub}</div>}
     </div>
   )
 }

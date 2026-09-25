@@ -95,17 +95,17 @@ export default function PropertiesTab() {
     <div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
         <button onClick={() => { setShowCreate(true); setError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Add Property
         </button>
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading...</div>
       ) : (properties as any[]).length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Building2 size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No properties yet</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No properties yet</div>
           <div style={{ fontSize: 13, marginTop: 4 }}>Add your first property to start managing your portfolio.</div>
         </div>
       ) : (
@@ -116,61 +116,61 @@ export default function PropertiesTab() {
             const pct    = p.totalUnits > 0 ? Math.round((p.occupiedUnits / p.totalUnits) * 100) : 0
 
             return (
-              <div key={p.id} style={{ border: "1px solid #E2E8F0", borderLeft: `3px solid ${color}`, borderRadius: 10, overflow: "hidden" }}>
+              <div key={p.id} style={{ border: "1px solid var(--hf-border)", borderLeft: `3px solid ${color}`, borderRadius: 10, overflow: "hidden" }}>
                 <div onClick={() => setExpanded(isOpen ? null : p.id)}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", cursor: "pointer", background: isOpen ? "#F8FAFC" : "#fff" }}>
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", cursor: "pointer", background: isOpen ? "var(--hf-surface-muted)" : "var(--hf-surface)" }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                      <span style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{p.name}</span>
+                      <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{p.name}</span>
                       <span style={{ background: `${color}18`, color, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{p.propertyType.replace("_"," ")}</span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 12, color: "#64748B" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 12, color: "var(--hf-text-muted)" }}>
                       {p.address && <span><MapPin size={11} style={{ verticalAlign: "middle", marginRight: 2 }} />{p.address.suburb}, {p.address.city}</span>}
                       <span><Layers size={11} style={{ verticalAlign: "middle", marginRight: 2 }} />{p.totalUnits} units</span>
-                      <span style={{ fontWeight: 600, color: pct >= 80 ? "#166534" : pct >= 50 ? "#D97706" : "#DC2626" }}>{pct}% occupied</span>
-                      {p.marketValue > 0 && <span style={{ fontWeight: 600, color: "#1B3A6B" }}>{fmtR(p.marketValue)}</span>}
+                      <span style={{ fontWeight: 600, color: pct >= 80 ? "var(--hf-success-text-strong)" : pct >= 50 ? "var(--hf-warning-text)" : "var(--hf-danger-text)" }}>{pct}% occupied</span>
+                      {p.marketValue > 0 && <span style={{ fontWeight: 600, color: "var(--hf-primary-text)" }}>{fmtR(p.marketValue)}</span>}
                     </div>
                   </div>
                   {isOpen ? <ChevronUp size={16} color="#94A3B8" /> : <ChevronDown size={16} color="#94A3B8" />}
                 </div>
 
                 {isOpen && (
-                  <div style={{ borderTop: "1px solid #E2E8F0", padding: "16px 20px", background: "#FAFAFA" }}>
+                  <div style={{ borderTop: "1px solid var(--hf-border)", padding: "16px 20px", background: "var(--hf-surface-muted)" }}>
                     {/* Occupancy bar */}
                     <div style={{ marginBottom: 18 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748B", marginBottom: 5 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 5 }}>
                         <span>Occupancy</span>
                         <span>{p.occupiedUnits} occupied · {p.vacantUnits} vacant</span>
                       </div>
-                      <div style={{ height: 7, background: "#E2E8F0", borderRadius: 99, overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${pct}%`, background: pct >= 80 ? "#16A34A" : pct >= 50 ? "#D97706" : "#DC2626", borderRadius: 99 }} />
+                      <div style={{ height: 7, background: "var(--hf-surface-strong)", borderRadius: 99, overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${pct}%`, background: pct >= 80 ? "var(--hf-success)" : pct >= 50 ? "var(--hf-warning)" : "var(--hf-danger)", borderRadius: 99 }} />
                       </div>
                     </div>
 
                     {/* Units grid */}
                     <div style={{ marginBottom: 16 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>Units</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>Units</span>
                         <button onClick={() => { setShowUnit(p.id); setError("") }}
-                          style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#374151" }}>
+                          style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", color: "var(--hf-text-secondary)" }}>
                           <Plus size={11} /> Add Unit
                         </button>
                       </div>
                       {units.length === 0 ? (
-                        <div style={{ fontSize: 13, color: "#94A3B8" }}>No units added yet.</div>
+                        <div style={{ fontSize: 13, color: "var(--hf-text-faint)" }}>No units added yet.</div>
                       ) : (
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
                           {units.map((u: any) => {
                             const sc = STATUS_CFG[u.status] ?? { color: "#64748B", bg: "#F8FAFC" }
                             return (
-                              <div key={u.id} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: "12px 14px" }}>
+                              <div key={u.id} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "12px 14px" }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                                  <span style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>Unit {u.unitNumber}</span>
+                                  <span style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>Unit {u.unitNumber}</span>
                                   <span style={{ background: sc.bg, color: sc.color, padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>{u.status}</span>
                                 </div>
-                                <div style={{ fontSize: 11, color: "#64748B" }}>{u.unitType.replace("_"," ")} {u.sizeSqm && `· ${u.sizeSqm}m²`}</div>
-                                <div style={{ fontSize: 12, fontWeight: 700, color: "#1B3A6B", marginTop: 4 }}>{fmtR(u.baseRent)}/mo</div>
-                                {u.furnished && <div style={{ fontSize: 10, color: "#0D9488", marginTop: 2, fontWeight: 600 }}>Furnished</div>}
+                                <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{u.unitType.replace("_"," ")} {u.sizeSqm && `· ${u.sizeSqm}m²`}</div>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-primary-text)", marginTop: 4 }}>{fmtR(u.baseRent)}/mo</div>
+                                {u.furnished && <div style={{ fontSize: 10, color: "var(--hf-accent-text)", marginTop: 2, fontWeight: 600 }}>Furnished</div>}
                               </div>
                             )
                           })}
@@ -180,7 +180,7 @@ export default function PropertiesTab() {
 
                     <div style={{ display: "flex", justifyContent: "flex-end" }}>
                       <button onClick={() => deleteProperty.mutate(p.id)}
-                        style={{ padding: "6px 14px", background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        style={{ padding: "6px 14px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                         Delete Property
                       </button>
                     </div>
@@ -203,7 +203,7 @@ export default function PropertiesTab() {
               </div>
               <div>
                 <label style={lbl}>Property type *</label>
-                <select value={form.propertyType} onChange={e => setForm(f => ({ ...f, propertyType: e.target.value }))} style={{ ...inp, background: "#fff" }}>
+                <select value={form.propertyType} onChange={e => setForm(f => ({ ...f, propertyType: e.target.value }))} style={{ ...inp, background: "var(--hf-surface)" }}>
                   {PROPERTY_TYPES.map(t => <option key={t} value={t}>{t.replace("_"," ")}</option>)}
                 </select>
               </div>
@@ -251,7 +251,7 @@ export default function PropertiesTab() {
             </div>
             <div>
               <label style={lbl}>Unit type *</label>
-              <select value={unitForm.unitType} onChange={e => setUnitForm(f => ({ ...f, unitType: e.target.value }))} style={{ ...inp, background: "#fff" }}>
+              <select value={unitForm.unitType} onChange={e => setUnitForm(f => ({ ...f, unitType: e.target.value }))} style={{ ...inp, background: "var(--hf-surface)" }}>
                 {UNIT_TYPES.map(t => <option key={t} value={t}>{t.replace("_"," ")}</option>)}
               </select>
             </div>
@@ -272,7 +272,7 @@ export default function PropertiesTab() {
               <input type="number" value={unitForm.floorNumber} onChange={e => setUnitForm(f => ({ ...f, floorNumber: e.target.value }))} placeholder="1" style={inp} />
             </div>
             <div style={{ gridColumn: "1/-1" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "#374151", cursor: "pointer" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", cursor: "pointer" }}>
                 <input type="checkbox" checked={unitForm.furnished} onChange={e => setUnitForm(f => ({ ...f, furnished: e.target.checked }))} />
                 Furnished
               </label>
@@ -298,7 +298,7 @@ export default function PropertiesTab() {
 function Sect({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.07em", marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #F1F5F9" }}>{title}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, letterSpacing: "0.07em", marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid var(--hf-border-subtle)" }}>{title}</div>
       {children}
     </div>
   )
@@ -306,10 +306,10 @@ function Sect({ title, children }: { title: string; children: React.ReactNode })
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 580, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 580, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{title}</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{title}</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
         </div>
         {children}
       </div>
@@ -319,14 +319,14 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 function ModalFoot({ onCancel, onSubmit, loading, disabled, label }: any) {
   return (
     <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-      <button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
+      <button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
       <button onClick={onSubmit} disabled={disabled || loading}
-        style={{ padding: "9px 22px", background: disabled ? "#94A3B8" : "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+        style={{ padding: "9px 22px", background: disabled ? "var(--hf-text-faint)" : "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
         {loading ? "Saving..." : label}
       </button>
     </div>
   )
 }
 function ErrBox({ msg }: { msg: string }) {
-  return <div style={{ marginTop: 12, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{msg}</div>
+  return <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{msg}</div>
 }

@@ -20,13 +20,13 @@ const INCIDENT_TYPES = [
 
 // Severity drives colour and escalation order — matches CCMA progressive discipline ladder
 const TYPE_CFG: Record<string, { color: string; bg: string; border: string; label: string; severity: number }> = {
-  VERBAL_WARNING:        { color: "#D97706", bg: "#FFFBEB", border: "#FDE68A", label: "Verbal Warning",        severity: 1 },
-  WRITTEN_WARNING:       { color: "#EA580C", bg: "#FFF7ED", border: "#FDBA74", label: "Written Warning",       severity: 2 },
-  FINAL_WRITTEN_WARNING: { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", label: "Final Written Warning", severity: 3 },
-  NOTICE_TO_ATTEND:      { color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE", label: "Notice to Attend",      severity: 3 },
-  SUSPENSION:            { color: "#1D4ED8", bg: "#EFF6FF", border: "#BFDBFE", label: "Suspension",            severity: 4 },
-  DISMISSAL:             { color: "#881337", bg: "#FFF1F2", border: "#FECDD3", label: "Dismissal",             severity: 5 },
-  OTHER:                 { color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0", label: "Other",                 severity: 0 },
+  VERBAL_WARNING:        { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)", label: "Verbal Warning",        severity: 1 },
+  WRITTEN_WARNING:       { color: "var(--hf-orange-text)", bg: "var(--hf-orange-soft)", border: "var(--hf-orange-border)", label: "Written Warning",       severity: 2 },
+  FINAL_WRITTEN_WARNING: { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)", label: "Final Written Warning", severity: 3 },
+  NOTICE_TO_ATTEND:      { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", border: "var(--hf-violet-border)", label: "Notice to Attend",      severity: 3 },
+  SUSPENSION:            { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", border: "var(--hf-info-border)", label: "Suspension",            severity: 4 },
+  DISMISSAL:             { color: "var(--hf-danger-text-strong)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)", label: "Dismissal",             severity: 5 },
+  OTHER:                 { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)", label: "Other",                 severity: 0 },
 }
 
 // How many warnings before escalation is expected (CCMA guideline, not enforced)
@@ -84,15 +84,15 @@ export default function DisciplinaryTab() {
   const byType = (t: string) => (records as any[]).filter(r => r.incidentType === t).length
 
   const inp: React.CSSProperties = {
-    width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0",
-    borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none", background: "#fff",
+    width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)",
+    borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none", background: "var(--hf-surface)",
   }
-  const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+  const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
 
   return (
     <div>
       {/* CCMA compliance notice */}
-      <div style={{ marginBottom: 18, padding: "10px 16px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 12, color: "#B91C1C", display: "flex", gap: 9, alignItems: "flex-start" }}>
+      <div style={{ marginBottom: 18, padding: "10px 16px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-danger-text-strong)", display: "flex", gap: 9, alignItems: "flex-start" }}>
         <ShieldAlert size={14} style={{ flexShrink: 0, marginTop: 1 }} />
         <div>
           <strong>CCMA progressive discipline:</strong> Verbal warning → Written warning → Final written warning → Notice to Attend (hearing) → Outcome.
@@ -103,9 +103,9 @@ export default function DisciplinaryTab() {
       {/* Employee selector + add button */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <label style={{ fontSize: 14, fontWeight: 600, color: "#374151", whiteSpace: "nowrap" as const }}>Employee:</label>
+          <label style={{ fontSize: 14, fontWeight: 600, color: "var(--hf-text-secondary)", whiteSpace: "nowrap" as const }}>Employee:</label>
           <select value={selectedEmp} onChange={e => setSelectedEmp(e.target.value)}
-            style={{ padding: "9px 14px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, background: "#fff", minWidth: 280, outline: "none", color: "#0F172A" }}>
+            style={{ padding: "9px 14px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, background: "var(--hf-surface)", minWidth: 280, outline: "none", color: "var(--hf-text)" }}>
             <option value="">Select employee...</option>
             {(employees as any[]).map(e => (
               <option key={e.id} value={e.id}>{e.fullName} ({e.employeeNumber})</option>
@@ -115,25 +115,25 @@ export default function DisciplinaryTab() {
         {selectedEmp && (
           <button
             onClick={() => { setShowAdd(true); setForm({ ...EMPTY_FORM, employeeId: selectedEmp, incidentDate: new Date().toISOString().split("T")[0] }); setApiError("") }}
-            style={{ display: "flex", alignItems: "center", gap: 7, background: "#DC2626", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             <Plus size={15} /> Add Record
           </button>
         )}
       </div>
 
       {!selectedEmp ? (
-        <div style={{ textAlign: "center", padding: "70px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "70px 20px", color: "var(--hf-text-faint)" }}>
           <AlertOctagon size={44} style={{ marginBottom: 14, opacity: 0.3 }} />
-          <div style={{ fontWeight: 600, fontSize: 15, color: "#475569" }}>Select an employee to view their disciplinary history</div>
+          <div style={{ fontWeight: 600, fontSize: 15, color: "var(--hf-text-tertiary)" }}>Select an employee to view their disciplinary history</div>
           <div style={{ fontSize: 13, marginTop: 4 }}>Records are employee-specific and visible to HR administrators only.</div>
         </div>
       ) : isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading disciplinary records...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading disciplinary records...</div>
       ) : (
         <div>
           {/* Escalation summary bar */}
-          <div style={{ marginBottom: 22, padding: "14px 18px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 12 }}>
+          <div style={{ marginBottom: 22, padding: "14px 18px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 12 }}>
               Sanction escalation — {selectedEmployee?.fullName} · {records.length} record{records.length !== 1 ? "s" : ""}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
@@ -146,8 +146,8 @@ export default function DisciplinaryTab() {
                     {i > 0 && <ChevronRight size={12} color={active ? "#94A3B8" : "#CBD5E1"} />}
                     <span style={{
                       padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
-                      background: active ? cfg.bg : "#F1F5F9",
-                      color: active ? cfg.color : "#94A3B8",
+                      background: active ? cfg.bg : "var(--hf-surface-sunken)",
+                      color: active ? cfg.color : "var(--hf-text-faint)",
                       border: `1px solid ${active ? cfg.border : "#E2E8F0"}`,
                     }}>
                       {cfg.label}{count > 1 ? ` ×${count}` : ""}
@@ -174,7 +174,7 @@ export default function DisciplinaryTab() {
 
           {/* Record list */}
           {sorted.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", border: "1px dashed #E2E8F0", borderRadius: 12 }}>
+            <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)", border: "1px dashed var(--hf-border)", borderRadius: 12 }}>
               No disciplinary records for {selectedEmployee?.fullName}.
             </div>
           ) : (
@@ -182,20 +182,20 @@ export default function DisciplinaryTab() {
               {sorted.map(r => {
                 const cfg = TYPE_CFG[r.incidentType] ?? TYPE_CFG.OTHER
                 return (
-                  <div key={r.id} style={{ border: `1px solid ${cfg.border}`, borderLeft: `4px solid ${cfg.color}`, borderRadius: 10, padding: "14px 18px", background: "#fff" }}>
+                  <div key={r.id} style={{ border: `1px solid ${cfg.border}`, borderLeft: `4px solid ${cfg.color}`, borderRadius: 10, padding: "14px 18px", background: "var(--hf-surface)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
                       <span style={{ background: cfg.bg, color: cfg.color, padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{cfg.label}</span>
-                      <span style={{ fontSize: 12, color: "#64748B" }}>Incident: {fmtDate(r.incidentDate)}</span>
-                      {r.hearingDate && <span style={{ fontSize: 12, color: "#64748B" }}>· Hearing: {fmtDate(r.hearingDate)}</span>}
+                      <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Incident: {fmtDate(r.incidentDate)}</span>
+                      {r.hearingDate && <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>· Hearing: {fmtDate(r.hearingDate)}</span>}
                       {r.acknowledged && (
-                        <span style={{ fontSize: 11, fontWeight: 700, background: "#DCFCE7", color: "#166534", padding: "1px 7px", borderRadius: 20, border: "1px solid #86EFAC" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", padding: "1px 7px", borderRadius: 20, border: "1px solid var(--hf-success-border)" }}>
                           ✓ Acknowledged
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: 14, color: "#374151", lineHeight: 1.6 }}>{r.description}</div>
+                    <div style={{ fontSize: 14, color: "var(--hf-text-secondary)", lineHeight: 1.6 }}>{r.description}</div>
                     {r.outcome && (
-                      <div style={{ marginTop: 10, padding: "9px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 13, color: "#475569" }}>
+                      <div style={{ marginTop: 10, padding: "9px 12px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 13, color: "var(--hf-text-tertiary)" }}>
                         <strong>Outcome:</strong> {r.outcome}
                       </div>
                     )}
@@ -210,13 +210,13 @@ export default function DisciplinaryTab() {
       {/* Add record modal */}
       {showAdd && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 580, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 580, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Add Disciplinary Record</h3>
-                <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>{selectedEmployee?.fullName} · {selectedEmployee?.employeeNumber}</div>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Add Disciplinary Record</h3>
+                <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 2 }}>{selectedEmployee?.fullName} · {selectedEmployee?.employeeNumber}</div>
               </div>
-              <button onClick={() => setShowAdd(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+              <button onClick={() => setShowAdd(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -231,9 +231,9 @@ export default function DisciplinaryTab() {
                 <input type="date" value={form.incidentDate} onChange={e => setForm(f => ({ ...f, incidentDate: e.target.value }))} style={inp} />
               </div>
               <div>
-                <label style={lbl}>Hearing Date <span style={{ fontWeight: 400, color: "#94A3B8" }}>(if applicable)</span></label>
+                <label style={lbl}>Hearing Date <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(if applicable)</span></label>
                 <input type="date" value={form.hearingDate} onChange={e => setForm(f => ({ ...f, hearingDate: e.target.value }))} style={inp} />
-                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>Required for NTA, suspension, and dismissal</div>
+                <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 2 }}>Required for NTA, suspension, and dismissal</div>
               </div>
               <div />
               <div style={{ gridColumn: "1/-1" }}>
@@ -247,31 +247,31 @@ export default function DisciplinaryTab() {
 
             {/* Context-sensitive CCMA guidance */}
             {form.incidentType === "DISMISSAL" && (
-              <div style={{ marginTop: 12, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 12, color: "#B91C1C" }}>
+              <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-danger-text-strong)" }}>
                 <strong>Before dismissal:</strong> A written Notice to Attend, a formal hearing, and an outcome letter must be on record.
                 Dismissal without a fair procedure is automatically unfair under LRA s.188. Ensure prior warnings and the NTA are already captured.
               </div>
             )}
             {form.incidentType === "SUSPENSION" && (
-              <div style={{ marginTop: 12, padding: "10px 14px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, fontSize: 12, color: "#1D4ED8" }}>
+              <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-info-text)" }}>
                 <strong>Suspension:</strong> Preventive suspension (on full pay) is permissible pending a disciplinary hearing. Suspension as a sanction after conviction is punitive and must form part of the outcome, not precede the hearing.
               </div>
             )}
             {(form.incidentType === "VERBAL_WARNING" || form.incidentType === "WRITTEN_WARNING") && (
-              <div style={{ marginTop: 12, padding: "10px 14px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, fontSize: 12, color: "#92400E" }}>
+              <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-warning-text-deep)" }}>
                 <strong>Validity:</strong> Verbal warnings: 3 months. Written warnings: 3–6 months. Final written warnings: 6 months.
                 Expired warnings cannot be used to justify dismissal but remain on record.
               </div>
             )}
 
             {apiError && (
-              <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}>
                 <AlertCircle size={14} />{apiError}
               </div>
             )}
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-              <button onClick={() => setShowAdd(false)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
+              <button onClick={() => setShowAdd(false)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button
                 onClick={() => addRecord.mutate({
                   incidentDate: form.incidentDate,
@@ -280,7 +280,7 @@ export default function DisciplinaryTab() {
                   hearingDate:  form.hearingDate || null,
                 })}
                 disabled={!form.incidentDate || !form.description.trim() || addRecord.isPending}
-                style={{ padding: "9px 22px", background: !form.incidentDate || !form.description.trim() ? "#94A3B8" : "#DC2626", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: !form.incidentDate || !form.description.trim() ? "var(--hf-text-faint)" : "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {addRecord.isPending ? "Adding..." : "Add Record"}
               </button>
             </div>

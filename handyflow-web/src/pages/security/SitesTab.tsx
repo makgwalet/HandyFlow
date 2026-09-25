@@ -44,10 +44,10 @@ interface Site {
 interface Branch { id: string; name: string; region: string | null; active: boolean }
 
 const CONTRACT_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
-  ACTIVE:         { color: "#166534", bg: "#DCFCE7",  label: "Active" },
-  EXPIRING_SOON:  { color: "#D97706", bg: "#FFFBEB",  label: "Expiring soon" },
-  EXPIRED:        { color: "#DC2626", bg: "#FEF2F2",  label: "Expired" },
-  TERMINATED:     { color: "#64748B", bg: "#F1F5F9",  label: "Terminated" },
+  ACTIVE:         { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)",  label: "Active" },
+  EXPIRING_SOON:  { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)",  label: "Expiring soon" },
+  EXPIRED:        { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)",  label: "Expired" },
+  TERMINATED:     { color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)",  label: "Terminated" },
 }
 
 const EMPTY_SITE_FORM = {
@@ -83,12 +83,12 @@ function CheckpointQrThumbnail({ siteId, checkpointId }: { siteId: string; check
   })
 
   const boxStyle: React.CSSProperties = {
-    width: 96, height: 96, borderRadius: 8, border: "1px solid #E2E8F0",
+    width: 96, height: 96, borderRadius: 8, border: "1px solid var(--hf-border)",
     display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-    background: "#F8FAFC", alignSelf: "center",
+    background: "var(--hf-surface-muted)", alignSelf: "center",
   }
 
-  if (isLoading) return <div style={boxStyle}><div style={{ width: 44, height: 44, background: "#E2E8F0", borderRadius: 4 }} /></div>
+  if (isLoading) return <div style={boxStyle}><div style={{ width: 44, height: 44, background: "var(--hf-surface-strong)", borderRadius: 4 }} /></div>
   if (isError || !imgUrl) return <div style={boxStyle}><QrCode size={24} color="#CBD5E1" /></div>
 
   return <img src={imgUrl} alt="Checkpoint QR code" style={{ ...boxStyle, objectFit: "contain", padding: 6 }} />
@@ -289,18 +289,18 @@ export default function SitesTab() {
       {/* Stats */}
       <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
         {[
-          { label: "Total sites",    value: sites.length,          color: "#1B3A6B" },
-          { label: "Active",         value: activeSites.length,    color: "#166534" },
-          { label: "Terminated",     value: terminatedSites.length, color: "#64748B" },
+          { label: "Total sites",    value: sites.length,          color: "var(--hf-primary-text)" },
+          { label: "Active",         value: activeSites.length,    color: "var(--hf-success-text-strong)" },
+          { label: "Terminated",     value: terminatedSites.length, color: "var(--hf-text-muted)" },
           {
             label: "Total checkpoints",
             value: sites.reduce((sum, s) => sum + (s.checkpoints?.length ?? 0), 0),
-            color: "#0D9488"
+            color: "var(--hf-accent-text)"
           },
         ].map(s => (
-          <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
+          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>{s.label}</div>
+            <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -308,17 +308,17 @@ export default function SitesTab() {
       {/* Toolbar */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
         <button onClick={() => { setShowAddSite(true); setSiteForm(EMPTY_SITE_FORM); setSiteErrors({}); setApiError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Add Site
         </button>
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading sites...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading sites...</div>
       ) : sites.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <MapPin size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No sites registered</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No sites registered</div>
           <div style={{ fontSize: 13, marginTop: 4 }}>Add your first client site to get started.</div>
         </div>
       ) : (
@@ -329,27 +329,27 @@ export default function SitesTab() {
             const detail = isExpanded ? siteDetail : null
 
             return (
-              <div key={site.id} style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
+              <div key={site.id} style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden", background: "var(--hf-surface)" }}>
                 {/* Site header row */}
                 <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", gap: 14, cursor: "pointer" }}
                   onClick={() => setExpanded(isExpanded ? null : site.id)}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--hf-info-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     <MapPin size={18} color="#1B3A6B" />
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 3 }}>
-                      <span style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{site.name}</span>
+                      <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{site.name}</span>
                       <span style={{ fontSize: 11, fontWeight: 600, background: contract.bg, color: contract.color, padding: "2px 8px", borderRadius: 20 }}>
                         {contract.label}
                       </span>
                     </div>
-                    <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                    <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>
                       {site.contactName && `${site.contactName} · `}
                       {site.contactPhone && `${site.contactPhone} · `}
                       {site.checkpoints?.length ?? 0} checkpoint{(site.checkpoints?.length ?? 0) !== 1 ? "s" : ""}
                     </div>
                     {site.contractStatus === "TERMINATED" && site.terminationReason && (
-                      <div style={{ fontSize: 11, color: "#DC2626", marginTop: 2 }}>
+                      <div style={{ fontSize: 11, color: "var(--hf-danger-text)", marginTop: 2 }}>
                         Terminated: {site.terminationReason}
                         {site.terminatedAt && ` · ${new Date(site.terminatedAt).toLocaleDateString("en-ZA")}`}
                       </div>
@@ -360,32 +360,32 @@ export default function SitesTab() {
                       <>
                         <button onClick={e => { e.stopPropagation(); setShowPortal(site); setPortalLabel(site.name); setPortalToken(null); setApiError("") }}
                           title="Client portal"
-                          style={{ background: "#F0FDF4", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "#166534", fontSize: 12, fontWeight: 600 }}>
+                          style={{ background: "var(--hf-success-soft)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--hf-success-text-strong)", fontSize: 12, fontWeight: 600 }}>
                           Portal
                         </button>
                         {(site.checkpoints?.length ?? 0) > 0 && (
                           <button onClick={e => { e.stopPropagation(); printSiteQrSheet.mutate(site.id) }}
                             disabled={printingSiteId === site.id}
                             title="Print all checkpoint QR codes for this site"
-                            style={{ display: "flex", alignItems: "center", gap: 5, background: "#F5F3FF", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "#7C3AED", fontSize: 12, fontWeight: 600 }}>
+                            style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-violet-soft)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--hf-violet-text)", fontSize: 12, fontWeight: 600 }}>
                             <Printer size={12} /> {printingSiteId === site.id ? "Preparing…" : "Print All"}
                           </button>
                         )}
                         <button onClick={e => { e.stopPropagation(); setShowTerminate(site); setTerminateReason(""); setApiError("") }}
                           title="Terminate contract"
-                          style={{ background: "#FEF3C7", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "#D97706", fontSize: 12, fontWeight: 600 }}>
+                          style={{ background: "var(--hf-warning-soft-strong)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--hf-warning-text)", fontSize: 12, fontWeight: 600 }}>
                           Terminate
                         </button>
                         <button onClick={e => { e.stopPropagation(); setShowAddCp(site.id); setCpForm(EMPTY_CP_FORM); setApiError("") }}
                           title="Add checkpoint"
-                          style={{ background: "#EFF6FF", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "#1D4ED8", fontSize: 12, fontWeight: 600 }}>
+                          style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--hf-info-text)", fontSize: 12, fontWeight: 600 }}>
                           + Checkpoint
                         </button>
                       </>
                     )}
                     <button onClick={e => { e.stopPropagation(); setShowDelete(site); setApiError("") }}
                       title="Delete site"
-                      style={{ background: "#FEF2F2", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#DC2626", display: "flex" }}>
+                      style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)", display: "flex" }}>
                       <Trash2 size={13} />
                     </button>
                     {isExpanded ? <ChevronDown size={16} color="#94A3B8" /> : <ChevronRight size={16} color="#94A3B8" />}
@@ -394,28 +394,28 @@ export default function SitesTab() {
 
                 {/* Expanded — checkpoints */}
                 {isExpanded && (
-                  <div style={{ borderTop: "1px solid #F1F5F9", padding: "16px 20px", background: "#FAFAFA" }}>
+                  <div style={{ borderTop: "1px solid var(--hf-border-subtle)", padding: "16px 20px", background: "var(--hf-surface-muted)" }}>
                     {!detail ? (
-                      <div style={{ color: "#94A3B8", fontSize: 13 }}>Loading checkpoints...</div>
+                      <div style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading checkpoints...</div>
                     ) : detail.checkpoints.length === 0 ? (
-                      <div style={{ color: "#94A3B8", fontSize: 13, textAlign: "center", padding: "20px 0" }}>
+                      <div style={{ color: "var(--hf-text-faint)", fontSize: 13, textAlign: "center", padding: "20px 0" }}>
                         No checkpoints yet. Click "+ Checkpoint" to add one.
                       </div>
                     ) : (
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 12 }}>
                         {detail.checkpoints.map((cp, i) => (
-                          <div key={cp.id} style={{ display: "flex", flexDirection: "column", gap: 10, padding: "14px 16px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10 }}>
+                          <div key={cp.id} style={{ display: "flex", flexDirection: "column", gap: 10, padding: "14px 16px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 10 }}>
                             <div style={{ display: "flex", justifyContent: "center" }}>
                               <CheckpointQrThumbnail siteId={site.id} checkpointId={cp.id} />
                             </div>
 
                             <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                              <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 11, fontWeight: 700, color: "#1D4ED8" }}>
+                              <div style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--hf-info-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 11, fontWeight: 700, color: "var(--hf-info-text)" }}>
                                 {i + 1}
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontWeight: 600, fontSize: 14, color: "#0F172A" }}>{cp.name}</div>
-                                {cp.description && <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>{cp.description}</div>}
+                                <div style={{ fontWeight: 600, fontSize: 14, color: "var(--hf-text)" }}>{cp.name}</div>
+                                {cp.description && <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 2 }}>{cp.description}</div>}
                               </div>
                             </div>
 
@@ -423,13 +423,13 @@ export default function SitesTab() {
                               <button onClick={() => printCheckpointQr.mutate({ siteId: site.id, checkpointId: cp.id })}
                                 disabled={printingCpId === cp.id}
                                 title="Print this checkpoint's QR code"
-                                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: "#EFF6FF", border: "none", borderRadius: 7, padding: "7px 10px", cursor: "pointer", color: "#1D4ED8", fontSize: 12, fontWeight: 600 }}>
+                                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: "var(--hf-info-soft)", border: "none", borderRadius: 7, padding: "7px 10px", cursor: "pointer", color: "var(--hf-info-text)", fontSize: 12, fontWeight: 600 }}>
                                 <Printer size={12} /> {printingCpId === cp.id ? "…" : "Print"}
                               </button>
                               <button onClick={() => handleRegenerateQr(site.id, cp)}
                                 disabled={regeneratingCpId === cp.id}
                                 title="Regenerate this checkpoint's QR code (e.g. compromised sticker)"
-                                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: "#FEF2F2", border: "none", borderRadius: 7, padding: "7px 10px", cursor: "pointer", color: "#DC2626", fontSize: 12, fontWeight: 600 }}>
+                                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: "var(--hf-danger-soft)", border: "none", borderRadius: 7, padding: "7px 10px", cursor: "pointer", color: "var(--hf-danger-text)", fontSize: 12, fontWeight: 600 }}>
                                 <RefreshCw size={12} /> {regeneratingCpId === cp.id ? "…" : "Regenerate"}
                               </button>
                             </div>
@@ -440,7 +440,7 @@ export default function SitesTab() {
 
                     {/* GPS coordinates if set */}
                     {(site.latitude || site.longitude) && (
-                      <div style={{ marginTop: 12, padding: "8px 12px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, fontSize: 12, color: "#166534", display: "flex", gap: 8 }}>
+                      <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border-subtle)", borderRadius: 8, fontSize: 12, color: "var(--hf-success-text-strong)", display: "flex", gap: 8 }}>
                         <MapPin size={13} />
                         {site.latitude?.toFixed(6)}, {site.longitude?.toFixed(6)}
                       </div>
@@ -448,20 +448,20 @@ export default function SitesTab() {
 
                     {/* Site settings — branch assignment + QR enforcement */}
                     {detail && (
-                      <div style={{ marginTop: 12, padding: "14px 16px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10, display: "flex", flexWrap: "wrap" as const, gap: 20 }}>
+                      <div style={{ marginTop: 12, padding: "14px 16px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 10, display: "flex", flexWrap: "wrap" as const, gap: 20 }}>
                         <div style={{ flex: "1 1 220px" }}>
                           <label style={{ ...lbl, marginBottom: 6 }}>Branch</label>
                           <select
                             value={detail.branchId ?? ""}
                             onChange={e => setSiteBranch.mutate({ siteId: site.id, branchId: e.target.value || null })}
                             disabled={setSiteBranch.isPending}
-                            style={{ ...inp, background: "#fff" }}>
+                            style={{ ...inp, background: "var(--hf-surface)" }}>
                             <option value="">— No branch assigned —</option>
                             {branches.filter(b => b.active).map(b => (
                               <option key={b.id} value={b.id}>{b.name}{b.region ? ` (${b.region})` : ""}</option>
                             ))}
                           </select>
-                          <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>
+                          <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>
                             Note: branch assignment doesn't yet restrict who can see this site — visibility scoping isn't wired up.
                           </div>
                         </div>
@@ -475,11 +475,11 @@ export default function SitesTab() {
                               disabled={setQrEnforcement.isPending}
                               onChange={e => setQrEnforcement.mutate({ siteId: site.id, requireSignedQr: e.target.checked })}
                             />
-                            <span style={{ fontSize: 13, color: "#374151" }}>
+                            <span style={{ fontSize: 13, color: "var(--hf-text-secondary)" }}>
                               {detail.requireSignedQr ? "Enforced — unsigned QR scans are rejected" : "Not enforced — legacy unsigned codes still accepted"}
                             </span>
                           </label>
-                          <div style={{ fontSize: 11, color: "#D97706", marginTop: 4 }}>
+                          <div style={{ fontSize: 11, color: "var(--hf-warning-text)", marginTop: 4 }}>
                             Only enable after reprinting every checkpoint's QR here (use "Print" or "Print All" above) — enabling first will break scanning at any checkpoint still using an old sticker.
                           </div>
                         </div>
@@ -516,7 +516,7 @@ export default function SitesTab() {
                   placeholder="+27 11 555 0101" style={inp} />
               </div>
               <div>
-                <label style={lbl}>Latitude <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+                <label style={lbl}>Latitude <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
                 <input type="number" value={siteForm.latitude} onChange={e => { setSiteForm(f => ({ ...f, latitude: e.target.value })); setSiteErrors(v => omit(v, "latitude")) }}
                   placeholder="-26.1076" step="0.000001" style={inpSt(siteErrors.latitude)} />
                 <FErr msg={siteErrors.latitude} />
@@ -529,14 +529,14 @@ export default function SitesTab() {
               </div>
             </div>
             <div>
-              <label style={lbl}>Site Instructions <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+              <label style={lbl}>Site Instructions <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
               <textarea value={siteForm.instructions} onChange={e => setSiteForm(f => ({ ...f, instructions: e.target.value }))}
                 rows={2} placeholder="Access code for main gate: 1234. Report to front desk on arrival."
                 style={{ ...inp, resize: "vertical" as const }} />
             </div>
           </div>
 
-          <div style={{ marginTop: 14, padding: "10px 14px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, fontSize: 12, color: "#1D4ED8", display: "flex", gap: 8 }}>
+          <div style={{ marginTop: 14, padding: "10px 14px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-info-text)", display: "flex", gap: 8 }}>
             <Radio size={13} style={{ marginTop: 1, flexShrink: 0 }} />
             Checkpoints (QR, NFC, BLE) are added after the site is created. QR codes are auto-generated.
           </div>
@@ -557,13 +557,13 @@ export default function SitesTab() {
                 placeholder="North Gate / Server Room / Parking Level 2" autoFocus style={inp} />
             </div>
             <div>
-              <label style={lbl}>Description <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+              <label style={lbl}>Description <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
               <input value={cpForm.description} onChange={e => setCpForm(f => ({ ...f, description: e.target.value }))}
                 placeholder="Check that gate is locked and alarm is armed" style={inp} />
             </div>
           </div>
 
-          <div style={{ marginTop: 14, padding: "10px 14px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 8, fontSize: 12, color: "#166534", display: "flex", gap: 8 }}>
+          <div style={{ marginTop: 14, padding: "10px 14px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-success-text-strong)", display: "flex", gap: 8 }}>
             <QrCode size={13} style={{ marginTop: 1, flexShrink: 0 }} />
             A unique QR code is generated automatically. Use "Print" on the checkpoint row after
             saving to get a scannable, printable PDF. NFC tag and BLE beacon can be added later
@@ -583,11 +583,11 @@ export default function SitesTab() {
       {/* ── Terminate Contract Modal ───────────────────────────────────────── */}
       {showTerminate && (
         <Modal title="Terminate Contract" onClose={() => { setShowTerminate(null); setApiError("") }} width={440}>
-          <div style={{ padding: "12px 14px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 9, marginBottom: 16, display: "flex", gap: 10 }}>
+          <div style={{ padding: "12px 14px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 9, marginBottom: 16, display: "flex", gap: 10 }}>
             <AlertTriangle size={16} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
             <div>
-              <div style={{ fontWeight: 600, fontSize: 13, color: "#92400E" }}>Terminate contract for {showTerminate.name}?</div>
-              <div style={{ fontSize: 12, color: "#78350F", marginTop: 2 }}>This deactivates the site and removes it from active shifts. Historical records are preserved.</div>
+              <div style={{ fontWeight: 600, fontSize: 13, color: "var(--hf-warning-text-deep)" }}>Terminate contract for {showTerminate.name}?</div>
+              <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)", marginTop: 2 }}>This deactivates the site and removes it from active shifts. Historical records are preserved.</div>
             </div>
           </div>
           <div>
@@ -605,7 +605,7 @@ export default function SitesTab() {
                 terminateSite.mutate({ id: showTerminate.id, reason: terminateReason })
               }}
               disabled={terminateSite.isPending}
-              style={{ flex: 1, padding: "10px", background: "#D97706", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+              style={{ flex: 1, padding: "10px", background: "var(--hf-warning)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
               {terminateSite.isPending ? "Terminating..." : "Terminate Contract"}
             </button>
           </div>
@@ -615,9 +615,9 @@ export default function SitesTab() {
       {/* ── Client Portal Modal ──────────────────────────────────────────────── */}
       {showPortal && (
         <Modal title="Client Portal" onClose={() => { setShowPortal(null); setPortalToken(null); setApiError("") }} width={480}>
-          <div style={{ padding: "12px 14px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 9, marginBottom: 18 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#1D4ED8", marginBottom: 4 }}>Share read-only access with your client</div>
-            <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.6 }}>
+          <div style={{ padding: "12px 14px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 9, marginBottom: 18 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-info-text)", marginBottom: 4 }}>Share read-only access with your client</div>
+            <div style={{ fontSize: 12, color: "var(--hf-text-tertiary)", lineHeight: 1.6 }}>
               The portal gives your client a real-time view of guards on-site, shifts, and open incidents — no HandyFlow login required. The URL is the only credential.
             </div>
           </div>
@@ -625,17 +625,17 @@ export default function SitesTab() {
           {!portalToken ? (
             <>
               <div style={{ marginBottom: 14 }}>
-                <label style={lbl}>Portal label <span style={{ fontWeight: 400, color: "#94A3B8" }}>(shown in portal header)</span></label>
+                <label style={lbl}>Portal label <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(shown in portal header)</span></label>
                 <input value={portalLabel} onChange={e => setPortalLabel(e.target.value)}
                   placeholder={showPortal.name}
-                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }} />
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }} />
               </div>
               {apiError && <ErrBanner msg={apiError} />}
               <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
                 <button onClick={() => { setShowPortal(null); setApiError("") }} style={cancelBtn}>Cancel</button>
                 <button onClick={() => generatePortalToken.mutate({ id: showPortal.id, label: portalLabel || showPortal.name })}
                   disabled={generatePortalToken.isPending}
-                  style={{ flex: 1, padding: "10px", background: "#166534", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                  style={{ flex: 1, padding: "10px", background: "var(--hf-success-solid-strong)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                   {generatePortalToken.isPending ? "Generating..." : "Generate Portal Link"}
                 </button>
               </div>
@@ -646,18 +646,18 @@ export default function SitesTab() {
                 <label style={lbl}>Portal URL — share this with your client</label>
                 <div style={{ display: "flex", gap: 8 }}>
                   <input readOnly value={`${window.location.origin}/portal/${portalToken}`}
-                    style={{ flex: 1, padding: "9px 12px", border: "1.5px solid #86EFAC", borderRadius: 8, fontSize: 13, background: "#F0FDF4", color: "#166534", fontFamily: "monospace", outline: "none" }} />
+                    style={{ flex: 1, padding: "9px 12px", border: "1.5px solid var(--hf-success-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-success-soft)", color: "var(--hf-success-text-strong)", fontFamily: "monospace", outline: "none" }} />
                   <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/portal/${portalToken}`)}
-                    style={{ padding: "9px 14px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 8, cursor: "pointer", fontSize: 12, color: "#166534", fontWeight: 600 }}>
+                    style={{ padding: "9px 14px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", borderRadius: 8, cursor: "pointer", fontSize: 12, color: "var(--hf-success-text-strong)", fontWeight: 600 }}>
                     Copy
                   </button>
                 </div>
-                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 5 }}>Anyone with this link can view the portal. To revoke access, click "Disable Portal".</div>
+                <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 5 }}>Anyone with this link can view the portal. To revoke access, click "Disable Portal".</div>
               </div>
               <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-                <button onClick={() => { setShowPortal(null); setPortalToken(null) }} style={{ flex: 1, padding: "10px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Done</button>
+                <button onClick={() => { setShowPortal(null); setPortalToken(null) }} style={{ flex: 1, padding: "10px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Done</button>
                 <button onClick={() => disablePortal.mutate(showPortal.id)} disabled={disablePortal.isPending}
-                  style={{ padding: "10px 16px", background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 9, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
+                  style={{ padding: "10px 16px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 9, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
                   Disable Portal
                 </button>
               </div>
@@ -670,19 +670,19 @@ export default function SitesTab() {
       {showDelete && (
         <Modal title="" onClose={() => { setShowDelete(null); setApiError("") }} width={400}>
           <div style={{ textAlign: "center" }}>
-            <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#FEF2F2", border: "2px solid #FECACA", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+            <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--hf-danger-soft)", border: "2px solid var(--hf-danger-border)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
               <Trash2 size={22} color="#DC2626" />
             </div>
-            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Delete Site?</h3>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#0F172A", marginBottom: 8 }}>{showDelete.name}</div>
-            <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 20px", lineHeight: 1.6 }}>
+            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Delete Site?</h3>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--hf-text)", marginBottom: 8 }}>{showDelete.name}</div>
+            <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: "0 0 20px", lineHeight: 1.6 }}>
               The site record will be deactivated. All shift history, incident records, and checkpoint scan logs are preserved.
             </p>
             {apiError && <ErrBanner msg={apiError} />}
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => { setShowDelete(null); setApiError("") }} style={{ flex: 1, padding: "10px", border: "1.5px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#374151" }}>Keep Site</button>
+              <button onClick={() => { setShowDelete(null); setApiError("") }} style={{ flex: 1, padding: "10px", border: "1.5px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Keep Site</button>
               <button onClick={() => deleteSite.mutate(showDelete.id)} disabled={deleteSite.isPending}
-                style={{ flex: 1, padding: "10px", border: "none", borderRadius: 9, background: "#DC2626", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ flex: 1, padding: "10px", border: "none", borderRadius: 9, background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {deleteSite.isPending ? "Deleting..." : "Yes, Delete"}
               </button>
             </div>
@@ -694,23 +694,23 @@ export default function SitesTab() {
       {regenerateConfirm && (
         <Modal title="" onClose={() => setRegenerateConfirm(null)} width={420}>
           <div style={{ textAlign: "center" }}>
-            <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#FEF2F2", border: "2px solid #FECACA", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+            <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--hf-danger-soft)", border: "2px solid var(--hf-danger-border)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
               <RefreshCw size={22} color="#DC2626" />
             </div>
-            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Regenerate QR Code?</h3>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#0F172A", marginBottom: 12 }}>{regenerateConfirm.checkpoint.name}</div>
-            <div style={{ padding: "12px 14px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 9, marginBottom: 20, display: "flex", gap: 10, textAlign: "left" as const }}>
+            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Regenerate QR Code?</h3>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--hf-text)", marginBottom: 12 }}>{regenerateConfirm.checkpoint.name}</div>
+            <div style={{ padding: "12px 14px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 9, marginBottom: 20, display: "flex", gap: 10, textAlign: "left" as const }}>
               <AlertTriangle size={16} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
-              <div style={{ fontSize: 12.5, color: "#78350F", lineHeight: 1.6 }}>
+              <div style={{ fontSize: 12.5, color: "var(--hf-warning-text-deep)", lineHeight: 1.6 }}>
                 The physical sticker currently mounted at this checkpoint will stop working immediately.
                 A fresh QR PDF will open automatically for reprinting.
               </div>
             </div>
             {apiError && <ErrBanner msg={apiError} />}
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setRegenerateConfirm(null)} style={{ flex: 1, padding: "10px", border: "1.5px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#374151" }}>Cancel</button>
+              <button onClick={() => setRegenerateConfirm(null)} style={{ flex: 1, padding: "10px", border: "1.5px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button onClick={confirmRegenerateQr} disabled={regenerateQr.isPending}
-                style={{ flex: 1, padding: "10px", border: "none", borderRadius: 9, background: "#DC2626", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ flex: 1, padding: "10px", border: "none", borderRadius: 9, background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {regenerateQr.isPending ? "Regenerating..." : "Yes, Regenerate"}
               </button>
             </div>
@@ -728,11 +728,11 @@ function Modal({ title, onClose, children, width = 520 }: {
 }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
         {title && (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{title}</h3>
-            <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{title}</h3>
+            <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
           </div>
         )}
         {children}
@@ -743,7 +743,7 @@ function Modal({ title, onClose, children, width = 520 }: {
 
 function ErrBanner({ msg }: { msg: string }) {
   return (
-    <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}>
+    <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}>
       <AlertCircle size={14} />{msg}
     </div>
   )
@@ -756,7 +756,7 @@ function Footer({ onCancel, onSubmit, loading, label }: {
     <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
       <button onClick={onCancel} style={cancelBtn}>Cancel</button>
       <button onClick={onSubmit} disabled={loading}
-        style={{ padding: "9px 22px", background: loading ? "#94A3B8" : "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}>
+        style={{ padding: "9px 22px", background: loading ? "var(--hf-text-faint)" : "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}>
         {loading ? "Saving..." : label}
       </button>
     </div>
@@ -766,14 +766,14 @@ function Footer({ onCancel, onSubmit, loading, label }: {
 function FErr({ msg }: { msg?: string }) {
   if (!msg) return null
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#DC2626", marginTop: 4 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
       <AlertCircle size={12} />{msg}
     </div>
   )
 }
 
 const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "#fff", outline: "none" }
-const inpSt = (err?: string): React.CSSProperties => ({ ...inp, border: `1.5px solid ${err ? "#DC2626" : "#E2E8F0"}`, background: err ? "#FFF5F5" : "#fff" })
-const cancelBtn: React.CSSProperties = { padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "var(--hf-surface)", outline: "none" }
+const inpSt = (err?: string): React.CSSProperties => ({ ...inp, border: `1.5px solid ${err ? "#DC2626" : "#E2E8F0"}`, background: err ? "var(--hf-danger-soft)" : "var(--hf-surface)" })
+const cancelBtn: React.CSSProperties = { padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }

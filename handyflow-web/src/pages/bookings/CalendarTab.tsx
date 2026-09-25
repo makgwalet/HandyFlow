@@ -105,7 +105,7 @@ export default function CalendarTab() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={prevWeek} style={navBtn}><ChevronLeft size={18} /></button>
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#0F172A" }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "var(--hf-text)" }}>
             {weekDays[0].toLocaleDateString("en-ZA", { day: "numeric", month: "long" })} –{" "}
             {weekDays[6].toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })}
           </span>
@@ -113,7 +113,7 @@ export default function CalendarTab() {
         </div>
         <button
           onClick={() => setBaseDate(new Date())}
-          style={{ padding: "6px 14px", background: "#F1F5F9", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", color: "#374151", fontWeight: 600 }}>
+          style={{ padding: "6px 14px", background: "var(--hf-surface-sunken)", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)", fontWeight: 600 }}>
           Today
         </button>
       </div>
@@ -122,28 +122,28 @@ export default function CalendarTab() {
       <div style={{
         display: "grid",
         gridTemplateColumns: "48px repeat(7, 1fr)",
-        border: "1px solid #E2E8F0",
+        border: "1px solid var(--hf-border)",
         borderRadius: 12, overflow: "hidden",
       }}>
         {/* Header row */}
-        <div style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0", height: 52 }} />
+        <div style={{ background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border)", height: 52 }} />
         {weekDays.map((day, i) => {
           const ds      = day.toISOString().split("T")[0]
           const isToday = ds === today
           const count   = bookingsOnDay(day).length
           return (
             <div key={i} style={{
-              background: "#F8FAFC", borderBottom: "1px solid #E2E8F0",
-              borderLeft: "1px solid #E2E8F0", padding: "10px 8px", textAlign: "center", height: 52,
+              background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border)",
+              borderLeft: "1px solid var(--hf-border)", padding: "10px 8px", textAlign: "center", height: 52,
             }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: isToday ? "#0D9488" : "#94A3B8", textTransform: "uppercase" }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: isToday ? "var(--hf-accent-text)" : "var(--hf-text-faint)", textTransform: "uppercase" }}>
                 {day.toLocaleDateString("en-ZA", { weekday: "short" })}
               </div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: isToday ? "#0D9488" : "#0F172A", marginTop: 1 }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: isToday ? "var(--hf-accent-text)" : "var(--hf-text)", marginTop: 1 }}>
                 {day.getDate()}
               </div>
               {count > 0 && (
-                <div style={{ width: 6, height: 6, borderRadius: "50%", background: isToday ? "#0D9488" : "#1B3A6B", margin: "3px auto 0" }} />
+                <div style={{ width: 6, height: 6, borderRadius: "50%", background: isToday ? "var(--hf-accent)" : "var(--hf-primary)", margin: "3px auto 0" }} />
               )}
             </div>
           )
@@ -162,7 +162,7 @@ export default function CalendarTab() {
                 key={hour}
                 style={{
                   position: "absolute", top: (hour - HOUR_START) * HOUR_HEIGHT,
-                  right: 6, fontSize: 10, color: "#94A3B8", lineHeight: `${HOUR_HEIGHT}px`,
+                  right: 6, fontSize: 10, color: "var(--hf-text-faint)", lineHeight: `${HOUR_HEIGHT}px`,
                 }}>
                 {String(hour).padStart(2, "0")}:00
               </div>
@@ -179,7 +179,7 @@ export default function CalendarTab() {
               <div
                 key={di}
                 style={{
-                  borderLeft: "1px solid #E2E8F0",
+                  borderLeft: "1px solid var(--hf-border)",
                   position: "relative", height: totalDayHeight,
                   background: isToday ? "rgba(13,148,136,0.02)" : "white",
                 }}>
@@ -190,7 +190,7 @@ export default function CalendarTab() {
                     style={{
                       position: "absolute", top: (hour - HOUR_START) * HOUR_HEIGHT,
                       left: 0, right: 0, height: 1,
-                      background: hour === HOUR_START ? "transparent" : "#F1F5F9",
+                      background: hour === HOUR_START ? "transparent" : "var(--hf-surface-sunken)",
                     }}
                   />
                 ))}
@@ -245,7 +245,7 @@ export default function CalendarTab() {
       {/* ── Legend ────────────────────────────────────────────────────────── */}
       <div style={{ display: "flex", gap: 16, marginTop: 14, flexWrap: "wrap" }}>
         {Object.entries(STATUS_COLOR).map(([status, color]) => (
-          <div key={status} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#64748B" }}>
+          <div key={status} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--hf-text-muted)" }}>
             <div style={{ width: 10, height: 10, borderRadius: 2, background: color }} />
             {status.replace("_", " ")}
           </div>

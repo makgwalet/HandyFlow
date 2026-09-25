@@ -65,8 +65,8 @@ function EditSessionModal({ session, onClose }: { session: SessionResponse; onCl
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 460 }}>
-        <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", margin: "0 0 18px" }}>Edit session</p>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 460 }}>
+        <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: "0 0 18px" }}>Edit session</p>
         <div style={{ display: "grid", gap: 12 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div><label style={labelStyle}>Start date</label><input type="date" style={inputStyle} value={startDate} onChange={e => setStartDate(e.target.value)} /></div>
@@ -79,11 +79,11 @@ function EditSessionModal({ session, onClose }: { session: SessionResponse; onCl
           </div>
           <div><label style={labelStyle}>Notes</label><textarea style={{ ...inputStyle, minHeight: 50, resize: "vertical" }} value={notes} onChange={e => setNotes(e.target.value)} /></div>
         </div>
-        {save.isError && <p style={{ color: "#DC2626", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not save"}</p>}
+        {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not save"}</p>}
         <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+          <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
           <button onClick={() => save.mutate()} disabled={save.isPending}
-            style={{ flex: 2, padding: "10px", borderRadius: 8, border: "none", background: TRAINING_ACCENT, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: save.isPending ? 0.6 : 1 }}>
+            style={{ flex: 2, padding: "10px", borderRadius: 8, border: "none", background: TRAINING_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: save.isPending ? 0.6 : 1 }}>
             {save.isPending ? "Saving…" : "Save changes"}
           </button>
         </div>
@@ -104,19 +104,19 @@ function EnrollModal({ sessionId, onClose }: { sessionId: string; onClose: () =>
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 440 }}>
-        <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", margin: "0 0 18px" }}>Enrol an employee</p>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 440 }}>
+        <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: "0 0 18px" }}>Enrol an employee</p>
         <label style={labelStyle}>Employee</label>
         <EmployeePicker value={employee} onChange={setEmployee} />
         <div style={{ marginTop: 12 }}>
           <label style={labelStyle}>Notes</label>
           <textarea style={{ ...inputStyle, minHeight: 50, resize: "vertical" }} value={notes} onChange={e => setNotes(e.target.value)} />
         </div>
-        {enroll.isError && <p style={{ color: "#DC2626", fontSize: 12, marginTop: 12 }}>{(enroll.error as any)?.response?.data?.message ?? "Could not enrol this employee"}</p>}
+        {enroll.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(enroll.error as any)?.response?.data?.message ?? "Could not enrol this employee"}</p>}
         <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+          <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
           <button onClick={() => enroll.mutate()} disabled={!employee || enroll.isPending}
-            style={{ flex: 2, padding: "10px", borderRadius: 8, border: "none", background: TRAINING_ACCENT, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: (!employee || enroll.isPending) ? 0.6 : 1 }}>
+            style={{ flex: 2, padding: "10px", borderRadius: 8, border: "none", background: TRAINING_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: (!employee || enroll.isPending) ? 0.6 : 1 }}>
             {enroll.isPending ? "Enrolling…" : "Enrol"}
           </button>
         </div>
@@ -139,20 +139,20 @@ function CompleteEnrollmentModal({ enrollment, onClose }: { enrollment: Enrollme
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 380 }}>
-        <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", margin: "0 0 4px" }}>Record outcome</p>
-        <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 18px" }}>{enrollment.employeeNameSnapshot}</p>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 380 }}>
+        <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: "0 0 4px" }}>Record outcome</p>
+        <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "0 0 18px" }}>{enrollment.employeeNameSnapshot}</p>
         <label style={labelStyle}>Score (optional)</label>
         <input type="number" step="0.01" style={inputStyle} value={score} onChange={e => setScore(e.target.value)} />
         <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-          <button onClick={() => setPassed(true)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: passed ? `1.5px solid ${TRAINING_ACCENT}` : "1px solid #E2E8F0", background: passed ? "#F0FDF4" : "#fff", color: passed ? TRAINING_ACCENT : "#64748B", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Passed</button>
-          <button onClick={() => setPassed(false)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: !passed ? "1.5px solid #DC2626" : "1px solid #E2E8F0", background: !passed ? "#FEF2F2" : "#fff", color: !passed ? "#DC2626" : "#64748B", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Failed</button>
+          <button onClick={() => setPassed(true)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: passed ? `1.5px solid ${TRAINING_ACCENT}` : "1px solid var(--hf-border)", background: passed ? "var(--hf-success-soft)" : "var(--hf-surface)", color: passed ? TRAINING_ACCENT : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Passed</button>
+          <button onClick={() => setPassed(false)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: !passed ? "1.5px solid var(--hf-danger)" : "1px solid var(--hf-border)", background: !passed ? "var(--hf-danger-soft)" : "var(--hf-surface)", color: !passed ? "var(--hf-danger-text)" : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Failed</button>
         </div>
-        {save.isError && <p style={{ color: "#DC2626", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not record outcome"}</p>}
+        {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not record outcome"}</p>}
         <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+          <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
           <button onClick={() => save.mutate()} disabled={save.isPending}
-            style={{ flex: 2, padding: "10px", borderRadius: 8, border: "none", background: TRAINING_ACCENT, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: save.isPending ? 0.6 : 1 }}>
+            style={{ flex: 2, padding: "10px", borderRadius: 8, border: "none", background: TRAINING_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: save.isPending ? 0.6 : 1 }}>
             {save.isPending ? "Saving…" : "Record outcome"}
           </button>
         </div>
@@ -234,32 +234,32 @@ export default function TrainingSessionDetail({ sessionId, onBack }: { sessionId
     window.URL.revokeObjectURL(url)
   }
 
-  if (isLoading || !session) return <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+  if (isLoading || !session) return <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p>
 
   return (
     <div>
-      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "#64748B", fontSize: 13, marginBottom: 16, padding: 0 }}>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-muted)", fontSize: 13, marginBottom: 16, padding: 0 }}>
         <ArrowLeft size={15} /> All sessions
       </button>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0F172A", margin: 0 }}>{session.courseTitle}</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>{session.courseTitle}</h2>
             <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: `${STATUS_COLORS[session.status]}18`, color: STATUS_COLORS[session.status] }}>{session.status.replace("_", " ")}</span>
           </div>
-          <p style={{ fontSize: 12.5, color: "#94A3B8", margin: "4px 0 0" }}>
+          <p style={{ fontSize: 12.5, color: "var(--hf-text-faint)", margin: "4px 0 0" }}>
             {session.startDate} → {session.endDate} {session.venue ? `· ${session.venue}` : ""} {session.trainerName ? `· ${session.trainerName}` : ""}
             {session.capacity != null ? ` · ${session.enrolledCount}/${session.capacity} enrolled` : ` · ${session.enrolledCount} enrolled`}
           </p>
-          {session.cancelReason && <p style={{ fontSize: 12, color: "#DC2626", margin: "4px 0 0" }}>Cancelled: {session.cancelReason}</p>}
+          {session.cancelReason && <p style={{ fontSize: 12, color: "var(--hf-danger-text)", margin: "4px 0 0" }}>Cancelled: {session.cancelReason}</p>}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           {session.status === "SCHEDULED" && (
             <>
               <button onClick={() => setShowEdit(true)} style={btnStyle}><Pencil size={13} /> Edit</button>
               <button onClick={() => lifecycle.mutate("start")} style={btnStyle}><Play size={13} /> Start</button>
-              <button onClick={() => lifecycle.mutate("cancel")} style={{ ...btnStyle, color: "#DC2626" }}><XCircle size={13} /> Cancel</button>
+              <button onClick={() => lifecycle.mutate("cancel")} style={{ ...btnStyle, color: "var(--hf-danger-text)" }}><XCircle size={13} /> Cancel</button>
             </>
           )}
           {session.status === "IN_PROGRESS" && (
@@ -270,33 +270,33 @@ export default function TrainingSessionDetail({ sessionId, onBack }: { sessionId
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "20px 0 10px" }}>
-        <p style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", margin: 0 }}>Enrolled employees ({enrollments.length})</p>
+        <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Enrolled employees ({enrollments.length})</p>
         {session.status !== "CANCELLED" && session.status !== "COMPLETED" && (
-          <button onClick={() => setShowEnroll(true)} style={{ display: "flex", alignItems: "center", gap: 6, background: TRAINING_ACCENT, color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+          <button onClick={() => setShowEnroll(true)} style={{ display: "flex", alignItems: "center", gap: 6, background: TRAINING_ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
             <UserPlus size={14} /> Enrol
           </button>
         )}
       </div>
 
       {enrollments.length === 0 ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>No one enrolled yet.</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No one enrolled yet.</p>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
           {enrollments.map((e, i) => (
-            <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9" }}>
+            <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", margin: 0 }}>{e.employeeNameSnapshot}</p>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: `${STATUS_COLORS[e.status] ?? "#94A3B8"}18`, color: STATUS_COLORS[e.status] ?? "#94A3B8" }}>{e.status.replace("_", " ")}</span>
-                  {e.score != null && <span style={{ fontSize: 11, color: "#94A3B8" }}>Score: {e.score}</span>}
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)", margin: 0 }}>{e.employeeNameSnapshot}</p>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: `${STATUS_COLORS[e.status] ?? "#94A3B8"}18`, color: STATUS_COLORS[e.status] ?? "var(--hf-text-faint)" }}>{e.status.replace("_", " ")}</span>
+                  {e.score != null && <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>Score: {e.score}</span>}
                 </div>
-                {e.employeeNumberSnapshot && <p style={{ fontSize: 11, color: "#94A3B8", margin: "2px 0 0" }}>{e.employeeNumberSnapshot}</p>}
+                {e.employeeNumberSnapshot && <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: "2px 0 0" }}>{e.employeeNumberSnapshot}</p>}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 {e.status === "ENROLLED" && (
                   <>
                     <button onClick={() => markAttended.mutate(e.id)} style={btnStyle}><Check size={12} /> Attended</button>
-                    <button onClick={() => markNoShow.mutate(e.id)} style={{ ...btnStyle, color: "#DC2626" }}><XIcon size={12} /> No-show</button>
+                    <button onClick={() => markNoShow.mutate(e.id)} style={{ ...btnStyle, color: "var(--hf-danger-text)" }}><XIcon size={12} /> No-show</button>
                   </>
                 )}
                 {(e.status === "ENROLLED" || e.status === "ATTENDED") && (
@@ -307,7 +307,7 @@ export default function TrainingSessionDetail({ sessionId, onBack }: { sessionId
                 )}
                 {e.status === "COMPLETED" && e.passed && course?.certificationOffered && (
                   <button onClick={() => issueCertificate.mutate(e.id)} disabled={issueCertificate.isPending}
-                    style={{ ...btnStyle, color: "#D97706", opacity: issueCertificate.isPending ? 0.6 : 1 }}>
+                    style={{ ...btnStyle, color: "var(--hf-warning-text)", opacity: issueCertificate.isPending ? 0.6 : 1 }}>
                     <Award size={12} /> Issue certificate
                   </button>
                 )}
@@ -318,8 +318,8 @@ export default function TrainingSessionDetail({ sessionId, onBack }: { sessionId
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 0 10px" }}>
-        <p style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", margin: 0 }}>Evidence ({evidence.length})</p>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, color: "#64748B", cursor: "pointer" }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Evidence ({evidence.length})</p>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, color: "var(--hf-text-muted)", cursor: "pointer" }}>
           <Upload size={13} /> Upload
           <input type="file" hidden onChange={e => {
             const file = e.target.files?.[0]
@@ -331,13 +331,13 @@ export default function TrainingSessionDetail({ sessionId, onBack }: { sessionId
         </label>
       </div>
       {evidence.length === 0 ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>No files attached.</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No files attached.</p>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {evidence.map((ev, i) => (
-            <div key={ev.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9" }}>
-              <p style={{ fontSize: 12.5, color: "#0F172A", margin: 0 }}>{ev.fileName}</p>
-              <span style={{ fontSize: 11, color: "#94A3B8" }}>{ev.evidenceType}</span>
+            <div key={ev.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
+              <p style={{ fontSize: 12.5, color: "var(--hf-text)", margin: 0 }}>{ev.fileName}</p>
+              <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{ev.evidenceType}</span>
             </div>
           ))}
         </div>

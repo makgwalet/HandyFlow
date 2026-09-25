@@ -41,20 +41,20 @@ const btnS: React.CSSProperties = { display: "inline-flex", alignItems: "center"
 function ConfirmModal({ title, message, confirmLabel, danger = false, loading = false, onConfirm, onCancel, children }: any) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
         <div style={{ display: "flex", gap: 14, marginBottom: 20 }}>
-          <div style={{ width: 40, height: 40, borderRadius: "50%", background: danger ? "#FEF2F2" : "#DCFCE7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <div style={{ width: 40, height: 40, borderRadius: "50%", background: danger ? "var(--hf-danger-soft)" : "var(--hf-success-soft-strong)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             {danger ? <AlertTriangle size={18} color="#DC2626" /> : <CheckCircle size={18} color="#166534" />}
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>{title}</div>
-            <div style={{ fontSize: 13, color: "#64748B", lineHeight: 1.6 }}>{message}</div>
+            <div style={{ fontSize: 13, color: "var(--hf-text-muted)", lineHeight: 1.6 }}>{message}</div>
           </div>
         </div>
         {children}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
           <button onClick={onCancel} style={btnS}>Cancel</button>
-          <button onClick={onConfirm} disabled={loading} style={{ ...btnP, background: danger ? "#DC2626" : "#166534", opacity: loading ? 0.6 : 1 }}>
+          <button onClick={onConfirm} disabled={loading} style={{ ...btnP, background: danger ? "var(--hf-danger)" : "var(--hf-success-solid-strong)", opacity: loading ? 0.6 : 1 }}>
             {loading && <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />}
             {confirmLabel}
           </button>
@@ -200,12 +200,12 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 48, color: "#94A3B8" }}>Loading batches...</div>
+        <div style={{ textAlign: "center", padding: 48, color: "var(--hf-text-faint)" }}>Loading batches...</div>
       ) : batches.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px" }}>
-          <CreditCard size={40} style={{ marginBottom: 12, color: "#CBD5E1" }} />
-          <div style={{ fontWeight: 700, color: "#475569", fontSize: 15, marginBottom: 6 }}>No EFT batches yet</div>
-          <div style={{ fontSize: 13, color: "#94A3B8", marginBottom: 18 }}>Group approved bills into batches for bulk bank payment.</div>
+          <CreditCard size={40} style={{ marginBottom: 12, color: "var(--hf-text-disabled)" }} />
+          <div style={{ fontWeight: 700, color: "var(--hf-text-tertiary)", fontSize: 15, marginBottom: 6 }}>No EFT batches yet</div>
+          <div style={{ fontSize: 13, color: "var(--hf-text-faint)", marginBottom: 18 }}>Group approved bills into batches for bulk bank payment.</div>
           <button onClick={() => setShowCreate(true)} style={btnP}><Plus size={14} /> Create first batch</button>
         </div>
       ) : (
@@ -214,22 +214,22 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
             const sc = STATUS[batch.status] ?? STATUS.DRAFT
             const expanded = expandedBatch === batch.id
             return (
-              <div key={batch.id} style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
-                <div style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: "#fff" }}
+              <div key={batch.id} style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: "var(--hf-surface)" }}
                   onClick={() => handleExpand(batch)}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     <div style={{ width: 40, height: 40, borderRadius: 10, background: sc.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <CreditCard size={18} color={sc.color} />
                     </div>
                     <div>
-                      <div style={{ fontWeight: 800, fontSize: 14, color: "#0F172A", display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ fontWeight: 800, fontSize: 14, color: "var(--hf-text)", display: "flex", alignItems: "center", gap: 8 }}>
                         {batch.batchNumber}
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
                           <span style={{ width: 4, height: 4, borderRadius: "50%", background: sc.dot }} />{sc.label}
                         </span>
                         {batch.hasPop && <CheckCircle size={12} color="#0D9488" />}
                       </div>
-                      <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
+                      <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 2 }}>
                         {batch.billCount} bill{batch.billCount !== 1 ? "s" : ""} · Payment {fmtDate(batch.paymentDate)}
                         {batch.bankAccountName && ` · ${batch.bankAccountName}`}
                         {batch.description && ` · ${batch.description}`}
@@ -238,24 +238,24 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <div style={{ textAlign: "right" as const }}>
-                      <div style={{ fontWeight: 800, fontSize: 16, color: "#0F172A" }}>{fmtR(batch.totalAmount)}</div>
-                      <div style={{ fontSize: 11, color: "#94A3B8" }}>{fmtDate(batch.createdAt)}</div>
+                      <div style={{ fontWeight: 800, fontSize: 16, color: "var(--hf-text)" }}>{fmtR(batch.totalAmount)}</div>
+                      <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{fmtDate(batch.createdAt)}</div>
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
                       {batch.status === "DRAFT" && (
                         <button onClick={e => { e.stopPropagation(); loadBatchDetail(batch).then(() => setShowSubmit(true)) }}
-                          style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 11px", background: "#FFFBEB", color: "#D97706", border: "1px solid #FDE68A", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                          style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 11px", background: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", border: "1px solid var(--hf-warning-border)", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                           <Send size={10} /> Submit
                         </button>
                       )}
                       {batch.status === "SUBMITTED" && (
                         <button onClick={e => { e.stopPropagation(); loadBatchDetail(batch).then(() => setShowConfirmPaid(true)) }}
-                          style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 11px", background: "#DCFCE7", color: "#166534", border: "1px solid #86EFAC", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                          style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 11px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                           <CheckCircle size={10} /> Confirm paid
                         </button>
                       )}
                       <button onClick={e => { e.stopPropagation(); exportBatch(batch.id, batch.batchNumber) }}
-                        style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE", borderRadius: 7, fontSize: 11, cursor: "pointer" }}>
+                        style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1px solid var(--hf-info-border)", borderRadius: 7, fontSize: 11, cursor: "pointer" }}>
                         <Download size={10} />
                       </button>
                     </div>
@@ -265,18 +265,18 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
 
                 {/* Expanded bill list */}
                 {expanded && (
-                  <div style={{ borderTop: "1px solid #F1F5F9", background: "#F8FAFC" }}>
+                  <div style={{ borderTop: "1px solid var(--hf-border-subtle)", background: "var(--hf-surface-muted)" }}>
                     <div style={{ padding: "10px 20px 6px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em" }}>Bills in this batch</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Bills in this batch</span>
                       <div style={{ display: "flex", gap: 8 }}>
                         {!["PAID","CANCELLED"].includes(batch.status) && (
                           <>
                             <button onClick={() => { loadBatchDetail(batch).then(() => setShowPopUpload(true)) }}
-                              style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 11, cursor: "pointer", color: "#64748B" }}>
+                              style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 11, cursor: "pointer", color: "var(--hf-text-muted)" }}>
                               <Upload size={10} /> Upload POP
                             </button>
                             <button onClick={() => loadBatchDetail(batch).then(() => setShowCancel(true))}
-                              style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, fontSize: 11, cursor: "pointer", color: "#DC2626" }}>
+                              style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 11, cursor: "pointer", color: "var(--hf-danger-text)" }}>
                               <XCircle size={10} /> Cancel
                             </button>
                           </>
@@ -286,40 +286,40 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
                     {(() => {
                       const detail = batchDetails[batch.id]
                       if (!detail) return (
-                        <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#94A3B8" }}>
+                        <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--hf-text-faint)" }}>
                           <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> Loading bills...
                         </div>
                       )
                       const bills = detail.bills ?? []
                       if (bills.length === 0) return (
-                        <div style={{ padding: "16px 20px", fontSize: 13, color: "#94A3B8" }}>No bills in this batch.</div>
+                        <div style={{ padding: "16px 20px", fontSize: 13, color: "var(--hf-text-faint)" }}>No bills in this batch.</div>
                       )
                       return (
                       <table style={{ width: "100%", borderCollapse: "collapse" as const, fontSize: 12 }}>
                         <thead>
-                          <tr style={{ borderBottom: "1px solid #E2E8F0" }}>
+                          <tr style={{ borderBottom: "1px solid var(--hf-border)" }}>
                             {["Supplier", "Bill #", "Due date", "Amount", "POP"].map(h => (
-                              <th key={h} style={{ padding: "8px 16px", textAlign: "left" as const, fontSize: 10, fontWeight: 700, color: "#64748B", letterSpacing: "0.05em" }}>{h}</th>
+                              <th key={h} style={{ padding: "8px 16px", textAlign: "left" as const, fontSize: 10, fontWeight: 700, color: "var(--hf-text-muted)", letterSpacing: "0.05em" }}>{h}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
                           {bills.map((bill: Bill) => (
-                            <tr key={bill.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                              <td style={{ padding: "9px 16px", fontWeight: 600, color: "#0F172A" }}>{bill.supplierName}</td>
-                              <td style={{ padding: "9px 16px", color: "#64748B" }}>#{bill.billNumber}</td>
-                              <td style={{ padding: "9px 16px", color: "#64748B" }}>{fmtDate(bill.dueDate)}</td>
-                              <td style={{ padding: "9px 16px", fontWeight: 700, color: "#0F172A" }}>{fmtR(bill.totalAmount)}</td>
+                            <tr key={bill.id} style={{ borderBottom: "1px solid var(--hf-border-subtle)" }}>
+                              <td style={{ padding: "9px 16px", fontWeight: 600, color: "var(--hf-text)" }}>{bill.supplierName}</td>
+                              <td style={{ padding: "9px 16px", color: "var(--hf-text-muted)" }}>#{bill.billNumber}</td>
+                              <td style={{ padding: "9px 16px", color: "var(--hf-text-muted)" }}>{fmtDate(bill.dueDate)}</td>
+                              <td style={{ padding: "9px 16px", fontWeight: 700, color: "var(--hf-text)" }}>{fmtR(bill.totalAmount)}</td>
                               <td style={{ padding: "9px 16px" }}>
-                                {bill.hasPop ? <CheckCircle size={13} color="#0D9488" /> : <span style={{ fontSize: 10, color: "#94A3B8" }}>—</span>}
+                                {bill.hasPop ? <CheckCircle size={13} color="#0D9488" /> : <span style={{ fontSize: 10, color: "var(--hf-text-faint)" }}>—</span>}
                               </td>
                             </tr>
                           ))}
                         </tbody>
                         <tfoot>
-                          <tr style={{ background: "#F0F9FF", borderTop: "1px solid #BFDBFE" }}>
-                            <td colSpan={3} style={{ padding: "9px 16px", fontSize: 11, fontWeight: 700, color: "#1D4ED8" }}>Total</td>
-                            <td style={{ padding: "9px 16px", fontWeight: 800, color: "#1D4ED8" }}>{fmtR(batch.totalAmount)}</td>
+                          <tr style={{ background: "var(--hf-sky-soft)", borderTop: "1px solid var(--hf-info-border)" }}>
+                            <td colSpan={3} style={{ padding: "9px 16px", fontSize: 11, fontWeight: 700, color: "var(--hf-info-text)" }}>Total</td>
+                            <td style={{ padding: "9px 16px", fontWeight: 800, color: "var(--hf-info-text)" }}>{fmtR(batch.totalAmount)}</td>
                             <td />
                           </tr>
                         </tfoot>
@@ -337,13 +337,13 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
       {/* Create batch modal */}
       {showCreate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 20, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 640, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 25px 80px rgba(0,0,0,0.25)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 640, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 25px 80px rgba(0,0,0,0.25)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 22 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>Create EFT Batch</h3>
-                <p style={{ margin: "3px 0 0", fontSize: 13, color: "#64748B" }}>Group approved bills for bulk payment via bank EFT</p>
+                <p style={{ margin: "3px 0 0", fontSize: 13, color: "var(--hf-text-muted)" }}>Group approved bills for bulk payment via bank EFT</p>
               </div>
-              <button onClick={() => setShowCreate(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+              <button onClick={() => setShowCreate(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 18 }}>
@@ -353,7 +353,7 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
               </div>
               <div>
                 <label style={lbl}>Bank account</label>
-                <select value={createForm.bankAccountId} onChange={e => setCreateForm(p => ({ ...p, bankAccountId: e.target.value }))} style={{ ...inp, background: "#fff" }}>
+                <select value={createForm.bankAccountId} onChange={e => setCreateForm(p => ({ ...p, bankAccountId: e.target.value }))} style={{ ...inp, background: "var(--hf-surface)" }}>
                   {bankAccounts.map((a: any) => <option key={a.id} value={a.id}>{a.accountName}</option>)}
                 </select>
               </div>
@@ -366,24 +366,24 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
             <div style={{ marginBottom: 14 }}>
               <label style={{ ...lbl, marginBottom: 10 }}>Select approved bills to include ({createForm.billIds.length} selected)</label>
               {(approvableBills as Bill[]).length === 0 ? (
-                <div style={{ padding: "20px", textAlign: "center", color: "#94A3B8", border: "1.5px dashed #E2E8F0", borderRadius: 10, fontSize: 13 }}>
+                <div style={{ padding: "20px", textAlign: "center", color: "var(--hf-text-faint)", border: "1.5px dashed var(--hf-border)", borderRadius: 10, fontSize: 13 }}>
                   No approved bills available. Approve bills in the Bills tab first.
                 </div>
               ) : (
-                <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden", maxHeight: 320, overflowY: "auto" }}>
+                <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden", maxHeight: 320, overflowY: "auto" }}>
                   {(approvableBills as Bill[]).map((bill, i) => {
                     const checked = createForm.billIds.includes(bill.id)
                     return (
                       <div key={bill.id} onClick={() => toggleBillSelection(bill.id)}
-                        style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", cursor: "pointer", background: checked ? "#EFF6FF" : i % 2 === 0 ? "#fff" : "#FAFAFA", borderBottom: "1px solid #F1F5F9", transition: "background 0.1s" }}>
-                        <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${checked ? "#1B3A6B" : "#D1D5DB"}`, background: checked ? "#1B3A6B" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", cursor: "pointer", background: checked ? "var(--hf-info-soft)" : i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border-subtle)", transition: "background 0.1s" }}>
+                        <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${checked ? "#1B3A6B" : "#D1D5DB"}`, background: checked ? "var(--hf-primary)" : "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                           {checked && <CheckCircle size={11} color="#fff" />}
                         </div>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600, fontSize: 13, color: "#0F172A" }}>{bill.supplierName}</div>
-                          <div style={{ fontSize: 11, color: "#94A3B8" }}>#{bill.billNumber} · Due {fmtDate(bill.dueDate)}</div>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: "var(--hf-text)" }}>{bill.supplierName}</div>
+                          <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>#{bill.billNumber} · Due {fmtDate(bill.dueDate)}</div>
                         </div>
-                        <div style={{ fontWeight: 800, fontSize: 13, color: "#0F172A" }}>{fmtR(bill.totalAmount)}</div>
+                        <div style={{ fontWeight: 800, fontSize: 13, color: "var(--hf-text)" }}>{fmtR(bill.totalAmount)}</div>
                       </div>
                     )
                   })}
@@ -392,13 +392,13 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
             </div>
 
             {createForm.billIds.length > 0 && (
-              <div style={{ padding: "12px 16px", background: "#EFF6FF", borderRadius: 9, border: "1px solid #BFDBFE", marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 13, color: "#1D4ED8", fontWeight: 600 }}>{createForm.billIds.length} bills selected</span>
-                <span style={{ fontSize: 16, fontWeight: 800, color: "#1B3A6B" }}>{fmtR(selectedBillsTotal)}</span>
+              <div style={{ padding: "12px 16px", background: "var(--hf-info-soft)", borderRadius: 9, border: "1px solid var(--hf-info-border)", marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 13, color: "var(--hf-info-text)", fontWeight: 600 }}>{createForm.billIds.length} bills selected</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: "var(--hf-primary-text)" }}>{fmtR(selectedBillsTotal)}</span>
               </div>
             )}
 
-            {error && <div style={{ marginBottom: 12, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{error}</div>}
+            {error && <div style={{ marginBottom: 12, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button onClick={() => setShowCreate(false)} style={btnS}>Cancel</button>
@@ -415,14 +415,14 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
       {/* POP upload */}
       {showPopUpload && selectedBatch && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Upload remittance / POP</h3>
-              <button onClick={() => setShowPopUpload(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={18} /></button>
+              <button onClick={() => setShowPopUpload(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={18} /></button>
             </div>
-            <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "28px", border: `2px dashed ${popFile ? "#0D9488" : "#E2E8F0"}`, borderRadius: 10, cursor: "pointer", background: popFile ? "#F0FDF9" : "#F9FAFB" }}>
+            <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "28px", border: `2px dashed ${popFile ? "#0D9488" : "#E2E8F0"}`, borderRadius: 10, cursor: "pointer", background: popFile ? "var(--hf-accent-soft)" : "var(--hf-surface-muted)" }}>
               <input type="file" style={{ display: "none" }} onChange={handleFile} />
-              {popFile ? <><CheckCircle size={24} color="#0D9488" /><span style={{ fontSize: 13, color: "#0D9488", fontWeight: 600 }}>{popName}</span></> : <><Upload size={24} color="#94A3B8" /><span style={{ fontSize: 13, color: "#64748B" }}>Bank confirmation, remittance advice</span></>}
+              {popFile ? <><CheckCircle size={24} color="#0D9488" /><span style={{ fontSize: 13, color: "var(--hf-accent-text)", fontWeight: 600 }}>{popName}</span></> : <><Upload size={24} color="#94A3B8" /><span style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>Bank confirmation, remittance advice</span></>}
             </label>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setShowPopUpload(false)} style={btnS}>Cancel</button>

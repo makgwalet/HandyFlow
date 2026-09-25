@@ -32,7 +32,7 @@ const EMPTY_FORM = {
 
 function Tip({ text }: { text: string }) {
   return (
-    <span title={text} style={{ cursor: "help", color: "#94A3B8", display: "inline-flex", alignItems: "center", marginLeft: 4 }}>
+    <span title={text} style={{ cursor: "help", color: "var(--hf-text-faint)", display: "inline-flex", alignItems: "center", marginLeft: 4 }}>
       <Info size={11} />
     </span>
   )
@@ -125,7 +125,7 @@ export default function ServicesTab() {
 
   const FieldErr = ({ name }: { name: string }) =>
     errors[name] ? (
-      <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#DC2626", marginTop: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
         <AlertCircle size={12} />{errors[name]}
       </div>
     ) : null
@@ -133,7 +133,7 @@ export default function ServicesTab() {
   const fmtMins = (m: number) => m === 0 ? "None" : m >= 60 ? `${m / 60}h` : `${m}m`
   const fmtR    = (n: number) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
 
-  if (isLoading) return <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading services…</div>
+  if (isLoading) return <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading services…</div>
 
   return (
     <div>
@@ -143,49 +143,49 @@ export default function ServicesTab() {
       </div>
 
       {services.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Tag size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
-          <div style={{ fontWeight: 600, color: "#475569", marginBottom: 4 }}>No services yet</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)", marginBottom: 4 }}>No services yet</div>
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
           {services.map(s => (
             <div key={s.id} onClick={() => openEdit(s)}
-              style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden", cursor: "pointer" }}
+              style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden", cursor: "pointer" }}
               onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)")}
               onMouseLeave={e => (e.currentTarget.style.boxShadow = "none")}>
-              <div style={{ height: 5, background: s.color ?? "#0D9488" }} />
+              <div style={{ height: 5, background: s.color ?? "var(--hf-accent)" }} />
               <div style={{ padding: "16px 18px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{s.name}</div>
-                    {s.description && <div style={{ fontSize: 12, color: "#64748B", marginTop: 3 }}>{s.description}</div>}
+                    <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{s.name}</div>
+                    {s.description && <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 3 }}>{s.description}</div>}
                   </div>
                   <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                  {!s.active && <span style={{ fontSize: 10, color: "#94A3B8", background: "#F8FAFC", padding: "2px 7px", borderRadius: 20, fontWeight: 600 }}>INACTIVE</span>}
+                  {!s.active && <span style={{ fontSize: 10, color: "var(--hf-text-faint)", background: "var(--hf-surface-muted)", padding: "2px 7px", borderRadius: 20, fontWeight: 600 }}>INACTIVE</span>}
                   <button
                     onClick={e => { e.stopPropagation(); setConfirmDelete(s) }}
                     title="Delete service"
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "#DC2626", padding: 4, display: "flex", marginLeft: "auto" }}>
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-danger-text)", padding: 4, display: "flex", marginLeft: "auto" }}>
                     <Trash2 size={13} />
                   </button>
                 </div>
                 </div>
                 <div style={{ display: "flex", gap: 14, marginBottom: 10 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "#64748B" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "var(--hf-text-muted)" }}>
                     <Clock size={13} color={s.color ?? "#0D9488"} />{s.durationMinutes} min
                   </div>
-                  <div style={{ fontWeight: 800, fontSize: 16, color: s.color ?? "#0D9488" }}>{fmtR(s.price)}</div>
+                  <div style={{ fontWeight: 800, fontSize: 16, color: s.color ?? "var(--hf-accent-text)" }}>{fmtR(s.price)}</div>
                 </div>
                 {/* Buffer/lead time chips — only shown when non-zero */}
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {s.bufferAfterMinutes > 0 && (
-                    <span style={{ fontSize: 10, color: "#7C3AED", background: "#F5F3FF", border: "1px solid #E9D5FF", padding: "1px 7px", borderRadius: 10 }}>
+                    <span style={{ fontSize: 10, color: "var(--hf-violet-text)", background: "var(--hf-violet-soft)", border: "1px solid var(--hf-violet-border)", padding: "1px 7px", borderRadius: 10 }}>
                       +{s.bufferAfterMinutes}m buffer
                     </span>
                   )}
                   {s.minLeadTimeMinutes > 0 && (
-                    <span style={{ fontSize: 10, color: "#D97706", background: "#FFFBEB", border: "1px solid #FDE68A", padding: "1px 7px", borderRadius: 10 }}>
+                    <span style={{ fontSize: 10, color: "var(--hf-warning-text)", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", padding: "1px 7px", borderRadius: 10 }}>
                       {fmtMins(s.minLeadTimeMinutes)} lead
                     </span>
                   )}
@@ -199,10 +199,10 @@ export default function ServicesTab() {
       {/* ── Service modal ─────────────────────────────────────────────────── */}
       {(showCreate || editing) && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 560, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 560, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 22 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{editing ? "Edit Service" : "New Service"}</h3>
-              <button onClick={close_} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{editing ? "Edit Service" : "New Service"}</h3>
+              <button onClick={close_} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -214,7 +214,7 @@ export default function ServicesTab() {
                 <FieldErr name="name" />
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
-                <label style={lbl}>Description <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+                <label style={lbl}>Description <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
                 <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                   placeholder="Brief description…" style={inpStyle("description")} />
               </div>
@@ -226,8 +226,8 @@ export default function ServicesTab() {
                   {DURATIONS.map(d => (
                     <button key={d} onClick={() => { setForm(f => ({ ...f, durationMinutes: String(d) })); setErrors(f => { const n = { ...f }; delete n.durationMinutes; return n }) }}
                       style={{ padding: "6px 12px", borderRadius: 7, fontSize: 12, cursor: "pointer", border: "none", fontWeight: 600,
-                        background: form.durationMinutes === String(d) ? "#1B3A6B" : "#F1F5F9",
-                        color: form.durationMinutes === String(d) ? "#fff" : "#64748B",
+                        background: form.durationMinutes === String(d) ? "var(--hf-primary)" : "var(--hf-surface-sunken)",
+                        color: form.durationMinutes === String(d) ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)",
                       }}>
                       {d < 60 ? `${d}m` : `${d / 60}h`}
                     </button>
@@ -271,8 +271,8 @@ export default function ServicesTab() {
                   {BUFFERS.map(b => (
                     <button key={b} onClick={() => setForm(f => ({ ...f, bufferBeforeMinutes: String(b) }))}
                       style={{ padding: "5px 10px", borderRadius: 7, fontSize: 12, cursor: "pointer", border: "none", fontWeight: 600,
-                        background: form.bufferBeforeMinutes === String(b) ? "#7C3AED" : "#F1F5F9",
-                        color: form.bufferBeforeMinutes === String(b) ? "#fff" : "#64748B",
+                        background: form.bufferBeforeMinutes === String(b) ? "var(--hf-violet)" : "var(--hf-surface-sunken)",
+                        color: form.bufferBeforeMinutes === String(b) ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)",
                       }}>
                       {b === 0 ? "None" : `${b}m`}
                     </button>
@@ -289,8 +289,8 @@ export default function ServicesTab() {
                   {BUFFERS.map(b => (
                     <button key={b} onClick={() => setForm(f => ({ ...f, bufferAfterMinutes: String(b) }))}
                       style={{ padding: "5px 10px", borderRadius: 7, fontSize: 12, cursor: "pointer", border: "none", fontWeight: 600,
-                        background: form.bufferAfterMinutes === String(b) ? "#7C3AED" : "#F1F5F9",
-                        color: form.bufferAfterMinutes === String(b) ? "#fff" : "#64748B",
+                        background: form.bufferAfterMinutes === String(b) ? "var(--hf-violet)" : "var(--hf-surface-sunken)",
+                        color: form.bufferAfterMinutes === String(b) ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)",
                       }}>
                       {b === 0 ? "None" : `${b}m`}
                     </button>
@@ -313,8 +313,8 @@ export default function ServicesTab() {
                   {LEAD_MINS.map(m => (
                     <button key={m} onClick={() => setForm(f => ({ ...f, minLeadTimeMinutes: String(m) }))}
                       style={{ padding: "5px 10px", borderRadius: 7, fontSize: 12, cursor: "pointer", border: "none", fontWeight: 600,
-                        background: form.minLeadTimeMinutes === String(m) ? "#D97706" : "#F1F5F9",
-                        color: form.minLeadTimeMinutes === String(m) ? "#fff" : "#64748B",
+                        background: form.minLeadTimeMinutes === String(m) ? "var(--hf-warning)" : "var(--hf-surface-sunken)",
+                        color: form.minLeadTimeMinutes === String(m) ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)",
                       }}>
                       {m === 0 ? "None" : m >= 60 ? `${m / 60}h` : `${m}m`}
                     </button>
@@ -331,8 +331,8 @@ export default function ServicesTab() {
                   {ADVANCE_DAYS.map(d => (
                     <button key={d} onClick={() => setForm(f => ({ ...f, maxAdvanceDays: String(d) }))}
                       style={{ padding: "5px 10px", borderRadius: 7, fontSize: 12, cursor: "pointer", border: "none", fontWeight: 600,
-                        background: form.maxAdvanceDays === String(d) ? "#D97706" : "#F1F5F9",
-                        color: form.maxAdvanceDays === String(d) ? "#fff" : "#64748B",
+                        background: form.maxAdvanceDays === String(d) ? "var(--hf-warning)" : "var(--hf-surface-sunken)",
+                        color: form.maxAdvanceDays === String(d) ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)",
                       }}>
                       {d >= 365 ? "1 year" : `${d}d`}
                     </button>
@@ -342,15 +342,15 @@ export default function ServicesTab() {
             </div>
 
             {apiError && (
-              <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", gap: 8 }}>
+              <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", gap: 8 }}>
                 <AlertCircle size={15} />{apiError}
               </div>
             )}
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-              <button onClick={close_} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
+              <button onClick={close_} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button onClick={handleSubmit} disabled={createService.isPending || updateService.isPending}
-                style={{ padding: "9px 22px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {editing ? "Save changes" : "Create service"}
               </button>
             </div>
@@ -360,27 +360,27 @@ export default function ServicesTab() {
       {/* Styled delete confirmation modal */}
       {confirmDelete && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", textAlign: "center" }}>
-            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#FEF2F2", border: "2px solid #FECACA", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", textAlign: "center" }}>
+            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--hf-danger-soft)", border: "2px solid var(--hf-danger-border)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
               <Trash2 size={22} color="#DC2626" />
             </div>
-            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Delete Service?</h3>
-            <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 6px" }}>
+            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Delete Service?</h3>
+            <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: "0 0 6px" }}>
               <strong>{confirmDelete.name}</strong>
             </p>
-            <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 20px", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "0 0 20px", lineHeight: 1.5 }}>
               The service will be hidden from new bookings. Past bookings are preserved.
               This action cannot be undone.
             </p>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setConfirmDelete(null)}
-                style={{ flex: 1, padding: "10px", border: "1.5px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#374151" }}>
+                style={{ flex: 1, padding: "10px", border: "1.5px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "var(--hf-text-secondary)" }}>
                 Keep service
               </button>
               <button
                 onClick={() => { deleteMutation.mutate(confirmDelete.id); setConfirmDelete(null) }}
                 disabled={deleteMutation.isPending}
-                style={{ flex: 1, padding: "10px", border: "none", borderRadius: 9, background: "#DC2626", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ flex: 1, padding: "10px", border: "none", borderRadius: 9, background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 Yes, delete
               </button>
             </div>

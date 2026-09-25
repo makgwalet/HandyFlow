@@ -43,26 +43,26 @@ export default function CollAgencyClientDetail({ clientId, client, onBack }: { c
 
   return (
     <div>
-      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "#64748B", fontSize: 13, marginBottom: 16, padding: 0 }}>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-muted)", fontSize: 13, marginBottom: 16, padding: 0 }}>
         <ArrowLeft size={15} /> Back to clients
       </button>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
-          <h2 style={{ fontSize: 19, fontWeight: 800, color: "#0F172A", margin: "0 0 4px" }}>{client?.tradingName ?? "Client"}</h2>
-          <p style={{ fontSize: 12, color: "#94A3B8", margin: 0 }}>
+          <h2 style={{ fontSize: 19, fontWeight: 800, color: "var(--hf-text)", margin: "0 0 4px" }}>{client?.tradingName ?? "Client"}</h2>
+          <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: 0 }}>
             {client?.commissionRatePct}% commission{client?.registrationNumber ? ` · Reg. ${client.registrationNumber}` : ""}
           </p>
         </div>
         {client && (
           <div style={{ textAlign: "right" }}>
-            <p style={{ fontSize: 11, color: "#94A3B8", margin: "0 0 2px" }}>Trust held</p>
-            <p style={{ fontSize: 20, fontWeight: 800, color: "#059669", margin: 0 }}>{fmtMoney(client.trustBalance)}</p>
+            <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: "0 0 2px" }}>Trust held</p>
+            <p style={{ fontSize: 20, fontWeight: 800, color: "var(--hf-success-text)", margin: 0 }}>{fmtMoney(client.trustBalance)}</p>
           </div>
         )}
       </div>
 
-      <div style={{ display: "flex", gap: 2, borderBottom: "1px solid #E2E8F0", marginBottom: 22, overflowX: "auto" }}>
+      <div style={{ display: "flex", gap: 2, borderBottom: "1px solid var(--hf-border)", marginBottom: 22, overflowX: "auto" }}>
         {SUB_TABS.map(t => {
           const Icon = t.icon
           const active = sub === t.id
@@ -72,7 +72,7 @@ export default function CollAgencyClientDetail({ clientId, client, onBack }: { c
                 display: "flex", alignItems: "center", gap: 6, padding: "9px 14px",
                 background: "none", border: "none", whiteSpace: "nowrap",
                 borderBottom: active ? `2px solid ${CA_ACCENT}` : "2px solid transparent",
-                color: active ? CA_ACCENT : "#64748B",
+                color: active ? CA_ACCENT : "var(--hf-text-muted)",
                 fontWeight: active ? 600 : 400, fontSize: 12.5, cursor: "pointer",
                 marginBottom: -1,
               }}>

@@ -222,7 +222,7 @@ export default function ShiftsTab() {
 
   const FieldErr = ({ name }: { name: string }) =>
     fieldErrors[name] ? (
-      <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#DC2626", marginTop: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
         <AlertCircle size={12} />{fieldErrors[name]}
       </div>
     ) : null
@@ -235,9 +235,9 @@ export default function ShiftsTab() {
       {/* Stats */}
       <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
         {stats.map(s => (
-          <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
+          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 12, color: "#64748B", marginTop: 1 }}>{s.label}</div>
+            <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 1 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -248,8 +248,8 @@ export default function ShiftsTab() {
           {(["ALL", "SCHEDULED", "ACTIVE", "COMPLETED", "MISSED", "CANCELLED"] as const).map(s => (
             <button key={s} onClick={() => setFilterStatus(s)} style={{
               padding: "6px 12px", borderRadius: 20, border: "none", cursor: "pointer",
-              background: filterStatus === s ? "#1B3A6B" : "#F1F5F9",
-              color: filterStatus === s ? "#fff" : "#64748B",
+              background: filterStatus === s ? "var(--hf-primary)" : "var(--hf-surface-sunken)",
+              color: filterStatus === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)",
               fontSize: 12, fontWeight: filterStatus === s ? 600 : 400,
             }}>
               {s === "ALL" ? "All" : STATUS_CONFIG[s]?.label ?? s}
@@ -258,26 +258,26 @@ export default function ShiftsTab() {
         </div>
         <button
           onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Schedule Shift
         </button>
       </div>
 
       {/* Global error */}
       {apiError && (
-        <div style={{ marginBottom: 16, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}>
           <AlertCircle size={14} />{apiError}
-          <button onClick={() => setApiError("")} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#DC2626" }}><X size={14} /></button>
+          <button onClick={() => setApiError("")} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "var(--hf-danger-text)" }}><X size={14} /></button>
         </div>
       )}
 
       {/* Shift list */}
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading shifts…</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading shifts…</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Clock size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>
             {filterStatus === "ALL" ? "No shifts yet" : `No ${STATUS_CONFIG[filterStatus as keyof typeof STATUS_CONFIG]?.label.toLowerCase() ?? filterStatus} shifts`}
           </div>
           <div style={{ fontSize: 14, marginTop: 4 }}>Schedule a shift to assign a guard to a site.</div>
@@ -292,7 +292,7 @@ export default function ShiftsTab() {
             const canEdit   = isScheduled || isActive
 
             return (
-              <div key={shift.id} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+              <div key={shift.id} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
 
                 {/* Left */}
                 <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
@@ -301,15 +301,15 @@ export default function ShiftsTab() {
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: 700, color: "#0F172A", fontSize: 14 }}>{guardName(shift.guardId)}</span>
-                      <span style={{ color: "#94A3B8", fontSize: 13 }}>→</span>
-                      <span style={{ color: "#475569", fontSize: 14 }}>{siteName(shift.siteId)}</span>
+                      <span style={{ fontWeight: 700, color: "var(--hf-text)", fontSize: 14 }}>{guardName(shift.guardId)}</span>
+                      <span style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>→</span>
+                      <span style={{ color: "var(--hf-text-tertiary)", fontSize: 14 }}>{siteName(shift.siteId)}</span>
                     </div>
-                    <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                    <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>
                       {fmtDate(shift.startAt)} · {fmtTime(shift.startAt)} – {fmtTime(shift.endAt)}
                     </div>
                     {shift.notes && (
-                      <div style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", marginTop: 2 }}>
+                      <div style={{ fontSize: 12, color: "var(--hf-text-muted)", fontStyle: "italic", marginTop: 2 }}>
                         {shift.notes}
                       </div>
                     )}
@@ -324,42 +324,42 @@ export default function ShiftsTab() {
 
                   {canEdit && (
                     <button onClick={() => openEdit(shift)} title="Edit shift"
-                      style={{ display: "flex", alignItems: "center", gap: 4, background: "#F0F9FF", color: "#0369A1", border: "1px solid #BAE6FD", borderRadius: 7, padding: "7px 12px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+                      style={{ display: "flex", alignItems: "center", gap: 4, background: "var(--hf-sky-soft)", color: "var(--hf-sky-text-strong)", border: "1px solid var(--hf-sky-border)", borderRadius: 7, padding: "7px 12px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
                       <Edit2 size={12} /> Edit
                     </button>
                   )}
 
                   {isScheduled && (
                     <button onClick={() => startShift.mutate(shift.id)} disabled={startShift.isPending}
-                      style={{ display: "flex", alignItems: "center", gap: 5, background: "#DCFCE7", color: "#166534", border: "1px solid #86EFAC", borderRadius: 7, padding: "7px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 7, padding: "7px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                       <PlayCircle size={13} /> Start
                     </button>
                   )}
 
                   {isScheduled && (
                     <button onClick={() => setInterrupting({ shift, action: "dismiss-no-show", label: "Dismiss No-Show" })} title="Dismiss a no-show/late alert for this shift"
-                      style={{ display: "flex", alignItems: "center", gap: 5, background: "#F8FAFC", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-surface-muted)", color: "var(--hf-text-muted)", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                       <UserX size={13} /> Dismiss No-Show
                     </button>
                   )}
 
                   {isActive && (
                     <button onClick={() => completeShift.mutate(shift.id)} disabled={completeShift.isPending}
-                      style={{ display: "flex", alignItems: "center", gap: 5, background: "#F0FDF4", color: "#0D9488", border: "1px solid #99F6E4", borderRadius: 7, padding: "7px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-success-soft)", color: "var(--hf-accent-text)", border: "1px solid var(--hf-accent-border)", borderRadius: 7, padding: "7px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                       <CheckCircle size={13} /> Complete
                     </button>
                   )}
 
                   {isActive && (
                     <button onClick={() => setInterrupting({ shift, action: "close-overtime", label: "Force-Close Overtime" })} title="Force-close a shift running in unconfirmed overtime"
-                      style={{ display: "flex", alignItems: "center", gap: 5, background: "#FFFBEB", color: "#B45309", border: "1px solid #FDE68A", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-warning-soft)", color: "var(--hf-warning-text-strong)", border: "1px solid var(--hf-warning-border)", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                       <TimerOff size={13} /> Close Overtime
                     </button>
                   )}
 
                   {isActive && (
                     <button onClick={() => setInterrupting({ shift, action: "pull", label: "Pull From Site" })} title="Supervisor-initiated interrupt — client complaint, guard unwell, redeployment, etc."
-                      style={{ display: "flex", alignItems: "center", gap: 5, background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                       <LogOut size={13} /> Pull From Site
                     </button>
                   )}
@@ -435,7 +435,7 @@ export default function ShiftsTab() {
 
             {/* Notes */}
             <div>
-              <label style={lbl}>Notes <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+              <label style={lbl}>Notes <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
               <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                 placeholder="e.g. Armed response required, access code 1234" style={inpSt("_")} />
             </div>
@@ -460,24 +460,24 @@ export default function ShiftsTab() {
       {/* ── Edit Shift Modal ───────────────────────────────────────────────── */}
       {editing && (
         <Modal onClose={() => { setEditing(null); setApiError("") }} title="Edit Shift">
-          <div style={{ marginBottom: 16, padding: "12px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, marginBottom: 4 }}>Current schedule</div>
-            <div style={{ fontSize: 13, color: "#0F172A" }}>
+          <div style={{ marginBottom: 16, padding: "12px 14px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, marginBottom: 4 }}>Current schedule</div>
+            <div style={{ fontSize: 13, color: "var(--hf-text)" }}>
               {guardName(editing.guardId)} → {siteName(editing.siteId)}
             </div>
-            <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 2 }}>
               {fmtDate(editing.startAt)} · {fmtTime(editing.startAt)} – {fmtTime(editing.endAt)}
             </div>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div>
-              <label style={lbl}>Extend end time <span style={{ fontWeight: 400, color: "#94A3B8" }}>(leave blank to keep current)</span></label>
+              <label style={lbl}>Extend end time <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(leave blank to keep current)</span></label>
               <input type="datetime-local" value={editForm.endAt}
                 onChange={e => setEditForm(f => ({ ...f, endAt: e.target.value }))}
-                style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }} />
+                style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }} />
               {editForm.endAt && (
-                <div style={{ fontSize: 12, color: "#0D9488", marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: "var(--hf-accent-text)", marginTop: 4 }}>
                   New end: {fmtTime(new Date(editForm.endAt).toISOString())} · {fmtDate(new Date(editForm.endAt).toISOString())}
                 </div>
               )}
@@ -487,7 +487,7 @@ export default function ShiftsTab() {
               <input value={editForm.notes}
                 onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
                 placeholder="Update shift notes…"
-                style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }} />
+                style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }} />
             </div>
           </div>
 
@@ -507,17 +507,17 @@ export default function ShiftsTab() {
         <Modal onClose={() => { setInterrupting(null); setInterruptReason(""); setApiError("") }}
           title={interrupting.label}
           icon={<AlertTriangle size={18} color="#B45309" />} iconBg="#FFFBEB">
-          <div style={{ marginBottom: 16, padding: "12px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8 }}>
-            <div style={{ fontSize: 13, color: "#0F172A" }}>
+          <div style={{ marginBottom: 16, padding: "12px 14px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8 }}>
+            <div style={{ fontSize: 13, color: "var(--hf-text)" }}>
               {guardName(interrupting.shift.guardId)} → {siteName(interrupting.shift.siteId)}
             </div>
           </div>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>
-            Reason <span style={{ color: "#DC2626" }}>*</span>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 6 }}>
+            Reason <span style={{ color: "var(--hf-danger-text)" }}>*</span>
           </label>
           <textarea value={interruptReason} onChange={e => setInterruptReason(e.target.value)}
             rows={3} placeholder="Required — this action is fully audited"
-            style={{ width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, outline: "none", resize: "vertical" as const, fontFamily: "inherit" }} />
+            style={{ width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, outline: "none", resize: "vertical" as const, fontFamily: "inherit" }} />
 
           {apiError && <ErrBanner msg={apiError} />}
 
@@ -526,7 +526,7 @@ export default function ShiftsTab() {
             <button
               onClick={() => interruptMut.mutate({ id: interrupting.shift.id, action: interrupting.action, reason: interruptReason })}
               disabled={interruptMut.isPending || !interruptReason.trim()}
-              style={{ ...submitBtn, background: interruptReason.trim() ? "#DC2626" : "#F1F5F9", opacity: interruptReason.trim() ? 1 : 0.6 }}>
+              style={{ ...submitBtn, background: interruptReason.trim() ? "var(--hf-danger)" : "var(--hf-surface-sunken)", opacity: interruptReason.trim() ? 1 : 0.6 }}>
               {interruptMut.isPending ? "Saving…" : "Confirm"}
             </button>
           </div>
@@ -548,13 +548,13 @@ function Modal({ onClose, title, icon, iconBg, children }: {
 }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 520, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 520, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {icon && <div style={{ width: 36, height: 36, borderRadius: 9, background: iconBg ?? "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</div>}
-            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{title}</h3>
+            {icon && <div style={{ width: 36, height: 36, borderRadius: 9, background: iconBg ?? "var(--hf-surface-sunken)", display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</div>}
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{title}</h3>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
         </div>
         {children}
       </div>
@@ -575,7 +575,7 @@ function Notice({ color, bg, border, children, style }: {
 
 function ErrBanner({ msg }: { msg: string }) {
   return (
-    <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}>
+    <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}>
       <AlertCircle size={14} />{msg}
     </div>
   )

@@ -39,55 +39,55 @@ interface AppTile {
 // ─────────────────────────────────────────────────────────────────────────────
 const MODULE_REGISTRY: Record<string, AppTile> = {
   // ── Core (always shown — not gated by billing API) ────────────────────────
-  crm:         { key: 'crm',         name: 'CRM',            description: 'Customers & contacts',          icon: Users,        bg: '#DBEAFE', iconColor: '#1D4ED8', route: '/customers'    },
-  catalogue:   { key: 'catalogue',   name: 'Catalogue',      description: 'Products & services',           icon: Package,      bg: '#F3E8FF', iconColor: '#7C3AED', route: '/catalogue'    },
+  crm:         { key: 'crm',         name: 'CRM',            description: 'Customers & contacts',          icon: Users,        bg: 'var(--hf-info-soft-strong)', iconColor: 'var(--hf-info-text)', route: '/customers'    },
+  catalogue:   { key: 'catalogue',   name: 'Catalogue',      description: 'Products & services',           icon: Package,      bg: 'var(--hf-violet-soft-strong)', iconColor: 'var(--hf-violet-text)', route: '/catalogue'    },
 
   // ── Billing-gated modules ─────────────────────────────────────────────────
-  invoicing:   { key: 'invoicing',   name: 'Invoicing',      description: 'Quotes & invoices',             icon: FileText,     bg: '#DCFCE7', iconColor: '#166534', route: '/invoices'     },
-  accounting:  { key: 'accounting',  name: 'Accounting',     description: 'Accounts & reports',            icon: Calculator,   bg: '#ECFDF5', iconColor: '#059669', route: '/accounting'   },
-  security:    { key: 'security',    name: 'Security',       description: 'Guards, sites & QR patrols',   icon: Shield,       bg: '#F0FDF4', iconColor: '#0D9488', route: '/security'     },
-  fuel:        { key: 'fuel',        name: 'Fuel',           description: 'Tanks, dispatch & deliveries', icon: Fuel,         bg: '#FEF3C7', iconColor: '#D97706', route: '/fuel'         },
-  earthmoving: { key: 'earthmoving', name: 'Earthmoving',    description: 'Assets & operators',           icon: HardHat,      bg: '#FEF9C3', iconColor: '#854D0E', route: '/earthmoving'  },
-  property:    { key: 'property',    name: 'Property',       description: 'Units, leases & rent',         icon: Building2,    bg: '#EDE9FE', iconColor: '#7C3AED', route: '/property'     },
-  fleet:       { key: 'fleet',       name: 'Fleet',          description: 'Vehicles & trips',             icon: Car,          bg: '#E0F2FE', iconColor: '#0369A1', route: '/fleet'        },
-  hr:          { key: 'hr',          name: 'HR & Payroll',   description: 'Employees & pay runs',         icon: Briefcase,    bg: '#FCE7F3', iconColor: '#9D174D', route: '/hr'           },
-  bookings:    { key: 'bookings',    name: 'Bookings',       description: 'Appointments & scheduling',    icon: Calendar,     bg: '#FFF7ED', iconColor: '#EA580C', route: '/bookings'     },
-  clinic:      { key: 'clinic',      name: 'Clinic',         description: 'Patients & consultations',     icon: HeartPulse,   bg: '#FFF1F2', iconColor: '#BE123C', route: '/clinic'       },
-  events:      { key: 'events',      name: 'Events',         description: 'Ticketing & QR check-in',      icon: PartyPopper,  bg: '#F0F9FF', iconColor: '#0284C7', route: '/events'       },
-  contracting: { key: 'contracting', name: 'Contracting',    description: 'Contracts & OTP signing',      icon: FilePen,      bg: '#F0F9FF', iconColor: '#0284C7', route: '/contracts'    },
-  expenses:    { key: 'expenses',    name: 'Expenses',       description: 'Staff expense claims',         icon: Wallet,       bg: '#FDF4FF', iconColor: '#9333EA', route: '/expenses'     },
-  creative:    { key: 'creative',    name: 'Creative',       description: 'Design jobs & proofs',         icon: Palette,      bg: '#FDF4FF', iconColor: '#9333EA', route: '/creative'     },
-  desk:        { key: 'desk',        name: 'Desk Support',   description: 'Helpdesk & SLA tracking',      icon: Headphones,   bg: '#F0F9FF', iconColor: '#0369A1', route: '/desk'         },
-  tasks:       { key: 'tasks',       name: 'Tasks',          description: 'Kanban boards & time logs',    icon: CheckSquare,  bg: '#F0FDF4', iconColor: '#059669', route: '/tasks'        },
-  marketing:   { key: 'marketing',   name: 'Marketing',      description: 'Email campaigns & contacts',   icon: Megaphone,    bg: '#FFF7ED', iconColor: '#EA580C', route: '/marketing'    },
-  recruiter:   { key: 'recruiter',   name: 'Recruiter',      description: 'Jobs, pipeline & hiring',      icon: UserCheck,    bg: '#ECFDF5', iconColor: '#059669', route: '/recruiter'    },
-  pos:         { key: 'pos',         name: 'POS & Stock',    description: 'Point of sale & inventory',    icon: ShoppingCart, bg: '#EFF6FF', iconColor: '#2563EB', route: '/pos'          },
-  accountant:  { key: 'accountant',  name: 'Accountant',     description: 'Clients, SARS & billing',      icon: BookOpen,     bg: '#EFF6FF', iconColor: '#1B3A6B', route: '/accountant'   },
-  collectionsagency: { key: 'collectionsagency', name: 'Collections Agency', description: 'Client portfolios, placement & trust ledger', icon: Handshake, bg: '#F5F3FF', iconColor: '#5B21B6', route: '/collections-agency' },
-  warehousing: { key: 'warehousing', name: 'Warehousing', description: '3PL stock, shipments & billing', icon: Warehouse, bg: '#F0FDFA', iconColor: '#0F766E', route: '/warehousing' },
-  legalcompliance: { key: 'legalcompliance', name: 'Legal & Compliance', description: 'Obligations, litigation & POPIA', icon: Scale, bg: '#E0E7FF', iconColor: '#4338CA', route: '/legalcompliance' },
+  invoicing:   { key: 'invoicing',   name: 'Invoicing',      description: 'Quotes & invoices',             icon: FileText,     bg: 'var(--hf-success-soft-strong)', iconColor: 'var(--hf-success-text-strong)', route: '/invoices'     },
+  accounting:  { key: 'accounting',  name: 'Accounting',     description: 'Accounts & reports',            icon: Calculator,   bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text)', route: '/accounting'   },
+  security:    { key: 'security',    name: 'Security',       description: 'Guards, sites & QR patrols',   icon: Shield,       bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-accent-text)', route: '/security'     },
+  fuel:        { key: 'fuel',        name: 'Fuel',           description: 'Tanks, dispatch & deliveries', icon: Fuel,         bg: 'var(--hf-warning-soft-strong)', iconColor: 'var(--hf-warning-text)', route: '/fuel'         },
+  earthmoving: { key: 'earthmoving', name: 'Earthmoving',    description: 'Assets & operators',           icon: HardHat,      bg: 'var(--hf-warning-soft)', iconColor: 'var(--hf-warning-text-deep)', route: '/earthmoving'  },
+  property:    { key: 'property',    name: 'Property',       description: 'Units, leases & rent',         icon: Building2,    bg: 'var(--hf-violet-soft-strong)', iconColor: 'var(--hf-violet-text)', route: '/property'     },
+  fleet:       { key: 'fleet',       name: 'Fleet',          description: 'Vehicles & trips',             icon: Car,          bg: 'var(--hf-sky-soft-strong)', iconColor: 'var(--hf-sky-text-strong)', route: '/fleet'        },
+  hr:          { key: 'hr',          name: 'HR & Payroll',   description: 'Employees & pay runs',         icon: Briefcase,    bg: 'var(--hf-danger-soft)', iconColor: 'var(--hf-danger-text-strong)', route: '/hr'           },
+  bookings:    { key: 'bookings',    name: 'Bookings',       description: 'Appointments & scheduling',    icon: Calendar,     bg: 'var(--hf-orange-soft)', iconColor: 'var(--hf-orange-text)', route: '/bookings'     },
+  clinic:      { key: 'clinic',      name: 'Clinic',         description: 'Patients & consultations',     icon: HeartPulse,   bg: 'var(--hf-danger-soft)', iconColor: 'var(--hf-danger-text-strong)', route: '/clinic'       },
+  events:      { key: 'events',      name: 'Events',         description: 'Ticketing & QR check-in',      icon: PartyPopper,  bg: 'var(--hf-sky-soft)', iconColor: 'var(--hf-sky-text)', route: '/events'       },
+  contracting: { key: 'contracting', name: 'Contracting',    description: 'Contracts & OTP signing',      icon: FilePen,      bg: 'var(--hf-sky-soft)', iconColor: 'var(--hf-sky-text)', route: '/contracts'    },
+  expenses:    { key: 'expenses',    name: 'Expenses',       description: 'Staff expense claims',         icon: Wallet,       bg: 'var(--hf-violet-soft)', iconColor: 'var(--hf-violet-text)', route: '/expenses'     },
+  creative:    { key: 'creative',    name: 'Creative',       description: 'Design jobs & proofs',         icon: Palette,      bg: 'var(--hf-violet-soft)', iconColor: 'var(--hf-violet-text)', route: '/creative'     },
+  desk:        { key: 'desk',        name: 'Desk Support',   description: 'Helpdesk & SLA tracking',      icon: Headphones,   bg: 'var(--hf-sky-soft)', iconColor: 'var(--hf-sky-text-strong)', route: '/desk'         },
+  tasks:       { key: 'tasks',       name: 'Tasks',          description: 'Kanban boards & time logs',    icon: CheckSquare,  bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text)', route: '/tasks'        },
+  marketing:   { key: 'marketing',   name: 'Marketing',      description: 'Email campaigns & contacts',   icon: Megaphone,    bg: 'var(--hf-orange-soft)', iconColor: 'var(--hf-orange-text)', route: '/marketing'    },
+  recruiter:   { key: 'recruiter',   name: 'Recruiter',      description: 'Jobs, pipeline & hiring',      icon: UserCheck,    bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text)', route: '/recruiter'    },
+  pos:         { key: 'pos',         name: 'POS & Stock',    description: 'Point of sale & inventory',    icon: ShoppingCart, bg: 'var(--hf-info-soft)', iconColor: 'var(--hf-info-text)', route: '/pos'          },
+  accountant:  { key: 'accountant',  name: 'Accountant',     description: 'Clients, SARS & billing',      icon: BookOpen,     bg: 'var(--hf-info-soft)', iconColor: 'var(--hf-primary-text)', route: '/accountant'   },
+  collectionsagency: { key: 'collectionsagency', name: 'Collections Agency', description: 'Client portfolios, placement & trust ledger', icon: Handshake, bg: 'var(--hf-violet-soft)', iconColor: 'var(--hf-violet-text-strong)', route: '/collections-agency' },
+  warehousing: { key: 'warehousing', name: 'Warehousing', description: '3PL stock, shipments & billing', icon: Warehouse, bg: 'var(--hf-accent-soft)', iconColor: 'var(--hf-accent-text-strong)', route: '/warehousing' },
+  legalcompliance: { key: 'legalcompliance', name: 'Legal & Compliance', description: 'Obligations, litigation & POPIA', icon: Scale, bg: 'var(--hf-indigo-soft)', iconColor: 'var(--hf-indigo-text)', route: '/legalcompliance' },
   compliancetender: { key: 'compliancetender', name: 'Business Compliance & Tender', description: 'CIPC, SARS, PSIRA registrations & tender workspace', icon: ClipboardCheck, bg: '#E0F2FE', iconColor: '#0369A1', route: '/compliancetender' },
   complianceservices: { key: 'complianceservices', name: 'Compliance Services', description: 'Manage compliance and tender work for your client companies', icon: Building2, bg: '#ECFDF5', iconColor: '#065F46', route: '/complianceservices' },
   'internal-audit': { key: 'internal-audit', name: 'Internal Audit', description: 'Risk-based audit planning, annual plan and engagement management', icon: ShieldCheck, bg: '#F4F4F5', iconColor: '#3F3F46', route: '/internal-audit' },
-  debtcollection: { key: 'debtcollection',  name: 'Debt Collection', description: 'Cases, contact trail & payment plans', icon: Landmark, bg: '#FFEDD5', iconColor: '#9A3412', route: '/debtcollection',
+  debtcollection: { key: 'debtcollection',  name: 'Debt Collection', description: 'Cases, contact trail & payment plans', icon: Landmark, bg: 'var(--hf-orange-soft)', iconColor: 'var(--hf-orange-text-strong)', route: '/debtcollection',
 
 },
 
   // ── Previously missing — added to match API moduleKey values ─────────────
   // JWT has SCM_READ, SCM_ORDER, SCM_ADMIN, SCM_INVENTORY, SCM_INVOICE → supply_chain
-  supply_chain: { key: 'supply_chain', name: 'Supply Chain', description: 'Suppliers, POs & inventory',    icon: Truck,        bg: '#FEF3C7', iconColor: '#D97706', route: '/supply-chain' },
+  supply_chain: { key: 'supply_chain', name: 'Supply Chain', description: 'Suppliers, POs & inventory',    icon: Truck,        bg: 'var(--hf-warning-soft-strong)', iconColor: 'var(--hf-warning-text)', route: '/supply-chain' },
 
   // JWT has PM_READ, PM_WRITE, PM_APPROVE → projects
-  projects:    { key: 'projects',    name: 'Projects',       description: 'Gantt, budget & field ops',    icon: HardHat,      bg: '#DBEAFE', iconColor: '#1B3A6B', route: '/projects'     },
+  projects:    { key: 'projects',    name: 'Projects',       description: 'Gantt, budget & field ops',    icon: HardHat,      bg: 'var(--hf-info-soft-strong)', iconColor: 'var(--hf-primary-text)', route: '/projects'     },
 
   // JWT has AP_MANAGE, AP_READ → ap
-  ap:          { key: 'ap',          name: 'Accounts Payable', description: 'Supplier invoices & payments', icon: Receipt,      bg: '#ECFDF5', iconColor: '#059669', route: '/ap'           },
+  ap:          { key: 'ap',          name: 'Accounts Payable', description: 'Supplier invoices & payments', icon: Receipt,      bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text)', route: '/ap'           },
 }
 
 const QUICK_ACTIONS = [
-  { label: 'Add customer',        sub: 'CRM',       icon: UserPlus, bg: '#DBEAFE', color: '#1D4ED8', route: '/customers' },
-  { label: 'New quote',           sub: 'Invoicing', icon: FilePlus, bg: '#DCFCE7', color: '#166534', route: '/quotes'    },
-  { label: 'Add catalogue item',  sub: 'Catalogue', icon: Plus,     bg: '#F3E8FF', color: '#7C3AED', route: '/catalogue' },
+  { label: 'Add customer',        sub: 'CRM',       icon: UserPlus, bg: 'var(--hf-info-soft-strong)', color: 'var(--hf-info-text)', route: '/customers' },
+  { label: 'New quote',           sub: 'Invoicing', icon: FilePlus, bg: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', route: '/quotes'    },
+  { label: 'Add catalogue item',  sub: 'Catalogue', icon: Plus,     bg: 'var(--hf-violet-soft-strong)', color: 'var(--hf-violet-text)', route: '/catalogue' },
 ]
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -142,7 +142,7 @@ function AppTileCard({ app, onClick }: { app: AppTile; onClick: () => void }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? '#FAFBFF' : 'white',
+        background: hovered ? 'var(--hf-surface-muted)' : 'white',
         border: `1.5px solid ${hovered ? '#1B3A6B' : '#E8EDF5'}`,
         borderRadius: 16,
         padding: '28px 16px 20px',
@@ -156,11 +156,11 @@ function AppTileCard({ app, onClick }: { app: AppTile; onClick: () => void }) {
     >
       {hovered && <ExternalLink size={12} color="#94A3B8" style={{ position: 'absolute', top: 12, right: 12 }} />}
       <div style={{ width: 56, height: 56, borderRadius: 16, background: app.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 2px 8px ${app.bg}` }}>
-        <app.icon size={26} color={app.iconColor} />
+        <app.icon size={26} style={{ color: app.iconColor }} />
       </div>
       <div>
-        <p style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', margin: '0 0 3px' }}>{app.name}</p>
-        <p style={{ fontSize: 12, color: '#94A3B8', margin: 0, lineHeight: 1.4 }}>{app.description}</p>
+        <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--hf-text)', margin: '0 0 3px' }}>{app.name}</p>
+        <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: 0, lineHeight: 1.4 }}>{app.description}</p>
       </div>
     </button>
   )
@@ -242,9 +242,9 @@ export function DashboardPage() {
   const today = new Date().toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
   const stats = [
-    { label: 'Customers',     value: customerCount,  sub: customersThisMonth > 0 ? `↑ ${customersThisMonth} this month` : 'No new this month', positive: customersThisMonth > 0, icon: Users,       bg: '#EFF6FF', iconColor: '#2563EB' },
-    { label: 'Active quotes', value: activeQuotes,   sub: invoicedQuotes > 0 ? `${invoicedQuotes} invoiced` : 'None invoiced yet',                                                icon: FileText,    bg: '#F0FDF4', iconColor: '#16A34A' },
-    { label: 'Revenue MTD',   value: revenueMTD > 0 ? `R ${(revenueMTD / 1000).toFixed(0)}K` : 'R 0', sub: totalQuoted > 0 ? `R ${(totalQuoted / 1000).toFixed(0)}K quoted` : 'No quotes yet',   icon: TrendingUp,  bg: '#FEFCE8', iconColor: '#CA8A04' },
+    { label: 'Customers',     value: customerCount,  sub: customersThisMonth > 0 ? `↑ ${customersThisMonth} this month` : 'No new this month', positive: customersThisMonth > 0, icon: Users,       bg: 'var(--hf-info-soft)', iconColor: 'var(--hf-info-text)' },
+    { label: 'Active quotes', value: activeQuotes,   sub: invoicedQuotes > 0 ? `${invoicedQuotes} invoiced` : 'None invoiced yet',                                                icon: FileText,    bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text)' },
+    { label: 'Revenue MTD',   value: revenueMTD > 0 ? `R ${(revenueMTD / 1000).toFixed(0)}K` : 'R 0', sub: totalQuoted > 0 ? `R ${(totalQuoted / 1000).toFixed(0)}K quoted` : 'No quotes yet',   icon: TrendingUp,  bg: 'var(--hf-warning-soft)', iconColor: 'var(--hf-warning-text)' },
     // FIX: this was 'Active apps' with the same count already shown right
     // below in the Your Apps section header ("N active apps on your
     // plan") — a duplicate sitting directly above its own duplicate.
@@ -252,18 +252,18 @@ export function DashboardPage() {
     // shown anywhere else now that the detailed subscription card was
     // simplified to a link-out prompt.
     subscription?.status === 'PILOT'
-      ? { label: 'Pilot days',    value: subscription?.pilotDaysRemaining ?? '—', sub: subscription?.pilotEndsAt ? `Ends ${new Date(subscription.pilotEndsAt).toLocaleDateString('en-ZA')}` : 'Loading…', icon: Clock, bg: '#FFF1F2', iconColor: '#BE123C' }
-      : { label: 'Next renewal',  value: subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : '—', sub: subscription?.priceInRands != null ? `R ${subscription.priceInRands}/month` : '', icon: Clock, bg: '#EFF6FF', iconColor: '#2563EB' },
+      ? { label: 'Pilot days',    value: subscription?.pilotDaysRemaining ?? '—', sub: subscription?.pilotEndsAt ? `Ends ${new Date(subscription.pilotEndsAt).toLocaleDateString('en-ZA')}` : 'Loading…', icon: Clock, bg: 'var(--hf-danger-soft)', iconColor: 'var(--hf-danger-text-strong)' }
+      : { label: 'Next renewal',  value: subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : '—', sub: subscription?.priceInRands != null ? `R ${subscription.priceInRands}/month` : '', icon: Clock, bg: 'var(--hf-info-soft)', iconColor: 'var(--hf-info-text)' },
   ]
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F1F5F9', fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: 'var(--hf-surface-sunken)', fontFamily: "'Inter', system-ui, sans-serif" }}>
 
       {/* TOP BAR */}
-      <header style={{ background: '#1B3A6B', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 12px rgba(0,0,0,0.2)' }}>
+      <header style={{ background: 'var(--hf-primary)', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 12px rgba(0,0,0,0.2)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 34, height: 34, background: '#0D9488', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(13,148,136,0.4)' }}>
+            <div style={{ width: 34, height: 34, background: 'var(--hf-accent)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(13,148,136,0.4)' }}>
               <Building2 size={18} color="white" strokeWidth={2.5} />
             </div>
             <span style={{ color: 'white', fontWeight: 700, fontSize: 17, letterSpacing: '-0.3px' }}>HandyFlow</span>
@@ -280,7 +280,7 @@ export function DashboardPage() {
             style={{ background: notifDrawerOpen ? 'rgba(255,255,255,0.12)' : 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.7)', padding: '8px 10px', borderRadius: 9, display: 'flex', alignItems: 'center', position: 'relative' }}>
             <Bell size={20} />
             {unreadCount > 0 && (
-              <span style={{ position: 'absolute', top: 4, right: 5, width: 17, height: 17, background: '#EF4444', borderRadius: '50%', fontSize: 10, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #1B3A6B', fontWeight: 700 }}>{unreadCount > 99 ? '99+' : unreadCount}</span>
+              <span style={{ position: 'absolute', top: 4, right: 5, width: 17, height: 17, background: 'var(--hf-danger)', borderRadius: '50%', fontSize: 10, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--hf-primary)', fontWeight: 700 }}>{unreadCount > 99 ? '99+' : unreadCount}</span>
             )}
           </button>
 
@@ -290,25 +290,25 @@ export function DashboardPage() {
           <div ref={profileRef} style={{ position: 'relative' }}>
             <button onClick={() => { setProfileOpen(o => !o); setNotifOpen(false) }}
               style={{ display: 'flex', alignItems: 'center', gap: 9, background: profileOpen ? 'rgba(255,255,255,0.12)' : 'none', border: 'none', borderRadius: 10, padding: '5px 10px 5px 6px', cursor: 'pointer' }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#0D9488', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 12, fontWeight: 700 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--hf-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 12, fontWeight: 700 }}>
                 {user?.firstName?.[0]}{user?.lastName?.[0]}
               </div>
               <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: 500 }}>{user?.firstName}</span>
               <ChevronDown size={14} color="rgba(255,255,255,0.4)" />
             </button>
             {profileOpen && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: 260, background: 'white', border: '1px solid #E2E8F0', borderRadius: 16, boxShadow: '0 12px 40px rgba(0,0,0,0.15)', zIndex: 200, overflow: 'hidden' }}>
-                <div style={{ padding: '16px 18px', borderBottom: '1px solid #F1F5F9' }}>
+              <div style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: 260, background: 'white', border: '1px solid var(--hf-border)', borderRadius: 16, boxShadow: '0 12px 40px rgba(0,0,0,0.15)', zIndex: 200, overflow: 'hidden' }}>
+                <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--hf-border-subtle)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#1B3A6B', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 14, fontWeight: 700 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--hf-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 14, fontWeight: 700 }}>
                       {user?.firstName?.[0]}{user?.lastName?.[0]}
                     </div>
                     <div>
-                      <p style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', margin: 0 }}>{user?.firstName} {user?.lastName}</p>
-                      <p style={{ fontSize: 11, color: '#94A3B8', margin: '2px 0 0' }}>{user?.email}</p>
+                      <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--hf-text)', margin: 0 }}>{user?.firstName} {user?.lastName}</p>
+                      <p style={{ fontSize: 11, color: 'var(--hf-text-faint)', margin: '2px 0 0' }}>{user?.email}</p>
                     </div>
                   </div>
-                  <div style={{ background: '#F1F5F9', borderRadius: 6, padding: '3px 10px', fontSize: 11, color: '#64748B', display: 'inline-block' }}>Essential · Pilot</div>
+                  <div style={{ background: 'var(--hf-surface-sunken)', borderRadius: 6, padding: '3px 10px', fontSize: 11, color: 'var(--hf-text-muted)', display: 'inline-block' }}>Essential · Pilot</div>
                 </div>
                 <div style={{ padding: '6px 0' }}>
                   {[
@@ -318,15 +318,15 @@ export function DashboardPage() {
                     { icon: Settings,   label: 'Settings',        action: () => navigate('/settings') },
                   ].map(item => (
                     <button key={item.label} onClick={() => { item.action(); setProfileOpen(false) }}
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: '#374151', textAlign: 'left' }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'} onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--hf-text-secondary)', textAlign: 'left' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--hf-surface-muted)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}>
                       <item.icon size={16} color="#94A3B8" />{item.label}
                     </button>
                   ))}
-                  <div style={{ height: 1, background: '#F1F5F9', margin: '4px 0' }} />
+                  <div style={{ height: 1, background: 'var(--hf-surface-sunken)', margin: '4px 0' }} />
                   <button onClick={() => { logout(); navigate('/login') }}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: '#DC2626', textAlign: 'left' }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#FEF2F2'} onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--hf-danger-text)', textAlign: 'left' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--hf-danger-soft)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}>
                     <LogOut size={16} color="#DC2626" />Sign out
                   </button>
                 </div>
@@ -344,19 +344,19 @@ export function DashboardPage() {
         {/* Welcome row */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 }}>
           <div>
-            <h1 style={{ fontSize: 26, fontWeight: 800, color: '#0F172A', margin: '0 0 6px', letterSpacing: '-0.5px' }}>{getGreeting(user?.firstName)}</h1>
-            <p style={{ fontSize: 13, color: '#94A3B8', margin: 0 }}>
-              {today}{subscription && <> &nbsp;·&nbsp; <strong style={{ color: '#64748B' }}>{subscription.planDisplayName} plan</strong></>}
+            <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 6px', letterSpacing: '-0.5px' }}>{getGreeting(user?.firstName)}</h1>
+            <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0 }}>
+              {today}{subscription && <> &nbsp;·&nbsp; <strong style={{ color: 'var(--hf-text-muted)' }}>{subscription.planDisplayName} plan</strong></>}
             </p>
           </div>
           {subscription?.status === 'PILOT' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)', border: '1px solid #FCD34D', borderRadius: 24, padding: '8px 16px 8px 12px', boxShadow: '0 2px 8px rgba(245,158,11,0.15)' }}>
-              <div style={{ width: 28, height: 28, background: '#F59E0B', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Clock size={15} color="white" strokeWidth={2.5} /></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'linear-gradient(135deg, var(--hf-warning-soft), var(--hf-warning-soft-strong))', border: '1px solid var(--hf-warning-border-strong)', borderRadius: 24, padding: '8px 16px 8px 12px', boxShadow: '0 2px 8px rgba(245,158,11,0.15)' }}>
+              <div style={{ width: 28, height: 28, background: 'var(--hf-warning)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Clock size={15} color="white" strokeWidth={2.5} /></div>
               <div>
-                <p style={{ fontSize: 12, fontWeight: 700, color: '#92400E', margin: 0 }}>{subscription.pilotDaysRemaining} days left in pilot</p>
-                <p style={{ fontSize: 11, color: '#B45309', margin: 0 }}>Ends {new Date(subscription.pilotEndsAt!).toLocaleDateString('en-ZA')}</p>
+                <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-warning-text-deep)', margin: 0 }}>{subscription.pilotDaysRemaining} days left in pilot</p>
+                <p style={{ fontSize: 11, color: 'var(--hf-warning-text-strong)', margin: 0 }}>Ends {new Date(subscription.pilotEndsAt!).toLocaleDateString('en-ZA')}</p>
               </div>
-              <button onClick={() => navigate('/billing')} style={{ background: '#1B3A6B', color: 'white', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', marginLeft: 4 }}>Upgrade</button>
+              <button onClick={() => navigate('/billing')} style={{ background: 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', marginLeft: 4 }}>Upgrade</button>
             </div>
           )}
         </div>
@@ -364,14 +364,14 @@ export function DashboardPage() {
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 36 }}>
           {stats.map(s => (
-            <div key={s.label} style={{ background: 'white', border: '1px solid #E8EDF5', borderRadius: 16, padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+            <div key={s.label} style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
               <div>
-                <p style={{ fontSize: 12, color: '#94A3B8', margin: '0 0 6px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</p>
-                <p style={{ fontSize: 28, fontWeight: 800, color: '#0F172A', margin: '0 0 4px', letterSpacing: '-0.5px' }}>{s.value}</p>
-                <p style={{ fontSize: 12, margin: 0, color: (s as any).positive ? '#059669' : '#94A3B8', fontWeight: (s as any).positive ? 600 : 400 }}>{s.sub}</p>
+                <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: '0 0 6px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</p>
+                <p style={{ fontSize: 28, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 4px', letterSpacing: '-0.5px' }}>{s.value}</p>
+                <p style={{ fontSize: 12, margin: 0, color: (s as any).positive ? 'var(--hf-success-text)' : 'var(--hf-text-faint)', fontWeight: (s as any).positive ? 600 : 400 }}>{s.sub}</p>
               </div>
               <div style={{ width: 48, height: 48, borderRadius: 14, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <s.icon size={22} color={s.iconColor} strokeWidth={2} />
+                <s.icon size={22} style={{ color: s.iconColor }} strokeWidth={2} />
               </div>
             </div>
           ))}
@@ -380,11 +380,11 @@ export function DashboardPage() {
         {/* Your Apps */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div>
-            <p style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 2px' }}>Your apps</p>
-            <p style={{ fontSize: 13, color: '#64748B', margin: 0 }}>{activeApps.length} active {activeApps.length === 1 ? 'app' : 'apps'} on your plan</p>
+            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 2px' }}>Your apps</p>
+            <p style={{ fontSize: 13, color: 'var(--hf-text-muted)', margin: 0 }}>{activeApps.length} active {activeApps.length === 1 ? 'app' : 'apps'} on your plan</p>
           </div>
           <button onClick={() => navigate('/billing')}
-            style={{ background: 'none', border: '1px solid #E2E8F0', cursor: 'pointer', fontSize: 13, color: '#1B3A6B', fontWeight: 600, padding: '7px 14px', borderRadius: 9 }}>
+            style={{ background: 'none', border: '1px solid var(--hf-border)', cursor: 'pointer', fontSize: 13, color: 'var(--hf-primary-text)', fontWeight: 600, padding: '7px 14px', borderRadius: 9 }}>
             Explore more apps →
           </button>
         </div>
@@ -407,19 +407,19 @@ export function DashboardPage() {
           <button onClick={() => navigate('/billing')}
             style={{
               width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: 'white', border: '1px solid #E8EDF5', borderRadius: 16, padding: '18px 24px',
+              background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: '18px 24px',
               boxShadow: '0 1px 6px rgba(0,0,0,0.04)', cursor: 'pointer', textAlign: 'left',
             }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 12, background: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--hf-indigo-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <CreditCard size={18} color="#1B3A6B" />
               </div>
               <div>
-                <p style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', margin: '0 0 2px' }}>
+                <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--hf-text)', margin: '0 0 2px' }}>
                   {subscription.planDisplayName} plan
-                  <span style={{ marginLeft: 8, background: subscription.status === 'PILOT' ? '#FEF3C7' : '#DCFCE7', color: subscription.status === 'PILOT' ? '#92400E' : '#166534', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>{subscription.status}</span>
+                  <span style={{ marginLeft: 8, background: subscription.status === 'PILOT' ? 'var(--hf-warning-soft-strong)' : 'var(--hf-success-soft-strong)', color: subscription.status === 'PILOT' ? 'var(--hf-warning-text-deep)' : 'var(--hf-success-text-strong)', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>{subscription.status}</span>
                 </p>
-                <p style={{ fontSize: 12, color: '#94A3B8', margin: 0 }}>
+                <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: 0 }}>
                   {activeApps.length} active {activeApps.length === 1 ? 'app' : 'apps'} · manage billing and apps
                 </p>
               </div>

@@ -78,7 +78,7 @@ export function ExportButton() {
       {open && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 6px)', right: 0,
-          background: 'white', border: '1px solid #E2E8F0',
+          background: 'white', border: '1px solid var(--hf-border)',
           borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,.1)',
           minWidth: 220, zIndex: 200, overflow: 'hidden',
         }} role="menu">
@@ -100,9 +100,9 @@ export function ExportButton() {
         <div role="alert" style={{
           position: 'absolute', top: 'calc(100% + 6px)', right: 0,
           display: 'flex', alignItems: 'flex-start', gap: 8,
-          background: '#FEF2F2', border: '1px solid #FECACA',
+          background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)',
           borderRadius: 8, padding: '10px 12px',
-          fontSize: 12, color: '#DC2626',
+          fontSize: 12, color: 'var(--hf-danger-text)',
           width: 260, zIndex: 200,
           boxShadow: '0 4px 12px rgba(0,0,0,.08)',
         }}>
@@ -111,7 +111,7 @@ export function ExportButton() {
           <button
             onClick={() => setError(null)}
             style={{ background: 'none', border: 'none', cursor: 'pointer',
-                     color: '#DC2626', padding: 0, display: 'flex', flexShrink: 0 }}
+                     color: 'var(--hf-danger-text)', padding: 0, display: 'flex', flexShrink: 0 }}
             aria-label="Dismiss error">
             <X size={13} />
           </button>
@@ -129,14 +129,14 @@ function DropItem({ label, sub, onClick }: { label: string; sub: string; onClick
       style={{
         display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%',
         padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer',
-        textAlign: 'left', borderBottom: '1px solid #F1F5F9',
+        textAlign: 'left', borderBottom: '1px solid var(--hf-border-subtle)',
       }}
-      onMouseEnter={e => (e.currentTarget.style.background = '#F8FAFC')}
+      onMouseEnter={e => (e.currentTarget.style.background = 'var(--hf-surface-muted)')}
       onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
-      <Download size={13} style={{ color: '#64748B', marginTop: 2, flexShrink: 0 }} />
+      <Download size={13} style={{ color: 'var(--hf-text-muted)', marginTop: 2, flexShrink: 0 }} />
       <div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#0F172A' }}>{label}</div>
-        <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>{sub}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-text)' }}>{label}</div>
+        <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 2 }}>{sub}</div>
       </div>
     </button>
   )

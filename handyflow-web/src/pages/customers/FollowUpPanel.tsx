@@ -33,9 +33,9 @@ interface FollowUp {
 }
 
 const OUTCOME_CONFIG: Record<Outcome, { label: string; color: string; bg: string; border: string }> = {
-  COMPLETED:    { label: 'Completed',    color: '#16A34A', bg: '#F0FDF4', border: '#BBF7D0' },
-  NO_RESPONSE:  { label: 'No response',  color: '#EA580C', bg: '#FFF7ED', border: '#FED7AA' },
-  RESCHEDULED:  { label: 'Rescheduled',  color: '#1D4ED8', bg: '#EFF6FF', border: '#BFDBFE' },
+  COMPLETED:    { label: 'Completed',    color: 'var(--hf-success-text)', bg: 'var(--hf-success-soft)', border: 'var(--hf-success-border-subtle)' },
+  NO_RESPONSE:  { label: 'No response',  color: 'var(--hf-orange-text)', bg: 'var(--hf-orange-soft)', border: 'var(--hf-orange-border)' },
+  RESCHEDULED:  { label: 'Rescheduled',  color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)', border: 'var(--hf-info-border)' },
 }
 
 const fmtDate = (iso: string) =>
@@ -108,21 +108,21 @@ export function FollowUpPanel({ customerId }: { customerId: string }) {
   }
 
   return (
-    <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #F1F5F9' }}>
+    <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--hf-border-subtle)' }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         marginBottom: 12,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <CalendarClock size={13} color={overdueCount > 0 ? '#DC2626' : '#94A3B8'} />
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Follow-ups
           </span>
           {pending.length > 0 && (
             <span style={{
               fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 20,
-              background: overdueCount > 0 ? '#FEF2F2' : '#EFF6FF',
-              color:      overdueCount > 0 ? '#DC2626' : '#1D4ED8',
+              background: overdueCount > 0 ? 'var(--hf-danger-soft)' : 'var(--hf-info-soft)',
+              color:      overdueCount > 0 ? 'var(--hf-danger-text)' : 'var(--hf-info-text)',
               border:     `1px solid ${overdueCount > 0 ? '#FECACA' : '#BFDBFE'}`,
             }}>
               {pending.length} pending{overdueCount > 0 ? ` · ${overdueCount} overdue` : ''}
@@ -132,10 +132,10 @@ export function FollowUpPanel({ customerId }: { customerId: string }) {
       </div>
 
       <div>
-        {isLoading && <p style={{ fontSize: 12, color: '#94A3B8', margin: 0 }}>Loading…</p>}
+        {isLoading && <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: 0 }}>Loading…</p>}
 
         {!isLoading && pending.length === 0 && !showAdd && (
-          <p style={{ fontSize: 12, color: '#64748B', margin: '0 0 10px', lineHeight: 1.5 }}>
+          <p style={{ fontSize: 12, color: 'var(--hf-text-muted)', margin: '0 0 10px', lineHeight: 1.5 }}>
             No pending follow-ups. Schedule one to remind yourself (or a teammate) what to do next.
           </p>
         )}
@@ -157,7 +157,7 @@ export function FollowUpPanel({ customerId }: { customerId: string }) {
 
         {completed.length > 0 && (
           <details style={{ marginTop: pending.length > 0 ? 8 : 0 }}>
-            <summary style={{ fontSize: 11, color: '#94A3B8', cursor: 'pointer', marginBottom: 6 }}>
+            <summary style={{ fontSize: 11, color: 'var(--hf-text-faint)', cursor: 'pointer', marginBottom: 6 }}>
               {completed.length} completed
             </summary>
             {completed.map(f => (
@@ -174,21 +174,21 @@ export function FollowUpPanel({ customerId }: { customerId: string }) {
             onClick={() => { setShowAdd(true); setFormError('') }}
             style={{
               marginTop: 10, display: 'flex', alignItems: 'center', gap: 5,
-              fontSize: 12, color: '#1D4ED8', background: '#EFF6FF',
-              border: '1px solid #BFDBFE', borderRadius: 6, padding: '5px 10px',
+              fontSize: 12, color: 'var(--hf-info-text)', background: 'var(--hf-info-soft)',
+              border: '1px solid var(--hf-info-border)', borderRadius: 6, padding: '5px 10px',
               cursor: 'pointer',
             }}>
             <Plus size={12} /> Schedule follow-up
           </button>
         ) : (
           <div style={{ marginTop: 10 }}>
-            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 3 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--hf-text-secondary)', display: 'block', marginBottom: 3 }}>
               Due date
             </label>
             <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
               min={new Date().toISOString().slice(0, 10)}
-              style={{ padding: '6px 10px', fontSize: 13, border: '1.5px solid #E2E8F0', borderRadius: 6, fontFamily: 'inherit', marginBottom: 8 }} />
-            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 3 }}>
+              style={{ padding: '6px 10px', fontSize: 13, border: '1.5px solid var(--hf-border)', borderRadius: 6, fontFamily: 'inherit', marginBottom: 8 }} />
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--hf-text-secondary)', display: 'block', marginBottom: 3 }}>
               Note
             </label>
             <textarea value={note} onChange={e => setNote(e.target.value)}
@@ -196,21 +196,21 @@ export function FollowUpPanel({ customerId }: { customerId: string }) {
               rows={2}
               style={{
                 width: '100%', padding: '8px 10px', fontSize: 13,
-                border: '1.5px solid #E2E8F0', borderRadius: 8,
+                border: '1.5px solid var(--hf-border)', borderRadius: 8,
                 fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box',
               }} />
             {formError && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, fontSize: 12, color: '#DC2626' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, fontSize: 12, color: 'var(--hf-danger-text)' }}>
                 <AlertCircle size={11} />{formError}
               </div>
             )}
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
               <button onClick={submitCreate} disabled={createMutation.isPending}
-                style={{ fontSize: 12, color: '#1D4ED8', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                style={{ fontSize: 12, color: 'var(--hf-info-text)', background: 'var(--hf-info-soft)', border: '1px solid var(--hf-info-border)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
                 {createMutation.isPending ? 'Scheduling…' : 'Schedule'}
               </button>
               <button onClick={() => { setShowAdd(false); setFormError('') }}
-                style={{ fontSize: 12, color: '#374151', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                style={{ fontSize: 12, color: 'var(--hf-text-secondary)', background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
                 Cancel
               </button>
             </div>
@@ -241,24 +241,24 @@ function OutcomePrompt({ f, rescheduleDate, setRescheduleDate, isPending, onComp
   const [pickingDate, setPickingDate] = useState(false)
 
   return (
-    <div style={{ padding: '10px 0', borderBottom: '1px solid #F8FAFC' }}>
-      <p style={{ fontSize: 12.5, color: '#0F172A', margin: '0 0 8px', fontWeight: 600 }}>{f.note}</p>
+    <div style={{ padding: '10px 0', borderBottom: '1px solid var(--hf-border-subtle)' }}>
+      <p style={{ fontSize: 12.5, color: 'var(--hf-text)', margin: '0 0 8px', fontWeight: 600 }}>{f.note}</p>
       {!pickingDate ? (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button onClick={() => onComplete('COMPLETED')} disabled={isPending}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: '#16A34A', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--hf-success-text)', background: 'var(--hf-success-soft)', border: '1px solid var(--hf-success-border-subtle)', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
             <Check size={12} /> Completed
           </button>
           <button onClick={() => onComplete('NO_RESPONSE')} disabled={isPending}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: '#EA580C', background: '#FFF7ED', border: '1px solid #FED7AA', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--hf-orange-text)', background: 'var(--hf-orange-soft)', border: '1px solid var(--hf-orange-border)', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
             <PhoneMissed size={12} /> No response
           </button>
           <button onClick={() => setPickingDate(true)} disabled={isPending}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: '#1D4ED8', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--hf-info-text)', background: 'var(--hf-info-soft)', border: '1px solid var(--hf-info-border)', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
             <CalendarPlus size={12} /> Reschedule
           </button>
           <button onClick={onCancel} disabled={isPending}
-            style={{ display: 'flex', alignItems: 'center', color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer', padding: '6px' }}>
+            style={{ display: 'flex', alignItems: 'center', color: 'var(--hf-text-faint)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px' }}>
             <X size={14} />
           </button>
         </div>
@@ -266,13 +266,13 @@ function OutcomePrompt({ f, rescheduleDate, setRescheduleDate, isPending, onComp
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <input type="date" value={rescheduleDate} onChange={e => setRescheduleDate(e.target.value)}
             min={new Date().toISOString().slice(0, 10)}
-            style={{ padding: '6px 10px', fontSize: 13, border: '1.5px solid #E2E8F0', borderRadius: 6, fontFamily: 'inherit' }} />
+            style={{ padding: '6px 10px', fontSize: 13, border: '1.5px solid var(--hf-border)', borderRadius: 6, fontFamily: 'inherit' }} />
           <button onClick={onSubmitReschedule} disabled={isPending || !rescheduleDate}
-            style={{ fontSize: 12, fontWeight: 600, color: '#1D4ED8', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+            style={{ fontSize: 12, fontWeight: 600, color: 'var(--hf-info-text)', background: 'var(--hf-info-soft)', border: '1px solid var(--hf-info-border)', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
             {isPending ? 'Rescheduling…' : 'Confirm new date'}
           </button>
           <button onClick={() => setPickingDate(false)} disabled={isPending}
-            style={{ fontSize: 12, color: '#374151', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+            style={{ fontSize: 12, color: 'var(--hf-text-secondary)', background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
             Back
           </button>
         </div>
@@ -293,7 +293,7 @@ function FollowUpRow({ f, onStartComplete, onReopen, onDelete, rescheduledTo }: 
   return (
     <div style={{
       display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 0',
-      borderBottom: '1px solid #F8FAFC', opacity: f.completed ? 0.75 : 1,
+      borderBottom: '1px solid var(--hf-border-subtle)', opacity: f.completed ? 0.75 : 1,
     }}>
       {!f.completed ? (
         <button onClick={onStartComplete} title="Record outcome"
@@ -303,17 +303,17 @@ function FollowUpRow({ f, onStartComplete, onReopen, onDelete, rescheduledTo }: 
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
           }} />
       ) : (
-        <div style={{ flexShrink: 0, marginTop: 1, width: 18, height: 18, borderRadius: '50%', background: outcomeCfg?.color ?? '#16A34A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ flexShrink: 0, marginTop: 1, width: 18, height: 18, borderRadius: '50%', background: outcomeCfg?.color ?? 'var(--hf-success)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Check size={11} color="white" />
         </div>
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 12.5, color: '#0F172A', margin: '0 0 2px', lineHeight: 1.4 }}>
+        <p style={{ fontSize: 12.5, color: 'var(--hf-text)', margin: '0 0 2px', lineHeight: 1.4 }}>
           {f.note}
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, flexWrap: 'wrap' }}>
           {f.overdue && !f.completed && <AlertTriangle size={10} color="#DC2626" />}
-          <span style={{ color: f.overdue && !f.completed ? '#DC2626' : '#94A3B8', fontWeight: f.overdue && !f.completed ? 600 : 400 }}>
+          <span style={{ color: f.overdue && !f.completed ? 'var(--hf-danger-text)' : 'var(--hf-text-faint)', fontWeight: f.overdue && !f.completed ? 600 : 400 }}>
             {f.completed ? fmtDate(f.completedAt!) : `Due ${fmtDate(f.dueDate)}`}
           </span>
           {outcomeCfg && (
@@ -325,17 +325,17 @@ function FollowUpRow({ f, onStartComplete, onReopen, onDelete, rescheduledTo }: 
             </span>
           )}
           {rescheduledTo && (
-            <span style={{ color: '#1D4ED8' }}>→ new follow-up due {fmtDate(rescheduledTo.dueDate)}</span>
+            <span style={{ color: 'var(--hf-info-text)' }}>→ new follow-up due {fmtDate(rescheduledTo.dueDate)}</span>
           )}
         </div>
       </div>
       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
         {f.completed && (
-          <button onClick={onReopen} title="Reopen" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex', padding: 3 }}>
+          <button onClick={onReopen} title="Reopen" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex', padding: 3 }}>
             <RotateCcw size={12} />
           </button>
         )}
-        <button onClick={onDelete} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#CBD5E1', display: 'flex', padding: 3 }}>
+        <button onClick={onDelete} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-disabled)', display: 'flex', padding: 3 }}>
           <Trash2 size={12} />
         </button>
       </div>

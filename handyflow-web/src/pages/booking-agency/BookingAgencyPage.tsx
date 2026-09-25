@@ -134,13 +134,13 @@ export function BookingAgencyPage() {
   return (
     <div style={{ display: "flex", height: "calc(100vh - 60px)", fontFamily: "'Inter', system-ui, sans-serif" }}>
       {/* Client list */}
-      <div style={{ width: 300, borderRight: `1px solid ${BORDER}`, background: "#fff", display: "flex", flexDirection: "column" }}>
+      <div style={{ width: 300, borderRight: `1px solid ${BORDER}`, background: "var(--hf-surface)", display: "flex", flexDirection: "column" }}>
         <div style={{ padding: 16, borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 style={{ fontSize: 15, fontWeight: 800, color: INK, margin: 0 }}>Booking Clients</h2>
           <div style={{ display: "flex", gap: 6 }}>
             <button onClick={() => setShowAgencyProfile(true)} style={btnSecondary}>Agency Profile</button>
             <button onClick={() => setShowNewClient(true)}
-              style={{ padding: "5px 10px", background: NAVY, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              style={{ padding: "5px 10px", background: NAVY, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
               + New
             </button>
           </div>
@@ -160,7 +160,7 @@ export function BookingAgencyPage() {
             visibleClients.map(c => (
               <button key={c.id} onClick={() => { setSelected(c); setTab("resources") }}
                 style={{ display: "block", width: "100%", textAlign: "left" as const, padding: "12px 16px",
-                  background: selected?.id === c.id ? "#EFF6FF" : "none", border: "none",
+                  background: selected?.id === c.id ? "var(--hf-info-soft)" : "none", border: "none",
                   borderBottom: `1px solid ${BORDER}`, cursor: "pointer",
                   opacity: c.status === "INACTIVE" ? 0.55 : 1 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 700, color: INK }}>{c.tradingName}</div>
@@ -186,8 +186,8 @@ export function BookingAgencyPage() {
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => setShowEditClient(true)} style={btnSecondary}>Edit</button>
                 <button onClick={toggleArchive} disabled={archiving}
-                  style={{ ...btnSecondary, color: selected.status === "INACTIVE" ? "#166534" : "#DC2626",
-                    borderColor: selected.status === "INACTIVE" ? "#166534" : "#DC2626" }}>
+                  style={{ ...btnSecondary, color: selected.status === "INACTIVE" ? "var(--hf-success-text-strong)" : "var(--hf-danger-text)",
+                    borderColor: selected.status === "INACTIVE" ? "var(--hf-success-solid-strong)" : "var(--hf-danger)" }}>
                   {archiving ? "…" : selected.status === "INACTIVE" ? "Reactivate" : "Deactivate"}
                 </button>
               </div>
@@ -561,7 +561,7 @@ function OfferingsTab({ client }: { client: BookAgencyClient }) {
                   <div style={{ display: "flex", gap: 6 }}>
                     <button onClick={() => setEditing(o)} style={btnSecondary}>Edit</button>
                     <button onClick={() => handleDeactivate(o.id)} disabled={deactivatingId === o.id}
-                      style={{ ...btnSecondary, color: "#DC2626", borderColor: "#DC2626" }}>
+                      style={{ ...btnSecondary, color: "var(--hf-danger-text)", borderColor: "var(--hf-danger)" }}>
                       {deactivatingId === o.id ? "…" : "Deactivate"}
                     </button>
                   </div>
@@ -691,7 +691,7 @@ function BookingsTab({ client }: { client: BookAgencyClient }) {
                   <div style={{ display: "flex", gap: 6 }}>
                     <button onClick={() => handleAction(b.id, "complete")} style={btnSecondary}>Complete</button>
                     <button onClick={() => handleAction(b.id, "no-show")} style={btnSecondary}>No-show</button>
-                    <button onClick={() => handleAction(b.id, "cancel")} style={{ ...btnSecondary, color: "#DC2626", borderColor: "#DC2626" }}>Cancel</button>
+                    <button onClick={() => handleAction(b.id, "cancel")} style={{ ...btnSecondary, color: "var(--hf-danger-text)", borderColor: "var(--hf-danger)" }}>Cancel</button>
                   </div>
                 )}
               </td>
@@ -818,7 +818,7 @@ function PortalAccessTab({ client }: { client: BookAgencyClient }) {
               <td style={cellStyle}>
                 {g.status !== "REVOKED" && (
                   <button onClick={() => handleRevoke(g.id)} disabled={revokingId === g.id}
-                    style={{ ...btnSecondary, color: "#DC2626", borderColor: "#DC2626" }}>
+                    style={{ ...btnSecondary, color: "var(--hf-danger-text)", borderColor: "var(--hf-danger)" }}>
                     {revokingId === g.id ? "…" : "Revoke"}
                   </button>
                 )}
@@ -868,13 +868,13 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
 
 function StatusBadge({ status }: { status: string }) {
   const tones: Record<string, { c: string; bg: string }> = {
-    ACTIVE: { c: "#166534", bg: "#DCFCE7" }, CONFIRMED: { c: "#1D4ED8", bg: "#EFF6FF" },
-    COMPLETED: { c: "#166534", bg: "#DCFCE7" }, INACTIVE: { c: "#64748B", bg: "#F1F5F9" },
-    CANCELLED: { c: "#64748B", bg: "#F1F5F9" }, NO_SHOW: { c: "#DC2626", bg: "#FEF2F2" },
-    PENDING: { c: "#D97706", bg: "#FFFBEB" }, REVOKED: { c: "#DC2626", bg: "#FEF2F2" },
-    DRAFT: { c: "#64748B", bg: "#F1F5F9" }, SENT: { c: "#1D4ED8", bg: "#EFF6FF" },
-    PARTIAL: { c: "#1D4ED8", bg: "#EFF6FF" }, PAID: { c: "#166534", bg: "#DCFCE7" },
-    OVERDUE: { c: "#DC2626", bg: "#FEF2F2" },
+    ACTIVE: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" }, CONFIRMED: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+    COMPLETED: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" }, INACTIVE: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
+    CANCELLED: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" }, NO_SHOW: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
+    PENDING: { c: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" }, REVOKED: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
+    DRAFT: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" }, SENT: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+    PARTIAL: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" }, PAID: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+    OVERDUE: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
   }
   const t = tones[status] ?? tones.INACTIVE
   return <span style={{ background: t.bg, color: t.c, padding: "2px 8px", borderRadius: 20, fontSize: 10.5, fontWeight: 700 }}>{status}</span>
@@ -882,7 +882,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function Table({ headers, children }: { headers: string[]; children: React.ReactNode }) {
   return (
-    <table style={{ width: "100%", borderCollapse: "collapse" as const, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
+    <table style={{ width: "100%", borderCollapse: "collapse" as const, background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
       <thead>
         <tr style={{ background: CANVAS }}>
           {headers.map(h => <th key={h} style={{ textAlign: "left" as const, padding: "8px 12px", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase" as const, letterSpacing: "0.03em" }}>{h}</th>)}
@@ -901,7 +901,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
       onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
+      <div style={{ background: "var(--hf-surface)", borderRadius: 12, padding: 24, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
         onClick={e => e.stopPropagation()}>
         <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 800, color: INK }}>{title}</h3>
         {children}
@@ -920,7 +920,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function ErrorBox({ text }: { text: string }) {
-  return <div style={{ padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, fontSize: 12.5, color: "#DC2626", marginBottom: 12 }}>{text}</div>
+  return <div style={{ padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 12.5, color: "var(--hf-danger-text)", marginBottom: 12 }}>{text}</div>
 }
 
 function ModalActions({ onClose, onSubmit, saving, submitLabel }: { onClose: () => void; onSubmit: () => void; saving: boolean; submitLabel: string }) {
@@ -933,7 +933,7 @@ function ModalActions({ onClose, onSubmit, saving, submitLabel }: { onClose: () 
 }
 
 const inputStyle: React.CSSProperties = { width: "100%", padding: "8px 10px", border: `1.5px solid ${BORDER}`, borderRadius: 6, fontSize: 13, boxSizing: "border-box" }
-const btnPrimary: React.CSSProperties = { padding: "7px 14px", background: NAVY, color: "#fff", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
-const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "#fff", color: NAVY, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }
+const btnPrimary: React.CSSProperties = { padding: "7px 14px", background: NAVY, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
+const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "var(--hf-surface)", color: NAVY, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }
 const rowStyle: React.CSSProperties = { borderTop: `1px solid ${BORDER}` }
 const cellStyle: React.CSSProperties = { padding: "8px 12px", fontSize: 12.5, color: INK }

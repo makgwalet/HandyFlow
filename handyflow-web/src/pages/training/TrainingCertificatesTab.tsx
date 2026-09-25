@@ -51,9 +51,9 @@ export default function TrainingCertificatesTab() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <p style={{ fontSize: 13, color: "#94A3B8", margin: 0 }}>{certificates.length} certificate{certificates.length === 1 ? "" : "s"}</p>
+        <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0 }}>{certificates.length} certificate{certificates.length === 1 ? "" : "s"}</p>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-          style={{ padding: "6px 10px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, fontFamily: "inherit" }}>
+          style={{ padding: "6px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12, fontFamily: "inherit" }}>
           <option value="">All statuses</option>
           <option value="VALID">Valid</option>
           <option value="EXPIRED">Expired</option>
@@ -61,37 +61,37 @@ export default function TrainingCertificatesTab() {
         </select>
       </div>
 
-      <p style={{ fontSize: 11.5, color: "#94A3B8", margin: "0 0 14px" }}>
+      <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: "0 0 14px" }}>
         Certificates are issued from a completed enrollment on the session's detail page, not here.
       </p>
 
       {isLoading ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p>
       ) : certificates.length === 0 ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>No certificates issued yet.</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No certificates issued yet.</p>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {certificates.map((c, i) => (
-            <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9" }}>
+            <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: "#FFFBEB", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--hf-warning-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Award size={15} color="#D97706" />
                 </div>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <p style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A", margin: 0 }}>{c.employeeNameSnapshot}</p>
+                    <p style={{ fontSize: 13.5, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{c.employeeNameSnapshot}</p>
                     <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: `${STATUS_COLORS[c.status]}18`, color: STATUS_COLORS[c.status] }}>{c.status}</span>
                   </div>
-                  <p style={{ fontSize: 11.5, color: "#94A3B8", margin: 0 }}>
+                  <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>
                     {c.courseTitleSnapshot} · {c.certificateNumber} · Issued {c.issueDate}{c.expiryDate ? ` · Expires ${c.expiryDate}` : " · No expiry"}
                   </p>
-                  {c.revokedReason && <p style={{ fontSize: 11, color: "#DC2626", margin: "2px 0 0" }}>Revoked: {c.revokedReason}</p>}
+                  {c.revokedReason && <p style={{ fontSize: 11, color: "var(--hf-danger-text)", margin: "2px 0 0" }}>Revoked: {c.revokedReason}</p>}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 6 }}>
                 <button onClick={() => downloadPdf(c)} style={btnStyle}><Download size={12} /> PDF</button>
                 {c.status === "VALID" && (
-                  <button onClick={() => revoke.mutate(c.id)} style={{ ...btnStyle, color: "#DC2626" }}><Ban size={12} /> Revoke</button>
+                  <button onClick={() => revoke.mutate(c.id)} style={{ ...btnStyle, color: "var(--hf-danger-text)" }}><Ban size={12} /> Revoke</button>
                 )}
               </div>
             </div>

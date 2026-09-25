@@ -204,7 +204,7 @@ export function PortalClientDetailPage() {
                     fontSize: 11,
                     fontWeight: 700,
                     background: tab === t.id ? color.navy : color.border,
-                    color: tab === t.id ? "#fff" : color.slate,
+                    color: tab === t.id ? "var(--hf-text-on-solid)" : color.slate,
                     borderRadius: radius.pill,
                     padding: "1px 6px",
                     minWidth: 16,
@@ -396,7 +396,7 @@ export function PortalClientDetailPage() {
             </div>
             {uploading && <div style={{ fontSize: 12.5, color: color.muted, marginTop: space(2) }}>Uploading…</div>}
             {uploadError && (
-              <div style={{ marginTop: space(3), padding: `${space(2)} ${space(3)}`, background: color.redBg, border: "1px solid #FECACA", borderRadius: radius.sm, fontSize: 13, color: color.red }}>
+              <div style={{ marginTop: space(3), padding: `${space(2)} ${space(3)}`, background: color.redBg, border: "1px solid var(--hf-danger-border)", borderRadius: radius.sm, fontSize: 13, color: color.red }}>
                 {uploadError}
               </div>
             )}
@@ -460,7 +460,7 @@ function PrimaryButton({ children, onClick, disabled, small }: { children: React
       style={{
         padding: small ? "7px 14px" : "9px 18px",
         background: disabled ? color.faint : color.navy,
-        color: "#fff",
+        color: "var(--hf-text-on-solid)",
         border: "none",
         borderRadius: 8,
         fontSize: small ? 12.5 : 13.5,

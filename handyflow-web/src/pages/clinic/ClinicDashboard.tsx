@@ -73,23 +73,23 @@ export default function ClinicDashboard({ onNavigate }: { onNavigate: (tab: any)
         {/* Today's schedule */}
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>
               Today — {new Date().toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long" })}
             </span>
             <button onClick={() => onNavigate("appointments")}
-              style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#0D9488",
+              style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-accent-text)",
                 background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
               View all <ArrowRight size={13} />
             </button>
           </div>
 
           {todayA.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed #E2E8F0",
-              borderRadius: 12, color: "#94A3B8" }}>
+            <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed var(--hf-border)",
+              borderRadius: 12, color: "var(--hf-text-faint)" }}>
               <Calendar size={32} color="#CBD5E1" style={{ marginBottom: 10 }} />
-              <div style={{ fontWeight: 600, color: "#475569" }}>No appointments today</div>
+              <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No appointments today</div>
               <button onClick={() => onNavigate("appointments")}
-                style={{ marginTop: 12, padding: "7px 16px", background: "#0D9488", color: "#fff",
+                style={{ marginTop: 12, padding: "7px 16px", background: "var(--hf-accent)", color: "var(--hf-text-on-solid)",
                   border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
                 Book appointment
               </button>
@@ -100,19 +100,19 @@ export default function ClinicDashboard({ onNavigate }: { onNavigate: (tab: any)
                 const s = STATUS_CFG[a.status] ?? STATUS_CFG.SCHEDULED
                 return (
                   <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px",
-                    border: "1px solid #E2E8F0", borderRadius: 10, background: "#fff" }}>
+                    border: "1px solid var(--hf-border)", borderRadius: 10, background: "var(--hf-surface)" }}>
                     <div style={{ textAlign: "center", minWidth: 44 }}>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: "#0F172A" }}>{fmtTime(a.scheduledAt)}</div>
-                      <div style={{ fontSize: 10, color: "#94A3B8" }}>{a.durationMinutes}m</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "var(--hf-text)" }}>{fmtTime(a.scheduledAt)}</div>
+                      <div style={{ fontSize: 10, color: "var(--hf-text-faint)" }}>{a.durationMinutes}m</div>
                     </div>
                     <div style={{ width: 3, height: 36, borderRadius: 2, background: s.color, flexShrink: 0 }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                        <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{a.patientName}</span>
+                        <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{a.patientName}</span>
                         <span style={{ fontSize: 10, fontWeight: 600, background: s.bg, color: s.color,
                           padding: "1px 7px", borderRadius: 20 }}>{s.label}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: "#64748B" }}>
+                      <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>
                         {a.appointmentType?.replace("_"," ")}
                         {a.practitionerName ? ` · ${a.practitionerName}` : ""}
                       </div>
@@ -128,7 +128,7 @@ export default function ClinicDashboard({ onNavigate }: { onNavigate: (tab: any)
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* Next up */}
           {upcoming[0] && (
-            <div style={{ background: "#0D9488", borderRadius: 12, padding: 20, color: "#fff" }}>
+            <div style={{ background: "var(--hf-accent)", borderRadius: 12, padding: 20, color: "var(--hf-text-on-solid)" }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 8,
                 textTransform: "uppercase", letterSpacing: "0.06em" }}>Next up</div>
               <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 3 }}>{upcoming[0].patientName}</div>
@@ -145,39 +145,39 @@ export default function ClinicDashboard({ onNavigate }: { onNavigate: (tab: any)
           )}
 
           {/* Practitioners */}
-          <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 12 }}>Practitioners</div>
+          <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 12 }}>Practitioners</div>
             {(practitioners as any[]).slice(0, 5).map((p: any) => (
               <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0",
-                borderBottom: "1px solid #F1F5F9" }}>
-                <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#E0F2FE",
+                borderBottom: "1px solid var(--hf-border-subtle)" }}>
+                <div style={{ width: 30, height: 30, borderRadius: "50%", background: "var(--hf-sky-soft-strong)",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 11, fontWeight: 700, color: "#0369A1", flexShrink: 0 }}>
+                  fontSize: 11, fontWeight: 700, color: "var(--hf-sky-text-strong)", flexShrink: 0 }}>
                   {p.firstName?.[0]}{p.lastName?.[0]}
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A",
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)",
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.fullName}</div>
-                  <div style={{ fontSize: 11, color: "#94A3B8" }}>{p.specialty}</div>
+                  <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{p.specialty}</div>
                 </div>
               </div>
             ))}
             {practitioners.length === 0 && (
-              <div style={{ fontSize: 13, color: "#94A3B8" }}>No practitioners added</div>
+              <div style={{ fontSize: 13, color: "var(--hf-text-faint)" }}>No practitioners added</div>
             )}
           </div>
 
           {/* Quick actions */}
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 10 }}>Quick actions</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 10 }}>Quick actions</div>
             {[
               { label: "Register patient",    tab: "patients",      color: "#1B3A6B" },
               { label: "Book appointment",    tab: "appointments",  color: "#0D9488" },
               { label: "Record consultation", tab: "consultations", color: "#7C3AED" },
             ].map(a => (
               <button key={a.label} onClick={() => onNavigate(a.tab)}
-                style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "#fff",
-                  border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "var(--hf-surface)",
+                  border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600,
                   color: a.color, cursor: "pointer", textAlign: "left", display: "flex",
                   alignItems: "center", justifyContent: "space-between" }}>
                 {a.label} <ArrowRight size={13} />

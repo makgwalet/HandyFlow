@@ -91,10 +91,10 @@ interface SamplingPlanResp {
 // ── Config ─────────────────────────────────────────────────────────────────────
 
 const RISK_CFG: Record<string, { color: string; bg: string }> = {
-  LOW:      { color: "#166534", bg: "#DCFCE7" },
-  MEDIUM:   { color: "#B45309", bg: "#FFFBEB" },
-  HIGH:     { color: "#C2410C", bg: "#FFEDD5" },
-  CRITICAL: { color: "#DC2626", bg: "#FEF2F2" },
+  LOW:      { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+  MEDIUM:   { color: "var(--hf-warning-text-strong)", bg: "var(--hf-warning-soft)" },
+  HIGH:     { color: "var(--hf-orange-text-strong)", bg: "var(--hf-orange-soft)" },
+  CRITICAL: { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
 }
 const ENGAGEMENT_ROLES = ["HEAD_OF_INTERNAL_AUDIT", "AUDIT_MANAGER", "SENIOR_AUDITOR", "AUDITOR", "AUDIT_REVIEWER"]
 const ALLOWED_WP_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png",
@@ -102,10 +102,10 @@ const ALLOWED_WP_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/p
   "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]
 const MAX_WP_BYTES = 10 * 1024 * 1024
 const WP_STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
-  DRAFT:      { label: "Draft",      color: "#64748B", bg: "#F1F5F9" },
-  PREPARED:   { label: "Prepared",   color: "#B45309", bg: "#FFFBEB" },
-  REVIEWED:   { label: "Reviewed",   color: "#1D4ED8", bg: "#EFF6FF" },
-  SIGNED_OFF: { label: "Signed Off", color: "#166534", bg: "#DCFCE7" },
+  DRAFT:      { label: "Draft",      color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
+  PREPARED:   { label: "Prepared",   color: "var(--hf-warning-text-strong)", bg: "var(--hf-warning-soft)" },
+  REVIEWED:   { label: "Reviewed",   color: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+  SIGNED_OFF: { label: "Signed Off", color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
 }
 
 const TOP_TABS = [
@@ -114,15 +114,15 @@ const TOP_TABS = [
   { id: "engagements", label: "Engagements",    icon: ClipboardList },
 ] as const
 
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "#fff", outline: "none" }
-const cancelBtn: React.CSSProperties = { padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }
-const submitBtn: React.CSSProperties = { padding: "9px 18px", border: "none", borderRadius: 9, background: "#1B3A6B", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "var(--hf-surface)", outline: "none" }
+const cancelBtn: React.CSSProperties = { padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }
+const submitBtn: React.CSSProperties = { padding: "9px 18px", border: "none", borderRadius: 9, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", fontSize: 14, fontWeight: 600, cursor: "pointer" }
 const modalOverlay: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }
-const modalBox: React.CSSProperties = { background: "#fff", borderRadius: 14, padding: 26, width: 460, maxHeight: "85vh", overflowY: "auto" as const }
+const modalBox: React.CSSProperties = { background: "var(--hf-surface)", borderRadius: 14, padding: 26, width: 460, maxHeight: "85vh", overflowY: "auto" as const }
 
 function RiskBadge({ level }: { level: string | null }) {
-  if (!level) return <span style={{ fontSize: 11, color: "#94A3B8" }}>Not assessed</span>
+  if (!level) return <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>Not assessed</span>
   const c = RISK_CFG[level] ?? RISK_CFG.LOW
   return <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: c.bg, color: c.color }}>{level}</span>
 }
@@ -153,16 +153,16 @@ export default function InternalAuditPage() {
   return (
     <div style={{ padding: "24px 28px" }}>
       <div style={{ marginBottom: 18 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0F172A" }}>Internal Audit</h1>
-        <div style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>Risk-based audit planning — Phase 1: universe, risk scoring, annual plan, engagements</div>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "var(--hf-text)" }}>Internal Audit</h1>
+        <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginTop: 2 }}>Risk-based audit planning — Phase 1: universe, risk scoring, annual plan, engagements</div>
       </div>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 20, borderBottom: "1px solid #E2E8F0" }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 20, borderBottom: "1px solid var(--hf-border)" }}>
         {TOP_TABS.map(t => {
           const Icon = t.icon; const active = tab === t.id
           return (
             <button key={t.id} onClick={() => setTab(t.id)}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", background: "none", border: "none", borderBottom: active ? "2px solid #1B3A6B" : "2px solid transparent", color: active ? "#1B3A6B" : "#64748B", fontWeight: active ? 700 : 500, fontSize: 13, cursor: "pointer" }}>
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", background: "none", border: "none", borderBottom: active ? "2px solid var(--hf-primary)" : "2px solid transparent", color: active ? "var(--hf-primary-text)" : "var(--hf-text-muted)", fontWeight: active ? 700 : 500, fontSize: 13, cursor: "pointer" }}>
               <Icon size={15} /> {t.label}
             </button>
           )
@@ -230,73 +230,73 @@ function UniverseSection({ universe, isLoading, qc }: { universe: UniverseEntry[
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-        <button onClick={openNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+        <button onClick={openNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={14} /> New Universe Entry
         </button>
       </div>
-      {error && <div style={{ padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#DC2626", fontSize: 13, marginBottom: 14 }}>{error}</div>}
+      {error && <div style={{ padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, color: "var(--hf-danger-text)", fontSize: 13, marginBottom: 14 }}>{error}</div>}
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>Loading…</div>
+        <div style={{ textAlign: "center", padding: 30, color: "var(--hf-text-faint)" }}>Loading…</div>
       ) : universe.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "50px 20px", color: "#94A3B8", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+        <div style={{ textAlign: "center", padding: "50px 20px", color: "var(--hf-text-faint)", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>
           <Database size={30} style={{ marginBottom: 10, opacity: 0.3 }} />
           No universe entries yet — register the business processes or GL account groups you plan to audit.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {universe.map(u => (
-            <div key={u.id} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10, opacity: u.active ? 1 : 0.6 }}>
+            <div key={u.id} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 10, opacity: u.active ? 1 : 0.6 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <button onClick={() => setExpanded(expanded === u.id ? null : u.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
+                  <button onClick={() => setExpanded(expanded === u.id ? null : u.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}>
                     {expanded === u.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </button>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{u.name}</div>
-                    <div style={{ fontSize: 12, color: "#94A3B8" }}>{u.processArea || "—"}{u.glAccountGroup ? ` · ${u.glAccountGroup}` : ""}</div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{u.name}</div>
+                    <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>{u.processArea || "—"}{u.glAccountGroup ? ` · ${u.glAccountGroup}` : ""}</div>
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <RiskBadge level={u.currentRiskLevel} />
-                  <button onClick={() => openEdit(u)} style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Edit</button>
+                  <button onClick={() => openEdit(u)} style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Edit</button>
                   {u.active && (
-                    <button onClick={() => deactivate.mutate(u.id)} style={{ padding: "6px 8px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, cursor: "pointer", color: "#DC2626" }}><Ban size={13} /></button>
+                    <button onClick={() => deactivate.mutate(u.id)} style={{ padding: "6px 8px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-danger-text)" }}><Ban size={13} /></button>
                   )}
                 </div>
               </div>
 
               {expanded === u.id && (
                 <div style={{ padding: "0 16px 16px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingTop: 12, borderTop: "1px solid #F1F5F9" }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>Risk Assessment History</span>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingTop: 12, borderTop: "1px solid var(--hf-border-subtle)" }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const }}>Risk Assessment History</span>
                     <button onClick={() => { setAssessForm({ inherentRiskScore: 3, controlRiskScore: 3, historicalFindingsScore: 3, businessRegulatoryImpactScore: 3 }); setShowAssessForm(u.id); setError("") }}
-                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid #7C3AED", background: "#F5F3FF", color: "#7C3AED", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid var(--hf-violet)", background: "var(--hf-violet-soft)", color: "var(--hf-violet-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                       <ShieldAlert size={11} /> New Assessment
                     </button>
                   </div>
                   {riskHistoryQuery.isLoading ? (
-                    <p style={{ fontSize: 12, color: "#94A3B8" }}>Loading…</p>
+                    <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Loading…</p>
                   ) : !riskHistoryQuery.data?.length ? (
-                    <p style={{ fontSize: 12, color: "#94A3B8" }}>No risk assessments recorded yet.</p>
+                    <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>No risk assessments recorded yet.</p>
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {riskHistoryQuery.data.map(r => (
-                        <div key={r.id} style={{ padding: "10px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
+                        <div key={r.id} style={{ padding: "10px 12px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <span style={{ color: "#94A3B8" }}>System-calculated:</span> <RiskBadge level={r.systemCalculatedRisk} />
-                              <span style={{ color: "#94A3B8" }}>→ Final:</span> <RiskBadge level={r.finalAuditRisk} />
+                              <span style={{ color: "var(--hf-text-faint)" }}>System-calculated:</span> <RiskBadge level={r.systemCalculatedRisk} />
+                              <span style={{ color: "var(--hf-text-faint)" }}>→ Final:</span> <RiskBadge level={r.finalAuditRisk} />
                             </div>
                             {r.finalAuditRisk === r.systemCalculatedRisk && (
                               <button onClick={() => { setOverrideForm({ finalAuditRisk: r.finalAuditRisk, reason: "" }); setShowOverride(r) }}
-                                style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                                style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                                 Override
                               </button>
                             )}
                           </div>
-                          {r.overrideReason && <div style={{ color: "#B45309", marginTop: 6, fontStyle: "italic" }}>"{r.overrideReason}"</div>}
-                          <div style={{ color: "#94A3B8", marginTop: 6 }}>
+                          {r.overrideReason && <div style={{ color: "var(--hf-warning-text-strong)", marginTop: 6, fontStyle: "italic" }}>"{r.overrideReason}"</div>}
+                          <div style={{ color: "var(--hf-text-faint)", marginTop: 6 }}>
                             Inherent {r.inherentRiskScore} · Control {r.controlRiskScore} · Findings {r.historicalFindingsScore} · Time Since Audit {r.timeSinceLastAuditScore} · Impact {r.businessRegulatoryImpactScore}
                           </div>
                         </div>
@@ -314,7 +314,7 @@ function UniverseSection({ universe, isLoading, qc }: { universe: UniverseEntry[
       {showForm && (
         <div style={modalOverlay}>
           <div style={modalBox}>
-            <h3 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>{showForm === "new" ? "New Universe Entry" : "Edit Universe Entry"}</h3>
+            <h3 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>{showForm === "new" ? "New Universe Entry" : "Edit Universe Entry"}</h3>
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Name *</label>
               <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Payroll" style={inp} />
@@ -345,9 +345,9 @@ function UniverseSection({ universe, isLoading, qc }: { universe: UniverseEntry[
       {showAssessForm && (
         <div style={modalOverlay}>
           <div style={modalBox}>
-            <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>New Risk Assessment</h3>
-            <p style={{ fontSize: 12, color: "#94A3B8", marginBottom: 16 }}>Score each factor 1 (lowest) to 5 (highest). "Time since last audit" is calculated automatically from this entry's last audit date.</p>
-            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>New Risk Assessment</h3>
+            <p style={{ fontSize: 12, color: "var(--hf-text-faint)", marginBottom: 16 }}>Score each factor 1 (lowest) to 5 (highest). "Time since last audit" is calculated automatically from this entry's last audit date.</p>
+            {error && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{error}</p>}
             {(["inherentRiskScore", "controlRiskScore", "historicalFindingsScore", "businessRegulatoryImpactScore"] as const).map(field => (
               <div key={field} style={{ marginBottom: 14 }}>
                 <label style={lbl}>
@@ -372,9 +372,9 @@ function UniverseSection({ universe, isLoading, qc }: { universe: UniverseEntry[
       {showOverride && (
         <div style={modalOverlay}>
           <div style={modalBox}>
-            <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Override Risk Level</h3>
-            <p style={{ fontSize: 12, color: "#94A3B8", marginBottom: 16 }}>System-calculated: <strong>{showOverride.systemCalculatedRisk}</strong>. A reason is required if you change this.</p>
-            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Override Risk Level</h3>
+            <p style={{ fontSize: 12, color: "var(--hf-text-faint)", marginBottom: 16 }}>System-calculated: <strong>{showOverride.systemCalculatedRisk}</strong>. A reason is required if you change this.</p>
+            {error && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{error}</p>}
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Final Audit Risk</label>
               <select value={overrideForm.finalAuditRisk} onChange={e => setOverrideForm(f => ({ ...f, finalAuditRisk: e.target.value }))} style={inp}>
@@ -383,7 +383,7 @@ function UniverseSection({ universe, isLoading, qc }: { universe: UniverseEntry[
               </select>
             </div>
             <div style={{ marginBottom: 18 }}>
-              <label style={lbl}>Reason {overrideForm.finalAuditRisk !== showOverride.systemCalculatedRisk && <span style={{ color: "#DC2626" }}>*</span>}</label>
+              <label style={lbl}>Reason {overrideForm.finalAuditRisk !== showOverride.systemCalculatedRisk && <span style={{ color: "var(--hf-danger-text)" }}>*</span>}</label>
               <textarea value={overrideForm.reason} onChange={e => setOverrideForm(f => ({ ...f, reason: e.target.value }))} rows={3}
                 placeholder="e.g. Major payroll system migration occurred in Q2." style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
             </div>
@@ -432,34 +432,34 @@ function PlansSection({ plans, universe, isLoading, qc }: { plans: AnnualPlan[];
     <div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
         <button onClick={() => { setPlanYear(new Date().getFullYear() + 1); setShowNewPlan(true); setError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={14} /> New Annual Plan
         </button>
       </div>
-      {error && <div style={{ padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#DC2626", fontSize: 13, marginBottom: 14 }}>{error}</div>}
+      {error && <div style={{ padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, color: "var(--hf-danger-text)", fontSize: 13, marginBottom: 14 }}>{error}</div>}
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>Loading…</div>
+        <div style={{ textAlign: "center", padding: 30, color: "var(--hf-text-faint)" }}>Loading…</div>
       ) : plans.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "50px 20px", color: "#94A3B8", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+        <div style={{ textAlign: "center", padding: "50px 20px", color: "var(--hf-text-faint)", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>
           <CalendarRange size={30} style={{ marginBottom: 10, opacity: 0.3 }} />
           No annual plans yet.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {plans.map(p => (
-            <div key={p.id} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10 }}>
+            <div key={p.id} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <button onClick={() => setExpanded(expanded === p.id ? null : p.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
+                  <button onClick={() => setExpanded(expanded === p.id ? null : p.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}>
                     {expanded === p.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </button>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{p.planYear} Audit Plan</div>
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: p.status === "APPROVED" || p.status === "ACTIVE" ? "#DCFCE7" : "#F1F5F9", color: p.status === "APPROVED" || p.status === "ACTIVE" ? "#166534" : "#64748B" }}>{p.status}</span>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{p.planYear} Audit Plan</div>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: p.status === "APPROVED" || p.status === "ACTIVE" ? "var(--hf-success-soft-strong)" : "var(--hf-surface-sunken)", color: p.status === "APPROVED" || p.status === "ACTIVE" ? "var(--hf-success-text-strong)" : "var(--hf-text-muted)" }}>{p.status}</span>
                 </div>
                 {p.status === "DRAFT" && (
                   <button onClick={() => approvePlan.mutate(p.id)} disabled={approvePlan.isPending}
-                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "#DCFCE7", color: "#166534", border: "1px solid #86EFAC", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                     <CheckCircle2 size={13} /> Approve
                   </button>
                 )}
@@ -467,23 +467,23 @@ function PlansSection({ plans, universe, isLoading, qc }: { plans: AnnualPlan[];
 
               {expanded === p.id && (
                 <div style={{ padding: "0 16px 16px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingTop: 12, borderTop: "1px solid #F1F5F9" }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>Plan Entries — {p.entries.length}</span>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingTop: 12, borderTop: "1px solid var(--hf-border-subtle)" }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const }}>Plan Entries — {p.entries.length}</span>
                     <button onClick={() => { setEntryForm({ universeEntryId: "", plannedQuarter: 1, rationale: "" }); setShowAddEntry(p.id); setError("") }}
-                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid #1B3A6B", background: "#EFF6FF", color: "#1B3A6B", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid var(--hf-primary)", background: "var(--hf-info-soft)", color: "var(--hf-primary-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                       <Plus size={11} /> Add Entry
                     </button>
                   </div>
                   {p.entries.length === 0 ? (
-                    <p style={{ fontSize: 12, color: "#94A3B8" }}>No universe entries selected into this plan yet.</p>
+                    <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>No universe entries selected into this plan yet.</p>
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {p.entries.map(e => (
-                        <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
+                        <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 12px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
                           <div>
-                            <strong style={{ color: "#0F172A" }}>{e.universeEntryName}</strong>
-                            {e.plannedQuarter && <span style={{ color: "#94A3B8", marginLeft: 8 }}>Q{e.plannedQuarter}</span>}
-                            {e.rationale && <div style={{ color: "#94A3B8", marginTop: 2 }}>{e.rationale}</div>}
+                            <strong style={{ color: "var(--hf-text)" }}>{e.universeEntryName}</strong>
+                            {e.plannedQuarter && <span style={{ color: "var(--hf-text-faint)", marginLeft: 8 }}>Q{e.plannedQuarter}</span>}
+                            {e.rationale && <div style={{ color: "var(--hf-text-faint)", marginTop: 2 }}>{e.rationale}</div>}
                           </div>
                           <RiskBadge level={e.riskLevel} />
                         </div>
@@ -500,8 +500,8 @@ function PlansSection({ plans, universe, isLoading, qc }: { plans: AnnualPlan[];
       {showNewPlan && (
         <div style={modalOverlay}>
           <div style={{ ...modalBox, width: 360 }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>New Annual Plan</h3>
-            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>New Annual Plan</h3>
+            {error && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{error}</p>}
             <label style={lbl}>Plan Year</label>
             <input type="number" value={planYear} onChange={e => setPlanYear(Number(e.target.value))} style={inp} />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
@@ -515,8 +515,8 @@ function PlansSection({ plans, universe, isLoading, qc }: { plans: AnnualPlan[];
       {showAddEntry && (
         <div style={modalOverlay}>
           <div style={modalBox}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Add Plan Entry</h3>
-            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Add Plan Entry</h3>
+            {error && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{error}</p>}
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Universe Entry *</label>
               <select value={entryForm.universeEntryId} onChange={e => setEntryForm(f => ({ ...f, universeEntryId: e.target.value }))} style={inp}>
@@ -796,42 +796,42 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
     <div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
         <button onClick={() => { setForm({ universeEntryId: "", planEntryId: "", name: "", startDate: "", endDate: "" }); setShowNew(true); setError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={14} /> New Engagement
         </button>
       </div>
-      {error && <div style={{ padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#DC2626", fontSize: 13, marginBottom: 14 }}>{error}</div>}
+      {error && <div style={{ padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, color: "var(--hf-danger-text)", fontSize: 13, marginBottom: 14 }}>{error}</div>}
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>Loading…</div>
+        <div style={{ textAlign: "center", padding: 30, color: "var(--hf-text-faint)" }}>Loading…</div>
       ) : engagements.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "50px 20px", color: "#94A3B8", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+        <div style={{ textAlign: "center", padding: "50px 20px", color: "var(--hf-text-faint)", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>
           <ClipboardList size={30} style={{ marginBottom: 10, opacity: 0.3 }} />
           No engagements yet.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {engagements.map(e => (
-            <div key={e.id} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10 }}>
+            <div key={e.id} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <button onClick={() => expandEngagement(e)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
+                  <button onClick={() => expandEngagement(e)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}>
                     {expanded === e.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </button>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{e.name}</div>
-                    <div style={{ fontSize: 12, color: "#94A3B8" }}>{e.universeEntryName}{!e.planEntryId && " · Ad-hoc"}</div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{e.name}</div>
+                    <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>{e.universeEntryName}{!e.planEntryId && " · Ad-hoc"}</div>
                   </div>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: "#F1F5F9", color: "#64748B" }}>{e.status}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: "var(--hf-surface-sunken)", color: "var(--hf-text-muted)" }}>{e.status}</span>
               </div>
 
               {expanded === e.id && (
                 <div style={{ padding: "0 16px 16px" }}>
-                  <div style={{ display: "flex", gap: 4, marginBottom: 12, paddingTop: 12, borderTop: "1px solid #F1F5F9" }}>
+                  <div style={{ display: "flex", gap: 4, marginBottom: 12, paddingTop: 12, borderTop: "1px solid var(--hf-border-subtle)" }}>
                     {(["team", "planning", "workpapers", "sampling", "findings"] as const).map(st => (
                       <button key={st} onClick={() => setEngagementSubTab(st)}
-                        style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: engagementSubTab === st ? "#EFF6FF" : "transparent", color: engagementSubTab === st ? "#1B3A6B" : "#94A3B8", fontWeight: engagementSubTab === st ? 700 : 500, fontSize: 12, cursor: "pointer", textTransform: "capitalize" as const }}>
+                        style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: engagementSubTab === st ? "var(--hf-info-soft)" : "transparent", color: engagementSubTab === st ? "var(--hf-primary-text)" : "var(--hf-text-faint)", fontWeight: engagementSubTab === st ? 700 : 500, fontSize: 12, cursor: "pointer", textTransform: "capitalize" as const }}>
                         {st}
                       </button>
                     ))}
@@ -840,21 +840,21 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                   {engagementSubTab === "team" && (
                     <div>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>Team — {e.assignments.length}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const }}>Team — {e.assignments.length}</span>
                         <button onClick={() => { setAssignForm({ userId: "", role: "AUDITOR" }); setShowAssign(e.id); setError("") }}
-                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid #1B3A6B", background: "#EFF6FF", color: "#1B3A6B", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid var(--hf-primary)", background: "var(--hf-info-soft)", color: "var(--hf-primary-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                           <UserPlus size={11} /> Assign
                         </button>
                       </div>
                       {e.assignments.length === 0 ? (
-                        <p style={{ fontSize: 12, color: "#94A3B8" }}>No team members assigned yet.</p>
+                        <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>No team members assigned yet.</p>
                       ) : (
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                           {e.assignments.map(a => (
-                            <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
+                            <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
                               <Users2 size={13} color="#7C3AED" />
-                              <span style={{ fontWeight: 600, color: "#0F172A" }}>{a.userName}</span>
-                              <span style={{ color: "#7C3AED", fontWeight: 600 }}>{a.role.replace(/_/g, " ")}</span>
+                              <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{a.userName}</span>
+                              <span style={{ color: "var(--hf-violet-text)", fontWeight: 600 }}>{a.role.replace(/_/g, " ")}</span>
                             </div>
                           ))}
                         </div>
@@ -891,25 +891,25 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                         </div>
                       </div>
                       <button onClick={() => updatePlanning.mutate(e.id)} disabled={updatePlanning.isPending}
-                        style={{ padding: "7px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", marginBottom: 18 }}>
+                        style={{ padding: "7px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", marginBottom: 18 }}>
                         {updatePlanning.isPending ? "Saving…" : "Save Planning Detail"}
                       </button>
 
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingTop: 14, borderTop: "1px solid #F1F5F9" }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>Specific Materiality (optional)</span>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingTop: 14, borderTop: "1px solid var(--hf-border-subtle)" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const }}>Specific Materiality (optional)</span>
                         <button onClick={() => { setMaterialityForm({ accountOrGlSegment: "", threshold: "" }); setShowAddMateriality(true) }}
-                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid #1B3A6B", background: "#EFF6FF", color: "#1B3A6B", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid var(--hf-primary)", background: "var(--hf-info-soft)", color: "var(--hf-primary-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                           <Plus size={11} /> Add
                         </button>
                       </div>
                       {e.specificMateriality.length === 0 ? (
-                        <p style={{ fontSize: 12, color: "#94A3B8" }}>No account-specific thresholds — the engagement-level materiality above applies to everything by default.</p>
+                        <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>No account-specific thresholds — the engagement-level materiality above applies to everything by default.</p>
                       ) : (
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                           {e.specificMateriality.map(m => (
-                            <div key={m.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
-                              <span style={{ fontWeight: 600, color: "#0F172A" }}>{m.accountOrGlSegment}</span>
-                              <span style={{ color: "#64748B" }}>R {m.threshold.toLocaleString()}</span>
+                            <div key={m.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
+                              <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{m.accountOrGlSegment}</span>
+                              <span style={{ color: "var(--hf-text-muted)" }}>R {m.threshold.toLocaleString()}</span>
                             </div>
                           ))}
                         </div>
@@ -922,18 +922,18 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                       <div style={{ display: "flex", gap: 12 }}>
                         <div style={{ width: 180, flexShrink: 0 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>Folders</span>
-                            <button onClick={() => { setFolderForm({ name: "", folderType: "GENERAL" }); setShowNewFolder(true) }} style={{ background: "none", border: "none", cursor: "pointer", color: "#1B3A6B" }}><Plus size={13} /></button>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const }}>Folders</span>
+                            <button onClick={() => { setFolderForm({ name: "", folderType: "GENERAL" }); setShowNewFolder(true) }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-primary-text)" }}><Plus size={13} /></button>
                           </div>
                           {foldersQuery.isLoading ? (
-                            <p style={{ fontSize: 11, color: "#94A3B8" }}>Loading…</p>
+                            <p style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>Loading…</p>
                           ) : !foldersQuery.data?.length ? (
-                            <p style={{ fontSize: 11, color: "#94A3B8" }}>No folders yet.</p>
+                            <p style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>No folders yet.</p>
                           ) : (
                             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                               {foldersQuery.data.map(f => (
                                 <button key={f.id} onClick={() => { setSelectedFolder(f.id); setShowDeletedFiles(false) }}
-                                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", borderRadius: 6, border: "none", background: selectedFolder === f.id ? "#EFF6FF" : "transparent", color: selectedFolder === f.id ? "#1B3A6B" : "#374151", fontSize: 12, fontWeight: selectedFolder === f.id ? 700 : 500, cursor: "pointer", textAlign: "left" as const }}>
+                                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", borderRadius: 6, border: "none", background: selectedFolder === f.id ? "var(--hf-info-soft)" : "transparent", color: selectedFolder === f.id ? "var(--hf-primary-text)" : "var(--hf-text-secondary)", fontSize: 12, fontWeight: selectedFolder === f.id ? 700 : 500, cursor: "pointer", textAlign: "left" as const }}>
                                   <Folder size={12} /> {f.name}
                                 </button>
                               ))}
@@ -941,49 +941,49 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                           )}
                         </div>
 
-                        <div style={{ flex: 1, borderLeft: "1px solid #F1F5F9", paddingLeft: 14 }}>
+                        <div style={{ flex: 1, borderLeft: "1px solid var(--hf-border-subtle)", paddingLeft: 14 }}>
                           {!selectedFolder ? (
-                            <p style={{ fontSize: 12, color: "#94A3B8" }}>Select a folder to view its files.</p>
+                            <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Select a folder to view its files.</p>
                           ) : (
                             <div>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                                 <button onClick={() => setShowDeletedFiles(v => !v)}
-                                  style={{ fontSize: 11, color: "#64748B", background: "none", border: "1px solid #E2E8F0", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
+                                  style={{ fontSize: 11, color: "var(--hf-text-muted)", background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
                                   {showDeletedFiles ? "Show Active" : "Show Deleted"}
                                 </button>
                                 {!showDeletedFiles && (
-                                  <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: "#1B3A6B", cursor: "pointer" }}>
+                                  <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: "var(--hf-primary-text)", cursor: "pointer" }}>
                                     <Upload size={12} /> {uploadFile.isPending ? `Uploading ${uploadFileName}…` : "Upload File"}
                                     <input type="file" style={{ display: "none" }} onChange={ev => { const f = ev.target.files?.[0]; if (f) handleFileUpload(f); ev.target.value = "" }} />
                                   </label>
                                 )}
                               </div>
                               {filesQuery.isLoading ? (
-                                <p style={{ fontSize: 12, color: "#94A3B8" }}>Loading…</p>
+                                <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Loading…</p>
                               ) : !filesQuery.data?.length ? (
-                                <p style={{ fontSize: 12, color: "#94A3B8" }}>{showDeletedFiles ? "No deleted files." : "No files in this folder yet."}</p>
+                                <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>{showDeletedFiles ? "No deleted files." : "No files in this folder yet."}</p>
                               ) : (
                                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                                   {filesQuery.data.map(f => {
                                     const sc = WP_STATUS_CFG[f.reviewStatus] ?? WP_STATUS_CFG.DRAFT
                                     return (
-                                      <div key={f.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
+                                      <div key={f.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                           <FileText size={13} color="#94A3B8" />
-                                          <span style={{ fontWeight: 600, color: "#0F172A" }}>{f.fileName}</span>
-                                          <span style={{ color: "#CBD5E1" }}>v{f.versionNumber}</span>
+                                          <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{f.fileName}</span>
+                                          <span style={{ color: "var(--hf-text-disabled)" }}>v{f.versionNumber}</span>
                                           <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: sc.bg, color: sc.color }}>{sc.label}</span>
                                         </div>
                                         <div style={{ display: "flex", gap: 6 }}>
                                           {showDeletedFiles ? (
-                                            <button onClick={() => restoreFile.mutate(f.id)} title="Restore" style={{ padding: "4px 6px", background: "#DCFCE7", border: "1px solid #86EFAC", borderRadius: 6, cursor: "pointer", color: "#166534" }}><RotateCcw size={12} /></button>
+                                            <button onClick={() => restoreFile.mutate(f.id)} title="Restore" style={{ padding: "4px 6px", background: "var(--hf-success-soft-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 6, cursor: "pointer", color: "var(--hf-success-text-strong)" }}><RotateCcw size={12} /></button>
                                           ) : (
                                             <>
-                                              {f.reviewStatus === "DRAFT" && <button onClick={() => updateFileStatus.mutate({ fileId: f.id, action: "PREPARE" })} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 11, cursor: "pointer" }}>Prepare</button>}
-                                              {f.reviewStatus === "PREPARED" && <button onClick={() => updateFileStatus.mutate({ fileId: f.id, action: "REVIEW" })} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 11, cursor: "pointer" }}>Review</button>}
-                                              {f.reviewStatus === "REVIEWED" && <button onClick={() => updateFileStatus.mutate({ fileId: f.id, action: "SIGN_OFF" })} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #86EFAC", background: "#DCFCE7", color: "#166534", fontSize: 11, cursor: "pointer" }}>Sign Off</button>}
-                                              {f.reviewStatus !== "DRAFT" && <button onClick={() => updateFileStatus.mutate({ fileId: f.id, action: "REOPEN" })} title="Reopen" style={{ padding: "4px 6px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 6, cursor: "pointer", color: "#94A3B8" }}><Eye size={12} /></button>}
-                                              <button onClick={() => deleteFile.mutate(f.id)} title="Delete" style={{ padding: "4px 6px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, cursor: "pointer", color: "#DC2626" }}><Trash2 size={12} /></button>
+                                              {f.reviewStatus === "DRAFT" && <button onClick={() => updateFileStatus.mutate({ fileId: f.id, action: "PREPARE" })} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 11, cursor: "pointer" }}>Prepare</button>}
+                                              {f.reviewStatus === "PREPARED" && <button onClick={() => updateFileStatus.mutate({ fileId: f.id, action: "REVIEW" })} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 11, cursor: "pointer" }}>Review</button>}
+                                              {f.reviewStatus === "REVIEWED" && <button onClick={() => updateFileStatus.mutate({ fileId: f.id, action: "SIGN_OFF" })} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--hf-success-border)", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", fontSize: 11, cursor: "pointer" }}>Sign Off</button>}
+                                              {f.reviewStatus !== "DRAFT" && <button onClick={() => updateFileStatus.mutate({ fileId: f.id, action: "REOPEN" })} title="Reopen" style={{ padding: "4px 6px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 6, cursor: "pointer", color: "var(--hf-text-faint)" }}><Eye size={12} /></button>}
+                                              <button onClick={() => deleteFile.mutate(f.id)} title="Delete" style={{ padding: "4px 6px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, cursor: "pointer", color: "var(--hf-danger-text)" }}><Trash2 size={12} /></button>
                                             </>
                                           )}
                                         </div>
@@ -1002,32 +1002,32 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                   {engagementSubTab === "sampling" && (
                     <div>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>Sampling Plans — {samplingPlansQuery.data?.length ?? 0}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const }}>Sampling Plans — {samplingPlansQuery.data?.length ?? 0}</span>
                         <button onClick={() => { setPlanForm({ samplingObjective: "", riskLevel: "MEDIUM", expectedErrorRate: "", tolerableErrorRate: "", sampleSize: 25, selectionMethod: "RANDOM", samplePeriodFrom: "", samplePeriodTo: "", exclusions: "", rationale: "" }); setShowNewPlan(true); setError("") }}
-                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid #1B3A6B", background: "#EFF6FF", color: "#1B3A6B", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid var(--hf-primary)", background: "var(--hf-info-soft)", color: "var(--hf-primary-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                           <Plus size={11} /> New Sampling Plan
                         </button>
                       </div>
 
                       {samplingPlansQuery.isLoading ? (
-                        <p style={{ fontSize: 12, color: "#94A3B8" }}>Loading…</p>
+                        <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Loading…</p>
                       ) : !samplingPlansQuery.data?.length ? (
-                        <p style={{ fontSize: 12, color: "#94A3B8" }}>No sampling plans yet.</p>
+                        <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>No sampling plans yet.</p>
                       ) : (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
                           {samplingPlansQuery.data.map(p => (
-                            <div key={p.id} style={{ border: "1px solid #E2E8F0", borderRadius: 8 }}>
+                            <div key={p.id} style={{ border: "1px solid var(--hf-border)", borderRadius: 8 }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", cursor: "pointer" }} onClick={() => setExpandedPlan(expandedPlan === p.id ? null : p.id)}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                   {expandedPlan === p.id ? <ChevronUp size={13} color="#94A3B8" /> : <ChevronDown size={13} color="#94A3B8" />}
-                                  <span style={{ fontWeight: 700, fontSize: 12, color: "#0F172A" }}>{p.samplePeriodFrom} to {p.samplePeriodTo}</span>
-                                  <span style={{ fontSize: 11, color: "#94A3B8" }}>{p.sampleSize} of {p.population} entries</span>
+                                  <span style={{ fontWeight: 700, fontSize: 12, color: "var(--hf-text)" }}>{p.samplePeriodFrom} to {p.samplePeriodTo}</span>
+                                  <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{p.sampleSize} of {p.population} entries</span>
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: p.status === "FINALIZED" ? "#DCFCE7" : "#F1F5F9", color: p.status === "FINALIZED" ? "#166534" : "#64748B" }}>{p.status}</span>
+                                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: p.status === "FINALIZED" ? "var(--hf-success-soft-strong)" : "var(--hf-surface-sunken)", color: p.status === "FINALIZED" ? "var(--hf-success-text-strong)" : "var(--hf-text-muted)" }}>{p.status}</span>
                                   {p.status === "DRAFT" && (
                                     <button onClick={ev => { ev.stopPropagation(); reviewPlan.mutate(p.id) }}
-                                      style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #86EFAC", background: "#DCFCE7", color: "#166534", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                                      style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid var(--hf-success-border)", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
                                       Review & Finalize
                                     </button>
                                   )}
@@ -1035,35 +1035,35 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                               </div>
 
                               {expandedPlan === p.id && (
-                                <div style={{ padding: "0 12px 12px", borderTop: "1px solid #F1F5F9" }}>
-                                  {p.rationale && <p style={{ fontSize: 11, color: "#94A3B8", margin: "10px 0" }}>{p.rationale}</p>}
+                                <div style={{ padding: "0 12px 12px", borderTop: "1px solid var(--hf-border-subtle)" }}>
+                                  {p.rationale && <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: "10px 0" }}>{p.rationale}</p>}
                                   <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
                                     {p.items.map(item => (
-                                      <div key={item.id} style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, padding: "8px 10px" }}>
+                                      <div key={item.id} style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "8px 10px" }}>
                                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: item.tests.length ? 6 : 0 }}>
-                                          <span style={{ fontSize: 12, fontWeight: 600, color: "#0F172A" }}>{item.entryNumberSnapshot} — {item.entryDateSnapshot}</span>
+                                          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--hf-text)" }}>{item.entryNumberSnapshot} — {item.entryDateSnapshot}</span>
                                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                            <span style={{ fontSize: 11, color: "#64748B" }}>R {item.amountSnapshot?.toLocaleString() ?? "—"}</span>
+                                            <span style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>R {item.amountSnapshot?.toLocaleString() ?? "—"}</span>
                                             <button onClick={() => { setTestProcedure(""); setShowNewTest(item.id) }}
-                                              style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                                              style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
                                               + Test
                                             </button>
                                           </div>
                                         </div>
                                         {item.tests.map(t => (
-                                          <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 8px", background: "#fff", border: "1px solid #F1F5F9", borderRadius: 6, fontSize: 11, marginTop: 4 }}>
-                                            <span style={{ color: "#374151" }}>{t.procedure}</span>
+                                          <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 8px", background: "var(--hf-surface)", border: "1px solid var(--hf-border-subtle)", borderRadius: 6, fontSize: 11, marginTop: 4 }}>
+                                            <span style={{ color: "var(--hf-text-secondary)" }}>{t.procedure}</span>
                                             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20, background: t.result === "PASS" ? "#DCFCE7" : t.result === "PENDING" ? "#F1F5F9" : "#FEF2F2", color: t.result === "PASS" ? "#166534" : t.result === "PENDING" ? "#64748B" : "#DC2626" }}>{t.result}</span>
+                                              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20, background: t.result === "PASS" ? "var(--hf-success-soft-strong)" : t.result === "PENDING" ? "var(--hf-surface-sunken)" : "var(--hf-danger-soft)", color: t.result === "PASS" ? "var(--hf-success-text-strong)" : t.result === "PENDING" ? "var(--hf-text-muted)" : "var(--hf-danger-text)" }}>{t.result}</span>
                                               {t.result === "PENDING" && (
                                                 <button onClick={() => { setResultForm({ result: "PASS", notes: "" }); setShowRecordResult(t.id) }}
-                                                  style={{ padding: "2px 7px", borderRadius: 5, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 10, cursor: "pointer" }}>
+                                                  style={{ padding: "2px 7px", borderRadius: 5, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 10, cursor: "pointer" }}>
                                                   Record
                                                 </button>
                                               )}
                                               {(t.result === "FAIL" || t.result === "EXCEPTION") && t.exceptions.length === 0 && (
                                                 <button onClick={() => { setExceptionForm({ description: "", severity: "MEDIUM" }); setShowRaiseException(t.id) }}
-                                                  style={{ padding: "2px 7px", borderRadius: 5, border: "1px solid #FECACA", background: "#FEF2F2", color: "#DC2626", fontSize: 10, cursor: "pointer" }}>
+                                                  style={{ padding: "2px 7px", borderRadius: 5, border: "1px solid var(--hf-danger-border)", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", fontSize: 10, cursor: "pointer" }}>
                                                   Raise Exception
                                                 </button>
                                               )}
@@ -1080,27 +1080,27 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                         </div>
                       )}
 
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, marginBottom: 8, paddingTop: 12, borderTop: "1px solid #F1F5F9" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, marginBottom: 8, paddingTop: 12, borderTop: "1px solid var(--hf-border-subtle)" }}>
                         Exceptions — {exceptionsQuery.data?.length ?? 0}
                       </div>
                       {!exceptionsQuery.data?.length ? (
-                        <p style={{ fontSize: 12, color: "#94A3B8" }}>No exceptions raised for this engagement.</p>
+                        <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>No exceptions raised for this engagement.</p>
                       ) : (
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                           {exceptionsQuery.data.map(ex => {
                             const sevColor = ex.severity === "CRITICAL" || ex.severity === "HIGH" ? "#DC2626" : ex.severity === "MEDIUM" ? "#B45309" : "#64748B"
                             const sevBg = ex.severity === "CRITICAL" || ex.severity === "HIGH" ? "#FEF2F2" : ex.severity === "MEDIUM" ? "#FFFBEB" : "#F1F5F9"
                             return (
-                              <div key={ex.id} style={{ padding: "9px 12px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
+                              <div key={ex.id} style={{ padding: "9px 12px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
                                   <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: sevBg, color: sevColor }}>{ex.severity}</span>
-                                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: ex.status === "OPEN" ? "#FFFBEB" : "#F1F5F9", color: ex.status === "OPEN" ? "#B45309" : "#64748B" }}>{ex.status}</span>
+                                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: ex.status === "OPEN" ? "var(--hf-warning-soft)" : "var(--hf-surface-sunken)", color: ex.status === "OPEN" ? "var(--hf-warning-text-strong)" : "var(--hf-text-muted)" }}>{ex.status}</span>
                                 </div>
-                                <p style={{ margin: 0, color: "#374151" }}>{ex.description}</p>
-                                {ex.resolutionNotes && <p style={{ margin: "4px 0 0", color: "#94A3B8", fontStyle: "italic" }}>{ex.resolutionNotes}</p>}
+                                <p style={{ margin: 0, color: "var(--hf-text-secondary)" }}>{ex.description}</p>
+                                {ex.resolutionNotes && <p style={{ margin: "4px 0 0", color: "var(--hf-text-faint)", fontStyle: "italic" }}>{ex.resolutionNotes}</p>}
                                 {ex.status === "OPEN" && (
                                   <button onClick={() => { const notes = prompt("Resolution notes?"); if (notes) dismissException.mutate({ id: ex.id, resolutionNotes: notes }) }}
-                                    style={{ marginTop: 6, padding: "3px 9px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                                    style={{ marginTop: 6, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
                                     Dismiss
                                   </button>
                                 )}
@@ -1116,33 +1116,33 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                     <div>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                         <div>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>Report Sign-off</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const }}>Report Sign-off</span>
                           {reportStatusQuery.data ? (
                             <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 8 }}>
-                              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 20, background: reportStatusQuery.data.status === "APPROVED" ? "#DCFCE7" : reportStatusQuery.data.status === "REJECTED" ? "#FEF2F2" : "#FFFBEB", color: reportStatusQuery.data.status === "APPROVED" ? "#166534" : reportStatusQuery.data.status === "REJECTED" ? "#DC2626" : "#B45309" }}>{reportStatusQuery.data.status}</span>
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 20, background: reportStatusQuery.data.status === "APPROVED" ? "var(--hf-success-soft-strong)" : reportStatusQuery.data.status === "REJECTED" ? "var(--hf-danger-soft)" : "var(--hf-warning-soft)", color: reportStatusQuery.data.status === "APPROVED" ? "var(--hf-success-text-strong)" : reportStatusQuery.data.status === "REJECTED" ? "var(--hf-danger-text)" : "var(--hf-warning-text-strong)" }}>{reportStatusQuery.data.status}</span>
                             </div>
                           ) : (
-                            <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>Not yet submitted for sign-off.</div>
+                            <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>Not yet submitted for sign-off.</div>
                           )}
                         </div>
                         <button onClick={() => submitReport.mutate(e.id)} disabled={submitReport.isPending}
-                          style={{ padding: "7px 14px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          style={{ padding: "7px 14px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                           {submitReport.isPending ? "Submitting…" : reportStatusQuery.data ? "Resubmit for Sign-off" : "Submit for Sign-off"}
                         </button>
                       </div>
 
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingTop: 12, borderTop: "1px solid #F1F5F9" }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>Findings — {findingsQuery.data?.length ?? 0}</span>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingTop: 12, borderTop: "1px solid var(--hf-border-subtle)" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const }}>Findings — {findingsQuery.data?.length ?? 0}</span>
                         <button onClick={() => { setFindingForm({ sourceExceptionId: "", title: "", description: "", rootCause: "", recommendation: "", severity: "MEDIUM", owner: "", dueDate: "" }); setShowNewFinding(true); setError("") }}
-                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid #1B3A6B", background: "#EFF6FF", color: "#1B3A6B", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, border: "1px solid var(--hf-primary)", background: "var(--hf-info-soft)", color: "var(--hf-primary-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                           <Plus size={11} /> Raise Finding
                         </button>
                       </div>
 
                       {findingsQuery.isLoading ? (
-                        <p style={{ fontSize: 12, color: "#94A3B8" }}>Loading…</p>
+                        <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Loading…</p>
                       ) : !findingsQuery.data?.length ? (
-                        <p style={{ fontSize: 12, color: "#94A3B8" }}>No findings raised for this engagement yet.</p>
+                        <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>No findings raised for this engagement yet.</p>
                       ) : (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                           {findingsQuery.data.map(f => {
@@ -1151,43 +1151,43 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                             const statusColor = f.status === "CLOSED" ? "#166534" : f.status === "RESOLVED" ? "#1D4ED8" : f.status === "IN_PROGRESS" ? "#B45309" : "#64748B"
                             const statusBg = f.status === "CLOSED" ? "#DCFCE7" : f.status === "RESOLVED" ? "#EFF6FF" : f.status === "IN_PROGRESS" ? "#FFFBEB" : "#F1F5F9"
                             return (
-                              <div key={f.id} style={{ padding: "12px 14px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10, fontSize: 12 }}>
+                              <div key={f.id} style={{ padding: "12px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 10, fontSize: 12 }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                                  <span style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{f.title}</span>
+                                  <span style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>{f.title}</span>
                                   <div style={{ display: "flex", gap: 6 }}>
                                     <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: sevBg, color: sevColor }}>{f.severity}</span>
                                     <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: statusBg, color: statusColor }}>{f.status.replace(/_/g, " ")}</span>
                                   </div>
                                 </div>
-                                <p style={{ margin: "0 0 6px", color: "#374151" }}>{f.description}</p>
-                                {f.rootCause && <p style={{ margin: "0 0 4px", color: "#94A3B8" }}><strong>Root cause:</strong> {f.rootCause}</p>}
-                                {f.recommendation && <p style={{ margin: "0 0 4px", color: "#94A3B8" }}><strong>Recommendation:</strong> {f.recommendation}</p>}
-                                {f.managementResponse && <p style={{ margin: "0 0 4px", color: "#1D4ED8" }}><strong>Management response:</strong> {f.managementResponse}</p>}
+                                <p style={{ margin: "0 0 6px", color: "var(--hf-text-secondary)" }}>{f.description}</p>
+                                {f.rootCause && <p style={{ margin: "0 0 4px", color: "var(--hf-text-faint)" }}><strong>Root cause:</strong> {f.rootCause}</p>}
+                                {f.recommendation && <p style={{ margin: "0 0 4px", color: "var(--hf-text-faint)" }}><strong>Recommendation:</strong> {f.recommendation}</p>}
+                                {f.managementResponse && <p style={{ margin: "0 0 4px", color: "var(--hf-info-text)" }}><strong>Management response:</strong> {f.managementResponse}</p>}
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-                                  <span style={{ color: "#94A3B8" }}>
+                                  <span style={{ color: "var(--hf-text-faint)" }}>
                                     {f.ownerName && `Owner: ${f.ownerName}`}{f.dueDate && ` · Due ${f.dueDate}`}
                                   </span>
                                   <div style={{ display: "flex", gap: 6 }}>
                                     {(f.status === "OPEN" || f.status === "IN_PROGRESS") && !f.managementResponse && (
                                       <button onClick={() => { setMgmtResponseText(""); setShowMgmtResponse(f.id) }}
-                                        style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                                        style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
                                         Add Management Response
                                       </button>
                                     )}
                                     {f.status === "IN_PROGRESS" && (
                                       <button onClick={() => resolveFinding.mutate(f.id)}
-                                        style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid #BFDBFE", background: "#EFF6FF", color: "#1D4ED8", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                                        style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid var(--hf-info-border)", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
                                         Mark Resolved
                                       </button>
                                     )}
                                     {f.status === "RESOLVED" && (
                                       <>
                                         <button onClick={() => reopenFinding.mutate(f.id)}
-                                          style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                                          style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
                                           Reopen
                                         </button>
                                         <button onClick={() => closeFinding.mutate(f.id)}
-                                          style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid #86EFAC", background: "#DCFCE7", color: "#166534", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                                          style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid var(--hf-success-border)", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
                                           Close
                                         </button>
                                       </>
@@ -1211,8 +1211,8 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
       {showNew && (
         <div style={modalOverlay}>
           <div style={modalBox}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>New Engagement</h3>
-            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>New Engagement</h3>
+            {error && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{error}</p>}
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Name *</label>
               <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="2026 Payroll Audit" style={inp} />
@@ -1254,8 +1254,8 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
       {showAssign && (
         <div style={modalOverlay}>
           <div style={{ ...modalBox, width: 380 }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Assign Engagement Role</h3>
-            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Assign Engagement Role</h3>
+            {error && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{error}</p>}
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>User *</label>
               <select value={assignForm.userId} onChange={e => setAssignForm(f => ({ ...f, userId: e.target.value }))} style={inp}>
@@ -1282,8 +1282,8 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
       {showNewFolder && expanded && (
         <div style={modalOverlay}>
           <div style={{ ...modalBox, width: 360 }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>New Folder</h3>
-            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>New Folder</h3>
+            {error && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{error}</p>}
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Name *</label>
               <input value={folderForm.name} onChange={e => setFolderForm(f => ({ ...f, name: e.target.value }))} placeholder="Fieldwork" style={inp} />
@@ -1309,8 +1309,8 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
       {showAddMateriality && expanded && (
         <div style={modalOverlay}>
           <div style={{ ...modalBox, width: 380 }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Add Specific Materiality</h3>
-            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Add Specific Materiality</h3>
+            {error && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{error}</p>}
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Account / GL Segment *</label>
               <input value={materialityForm.accountOrGlSegment} onChange={e => setMaterialityForm(f => ({ ...f, accountOrGlSegment: e.target.value }))} placeholder="Petty Cash" style={inp} />
@@ -1332,9 +1332,9 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
       {showNewPlan && expanded && (
         <div style={modalOverlay}>
           <div style={modalBox}>
-            <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>New Sampling Plan</h3>
-            <p style={{ fontSize: 11, color: "#94A3B8", marginBottom: 16 }}>Population is calculated automatically from posted journal entries in the period below. The sample is drawn immediately using random selection.</p>
-            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>New Sampling Plan</h3>
+            <p style={{ fontSize: 11, color: "var(--hf-text-faint)", marginBottom: 16 }}>Population is calculated automatically from posted journal entries in the period below. The sample is drawn immediately using random selection.</p>
+            {error && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{error}</p>}
             <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
               <div style={{ flex: 1 }}>
                 <label style={lbl}>Period From *</label>
@@ -1398,8 +1398,8 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
       {showNewTest && (
         <div style={modalOverlay}>
           <div style={{ ...modalBox, width: 400 }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>New Test</h3>
-            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>New Test</h3>
+            {error && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{error}</p>}
             <label style={lbl}>Procedure *</label>
             <textarea value={testProcedure} onChange={e => setTestProcedure(e.target.value)} rows={3}
               placeholder="e.g. Vouch to supporting documentation and confirm dual authorisation" style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
@@ -1416,8 +1416,8 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
       {showRecordResult && (
         <div style={modalOverlay}>
           <div style={{ ...modalBox, width: 400 }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Record Test Result</h3>
-            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Record Test Result</h3>
+            {error && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{error}</p>}
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Result</label>
               <select value={resultForm.result} onChange={e => setResultForm(f => ({ ...f, result: e.target.value }))} style={inp}>
@@ -1441,9 +1441,9 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
       {showRaiseException && (
         <div style={modalOverlay}>
           <div style={{ ...modalBox, width: 400 }}>
-            <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Raise Exception</h3>
-            <p style={{ fontSize: 11, color: "#94A3B8", marginBottom: 14 }}>Severity is independent of the engagement's risk level — assess it on its own terms.</p>
-            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Raise Exception</h3>
+            <p style={{ fontSize: 11, color: "var(--hf-text-faint)", marginBottom: 14 }}>Severity is independent of the engagement's risk level — assess it on its own terms.</p>
+            {error && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{error}</p>}
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Description *</label>
               <textarea value={exceptionForm.description} onChange={e => setExceptionForm(f => ({ ...f, description: e.target.value }))} rows={3} style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
@@ -1467,8 +1467,8 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
       {showNewFinding && expanded && (
         <div style={modalOverlay}>
           <div style={modalBox}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Raise Finding</h3>
-            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Raise Finding</h3>
+            {error && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{error}</p>}
             {openExceptionsForFinding.length > 0 && (
               <div style={{ marginBottom: 14 }}>
                 <label style={lbl}>Promote an Open Exception (optional)</label>
@@ -1526,8 +1526,8 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
       {showMgmtResponse && (
         <div style={modalOverlay}>
           <div style={{ ...modalBox, width: 420 }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Management Response</h3>
-            {error && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{error}</p>}
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Management Response</h3>
+            {error && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{error}</p>}
             <label style={lbl}>The auditee's response *</label>
             <textarea value={mgmtResponseText} onChange={e => setMgmtResponseText(e.target.value)} rows={4} style={{ ...inp, fontFamily: "inherit", resize: "vertical" as const }} />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>

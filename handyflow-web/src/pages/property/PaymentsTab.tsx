@@ -90,11 +90,11 @@ export default function PaymentsTab({ initialLeaseId }: { initialLeaseId?: strin
     <div>
       {/* Arrears banner */}
       {os.length > 0 && (
-        <div style={{ marginBottom: 20, padding: "14px 18px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ marginBottom: 20, padding: "14px 18px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <AlertTriangle size={16} color="#DC2626" />
-            <span style={{ fontWeight: 700, fontSize: 14, color: "#DC2626" }}>{os.length} outstanding payment{os.length !== 1 ? "s" : ""}</span>
-            <span style={{ fontSize: 13, color: "#B91C1C" }}>· Total arrears: <strong>{fmtR(totalArrears)}</strong></span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-danger-text)" }}>{os.length} outstanding payment{os.length !== 1 ? "s" : ""}</span>
+            <span style={{ fontSize: 13, color: "var(--hf-danger-text-strong)" }}>· Total arrears: <strong>{fmtR(totalArrears)}</strong></span>
           </div>
         </div>
       )}
@@ -102,22 +102,22 @@ export default function PaymentsTab({ initialLeaseId }: { initialLeaseId?: strin
       <div style={{ display: "flex", gap: 16 }}>
         {/* Lease selector */}
         <div style={{ width: 280, flexShrink: 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>Active leases</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>Active leases</div>
           <div style={{ display: "flex", flexDirection: "column" as const, gap: 6 }}>
             {(leases as any[]).map(l => (
               <button key={l.id} onClick={() => setLease(l)}
-                style={{ width: "100%", textAlign: "left" as const, padding: "10px 14px", border: `1px solid ${selectedLease?.id === l.id ? "#1B3A6B" : "#E2E8F0"}`, background: selectedLease?.id === l.id ? "#EEF2FF" : "#fff", borderRadius: 9, cursor: "pointer" }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{l.lesseeName}</div>
-                <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{fmtR(l.monthlyRent)}/mo · Day {l.paymentDay}</div>
+                style={{ width: "100%", textAlign: "left" as const, padding: "10px 14px", border: `1px solid ${selectedLease?.id === l.id ? "#1B3A6B" : "#E2E8F0"}`, background: selectedLease?.id === l.id ? "var(--hf-indigo-soft)" : "var(--hf-surface)", borderRadius: 9, cursor: "pointer" }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>{l.lesseeName}</div>
+                <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{fmtR(l.monthlyRent)}/mo · Day {l.paymentDay}</div>
               </button>
             ))}
-            {(leases as any[]).length === 0 && <div style={{ fontSize: 13, color: "#94A3B8", padding: "12px 0" }}>No active leases</div>}
+            {(leases as any[]).length === 0 && <div style={{ fontSize: 13, color: "var(--hf-text-faint)", padding: "12px 0" }}>No active leases</div>}
           </div>
 
           {/* Outstanding summary */}
           {os.length > 0 && (
             <div style={{ marginTop: 20 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>Overdue</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-danger-text)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>Overdue</div>
               {os.slice(0, 8).map((p: any) => {
                 // FIX: these rows had no click behaviour at all — a flat
                 // list of overdue periods with no way to act on any of
@@ -130,9 +130,9 @@ export default function PaymentsTab({ initialLeaseId }: { initialLeaseId?: strin
                 const matchingLease = (leases as any[]).find(l => l.id === p.leaseId)
                 return (
                   <div key={p.id} onClick={() => matchingLease && setLease(matchingLease)}
-                    style={{ padding: "8px 12px", marginBottom: 6, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, cursor: matchingLease ? "pointer" : "default" }}>
-                    <div style={{ fontWeight: 600, fontSize: 12, color: "#DC2626" }}>{MONTH_NAMES[p.periodMonth]} {p.periodYear}</div>
-                    <div style={{ fontSize: 11, color: "#94A3B8" }}>{fmtR(Number(p.amountDue) - Number(p.amountPaid))} outstanding</div>
+                    style={{ padding: "8px 12px", marginBottom: 6, background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, cursor: matchingLease ? "pointer" : "default" }}>
+                    <div style={{ fontWeight: 600, fontSize: 12, color: "var(--hf-danger-text)" }}>{MONTH_NAMES[p.periodMonth]} {p.periodYear}</div>
+                    <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{fmtR(Number(p.amountDue) - Number(p.amountPaid))} outstanding</div>
                   </div>
                 )
               })}
@@ -143,7 +143,7 @@ export default function PaymentsTab({ initialLeaseId }: { initialLeaseId?: strin
         {/* Payment ledger */}
         <div style={{ flex: 1 }}>
           {!selectedLease ? (
-            <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+            <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
               <CreditCard size={36} style={{ marginBottom: 12, opacity: 0.3 }} />
               <div>Select a lease to view the payment ledger</div>
             </div>
@@ -151,19 +151,19 @@ export default function PaymentsTab({ initialLeaseId }: { initialLeaseId?: strin
             <>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{selectedLease.lesseeName}</div>
-                  <div style={{ fontSize: 12, color: "#64748B" }}>{fmtR(selectedLease.monthlyRent)}/mo · Due on {selectedLease.paymentDay}{["st","nd","rd"][selectedLease.paymentDay-1]||"th"}</div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{selectedLease.lesseeName}</div>
+                  <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{fmtR(selectedLease.monthlyRent)}/mo · Due on {selectedLease.paymentDay}{["st","nd","rd"][selectedLease.paymentDay-1]||"th"}</div>
                 </div>
                 <button onClick={() => { setCreate(true); setCreateForm({ periodYear: String(now.getFullYear()), periodMonth: String(now.getMonth()+1), amountDue: selectedLease.monthlyRent, dueDate: "" }); setError("") }}
-                  style={{ display: "flex", alignItems: "center", gap: 6, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                  style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                   <Plus size={13} /> Add period
                 </button>
               </div>
 
               {isLoading ? (
-                <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading...</div>
+                <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading...</div>
               ) : (payments as any[]).length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", border: "1px dashed #E2E8F0", borderRadius: 10, fontSize: 13 }}>
+                <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)", border: "1px dashed var(--hf-border)", borderRadius: 10, fontSize: 13 }}>
                   No payment records yet. Add a period to start tracking.
                 </div>
               ) : (
@@ -173,23 +173,23 @@ export default function PaymentsTab({ initialLeaseId }: { initialLeaseId?: strin
                     const Icon = cfg.icon
                     const balance = Number(p.amountDue) - Number(p.amountPaid)
                     return (
-                      <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", border: `1px solid ${cfg.border}`, borderLeft: `3px solid ${cfg.color}`, borderRadius: 8, background: "#fff" }}>
+                      <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", border: `1px solid ${cfg.border}`, borderLeft: `3px solid ${cfg.color}`, borderRadius: 8, background: "var(--hf-surface)" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                           <Icon size={16} color={cfg.color} />
                           <div>
-                            <div style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{MONTH_NAMES[p.periodMonth]} {p.periodYear}</div>
-                            <div style={{ fontSize: 11, color: "#64748B" }}>Due {fmtD(p.dueDate)}{p.paidDate && ` · Paid ${fmtD(p.paidDate)}`}</div>
+                            <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>{MONTH_NAMES[p.periodMonth]} {p.periodYear}</div>
+                            <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>Due {fmtD(p.dueDate)}{p.paidDate && ` · Paid ${fmtD(p.paidDate)}`}</div>
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
                           <div style={{ textAlign: "right" as const }}>
-                            <div style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{fmtR(p.amountPaid)} / {fmtR(p.amountDue)}</div>
+                            <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>{fmtR(p.amountPaid)} / {fmtR(p.amountDue)}</div>
                             {balance > 0 && <div style={{ fontSize: 11, color: cfg.color, fontWeight: 600 }}>{fmtR(balance)} outstanding</div>}
                           </div>
                           <span style={{ background: cfg.bg, color: cfg.color, padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{p.status}</span>
                           {(p.status === "PENDING" || p.status === "PARTIAL" || p.status === "OVERDUE") && (
                             <button onClick={() => { setRecord(p); setRecordForm({ amountPaid: String(Number(p.amountDue) - Number(p.amountPaid)), paidDate: new Date().toISOString().split("T")[0], paymentMethod: "EFT", reference: "" }); setError("") }}
-                              style={{ padding: "5px 10px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                              style={{ padding: "5px 10px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                               Record
                             </button>
                           )}
@@ -214,7 +214,7 @@ export default function PaymentsTab({ initialLeaseId }: { initialLeaseId?: strin
             </div>
             <div>
               <label style={lbl}>Month *</label>
-              <select value={createForm.periodMonth} onChange={e => setCreateForm(f => ({ ...f, periodMonth: e.target.value }))} style={{ ...inp, background: "#fff" }}>
+              <select value={createForm.periodMonth} onChange={e => setCreateForm(f => ({ ...f, periodMonth: e.target.value }))} style={{ ...inp, background: "var(--hf-surface)" }}>
                 {MONTH_NAMES.slice(1).map((m, i) => <option key={i+1} value={String(i+1)}>{m}</option>)}
               </select>
             </div>
@@ -240,7 +240,7 @@ export default function PaymentsTab({ initialLeaseId }: { initialLeaseId?: strin
       {/* Record payment modal */}
       {showRecord && selectedLease && (
         <ModalShell title={`Record Payment — ${MONTH_NAMES[showRecord.periodMonth]} ${showRecord.periodYear}`} onClose={() => setRecord(null)}>
-          <div style={{ marginBottom: 16, padding: "10px 14px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, fontSize: 13, color: "#1D4ED8" }}>
+          <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-info-text)" }}>
             Amount due: <strong>{fmtR(showRecord.amountDue)}</strong> · Already paid: <strong>{fmtR(showRecord.amountPaid)}</strong>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -254,7 +254,7 @@ export default function PaymentsTab({ initialLeaseId }: { initialLeaseId?: strin
             </div>
             <div>
               <label style={lbl}>Payment method</label>
-              <select value={recordForm.paymentMethod} onChange={e => setRecordForm(f => ({ ...f, paymentMethod: e.target.value }))} style={{ ...inp, background: "#fff" }}>
+              <select value={recordForm.paymentMethod} onChange={e => setRecordForm(f => ({ ...f, paymentMethod: e.target.value }))} style={{ ...inp, background: "var(--hf-surface)" }}>
                 {["EFT","CASH","CARD","DEBIT_ORDER","OTHER"].map(m => <option key={m} value={m}>{m.replace("_"," ")}</option>)}
               </select>
             </div>
@@ -279,10 +279,10 @@ export default function PaymentsTab({ initialLeaseId }: { initialLeaseId?: strin
 function ModalShell({ title, onClose, children }: any) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 520, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 520, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{title}</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{title}</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
         </div>
         {children}
       </div>
@@ -292,14 +292,14 @@ function ModalShell({ title, onClose, children }: any) {
 function ModalFoot({ onCancel, onSubmit, loading, disabled, label }: any) {
   return (
     <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-      <button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
+      <button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
       <button onClick={onSubmit} disabled={disabled || loading}
-        style={{ padding: "9px 22px", background: disabled ? "#94A3B8" : "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+        style={{ padding: "9px 22px", background: disabled ? "var(--hf-text-faint)" : "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
         {loading ? "Saving..." : label}
       </button>
     </div>
   )
 }
 function ErrBox({ msg }: { msg: string }) {
-  return <div style={{ marginTop: 12, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{msg}</div>
+  return <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{msg}</div>
 }

@@ -30,19 +30,19 @@ interface Staff   { id: string; name: string }
 interface Slot    { startTime: string; endTime: string; displayLabel: string }
 
 const STATUS_STYLE: Record<string, { color: string; bg: string; label: string }> = {
-  PENDING:     { color: "#D97706", bg: "#FFFBEB", label: "Pending" },
-  CONFIRMED:   { color: "#1D4ED8", bg: "#EFF6FF", label: "Confirmed" },
-  IN_PROGRESS: { color: "#7C3AED", bg: "#F5F3FF", label: "In Progress" },
-  COMPLETED:   { color: "#166534", bg: "#DCFCE7", label: "Completed" },
-  CANCELLED:   { color: "#DC2626", bg: "#FEF2F2", label: "Cancelled" },
-  NO_SHOW:     { color: "#64748B", bg: "#F8FAFC", label: "No Show" },
+  PENDING:     { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", label: "Pending" },
+  CONFIRMED:   { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", label: "Confirmed" },
+  IN_PROGRESS: { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", label: "In Progress" },
+  COMPLETED:   { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", label: "Completed" },
+  CANCELLED:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", label: "Cancelled" },
+  NO_SHOW:     { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)", label: "No Show" },
 }
 
 const STATUS_ORDER = ["PENDING", "CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "NO_SHOW"]
 const EMPTY_FORM   = { serviceId: "", staffId: "", clientName: "", clientEmail: "", clientPhone: "", bookingDate: "", startTime: "", notes: "" }
 
 function Skeleton({ w = "100%", h = 16, mb = 0 }: { w?: string | number; h?: number; mb?: number }) {
-  return <div style={{ width: w, height: h, background: "#F1F5F9", borderRadius: 6, marginBottom: mb }} />
+  return <div style={{ width: w, height: h, background: "var(--hf-surface-sunken)", borderRadius: 6, marginBottom: mb }} />
 }
 
 export default function BookingsTab() {
@@ -200,30 +200,30 @@ export default function BookingsTab() {
   // WHY: action buttons returned here instead of inline so they're easy to extend
   const nextActions = (status: string) => {
     if (status === "PENDING")     return [
-      { label: "Confirm",   action: "confirm",    color: "#1D4ED8", bg: "#EFF6FF" },
-      { label: "Reschedule", action: "reschedule", color: "#7C3AED", bg: "#F5F3FF", icon: RotateCcw },
-      { label: "Cancel",    action: "cancel",     color: "#DC2626", bg: "#FEF2F2" },
+      { label: "Confirm",   action: "confirm",    color: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+      { label: "Reschedule", action: "reschedule", color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", icon: RotateCcw },
+      { label: "Cancel",    action: "cancel",     color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
     ]
     if (status === "CONFIRMED")   return [
-      { label: "Start",     action: "start",      color: "#7C3AED", bg: "#F5F3FF" },
-      { label: "Reschedule", action: "reschedule", color: "#0D9488", bg: "#F0FDF4", icon: RotateCcw },
-      { label: "No Show",   action: "no-show",    color: "#64748B", bg: "#F8FAFC" },
-      { label: "Cancel",    action: "cancel",     color: "#DC2626", bg: "#FEF2F2" },
+      { label: "Start",     action: "start",      color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)" },
+      { label: "Reschedule", action: "reschedule", color: "var(--hf-accent-text)", bg: "var(--hf-success-soft)", icon: RotateCcw },
+      { label: "No Show",   action: "no-show",    color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)" },
+      { label: "Cancel",    action: "cancel",     color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
     ]
     if (status === "IN_PROGRESS") return [
-      { label: "Complete",  action: "complete",   color: "#166534", bg: "#DCFCE7" },
+      { label: "Complete",  action: "complete",   color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
     ]
     return []
   }
 
   const inpStyle = (key: string): React.CSSProperties => ({
     ...inputStyle,
-    ...(formErrors[key] ? { borderColor: "#DC2626", background: "#FFF5F5" } : {}),
+    ...(formErrors[key] ? { borderColor: "var(--hf-danger)", background: "var(--hf-danger-soft)" } : {}),
   })
 
   const FieldErr = ({ name }: { name: string }) =>
     formErrors[name] ? (
-      <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#DC2626", marginTop: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
         <AlertCircle size={12} />{formErrors[name]}
       </div>
     ) : null
@@ -242,11 +242,11 @@ export default function BookingsTab() {
           <input
             type="date" value={dateFilter}
             onChange={e => setDateFilter(e.target.value)}
-            style={{ padding: "6px 10px", border: "1px solid #E2E8F0", borderRadius: 6, fontSize: 13, color: "#374151" }}
+            style={{ padding: "6px 10px", border: "1px solid var(--hf-border)", borderRadius: 6, fontSize: 13, color: "var(--hf-text-secondary)" }}
           />
           {dateFilter && (
             <button onClick={() => setDateFilter("")}
-              style={{ fontSize: 12, color: "#DC2626", background: "none", border: "none", cursor: "pointer", padding: "6px 4px" }}>
+              style={{ fontSize: 12, color: "var(--hf-danger-text)", background: "none", border: "none", cursor: "pointer", padding: "6px 4px" }}>
               Clear
             </button>
           )}
@@ -256,11 +256,11 @@ export default function BookingsTab() {
             onChange={e => setSearchInput(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") setSearch(searchInput) }}
             placeholder="Search client, phone…"
-            style={{ padding: "6px 10px", border: "1px solid #E2E8F0", borderRadius: 6, fontSize: 13, color: "#374151", width: 180 }}
+            style={{ padding: "6px 10px", border: "1px solid var(--hf-border)", borderRadius: 6, fontSize: 13, color: "var(--hf-text-secondary)", width: 180 }}
           />
           {search && (
             <button onClick={() => { setSearch(""); setSearchInput("") }}
-              style={{ fontSize: 12, color: "#DC2626", background: "none", border: "none", cursor: "pointer", padding: "6px 4px" }}>
+              style={{ fontSize: 12, color: "var(--hf-danger-text)", background: "none", border: "none", cursor: "pointer", padding: "6px 4px" }}>
               Clear search
             </button>
           )}
@@ -293,7 +293,7 @@ export default function BookingsTab() {
       {isLoading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {[1, 2, 3, 4].map(i => (
-            <div key={i} style={{ padding: "14px 18px", border: "1px solid #E2E8F0", borderRadius: 10 }}>
+            <div key={i} style={{ padding: "14px 18px", border: "1px solid var(--hf-border)", borderRadius: 10 }}>
               <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
                 <Skeleton w={52} h={44} />
                 <div style={{ flex: 1 }}>
@@ -308,12 +308,12 @@ export default function BookingsTab() {
       ) : isError ? (
         <div style={{ textAlign: "center", padding: 60 }}>
           <AlertCircle size={32} color="#DC2626" style={{ marginBottom: 10 }} />
-          <div style={{ fontWeight: 600, color: "#DC2626" }}>Failed to load bookings</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-danger-text)" }}>Failed to load bookings</div>
         </div>
       ) : bookings.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Calendar size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
-          <div style={{ fontWeight: 600, color: "#475569", marginBottom: 4 }}>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)", marginBottom: 4 }}>
             {statusFilter || dateFilter ? "No bookings match your filters" : "No bookings yet"}
           </div>
         </div>
@@ -326,28 +326,28 @@ export default function BookingsTab() {
                 <div
                   key={b.id}
                   onClick={() => { setSelected(b); setActionError("") }}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", border: "1px solid #E2E8F0", borderRadius: 10, cursor: "pointer", background: "#fff" }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = "#0D9488")}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = "#E2E8F0")}>
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", border: "1px solid var(--hf-border)", borderRadius: 10, cursor: "pointer", background: "var(--hf-surface)" }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--hf-accent)")}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = "var(--hf-border)")}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                    <div style={{ textAlign: "center", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, padding: "6px 12px", minWidth: 52 }}>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A", lineHeight: 1 }}>{b.bookingDate?.split("-")[2]}</div>
-                      <div style={{ fontSize: 9, color: "#64748B", fontWeight: 600, textTransform: "uppercase" }}>
+                    <div style={{ textAlign: "center", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "6px 12px", minWidth: 52 }}>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: "var(--hf-text)", lineHeight: 1 }}>{b.bookingDate?.split("-")[2]}</div>
+                      <div style={{ fontSize: 9, color: "var(--hf-text-muted)", fontWeight: 600, textTransform: "uppercase" }}>
                         {new Date(b.bookingDate + "T00:00:00").toLocaleString("en-ZA", { month: "short" })}
                       </div>
                     </div>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                        <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{b.clientName}</span>
+                        <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{b.clientName}</span>
                         <span style={{ background: ss.bg, color: ss.color, padding: "2px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{ss.label}</span>
-                        <span style={{ fontSize: 11, color: "#94A3B8" }}>#{b.bookingNumber}</span>
+                        <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>#{b.bookingNumber}</span>
                         {b.originalBookingDate && (
-                          <span title="This booking was rescheduled" style={{ fontSize: 10, color: "#0D9488", background: "#F0FDF4", border: "1px solid #BBF7D0", padding: "1px 6px", borderRadius: 10 }}>
+                          <span title="This booking was rescheduled" style={{ fontSize: 10, color: "var(--hf-accent-text)", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border-subtle)", padding: "1px 6px", borderRadius: 10 }}>
                             rescheduled
                           </span>
                         )}
                       </div>
-                      <div style={{ display: "flex", gap: 14, fontSize: 12, color: "#64748B" }}>
+                      <div style={{ display: "flex", gap: 14, fontSize: 12, color: "var(--hf-text-muted)" }}>
                         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Briefcase size={11} />{b.serviceName}</span>
                         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Clock size={11} />{fmtTime(b.startTime)} – {fmtTime(b.endTime)}</span>
                         {b.staffName && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><User size={11} />{b.staffName}</span>}
@@ -355,7 +355,7 @@ export default function BookingsTab() {
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-                    <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{fmtR(b.price)}</span>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{fmtR(b.price)}</span>
                     <ChevronRight size={15} color="#94A3B8" />
                   </div>
                 </div>
@@ -372,7 +372,7 @@ export default function BookingsTab() {
                 style={{ ...navBtn, opacity: page === 0 ? 0.4 : 1 }}>
                 <ChevronLeft size={15} /> Previous
               </button>
-              <span style={{ fontSize: 13, color: "#64748B" }}>
+              <span style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>
                 Page {page + 1} of {totalPages}
               </span>
               <button
@@ -392,13 +392,13 @@ export default function BookingsTab() {
           <div style={{ ...modal, width: 540 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
               <div>
-                <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 4 }}>#{selected.bookingNumber}</div>
-                <h3 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 800, color: "#0F172A" }}>{selected.clientName}</h3>
+                <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginBottom: 4 }}>#{selected.bookingNumber}</div>
+                <h3 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 800, color: "var(--hf-text)" }}>{selected.clientName}</h3>
                 <span style={{ background: STATUS_STYLE[selected.status]?.bg, color: STATUS_STYLE[selected.status]?.color, padding: "3px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
                   {STATUS_STYLE[selected.status]?.label ?? selected.status}
                 </span>
                 {selected.originalBookingDate && (
-                  <span style={{ marginLeft: 8, fontSize: 11, color: "#0D9488", background: "#F0FDF4", border: "1px solid #BBF7D0", padding: "2px 8px", borderRadius: 10 }}>
+                  <span style={{ marginLeft: 8, fontSize: 11, color: "var(--hf-accent-text)", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border-subtle)", padding: "2px 8px", borderRadius: 10 }}>
                     Rescheduled from {selected.originalBookingDate}
                   </span>
                 )}
@@ -416,26 +416,26 @@ export default function BookingsTab() {
                 ...(selected.clientPhone ? [{ icon: <Phone size={14} />, label: "Phone", value: selected.clientPhone }] : []),
               ].map(({ icon, label, value }) => (
                 <div key={label} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                  <span style={{ color: "#94A3B8", marginTop: 2 }}>{icon}</span>
+                  <span style={{ color: "var(--hf-text-faint)", marginTop: 2 }}>{icon}</span>
                   <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", marginBottom: 1 }}>{label}</div>
-                    <div style={{ fontSize: 13, color: "#0F172A" }}>{value}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase", marginBottom: 1 }}>{label}</div>
+                    <div style={{ fontSize: 13, color: "var(--hf-text)" }}>{value}</div>
                   </div>
                 </div>
               ))}
             </div>
 
             {selected.notes && (
-              <div style={{ marginBottom: 16, padding: "10px 14px", background: "#FFFBEB", border: "1px solid #FEF3C7", borderRadius: 8 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#92400E", marginBottom: 4 }}>NOTES</div>
-                <div style={{ fontSize: 13, color: "#78350F" }}>{selected.notes}</div>
+              <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-warning-text-deep)", marginBottom: 4 }}>NOTES</div>
+                <div style={{ fontSize: 13, color: "var(--hf-warning-text-deep)" }}>{selected.notes}</div>
               </div>
             )}
 
             {selected.cancellationReason && (
-              <div style={{ marginBottom: 16, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#991B1B", marginBottom: 4 }}>CANCELLATION REASON</div>
-                <div style={{ fontSize: 13, color: "#7F1D1D" }}>{selected.cancellationReason}</div>
+              <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-danger-text-strong)", marginBottom: 4 }}>CANCELLATION REASON</div>
+                <div style={{ fontSize: 13, color: "var(--hf-danger-text-strong)" }}>{selected.cancellationReason}</div>
               </div>
             )}
 
@@ -443,27 +443,27 @@ export default function BookingsTab() {
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
               <span style={{
                 fontSize: 11, fontWeight: 600, padding: "2px 10px", borderRadius: 20,
-                background: selected.reminderSent ? "#F0FDF4" : "#F8FAFC",
-                color: selected.reminderSent ? "#166534" : "#94A3B8",
+                background: selected.reminderSent ? "var(--hf-success-soft)" : "var(--hf-surface-muted)",
+                color: selected.reminderSent ? "var(--hf-success-text-strong)" : "var(--hf-text-faint)",
                 border: `1px solid ${selected.reminderSent ? "#BBF7D0" : "#E2E8F0"}`,
               }}>
                 {selected.reminderSent ? "✓ Reminder sent" : "Reminder pending"}
               </span>
               {selected.originalBookingDate && (
-                <span style={{ fontSize: 11, color: "#0D9488", background: "#F0FDF4", border: "1px solid #BBF7D0", padding: "2px 10px", borderRadius: 20 }}>
+                <span style={{ fontSize: 11, color: "var(--hf-accent-text)", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border-subtle)", padding: "2px 10px", borderRadius: 20 }}>
                   Rescheduled from {selected.originalBookingDate}
                 </span>
               )}
             </div>
 
             {actionError && (
-              <div style={{ marginBottom: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", gap: 8 }}>
+              <div style={{ marginBottom: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", gap: 8 }}>
                 <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />{actionError}
               </div>
             )}
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color: "#0F172A" }}>{fmtR(selected.price)}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "var(--hf-text)" }}>{fmtR(selected.price)}</div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <button
                   onClick={async () => {
@@ -477,7 +477,7 @@ export default function BookingsTab() {
                     } catch { /* silent */ }
                   }}
                   title="Download confirmation PDF"
-                  style={{ padding: "7px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: "1px solid #E2E8F0", background: "#F8FAFC", color: "#374151" }}>
+                  style={{ padding: "7px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: "1px solid var(--hf-border)", background: "var(--hf-surface-muted)", color: "var(--hf-text-secondary)" }}>
                   ↓ PDF
                 </button>
                 {nextActions(selected.status).map(({ label, action, color, bg }) => (
@@ -509,13 +509,13 @@ export default function BookingsTab() {
         <div style={overlay}>
           <div style={{ ...modal, width: 480 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Reschedule Booking</h3>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Reschedule Booking</h3>
               <button onClick={() => { setShowReschedule(false); setActionError("") }} style={iconBtn}><X size={20} /></button>
             </div>
 
-            <div style={{ marginBottom: 16, padding: "10px 14px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, fontSize: 13, color: "#1E40AF" }}>
+            <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-info-text-strong)" }}>
               Moving <strong>{selected.clientName}</strong> — {selected.serviceName}<br />
-              <span style={{ fontSize: 12, color: "#3B82F6" }}>
+              <span style={{ fontSize: 12, color: "var(--hf-info-text)" }}>
                 Currently: {selected.bookingDate} at {fmtTime(selected.startTime)}
               </span>
             </div>
@@ -536,7 +536,7 @@ export default function BookingsTab() {
                 <div>
                   <label style={lbl}>New time slot *</label>
                   {rescheduleSlots.length === 0 ? (
-                    <div style={{ padding: "12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", gap: 8 }}>
+                    <div style={{ padding: "12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", gap: 8 }}>
                       <AlertCircle size={14} />No available slots. Try another date.
                     </div>
                   ) : (
@@ -547,9 +547,9 @@ export default function BookingsTab() {
                           onClick={() => setRescheduleForm(f => ({ ...f, newStartTime: slot.startTime }))}
                           style={{
                             padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer",
-                            border: rescheduleForm.newStartTime === slot.startTime ? "2px solid #0D9488" : "1.5px solid #E2E8F0",
-                            background: rescheduleForm.newStartTime === slot.startTime ? "#F0FDF4" : "#fff",
-                            color: rescheduleForm.newStartTime === slot.startTime ? "#0D9488" : "#374151",
+                            border: rescheduleForm.newStartTime === slot.startTime ? "2px solid var(--hf-accent)" : "1.5px solid var(--hf-border)",
+                            background: rescheduleForm.newStartTime === slot.startTime ? "var(--hf-success-soft)" : "var(--hf-surface)",
+                            color: rescheduleForm.newStartTime === slot.startTime ? "var(--hf-accent-text)" : "var(--hf-text-secondary)",
                             fontWeight: rescheduleForm.newStartTime === slot.startTime ? 700 : 400,
                           }}>
                           {slot.displayLabel || `${slot.startTime?.substring(0, 5)} – ${slot.endTime?.substring(0, 5)}`}
@@ -562,14 +562,14 @@ export default function BookingsTab() {
             </div>
 
             {actionError && (
-              <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", gap: 8 }}>
+              <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", gap: 8 }}>
                 <AlertCircle size={14} />{actionError}
               </div>
             )}
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => { setShowReschedule(false); setActionError("") }}
-                style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>
+                style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>
                 Cancel
               </button>
               <button
@@ -584,7 +584,7 @@ export default function BookingsTab() {
                   })
                 }}
                 disabled={statusAction.isPending}
-                style={{ padding: "9px 22px", background: "#0D9488", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {statusAction.isPending ? "Rescheduling…" : "Confirm reschedule"}
               </button>
             </div>
@@ -596,15 +596,15 @@ export default function BookingsTab() {
       {showCancel && selected && (
         <div style={{ ...overlay, zIndex: 1001 }}>
           <div style={{ ...modal, width: 420, textAlign: "center" }}>
-            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#FEF2F2", border: "2px solid #FECACA", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--hf-danger-soft)", border: "2px solid var(--hf-danger-border)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
               <X size={22} color="#DC2626" />
             </div>
-            <h3 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "#0F172A" }}>Cancel Booking?</h3>
-            <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 16px", lineHeight: 1.6 }}>
+            <h3 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "var(--hf-text)" }}>Cancel Booking?</h3>
+            <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: "0 0 16px", lineHeight: 1.6 }}>
               {selected.clientName} — {selected.serviceName} on {selected.bookingDate}
             </p>
             <div style={{ marginBottom: 16, textAlign: "left" }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Reason (optional)</label>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }}>Reason (optional)</label>
               <input
                 value={cancelReason}
                 onChange={e => setCancelReason(e.target.value)}
@@ -614,13 +614,13 @@ export default function BookingsTab() {
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => { setShowCancel(false); setCancelReason(""); setActionError("") }}
-                style={{ flex: 1, padding: "10px", border: "1.5px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#374151" }}>
+                style={{ flex: 1, padding: "10px", border: "1.5px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "var(--hf-text-secondary)" }}>
                 Keep booking
               </button>
               <button
                 onClick={() => statusAction.mutate({ id: selected.id, action: "cancel", body: { reason: cancelReason || "Cancelled" } })}
                 disabled={statusAction.isPending}
-                style={{ flex: 1, padding: "10px", border: "none", borderRadius: 9, background: "#DC2626", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ flex: 1, padding: "10px", border: "none", borderRadius: 9, background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {statusAction.isPending ? "Cancelling…" : "Yes, cancel"}
               </button>
             </div>
@@ -633,7 +633,7 @@ export default function BookingsTab() {
         <div style={overlay}>
           <div style={{ ...modal, width: 580, maxHeight: "88vh", overflowY: "auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>New Booking</h3>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>New Booking</h3>
               <button onClick={() => { setShowCreate(false); setForm(EMPTY_FORM); setFormErrors({}); setCreateError("") }} style={iconBtn}><X size={20} /></button>
             </div>
 
@@ -652,7 +652,7 @@ export default function BookingsTab() {
 
               {/* Staff */}
               <div>
-                <label style={lbl}>Staff <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+                <label style={lbl}>Staff <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
                 <select value={form.staffId} onChange={e => setForm(f => ({ ...f, staffId: e.target.value, startTime: "" }))} style={inputStyle}>
                   <option value="">Any available staff</option>
                   {eligibleStaff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -683,7 +683,7 @@ export default function BookingsTab() {
                 <div style={{ gridColumn: "1 / -1" }}>
                   <label style={lbl}>Available slots *</label>
                   {slots.length === 0 ? (
-                    <div style={{ padding: "12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", gap: 8 }}>
+                    <div style={{ padding: "12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", gap: 8 }}>
                       <AlertCircle size={14} />No available slots. Try another date or staff member.
                     </div>
                   ) : (
@@ -693,9 +693,9 @@ export default function BookingsTab() {
                           onClick={() => { setForm(f => ({ ...f, startTime: slot.startTime })); setFormErrors(f => { const n = { ...f }; delete n.startTime; return n }) }}
                           style={{
                             padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer",
-                            border: form.startTime === slot.startTime ? "2px solid #0D9488" : "1.5px solid #E2E8F0",
-                            background: form.startTime === slot.startTime ? "#F0FDF4" : "#fff",
-                            color: form.startTime === slot.startTime ? "#0D9488" : "#374151",
+                            border: form.startTime === slot.startTime ? "2px solid var(--hf-accent)" : "1.5px solid var(--hf-border)",
+                            background: form.startTime === slot.startTime ? "var(--hf-success-soft)" : "var(--hf-surface)",
+                            color: form.startTime === slot.startTime ? "var(--hf-accent-text)" : "var(--hf-text-secondary)",
                             fontWeight: form.startTime === slot.startTime ? 700 : 400,
                           }}>
                           {slot.displayLabel || `${slot.startTime?.substring(0, 5)} – ${slot.endTime?.substring(0, 5)}`}
@@ -727,7 +727,7 @@ export default function BookingsTab() {
                   {showClientSuggestions && clientSuggestions.length > 0 && (
                     <div style={{
                       position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10,
-                      background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8,
+                      background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8,
                       boxShadow: "0 4px 16px rgba(0,0,0,0.1)", marginTop: 2, overflow: "hidden",
                     }}>
                       {clientSuggestions.map((c: any) => (
@@ -745,10 +745,10 @@ export default function BookingsTab() {
                             setShowClientSuggestions(false)
                           }}
                           style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", width: "100%", padding: "10px 14px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}
-                          onMouseEnter={e => (e.currentTarget.style.background = "#F8FAFC")}
+                          onMouseEnter={e => (e.currentTarget.style.background = "var(--hf-surface-muted)")}
                           onMouseLeave={e => (e.currentTarget.style.background = "none")}>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{c.name}</span>
-                          <span style={{ fontSize: 11, color: "#94A3B8" }}>{[c.email, c.phone].filter(Boolean).join(" · ")}</span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{c.name}</span>
+                          <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{[c.email, c.phone].filter(Boolean).join(" · ")}</span>
                         </button>
                       ))}
                     </div>
@@ -758,7 +758,7 @@ export default function BookingsTab() {
               </div>
 
               <div>
-                <label style={lbl}>Email <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+                <label style={lbl}>Email <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
                 <input type="email" value={form.clientEmail}
                   onChange={e => { setForm(f => ({ ...f, clientEmail: e.target.value })); setFormErrors(f => { const n = { ...f }; delete n.clientEmail; return n }) }}
                   placeholder="client@example.com" style={inpStyle("clientEmail")} />
@@ -766,7 +766,7 @@ export default function BookingsTab() {
               </div>
 
               <div>
-                <label style={lbl}>Phone <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+                <label style={lbl}>Phone <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
                 <input value={form.clientPhone}
                   onChange={e => { setForm(f => ({ ...f, clientPhone: e.target.value.replace(/[^\d\s\-+]/g, "") })); setFormErrors(f => { const n = { ...f }; delete n.clientPhone; return n }) }}
                   placeholder="+27 82 123 4567" style={inpStyle("clientPhone")} />
@@ -774,7 +774,7 @@ export default function BookingsTab() {
               </div>
 
               <div style={{ gridColumn: "1 / -1" }}>
-                <label style={lbl}>Notes <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+                <label style={lbl}>Notes <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
                 <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                   rows={2} placeholder="Any special requirements…"
                   style={{ ...inputStyle, resize: "vertical" }} />
@@ -782,20 +782,20 @@ export default function BookingsTab() {
             </div>
 
             {createError && (
-              <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", gap: 8 }}>
+              <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", gap: 8 }}>
                 <AlertCircle size={15} style={{ flexShrink: 0 }} />{createError}
               </div>
             )}
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => { setShowCreate(false); setForm(EMPTY_FORM); setFormErrors({}); setCreateError("") }}
-                style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>
+                style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>
                 Cancel
               </button>
               <button
                 onClick={() => { if (validate()) createBooking.mutate({ ...form, staffId: form.staffId || null }) }}
                 disabled={createBooking.isPending}
-                style={{ padding: "9px 22px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {createBooking.isPending ? "Creating…" : "Create booking"}
               </button>
             </div>
@@ -808,14 +808,14 @@ export default function BookingsTab() {
 
 const filterBtn = (active: boolean): React.CSSProperties => ({
   padding: "6px 12px", borderRadius: 6, fontSize: 12, cursor: "pointer",
-  border: active ? "1px solid #0D9488" : "1px solid #E2E8F0",
-  background: active ? "#F0FDF4" : "#fff",
-  color: active ? "#0D9488" : "#64748B", fontWeight: active ? 600 : 400,
+  border: active ? "1px solid var(--hf-accent)" : "1px solid var(--hf-border)",
+  background: active ? "var(--hf-success-soft)" : "var(--hf-surface)",
+  color: active ? "var(--hf-accent-text)" : "var(--hf-text-muted)", fontWeight: active ? 600 : 400,
 })
-const btnPrimary: React.CSSProperties  = { display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }
-const navBtn: React.CSSProperties      = { display: "flex", alignItems: "center", gap: 5, padding: "7px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 13, cursor: "pointer", color: "#374151" }
-const lbl: React.CSSProperties         = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
-const inputStyle: React.CSSProperties  = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box", background: "#fff", outline: "none" }
+const btnPrimary: React.CSSProperties  = { display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }
+const navBtn: React.CSSProperties      = { display: "flex", alignItems: "center", gap: 5, padding: "7px 14px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }
+const lbl: React.CSSProperties         = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
+const inputStyle: React.CSSProperties  = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box", background: "var(--hf-surface)", outline: "none" }
 const overlay: React.CSSProperties     = { position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }
-const modal: React.CSSProperties       = { background: "#fff", borderRadius: 16, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }
-const iconBtn: React.CSSProperties     = { background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }
+const modal: React.CSSProperties       = { background: "var(--hf-surface)", borderRadius: 16, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }
+const iconBtn: React.CSSProperties     = { background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }

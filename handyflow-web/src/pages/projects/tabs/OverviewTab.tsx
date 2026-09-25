@@ -9,7 +9,7 @@ const fmtR = (n:number) => `R ${Number(n??0).toLocaleString("en-ZA",{minimumFrac
 const fmtDate = (d:string|null) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
 
 const RATING_STYLE: Record<string,{bg:string;color:string}> = {
-  RED:{bg:"#FEF2F2",color:"#DC2626"}, AMBER:{bg:"#FEF3C7",color:"#92400E"}, GREEN:{bg:"#DCFCE7",color:"#166534"},
+  RED:{bg:"var(--hf-danger-soft)",color:"var(--hf-danger-text)"}, AMBER:{bg:"var(--hf-warning-soft-strong)",color:"var(--hf-warning-text-deep)"}, GREEN:{bg:"var(--hf-success-soft-strong)",color:"var(--hf-success-text-strong)"},
 }
 
 interface Task  { id:string; title:string; status:string; plannedEnd:string|null; isMilestone:boolean; progressPct:number; isCritical:boolean }
@@ -40,7 +40,7 @@ export function OverviewTab({ project }: { project: Project }) {
         </div>
         <ProgressBar pct={spentPct} label="Budget used" color={spentPct>90?"#EF4444":spentPct>75?"#F59E0B":"#22C55E"}/>
         {evm && (
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginTop:14, paddingTop:14, borderTop:"1px solid #F1F5F9" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginTop:14, paddingTop:14, borderTop:"1px solid var(--hf-border-subtle)" }}>
             <EVMStat label="SPI" value={evm.spi?.toFixed(2)??"—"} good={(evm.spi??1)>=1}/>
             <EVMStat label="CPI" value={evm.cpi?.toFixed(2)??"—"} good={(evm.cpi??1)>=1}/>
             <EVMStat label="EAC" value={fmtR(evm.eac)}/>
@@ -59,7 +59,7 @@ export function OverviewTab({ project }: { project: Project }) {
         </div>
         <ProgressBar pct={taskPct} label={`Tasks ${project.completedTaskCount}/${project.taskCount}`} color="#1B3A6B"/>
         {(project.cidbGrade||project.nhbrcNumber) && (
-          <div style={{ display:"flex", gap:8, marginTop:14, paddingTop:14, borderTop:"1px solid #F1F5F9" }}>
+          <div style={{ display:"flex", gap:8, marginTop:14, paddingTop:14, borderTop:"1px solid var(--hf-border-subtle)" }}>
             {project.cidbGrade && <Tag label="CIDB" value={project.cidbGrade}/>}
             {project.nhbrcNumber && <Tag label="NHBRC" value={project.nhbrcNumber}/>}
           </div>
@@ -71,15 +71,15 @@ export function OverviewTab({ project }: { project: Project }) {
         {milestones.length===0
           ? <Empty text="No milestones — add MILESTONE tasks in the Tasks tab"/>
           : milestones.slice(0,6).map(m=>(
-            <div key={m.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderBottom:"1px solid #F8FAFC" }}>
+            <div key={m.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderBottom:"1px solid var(--hf-border-subtle)" }}>
               {m.status==="COMPLETED"
                 ? <CheckCircle size={14} color="#16A34A" style={{ flexShrink:0 }}/>
                 : <div style={{ width:14, height:14, borderRadius:"50%", border:`2px solid ${m.isCritical?"#EF4444":"#CBD5E1"}`, flexShrink:0 }}/>}
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, fontWeight:600, color:"#0F172A", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{m.title}</div>
-                <div style={{ fontSize:11, color:"#94A3B8" }}>{fmtDate(m.plannedEnd)}</div>
+                <div style={{ fontSize:13, fontWeight:600, color:"var(--hf-text)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{m.title}</div>
+                <div style={{ fontSize:11, color:"var(--hf-text-faint)" }}>{fmtDate(m.plannedEnd)}</div>
               </div>
-              <span style={{ fontSize:12, fontWeight:700, color:m.status==="COMPLETED"?"#16A34A":"#64748B", flexShrink:0 }}>
+              <span style={{ fontSize:12, fontWeight:700, color:m.status==="COMPLETED"?"var(--hf-success-text)":"var(--hf-text-muted)", flexShrink:0 }}>
                 {m.status==="COMPLETED" ? "Done" : `${m.progressPct?.toFixed(0)??0}%`}
               </span>
             </div>
@@ -94,11 +94,11 @@ export function OverviewTab({ project }: { project: Project }) {
           : openRisks.slice(0,5).map(r=>{
             const rt = RATING_STYLE[r.rating]??RATING_STYLE.GREEN
             return (
-              <div key={r.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderBottom:"1px solid #F8FAFC" }}>
+              <div key={r.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderBottom:"1px solid var(--hf-border-subtle)" }}>
                 <span style={{ background:rt.bg, color:rt.color, fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:12, flexShrink:0 }}>{r.rating}</span>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:600, color:"#0F172A", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{r.title}</div>
-                  {r.category && <div style={{ fontSize:11, color:"#94A3B8" }}>{r.category}</div>}
+                  <div style={{ fontSize:13, fontWeight:600, color:"var(--hf-text)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{r.title}</div>
+                  {r.category && <div style={{ fontSize:11, color:"var(--hf-text-faint)" }}>{r.category}</div>}
                 </div>
                 <span style={{ fontSize:14, fontWeight:800, color:rt.color, flexShrink:0 }}>{r.riskScore}</span>
               </div>
@@ -112,8 +112,8 @@ export function OverviewTab({ project }: { project: Project }) {
 
 function Section({ title, children }:{ title:string; children:React.ReactNode }) {
   return (
-    <div style={{ border:"1px solid #E2E8F0", borderRadius:10, padding:"16px 18px" }}>
-      <div style={{ fontSize:13, fontWeight:700, color:"#0F172A", marginBottom:14 }}>{title}</div>
+    <div style={{ border:"1px solid var(--hf-border)", borderRadius:10, padding:"16px 18px" }}>
+      <div style={{ fontSize:13, fontWeight:700, color:"var(--hf-text)", marginBottom:14 }}>{title}</div>
       {children}
     </div>
   )
@@ -121,18 +121,18 @@ function Section({ title, children }:{ title:string; children:React.ReactNode })
 function Stat({ label, value, color }:{ label:string; value:string; color?:string }) {
   return (
     <div>
-      <div style={{ fontSize:11, color:"#94A3B8", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:3 }}>{label}</div>
-      <div style={{ fontSize:15, fontWeight:700, color:color??"#0F172A" }}>{value}</div>
+      <div style={{ fontSize:11, color:"var(--hf-text-faint)", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:3 }}>{label}</div>
+      <div style={{ fontSize:15, fontWeight:700, color:color??"var(--hf-text)" }}>{value}</div>
     </div>
   )
 }
 function ProgressBar({ pct, label, color }:{ pct:number; label:string; color:string }) {
   return (
     <div>
-      <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"#94A3B8", marginBottom:4 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--hf-text-faint)", marginBottom:4 }}>
         <span>{label}</span><span>{pct.toFixed(1)}%</span>
       </div>
-      <div style={{ height:6, background:"#F1F5F9", borderRadius:3 }}>
+      <div style={{ height:6, background:"var(--hf-surface-sunken)", borderRadius:3 }}>
         <div style={{ height:"100%", width:`${Math.min(pct,100)}%`, background:color, borderRadius:3 }}/>
       </div>
     </div>
@@ -141,14 +141,14 @@ function ProgressBar({ pct, label, color }:{ pct:number; label:string; color:str
 function EVMStat({ label, value, good }:{ label:string; value:string; good?:boolean }) {
   return (
     <div style={{ textAlign:"center" }}>
-      <div style={{ fontSize:10, color:"#94A3B8", fontWeight:600, marginBottom:2 }}>{label}</div>
-      <div style={{ fontSize:13, fontWeight:700, color:good===undefined?"#0F172A":good?"#059669":"#DC2626" }}>{value}</div>
+      <div style={{ fontSize:10, color:"var(--hf-text-faint)", fontWeight:600, marginBottom:2 }}>{label}</div>
+      <div style={{ fontSize:13, fontWeight:700, color:good===undefined?"var(--hf-text)":good?"var(--hf-success-text)":"var(--hf-danger-text)" }}>{value}</div>
     </div>
   )
 }
 function Tag({ label, value }:{ label:string; value:string }) {
-  return <div style={{ background:"#EFF6FF", borderRadius:8, padding:"5px 10px" }}><div style={{ fontSize:10, color:"#64748B", fontWeight:600 }}>{label}</div><div style={{ fontSize:13, fontWeight:700, color:"#1B3A6B" }}>{value}</div></div>
+  return <div style={{ background:"var(--hf-info-soft)", borderRadius:8, padding:"5px 10px" }}><div style={{ fontSize:10, color:"var(--hf-text-muted)", fontWeight:600 }}>{label}</div><div style={{ fontSize:13, fontWeight:700, color:"var(--hf-primary-text)" }}>{value}</div></div>
 }
 function Empty({ text }:{ text:string }) {
-  return <div style={{ fontSize:13, color:"#94A3B8", padding:"8px 0" }}>{text}</div>
+  return <div style={{ fontSize:13, color:"var(--hf-text-faint)", padding:"8px 0" }}>{text}</div>
 }

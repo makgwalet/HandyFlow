@@ -191,12 +191,12 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
           <div style={{ display:"flex", alignItems:"center", gap:16 }}>
             <div style={{ width:64, height:64, borderRadius:"50%", background:"rgba(255,255,255,0.15)",
               display:"flex", alignItems:"center", justifyContent:"center",
-              fontSize:24, fontWeight:800, color:"#fff", flexShrink:0 }}>
+              fontSize:24, fontWeight:800, color:"var(--hf-text-on-solid)", flexShrink:0 }}>
               {patient.firstName?.[0]}{patient.lastName?.[0]}
             </div>
             <div>
               <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:4 }}>
-                <h2 style={{ margin:0, fontSize:22, fontWeight:800, color:"#fff" }}>{patient.fullName}</h2>
+                <h2 style={{ margin:0, fontSize:22, fontWeight:800, color:"var(--hf-text-on-solid)" }}>{patient.fullName}</h2>
                 <span style={{ background:`${acctCfg.bg}25`, color:acctCfg.bg,
                   padding:"2px 10px", borderRadius:20, fontSize:11, fontWeight:700,
                   border:`1px solid ${acctCfg.bg}50` }}>
@@ -240,12 +240,12 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
           <div style={{ position:"relative" }}>
             <button onClick={()=>setShowActions(v=>!v)}
               style={{ background:"rgba(255,255,255,0.1)", border:"none", borderRadius:8,
-                cursor:"pointer", color:"#fff", padding:"8px 10px", display:"flex", alignItems:"center", gap:6, fontSize:13 }}>
+                cursor:"pointer", color:"var(--hf-text-on-solid)", padding:"8px 10px", display:"flex", alignItems:"center", gap:6, fontSize:13 }}>
               <MoreVertical size={16}/> Actions
             </button>
             {showActions && (
               <div style={{ position:"absolute", right:0, top:"100%", marginTop:6,
-                background:"#fff", borderRadius:10, border:`1px solid ${BORDER}`,
+                background:"var(--hf-surface)", borderRadius:10, border:`1px solid ${BORDER}`,
                 boxShadow:"0 8px 32px rgba(0,0,0,0.14)", minWidth:220, zIndex:50, overflow:"hidden" }}>
                 {/* Convert individual → principal */}
                 {patient.accountType==="INDIVIDUAL" && (
@@ -291,13 +291,13 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
               <button key={t.id} onClick={()=>setActiveTab(t.id)}
                 style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 14px",
                   background:active?"rgba(255,255,255,0.12)":"transparent", border:"none",
-                  borderBottom:active?"2px solid #0D9488":"2px solid transparent",
-                  color:active?"#fff":"rgba(255,255,255,0.6)",
+                  borderBottom:active?"2px solid var(--hf-accent)":"2px solid transparent",
+                  color:active?"var(--hf-text-on-solid)":"rgba(255,255,255,0.6)",
                   fontWeight:active?600:400, fontSize:13, cursor:"pointer",
                   whiteSpace:"nowrap", marginBottom:-1 }}>
                 <Icon size={13}/>{t.label}
                 {t.badge ? (
-                  <span style={{ background:TEAL, color:"#fff", borderRadius:"50%",
+                  <span style={{ background:TEAL, color:"var(--hf-text-on-solid)", borderRadius:"50%",
                     width:16, height:16, fontSize:10, fontWeight:700,
                     display:"flex", alignItems:"center", justifyContent:"center" }}>
                     {t.badge}
@@ -313,7 +313,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
       {activeSession && !sessionMinimised && (
         <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.7)",zIndex:1300,
           display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}}>
-          <div style={{background:"#fff",borderRadius:16,width:"min(1200px,96vw)",height:"92vh",
+          <div style={{background:"var(--hf-surface)",borderRadius:16,width:"min(1200px,96vw)",height:"92vh",
             padding:24,boxShadow:"0 32px 80px rgba(0,0,0,0.3)",display:"flex",flexDirection:"column"}}>
             <ConsultationSession
               patient={patient}
@@ -334,18 +334,18 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
       {/* ── Minimised session sticky bar ────────────────────────────────── */}
       {activeSession && sessionMinimised && (
         <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:1300,
-          background:"#1B3A6B",borderTop:"3px solid #0D9488",
+          background:"var(--hf-primary)",borderTop:"3px solid var(--hf-accent)",
           padding:"10px 24px",display:"flex",alignItems:"center",gap:16,
           boxShadow:"0 -4px 24px rgba(0,0,0,0.25)"}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{width:8,height:8,borderRadius:"50%",background:"#EF4444",animation:"pulse 1.5s infinite"}}/>
-            <span style={{color:"#fff",fontWeight:700,fontSize:14}}>Session in progress</span>
+            <div style={{width:8,height:8,borderRadius:"50%",background:"var(--hf-danger)",animation:"pulse 1.5s infinite"}}/>
+            <span style={{color:"var(--hf-text-on-solid)",fontWeight:700,fontSize:14}}>Session in progress</span>
             <span style={{color:"rgba(255,255,255,0.6)",fontSize:13}}>— {activeSession.patientName||patient.fullName}</span>
           </div>
           <div style={{flex:1}}/>
           <span style={{color:"rgba(255,255,255,0.5)",fontSize:12}}>Navigate freely — session is saved</span>
           <button onClick={()=>setSessionMinimised(false)}
-            style={{background:"#0D9488",color:"#fff",border:"none",borderRadius:8,
+            style={{background:"var(--hf-accent)",color:"var(--hf-text-on-solid)",border:"none",borderRadius:8,
               padding:"7px 16px",fontSize:13,fontWeight:700,cursor:"pointer",
               display:"flex",alignItems:"center",gap:6}}>
             ↑ Return to session
@@ -385,7 +385,7 @@ function ActionItem({ icon:Icon, label, color, onClick, hint }: {
       onMouseLeave={e=>(e.currentTarget.style.background="none")}>
       <Icon size={15} color={color} style={{ marginTop:2, flexShrink:0 }}/>
       <div>
-        <div style={{ fontSize:13, fontWeight:600, color:"#0F172A" }}>{label}</div>
+        <div style={{ fontSize:13, fontWeight:600, color:"var(--hf-text)" }}>{label}</div>
         <div style={{ fontSize:11, color:GRAY, marginTop:1 }}>{hint}</div>
       </div>
     </button>
@@ -432,23 +432,23 @@ function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc }: {
               borderRadius:10, border:`1px solid ${BORDER}` }}>
               <div style={{ fontSize:10, fontWeight:700, color:GRAY, textTransform:"uppercase",
                 letterSpacing:"0.06em", marginBottom:3 }}>{item.label}</div>
-              <div style={{ fontSize:14, color:"#0F172A", fontWeight:500, wordBreak:"break-all" }}>{item.value}</div>
+              <div style={{ fontSize:14, color:"var(--hf-text)", fontWeight:500, wordBreak:"break-all" }}>{item.value}</div>
             </div>
           ))}
         </div>
 
         {/* Allergies */}
         {patient.allergies?.length > 0 && (
-          <div style={{ marginBottom:12, padding:"14px 16px", background:"#FEF2F2",
-            border:"1px solid #FECACA", borderRadius:12 }}>
+          <div style={{ marginBottom:12, padding:"14px 16px", background:"var(--hf-danger-soft)",
+            border:"1px solid var(--hf-danger-border)", borderRadius:12 }}>
             <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
               <AlertCircle size={13} color={RED}/>
               <span style={{ fontSize:11, fontWeight:700, color:RED, textTransform:"uppercase", letterSpacing:"0.06em" }}>⚠ Allergies</span>
             </div>
             <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
               {patient.allergies.map(a=>(
-                <span key={a} style={{ background:"#fff", color:RED, padding:"3px 10px",
-                  borderRadius:6, fontSize:13, fontWeight:600, border:"1px solid #FECACA" }}>{a}</span>
+                <span key={a} style={{ background:"var(--hf-surface)", color:RED, padding:"3px 10px",
+                  borderRadius:6, fontSize:13, fontWeight:600, border:"1px solid var(--hf-danger-border)" }}>{a}</span>
               ))}
             </div>
           </div>
@@ -456,16 +456,16 @@ function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc }: {
 
         {/* Chronic conditions */}
         {patient.chronicConditions?.length > 0 && (
-          <div style={{ marginBottom:12, padding:"14px 16px", background:"#FFFBEB",
-            border:"1px solid #FDE68A", borderRadius:12 }}>
+          <div style={{ marginBottom:12, padding:"14px 16px", background:"var(--hf-warning-soft)",
+            border:"1px solid var(--hf-warning-border)", borderRadius:12 }}>
             <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
               <Heart size={13} color={AMBER}/>
               <span style={{ fontSize:11, fontWeight:700, color:AMBER, textTransform:"uppercase", letterSpacing:"0.06em" }}>Chronic conditions</span>
             </div>
             <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
               {patient.chronicConditions.map(c=>(
-                <span key={c} style={{ background:"#fff", color:AMBER, padding:"3px 10px",
-                  borderRadius:6, fontSize:13, fontWeight:600, border:"1px solid #FDE68A" }}>{c}</span>
+                <span key={c} style={{ background:"var(--hf-surface)", color:AMBER, padding:"3px 10px",
+                  borderRadius:6, fontSize:13, fontWeight:600, border:"1px solid var(--hf-warning-border)" }}>{c}</span>
               ))}
             </div>
           </div>
@@ -474,7 +474,7 @@ function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc }: {
         {patient.notes && (
           <div style={{ padding:"12px 14px", background:LIGHT, borderRadius:10, border:`1px solid ${BORDER}` }}>
             <div style={{ fontSize:10, fontWeight:700, color:GRAY, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.06em" }}>Notes</div>
-            <div style={{ fontSize:13, color:"#475569", lineHeight:1.6 }}>{patient.notes}</div>
+            <div style={{ fontSize:13, color:"var(--hf-text-tertiary)", lineHeight:1.6 }}>{patient.notes}</div>
           </div>
         )}
       </div>
@@ -485,10 +485,10 @@ function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc }: {
         <div style={{ padding:"14px 16px", background:LIGHT, border:`1px solid ${BORDER}`, borderRadius:12 }}>
           <div style={{ fontSize:11, fontWeight:700, color:GRAY, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:8 }}>Account status</div>
           <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-            <span style={{ background:patient.active?"#DCFCE7":"#FEF2F2",
+            <span style={{ background:patient.active?"var(--hf-success-soft-strong)":"var(--hf-danger-soft)",
               color:patient.active?GREEN:RED, padding:"3px 10px", borderRadius:20,
               fontSize:12, fontWeight:700 }}>{patient.active?"ACTIVE":"INACTIVE"}</span>
-            {patient.archivedAt && <span style={{ background:"#F1F5F9", color:GRAY, padding:"3px 10px", borderRadius:20, fontSize:12, fontWeight:700 }}>ARCHIVED</span>}
+            {patient.archivedAt && <span style={{ background:"var(--hf-surface-sunken)", color:GRAY, padding:"3px 10px", borderRadius:20, fontSize:12, fontWeight:700 }}>ARCHIVED</span>}
           </div>
         </div>
 
@@ -502,7 +502,7 @@ function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc }: {
               {patient.accountType==="PRINCIPAL" && (
                 <button onClick={()=>setShowAddDep(true)}
                   style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px",
-                    background:"#EFF6FF", color:"#1D4ED8", border:"1px solid #BFDBFE",
+                    background:"var(--hf-info-soft)", color:"var(--hf-info-text)", border:"1px solid var(--hf-info-border)",
                     borderRadius:6, fontSize:11, fontWeight:600, cursor:"pointer" }}>
                   <Plus size={11}/> Add
                 </button>
@@ -520,18 +520,18 @@ function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc }: {
                     <div key={m.id}
                       onClick={()=>!isCurrentPatient && onOpenPatient && onOpenPatient(m)}
                       style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 10px",
-                        background:"#fff", border:`1px solid ${BORDER}`, borderRadius:8,
+                        background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:8,
                         cursor:isCurrentPatient?"default":"pointer" }}
-                      onMouseEnter={e=>{ if (!isCurrentPatient) (e.currentTarget as HTMLDivElement).style.background="#F0FDF4" }}
-                      onMouseLeave={e=>{ (e.currentTarget as HTMLDivElement).style.background="#fff" }}>
+                      onMouseEnter={e=>{ if (!isCurrentPatient) (e.currentTarget as HTMLDivElement).style.background="var(--hf-success-soft)" }}
+                      onMouseLeave={e=>{ (e.currentTarget as HTMLDivElement).style.background="var(--hf-surface)" }}>
                       <div style={{ width:28, height:28, borderRadius:"50%",
-                        background:isCurrentPatient?"#E0F2FE":"#F0FDF4",
+                        background:isCurrentPatient?"var(--hf-sky-soft-strong)":"var(--hf-success-soft)",
                         display:"flex", alignItems:"center", justifyContent:"center",
-                        fontSize:11, fontWeight:700, color:isCurrentPatient?"#0369A1":TEAL, flexShrink:0 }}>
+                        fontSize:11, fontWeight:700, color:isCurrentPatient?"var(--hf-sky-text-strong)":TEAL, flexShrink:0 }}>
                         {m.firstName?.[0]}{m.lastName?.[0]}
                       </div>
                       <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:12, fontWeight:600, color:"#0F172A",
+                        <div style={{ fontSize:12, fontWeight:600, color:"var(--hf-text)",
                           overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" as const }}>
                           {m.fullName}
                           {isCurrentPatient && <span style={{ fontSize:10, color:GRAY, marginLeft:4 }}>(this patient)</span>}
@@ -555,7 +555,7 @@ function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc }: {
       {/* Add dependant modal */}
       {showAddDep && (
         <Modal title="Add dependant to family account" onClose={()=>setShowAddDep(false)}>
-          <div style={{ fontSize:12, color:GRAY, marginBottom:16, padding:"8px 12px", background:"#EFF6FF", borderRadius:8 }}>
+          <div style={{ fontSize:12, color:GRAY, marginBottom:16, padding:"8px 12px", background:"var(--hf-info-soft)", borderRadius:8 }}>
             Principal: <strong>{patient.fullName}</strong> · Emergency contact will be auto-filled from principal.
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
@@ -607,7 +607,7 @@ function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc }: {
               <input value={depForm.phone} onChange={e=>setDepForm(f=>({...f,phone:e.target.value}))} placeholder="+27 82 000 0000" style={sinp}/>
             </div>
           </div>
-          {depError && <div style={{ marginTop:10, padding:"8px 12px", background:"#FEF2F2", border:"1px solid #FECACA", borderRadius:8, fontSize:13, color:RED }}>{depError}</div>}
+          {depError && <div style={{ marginTop:10, padding:"8px 12px", background:"var(--hf-danger-soft)", border:"1px solid var(--hf-danger-border)", borderRadius:8, fontSize:13, color:RED }}>{depError}</div>}
           <ModalFooter onCancel={()=>setShowAddDep(false)}
             onConfirm={()=>{
               if (!depForm.firstName.trim()||!depForm.lastName.trim()) return
@@ -660,7 +660,7 @@ function AppointmentsTab({ patient, appointments, practitioners, qc, onStartSess
   return (
     <div>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
-        <div style={{ fontSize:15, fontWeight:700, color:"#0F172A" }}>
+        <div style={{ fontSize:15, fontWeight:700, color:"var(--hf-text)" }}>
           {appointments.length} appointment{appointments.length!==1?"s":""}
         </div>
         <button onClick={()=>setShowBook(true)} style={btnPrimary}><Plus size={14}/> Book appointment</button>
@@ -673,11 +673,11 @@ function AppointmentsTab({ patient, appointments, practitioners, qc, onStartSess
             const actions=STATUS_FLOW[a.status]??[]
             return (
               <div key={a.id} style={{ border:`1px solid ${BORDER}`, borderLeft:`4px solid ${s.color}`,
-                borderRadius:10, padding:"14px 18px", background:"#fff" }}>
+                borderRadius:10, padding:"14px 18px", background:"var(--hf-surface)" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
                   <div>
                     <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
-                      <span style={{ fontWeight:700, fontSize:14, color:"#0F172A" }}>{fmtDT(a.scheduledAt)} · {fmtTime(a.scheduledAt)}</span>
+                      <span style={{ fontWeight:700, fontSize:14, color:"var(--hf-text)" }}>{fmtDT(a.scheduledAt)} · {fmtTime(a.scheduledAt)}</span>
                       <span style={{ background:s.bg, color:s.color, padding:"1px 8px", borderRadius:20, fontSize:11, fontWeight:700 }}>{s.label}</span>
                       <span style={{ fontSize:11, color:GRAY }}>{a.appointmentType?.replace("_"," ")}</span>
                     </div>
@@ -839,7 +839,7 @@ function ConsultationTab({ patient, consultations, practitioners, qc, addToBill,
   return (
     <div>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
-        <div style={{ fontSize:15, fontWeight:700, color:"#0F172A" }}>{consultations.length} consultation{consultations.length!==1?"s":""}</div>
+        <div style={{ fontSize:15, fontWeight:700, color:"var(--hf-text)" }}>{consultations.length} consultation{consultations.length!==1?"s":""}</div>
         <button onClick={()=>{setShowNew(true);setForm({...EMPTY});setTranscript("");setApiError("")}} style={btnPrimary}><Plus size={14}/> Record consultation</button>
       </div>
 
@@ -850,46 +850,46 @@ function ConsultationTab({ patient, consultations, practitioners, qc, addToBill,
             return (
               <div key={c.id} style={{ border:`1px solid ${BORDER}`, borderRadius:12, overflow:"hidden" }}>
                 <div onClick={()=>setExpanded(isOpen?null:c.id)}
-                  style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", cursor:"pointer", background:isOpen?LIGHT:"#fff" }}>
+                  style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", cursor:"pointer", background:isOpen?LIGHT:"var(--hf-surface)" }}>
                   <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                    <div style={{ width:36, height:36, borderRadius:8, background:"#F0FDF4", border:"1px solid #86EFAC", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <div style={{ width:36, height:36, borderRadius:8, background:"var(--hf-success-soft)", border:"1px solid var(--hf-success-border)", display:"flex", alignItems:"center", justifyContent:"center" }}>
                       <Activity size={16} color={TEAL}/>
                     </div>
                     <div>
-                      <div style={{ fontWeight:700, fontSize:14, color:"#0F172A", marginBottom:2 }}>{c.chiefComplaint}</div>
+                      <div style={{ fontWeight:700, fontSize:14, color:"var(--hf-text)", marginBottom:2 }}>{c.chiefComplaint}</div>
                       <div style={{ fontSize:12, color:GRAY }}>{fmtDT(c.consultedAt)}{c.practitionerName&&` · Dr. ${c.practitionerName}`}{c.diagnosis&&` · ${c.diagnosis}`}</div>
                     </div>
                   </div>
                   <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                    <button onClick={e=>{e.stopPropagation();openEdit(c)}} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:"#EFF6FF", color:"#1D4ED8", border:"1px solid #BFDBFE", borderRadius:6, fontSize:12, cursor:"pointer", fontWeight:600 }}>✏ Edit</button>
-                    <button onClick={e=>{e.stopPropagation();setShowRx(c.id)}} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:"#F0FDF4", color:GREEN, border:"1px solid #86EFAC", borderRadius:6, fontSize:12, cursor:"pointer", fontWeight:600 }}><Pill size={11}/> Rx</button>
-                    <button onClick={e=>{e.stopPropagation();downloadPdf(`/api/v1/clinic/consultations/${c.id}/prescription-pdf`,`rx-${c.id}.pdf`)}} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:"#EFF6FF", color:"#1D4ED8", border:"1px solid #BFDBFE", borderRadius:6, fontSize:12, cursor:"pointer", fontWeight:600 }}>Rx PDF</button>
-                    {c.followUpDays&&<span style={{ fontSize:11, color:AMBER, background:"#FFFBEB", padding:"2px 8px", borderRadius:20, border:"1px solid #FDE68A" }}>F/U {c.followUpDays}d</span>}
+                    <button onClick={e=>{e.stopPropagation();openEdit(c)}} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:"var(--hf-info-soft)", color:"var(--hf-info-text)", border:"1px solid var(--hf-info-border)", borderRadius:6, fontSize:12, cursor:"pointer", fontWeight:600 }}>✏ Edit</button>
+                    <button onClick={e=>{e.stopPropagation();setShowRx(c.id)}} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:"var(--hf-success-soft)", color:GREEN, border:"1px solid var(--hf-success-border)", borderRadius:6, fontSize:12, cursor:"pointer", fontWeight:600 }}><Pill size={11}/> Rx</button>
+                    <button onClick={e=>{e.stopPropagation();downloadPdf(`/api/v1/clinic/consultations/${c.id}/prescription-pdf`,`rx-${c.id}.pdf`)}} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:"var(--hf-info-soft)", color:"var(--hf-info-text)", border:"1px solid var(--hf-info-border)", borderRadius:6, fontSize:12, cursor:"pointer", fontWeight:600 }}>Rx PDF</button>
+                    {c.followUpDays&&<span style={{ fontSize:11, color:AMBER, background:"var(--hf-warning-soft)", padding:"2px 8px", borderRadius:20, border:"1px solid var(--hf-warning-border)" }}>F/U {c.followUpDays}d</span>}
                     {isOpen?<ChevronUp size={16} color={GRAY}/>:<ChevronDown size={16} color={GRAY}/>}
                   </div>
                 </div>
                 {isOpen&&(
-                  <div style={{ borderTop:`1px solid ${BORDER}`, padding:"18px 20px", background:"#FAFAFA" }}>
+                  <div style={{ borderTop:`1px solid ${BORDER}`, padding:"18px 20px", background:"var(--hf-surface-muted)" }}>
                     {(c.weightKg||c.bloodPressure||c.pulseBpm||c.temperatureC)&&(
                       <div style={{ marginBottom:16 }}>
                         <div style={{ fontSize:10, fontWeight:700, color:GRAY, letterSpacing:"0.06em", marginBottom:8 }}>VITALS</div>
                         <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
                           {[{l:"Weight",v:c.weightKg?`${c.weightKg} kg`:null},{l:"Height",v:c.heightCm?`${c.heightCm} cm`:null},{l:"BP",v:c.bloodPressure},{l:"Pulse",v:c.pulseBpm?`${c.pulseBpm} bpm`:null},{l:"Temp",v:c.temperatureC?`${c.temperatureC}°C`:null},{l:"SpO₂",v:c.oxygenSatPct?`${c.oxygenSatPct}%`:null}].filter(x=>x.v).map(({l,v})=>(
-                            <div key={l} style={{ background:"#fff", border:`1px solid ${BORDER}`, borderRadius:8, padding:"8px 14px", textAlign:"center" }}>
+                            <div key={l} style={{ background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:8, padding:"8px 14px", textAlign:"center" }}>
                               <div style={{ fontSize:10, color:GRAY, marginBottom:2 }}>{l}</div>
-                              <div style={{ fontSize:14, fontWeight:700, color:"#0F172A" }}>{v}</div>
+                              <div style={{ fontSize:14, fontWeight:700, color:"var(--hf-text)" }}>{v}</div>
                             </div>
                           ))}
-                          {c.weightKg&&c.heightCm&&<div style={{ background:"#fff", border:`1px solid ${BORDER}`, borderRadius:8, padding:"8px 14px", textAlign:"center" }}><div style={{ fontSize:10, color:GRAY, marginBottom:2 }}>BMI</div><div style={{ fontSize:14, fontWeight:700, color:"#0F172A" }}>{(c.weightKg/Math.pow(c.heightCm/100,2)).toFixed(1)}</div></div>}
+                          {c.weightKg&&c.heightCm&&<div style={{ background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:8, padding:"8px 14px", textAlign:"center" }}><div style={{ fontSize:10, color:GRAY, marginBottom:2 }}>BMI</div><div style={{ fontSize:14, fontWeight:700, color:"var(--hf-text)" }}>{(c.weightKg/Math.pow(c.heightCm/100,2)).toFixed(1)}</div></div>}
                         </div>
                       </div>
                     )}
                     <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
                       {[{l:"History",v:c.history},{l:"Examination",v:c.examination},{l:"Diagnosis",v:c.diagnosis},{l:"Treatment plan",v:c.treatmentPlan}].filter(x=>x.v).map(({l,v})=>(
-                        <div key={l}><div style={{ fontSize:10, fontWeight:700, color:GRAY, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:3 }}>{l}</div><div style={{ fontSize:13, color:"#0F172A", lineHeight:1.5 }}>{v}</div></div>
+                        <div key={l}><div style={{ fontSize:10, fontWeight:700, color:GRAY, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:3 }}>{l}</div><div style={{ fontSize:13, color:"var(--hf-text)", lineHeight:1.5 }}>{v}</div></div>
                       ))}
                     </div>
-                    {c.icd10Codes?.length>0&&(<div style={{ marginTop:12 }}><div style={{ fontSize:10, fontWeight:700, color:GRAY, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:5 }}>ICD-10 codes</div><div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>{c.icd10Codes.map((code:string)=>(<span key={code} style={{ background:"#EFF6FF", color:"#1D4ED8", padding:"2px 8px", borderRadius:4, fontSize:12, fontWeight:600, border:"1px solid #BFDBFE" }}>{code}</span>))}</div></div>)}
+                    {c.icd10Codes?.length>0&&(<div style={{ marginTop:12 }}><div style={{ fontSize:10, fontWeight:700, color:GRAY, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:5 }}>ICD-10 codes</div><div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>{c.icd10Codes.map((code:string)=>(<span key={code} style={{ background:"var(--hf-info-soft)", color:"var(--hf-info-text)", padding:"2px 8px", borderRadius:4, fontSize:12, fontWeight:600, border:"1px solid var(--hf-info-border)" }}>{code}</span>))}</div></div>)}
                   </div>
                 )}
               </div>
@@ -904,17 +904,17 @@ function ConsultationTab({ patient, consultations, practitioners, qc, addToBill,
           {(prescriptions as Prescription[]).length===0?<p style={{color:GRAY,fontSize:13}}>No prescriptions for this consultation.</p>:(
             <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:20 }}>
               {(prescriptions as Prescription[]).map(rx=>(
-                <div key={rx.id} style={{ border:`1px solid ${BORDER}`, borderRadius:10, padding:"12px 16px", background:rx.dispensed?"#F0FDF4":"#fff" }}>
-                  <div style={{ fontWeight:700, fontSize:14, color:"#0F172A", marginBottom:3 }}>{rx.medicationName}</div>
+                <div key={rx.id} style={{ border:`1px solid ${BORDER}`, borderRadius:10, padding:"12px 16px", background:rx.dispensed?"var(--hf-success-soft)":"var(--hf-surface)" }}>
+                  <div style={{ fontWeight:700, fontSize:14, color:"var(--hf-text)", marginBottom:3 }}>{rx.medicationName}</div>
                   <div style={{ fontSize:12, color:GRAY }}>{[rx.dosage,rx.frequency,rx.duration].filter(Boolean).join(" · ")}{rx.quantity?` · Qty: ${rx.quantity}`:""}{rx.repeats>0?` · Repeats: ${rx.repeats}`:""}</div>
-                  {rx.instructions&&<div style={{ fontSize:12, color:"#475569", marginTop:4, fontStyle:"italic" }}>{rx.instructions}</div>}
-                  {rx.dispensed&&<span style={{ marginTop:6, display:"inline-block", background:"#DCFCE7", color:GREEN, padding:"1px 8px", borderRadius:20, fontSize:11, fontWeight:700 }}>DISPENSED</span>}
+                  {rx.instructions&&<div style={{ fontSize:12, color:"var(--hf-text-tertiary)", marginTop:4, fontStyle:"italic" }}>{rx.instructions}</div>}
+                  {rx.dispensed&&<span style={{ marginTop:6, display:"inline-block", background:"var(--hf-success-soft-strong)", color:GREEN, padding:"1px 8px", borderRadius:20, fontSize:11, fontWeight:700 }}>DISPENSED</span>}
                 </div>
               ))}
             </div>
           )}
           <div style={{ borderTop:`1px solid ${BORDER}`, paddingTop:16 }}>
-            <div style={{ fontSize:13, fontWeight:700, color:"#0F172A", marginBottom:12 }}>Add prescription</div>
+            <div style={{ fontSize:13, fontWeight:700, color:"var(--hf-text)", marginBottom:12 }}>Add prescription</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
               <div style={{ gridColumn:"1/-1" }}><label style={lbl}>Medication *</label><input value={rxForm.medicationName} onChange={e=>setRxForm(f=>({...f,medicationName:e.target.value}))} placeholder="Amoxicillin 500mg" style={sinp}/></div>
               <div><label style={lbl}>Dosage</label><input value={rxForm.dosage} onChange={e=>setRxForm(f=>({...f,dosage:e.target.value}))} placeholder="500mg" style={sinp}/></div>
@@ -934,7 +934,7 @@ function ConsultationTab({ patient, consultations, practitioners, qc, addToBill,
       {/* ── Edit consultation modal ──────────────────────────────────────── */}
       {editingId && (
         <Modal title="Edit consultation" onClose={()=>setEditingId(null)} wide>
-          <div style={{marginBottom:14,padding:"8px 12px",background:"#EFF6FF",border:"1px solid #BFDBFE",borderRadius:8,fontSize:12,color:"#1D4ED8"}}>
+          <div style={{marginBottom:14,padding:"8px 12px",background:"var(--hf-info-soft)",border:"1px solid var(--hf-info-border)",borderRadius:8,fontSize:12,color:"var(--hf-info-text)"}}>
             ℹ Editing saves immediately. Consultation date and practitioner cannot be changed.
           </div>
           <FSect title="Vitals">
@@ -1003,21 +1003,21 @@ function ConsultationTab({ patient, consultations, practitioners, qc, addToBill,
       {showNew&&(
         <Modal title={`Record consultation — ${patient.fullName}`} onClose={()=>setShowNew(false)} wide>
           {/* Speech panel */}
-          <div style={{ marginBottom:20, padding:"16px 18px", background:"#F5F3FF", border:"1px solid #DDD6FE", borderRadius:12 }}>
+          <div style={{ marginBottom:20, padding:"16px 18px", background:"var(--hf-violet-soft)", border:"1px solid var(--hf-violet-border)", borderRadius:12 }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
               <div style={{ fontSize:13, fontWeight:700, color:PURPLE, display:"flex", alignItems:"center", gap:6 }}><Mic size={14}/> Voice-to-notes</div>
               <div style={{ display:"flex", gap:8 }}>
                 {!isRecording
-                  ? <button onClick={startRecording} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", background:PURPLE, color:"#fff", border:"none", borderRadius:7, fontSize:12, fontWeight:600, cursor:"pointer" }}><Mic size={12}/> Start recording</button>
-                  : <button onClick={stopRecording} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", background:RED, color:"#fff", border:"none", borderRadius:7, fontSize:12, fontWeight:600, cursor:"pointer" }}><MicOff size={12}/> Stop recording</button>
+                  ? <button onClick={startRecording} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", background:PURPLE, color:"var(--hf-text-on-solid)", border:"none", borderRadius:7, fontSize:12, fontWeight:600, cursor:"pointer" }}><Mic size={12}/> Start recording</button>
+                  : <button onClick={stopRecording} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", background:RED, color:"var(--hf-text-on-solid)", border:"none", borderRadius:7, fontSize:12, fontWeight:600, cursor:"pointer" }}><MicOff size={12}/> Stop recording</button>
                 }
-                {transcript&&<button onClick={extractSOAP} disabled={extracting} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", background:extracting?"#E2E8F0":TEAL, color:extracting?GRAY:"#fff", border:"none", borderRadius:7, fontSize:12, fontWeight:600, cursor:extracting?"wait":"pointer" }}>{extracting?<><Loader size={12}/> Extracting...</>:<>✨ Extract SOAP</>}</button>}
+                {transcript&&<button onClick={extractSOAP} disabled={extracting} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", background:extracting?"var(--hf-surface-strong)":TEAL, color:extracting?GRAY:"var(--hf-text-on-solid)", border:"none", borderRadius:7, fontSize:12, fontWeight:600, cursor:extracting?"wait":"pointer" }}>{extracting?<><Loader size={12}/> Extracting...</>:<>✨ Extract SOAP</>}</button>}
                 {transcript&&<button onClick={()=>setTranscript("")} style={{ padding:"6px 10px", background:"none", border:`1px solid ${BORDER}`, borderRadius:7, fontSize:12, cursor:"pointer", color:GRAY }}>Clear</button>}
               </div>
             </div>
             {isRecording&&<div style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:RED, marginBottom:6 }}><span style={{ width:7, height:7, borderRadius:"50%", background:RED }}/> Recording — speak clearly</div>}
             <textarea value={transcript} onChange={e=>setTranscript(e.target.value)} rows={3}
-              style={{ ...sinp, fontSize:12, color:"#475569", background:"rgba(255,255,255,0.7)", resize:"vertical" as const }}
+              style={{ ...sinp, fontSize:12, color:"var(--hf-text-tertiary)", background:"rgba(255,255,255,0.7)", resize:"vertical" as const }}
               placeholder="Transcript appears here after recording. Then click Extract SOAP to fill the form below using Claude AI."/>
           </div>
 
@@ -1091,7 +1091,7 @@ function RunningBillTab({ billLines, onRemove, patient }:
     <div>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
         <div>
-          <div style={{ fontSize:15, fontWeight:700, color:"#0F172A" }}>Running bill</div>
+          <div style={{ fontSize:15, fontWeight:700, color:"var(--hf-text)" }}>Running bill</div>
           <div style={{ fontSize:12, color:GRAY, marginTop:2 }}>Items accumulate as the consultation progresses.</div>
         </div>
         <button onClick={()=>setShowAdd(true)} style={btnPrimary}><Plus size={14}/> Add item</button>
@@ -1117,13 +1117,13 @@ function RunningBillTab({ billLines, onRemove, patient }:
                   const cfg=TYPE_CFG[l.type]??TYPE_CFG.CONSULTATION
                   const isExtra=!billLines.find(b=>b.id===l.id)
                   return (
-                    <tr key={l.id} style={{ borderBottom:i<allLines.length-1?`1px solid #F1F5F9`:"none" }}>
+                    <tr key={l.id} style={{ borderBottom:i<allLines.length-1?`1px solid var(--hf-border-subtle)`:"none" }}>
                       <td style={{ padding:"11px 14px" }}><span style={{ background:cfg.bg, color:cfg.color, padding:"2px 8px", borderRadius:20, fontSize:11, fontWeight:700 }}>{cfg.label}</span></td>
-                      <td style={{ padding:"11px 14px", fontSize:13, fontWeight:600, color:"#0F172A" }}>{l.description}</td>
+                      <td style={{ padding:"11px 14px", fontSize:13, fontWeight:600, color:"var(--hf-text)" }}>{l.description}</td>
                       <td style={{ padding:"11px 14px", fontSize:12, color:GRAY }}>{l.tariffCode||l.nappiCode||"—"}</td>
-                      <td style={{ padding:"11px 14px", fontSize:13, color:"#0F172A" }}>{l.quantity}</td>
-                      <td style={{ padding:"11px 14px", fontSize:13, color:"#0F172A" }}>{fmtR(l.unitPrice)}</td>
-                      <td style={{ padding:"11px 14px", fontSize:13, fontWeight:700, color:"#0F172A" }}>{fmtR(l.gross)}</td>
+                      <td style={{ padding:"11px 14px", fontSize:13, color:"var(--hf-text)" }}>{l.quantity}</td>
+                      <td style={{ padding:"11px 14px", fontSize:13, color:"var(--hf-text)" }}>{fmtR(l.unitPrice)}</td>
+                      <td style={{ padding:"11px 14px", fontSize:13, fontWeight:700, color:"var(--hf-text)" }}>{fmtR(l.gross)}</td>
                       <td style={{ padding:"11px 14px" }}><button onClick={()=>isExtra?setExtra(e=>e.filter(x=>x.id!==l.id)):onRemove(l.id)} style={{ background:"none", border:"none", cursor:"pointer", color:RED, display:"flex" }}><X size={14}/></button></td>
                     </tr>
                   )
@@ -1138,7 +1138,7 @@ function RunningBillTab({ billLines, onRemove, patient }:
             </div>
             <div style={{ padding:"16px 24px", background:NAVY, borderRadius:12, textAlign:"right" as const }}>
               <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.6)", textTransform:"uppercase", letterSpacing:"0.06em" }}>Total</div>
-              <div style={{ fontSize:26, fontWeight:800, color:"#fff" }}>{fmtR(total)}</div>
+              <div style={{ fontSize:26, fontWeight:800, color:"var(--hf-text-on-solid)" }}>{fmtR(total)}</div>
               <div style={{ fontSize:10, color:"rgba(255,255,255,0.4)" }}>excl. VAT</div>
             </div>
           </div>
@@ -1152,7 +1152,7 @@ function RunningBillTab({ billLines, onRemove, patient }:
               <label style={lbl}>Item type</label>
               <div style={{ display:"flex", gap:6 }}>
                 {(["PROCEDURE","MEDICINE","CONSUMABLE"] as const).map(t=>(
-                  <button key={t} onClick={()=>setAddType(t)} style={{ padding:"6px 14px", borderRadius:8, border:`2px solid ${addType===t?NAVY:BORDER}`, background:addType===t?"#EFF6FF":"#fff", color:addType===t?NAVY:GRAY, fontSize:12, fontWeight:addType===t?600:400, cursor:"pointer" }}>
+                  <button key={t} onClick={()=>setAddType(t)} style={{ padding:"6px 14px", borderRadius:8, border:`2px solid ${addType===t?NAVY:BORDER}`, background:addType===t?"var(--hf-info-soft)":"var(--hf-surface)", color:addType===t?NAVY:GRAY, fontSize:12, fontWeight:addType===t?600:400, cursor:"pointer" }}>
                     {t.charAt(0)+t.slice(1).toLowerCase()}
                   </button>
                 ))}
@@ -1165,7 +1165,7 @@ function RunningBillTab({ billLines, onRemove, patient }:
               <div><label style={lbl}>Quantity</label><input type="number" step="0.5" value={addForm.quantity} onChange={e=>setAddForm(f=>({...f,quantity:e.target.value}))} style={sinp}/></div>
               <div><label style={lbl}>Unit price (R) *</label><input type="number" step="0.01" value={addForm.unitPrice} onChange={e=>setAddForm(f=>({...f,unitPrice:e.target.value}))} placeholder="0.00" style={sinp}/></div>
             </div>
-            {addForm.quantity&&addForm.unitPrice&&<div style={{ padding:"8px 12px", background:"#F0FDF4", border:"1px solid #86EFAC", borderRadius:8, fontSize:13, color:GREEN, fontWeight:600 }}>Line total: {fmtR(parseFloat(addForm.quantity)*parseFloat(addForm.unitPrice))}</div>}
+            {addForm.quantity&&addForm.unitPrice&&<div style={{ padding:"8px 12px", background:"var(--hf-success-soft)", border:"1px solid var(--hf-success-border)", borderRadius:8, fontSize:13, color:GREEN, fontWeight:600 }}>Line total: {fmtR(parseFloat(addForm.quantity)*parseFloat(addForm.unitPrice))}</div>}
           </div>
           <ModalFooter onCancel={()=>setShowAdd(false)} onConfirm={addLine} confirmLabel="Add to bill"/>
         </Modal>
@@ -1196,7 +1196,7 @@ function PrescriptionsTab({ patient, consultations }:
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
         <div style={{ display:"flex", gap:6 }}>
           {(["active","all"] as const).map(f=>(
-            <button key={f} onClick={()=>setFilter(f)} style={{ padding:"6px 14px", borderRadius:20, border:"none", fontSize:12, fontWeight:filter===f?600:400, background:filter===f?NAVY:"#F1F5F9", color:filter===f?"#fff":GRAY, cursor:"pointer" }}>
+            <button key={f} onClick={()=>setFilter(f)} style={{ padding:"6px 14px", borderRadius:20, border:"none", fontSize:12, fontWeight:filter===f?600:400, background:filter===f?NAVY:"var(--hf-surface-sunken)", color:filter===f?"var(--hf-text-on-solid)":GRAY, cursor:"pointer" }}>
               {f==="active"?"Active prescriptions":"All history"}
             </button>
           ))}
@@ -1207,16 +1207,16 @@ function PrescriptionsTab({ patient, consultations }:
       :displayed.length===0?<Empty icon={Pill} msg={filter==="active"?"No active prescriptions":"No prescription history"}/>:(
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {[...displayed].sort((a:any,b:any)=>b.prescribedAt.localeCompare(a.prescribedAt)).map((rx:Prescription)=>(
-            <div key={rx.id} style={{ border:`1px solid ${rx.dispensed?"#86EFAC":BORDER}`, borderLeft:`4px solid ${rx.dispensed?GREEN:TEAL}`, borderRadius:10, padding:"14px 18px", background:rx.dispensed?"#F0FDF4":"#fff" }}>
+            <div key={rx.id} style={{ border:`1px solid ${rx.dispensed?"#86EFAC":BORDER}`, borderLeft:`4px solid ${rx.dispensed?GREEN:TEAL}`, borderRadius:10, padding:"14px 18px", background:rx.dispensed?"var(--hf-success-soft)":"var(--hf-surface)" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
                 <div style={{ flex:1 }}>
-                  <div style={{ fontWeight:700, fontSize:15, color:"#0F172A", marginBottom:4 }}>{rx.medicationName}</div>
+                  <div style={{ fontWeight:700, fontSize:15, color:"var(--hf-text)", marginBottom:4 }}>{rx.medicationName}</div>
                   <div style={{ fontSize:13, color:GRAY, marginBottom:4 }}>{[rx.dosage,rx.frequency,rx.duration].filter(Boolean).join(" · ")}{rx.quantity?` · Qty: ${rx.quantity}`:""}{rx.repeats>0?` · Repeats: ${rx.repeats}`:""}</div>
-                  {rx.instructions&&<div style={{ fontSize:12, color:"#475569", fontStyle:"italic", marginBottom:4 }}>{rx.instructions}</div>}
+                  {rx.instructions&&<div style={{ fontSize:12, color:"var(--hf-text-tertiary)", fontStyle:"italic", marginBottom:4 }}>{rx.instructions}</div>}
                   <div style={{ fontSize:11, color:GRAY }}>Prescribed {fmtDT(rx.prescribedAt)}{rx.practitionerName&&` · Dr. ${rx.practitionerName}`}</div>
                 </div>
                 <div style={{ flexShrink:0, marginLeft:12 }}>
-                  {rx.dispensed?<span style={{ background:"#DCFCE7",color:GREEN,padding:"3px 10px",borderRadius:20,fontSize:12,fontWeight:700 }}>DISPENSED</span>:<span style={{ background:"#FFF7ED",color:AMBER,padding:"3px 10px",borderRadius:20,fontSize:12,fontWeight:700 }}>ACTIVE</span>}
+                  {rx.dispensed?<span style={{ background:"var(--hf-success-soft-strong)",color:GREEN,padding:"3px 10px",borderRadius:20,fontSize:12,fontWeight:700 }}>DISPENSED</span>:<span style={{ background:"var(--hf-orange-soft)",color:AMBER,padding:"3px 10px",borderRadius:20,fontSize:12,fontWeight:700 }}>ACTIVE</span>}
                 </div>
               </div>
             </div>
@@ -1250,7 +1250,7 @@ function LabsTab({ patient }:{patient:Patient}) {
   return (
     <div>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
-        <div style={{ fontSize:15, fontWeight:700, color:"#0F172A" }}>Lab results</div>
+        <div style={{ fontSize:15, fontWeight:700, color:"var(--hf-text)" }}>Lab results</div>
         <button onClick={()=>setShowUpload(true)} style={btnPrimary}><Upload size={14}/> Upload result</button>
       </div>
       {isLoading?<div style={{textAlign:"center",padding:40,color:GRAY}}>Loading...</div>
@@ -1259,12 +1259,12 @@ function LabsTab({ patient }:{patient:Patient}) {
           {(labs as any[]).map((lab:any)=>{
             const cfg=STATUS_LAB[lab.status]??STATUS_LAB.UNREVIEWED
             return (
-              <div key={lab.id} style={{ border:`1px solid ${BORDER}`, borderLeft:`4px solid ${cfg.color}`, borderRadius:10, padding:"14px 18px", background:"#fff" }}>
+              <div key={lab.id} style={{ border:`1px solid ${BORDER}`, borderLeft:`4px solid ${cfg.color}`, borderRadius:10, padding:"14px 18px", background:"var(--hf-surface)" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
                   <div>
-                    <div style={{ fontWeight:700, fontSize:14, color:"#0F172A", marginBottom:4 }}>{lab.pdfFilename||"Lab result"}</div>
+                    <div style={{ fontWeight:700, fontSize:14, color:"var(--hf-text)", marginBottom:4 }}>{lab.pdfFilename||"Lab result"}</div>
                     <div style={{ fontSize:12, color:GRAY }}>{lab.source} · Received {fmtDT(lab.receivedAt)}{lab.labReference&&` · Ref: ${lab.labReference}`}</div>
-                    {lab.interpretation&&<div style={{ marginTop:8, padding:"8px 12px", background:"#F0FDF4", border:"1px solid #86EFAC", borderRadius:8, fontSize:12, color:"#0F172A" }}><span style={{ fontWeight:700, color:TEAL }}>AI interpretation: </span>{lab.interpretation}</div>}
+                    {lab.interpretation&&<div style={{ marginTop:8, padding:"8px 12px", background:"var(--hf-success-soft)", border:"1px solid var(--hf-success-border)", borderRadius:8, fontSize:12, color:"var(--hf-text)" }}><span style={{ fontWeight:700, color:TEAL }}>AI interpretation: </span>{lab.interpretation}</div>}
                   </div>
                   <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6, flexShrink:0, marginLeft:12 }}>
                     <span style={{ background:cfg.bg, color:cfg.color, padding:"2px 8px", borderRadius:20, fontSize:11, fontWeight:700 }}>{lab.status}</span>
@@ -1286,7 +1286,7 @@ function LabsTab({ patient }:{patient:Patient}) {
               <div style={{ border:`2px dashed ${BORDER}`, borderRadius:10, padding:"24px", textAlign:"center", cursor:"pointer", background:LIGHT }} onClick={()=>fileRef.current?.click()}>
                 <Upload size={24} color={GRAY} style={{ marginBottom:8 }}/>
                 <div style={{ fontSize:13, color:GRAY }}>Click to select PDF</div>
-                <div style={{ fontSize:11, color:"#94A3B8", marginTop:4 }}>PDF only · max 10MB</div>
+                <div style={{ fontSize:11, color:"var(--hf-text-faint)", marginTop:4 }}>PDF only · max 10MB</div>
                 <input ref={fileRef} type="file" accept=".pdf" style={{ display:"none" }} onChange={e=>{ const file=e.target.files?.[0]; if (file) { setUploadFile(file); setUploadError("") } }}/>
               </div>
               {uploadFile&&<div style={{ marginTop:6, fontSize:13, color:GREEN, display:"flex", alignItems:"center", gap:6 }}><CheckCircle size={13}/> {uploadFile.name}</div>}
@@ -1360,11 +1360,11 @@ function DocumentsTab({ patient, consultations }:
     <div>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:14, marginBottom:24 }}>
         {docs.map(d=>(
-          <button key={d.label} onClick={d.action} style={{ display:"flex", alignItems:"flex-start", gap:14, padding:"18px 20px", background:"#fff", border:`1px solid ${BORDER}`, borderRadius:12, cursor:"pointer", textAlign:"left" as const }}
+          <button key={d.label} onClick={d.action} style={{ display:"flex", alignItems:"flex-start", gap:14, padding:"18px 20px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:12, cursor:"pointer", textAlign:"left" as const }}
             onMouseEnter={e=>{ (e.currentTarget as HTMLButtonElement).style.borderColor=d.color; (e.currentTarget as HTMLButtonElement).style.background=LIGHT }}
-            onMouseLeave={e=>{ (e.currentTarget as HTMLButtonElement).style.borderColor=BORDER; (e.currentTarget as HTMLButtonElement).style.background="#fff" }}>
+            onMouseLeave={e=>{ (e.currentTarget as HTMLButtonElement).style.borderColor=BORDER; (e.currentTarget as HTMLButtonElement).style.background="var(--hf-surface)" }}>
             <div style={{ width:40, height:40, borderRadius:10, background:`${d.color}14`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><d.icon size={18} color={d.color}/></div>
-            <div><div style={{ fontSize:14, fontWeight:700, color:"#0F172A", marginBottom:3 }}>{d.label}</div><div style={{ fontSize:12, color:GRAY }}>{d.desc}</div></div>
+            <div><div style={{ fontSize:14, fontWeight:700, color:"var(--hf-text)", marginBottom:3 }}>{d.label}</div><div style={{ fontSize:12, color:GRAY }}>{d.desc}</div></div>
           </button>
         ))}
       </div>
@@ -1405,23 +1405,23 @@ function HistoryTab({ appointments, consultations }:
           return (
             <div key={item.id} style={{ display:"flex", gap:16, alignItems:"flex-start" }}>
               <div style={{ display:"flex", flexDirection:"column", alignItems:"center", flexShrink:0 }}>
-                <div style={{ width:36, height:36, borderRadius:"50%", background:isAppt?"#EFF6FF":"#F0FDF4", border:`2px solid ${isAppt?"#BFDBFE":"#86EFAC"}`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <div style={{ width:36, height:36, borderRadius:"50%", background:isAppt?"var(--hf-info-soft)":"var(--hf-success-soft)", border:`2px solid ${isAppt?"#BFDBFE":"#86EFAC"}`, display:"flex", alignItems:"center", justifyContent:"center" }}>
                   {isAppt?<Calendar size={14} color="#1D4ED8"/>:<Stethoscope size={14} color={TEAL}/>}
                 </div>
                 {i<timeline.length-1&&<div style={{ width:2, height:32, background:BORDER, marginTop:4 }}/>}
               </div>
               <div style={{ flex:1, paddingBottom:20 }}>
-                <div style={{ padding:"12px 16px", background:"#fff", border:`1px solid ${BORDER}`, borderRadius:10 }}>
+                <div style={{ padding:"12px 16px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:10 }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
                     <div>
-                      <div style={{ fontWeight:600, fontSize:13, color:"#0F172A", marginBottom:3 }}>{isAppt?(item.appointmentType?.replace("_"," ")||"Appointment"):(item.chiefComplaint||"Consultation")}</div>
+                      <div style={{ fontWeight:600, fontSize:13, color:"var(--hf-text)", marginBottom:3 }}>{isAppt?(item.appointmentType?.replace("_"," ")||"Appointment"):(item.chiefComplaint||"Consultation")}</div>
                       <div style={{ fontSize:12, color:GRAY }}>{isAppt&&item.practitionerName&&`Dr. ${item.practitionerName} · `}{isAppt&&(item.reason||"")}{!isAppt&&item.practitionerName&&`Dr. ${item.practitionerName}`}{!isAppt&&item.diagnosis&&` · Dx: ${item.diagnosis}`}</div>
-                      {!isAppt&&item.icd10Codes?.length>0&&<div style={{ display:"flex", gap:4, marginTop:4, flexWrap:"wrap" }}>{item.icd10Codes.map((c:string)=>(<span key={c} style={{ background:"#EFF6FF", color:"#1D4ED8", padding:"1px 6px", borderRadius:4, fontSize:11, fontWeight:600 }}>{c}</span>))}</div>}
+                      {!isAppt&&item.icd10Codes?.length>0&&<div style={{ display:"flex", gap:4, marginTop:4, flexWrap:"wrap" }}>{item.icd10Codes.map((c:string)=>(<span key={c} style={{ background:"var(--hf-info-soft)", color:"var(--hf-info-text)", padding:"1px 6px", borderRadius:4, fontSize:11, fontWeight:600 }}>{c}</span>))}</div>}
                     </div>
                     <div style={{ textAlign:"right", flexShrink:0, marginLeft:12 }}>
                       <div style={{ fontSize:12, color:GRAY }}>{fmtDT(item._date)}{isAppt&&` · ${fmtTime(item._date)}`}</div>
                       {isAppt&&s&&<span style={{ fontSize:10, fontWeight:700, background:s.bg, color:s.color, padding:"1px 7px", borderRadius:20, marginTop:3, display:"inline-block" }}>{s.label}</span>}
-                      {!isAppt&&item.followUpDays&&<span style={{ fontSize:10, color:AMBER, background:"#FFFBEB", padding:"1px 7px", borderRadius:20, marginTop:3, display:"inline-block" }}>F/U {item.followUpDays}d</span>}
+                      {!isAppt&&item.followUpDays&&<span style={{ fontSize:10, color:AMBER, background:"var(--hf-warning-soft)", padding:"1px 7px", borderRadius:20, marginTop:3, display:"inline-block" }}>F/U {item.followUpDays}d</span>}
                     </div>
                   </div>
                 </div>
@@ -1439,9 +1439,9 @@ function HistoryTab({ appointments, consultations }:
 function Modal({ title, onClose, children, wide }:{title:string;onClose:()=>void;children:React.ReactNode;wide?:boolean}) {
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.55)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1200, backdropFilter:"blur(3px)" }}>
-      <div style={{ background:"#fff", borderRadius:16, padding:28, width:wide?740:500, maxHeight:"92vh", overflowY:"auto", boxShadow:"0 24px 64px rgba(0,0,0,0.22)" }}>
+      <div style={{ background:"var(--hf-surface)", borderRadius:16, padding:28, width:wide?740:500, maxHeight:"92vh", overflowY:"auto", boxShadow:"0 24px 64px rgba(0,0,0,0.22)" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
-          <h3 style={{ margin:0, fontSize:17, fontWeight:700, color:"#0F172A" }}>{title}</h3>
+          <h3 style={{ margin:0, fontSize:17, fontWeight:700, color:"var(--hf-text)" }}>{title}</h3>
           <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", color:GRAY, display:"flex" }}><X size={20}/></button>
         </div>
         {children}
@@ -1453,10 +1453,10 @@ function ModalFooter({ onCancel, onConfirm, confirmLabel, loading }:{onCancel:()
   return <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20 }}><button onClick={onCancel} style={btnCancel}>Cancel</button><button onClick={onConfirm} disabled={loading} style={btnPrimary}>{loading?<><Loader size={13}/> {confirmLabel}</>:confirmLabel}</button></div>
 }
 function Empty({ icon:Icon, msg, children }:{icon:React.ElementType;msg:string;children?:React.ReactNode}) {
-  return <div style={{ textAlign:"center", padding:"60px 20px", color:GRAY, border:`1px dashed ${BORDER}`, borderRadius:12 }}><Icon size={36} style={{ marginBottom:12, opacity:0.4 }}/><div style={{ fontWeight:600, color:"#475569", fontSize:15 }}>{msg}</div>{children}</div>
+  return <div style={{ textAlign:"center", padding:"60px 20px", color:GRAY, border:`1px dashed ${BORDER}`, borderRadius:12 }}><Icon size={36} style={{ marginBottom:12, opacity:0.4 }}/><div style={{ fontWeight:600, color:"var(--hf-text-tertiary)", fontSize:15 }}>{msg}</div>{children}</div>
 }
 function ErrBox({ msg }:{msg:string}) {
-  return <div style={{ padding:"10px 12px", background:"#FEF2F2", border:"1px solid #FECACA", borderRadius:8, fontSize:13, color:RED, display:"flex", alignItems:"center", gap:8 }}><AlertCircle size={14}/>{msg}</div>
+  return <div style={{ padding:"10px 12px", background:"var(--hf-danger-soft)", border:"1px solid var(--hf-danger-border)", borderRadius:8, fontSize:13, color:RED, display:"flex", alignItems:"center", gap:8 }}><AlertCircle size={14}/>{msg}</div>
 }
 function FSect({ title, children }:{title:string;children:React.ReactNode}) {
   return <div style={{ marginBottom:20 }}><div style={{ fontSize:10, fontWeight:700, color:GRAY, letterSpacing:"0.07em", textTransform:"uppercase", marginBottom:12, paddingBottom:8, borderBottom:`1px solid ${BORDER}` }}>{title}</div>{children}</div>

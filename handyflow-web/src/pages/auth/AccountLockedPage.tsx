@@ -70,14 +70,14 @@ export function AccountLockedPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0F172A 0%, #1B3A6B 55%, #0D9488 100%)',
+      background: 'linear-gradient(135deg, var(--hf-inverse-surface) 0%, var(--hf-primary) 55%, var(--hf-accent) 100%)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: '24px 16px', fontFamily: "'Inter', system-ui, sans-serif",
     }}>
       <div style={{ width: '100%', maxWidth: 460 }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 38, height: 38, background: '#0D9488', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 38, height: 38, background: 'var(--hf-accent)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Building2 size={19} color="white" strokeWidth={2.5} />
             </div>
             <span style={{ fontSize: 20, fontWeight: 800, color: 'white', letterSpacing: '-0.5px' }}>HandyFlow</span>
@@ -85,28 +85,28 @@ export function AccountLockedPage() {
         </div>
 
         <div style={{ background: 'white', borderRadius: 20, padding: 36, textAlign: 'center', boxShadow: '0 24px 80px rgba(0,0,0,0.3)' }}>
-          <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px' }}>
+          <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--hf-danger-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px' }}>
             <ShieldAlert size={28} color="#DC2626" />
           </div>
-          <h1 style={{ fontSize: 21, fontWeight: 800, color: '#0F172A', margin: '0 0 10px' }}>{copy.title}</h1>
-          <p style={{ fontSize: 14, color: '#64748B', lineHeight: 1.6, margin: '0 0 26px' }}>{copy.body}</p>
+          <h1 style={{ fontSize: 21, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 10px' }}>{copy.title}</h1>
+          <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', lineHeight: 1.6, margin: '0 0 26px' }}>{copy.body}</p>
 
           <button
             onClick={handleCtaClick}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#1B3A6B', color: 'white', border: 'none', borderRadius: 10, padding: '13px 24px', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 12 }}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 10, padding: '13px 24px', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 12 }}
           >
             {isPastDue ? <Mail size={16} /> : <CreditCard size={16} />} {copy.cta}
           </button>
 
           <button
             onClick={() => { logout(); navigate('/login') }}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'none', color: '#64748B', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 8 }}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'none', color: 'var(--hf-text-muted)', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 8 }}
           >
             <LogOut size={14} /> Sign out
           </button>
 
-          <p style={{ marginTop: 18, fontSize: 12, color: '#94A3B8' }}>
-            Need help? <a href="mailto:support@handyflow.co.za" style={{ color: '#1B3A6B', fontWeight: 600, textDecoration: 'none' }}>support@handyflow.co.za</a>
+          <p style={{ marginTop: 18, fontSize: 12, color: 'var(--hf-text-faint)' }}>
+            Need help? <a href="mailto:support@handyflow.co.za" style={{ color: 'var(--hf-primary-text)', fontWeight: 600, textDecoration: 'none' }}>support@handyflow.co.za</a>
           </p>
         </div>
       </div>

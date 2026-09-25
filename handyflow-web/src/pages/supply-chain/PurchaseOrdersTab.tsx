@@ -18,20 +18,20 @@ interface PO {
 }
 
 const ACCENT = "#D97706"
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 9, fontSize: 14, boxSizing: "border-box", outline: "none", background: "#fff" }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 9, fontSize: 14, boxSizing: "border-box", outline: "none", background: "var(--hf-surface)" }
 const fmtR = (n: number) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtD = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
 
 const STATUS_CFG: Record<string, { bg: string; color: string; label: string }> = {
-  DRAFT:              { bg: "#F1F5F9", color: "#475569",  label: "Draft" },
-  PENDING_APPROVAL:   { bg: "#FEF3C7", color: "#92400E",  label: "Pending Approval" },
-  APPROVED:           { bg: "#DBEAFE", color: "#1D4ED8",  label: "Approved" },
-  SENT:               { bg: "#EDE9FE", color: "#7C3AED",  label: "Sent to Supplier" },
-  ACKNOWLEDGED:       { bg: "#D1FAE5", color: "#065F46",  label: "Acknowledged" },
-  PARTIALLY_RECEIVED: { bg: "#FEF9C3", color: "#713F12",  label: "Partially Received" },
-  FULLY_RECEIVED:     { bg: "#DCFCE7", color: "#166534",  label: "Fully Received" },
-  INVOICED:           { bg: "#DBEAFE", color: "#1E40AF",  label: "Invoiced" },
-  CANCELLED:          { bg: "#FEE2E2", color: "#DC2626",  label: "Cancelled" },
+  DRAFT:              { bg: "var(--hf-surface-sunken)", color: "var(--hf-text-tertiary)",  label: "Draft" },
+  PENDING_APPROVAL:   { bg: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text-deep)",  label: "Pending Approval" },
+  APPROVED:           { bg: "var(--hf-info-soft-strong)", color: "var(--hf-info-text)",  label: "Approved" },
+  SENT:               { bg: "var(--hf-violet-soft-strong)", color: "var(--hf-violet-text)",  label: "Sent to Supplier" },
+  ACKNOWLEDGED:       { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)",  label: "Acknowledged" },
+  PARTIALLY_RECEIVED: { bg: "var(--hf-warning-soft)", color: "var(--hf-warning-text-deep)",  label: "Partially Received" },
+  FULLY_RECEIVED:     { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)",  label: "Fully Received" },
+  INVOICED:           { bg: "var(--hf-info-soft-strong)", color: "var(--hf-info-text-strong)",  label: "Invoiced" },
+  CANCELLED:          { bg: "var(--hf-danger-soft-strong)", color: "var(--hf-danger-text)",  label: "Cancelled" },
 }
 
 const STATUS_FILTERS = ["", "DRAFT", "PENDING_APPROVAL", "APPROVED", "SENT", "PARTIALLY_RECEIVED", "FULLY_RECEIVED"]
@@ -149,7 +149,7 @@ export function PurchaseOrdersTab() {
     const st = STATUS_CFG[detail.status] ?? STATUS_CFG.DRAFT
     return (
       <div>
-        <button onClick={() => setDetail(null)} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: "#64748B", fontSize: 13, marginBottom: 16, padding: 0 }}>
+        <button onClick={() => setDetail(null)} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-muted)", fontSize: 13, marginBottom: 16, padding: 0 }}>
           <ChevronLeft size={15} /> All Purchase Orders
         </button>
 
@@ -160,14 +160,14 @@ export function PurchaseOrdersTab() {
               <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT }}>{detail.orderNumber}</span>
               <span style={{ background: st.bg, color: st.color, fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 20 }}>{st.label}</span>
             </div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A", marginBottom: 4 }}>{detail.supplierName}</div>
-            <div style={{ fontSize: 13, color: "#64748B" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "var(--hf-text)", marginBottom: 4 }}>{detail.supplierName}</div>
+            <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>
               Order date: {fmtD(detail.orderDate)}
               {detail.requiredByDate && ` · Required by: ${fmtD(detail.requiredByDate)}`}
               {detail.projectRef && ` · Ref: ${detail.projectRef}`}
             </div>
             {detail.rejectionReason && (
-              <div style={{ marginTop: 8, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 12, color: "#DC2626" }}>
+              <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-danger-text)" }}>
                 ✕ Returned: {detail.rejectionReason}
               </div>
             )}
@@ -213,28 +213,28 @@ export function PurchaseOrdersTab() {
         {err && <ErrBox msg={err} />}
 
         {/* Lines table */}
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
-          <div style={{ background: "#F8FAFC", padding: "10px 16px", fontSize: 12, fontWeight: 700, color: "#475569" }}>Line Items</div>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
+          <div style={{ background: "var(--hf-surface-muted)", padding: "10px 16px", fontSize: 12, fontWeight: 700, color: "var(--hf-text-tertiary)" }}>Line Items</div>
           {lines.length === 0
-            ? <div style={{ padding: "24px 16px", textAlign: "center", color: "#94A3B8", fontSize: 13 }}>
+            ? <div style={{ padding: "24px 16px", textAlign: "center", color: "var(--hf-text-faint)", fontSize: 13 }}>
                 No lines yet — {detail.status === "DRAFT" ? "add items using the button above" : "lines will appear once added"}
               </div>
             : <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr style={{ background: "#F8FAFC", borderTop: "1px solid #E2E8F0" }}>
+                <thead><tr style={{ background: "var(--hf-surface-muted)", borderTop: "1px solid var(--hf-border)" }}>
                   {["Item", "SKU", "Qty Ordered", "Qty Received", "Unit Cost", "Subtotal", "VAT", "Total Incl.", ""].map(h => (
-                    <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</th>
+                    <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
                   {lines.map((l, i) => (
-                    <tr key={l.id} style={{ borderTop: "1px solid #F1F5F9", background: i % 2 === 0 ? "#fff" : "#FAFAFA" }}>
-                      <td style={{ padding: "10px 12px", fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{l.itemName}</td>
-                      <td style={{ padding: "10px 12px", fontSize: 12, color: "#64748B" }}>{l.supplierSku ?? "—"}</td>
+                    <tr key={l.id} style={{ borderTop: "1px solid var(--hf-border-subtle)", background: i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)" }}>
+                      <td style={{ padding: "10px 12px", fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{l.itemName}</td>
+                      <td style={{ padding: "10px 12px", fontSize: 12, color: "var(--hf-text-muted)" }}>{l.supplierSku ?? "—"}</td>
                       <td style={{ padding: "10px 12px", fontSize: 13 }}>{l.qtyOrdered.toFixed(2)}</td>
-                      <td style={{ padding: "10px 12px", fontSize: 13, color: l.isFullyReceived ? "#059669" : l.qtyReceived > 0 ? ACCENT : "#94A3B8" }}>{l.qtyReceived.toFixed(2)}{l.isFullyReceived && " ✓"}</td>
+                      <td style={{ padding: "10px 12px", fontSize: 13, color: l.isFullyReceived ? "var(--hf-success-text)" : l.qtyReceived > 0 ? ACCENT : "var(--hf-text-faint)" }}>{l.qtyReceived.toFixed(2)}{l.isFullyReceived && " ✓"}</td>
                       <td style={{ padding: "10px 12px", fontSize: 13 }}>{fmtR(l.unitCost)}</td>
                       <td style={{ padding: "10px 12px", fontSize: 13 }}>{fmtR(l.lineTotal)}</td>
-                      <td style={{ padding: "10px 12px", fontSize: 12, color: "#64748B" }}>{l.vatRate}%</td>
+                      <td style={{ padding: "10px 12px", fontSize: 12, color: "var(--hf-text-muted)" }}>{l.vatRate}%</td>
                       <td style={{ padding: "10px 12px", fontSize: 13, fontWeight: 600 }}>{fmtR(l.lineTotalIncl)}</td>
                       <td />
                     </tr>
@@ -248,20 +248,20 @@ export function PurchaseOrdersTab() {
             this PO's deliveries. Only shown once at least one GR exists,
             since most POs won't have one until goods actually arrive. */}
         {goodsReceipts.length > 0 && (
-          <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
-            <div style={{ background: "#F8FAFC", padding: "10px 16px", fontSize: 12, fontWeight: 700, color: "#475569" }}>Goods Receipts</div>
+          <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
+            <div style={{ background: "var(--hf-surface-muted)", padding: "10px 16px", fontSize: 12, fontWeight: 700, color: "var(--hf-text-tertiary)" }}>Goods Receipts</div>
             <div style={{ display: "flex", flexDirection: "column" }}>
               {goodsReceipts.map((gr, i) => (
-                <div key={gr.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderTop: i > 0 ? "1px solid #F1F5F9" : "none" }}>
+                <div key={gr.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderTop: i > 0 ? "1px solid var(--hf-border-subtle)" : "none" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT }}>{gr.receiptNumber}</span>
-                    <span style={{ fontSize: 11, color: "#94A3B8" }}>{gr.receivedDate ? fmtD(gr.receivedDate) : "—"}</span>
-                    <span style={{ background: gr.status === "POSTED" ? "#DCFCE7" : "#F1F5F9", color: gr.status === "POSTED" ? "#166534" : "#475569", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20 }}>
+                    <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{gr.receivedDate ? fmtD(gr.receivedDate) : "—"}</span>
+                    <span style={{ background: gr.status === "POSTED" ? "var(--hf-success-soft-strong)" : "var(--hf-surface-sunken)", color: gr.status === "POSTED" ? "var(--hf-success-text-strong)" : "var(--hf-text-tertiary)", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20 }}>
                       {gr.status}
                     </span>
                   </div>
                   <button onClick={() => downloadGrn(gr)} disabled={downloadingGrnId === gr.id}
-                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 11, fontWeight: 600, color: "#374151", cursor: "pointer" }}>
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", cursor: "pointer" }}>
                     <Download size={11} /> {downloadingGrnId === gr.id ? "Downloading…" : "Download GRN"}
                   </button>
                 </div>
@@ -272,13 +272,13 @@ export function PurchaseOrdersTab() {
 
         {/* Totals */}
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "16px 20px", minWidth: 260 }}>
+          <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "16px 20px", minWidth: 260 }}>
             {[["Subtotal (excl. VAT)", fmtR(detail.subtotal)], ["VAT", fmtR(detail.vatAmount)]].map(([k, v]) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#64748B", marginBottom: 8 }}>
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--hf-text-muted)", marginBottom: 8 }}>
                 <span>{k}</span><span>{v}</span>
               </div>
             ))}
-            <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 800, color: "#0F172A" }}>
+            <div style={{ borderTop: "1px solid var(--hf-border)", paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 800, color: "var(--hf-text)" }}>
               <span>Total (incl. VAT)</span><span style={{ color: ACCENT }}>{fmtR(detail.totalAmount)}</span>
             </div>
           </div>
@@ -287,7 +287,7 @@ export function PurchaseOrdersTab() {
         {/* Reject modal */}
         {showReject && (
           <Modal title="Return PO for Revision" onClose={() => setShowReject(false)}>
-            <p style={{ fontSize: 13, color: "#64748B", marginTop: 0 }}>Provide a reason so the buyer knows what to fix.</p>
+            <p style={{ fontSize: 13, color: "var(--hf-text-muted)", marginTop: 0 }}>Provide a reason so the buyer knows what to fix.</p>
             <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)}
               placeholder="e.g. Unit costs don't match the agreed quotation." autoFocus
               style={{ ...inp, minHeight: 80, resize: "vertical" }} />
@@ -323,43 +323,43 @@ export function PurchaseOrdersTab() {
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {STATUS_FILTERS.map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
-              style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: statusFilter === s ? 700 : 400, border: statusFilter === s ? `1.5px solid ${ACCENT}` : "1px solid #E2E8F0", background: statusFilter === s ? "#FEF3C7" : "#fff", color: statusFilter === s ? ACCENT : "#64748B" }}>
+              style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: statusFilter === s ? 700 : 400, border: statusFilter === s ? `1.5px solid ${ACCENT}` : "1px solid var(--hf-border)", background: statusFilter === s ? "var(--hf-warning-soft-strong)" : "var(--hf-surface)", color: statusFilter === s ? ACCENT : "var(--hf-text-muted)" }}>
               {s ? STATUS_CFG[s]?.label : "All"}
             </button>
           ))}
         </div>
         <button onClick={() => { setShowCreate(true); setErr("") }}
-          style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: ACCENT, color: "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={14} /> New Order
         </button>
       </div>
 
       {/* PO table */}
       {isLoading
-        ? <div style={{ padding: 40, textAlign: "center", color: "#94A3B8" }}>Loading…</div>
+        ? <div style={{ padding: 40, textAlign: "center", color: "var(--hf-text-faint)" }}>Loading…</div>
         : pos.length === 0
-          ? <div style={{ textAlign: "center", padding: "50px 0", color: "#94A3B8" }}><Package size={36} style={{ opacity: .3, marginBottom: 10 }} /><div style={{ fontWeight: 600, color: "#475569" }}>No purchase orders</div></div>
-          : <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+          ? <div style={{ textAlign: "center", padding: "50px 0", color: "var(--hf-text-faint)" }}><Package size={36} style={{ opacity: .3, marginBottom: 10 }} /><div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No purchase orders</div></div>
+          : <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr style={{ background: "#F8FAFC" }}>
+                <thead><tr style={{ background: "var(--hf-surface-muted)" }}>
                   {["PO #", "Supplier", "Amount", "Order Date", "Required By", "Status", ""].map(h => (
-                    <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                    <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
                   {pos.map((po, i) => {
                     const st = STATUS_CFG[po.status] ?? STATUS_CFG.DRAFT
                     return (
-                      <tr key={po.id} onClick={() => setDetail(po)} style={{ borderTop: "1px solid #F1F5F9", background: i % 2 === 0 ? "#fff" : "#FAFAFA", cursor: "pointer" }}
+                      <tr key={po.id} onClick={() => setDetail(po)} style={{ borderTop: "1px solid var(--hf-border-subtle)", background: i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)", cursor: "pointer" }}
                         onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#F0F7FF"}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? "#fff" : "#FAFAFA"}>
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)"}>
                         <td style={{ padding: "11px 14px", fontSize: 12, fontWeight: 700, color: ACCENT }}>{po.orderNumber}</td>
-                        <td style={{ padding: "11px 14px", fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{po.supplierName}</td>
+                        <td style={{ padding: "11px 14px", fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{po.supplierName}</td>
                         <td style={{ padding: "11px 14px", fontSize: 13, fontWeight: 600 }}>{fmtR(po.totalAmount)}</td>
-                        <td style={{ padding: "11px 14px", fontSize: 12, color: "#64748B" }}>{fmtD(po.orderDate)}</td>
-                        <td style={{ padding: "11px 14px", fontSize: 12, color: "#64748B" }}>{fmtD(po.requiredByDate)}</td>
+                        <td style={{ padding: "11px 14px", fontSize: 12, color: "var(--hf-text-muted)" }}>{fmtD(po.orderDate)}</td>
+                        <td style={{ padding: "11px 14px", fontSize: 12, color: "var(--hf-text-muted)" }}>{fmtD(po.requiredByDate)}</td>
                         <td style={{ padding: "11px 14px" }}><span style={{ background: st.bg, color: st.color, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20 }}>{st.label}</span></td>
-                        <td style={{ padding: "11px 14px", fontSize: 12, color: "#1D4ED8", fontWeight: 600 }}>Open →</td>
+                        <td style={{ padding: "11px 14px", fontSize: 12, color: "var(--hf-info-text)", fontWeight: 600 }}>Open →</td>
                       </tr>
                     )
                   })}
@@ -389,7 +389,7 @@ export function PurchaseOrdersTab() {
             <Field label="Notes"><input value={poForm.notes} onChange={e => spf("notes", e.target.value)} style={inp} /></Field>
             <Field label="Internal Notes" span={2}><textarea value={poForm.internalNotes} onChange={e => spf("internalNotes", e.target.value)} style={{ ...inp, minHeight: 48, resize: "vertical" }} /></Field>
           </div>
-          <div style={{ marginTop: 12, padding: "10px 12px", background: "#FFFBEB", borderRadius: 8, fontSize: 12, color: "#92400E" }}>
+          <div style={{ marginTop: 12, padding: "10px 12px", background: "var(--hf-warning-soft)", borderRadius: 8, fontSize: 12, color: "var(--hf-warning-text-deep)" }}>
             ℹ After creating the PO you can add line items before submitting for approval.
           </div>
           {err && <ErrBox msg={err} />}

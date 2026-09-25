@@ -10,10 +10,10 @@ const fmtDT  = (d: any) => d ? new Date(d).toLocaleString("en-ZA") : "—"
 const fmtKB  = (b: any) => b ? `${(Number(b) / 1024).toFixed(1)} KB` : "—"
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
-  DRAFT:      { label: "Draft",      color: "#64748B", bg: "#F1F5F9" },
-  PREPARED:   { label: "Prepared",   color: "#1D4ED8", bg: "#EFF6FF" },
-  REVIEWED:   { label: "Reviewed",   color: "#7C3AED", bg: "#F5F3FF" },
-  SIGNED_OFF: { label: "Signed Off", color: "#166534", bg: "#DCFCE7" },
+  DRAFT:      { label: "Draft",      color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
+  PREPARED:   { label: "Prepared",   color: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+  REVIEWED:   { label: "Reviewed",   color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)" },
+  SIGNED_OFF: { label: "Signed Off", color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
 }
 const NEXT_STATUS: Record<string, string> = { DRAFT: "PREPARED", PREPARED: "REVIEWED", REVIEWED: "SIGNED_OFF" }
 const FOLDER_TYPES = ["TB", "RECONS", "TAX", "FS", "FICA", "GENERAL"]
@@ -158,14 +158,14 @@ export default function WorkpapersTab() {
     <div>
       <div style={{ display: "flex", gap: 10, marginBottom: 20, alignItems: "center" }}>
         <select value={selClient} onChange={e => { setSelClient(e.target.value); setSelFolder(null); setError("") }}
-          style={{ padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, outline: "none", background: "#fff", minWidth: 220 }}>
+          style={{ padding: "8px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 14, outline: "none", background: "var(--hf-surface)", minWidth: 220 }}>
           <option value="">Select a client...</option>
           {(clients as any[]).map((c: any) => <option key={c.id} value={c.id}>{c.tradingName}</option>)}
         </select>
       </div>
 
       {!selClient ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <FolderOpen size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
           <div>Select a client to view their workpapers.</div>
         </div>
@@ -173,26 +173,26 @@ export default function WorkpapersTab() {
         <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 20 }}>
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase" as const }}>Folders</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase" as const }}>Folders</div>
               <button onClick={() => { setShowNewFolder(true); setError("") }}
-                style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                 <Plus size={12} /> New
               </button>
             </div>
             {foldersLoading ? (
-              <div style={{ fontSize: 12, color: "#94A3B8" }}>Loading...</div>
+              <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Loading...</div>
             ) : folders.length === 0 ? (
-              <div style={{ fontSize: 12, color: "#94A3B8" }}>No folders yet.</div>
+              <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>No folders yet.</div>
             ) : (
               Object.entries(foldersByYear).sort((a, b) => Number(b[0]) - Number(a[0])).map(([year, yearFolders]: any) => (
                 <div key={year} style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", marginBottom: 6 }}>{year}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", marginBottom: 6 }}>{year}</div>
                   {yearFolders.map((f: any) => (
                     <button key={f.id} onClick={() => setSelFolder(f)}
-                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left" as const, padding: "8px 10px", marginBottom: 4, background: selFolder?.id === f.id ? "#EEF2FF" : "#fff", border: `1px solid ${selFolder?.id === f.id ? "#1B3A6B" : "#E2E8F0"}`, borderRadius: 7, fontSize: 13, fontWeight: selFolder?.id === f.id ? 600 : 400, color: selFolder?.id === f.id ? "#1B3A6B" : "#374151", cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left" as const, padding: "8px 10px", marginBottom: 4, background: selFolder?.id === f.id ? "var(--hf-indigo-soft)" : "var(--hf-surface)", border: `1px solid ${selFolder?.id === f.id ? "#1B3A6B" : "#E2E8F0"}`, borderRadius: 7, fontSize: 13, fontWeight: selFolder?.id === f.id ? 600 : 400, color: selFolder?.id === f.id ? "var(--hf-primary-text)" : "var(--hf-text-secondary)", cursor: "pointer" }}>
                       <FolderOpen size={14} />
                       <span style={{ flex: 1 }}>{f.name}</span>
-                      {f.folderType && <span style={{ fontSize: 10, color: "#94A3B8" }}>{f.folderType}</span>}
+                      {f.folderType && <span style={{ fontSize: 10, color: "var(--hf-text-faint)" }}>{f.folderType}</span>}
                     </button>
                   ))}
                 </div>
@@ -202,31 +202,31 @@ export default function WorkpapersTab() {
 
           <div>
             {!selFolder ? (
-              <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+              <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
                 <ChevronRight size={30} style={{ marginBottom: 10, opacity: 0.3 }} />
                 <div>Select a folder to view its files.</div>
               </div>
             ) : (
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{selFolder.name}</div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{selFolder.name}</div>
                   <div style={{ display: "flex", gap: 8 }}>
                     {/* FIX (P1 backlog) — see the restoreMut mutation's own comment. */}
                     <button onClick={() => setShowDeleted(v => !v)}
-                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: showDeleted ? "#F1F5F9" : "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: showDeleted ? "var(--hf-surface-sunken)" : "var(--hf-surface)", color: "var(--hf-text-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                       <History size={14} /> {showDeleted ? "Hide" : "Show"} Deleted
                     </button>
                     <button onClick={() => { setShowUpload(true); setError("") }}
-                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                       <Upload size={14} /> Upload File
                     </button>
                   </div>
                 </div>
 
                 {filesLoading ? (
-                  <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>Loading...</div>
+                  <div style={{ textAlign: "center", padding: 30, color: "var(--hf-text-faint)" }}>Loading...</div>
                 ) : files.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8" }}>
+                  <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)" }}>
                     <FileText size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
                     <div>No files in this folder yet.</div>
                   </div>
@@ -236,41 +236,41 @@ export default function WorkpapersTab() {
                       const sc = STATUS_CFG[f.reviewStatus] ?? STATUS_CFG.DRAFT
                       const superseded = !!f.supersededBy
                       return (
-                        <div key={f.id} style={{ padding: "12px 16px", background: superseded ? "#F8FAFC" : "#fff", border: "1px solid #E2E8F0", borderRadius: 10, opacity: superseded ? 0.65 : 1 }}>
+                        <div key={f.id} style={{ padding: "12px 16px", background: superseded ? "var(--hf-surface-muted)" : "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 10, opacity: superseded ? 0.65 : 1 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                             <div>
                               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" as const }}>
-                                <span style={{ fontWeight: 600, fontSize: 13, color: "#0F172A" }}>{f.fileName}</span>
-                                <span style={{ fontSize: 11, color: "#94A3B8" }}>v{f.versionNumber}</span>
-                                {superseded && <span style={{ background: "#F1F5F9", color: "#64748B", padding: "1px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>SUPERSEDED</span>}
+                                <span style={{ fontWeight: 600, fontSize: 13, color: "var(--hf-text)" }}>{f.fileName}</span>
+                                <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>v{f.versionNumber}</span>
+                                {superseded && <span style={{ background: "var(--hf-surface-sunken)", color: "var(--hf-text-muted)", padding: "1px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>SUPERSEDED</span>}
                                 <span style={{ background: sc.bg, color: sc.color, padding: "1px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>{sc.label}</span>
                               </div>
-                              <div style={{ fontSize: 11, color: "#94A3B8" }}>{fmtKB(f.fileSizeBytes)} · Uploaded {fmtD(f.createdAt)}</div>
+                              <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{fmtKB(f.fileSizeBytes)} · Uploaded {fmtD(f.createdAt)}</div>
                             </div>
                             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                               <button onClick={() => handleDownload(f)} title="Download"
-                                style={{ padding: "6px 10px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 11, cursor: "pointer", color: "#374151" }}>
+                                style={{ padding: "6px 10px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 11, cursor: "pointer", color: "var(--hf-text-secondary)" }}>
                                 Download
                               </button>
                               <button onClick={() => setAuditFile(f)} title="Audit log"
-                                style={{ padding: "6px 8px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 7, cursor: "pointer", color: "#64748B" }}>
+                                style={{ padding: "6px 8px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-text-muted)" }}>
                                 <History size={13} />
                               </button>
                               {!superseded && (
                                 NEXT_STATUS[f.reviewStatus] ? (
                                   <button onClick={() => statusMut.mutate({ fileId: f.id, status: NEXT_STATUS[f.reviewStatus] })}
-                                    style={{ padding: "6px 12px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                                    style={{ padding: "6px 12px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                                     Mark {STATUS_CFG[NEXT_STATUS[f.reviewStatus]].label}
                                   </button>
                                 ) : (
                                   <button onClick={() => statusMut.mutate({ fileId: f.id, status: "DRAFT" })}
-                                    style={{ padding: "6px 10px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 11, cursor: "pointer", color: "#64748B" }}>
+                                    style={{ padding: "6px 10px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 11, cursor: "pointer", color: "var(--hf-text-muted)" }}>
                                     Reopen
                                   </button>
                                 )
                               )}
                               <button onClick={() => deleteMut.mutate(f.id)} title="Delete"
-                                style={{ padding: "6px 8px", background: "#fff", border: "1px solid #FECACA", borderRadius: 7, cursor: "pointer", color: "#DC2626" }}>
+                                style={{ padding: "6px 8px", background: "var(--hf-surface)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-danger-text)" }}>
                                 <Trash2 size={13} />
                               </button>
                             </div>
@@ -282,27 +282,27 @@ export default function WorkpapersTab() {
                 )}
 
                 {showDeleted && (
-                  <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #E2E8F0" }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#94A3B8", marginBottom: 10, textTransform: "uppercase" as const, letterSpacing: 0.4 }}>
+                  <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--hf-border)" }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-faint)", marginBottom: 10, textTransform: "uppercase" as const, letterSpacing: 0.4 }}>
                       Deleted Files
                     </div>
                     {deletedLoading ? (
-                      <div style={{ textAlign: "center", padding: 20, color: "#94A3B8" }}>Loading…</div>
+                      <div style={{ textAlign: "center", padding: 20, color: "var(--hf-text-faint)" }}>Loading…</div>
                     ) : deletedFiles.length === 0 ? (
-                      <div style={{ textAlign: "center", padding: 20, color: "#94A3B8", fontSize: 13 }}>No deleted files in this folder.</div>
+                      <div style={{ textAlign: "center", padding: 20, color: "var(--hf-text-faint)", fontSize: 13 }}>No deleted files in this folder.</div>
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {deletedFiles.map((f: any) => (
-                          <div key={f.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8 }}>
+                          <div key={f.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <FileText size={16} style={{ color: "#94A3B8" }} />
+                              <FileText size={16} style={{ color: "var(--hf-text-faint)" }} />
                               <div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{f.fileName}</div>
-                                <div style={{ fontSize: 11, color: "#94A3B8" }}>v{f.versionNumber}</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)" }}>{f.fileName}</div>
+                                <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>v{f.versionNumber}</div>
                               </div>
                             </div>
                             <button onClick={() => restoreMut.mutate(f.id)} disabled={restoreMut.isPending} title="Restore"
-                              style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 7, cursor: "pointer", color: "#166534", fontSize: 12, fontWeight: 600 }}>
+                              style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-success-text-strong)", fontSize: 12, fontWeight: 600 }}>
                               <History size={13} /> Restore
                             </button>
                           </div>
@@ -318,37 +318,37 @@ export default function WorkpapersTab() {
       )}
 
       {error && (
-        <div style={{ marginTop: 16, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{error}</div>
+        <div style={{ marginTop: 16, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>
       )}
 
       {showNewFolder && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <h3 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700 }}>New Folder</h3>
             <div style={{ marginBottom: 14 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Name *</label>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }}>Name *</label>
               <input autoFocus value={folderForm.name} onChange={e => setFolderForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Bank Reconciliations"
-                style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
+                style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 6 }}>
               <div>
-                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Engagement year</label>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }}>Engagement year</label>
                 <input type="number" value={folderForm.engagementYear} onChange={e => setFolderForm(p => ({ ...p, engagementYear: parseInt(e.target.value) || new Date().getFullYear() }))}
-                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
               </div>
               <div>
-                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Type</label>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }}>Type</label>
                 <select value={folderForm.folderType} onChange={e => setFolderForm(p => ({ ...p, folderType: e.target.value }))}
-                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, background: "#fff" }}>
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, background: "var(--hf-surface)" }}>
                   {FOLDER_TYPES.map(t => <option key={t} value={t}>{FOLDER_TYPE_LABELS[t]}</option>)}
                 </select>
               </div>
             </div>
-            {error && <div style={{ marginTop: 12, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{error}</div>}
+            {error && <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-              <button onClick={() => setShowNewFolder(false)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => setShowNewFolder(false)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer" }}>Cancel</button>
               <button disabled={!folderForm.name || createFolderMut.isPending} onClick={() => createFolderMut.mutate()}
-                style={{ padding: "9px 22px", background: !folderForm.name ? "#94A3B8" : "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: !folderForm.name ? "var(--hf-text-faint)" : "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {createFolderMut.isPending ? "Creating..." : "Create Folder"}
               </button>
             </div>
@@ -358,19 +358,19 @@ export default function WorkpapersTab() {
 
       {showUpload && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700 }}>Upload File</h3>
-            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#64748B" }}>
+            <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--hf-text-muted)" }}>
               Into <strong>{selFolder?.name}</strong>. Re-uploading the same file name creates a new version.
             </p>
             <input type="file" accept="application/pdf,image/jpeg,image/png,.doc,.docx,.xls,.xlsx"
               onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f) }}
               disabled={uploadFileMut.isPending}
               style={{ width: "100%", fontSize: 13, marginBottom: 6 }} />
-            {uploadFileMut.isPending && <div style={{ fontSize: 12, color: "#64748B", marginTop: 6 }}>Uploading {uploadFileName}...</div>}
-            {error && <div style={{ marginTop: 12, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{error}</div>}
+            {uploadFileMut.isPending && <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 6 }}>Uploading {uploadFileName}...</div>}
+            {error && <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
-              <button onClick={() => setShowUpload(false)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer" }}>Close</button>
+              <button onClick={() => setShowUpload(false)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer" }}>Close</button>
             </div>
           </div>
         </div>
@@ -378,21 +378,21 @@ export default function WorkpapersTab() {
 
       {auditFile && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 460, maxHeight: "80vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 460, maxHeight: "80vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Audit Log — {auditFile.fileName}</h3>
-              <button onClick={() => setAuditFile(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={18} /></button>
+              <button onClick={() => setAuditFile(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}><X size={18} /></button>
             </div>
             {auditLoading ? (
-              <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>Loading...</div>
+              <div style={{ textAlign: "center", padding: 30, color: "var(--hf-text-faint)" }}>Loading...</div>
             ) : auditLog.length === 0 ? (
-              <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>No audit events recorded.</div>
+              <div style={{ textAlign: "center", padding: 30, color: "var(--hf-text-faint)" }}>No audit events recorded.</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {auditLog.map((a: any) => (
-                  <div key={a.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12 }}>
+                  <div key={a.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12 }}>
                     <span style={{ fontWeight: 600 }}>{a.eventType}</span>
-                    <span style={{ color: "#94A3B8" }}>{fmtDT(a.performedAt)}</span>
+                    <span style={{ color: "var(--hf-text-faint)" }}>{fmtDT(a.performedAt)}</span>
                   </div>
                 ))}
               </div>

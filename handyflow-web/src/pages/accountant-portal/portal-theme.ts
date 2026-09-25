@@ -36,7 +36,7 @@ export const color = {
   slate: "#475569",     // secondary text
   muted: "#64748B",     // tertiary text / labels
   faint: "#94A3B8",     // placeholder / disabled text
-  border: "#E2E8F0",
+  border: "var(--hf-border)",
   borderLight: "#F1F5F9",
   surface: "#FFFFFF",
   canvas: "#F8FAFC",

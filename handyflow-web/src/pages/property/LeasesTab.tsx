@@ -8,14 +8,14 @@ const fmtR   = (n: any) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { 
 const fmtD   = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
 
 const STATUS_CFG: Record<string, { color: string; bg: string; border: string }> = {
-  ACTIVE:     { color: "#166534", bg: "#DCFCE7", border: "#86EFAC" },
-  PENDING:    { color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
-  EXPIRED:    { color: "#64748B", bg: "#F1F5F9", border: "#E2E8F0" },
-  TERMINATED: { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" },
+  ACTIVE:     { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", border: "var(--hf-success-border)" },
+  PENDING:    { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)" },
+  EXPIRED:    { color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)", border: "var(--hf-border)" },
+  TERMINATED: { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)" },
 }
 
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none", background: "#fff" }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none", background: "var(--hf-surface)" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
 
 export default function LeasesTab({ initialFilter }: { initialFilter?: string }) {
   const qc = useQueryClient()
@@ -124,24 +124,24 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
           {[{ k: "", l: "All" },{ k: "ACTIVE", l: "Active" },{ k: "PENDING", l: "Pending" },{ k: "EXPIRED", l: "Expired" },{ k: "TERMINATED", l: "Terminated" },{ k: "EXPIRING_SOON", l: "Expiring soon" }].map(s => (
             <button key={s.k} onClick={() => setStatus(s.k)}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none",
-                background: statusFilter === s.k ? "#1B3A6B" : "#F1F5F9",
-                color: statusFilter === s.k ? "#fff" : "#64748B", fontWeight: statusFilter === s.k ? 600 : 400 }}>
+                background: statusFilter === s.k ? "var(--hf-primary)" : "var(--hf-surface-sunken)",
+                color: statusFilter === s.k ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)", fontWeight: statusFilter === s.k ? 600 : 400 }}>
               {s.l}
             </button>
           ))}
         </div>
         <button onClick={() => { setCreate(true); setError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> New Lease
         </button>
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading...</div>
       ) : (visibleLeases).length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <FileText size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No leases found</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No leases found</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -151,17 +151,17 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
             return (
               <div key={l.id} style={{ border: `1px solid ${cfg.border}`, borderLeft: `3px solid ${cfg.color}`, borderRadius: 10, overflow: "hidden" }}>
                 <div onClick={() => setExpanded(isOpen ? null : l.id)}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", cursor: "pointer", background: isOpen ? "#F8FAFC" : "#fff" }}>
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", cursor: "pointer", background: isOpen ? "var(--hf-surface-muted)" : "var(--hf-surface)" }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{l.lesseeName}</span>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{l.lesseeName}</span>
                       <span style={{ background: cfg.bg, color: cfg.color, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{l.status}</span>
-                      {l.monthToMonth && <span style={{ background: "#F0FDF4", color: "#166534", padding: "1px 8px", borderRadius: 20, fontSize: 10, fontWeight: 600, border: "1px solid #86EFAC" }}>Month-to-month</span>}
-                      {l.expiringSoon && <span style={{ background: "#FFFBEB", color: "#D97706", padding: "1px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, border: "1px solid #FDE68A" }}>Expiring soon</span>}
+                      {l.monthToMonth && <span style={{ background: "var(--hf-success-soft)", color: "var(--hf-success-text-strong)", padding: "1px 8px", borderRadius: 20, fontSize: 10, fontWeight: 600, border: "1px solid var(--hf-success-border)" }}>Month-to-month</span>}
+                      {l.expiringSoon && <span style={{ background: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", padding: "1px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, border: "1px solid var(--hf-warning-border)" }}>Expiring soon</span>}
                     </div>
-                    <div style={{ fontSize: 12, color: "#64748B", display: "flex", gap: 14, flexWrap: "wrap" }}>
+                    <div style={{ fontSize: 12, color: "var(--hf-text-muted)", display: "flex", gap: 14, flexWrap: "wrap" }}>
                       <span>{fmtD(l.startDate)} → {l.endDate ? fmtD(l.endDate) : "Ongoing"}</span>
-                      <span style={{ fontWeight: 700, color: "#1B3A6B" }}>{fmtR(l.monthlyRent)}/mo</span>
+                      <span style={{ fontWeight: 700, color: "var(--hf-primary-text)" }}>{fmtR(l.monthlyRent)}/mo</span>
                       {l.paymentDay && <span>Due {l.paymentDay}{["st","nd","rd"][l.paymentDay-1]||"th"}</span>}
                     </div>
                   </div>
@@ -171,7 +171,7 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
                 </div>
 
                 {isOpen && (
-                  <div style={{ borderTop: `1px solid ${cfg.border}`, padding: "16px 20px", background: "#FAFAFA" }}>
+                  <div style={{ borderTop: `1px solid ${cfg.border}`, padding: "16px 20px", background: "var(--hf-surface-muted)" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 16 }}>
                       {[
                         { l: "Monthly rent",    v: fmtR(l.monthlyRent)    },
@@ -182,9 +182,9 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
                         { l: "Lessee phone",    v: l.lesseePhone ?? "—"   },
                         { l: "Deposit paid",    v: l.depositPaid ? "Yes" : "No" },
                       ].map(item => (
-                        <div key={item.l} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 7, padding: "8px 12px" }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, marginBottom: 2 }}>{item.l}</div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{item.v}</div>
+                        <div key={item.l} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "8px 12px" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, marginBottom: 2 }}>{item.l}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{item.v}</div>
                         </div>
                       ))}
                     </div>
@@ -192,19 +192,19 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
                     {l.status === "ACTIVE" && (
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         <button onClick={() => { setRenew(l); setRenewForm({ newEndDate: "", newMonthlyRent: "", newEscalationRate: "" }); setError("") }}
-                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 13px", background: "#F0FDF4", color: "#166534", border: "1px solid #86EFAC", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 13px", background: "var(--hf-success-soft)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                           <RefreshCw size={12} /> Renew
                         </button>
                         <button onClick={() => { setEscalate(l); setEscForm({ escalationPercent: "", newMonthlyRent: "" }); setError("") }}
-                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 13px", background: "#FFFBEB", color: "#D97706", border: "1px solid #FDE68A", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 13px", background: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", border: "1px solid var(--hf-warning-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                           <TrendingUp size={12} /> Escalate rent
                         </button>
                         <button onClick={() => { setTerminate(l); setTermReason(""); setError("") }}
-                          style={{ padding: "7px 13px", background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          style={{ padding: "7px 13px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                           Terminate
                         </button>
                         <button onClick={() => { setShowPortal(l); setPortalEmail(l.lesseeEmail ?? ""); setError("") }}
-                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 13px", background: "#EFF6FF", color: "#1B3A6B", border: "1px solid #BFDBFE", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 13px", background: "var(--hf-info-soft)", color: "var(--hf-primary-text)", border: "1px solid var(--hf-info-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                           <KeyRound size={12} /> Portal Access
                         </button>
                       </div>
@@ -223,11 +223,11 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div style={{ gridColumn: "1/-1" }}>
               <label style={lbl}>Unit *</label>
-              <select value={form.unitId} onChange={e => setForm(f => ({ ...f, unitId: e.target.value }))} style={{ ...inp, background: "#fff" }}>
+              <select value={form.unitId} onChange={e => setForm(f => ({ ...f, unitId: e.target.value }))} style={{ ...inp, background: "var(--hf-surface)" }}>
                 <option value="">Select a vacant unit</option>
                 {vacantUnits.map((u: any) => <option key={u.id} value={u.id}>Unit {u.unitNumber} — {fmtR(u.baseRent)}/mo</option>)}
               </select>
-              {vacantUnits.length === 0 && <div style={{ fontSize: 12, color: "#DC2626", marginTop: 4 }}>No vacant units available. Add units to a property first.</div>}
+              {vacantUnits.length === 0 && <div style={{ fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>No vacant units available. Add units to a property first.</div>}
             </div>
             <div style={{ gridColumn: "1/-1" }}>
               <label style={lbl}>Lessee full name *</label>
@@ -258,7 +258,7 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
               <input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} style={inp} />
             </div>
             <div>
-              <label style={lbl}>End date <span style={{ fontWeight: 400, color: "#94A3B8" }}>(leave blank for month-to-month)</span></label>
+              <label style={lbl}>End date <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(leave blank for month-to-month)</span></label>
               <input type="date" value={form.endDate} min={form.startDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} style={inp} />
             </div>
             <div>
@@ -275,7 +275,7 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
             </div>
           </div>
           {error && <ErrBox msg={error} />}
-          <div style={{ marginTop: 12, padding: "10px 14px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, fontSize: 12, color: "#1E40AF" }}>
+          <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-info-text-strong)" }}>
             Under the Rental Housing Act 50 of 1999, rental deposits must be held in an interest-bearing account. A confirmation email will be sent to the lessee if an email address is provided.
           </div>
           <ModalFoot onCancel={() => setCreate(false)} loading={createLease.isPending}
@@ -296,13 +296,13 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
       {/* Renew modal */}
       {showRenew && (
         <ModalShell title={`Renew Lease — ${showRenew.lesseeName}`} onClose={() => setRenew(null)}>
-          <div style={{ marginBottom: 16, padding: "10px 14px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 8, fontSize: 13, color: "#166534" }}>
+          <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-success-text-strong)" }}>
             Current: <strong>{fmtR(showRenew.monthlyRent)}/mo</strong> · Expires {fmtD(showRenew.endDate)}{showRenew.escalationRate > 0 && ` · ${showRenew.escalationRate}% escalation stored`}
           </div>
           <div style={{ display: "flex", flexDirection: "column" as const, gap: 14 }}>
             <div><label style={lbl}>New end date *</label><input type="date" value={renewForm.newEndDate} onChange={e => setRenewForm(f => ({ ...f, newEndDate: e.target.value }))} style={inp} /></div>
             <div>
-              <label style={lbl}>New monthly rent <span style={{ fontWeight: 400, color: "#94A3B8" }}>(leave blank to auto-apply stored escalation)</span></label>
+              <label style={lbl}>New monthly rent <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(leave blank to auto-apply stored escalation)</span></label>
               <input type="number" value={renewForm.newMonthlyRent} onChange={e => setRenewForm(f => ({ ...f, newMonthlyRent: e.target.value }))} placeholder={fmtR(showRenew.monthlyRent)} style={inp} />
             </div>
             <div><label style={lbl}>New escalation rate (%)</label><input type="number" value={renewForm.newEscalationRate} onChange={e => setRenewForm(f => ({ ...f, newEscalationRate: e.target.value }))} placeholder={showRenew.escalationRate?.toString()} style={inp} /></div>
@@ -321,7 +321,7 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
       {/* Escalate modal */}
       {showEscalate && (
         <ModalShell title={`Escalate Rent — ${showEscalate.lesseeName}`} onClose={() => setEscalate(null)}>
-          <div style={{ marginBottom: 16, padding: "10px 14px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, fontSize: 13, color: "#92400E" }}>
+          <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-warning-text-deep)" }}>
             Current rent: <strong>{fmtR(showEscalate.monthlyRent)}/mo</strong>
           </div>
           <div style={{ display: "flex", flexDirection: "column" as const, gap: 14 }}>
@@ -329,12 +329,12 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
               <label style={lbl}>Escalation percentage (%)</label>
               <input type="number" value={escalateForm.escalationPercent} onChange={e => setEscForm(f => ({ ...f, escalationPercent: e.target.value }))} placeholder="8.5" style={inp} />
               {escalateForm.escalationPercent && (
-                <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 4 }}>
                   New rent: <strong>{fmtR(Number(showEscalate.monthlyRent) * (1 + parseFloat(escalateForm.escalationPercent)/100))}</strong>
                 </div>
               )}
             </div>
-            <div style={{ textAlign: "center" as const, color: "#94A3B8", fontSize: 12 }}>— or set exact amount —</div>
+            <div style={{ textAlign: "center" as const, color: "var(--hf-text-faint)", fontSize: 12 }}>— or set exact amount —</div>
             <div><label style={lbl}>New monthly rent (R)</label><input type="number" value={escalateForm.newMonthlyRent} onChange={e => setEscForm(f => ({ ...f, newMonthlyRent: e.target.value }))} placeholder="0.00" style={inp} /></div>
           </div>
           {error && <ErrBox msg={error} />}
@@ -355,26 +355,26 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
             <div style={{ display: "flex", gap: 8 }}>
               <input value={portalEmail} onChange={e => setPortalEmail(e.target.value)} placeholder="tenant@example.com" style={{ ...inp, flex: 1 }} />
               <button onClick={() => invitePortal.mutate()} disabled={!portalEmail.trim() || invitePortal.isPending}
-                style={{ padding: "9px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" as const }}>
+                style={{ padding: "9px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" as const }}>
                 {invitePortal.isPending ? "Sending…" : "Send Invite"}
               </button>
             </div>
           </div>
           {error && <ErrBox msg={error} />}
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, marginBottom: 8 }}>Existing Invites</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, marginBottom: 8 }}>Existing Invites</div>
           {portalGrantsQuery.isLoading ? (
-            <p style={{ fontSize: 12, color: "#94A3B8" }}>Loading…</p>
+            <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Loading…</p>
           ) : !portalGrantsQuery.data?.length ? (
-            <p style={{ fontSize: 12, color: "#94A3B8" }}>No portal invites sent yet.</p>
+            <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>No portal invites sent yet.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {portalGrantsQuery.data.map((g: any) => (
-                <div key={g.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12 }}>
+                <div key={g.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12 }}>
                   <span>{g.inviteEmail}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontWeight: 600, color: g.status === "ACTIVE" ? "#166534" : g.status === "REVOKED" ? "#94A3B8" : "#B45309" }}>{g.status}</span>
+                    <span style={{ fontWeight: 600, color: g.status === "ACTIVE" ? "var(--hf-success-text-strong)" : g.status === "REVOKED" ? "var(--hf-text-faint)" : "var(--hf-warning-text-strong)" }}>{g.status}</span>
                     {g.status !== "REVOKED" && (
-                      <button onClick={() => revokePortal.mutate(g.id)} title="Revoke" style={{ padding: "4px 6px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, cursor: "pointer", color: "#DC2626" }}>
+                      <button onClick={() => revokePortal.mutate(g.id)} title="Revoke" style={{ padding: "4px 6px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, cursor: "pointer", color: "var(--hf-danger-text)" }}>
                         <Ban size={11} />
                       </button>
                     )}
@@ -389,15 +389,15 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
       {/* Terminate modal */}
       {showTerminate && (
         <ModalShell title="Terminate Lease" onClose={() => setTerminate(null)}>
-          <div style={{ marginBottom: 16, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>
+          <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>
             Terminating the lease for <strong>{showTerminate.lesseeName}</strong>. The unit will be set to VACANT.
           </div>
           <div><label style={lbl}>Reason</label><textarea value={terminateReason} autoFocus onChange={e => setTermReason(e.target.value)} rows={3} placeholder="Reason for termination..." style={{ ...inp, resize: "vertical" as const }} /></div>
           {error && <ErrBox msg={error} />}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-            <button onClick={() => setTerminate(null)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
+            <button onClick={() => setTerminate(null)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
             <button onClick={() => terminateLease.mutate({ id: showTerminate.id, reason: terminateReason || "Terminated by landlord" })} disabled={terminateLease.isPending}
-              style={{ padding: "9px 22px", background: "#DC2626", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+              style={{ padding: "9px 22px", background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
               {terminateLease.isPending ? "Terminating..." : "Terminate Lease"}
             </button>
           </div>
@@ -410,10 +410,10 @@ export default function LeasesTab({ initialFilter }: { initialFilter?: string })
 function ModalShell({ title, onClose, children, width = 520 }: any) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{title}</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{title}</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
         </div>
         {children}
       </div>
@@ -423,14 +423,14 @@ function ModalShell({ title, onClose, children, width = 520 }: any) {
 function ModalFoot({ onCancel, onSubmit, loading, disabled, label }: any) {
   return (
     <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-      <button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
+      <button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
       <button onClick={onSubmit} disabled={disabled || loading}
-        style={{ padding: "9px 22px", background: disabled ? "#94A3B8" : "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+        style={{ padding: "9px 22px", background: disabled ? "var(--hf-text-faint)" : "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
         {loading ? "Saving..." : label}
       </button>
     </div>
   )
 }
 function ErrBox({ msg }: { msg: string }) {
-  return <div style={{ marginTop: 12, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{msg}</div>
+  return <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{msg}</div>
 }

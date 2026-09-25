@@ -53,10 +53,10 @@ const SUB_TABS = [
   { id: "generate", label: "Generate Schedule", icon: CalendarRange },
 ] as const
 
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "#fff", outline: "none" }
-const cancelBtn: React.CSSProperties = { padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }
-const submitBtn: React.CSSProperties = { padding: "9px 18px", border: "none", borderRadius: 9, background: "#1B3A6B", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "var(--hf-surface)", outline: "none" }
+const cancelBtn: React.CSSProperties = { padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }
+const submitBtn: React.CSSProperties = { padding: "9px 18px", border: "none", borderRadius: 9, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", fontSize: 14, fontWeight: 600, cursor: "pointer" }
 const todayStr = () => new Date().toISOString().slice(0, 10)
 
 function emptyCycleDef(type: string): Record<string, any> {
@@ -186,66 +186,66 @@ export default function RotationPatternsTab() {
   return (
     <div>
       <div style={{ marginBottom: 18 }}>
-        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0F172A" }}>Rotation Patterns</h2>
-        <div style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>Recurring roster patterns and bulk shift generation</div>
+        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "var(--hf-text)" }}>Rotation Patterns</h2>
+        <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginTop: 2 }}>Recurring roster patterns and bulk shift generation</div>
       </div>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 16, borderBottom: "1px solid #E2E8F0" }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 16, borderBottom: "1px solid var(--hf-border)" }}>
         {SUB_TABS.map(t => {
           const Icon = t.icon; const active = subTab === t.id
           return (
             <button key={t.id} onClick={() => setSubTab(t.id)}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 14px", background: "none", border: "none", borderBottom: active ? "2px solid #1B3A6B" : "2px solid transparent", color: active ? "#1B3A6B" : "#64748B", fontWeight: active ? 700 : 500, fontSize: 13, cursor: "pointer" }}>
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 14px", background: "none", border: "none", borderBottom: active ? "2px solid var(--hf-primary)" : "2px solid transparent", color: active ? "var(--hf-primary-text)" : "var(--hf-text-muted)", fontWeight: active ? 700 : 500, fontSize: 13, cursor: "pointer" }}>
               <Icon size={14} /> {t.label}
             </button>
           )
         })}
       </div>
 
-      {error && <div style={{ padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#DC2626", fontSize: 13, marginBottom: 14 }}>{error}</div>}
+      {error && <div style={{ padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, color: "var(--hf-danger-text)", fontSize: 13, marginBottom: 14 }}>{error}</div>}
 
       {/* ── Patterns ── */}
       {subTab === "patterns" && (
         <div>
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-            <button onClick={openNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            <button onClick={openNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               <Plus size={14} /> New Pattern
             </button>
           </div>
           {patternsLoading ? (
-            <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>Loading…</div>
+            <div style={{ textAlign: "center", padding: 30, color: "var(--hf-text-faint)" }}>Loading…</div>
           ) : patterns.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+            <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>
               No rotation patterns configured yet.
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {patterns.map(p => (
-                <div key={p.id} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10, padding: "14px 16px", opacity: p.active ? 1 : 0.6 }}>
+                <div key={p.id} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "14px 16px", opacity: p.active ? 1 : 0.6 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{p.name}</span>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "#1B3A6B", background: "#EFF6FF", padding: "2px 8px", borderRadius: 4 }}>{p.patternType.replace(/_/g, " ")}</span>
+                        <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{p.name}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-primary-text)", background: "var(--hf-info-soft)", padding: "2px 8px", borderRadius: 4 }}>{p.patternType.replace(/_/g, " ")}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: "#94A3B8" }}>{p.siteName} · {p.shiftLengthHours}h shifts · {p.assignedGuardCount} guard{p.assignedGuardCount !== 1 ? "s" : ""} assigned</div>
+                      <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>{p.siteName} · {p.shiftLengthHours}h shifts · {p.assignedGuardCount} guard{p.assignedGuardCount !== 1 ? "s" : ""} assigned</div>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
                       <button onClick={() => setExpandedPattern(expandedPattern === p.id ? null : p.id)}
-                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                         <Users2 size={12} /> Guards
                       </button>
                       <button onClick={() => { setAssignForm({ guardId: "", startsAt: todayStr(), positionInCycle: 0 }); setAssignFor(p) }}
-                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid #1B3A6B", background: "#EFF6FF", color: "#1B3A6B", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid var(--hf-primary)", background: "var(--hf-info-soft)", color: "var(--hf-primary-text)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                         <Plus size={12} /> Assign
                       </button>
                       <button onClick={() => openEdit(p)}
-                        style={{ padding: "6px 10px", borderRadius: 7, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        style={{ padding: "6px 10px", borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                         Edit
                       </button>
                       {p.active && (
                         <button onClick={() => deactivatePattern.mutate(p.id)} title="Deactivate"
-                          style={{ padding: "6px 8px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, cursor: "pointer", color: "#DC2626" }}>
+                          style={{ padding: "6px 8px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-danger-text)" }}>
                           <Ban size={13} />
                         </button>
                       )}
@@ -253,18 +253,18 @@ export default function RotationPatternsTab() {
                   </div>
 
                   {expandedPattern === p.id && (
-                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #E2E8F0" }}>
+                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--hf-border)" }}>
                       {assignmentsQuery.isLoading ? (
-                        <p style={{ color: "#94A3B8", fontSize: 12, margin: 0 }}>Loading…</p>
+                        <p style={{ color: "var(--hf-text-faint)", fontSize: 12, margin: 0 }}>Loading…</p>
                       ) : !assignmentsQuery.data?.length ? (
-                        <p style={{ color: "#94A3B8", fontSize: 12, margin: 0 }}>No guards currently assigned to this pattern.</p>
+                        <p style={{ color: "var(--hf-text-faint)", fontSize: 12, margin: 0 }}>No guards currently assigned to this pattern.</p>
                       ) : (
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                           {assignmentsQuery.data.map(a => (
-                            <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12 }}>
-                              <span><strong style={{ color: "#0F172A" }}>{a.guardName}</strong> <span style={{ color: "#94A3B8" }}>since {a.startsAt} · position {a.positionInCycle}</span></span>
+                            <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12 }}>
+                              <span><strong style={{ color: "var(--hf-text)" }}>{a.guardName}</strong> <span style={{ color: "var(--hf-text-faint)" }}>since {a.startsAt} · position {a.positionInCycle}</span></span>
                               <button onClick={() => { const d = prompt("End this assignment on (YYYY-MM-DD)?", todayStr()); if (d) endAssignment.mutate({ id: a.id, endsAt: d }) }}
-                                style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, border: "1px solid #FECACA", background: "#FEF2F2", color: "#DC2626", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                                style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--hf-danger-border)", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                                 <UserMinus size={11} /> End
                               </button>
                             </div>
@@ -300,15 +300,15 @@ export default function RotationPatternsTab() {
               <input type="date" value={genTo} onChange={e => setGenTo(e.target.value)} style={inp} />
             </div>
           </div>
-          <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 18 }}>Maximum 90-day window. Idempotent — existing shifts are skipped, safe to re-run.</div>
+          <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginBottom: 18 }}>Maximum 90-day window. Idempotent — existing shifts are skipped, safe to re-run.</div>
           <button onClick={() => generateSchedule.mutate()} disabled={!genPatternId || generateSchedule.isPending}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 20px", background: genPatternId ? "#1B3A6B" : "#F1F5F9", color: genPatternId ? "#fff" : "#94A3B8", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: genPatternId ? "pointer" : "not-allowed" }}>
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 20px", background: genPatternId ? "var(--hf-primary)" : "var(--hf-surface-sunken)", color: genPatternId ? "var(--hf-text-on-solid)" : "var(--hf-text-faint)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: genPatternId ? "pointer" : "not-allowed" }}>
             <CalendarRange size={15} /> {generateSchedule.isPending ? "Generating…" : "Generate Schedule"}
           </button>
 
           {genResult && (
-            <div style={{ marginTop: 24, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 18 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: "#0F172A", marginBottom: 12 }}>{genResult.patternName} — {genResult.fromDate} to {genResult.toDate}</div>
+            <div style={{ marginTop: 24, background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 18 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)", marginBottom: 12 }}>{genResult.patternName} — {genResult.fromDate} to {genResult.toDate}</div>
               <div style={{ display: "flex", gap: 20, marginBottom: genResult.warnings.length ? 14 : 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <CheckCircle2 size={15} color="#166534" />
@@ -324,7 +324,7 @@ export default function RotationPatternsTab() {
               {genResult.warnings.length > 0 && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {genResult.warnings.map((w, i) => (
-                    <div key={i} style={{ fontSize: 12, color: "#B45309", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 6, padding: "6px 10px" }}>{w}</div>
+                    <div key={i} style={{ fontSize: 12, color: "var(--hf-warning-text-strong)", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 6, padding: "6px 10px" }}>{w}</div>
                   ))}
                 </div>
               )}
@@ -336,8 +336,8 @@ export default function RotationPatternsTab() {
       {/* New/Edit Pattern modal */}
       {showPatternForm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: 26, width: 460, maxHeight: "85vh", overflowY: "auto" as const }}>
-            <h3 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>{showPatternForm === "new" ? "New Rotation Pattern" : "Edit Pattern"}</h3>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 26, width: 460, maxHeight: "85vh", overflowY: "auto" as const }}>
+            <h3 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>{showPatternForm === "new" ? "New Rotation Pattern" : "Edit Pattern"}</h3>
             {showPatternForm === "new" && (
               <div style={{ marginBottom: 14 }}>
                 <label style={lbl}>Site *</label>
@@ -386,7 +386,7 @@ export default function RotationPatternsTab() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {DAYS.map(d => (
                     <div key={d} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ fontSize: 12, color: "#64748B", width: 80, textTransform: "capitalize" as const }}>{d}</span>
+                      <span style={{ fontSize: 12, color: "var(--hf-text-muted)", width: 80, textTransform: "capitalize" as const }}>{d}</span>
                       <select value={patternForm.cycleDefinition[d] ?? "OFF"} onChange={e => setPatternForm(f => ({ ...f, cycleDefinition: { ...f.cycleDefinition, [d]: e.target.value } }))} style={{ ...inp, flex: 1 }}>
                         <option value="OFF">Off</option>
                         <option value="DAY">Day</option>
@@ -403,7 +403,7 @@ export default function RotationPatternsTab() {
                 <label style={lbl}>Cycle Definition (raw JSON)</label>
                 <textarea value={patternForm.customJson} onChange={e => setPatternForm(f => ({ ...f, customJson: e.target.value }))} rows={5}
                   style={{ ...inp, fontFamily: "monospace", fontSize: 12, resize: "vertical" as const }} />
-                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>Not validated server-side for CUSTOM patterns — caller-interpreted.</div>
+                <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>Not validated server-side for CUSTOM patterns — caller-interpreted.</div>
               </div>
             )}
 
@@ -430,8 +430,8 @@ export default function RotationPatternsTab() {
       {/* Assign guard modal */}
       {assignFor && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: 26, width: 420 }}>
-            <h3 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Assign Guard — {assignFor.name}</h3>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 26, width: 420 }}>
+            <h3 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Assign Guard — {assignFor.name}</h3>
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Guard *</label>
               <select value={assignForm.guardId} onChange={e => setAssignForm(f => ({ ...f, guardId: e.target.value }))} style={inp}>

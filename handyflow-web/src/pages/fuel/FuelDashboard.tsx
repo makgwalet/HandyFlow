@@ -69,15 +69,15 @@ export default function FuelDashboard({ onNavigate }: { onNavigate: (t: any) => 
 
       {/* Low stock alert */}
       {lowTanks.length > 0 && (
-        <div style={{ marginBottom: 22, padding: "14px 18px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ marginBottom: 22, padding: "14px 18px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 12 }}>
           <AlertTriangle size={18} color="#DC2626" style={{ flexShrink: 0 }} />
           <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: "#DC2626" }}>Low Stock Alert</div>
-            <div style={{ fontSize: 13, color: "#B91C1C" }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-danger-text)" }}>Low Stock Alert</div>
+            <div style={{ fontSize: 13, color: "var(--hf-danger-text-strong)" }}>
               {lowTanks.map((t: any) => `${t.name} (${Number(t.currentLitres).toLocaleString()} L — ${Number(t.fillPercentage).toFixed(0)}%)`).join(" · ")}
             </div>
           </div>
-          <button onClick={() => onNavigate("tanks")} style={{ marginLeft: "auto", padding: "6px 14px", background: "#DC2626", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
+          <button onClick={() => onNavigate("tanks")} style={{ marginLeft: "auto", padding: "6px 14px", background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
             Receive stock
           </button>
         </div>
@@ -87,16 +87,16 @@ export default function FuelDashboard({ onNavigate }: { onNavigate: (t: any) => 
         {/* Tank levels */}
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Tank Levels</span>
-            <button onClick={() => onNavigate("tanks")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#0D9488", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Tank Levels</span>
+            <button onClick={() => onNavigate("tanks")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-accent-text)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
               Manage tanks <ArrowRight size={13} />
             </button>
           </div>
           {tanks.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed #E2E8F0", borderRadius: 12, color: "#94A3B8" }}>
+            <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed var(--hf-border)", borderRadius: 12, color: "var(--hf-text-faint)" }}>
               <Droplets size={32} color="#CBD5E1" style={{ marginBottom: 10 }} />
-              <div style={{ fontWeight: 600, color: "#475569" }}>No tanks registered</div>
-              <button onClick={() => onNavigate("tanks")} style={{ marginTop: 12, padding: "7px 16px", background: "#0D9488", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>Add tank</button>
+              <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No tanks registered</div>
+              <button onClick={() => onNavigate("tanks")} style={{ marginTop: 12, padding: "7px 16px", background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>Add tank</button>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -104,26 +104,26 @@ export default function FuelDashboard({ onNavigate }: { onNavigate: (t: any) => 
                 const color = FUEL_COLORS[tank.fuelType] ?? "#64748B"
                 const pct   = Math.min(100, Math.max(0, Number(tank.fillPercentage ?? 0)))
                 return (
-                  <div key={tank.id} style={{ background: "#fff", border: `1px solid ${tank.low ? "#FECACA" : "#E2E8F0"}`, borderRadius: 10, padding: "14px 18px" }}>
+                  <div key={tank.id} style={{ background: "var(--hf-surface)", border: `1px solid ${tank.low ? "#FECACA" : "#E2E8F0"}`, borderRadius: 10, padding: "14px 18px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <Droplets size={16} color={color} />
-                        <span style={{ fontWeight: 700, color: "#0F172A" }}>{tank.name}</span>
+                        <span style={{ fontWeight: 700, color: "var(--hf-text)" }}>{tank.name}</span>
                         <span style={{ fontSize: 11, fontWeight: 700, background: `${color}18`, color, padding: "1px 8px", borderRadius: 20 }}>{tank.fuelType}</span>
-                        {tank.low && <span style={{ fontSize: 10, fontWeight: 700, background: "#FEF2F2", color: "#DC2626", padding: "1px 7px", borderRadius: 20, display: "flex", alignItems: "center", gap: 3 }}><AlertTriangle size={9} />LOW</span>}
+                        {tank.low && <span style={{ fontSize: 10, fontWeight: 700, background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", padding: "1px 7px", borderRadius: 20, display: "flex", alignItems: "center", gap: 3 }}><AlertTriangle size={9} />LOW</span>}
                       </div>
                       <div style={{ textAlign: "right" as const }}>
-                        <span style={{ fontWeight: 700, fontSize: 15, color: tank.low ? "#DC2626" : "#0F172A" }}>{Number(tank.currentLitres).toLocaleString()} L</span>
-                        <span style={{ fontSize: 12, color: "#94A3B8" }}> / {Number(tank.capacityLitres).toLocaleString()} L</span>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: tank.low ? "#DC2626" : color, marginLeft: 10 }}>{pct.toFixed(1)}%</span>
+                        <span style={{ fontWeight: 700, fontSize: 15, color: tank.low ? "var(--hf-danger-text)" : "var(--hf-text)" }}>{Number(tank.currentLitres).toLocaleString()} L</span>
+                        <span style={{ fontSize: 12, color: "var(--hf-text-faint)" }}> / {Number(tank.capacityLitres).toLocaleString()} L</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: tank.low ? "var(--hf-danger-text)" : color, marginLeft: 10 }}>{pct.toFixed(1)}%</span>
                       </div>
                     </div>
-                    <div style={{ height: 8, background: "#F1F5F9", borderRadius: 99, overflow: "hidden" }}>
+                    <div style={{ height: 8, background: "var(--hf-surface-sunken)", borderRadius: 99, overflow: "hidden" }}>
                       <div style={{ height: "100%", width: `${pct}%`, borderRadius: 99,
                         background: tank.low ? "linear-gradient(90deg,#DC2626,#F87171)" : `linear-gradient(90deg,${color},${color}88)`,
                         transition: "width 0.5s" }} />
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94A3B8", marginTop: 4 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>
                       <span>{tank.location || "No location"}</span>
                       <span>Available: {(Number(tank.capacityLitres) - Number(tank.currentLitres)).toLocaleString()} L</span>
                     </div>
@@ -137,7 +137,7 @@ export default function FuelDashboard({ onNavigate }: { onNavigate: (t: any) => 
         {/* Sidebar */}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* This month summary */}
-          <div style={{ background: "#0D9488", borderRadius: 12, padding: 20 }}>
+          <div style={{ background: "var(--hf-accent)", borderRadius: 12, padding: 20 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 14, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>This month</div>
             {[
               { label: "Dispatches",   value: thisMonthDispatches.length },
@@ -146,7 +146,7 @@ export default function FuelDashboard({ onNavigate }: { onNavigate: (t: any) => 
             ].map(s => (
               <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid rgba(255,255,255,0.15)" }}>
                 <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)" }}>{s.label}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{s.value}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text-on-solid)" }}>{s.value}</span>
               </div>
             ))}
           </div>
@@ -155,26 +155,26 @@ export default function FuelDashboard({ onNavigate }: { onNavigate: (t: any) => 
           {(() => {
             const negVariance = ds.filter((d: any) => Number(d.varianceLitres ?? 0) < -5)
             return negVariance.length > 0 ? (
-              <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, padding: 14 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13, color: "#DC2626", marginBottom: 6 }}>
+              <div style={{ background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 10, padding: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13, color: "var(--hf-danger-text)", marginBottom: 6 }}>
                   <TrendingDown size={14} /> Variance Alerts
                 </div>
-                <div style={{ fontSize: 12, color: "#B91C1C" }}>{negVariance.length} dip reading(s) show negative variance — possible leak or theft. Review reconciliation.</div>
+                <div style={{ fontSize: 12, color: "var(--hf-danger-text-strong)" }}>{negVariance.length} dip reading(s) show negative variance — possible leak or theft. Review reconciliation.</div>
               </div>
             ) : null
           })()}
 
           {/* Pending deliveries */}
           {pendingDeliveries.length > 0 && (
-            <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 10, padding: 14 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: "#D97706", marginBottom: 8 }}>Pending Deliveries</div>
+            <div style={{ background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 10, padding: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-warning-text)", marginBottom: 8 }}>Pending Deliveries</div>
               {pendingDeliveries.slice(0, 3).map((d: any) => (
-                <div key={d.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "5px 0", borderBottom: "1px solid #FEF3C7" }}>
-                  <span style={{ color: "#78350F" }}>{d.fuelType} · {Number(d.litresOrdered).toLocaleString()} L</span>
-                  <span style={{ color: "#D97706", fontWeight: 600 }}>{fmtDate(d.scheduledAt)}</span>
+                <div key={d.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "5px 0", borderBottom: "1px solid var(--hf-warning-border)" }}>
+                  <span style={{ color: "var(--hf-warning-text-deep)" }}>{d.fuelType} · {Number(d.litresOrdered).toLocaleString()} L</span>
+                  <span style={{ color: "var(--hf-warning-text)", fontWeight: 600 }}>{fmtDate(d.scheduledAt)}</span>
                 </div>
               ))}
-              <button onClick={() => onNavigate("deliveries")} style={{ marginTop: 8, width: "100%", padding: "6px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 6, fontSize: 12, fontWeight: 600, color: "#D97706", cursor: "pointer" }}>
+              <button onClick={() => onNavigate("deliveries")} style={{ marginTop: 8, width: "100%", padding: "6px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 6, fontSize: 12, fontWeight: 600, color: "var(--hf-warning-text)", cursor: "pointer" }}>
                 View all →
               </button>
             </div>
@@ -182,7 +182,7 @@ export default function FuelDashboard({ onNavigate }: { onNavigate: (t: any) => 
 
           {/* Quick actions */}
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 10 }}>Quick actions</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 10 }}>Quick actions</div>
             {[
               { label: "Receive stock",    tab: "tanks",      color: "#0D9488" },
               { label: "Dispatch fuel",    tab: "dispatches", color: "#1B3A6B" },
@@ -190,7 +190,7 @@ export default function FuelDashboard({ onNavigate }: { onNavigate: (t: any) => 
               { label: "Schedule delivery",tab: "deliveries", color: "#7C3AED" },
             ].map(a => (
               <button key={a.label} onClick={() => onNavigate(a.tab)}
-                style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left" as const, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left" as const, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 {a.label} <ArrowRight size={13} />
               </button>
             ))}

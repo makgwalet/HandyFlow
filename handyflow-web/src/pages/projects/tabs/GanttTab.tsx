@@ -82,11 +82,11 @@ export function GanttTab({ projectId }: { projectId: string }) {
     return result
   }, [minDate, totalDays, dayW])
 
-  if (isLoading) return <div style={{ padding: 40, textAlign: 'center', color: '#94A3B8' }}>Loading schedule…</div>
+  if (isLoading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--hf-text-faint)' }}>Loading schedule…</div>
   if (!tasks.length) return (
-    <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94A3B8' }}>
+    <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--hf-text-faint)' }}>
       <div style={{ fontSize: 40, marginBottom: 12, opacity: .3 }}>📅</div>
-      <div style={{ fontWeight: 600, color: '#475569', marginBottom: 4 }}>No tasks yet</div>
+      <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)', marginBottom: 4 }}>No tasks yet</div>
       <div style={{ fontSize: 13 }}>Add tasks in the Tasks tab to build your Gantt chart</div>
     </div>
   )
@@ -104,25 +104,25 @@ export function GanttTab({ projectId }: { projectId: string }) {
 
   return (
     <div>
-      <div style={{ fontSize: 12, color: '#94A3B8', marginBottom: 8 }}>
+      <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', marginBottom: 8 }}>
         🔴 Critical path &nbsp;·&nbsp; ◆ Milestone &nbsp;·&nbsp; Drag to scroll horizontally
       </div>
-      <div style={{ overflowX: 'auto', border: '1px solid #E2E8F0', borderRadius: 12 }}>
+      <div style={{ overflowX: 'auto', border: '1px solid var(--hf-border)', borderRadius: 12 }}>
         <div style={{ display: 'flex', minWidth: labelW + chartW }}>
           {/* Left labels */}
-          <div style={{ width: labelW, flexShrink: 0, borderRight: '1px solid #E2E8F0' }}>
-            <div style={{ height: 36, background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 11, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <div style={{ width: labelW, flexShrink: 0, borderRight: '1px solid var(--hf-border)' }}>
+            <div style={{ height: 36, background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border)', display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Task
             </div>
             {rows.map((row, i) => row.type === 'phase' ? (
-              <div key={row.phase.id} style={{ height: rowH, display: 'flex', alignItems: 'center', padding: '0 12px', background: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{row.phase.name}</span>
+              <div key={row.phase.id} style={{ height: rowH, display: 'flex', alignItems: 'center', padding: '0 12px', background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border-subtle)' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{row.phase.name}</span>
               </div>
             ) : (
-              <div key={row.task.id} style={{ height: rowH, display: 'flex', alignItems: 'center', padding: '0 12px 0 24px', borderBottom: '1px solid #F1F5F9', gap: 6 }}>
-                {row.task.isCritical && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#EF4444', flexShrink: 0 }} />}
+              <div key={row.task.id} style={{ height: rowH, display: 'flex', alignItems: 'center', padding: '0 12px 0 24px', borderBottom: '1px solid var(--hf-border-subtle)', gap: 6 }}>
+                {row.task.isCritical && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--hf-danger)', flexShrink: 0 }} />}
                 {row.task.isMilestone && <span style={{ fontSize: 10 }}>◆</span>}
-                <span style={{ fontSize: 12, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.task.taskNumber} {row.task.title}</span>
+                <span style={{ fontSize: 12, color: 'var(--hf-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.task.taskNumber} {row.task.title}</span>
               </div>
             ))}
           </div>
@@ -186,7 +186,7 @@ export function GanttTab({ projectId }: { projectId: string }) {
       </div>
 
       {/* Legend */}
-      <div style={{ display: 'flex', gap: 20, marginTop: 10, fontSize: 11, color: '#64748B' }}>
+      <div style={{ display: 'flex', gap: 20, marginTop: 10, fontSize: 11, color: 'var(--hf-text-muted)' }}>
         {Object.entries(STATUS_COLOR).map(([status, color]) => (
           <span key={status} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{ width: 14, height: 8, background: color, borderRadius: 2, display: 'inline-block' }} />

@@ -19,16 +19,16 @@ import { apiClient } from "../../api/client"
 import { Plus, X, AlertTriangle, AlertCircle, FileText } from "lucide-react"
 
 const SEV_CONFIG: Record<string, { color: string; bg: string; border: string }> = {
-  CRITICAL: { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" },
-  HIGH:     { color: "#EA580C", bg: "#FFF7ED", border: "#FED7AA" },
-  MEDIUM:   { color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
-  LOW:      { color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0" },
+  CRITICAL: { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)" },
+  HIGH:     { color: "var(--hf-orange-text)", bg: "var(--hf-orange-soft)", border: "var(--hf-orange-border)" },
+  MEDIUM:   { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)" },
+  LOW:      { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)" },
 }
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
-  OPEN:         { color: "#DC2626", bg: "#FEF2F2", label: "Open" },
-  ACKNOWLEDGED: { color: "#D97706", bg: "#FFFBEB", label: "Acknowledged" },
-  RESOLVED:     { color: "#166534", bg: "#DCFCE7", label: "Resolved" },
+  OPEN:         { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", label: "Open" },
+  ACKNOWLEDGED: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", label: "Acknowledged" },
+  RESOLVED:     { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", label: "Resolved" },
 }
 
 // Incident types — now properly stored in the DB (V102 fix #16)
@@ -118,14 +118,14 @@ export default function IncidentsTab() {
       {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
         {[
-          { label: "Total",        value: total,    color: "#1B3A6B" },
-          { label: "Open",         value: open,     color: open > 0 ? "#DC2626" : "#166534" },
-          { label: "Acknowledged", value: ack,      color: "#D97706" },
-          { label: "Critical",     value: critical, color: critical > 0 ? "#DC2626" : "#166534" },
+          { label: "Total",        value: total,    color: "var(--hf-primary-text)" },
+          { label: "Open",         value: open,     color: open > 0 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)" },
+          { label: "Acknowledged", value: ack,      color: "var(--hf-warning-text)" },
+          { label: "Critical",     value: critical, color: critical > 0 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)" },
         ].map(s => (
-          <div key={s.label} style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
+          <div key={s.label} style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>{s.label}</div>
+            <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -137,8 +137,8 @@ export default function IncidentsTab() {
             {["ALL", "OPEN", "ACKNOWLEDGED", "RESOLVED"].map(s => (
               <button key={s} onClick={() => setStatusFilter(s)}
                 style={{ padding: "6px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none",
-                  background: statusFilter === s ? "#1B3A6B" : "#F1F5F9",
-                  color: statusFilter === s ? "#fff" : "#64748B", fontWeight: statusFilter === s ? 600 : 400 }}>
+                  background: statusFilter === s ? "var(--hf-primary)" : "var(--hf-surface-sunken)",
+                  color: statusFilter === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)", fontWeight: statusFilter === s ? 600 : 400 }}>
                 {s === "ALL" ? "All" : STATUS_CONFIG[s]?.label ?? s}
               </button>
             ))}
@@ -147,26 +147,26 @@ export default function IncidentsTab() {
             {["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW"].map(s => (
               <button key={s} onClick={() => setSevFilter(s)}
                 style={{ padding: "6px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none",
-                  background: sevFilter === s ? (SEV_CONFIG[s]?.color ?? "#1B3A6B") : "#F1F5F9",
-                  color: sevFilter === s ? "#fff" : "#64748B", fontWeight: sevFilter === s ? 600 : 400 }}>
+                  background: sevFilter === s ? (SEV_CONFIG[s]?.color ?? "var(--hf-primary)") : "var(--hf-surface-sunken)",
+                  color: sevFilter === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)", fontWeight: sevFilter === s ? 600 : 400 }}>
                 {s === "ALL" ? "All severity" : s}
               </button>
             ))}
           </div>
         </div>
         <button onClick={() => setShowCreate(true)}
-          style={{ display: "flex", alignItems: "center", gap: 7, background: "#DC2626", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Report Incident
         </button>
       </div>
 
       {/* Incident list */}
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading incidents...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading incidents...</div>
       ) : incidents.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <AlertTriangle size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
-          <div style={{ fontWeight: 600, color: "#166534" }}>No incidents — all clear</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-success-text-strong)" }}>No incidents — all clear</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -174,47 +174,47 @@ export default function IncidentsTab() {
             const sev = SEV_CONFIG[inc.severity]  ?? SEV_CONFIG.LOW
             const sts = STATUS_CONFIG[inc.status] ?? STATUS_CONFIG.OPEN
             return (
-              <div key={inc.id} style={{ border: `1px solid ${sev.border}`, borderLeft: `4px solid ${sev.color}`, borderRadius: 10, padding: "16px 20px", background: "#fff" }}>
+              <div key={inc.id} style={{ border: `1px solid ${sev.border}`, borderLeft: `4px solid ${sev.color}`, borderRadius: 10, padding: "16px 20px", background: "var(--hf-surface)" }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{inc.title}</span>
+                      <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{inc.title}</span>
                       <span style={{ fontSize: 10, fontWeight: 700, background: sev.bg, color: sev.color, padding: "2px 8px", borderRadius: 20, border: `1px solid ${sev.border}` }}>{inc.severity}</span>
                       <span style={{ fontSize: 11, fontWeight: 600, background: sts.bg, color: sts.color, padding: "2px 8px", borderRadius: 20 }}>{sts.label}</span>
                       {/* Incident type badge — was silently broken (see file header), now fixed backend-side */}
                       {inc.type && inc.type !== "GENERAL" && (
-                        <span style={{ fontSize: 10, fontWeight: 600, background: "#F0FDF4", color: "#166534", padding: "2px 8px", borderRadius: 20, border: "1px solid #BBF7D0" }}>{inc.type}</span>
+                        <span style={{ fontSize: 10, fontWeight: 600, background: "var(--hf-success-soft)", color: "var(--hf-success-text-strong)", padding: "2px 8px", borderRadius: 20, border: "1px solid var(--hf-success-border-subtle)" }}>{inc.type}</span>
                       )}
                     </div>
-                    {inc.description && <div style={{ fontSize: 13, color: "#64748B", marginBottom: 6 }}>{inc.description}</div>}
-                    <div style={{ fontSize: 11, color: "#94A3B8" }}>
+                    {inc.description && <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginBottom: 6 }}>{inc.description}</div>}
+                    <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>
                       Reported {fmtDt(inc.reportedAt)}
                       {inc.siteName  && ` · ${inc.siteName}`}
                       {inc.guardName && ` · By ${inc.guardName}`}
                     </div>
                     {/* Acknowledgement / resolution timestamps */}
                     {inc.acknowledgedAt && (
-                      <div style={{ fontSize: 11, color: "#D97706", marginTop: 2 }}>Acknowledged {fmtDt(inc.acknowledgedAt)}</div>
+                      <div style={{ fontSize: 11, color: "var(--hf-warning-text)", marginTop: 2 }}>Acknowledged {fmtDt(inc.acknowledgedAt)}</div>
                     )}
                     {inc.resolvedAt && (
-                      <div style={{ fontSize: 11, color: "#166534", marginTop: 2 }}>Resolved {fmtDt(inc.resolvedAt)}</div>
+                      <div style={{ fontSize: 11, color: "var(--hf-success-text-strong)", marginTop: 2 }}>Resolved {fmtDt(inc.resolvedAt)}</div>
                     )}
                   </div>
                   <div style={{ display: "flex", gap: 8, flexShrink: 0, marginLeft: 12 }}>
                     <button onClick={() => downloadPdf.mutate(inc.id)} disabled={downloadingId === inc.id}
                       title="Download incident report PDF"
-                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: "#F8FAFC", color: "#374151", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: "var(--hf-surface-muted)", color: "var(--hf-text-secondary)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                       <FileText size={12} /> {downloadingId === inc.id ? "…" : "PDF"}
                     </button>
                     {inc.status === "OPEN" && (
                       <button onClick={() => acknowledge.mutate(inc.id)} disabled={acknowledge.isPending}
-                        style={{ padding: "7px 14px", background: "#FFFBEB", color: "#D97706", border: "1px solid #FDE68A", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        style={{ padding: "7px 14px", background: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", border: "1px solid var(--hf-warning-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                         Acknowledge
                       </button>
                     )}
                     {inc.status !== "RESOLVED" && (
                       <button onClick={() => resolve.mutate(inc.id)} disabled={resolve.isPending}
-                        style={{ padding: "7px 14px", background: "#DCFCE7", color: "#166534", border: "1px solid #86EFAC", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        style={{ padding: "7px 14px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                         Resolve
                       </button>
                     )}
@@ -229,15 +229,15 @@ export default function IncidentsTab() {
       {/* Report incident modal */}
       {showCreate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 520, maxHeight: "88vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 520, maxHeight: "88vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 22 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: "#FEF2F2", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--hf-danger-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <AlertTriangle size={18} color="#DC2626" />
                 </div>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Report Incident</h3>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Report Incident</h3>
               </div>
-              <button onClick={() => setShowCreate(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+              <button onClick={() => setShowCreate(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -250,7 +250,7 @@ export default function IncidentsTab() {
                     const cfg = SEV_CONFIG[s]
                     return (
                       <button key={s} onClick={() => setForm(f => ({ ...f, severity: s }))}
-                        style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: `2px solid ${form.severity === s ? cfg.color : "#E2E8F0"}`, background: form.severity === s ? cfg.bg : "#fff", color: form.severity === s ? cfg.color : "#64748B", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                        style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: `2px solid ${form.severity === s ? cfg.color : "#E2E8F0"}`, background: form.severity === s ? cfg.bg : "var(--hf-surface)", color: form.severity === s ? cfg.color : "var(--hf-text-muted)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                         {s}
                       </button>
                     )
@@ -281,7 +281,7 @@ export default function IncidentsTab() {
                   </select>
                 </div>
                 <div>
-                  <label style={lbl}>Guard <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+                  <label style={lbl}>Guard <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
                   <select value={form.guardId} onChange={e => setForm(f => ({ ...f, guardId: e.target.value }))} style={inp}>
                     <option value="">Select guard...</option>
                     {guards.map((g: any) => <option key={g.id} value={g.id}>{g.fullName}</option>)}
@@ -297,7 +297,7 @@ export default function IncidentsTab() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label style={lbl}>Latitude <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+                  <label style={lbl}>Latitude <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
                   <input type="number" value={form.latitude} onChange={e => setForm(f => ({ ...f, latitude: e.target.value }))} placeholder="-26.2041" style={inp} />
                 </div>
                 <div>
@@ -308,13 +308,13 @@ export default function IncidentsTab() {
             </div>
 
             {formError && (
-              <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}>
                 <AlertCircle size={14} />{formError}
               </div>
             )}
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-              <button onClick={() => setShowCreate(false)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
+              <button onClick={() => setShowCreate(false)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button
                 onClick={() => createIncident.mutate({
                   siteId:      form.siteId   || null,
@@ -327,7 +327,7 @@ export default function IncidentsTab() {
                   longitude:   form.longitude ? parseFloat(form.longitude) : null,
                 })}
                 disabled={!form.title || !form.siteId || createIncident.isPending}
-                style={{ padding: "9px 22px", background: "#DC2626", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {createIncident.isPending ? "Reporting..." : "Report Incident"}
               </button>
             </div>
@@ -338,5 +338,5 @@ export default function IncidentsTab() {
   )
 }
 
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "#fff", outline: "none" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "var(--hf-surface)", outline: "none" }

@@ -28,21 +28,21 @@ interface Invoice {
 
 // ── Status configs ────────────────────────────────────────────────────────────
 const QUOTE_STATUS: Record<QuoteStatus, { label: string; bg: string; color: string; icon: React.ElementType }> = {
-  DRAFT:    { label: 'Draft',    bg: '#F1F5F9', color: '#475569', icon: AlertCircle },
-  SENT:     { label: 'Sent',     bg: '#EFF6FF', color: '#1D4ED8', icon: Send },
-  ACCEPTED: { label: 'Accepted', bg: '#F0FDF4', color: '#166534', icon: CheckCircle },
-  REJECTED: { label: 'Rejected', bg: '#FEF2F2', color: '#DC2626', icon: XCircle },
-  EXPIRED:  { label: 'Expired',  bg: '#FEF3C7', color: '#92400E', icon: Clock },
-  INVOICED: { label: 'Invoiced', bg: '#F3E8FF', color: '#7C3AED', icon: FileCheck },
+  DRAFT:    { label: 'Draft',    bg: 'var(--hf-surface-sunken)', color: 'var(--hf-text-tertiary)', icon: AlertCircle },
+  SENT:     { label: 'Sent',     bg: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', icon: Send },
+  ACCEPTED: { label: 'Accepted', bg: 'var(--hf-success-soft)', color: 'var(--hf-success-text-strong)', icon: CheckCircle },
+  REJECTED: { label: 'Rejected', bg: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', icon: XCircle },
+  EXPIRED:  { label: 'Expired',  bg: 'var(--hf-warning-soft-strong)', color: 'var(--hf-warning-text-deep)', icon: Clock },
+  INVOICED: { label: 'Invoiced', bg: 'var(--hf-violet-soft-strong)', color: 'var(--hf-violet-text)', icon: FileCheck },
 }
 
 const INVOICE_STATUS: Record<string, { label: string; bg: string; color: string }> = {
-  DRAFT:          { bg: '#F1F5F9', color: '#475569', label: 'Draft' },
-  ISSUED:         { bg: '#EFF6FF', color: '#1D4ED8', label: 'Issued' },
-  PARTIALLY_PAID: { bg: '#FEF3C7', color: '#92400E', label: 'Part paid' },
-  PAID:           { bg: '#F0FDF4', color: '#166534', label: 'Paid' },
-  OVERDUE:        { bg: '#FEF2F2', color: '#DC2626', label: 'Overdue' },
-  CANCELLED:      { bg: '#F8FAFC', color: '#94A3B8', label: 'Cancelled' },
+  DRAFT:          { bg: 'var(--hf-surface-sunken)', color: 'var(--hf-text-tertiary)', label: 'Draft' },
+  ISSUED:         { bg: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', label: 'Issued' },
+  PARTIALLY_PAID: { bg: 'var(--hf-warning-soft-strong)', color: 'var(--hf-warning-text-deep)', label: 'Part paid' },
+  PAID:           { bg: 'var(--hf-success-soft)', color: 'var(--hf-success-text-strong)', label: 'Paid' },
+  OVERDUE:        { bg: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', label: 'Overdue' },
+  CANCELLED:      { bg: 'var(--hf-surface-muted)', color: 'var(--hf-text-faint)', label: 'Cancelled' },
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ const fmtDate = (d: string | null) =>
   d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 
 const inp: React.CSSProperties = {
-  width: '100%', padding: '10px 12px', border: '1.5px solid #E2E8F0',
+  width: '100%', padding: '10px 12px', border: '1.5px solid var(--hf-border)',
   borderRadius: 9, fontSize: 14, boxSizing: 'border-box', background: 'white', outline: 'none',
 }
 
@@ -71,19 +71,19 @@ export function InvoicingPage() {
       {/* Page header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', margin: '0 0 4px' }}>Invoicing</h1>
-          <p style={{ fontSize: 13, color: '#94A3B8', margin: 0 }}>Quotes, invoices and payment tracking</p>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 4px' }}>Invoicing</h1>
+          <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0 }}>Quotes, invoices and payment tracking</p>
         </div>
         {activeTab === 'quotes' && (
           <button onClick={() => navigate('/quotes/new')}
-            style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#1B3A6B', color: 'white', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             <Plus size={15} /> New Quote
           </button>
         )}
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 24, background: '#F1F5F9', borderRadius: 12, padding: 4, width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 24, background: 'var(--hf-surface-sunken)', borderRadius: 12, padding: 4, width: 'fit-content' }}>
         {[
           { key: 'quotes',   label: 'Quotes',   icon: FileText, path: '/quotes' },
           { key: 'invoices', label: 'Invoices', icon: Receipt,  path: '/invoices' },
@@ -96,7 +96,7 @@ export function InvoicingPage() {
               padding: '8px 20px', borderRadius: 9, border: 'none',
               fontSize: 14, fontWeight: 600, cursor: 'pointer',
               background: activeTab === tab.key ? 'white' : 'transparent',
-              color: activeTab === tab.key ? '#1B3A6B' : '#64748B',
+              color: activeTab === tab.key ? 'var(--hf-primary-text)' : 'var(--hf-text-muted)',
               boxShadow: activeTab === tab.key ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
               transition: 'all 0.15s',
             }}>
@@ -140,39 +140,39 @@ function QuotesTab() {
       {/* Stats strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'Total',    value: quotes.length,                                            color: '#1B3A6B' },
-          { label: 'Draft',    value: quotes.filter(q => q.status === 'DRAFT').length,          color: '#475569' },
-          { label: 'Sent',     value: quotes.filter(q => q.status === 'SENT').length,           color: '#1D4ED8' },
-          { label: 'Accepted', value: quotes.filter(q => q.status === 'ACCEPTED').length,       color: '#166534' },
+          { label: 'Total',    value: quotes.length,                                            color: 'var(--hf-primary-text)' },
+          { label: 'Draft',    value: quotes.filter(q => q.status === 'DRAFT').length,          color: 'var(--hf-text-tertiary)' },
+          { label: 'Sent',     value: quotes.filter(q => q.status === 'SENT').length,           color: 'var(--hf-info-text)' },
+          { label: 'Accepted', value: quotes.filter(q => q.status === 'ACCEPTED').length,       color: 'var(--hf-success-text-strong)' },
         ].map(s => (
-          <div key={s.label} style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 12, padding: '14px 18px' }}>
+          <div key={s.label} style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '14px 18px' }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>{s.label}</div>
+            <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
         {isLoading ? (
-          <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8' }}>Loading quotes...</div>
+          <div style={{ padding: 60, textAlign: 'center', color: 'var(--hf-text-faint)' }}>Loading quotes...</div>
         ) : isError ? (
           <div style={{ padding: 60, textAlign: 'center' }}>
             <AlertCircle size={32} color="#DC2626" style={{ marginBottom: 10 }} />
-            <div style={{ fontWeight: 600, color: '#DC2626' }}>Failed to load quotes</div>
-            <div style={{ fontSize: 13, color: '#94A3B8', marginTop: 4 }}>Please refresh and try again.</div>
+            <div style={{ fontWeight: 600, color: 'var(--hf-danger-text)' }}>Failed to load quotes</div>
+            <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', marginTop: 4 }}>Please refresh and try again.</div>
           </div>
         ) : quotes.length === 0 ? (
-          <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8' }}>
+          <div style={{ padding: 60, textAlign: 'center', color: 'var(--hf-text-faint)' }}>
             <FileText size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
-            <div style={{ fontWeight: 600, color: '#475569', marginBottom: 4 }}>No quotes yet</div>
+            <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)', marginBottom: 4 }}>No quotes yet</div>
             <div style={{ fontSize: 13 }}>Create your first quote to get started.</div>
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
+              <tr style={{ borderBottom: '1px solid var(--hf-border-subtle)', background: 'var(--hf-surface-muted)' }}>
                 {['Quote #', 'Title', 'Status', 'Total', 'Expires', ''].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                  <th key={h} style={{ textAlign: 'left', padding: '11px 16px', fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -180,16 +180,16 @@ function QuotesTab() {
               {quotes.map(q => (
                 <tr key={q.id}
                   onClick={() => navigate(`/quotes/${q.id}`)}
-                  style={{ borderBottom: '1px solid #F8FAFC', cursor: 'pointer' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#F8FAFC')}
+                  style={{ borderBottom: '1px solid var(--hf-border-subtle)', cursor: 'pointer' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--hf-surface-muted)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
                   <td style={{ padding: '14px 16px' }}>
-                    <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700, color: '#1D4ED8' }}>{q.quoteNumber}</span>
+                    <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700, color: 'var(--hf-info-text)' }}>{q.quoteNumber}</span>
                   </td>
-                  <td style={{ padding: '14px 16px', fontSize: 14, fontWeight: 600, color: '#0F172A' }}>{q.title}</td>
+                  <td style={{ padding: '14px 16px', fontSize: 14, fontWeight: 600, color: 'var(--hf-text)' }}>{q.title}</td>
                   <td style={{ padding: '14px 16px' }}><StatusBadge status={q.status} /></td>
-                  <td style={{ padding: '14px 16px', fontSize: 14, fontWeight: 700, color: '#0F172A' }}>{fmtR(q.total)}</td>
-                  <td style={{ padding: '14px 16px', fontSize: 13, color: '#64748B' }}>
+                  <td style={{ padding: '14px 16px', fontSize: 14, fontWeight: 700, color: 'var(--hf-text)' }}>{fmtR(q.total)}</td>
+                  <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--hf-text-muted)' }}>
                     {q.expiresAt ? new Date(q.expiresAt).toLocaleDateString('en-ZA') : '—'}
                   </td>
                   <td style={{ padding: '14px 16px' }}>
@@ -275,8 +275,8 @@ function InvoicesTab() {
   const overdueCount     = invoices.filter(i => i.status === 'OVERDUE').length
 
   const customerName = (id: string | null) => {
-    if (!id) return <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>Walk-in client</span>
-    return customerMap[id] ?? <span style={{ color: '#94A3B8', fontSize: 12 }}>{id.slice(0, 8)}…</span>
+    if (!id) return <span style={{ color: 'var(--hf-text-faint)', fontStyle: 'italic' }}>Walk-in client</span>
+    return customerMap[id] ?? <span style={{ color: 'var(--hf-text-faint)', fontSize: 12 }}>{id.slice(0, 8)}…</span>
   }
 
   return (
@@ -284,14 +284,14 @@ function InvoicesTab() {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
         {[
-          { label: 'Total invoices',  value: invoices.length,    fmt: false, color: '#1B3A6B' },
-          { label: 'Paid',            value: invoices.filter(i => i.status === 'PAID').length, fmt: false, color: '#166534' },
-          { label: 'Total revenue',   value: fmtR(totalRevenue), fmt: true,  color: '#0D9488' },
-          { label: 'Outstanding',     value: fmtR(totalOutstanding), fmt: true, color: overdueCount > 0 ? '#DC2626' : '#D97706' },
+          { label: 'Total invoices',  value: invoices.length,    fmt: false, color: 'var(--hf-primary-text)' },
+          { label: 'Paid',            value: invoices.filter(i => i.status === 'PAID').length, fmt: false, color: 'var(--hf-success-text-strong)' },
+          { label: 'Total revenue',   value: fmtR(totalRevenue), fmt: true,  color: 'var(--hf-accent-text)' },
+          { label: 'Outstanding',     value: fmtR(totalOutstanding), fmt: true, color: overdueCount > 0 ? 'var(--hf-danger-text)' : 'var(--hf-warning-text)' },
         ].map(s => (
-          <div key={s.label} style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 12, padding: '16px 20px' }}>
+          <div key={s.label} style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '16px 20px' }}>
             <div style={{ fontSize: s.fmt ? 18 : 26, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 12, color: '#64748B', marginTop: 3 }}>{s.label}</div>
+            <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 3 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -301,8 +301,8 @@ function InvoicesTab() {
         {['ALL', 'DRAFT', 'ISSUED', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'CANCELLED'].map(s => (
           <button key={s} onClick={() => setStatusFilter(s)}
             style={{ padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
-              background: statusFilter === s ? '#1B3A6B' : '#F1F5F9',
-              color:      statusFilter === s ? 'white'   : '#64748B',
+              background: statusFilter === s ? 'var(--hf-primary)' : 'var(--hf-surface-sunken)',
+              color:      statusFilter === s ? 'white'   : 'var(--hf-text-muted)',
             }}>
             {s === 'ALL' ? 'All' : (INVOICE_STATUS[s]?.label ?? s)}
             {s !== 'ALL' && ` (${invoices.filter(i => i.status === s).length})`}
@@ -311,26 +311,26 @@ function InvoicesTab() {
       </div>
 
       {/* Table */}
-      <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
         {isLoading ? (
-          <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8' }}>Loading invoices...</div>
+          <div style={{ padding: 60, textAlign: 'center', color: 'var(--hf-text-faint)' }}>Loading invoices...</div>
         ) : isError ? (
           <div style={{ padding: 60, textAlign: 'center' }}>
             <AlertCircle size={32} color="#DC2626" style={{ marginBottom: 10 }} />
-            <div style={{ fontWeight: 600, color: '#DC2626' }}>Failed to load invoices</div>
+            <div style={{ fontWeight: 600, color: 'var(--hf-danger-text)' }}>Failed to load invoices</div>
           </div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8' }}>
+          <div style={{ padding: 60, textAlign: 'center', color: 'var(--hf-text-faint)' }}>
             <FileText size={36} color="#CBD5E1" style={{ marginBottom: 12, opacity: 0.5 }} />
-            <div style={{ fontWeight: 600, color: '#475569', marginBottom: 4 }}>No invoices</div>
+            <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)', marginBottom: 4 }}>No invoices</div>
             <div style={{ fontSize: 13 }}>Convert an accepted quote to generate an invoice.</div>
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
+              <tr style={{ borderBottom: '1px solid var(--hf-border-subtle)', background: 'var(--hf-surface-muted)' }}>
                 {['Invoice #', 'Customer', 'Issued', 'Due', 'Total', 'Status', 'Actions'].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                  <th key={h} style={{ textAlign: 'left', padding: '11px 16px', fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -342,27 +342,27 @@ function InvoicesTab() {
                   <>
                     <tr key={inv.id}
                       onClick={() => setExpanded(isExp ? null : inv.id)}
-                      style={{ borderBottom: '1px solid #F8FAFC', cursor: 'pointer', background: isExp ? '#FAFBFF' : 'white' }}
-                      onMouseEnter={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = '#F8FAFC' }}
+                      style={{ borderBottom: '1px solid var(--hf-border-subtle)', cursor: 'pointer', background: isExp ? 'var(--hf-surface-muted)' : 'white' }}
+                      onMouseEnter={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = 'var(--hf-surface-muted)' }}
                       onMouseLeave={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = 'white' }}>
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <FileText size={14} color="#0D9488" />
-                          <span style={{ fontWeight: 700, fontSize: 14, color: '#0F172A' }}>{inv.invoiceNumber}</span>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)' }}>{inv.invoiceNumber}</span>
                           {isExp ? <ChevronUp size={13} color="#94A3B8" /> : <ChevronDown size={13} color="#94A3B8" />}
                         </div>
                       </td>
-                      <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                      <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)' }}>
                         {customerName(inv.customerId)}
                       </td>
-                      <td style={{ padding: '14px 16px', fontSize: 13, color: '#64748B' }}>{fmtDate(inv.issuedAt)}</td>
-                      <td style={{ padding: '14px 16px', fontSize: 13, color: inv.status === 'OVERDUE' ? '#DC2626' : '#64748B' }}>
+                      <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--hf-text-muted)' }}>{fmtDate(inv.issuedAt)}</td>
+                      <td style={{ padding: '14px 16px', fontSize: 13, color: inv.status === 'OVERDUE' ? 'var(--hf-danger-text)' : 'var(--hf-text-muted)' }}>
                         {fmtDate(inv.dueDate)}
                       </td>
                       <td style={{ padding: '14px 16px' }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>{fmtR(inv.total)}</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--hf-text)' }}>{fmtR(inv.total)}</div>
                         {inv.status === 'PARTIALLY_PAID' && inv.amountPaid > 0 && (
-                          <div style={{ fontSize: 11, color: '#92400E', marginTop: 1 }}>Paid: {fmtR(inv.amountPaid)}</div>
+                          <div style={{ fontSize: 11, color: 'var(--hf-warning-text-deep)', marginTop: 1 }}>Paid: {fmtR(inv.amountPaid)}</div>
                         )}
                       </td>
                       <td style={{ padding: '14px 16px' }}>
@@ -375,19 +375,19 @@ function InvoicesTab() {
                           {inv.status === 'DRAFT' && (
                             <button disabled={issueInvoice.isPending}
                               onClick={() => issueInvoice.mutate(inv.id)}
-                              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', border: '1px solid var(--hf-info-border)', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                               <Send size={12} /> Issue
                             </button>
                           )}
                           {['ISSUED', 'PARTIALLY_PAID', 'OVERDUE'].includes(inv.status) && (
                             <button
                               onClick={() => { setPayModal(inv); setPayError(''); setPayForm(f => ({ ...f, amount: String(inv.total - (inv.amountPaid ?? 0)) })) }}
-                              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: 'var(--hf-success-soft)', color: 'var(--hf-success-text-strong)', border: '1px solid var(--hf-success-border-subtle)', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                               <CheckCircle size={12} /> Mark paid
                             </button>
                           )}
                           <button disabled={downloading === inv.id} onClick={() => downloadPdf(inv)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+                            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
                             <Download size={12} />{downloading === inv.id ? '…' : 'PDF'}
                           </button>
                         </div>
@@ -397,24 +397,24 @@ function InvoicesTab() {
                     {isExp && (
                       <tr key={`${inv.id}-lines`}>
                         <td colSpan={7} style={{ padding: 0 }}>
-                          <div style={{ background: '#F8FAFC', borderBottom: '1px solid #F1F5F9', padding: '16px 24px' }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.06em', marginBottom: 10 }}>LINE ITEMS</div>
+                          <div style={{ background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border-subtle)', padding: '16px 24px' }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', letterSpacing: '0.06em', marginBottom: 10 }}>LINE ITEMS</div>
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                               <thead>
-                                <tr style={{ borderBottom: '1px solid #E2E8F0' }}>
+                                <tr style={{ borderBottom: '1px solid var(--hf-border)' }}>
                                   {['Description', 'Qty', 'Unit Price', 'VAT %', 'Total'].map(h => (
-                                    <th key={h} style={{ textAlign: 'left', padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#64748B', textTransform: 'uppercase' as const }}>{h}</th>
+                                    <th key={h} style={{ textAlign: 'left', padding: '6px 12px', fontSize: 11, fontWeight: 600, color: 'var(--hf-text-muted)', textTransform: 'uppercase' as const }}>{h}</th>
                                   ))}
                                 </tr>
                               </thead>
                               <tbody>
                                 {inv.lineItems.map((li, i) => (
-                                  <tr key={i} style={{ borderBottom: i < inv.lineItems.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
-                                    <td style={{ padding: '8px 12px', color: '#374151' }}>{li.description}</td>
-                                    <td style={{ padding: '8px 12px', color: '#64748B' }}>{li.quantity}</td>
-                                    <td style={{ padding: '8px 12px', color: '#64748B' }}>{fmtR(li.unitPrice)}</td>
-                                    <td style={{ padding: '8px 12px', color: '#64748B' }}>{li.vatRate ?? 15}%</td>
-                                    <td style={{ padding: '8px 12px', fontWeight: 600, color: '#0F172A' }}>{fmtR(li.lineTotal)}</td>
+                                  <tr key={i} style={{ borderBottom: i < inv.lineItems.length - 1 ? '1px solid var(--hf-border-subtle)' : 'none' }}>
+                                    <td style={{ padding: '8px 12px', color: 'var(--hf-text-secondary)' }}>{li.description}</td>
+                                    <td style={{ padding: '8px 12px', color: 'var(--hf-text-muted)' }}>{li.quantity}</td>
+                                    <td style={{ padding: '8px 12px', color: 'var(--hf-text-muted)' }}>{fmtR(li.unitPrice)}</td>
+                                    <td style={{ padding: '8px 12px', color: 'var(--hf-text-muted)' }}>{li.vatRate ?? 15}%</td>
+                                    <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--hf-text)' }}>{fmtR(li.lineTotal)}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -422,11 +422,11 @@ function InvoicesTab() {
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
                               <div style={{ minWidth: 240 }}>
                                 {[['Subtotal', fmtR(inv.subtotal)], ['VAT', fmtR(inv.vatTotal)]].map(([l, v]) => (
-                                  <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, color: '#64748B' }}>
+                                  <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, color: 'var(--hf-text-muted)' }}>
                                     <span>{l}</span><span>{v}</span>
                                   </div>
                                 ))}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 0', fontSize: 15, fontWeight: 700, color: '#0F172A', borderTop: '1px solid #E2E8F0', marginTop: 4 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 0', fontSize: 15, fontWeight: 700, color: 'var(--hf-text)', borderTop: '1px solid var(--hf-border)', marginTop: 4 }}>
                                   <span>Total</span><span>{fmtR(inv.total)}</span>
                                 </div>
                               </div>
@@ -449,13 +449,13 @@ function InvoicesTab() {
           <div style={{ background: 'white', borderRadius: 16, padding: 28, width: 460, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>Record Payment</h3>
-                <p style={{ margin: '3px 0 0', fontSize: 13, color: '#94A3B8' }}>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>Record Payment</h3>
+                <p style={{ margin: '3px 0 0', fontSize: 13, color: 'var(--hf-text-faint)' }}>
                   {payModal.invoiceNumber} · Total {fmtR(payModal.total)}
                   {payModal.amountPaid > 0 && ` · Already paid ${fmtR(payModal.amountPaid)}`}
                 </p>
               </div>
-              <button onClick={() => setPayModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={20} /></button>
+              <button onClick={() => setPayModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={20} /></button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -465,14 +465,14 @@ function InvoicesTab() {
                 { label: 'Note (optional)', key: 'note', type: 'text', placeholder: 'e.g. Paid in full' },
               ].map(f => (
                 <div key={f.key}>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>{f.label}</label>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 5 }}>{f.label}</label>
                   <input type={f.type} value={(payForm as any)[f.key]}
                     onChange={e => setPayForm(p => ({ ...p, [f.key]: e.target.value }))}
                     placeholder={f.placeholder} style={inp} />
                 </div>
               ))}
               <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Payment Method</label>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 5 }}>Payment Method</label>
                 <select value={payForm.paymentMethod} onChange={e => setPayForm(p => ({ ...p, paymentMethod: e.target.value }))}
                   style={{ ...inp, appearance: 'none' }}>
                   {['EFT', 'CASH', 'CARD', 'CHEQUE', 'OTHER'].map(m => <option key={m}>{m}</option>)}
@@ -481,14 +481,14 @@ function InvoicesTab() {
             </div>
 
             {payError && (
-              <div style={{ marginTop: 14, padding: '10px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <AlertCircle size={15} color="#DC2626" style={{ flexShrink: 0 }} />{payError}
               </div>
             )}
 
             <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
               <button onClick={() => { setPayModal(null); setPayError('') }}
-                style={{ padding: '10px 18px', border: '1px solid #E2E8F0', borderRadius: 9, background: 'white', fontSize: 14, cursor: 'pointer', color: '#374151' }}>
+                style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'white', fontSize: 14, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
                 Cancel
               </button>
               <button
@@ -497,7 +497,7 @@ function InvoicesTab() {
                   id: payModal.id,
                   body: { amount: Number(payForm.amount), paymentMethod: payForm.paymentMethod, reference: payForm.reference || undefined, note: payForm.note || undefined },
                 })}
-                style={{ padding: '10px 22px', background: !payForm.amount ? '#E2E8F0' : '#16A34A', color: !payForm.amount ? '#94A3B8' : 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: !payForm.amount ? 'not-allowed' : 'pointer' }}>
+                style={{ padding: '10px 22px', background: !payForm.amount ? 'var(--hf-surface-strong)' : 'var(--hf-success)', color: !payForm.amount ? 'var(--hf-text-faint)' : 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: !payForm.amount ? 'not-allowed' : 'pointer' }}>
                 {markPaid.isPending ? 'Saving...' : 'Confirm payment'}
               </button>
             </div>

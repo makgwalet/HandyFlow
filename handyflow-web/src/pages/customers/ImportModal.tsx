@@ -152,7 +152,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
         {/* Template download */}
         <button onClick={downloadTemplate} style={{
           display: 'flex', alignItems: 'center', gap: 6,
-          fontSize: 13, color: '#1D4ED8', background: 'none',
+          fontSize: 13, color: 'var(--hf-info-text)', background: 'none',
           border: 'none', cursor: 'pointer', marginBottom: 16, padding: 0,
         }}>
           <Download size={14} /> Download CSV template
@@ -170,11 +170,11 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
             tabIndex={0}
             onKeyDown={e => { if (e.key === 'Enter') fileRef.current?.click() }}
             aria-label="Drop CSV file here or click to browse">
-            <Upload size={28} style={{ color: '#94A3B8', marginBottom: 10 }} />
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>
+            <Upload size={28} style={{ color: 'var(--hf-text-faint)', marginBottom: 10 }} />
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--hf-text-secondary)' }}>
               {file ? file.name : 'Drop your CSV here or click to browse'}
             </div>
-            <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', marginTop: 4 }}>
               UTF-8 or Excel-saved CSV · max 2,000 rows · 5 MB
             </div>
             <input
@@ -188,8 +188,8 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
         {phase === 'uploading' && (
           <div style={{ textAlign: 'center', padding: '32px 0' }}>
             <div className={styles.spinner} style={{ margin: '0 auto 16px' }} />
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>Processing import…</div>
-            <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--hf-text-secondary)' }}>Processing import…</div>
+            <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', marginTop: 4 }}>
               Checking for duplicates and validating rows
             </div>
           </div>
@@ -205,10 +205,10 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
             </div>
 
             {result.rowErrors.length > 0 && (
-              <div style={{ maxHeight: 240, overflowY: 'auto', border: '1px solid #E2E8F0', borderRadius: 10, marginBottom: 12 }}>
+              <div style={{ maxHeight: 240, overflowY: 'auto', border: '1px solid var(--hf-border)', borderRadius: 10, marginBottom: 12 }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
-                    <tr style={{ background: '#F8FAFC' }}>
+                    <tr style={{ background: 'var(--hf-surface-muted)' }}>
                       <th style={thStyle}>Row</th>
                       <th style={thStyle}>Name</th>
                       <th style={thStyle}>Reason skipped</th>
@@ -216,10 +216,10 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
                   </thead>
                   <tbody>
                     {result.rowErrors.map((err, i) => (
-                      <tr key={i} style={{ borderTop: '1px solid #F1F5F9' }}>
+                      <tr key={i} style={{ borderTop: '1px solid var(--hf-border-subtle)' }}>
                         <td style={tdStyle}>{err.row}</td>
                         <td style={tdStyle}>{err.name || '—'}</td>
-                        <td style={{ ...tdStyle, color: '#DC2626' }}>{err.reason}</td>
+                        <td style={{ ...tdStyle, color: 'var(--hf-danger-text)' }}>{err.reason}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -229,7 +229,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
 
             <button onClick={reset} style={{
               display: 'flex', alignItems: 'center', gap: 6,
-              fontSize: 13, color: '#1D4ED8', background: 'none',
+              fontSize: 13, color: 'var(--hf-info-text)', background: 'none',
               border: 'none', cursor: 'pointer', padding: 0,
             }}>
               <RefreshCw size={13} /> Import another file
@@ -266,15 +266,15 @@ function ResultStat({ icon, value, label, bg, bd }: {
   return (
     <div style={{ background: bg, border: `1px solid ${bd}`, borderRadius: 10, padding: '12px 14px', textAlign: 'center' }}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}>{icon}</div>
-      <div style={{ fontSize: 22, fontWeight: 800, color: '#0F172A' }}>{value}</div>
-      <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)' }}>{value}</div>
+      <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', marginTop: 2 }}>{label}</div>
     </div>
   )
 }
 
 const thStyle: React.CSSProperties = {
   textAlign: 'left', padding: '8px 12px', fontSize: 11, fontWeight: 700,
-  color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em',
+  color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em',
 }
 
-const tdStyle: React.CSSProperties = { padding: '8px 12px', color: '#374151' }
+const tdStyle: React.CSSProperties = { padding: '8px 12px', color: 'var(--hf-text-secondary)' }

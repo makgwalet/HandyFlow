@@ -30,11 +30,11 @@ const fmtMoney = (n: number) => new Intl.NumberFormat("en-ZA", { style: "currenc
 
 function StatCard({ label, value, sub, icon: Icon, tone }: { label: string; value: string | number; sub?: string; icon: React.ElementType; tone: string }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #E8EDF5", borderRadius: 14, padding: 18, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+    <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-primary-border)", borderRadius: 14, padding: 18, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
       <div>
-        <p style={{ fontSize: 11, color: "#94A3B8", margin: "0 0 6px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</p>
-        <p style={{ fontSize: 24, fontWeight: 800, color: "#0F172A", margin: "0 0 2px" }}>{value}</p>
-        {sub && <p style={{ fontSize: 12, color: "#94A3B8", margin: 0 }}>{sub}</p>}
+        <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: "0 0 6px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</p>
+        <p style={{ fontSize: 24, fontWeight: 800, color: "var(--hf-text)", margin: "0 0 2px" }}>{value}</p>
+        {sub && <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: 0 }}>{sub}</p>}
       </div>
       <div style={{ width: 42, height: 42, borderRadius: 12, background: `${tone}1A`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         <Icon size={20} color={tone} />
@@ -68,7 +68,7 @@ export default function CollAgencyDashboard({ onNavigate }: { onNavigate: (tab: 
   const clientsWithTrust = [...activeClients].sort((a, b) => (b.trustBalance || 0) - (a.trustBalance || 0)).slice(0, 6)
 
   if (clientsLoading || collectorsLoading) {
-    return <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+    return <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p>
   }
 
   return (
@@ -81,43 +81,43 @@ export default function CollAgencyDashboard({ onNavigate }: { onNavigate: (tab: 
       </div>
 
       {expiringCollectors.length > 0 && (
-        <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "14px 18px", marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 12, padding: "14px 18px", marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
           <AlertTriangle size={18} color="#DC2626" />
           <div>
-            <p style={{ fontSize: 13, fontWeight: 700, color: "#991B1B", margin: "0 0 2px" }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-danger-text-strong)", margin: "0 0 2px" }}>
               {expiringCollectors.length} collector registration{expiringCollectors.length === 1 ? "" : "s"} expiring within 30 days
             </p>
-            <p style={{ fontSize: 12, color: "#B91C1C", margin: 0 }}>
+            <p style={{ fontSize: 12, color: "var(--hf-danger-text-strong)", margin: 0 }}>
               Collecting while unregistered is a criminal offence under the Debt Collectors Act — renew before expiry.
             </p>
           </div>
           <button onClick={() => onNavigate("collectors")}
-            style={{ marginLeft: "auto", background: "#DC2626", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+            style={{ marginLeft: "auto", background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
             Review collectors
           </button>
         </div>
       )}
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <p style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", margin: 0 }}>Largest trust balances</p>
+        <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Largest trust balances</p>
         <button onClick={() => onNavigate("clients")}
-          style={{ background: "none", border: "1px solid #E2E8F0", cursor: "pointer", fontSize: 12, color: CA_ACCENT, fontWeight: 600, padding: "6px 12px", borderRadius: 8 }}>
+          style={{ background: "none", border: "1px solid var(--hf-border)", cursor: "pointer", fontSize: 12, color: CA_ACCENT, fontWeight: 600, padding: "6px 12px", borderRadius: 8 }}>
           All clients →
         </button>
       </div>
 
       {clientsWithTrust.length === 0 ? (
-        <p style={{ fontSize: 13, color: "#94A3B8" }}>No active clients yet. Onboard a creditor client to get started.</p>
+        <p style={{ fontSize: 13, color: "var(--hf-text-faint)" }}>No active clients yet. Onboard a creditor client to get started.</p>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {clientsWithTrust.map((c, i) => (
             <div key={c.id} onClick={() => onNavigate("clients")}
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9", cursor: "pointer" }}>
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)", cursor: "pointer" }}>
               <div>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", margin: "0 0 2px" }}>{c.tradingName}</p>
-                <p style={{ fontSize: 12, color: "#94A3B8", margin: 0 }}>{c.commissionRatePct}% commission{c.contactName ? ` · ${c.contactName}` : ""}</p>
+                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)", margin: "0 0 2px" }}>{c.tradingName}</p>
+                <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: 0 }}>{c.commissionRatePct}% commission{c.contactName ? ` · ${c.contactName}` : ""}</p>
               </div>
-              <p style={{ fontSize: 14, fontWeight: 700, color: "#059669", margin: 0 }}>{fmtMoney(c.trustBalance)}</p>
+              <p style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-success-text)", margin: 0 }}>{fmtMoney(c.trustBalance)}</p>
             </div>
           ))}
         </div>

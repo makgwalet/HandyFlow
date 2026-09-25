@@ -175,54 +175,54 @@ export default function TripsTab() {
     <div>
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {stats.map(s => (
-          <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
+          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
             <div style={{ fontSize: s.label === "Total km" ? 16 : 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{s.label}</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ marginBottom: 18, padding: "10px 14px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, fontSize: 12, color: "#1D4ED8" }}>
+      <div style={{ marginBottom: 18, padding: "10px 14px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-info-text)" }}>
         <strong>SARS Logbook:</strong> Classify each trip as Business or Private. Business trips are deductible for travel allowance purposes. Keep odometer readings accurate.
       </div>
 
       {/* ── Logbook export panel ─────────────────────────────────────────── */}
-      <div style={{ marginBottom: 22, padding: "16px 18px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+      <div style={{ marginBottom: 22, padding: "16px 18px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           <FileDown size={16} color="#1B3A6B" />
-          <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Export SARS Logbook</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Export SARS Logbook</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto auto", gap: 10, alignItems: "end" }}>
           <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4 }}>Vehicle *</label>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }}>Vehicle *</label>
             <select value={logbookVehicle} onChange={e => { setLogbookVehicle(e.target.value); setLogbookError("") }}
-              style={{ ...inp("_"), background: "#fff" }}>
+              style={{ ...inp("_"), background: "var(--hf-surface)" }}>
               <option value="">Select vehicle...</option>
               {(vehicles as Vehicle[]).map(v => <option key={v.id} value={v.id}>{v.registration} — {v.make} {v.model}</option>)}
             </select>
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4 }}>From</label>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }}>From</label>
             <input type="date" value={logbookFrom} onChange={e => setLogbookFrom(e.target.value)} style={inp("_")} />
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4 }}>To</label>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }}>To</label>
             <input type="date" value={logbookTo} onChange={e => setLogbookTo(e.target.value)} style={inp("_")} />
           </div>
           <button onClick={() => downloadLogbook("pdf")} disabled={!logbookVehicle || downloading !== null}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: !logbookVehicle ? "#E2E8F0" : "#DC2626", color: !logbookVehicle ? "#94A3B8" : "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: !logbookVehicle ? "not-allowed" : "pointer", whiteSpace: "nowrap" as const }}>
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: !logbookVehicle ? "var(--hf-surface-strong)" : "var(--hf-danger)", color: !logbookVehicle ? "var(--hf-text-faint)" : "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: !logbookVehicle ? "not-allowed" : "pointer", whiteSpace: "nowrap" as const }}>
             <FileDown size={14} /> {downloading === "pdf" ? "..." : "PDF"}
           </button>
           <button onClick={() => downloadLogbook("xlsx")} disabled={!logbookVehicle || downloading !== null}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: !logbookVehicle ? "#E2E8F0" : "#166534", color: !logbookVehicle ? "#94A3B8" : "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: !logbookVehicle ? "not-allowed" : "pointer", whiteSpace: "nowrap" as const }}>
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: !logbookVehicle ? "var(--hf-surface-strong)" : "var(--hf-success-solid-strong)", color: !logbookVehicle ? "var(--hf-text-faint)" : "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: !logbookVehicle ? "not-allowed" : "pointer", whiteSpace: "nowrap" as const }}>
             <FileSpreadsheet size={14} /> {downloading === "xlsx" ? "..." : "Excel"}
           </button>
         </div>
-        <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 8 }}>
+        <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 8 }}>
           Defaults to the current SA tax year (1 Mar – end of Feb). Only completed trips are included.
         </div>
         {logbookError && (
-          <div style={{ marginTop: 10, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, fontSize: 12, color: "#DC2626", display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ marginTop: 10, padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 12, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 6 }}>
             <AlertCircle size={13} />{logbookError}
           </div>
         )}
@@ -233,32 +233,32 @@ export default function TripsTab() {
           {["ALL","ACTIVE","COMPLETED","CANCELLED"].map(s => (
             <button key={s} onClick={() => setFilterStatus(s)}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterStatus === s ? 600 : 400,
-                background: filterStatus === s ? "#1B3A6B" : "#F1F5F9", color: filterStatus === s ? "#fff" : "#64748B" }}>
+                background: filterStatus === s ? "var(--hf-primary)" : "var(--hf-surface-sunken)", color: filterStatus === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
               {s === "ALL" ? "All" : STATUS_CFG[s]?.label}
             </button>
           ))}
-          <div style={{ width: 1, background: "#E2E8F0" }} />
+          <div style={{ width: 1, background: "var(--hf-surface-strong)" }} />
           {["ALL","BUSINESS","PRIVATE"].map(t => (
             <button key={t} onClick={() => setFilterType(t)}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterType === t ? 600 : 400,
-                background: filterType === t ? (TYPE_CFG[t]?.color ?? "#1B3A6B") : "#F1F5F9",
-                color: filterType === t ? "#fff" : "#64748B" }}>
+                background: filterType === t ? (TYPE_CFG[t]?.color ?? "var(--hf-primary)") : "var(--hf-surface-sunken)",
+                color: filterType === t ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
               {t === "ALL" ? "All types" : t}
             </button>
           ))}
         </div>
         <button onClick={() => { setShowStart(true); setStartForm(EMPTY_START); setFieldErrors({}); setApiError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Start Trip
         </button>
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading trips...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading trips...</div>
       ) : displayTrips.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Route size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No trips found</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No trips found</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -268,36 +268,36 @@ export default function TripsTab() {
             const TypeIcon = typeCfg.icon
             const vehicle  = vehicleMap[trip.vehicleId]
             return (
-              <div key={trip.id} style={{ background: "#fff", border: `1px solid ${trip.status === "ACTIVE" ? "#86EFAC" : "#E2E8F0"}`, borderLeft: `4px solid ${cfg.color}`, borderRadius: 10, padding: "14px 18px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+              <div key={trip.id} style={{ background: "var(--hf-surface)", border: `1px solid ${trip.status === "ACTIVE" ? "#86EFAC" : "#E2E8F0"}`, borderLeft: `4px solid ${cfg.color}`, borderRadius: 10, padding: "14px 18px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", gap: 12, flex: 1 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 9, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     <Route size={18} color={cfg.color} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>
                         {trip.registration ?? vehicle?.registration ?? "Unknown vehicle"}
                       </span>
-                      <span style={{ fontSize: 12, color: "#64748B" }}>{vehicle ? `${vehicle.make} ${vehicle.model}` : ""}</span>
+                      <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{vehicle ? `${vehicle.make} ${vehicle.model}` : ""}</span>
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 3, background: typeCfg.bg, color: typeCfg.color, padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>
                         <TypeIcon size={9} />{typeCfg.label}
                       </span>
                     </div>
-                    <div style={{ fontSize: 12, color: "#64748B", marginBottom: 2 }}>
+                    <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 2 }}>
                       {fmtDate(trip.startAt)} {fmtTime(trip.startAt)}
                       {trip.endAt ? ` → ${fmtTime(trip.endAt)}` : "  (active)"}
                       {trip.driverName && ` · ${trip.driverName}`}
                     </div>
-                    {trip.purpose && <div style={{ fontSize: 13, color: "#475569", marginBottom: 2 }}>{trip.purpose}</div>}
-                    <div style={{ fontSize: 12, color: "#64748B" }}>
+                    {trip.purpose && <div style={{ fontSize: 13, color: "var(--hf-text-tertiary)", marginBottom: 2 }}>{trip.purpose}</div>}
+                    <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>
                       {trip.startLocation && `From: ${trip.startLocation}`}
                       {trip.endLocation && ` → ${trip.endLocation}`}
                     </div>
                     <div style={{ display: "flex", gap: 14, fontSize: 12, marginTop: 4 }}>
                       <span>Start: <strong>{trip.startOdometer.toLocaleString()} km</strong></span>
                       {trip.endOdometer && <span>End: <strong>{trip.endOdometer.toLocaleString()} km</strong></span>}
-                      {trip.distanceKm && <span style={{ color: "#0D9488", fontWeight: 700 }}>{trip.distanceKm.toLocaleString()} km driven</span>}
-                      {trip.fuelUsedLitres && <span style={{ color: "#D97706" }}>{Number(trip.fuelUsedLitres).toFixed(1)} L</span>}
+                      {trip.distanceKm && <span style={{ color: "var(--hf-accent-text)", fontWeight: 700 }}>{trip.distanceKm.toLocaleString()} km driven</span>}
+                      {trip.fuelUsedLitres && <span style={{ color: "var(--hf-warning-text)" }}>{Number(trip.fuelUsedLitres).toFixed(1)} L</span>}
                     </div>
                   </div>
                 </div>
@@ -305,7 +305,7 @@ export default function TripsTab() {
                   <span style={{ background: cfg.bg, color: cfg.color, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{cfg.label}</span>
                   {trip.status === "ACTIVE" && (
                     <button onClick={() => { setShowEnd(trip); setEndOdometer(""); setEndLocation(""); setFuelUsed(""); setEndNotes(""); setApiError("") }}
-                      style={{ display: "flex", alignItems: "center", gap: 5, background: "#0D9488", color: "#fff", border: "none", borderRadius: 7, padding: "7px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, padding: "7px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                       <CheckCircle size={13} /> End Trip
                     </button>
                   )}
@@ -318,17 +318,17 @@ export default function TripsTab() {
 
       {showStart && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 540, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 540, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Start Trip</h3>
-              <button onClick={() => setShowStart(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Start Trip</h3>
+              <button onClick={() => setShowStart(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label style={lbl}>Vehicle *</label>
                 {availableVehicles.length === 0 ? (
-                  <div style={{ padding: "10px 12px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 8, fontSize: 13, color: "#92400E" }}>
+                  <div style={{ padding: "10px 12px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 8, fontSize: 13, color: "var(--hf-warning-text-deep)" }}>
                     No available vehicles. Change a vehicle's status to Available first.
                   </div>
                 ) : (
@@ -338,12 +338,12 @@ export default function TripsTab() {
                       setStartForm(f => ({ ...f, vehicleId: e.target.value, startOdometer: v ? String(v.currentOdometer) : "" }))
                       setFieldErrors(f => omit2(f, "vehicleId"))
                     }}
-                    style={{ ...inp("vehicleId"), background: "#fff" }}>
+                    style={{ ...inp("vehicleId"), background: "var(--hf-surface)" }}>
                     <option value="">Select vehicle...</option>
                     {availableVehicles.map(v => <option key={v.id} value={v.id}>{v.registration} — {v.make} {v.model} ({v.currentOdometer.toLocaleString()} km)</option>)}
                   </select>
                 )}
-                {fieldErrors.vehicleId && <div style={{ fontSize: 12, color: "#DC2626", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}><AlertCircle size={12} />{fieldErrors.vehicleId}</div>}
+                {fieldErrors.vehicleId && <div style={{ fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}><AlertCircle size={12} />{fieldErrors.vehicleId}</div>}
               </div>
 
               <div>
@@ -354,14 +354,14 @@ export default function TripsTab() {
                     const Icon = cfg.icon
                     return (
                       <button key={t} onClick={() => setStartForm(f => ({ ...f, tripType: t }))}
-                        style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px", border: `2px solid ${startForm.tripType === t ? cfg.color : "#E2E8F0"}`, borderRadius: 8, cursor: "pointer", background: startForm.tripType === t ? cfg.bg : "#fff" }}>
+                        style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px", border: `2px solid ${startForm.tripType === t ? cfg.color : "#E2E8F0"}`, borderRadius: 8, cursor: "pointer", background: startForm.tripType === t ? cfg.bg : "var(--hf-surface)" }}>
                         <Icon size={14} color={startForm.tripType === t ? cfg.color : "#94A3B8"} />
-                        <span style={{ fontSize: 13, fontWeight: 600, color: startForm.tripType === t ? cfg.color : "#64748B" }}>{cfg.label}</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: startForm.tripType === t ? cfg.color : "var(--hf-text-muted)" }}>{cfg.label}</span>
                       </button>
                     )
                   })}
                 </div>
-                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>Used for SARS travel allowance logbook reporting</div>
+                <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>Used for SARS travel allowance logbook reporting</div>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -375,7 +375,7 @@ export default function TripsTab() {
                     onChange={e => { setStartForm(f => ({ ...f, startOdometer: e.target.value })); setFieldErrors(f => omit2(f, "startOdometer")) }}
                     placeholder={selectedVehicle ? String(selectedVehicle.currentOdometer) : ""}
                     style={inp("startOdometer")} />
-                  {fieldErrors.startOdometer && <div style={{ fontSize: 12, color: "#DC2626", marginTop: 4 }}>{fieldErrors.startOdometer}</div>}
+                  {fieldErrors.startOdometer && <div style={{ fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>{fieldErrors.startOdometer}</div>}
                 </div>
               </div>
 
@@ -391,14 +391,14 @@ export default function TripsTab() {
               </div>
             </div>
 
-            {apiError && <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{apiError}</div>}
+            {apiError && <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{apiError}</div>}
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-              <button onClick={() => setShowStart(false)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
+              <button onClick={() => setShowStart(false)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button
                 onClick={() => { if (validateStart()) startTrip.mutate({ vehicleId: startForm.vehicleId, body: { driverName: startForm.driverName || null, purpose: startForm.purpose || null, tripType: startForm.tripType, startLocation: startForm.startLocation || null, startOdometer: Number(startForm.startOdometer), startAt: new Date().toISOString() } }) }}
                 disabled={startTrip.isPending}
-                style={{ padding: "9px 22px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {startTrip.isPending ? "Starting..." : "Start Trip"}
               </button>
             </div>
@@ -408,13 +408,13 @@ export default function TripsTab() {
 
       {showEnd && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>End Trip</h3>
-              <button onClick={() => setShowEnd(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>End Trip</h3>
+              <button onClick={() => setShowEnd(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
 
-            <div style={{ marginBottom: 16, padding: "12px 14px", background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 8, fontSize: 13, color: "#0369A1" }}>
+            <div style={{ marginBottom: 16, padding: "12px 14px", background: "var(--hf-sky-soft)", border: "1px solid var(--hf-sky-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-sky-text-strong)" }}>
               Started at <strong>{showEnd.startOdometer.toLocaleString()} km</strong>
               {endOdometer && Number(endOdometer) > showEnd.startOdometer && (
                 <> · Distance: <strong>{(Number(endOdometer) - showEnd.startOdometer).toLocaleString()} km</strong></>
@@ -428,7 +428,7 @@ export default function TripsTab() {
                   placeholder="Enter current odometer reading"
                   style={{ ...inp("_"), width: "100%", fontSize: 18, fontWeight: 700 }} />
                 {endOdometer && Number(endOdometer) < showEnd.startOdometer && (
-                  <div style={{ fontSize: 12, color: "#DC2626", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+                  <div style={{ fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
                     <AlertCircle size={12} /> End reading must be greater than start ({showEnd.startOdometer.toLocaleString()} km)
                   </div>
                 )}
@@ -449,14 +449,14 @@ export default function TripsTab() {
               </div>
             </div>
 
-            {apiError && <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{apiError}</div>}
+            {apiError && <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{apiError}</div>}
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-              <button onClick={() => setShowEnd(null)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
+              <button onClick={() => setShowEnd(null)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button
                 onClick={() => endTrip.mutate({ vehicleId: showEnd.vehicleId, body: { endOdometer: Number(endOdometer), endLocation: endLocation || null, endAt: new Date().toISOString(), fuelUsedLitres: fuelUsed ? Number(fuelUsed) : null, notes: endNotes || null } })}
                 disabled={!endOdometer || Number(endOdometer) <= showEnd.startOdometer || endTrip.isPending}
-                style={{ padding: "9px 22px", background: !endOdometer || Number(endOdometer) <= showEnd.startOdometer ? "#E2E8F0" : "#0D9488", color: !endOdometer || Number(endOdometer) <= showEnd.startOdometer ? "#94A3B8" : "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: !endOdometer || Number(endOdometer) <= showEnd.startOdometer ? "var(--hf-surface-strong)" : "var(--hf-accent)", color: !endOdometer || Number(endOdometer) <= showEnd.startOdometer ? "var(--hf-text-faint)" : "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {endTrip.isPending ? "Ending..." : "End Trip"}
               </button>
             </div>

@@ -17,14 +17,14 @@ interface DrillDown { accountCode: string; accountName: string; openingBalance: 
 const fmtR = (n: number) => n == null ? "—" : `R ${(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
 const fmtDt = (d: string) => new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })
 const inp: React.CSSProperties = {
-  padding: "8px 12px", border: "1.5px solid #E2E8F0",
+  padding: "8px 12px", border: "1.5px solid var(--hf-border)",
   borderRadius: 8, fontSize: 13, outline: "none",
 }
 
 const REPORT_CONFIG = {
-  "profit-and-loss": { label: "Profit & Loss",  icon: TrendingUp,  color: "#0D9488", path: "profit-and-loss" },
-  "balance-sheet":   { label: "Balance Sheet",  icon: Scale,       color: "#1B3A6B", path: "balance-sheet"  },
-  "trial-balance":   { label: "Trial Balance",  icon: BarChart2,   color: "#7C3AED", path: "trial-balance"  },
+  "profit-and-loss": { label: "Profit & Loss",  icon: TrendingUp,  color: "var(--hf-accent-text)", path: "profit-and-loss" },
+  "balance-sheet":   { label: "Balance Sheet",  icon: Scale,       color: "var(--hf-primary-text)", path: "balance-sheet"  },
+  "trial-balance":   { label: "Trial Balance",  icon: BarChart2,   color: "var(--hf-violet-text)", path: "trial-balance"  },
 }
 
 const now = new Date()
@@ -74,11 +74,11 @@ export default function ReportsTab() {
   return (
     <div>
       {/* Controls */}
-      <div style={{ background: "white", border: "1px solid #E2E8F0", borderRadius: 12,
+      <div style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12,
         padding: 20, marginBottom: 20, display: "flex", gap: 16, alignItems: "flex-end", flexWrap: "wrap" }}>
         {/* Report type picker */}
         <div>
-          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Report</label>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Report</label>
           <div style={{ display: "flex", gap: 6 }}>
             {(Object.keys(REPORT_CONFIG) as ReportType[]).map(k => {
               const c = REPORT_CONFIG[k]
@@ -87,8 +87,8 @@ export default function ReportsTab() {
                 <button key={k} onClick={() => { setReportType(k); setRun(false) }}
                   style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
                     borderRadius: 9, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer",
-                    background: reportType === k ? c.color : "#F1F5F9",
-                    color:      reportType === k ? "white"  : "#64748B" }}>
+                    background: reportType === k ? c.color : "var(--hf-surface-sunken)",
+                    color:      reportType === k ? "white"  : "var(--hf-text-muted)" }}>
                   <I size={13} />{c.label}
                 </button>
               )
@@ -96,11 +96,11 @@ export default function ReportsTab() {
           </div>
         </div>
         <div>
-          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>From</label>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>From</label>
           <input type="date" value={from} onChange={e => { setFrom(e.target.value); setRun(false) }} style={inp} />
         </div>
         <div>
-          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>To</label>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>To</label>
           <input type="date" value={to} onChange={e => { setTo(e.target.value); setRun(false) }} style={inp} />
         </div>
         <button onClick={handleRun}
@@ -110,11 +110,11 @@ export default function ReportsTab() {
         </button>
       </div>
 
-      {isLoading && <div style={{ padding: 60, textAlign: "center", color: "#94A3B8" }}>Generating report...</div>}
-      {isError   && <div style={{ padding: 60, textAlign: "center", color: "#DC2626" }}>Failed to load report — check your date range.</div>}
+      {isLoading && <div style={{ padding: 60, textAlign: "center", color: "var(--hf-text-faint)" }}>Generating report...</div>}
+      {isError   && <div style={{ padding: 60, textAlign: "center", color: "var(--hf-danger-text)" }}>Failed to load report — check your date range.</div>}
 
       {report && !isLoading && (
-        <div style={{ background: "white", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {/* Report header */}
           <div style={{ background: config.color, padding: "20px 28px", display: "flex",
             justifyContent: "space-between", alignItems: "center" }}>
@@ -140,9 +140,9 @@ export default function ReportsTab() {
           {/* Sections */}
           {report.sections.map(section => (
             <div key={section.title}>
-              <div style={{ padding: "14px 28px 8px", background: "#F8FAFC",
-                borderBottom: "1px solid #F1F5F9", borderTop: "1px solid #F1F5F9" }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              <div style={{ padding: "14px 28px 8px", background: "var(--hf-surface-muted)",
+                borderBottom: "1px solid var(--hf-border-subtle)", borderTop: "1px solid var(--hf-border-subtle)" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                   {section.title}
                 </span>
               </div>
@@ -151,39 +151,39 @@ export default function ReportsTab() {
               {reportType === "trial-balance" ? (
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
-                    <tr style={{ background: "#F8FAFC" }}>
-                      <th style={{ textAlign: "left", padding: "8px 28px", fontSize: 11, fontWeight: 700, color: "#94A3B8" }}>Code</th>
-                      <th style={{ textAlign: "left", padding: "8px 0", fontSize: 11, fontWeight: 700, color: "#94A3B8" }}>Account</th>
-                      <th style={{ textAlign: "right", padding: "8px 28px 8px 0", fontSize: 11, fontWeight: 700, color: "#1B3A6B" }}>Debit</th>
-                      <th style={{ textAlign: "right", padding: "8px 28px 8px 0", fontSize: 11, fontWeight: 700, color: "#0D9488" }}>Credit</th>
+                    <tr style={{ background: "var(--hf-surface-muted)" }}>
+                      <th style={{ textAlign: "left", padding: "8px 28px", fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)" }}>Code</th>
+                      <th style={{ textAlign: "left", padding: "8px 0", fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)" }}>Account</th>
+                      <th style={{ textAlign: "right", padding: "8px 28px 8px 0", fontSize: 11, fontWeight: 700, color: "var(--hf-primary-text)" }}>Debit</th>
+                      <th style={{ textAlign: "right", padding: "8px 28px 8px 0", fontSize: 11, fontWeight: 700, color: "var(--hf-accent-text)" }}>Credit</th>
                     </tr>
                   </thead>
                   <tbody>
                     {section.lines.map((line, i) => (
-                      <tr key={i} style={{ borderBottom: "1px solid #F8FAFC", cursor: "pointer" }}
+                      <tr key={i} style={{ borderBottom: "1px solid var(--hf-border-subtle)", cursor: "pointer" }}
                         onClick={() => setDrillCode(line.accountCode)}
-                        onMouseEnter={e => (e.currentTarget.style.background = "#F8FAFC")}
+                        onMouseEnter={e => (e.currentTarget.style.background = "var(--hf-surface-muted)")}
                         onMouseLeave={e => (e.currentTarget.style.background = "white")}>
-                        <td style={{ padding: "10px 28px", fontFamily: "monospace", fontSize: 12, color: "#64748B" }}>{line.accountCode}</td>
-                        <td style={{ padding: "10px 0", fontSize: 13, color: "#374151" }}>{line.accountName}</td>
+                        <td style={{ padding: "10px 28px", fontFamily: "monospace", fontSize: 12, color: "var(--hf-text-muted)" }}>{line.accountCode}</td>
+                        <td style={{ padding: "10px 0", fontSize: 13, color: "var(--hf-text-secondary)" }}>{line.accountName}</td>
                         <td style={{ padding: "10px 28px 10px 0", textAlign: "right", fontSize: 13, fontWeight: 600,
-                          color: (line.grossDebit ?? 0) > 0 ? "#1B3A6B" : "#94A3B8" }}>
+                          color: (line.grossDebit ?? 0) > 0 ? "var(--hf-primary-text)" : "var(--hf-text-faint)" }}>
                           {(line.grossDebit ?? 0) > 0 ? fmtR(line.grossDebit ?? 0) : "—"}
                         </td>
                         <td style={{ padding: "10px 28px 10px 0", textAlign: "right", fontSize: 13, fontWeight: 600,
-                          color: (line.grossCredit ?? 0) > 0 ? "#0D9488" : "#94A3B8" }}>
+                          color: (line.grossCredit ?? 0) > 0 ? "var(--hf-accent-text)" : "var(--hf-text-faint)" }}>
                           {(line.grossCredit ?? 0) > 0 ? fmtR(line.grossCredit ?? 0) : "—"}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr style={{ borderTop: "2px solid #E2E8F0", background: "#F8FAFC" }}>
-                      <td colSpan={2} style={{ padding: "10px 28px", fontWeight: 700, color: "#0F172A" }}>Total</td>
-                      <td style={{ padding: "10px 28px 10px 0", textAlign: "right", fontWeight: 700, color: "#1B3A6B" }}>
+                    <tr style={{ borderTop: "2px solid var(--hf-border)", background: "var(--hf-surface-muted)" }}>
+                      <td colSpan={2} style={{ padding: "10px 28px", fontWeight: 700, color: "var(--hf-text)" }}>Total</td>
+                      <td style={{ padding: "10px 28px 10px 0", textAlign: "right", fontWeight: 700, color: "var(--hf-primary-text)" }}>
                         {fmtR(section.lines.reduce((s, l) => s + (l.grossDebit ?? 0), 0))}
                       </td>
-                      <td style={{ padding: "10px 28px 10px 0", textAlign: "right", fontWeight: 700, color: "#0D9488" }}>
+                      <td style={{ padding: "10px 28px 10px 0", textAlign: "right", fontWeight: 700, color: "var(--hf-accent-text)" }}>
                         {fmtR(section.lines.reduce((s, l) => s + (l.grossCredit ?? 0), 0))}
                       </td>
                     </tr>
@@ -194,16 +194,16 @@ export default function ReportsTab() {
                   {section.lines.map((line, i) => (
                     <div key={i}
                       style={{ display: "flex", justifyContent: "space-between", padding: "10px 28px",
-                        borderBottom: "1px solid #F8FAFC", cursor: "pointer" }}
+                        borderBottom: "1px solid var(--hf-border-subtle)", cursor: "pointer" }}
                       onClick={() => setDrillCode(line.accountCode)}
-                      onMouseEnter={e => (e.currentTarget.style.background = "#F8FAFC")}
+                      onMouseEnter={e => (e.currentTarget.style.background = "var(--hf-surface-muted)")}
                       onMouseLeave={e => (e.currentTarget.style.background = "white")}>
                       <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
-                        <span style={{ fontFamily: "monospace", fontSize: 12, color: "#94A3B8", minWidth: 50 }}>{line.accountCode}</span>
-                        <span style={{ fontSize: 13, color: "#374151" }}>{line.accountName}</span>
+                        <span style={{ fontFamily: "monospace", fontSize: 12, color: "var(--hf-text-faint)", minWidth: 50 }}>{line.accountCode}</span>
+                        <span style={{ fontSize: 13, color: "var(--hf-text-secondary)" }}>{line.accountName}</span>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: line.amount >= 0 ? "#0F172A" : "#DC2626" }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: line.amount >= 0 ? "var(--hf-text)" : "var(--hf-danger-text)" }}>
                           {fmtR(line.amount)}
                         </span>
                         <ChevronRight size={13} color="#CBD5E1" />
@@ -211,8 +211,8 @@ export default function ReportsTab() {
                     </div>
                   ))}
                   <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 28px",
-                    borderTop: "2px solid #E2E8F0", background: "#F8FAFC" }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>Total {section.title}</span>
+                    borderTop: "2px solid var(--hf-border)", background: "var(--hf-surface-muted)" }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)" }}>Total {section.title}</span>
                     <span style={{ fontSize: 15, fontWeight: 800, color: config.color }}>{fmtR(section.total)}</span>
                   </div>
                 </>
@@ -223,10 +223,10 @@ export default function ReportsTab() {
       )}
 
       {!run && !isLoading && (
-        <div style={{ padding: 60, textAlign: "center", color: "#94A3B8", background: "white",
-          border: "1px solid #E2E8F0", borderRadius: 12 }}>
+        <div style={{ padding: 60, textAlign: "center", color: "var(--hf-text-faint)", background: "white",
+          border: "1px solid var(--hf-border)", borderRadius: 12 }}>
           <BarChart2 size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
-          <div style={{ fontWeight: 600, color: "#475569", marginBottom: 4 }}>Select a report and date range</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)", marginBottom: 4 }}>Select a report and date range</div>
           <div style={{ fontSize: 13 }}>Click Run Report to generate your financial statement.</div>
         </div>
       )}
@@ -238,82 +238,82 @@ export default function ReportsTab() {
           <div style={{ background: "white", borderRadius: 16, width: 640, maxHeight: "82vh",
             overflowY: "auto" as const, boxShadow: "0 20px 60px rgba(0,0,0,0.25)" }}
             onClick={e => e.stopPropagation()}>
-            <div style={{ padding: "20px 24px", borderBottom: "1px solid #F1F5F9",
+            <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--hf-border-subtle)",
               display: "flex", justifyContent: "space-between", alignItems: "flex-start", position: "sticky" as const, top: 0, background: "white" }}>
               <div>
-                <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "monospace", marginBottom: 2 }}>{drillCode}</div>
+                <div style={{ fontSize: 11, color: "var(--hf-text-faint)", fontFamily: "monospace", marginBottom: 2 }}>{drillCode}</div>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{drillDown?.accountName ?? "Loading..."}</h3>
                 {report && (
-                  <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>
+                  <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--hf-text-faint)" }}>
                     {new Date(report.fromDate).toLocaleDateString("en-ZA")} – {new Date(report.toDate).toLocaleDateString("en-ZA")}
                   </p>
                 )}
               </div>
               <button onClick={() => setDrillCode(null)}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={18} /></button>
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}><X size={18} /></button>
             </div>
 
             {drillLoading && (
-              <div style={{ padding: 50, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>Loading journal lines...</div>
+              <div style={{ padding: 50, textAlign: "center", color: "var(--hf-text-faint)", fontSize: 13 }}>Loading journal lines...</div>
             )}
             {drillError && (
-              <div style={{ padding: 50, textAlign: "center", color: "#DC2626", fontSize: 13 }}>Failed to load drill-down</div>
+              <div style={{ padding: 50, textAlign: "center", color: "var(--hf-danger-text)", fontSize: 13 }}>Failed to load drill-down</div>
             )}
 
             {drillDown && !drillLoading && (
               <div style={{ padding: "8px 0" }}>
                 {(drillDown.openingBalance ?? 0) !== 0 && (
                   <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 24px",
-                    background: "#F8FAFC", fontSize: 12, color: "#64748B" }}>
+                    background: "var(--hf-surface-muted)", fontSize: 12, color: "var(--hf-text-muted)" }}>
                     <span>Opening balance</span>
                     <span style={{ fontWeight: 600 }}>{fmtR(drillDown.openingBalance)}</span>
                   </div>
                 )}
 
                 {drillDown.lines.length === 0 ? (
-                  <div style={{ padding: 40, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>
+                  <div style={{ padding: 40, textAlign: "center", color: "var(--hf-text-faint)", fontSize: 13 }}>
                     No posted journal lines against this account in this date range —
                     the reported amount comes entirely from the opening balance above.
                   </div>
                 ) : (
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
-                      <tr style={{ background: "#F8FAFC" }}>
+                      <tr style={{ background: "var(--hf-surface-muted)" }}>
                         {["Journal #", "Date", "Description", "Debit", "Credit"].map(h => (
                           <th key={h} style={{ textAlign: h === "Debit" || h === "Credit" ? "right" : "left",
-                            padding: "8px 24px", fontSize: 10, fontWeight: 700, color: "#94A3B8",
+                            padding: "8px 24px", fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)",
                             textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {drillDown.lines.map((l, i) => (
-                        <tr key={l.journalEntryId + i} style={{ borderBottom: "1px solid #F8FAFC" }}>
-                          <td style={{ padding: "10px 24px", fontFamily: "monospace", fontSize: 12, fontWeight: 700, color: "#1B3A6B" }}>
+                        <tr key={l.journalEntryId + i} style={{ borderBottom: "1px solid var(--hf-border-subtle)" }}>
+                          <td style={{ padding: "10px 24px", fontFamily: "monospace", fontSize: 12, fontWeight: 700, color: "var(--hf-primary-text)" }}>
                             {l.entryNumber}
                           </td>
-                          <td style={{ padding: "10px 24px", fontSize: 12, color: "#64748B" }}>{fmtDt(l.entryDate)}</td>
-                          <td style={{ padding: "10px 24px", fontSize: 12, color: "#374151" }}>
+                          <td style={{ padding: "10px 24px", fontSize: 12, color: "var(--hf-text-muted)" }}>{fmtDt(l.entryDate)}</td>
+                          <td style={{ padding: "10px 24px", fontSize: 12, color: "var(--hf-text-secondary)" }}>
                             {l.lineDescription || l.entryDescription}
                           </td>
                           <td style={{ padding: "10px 24px", textAlign: "right", fontSize: 13, fontWeight: 600,
-                            color: l.debitAmount > 0 ? "#1B3A6B" : "#CBD5E1" }}>
+                            color: l.debitAmount > 0 ? "var(--hf-primary-text)" : "var(--hf-text-disabled)" }}>
                             {l.debitAmount > 0 ? fmtR(l.debitAmount) : "—"}
                           </td>
                           <td style={{ padding: "10px 24px", textAlign: "right", fontSize: 13, fontWeight: 600,
-                            color: l.creditAmount > 0 ? "#0D9488" : "#CBD5E1" }}>
+                            color: l.creditAmount > 0 ? "var(--hf-accent-text)" : "var(--hf-text-disabled)" }}>
                             {l.creditAmount > 0 ? fmtR(l.creditAmount) : "—"}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr style={{ borderTop: "2px solid #E2E8F0", background: "#F8FAFC" }}>
-                        <td colSpan={3} style={{ padding: "10px 24px", fontWeight: 700, fontSize: 12, color: "#0F172A" }}>Total</td>
-                        <td style={{ padding: "10px 24px", textAlign: "right", fontWeight: 700, fontSize: 13, color: "#1B3A6B" }}>
+                      <tr style={{ borderTop: "2px solid var(--hf-border)", background: "var(--hf-surface-muted)" }}>
+                        <td colSpan={3} style={{ padding: "10px 24px", fontWeight: 700, fontSize: 12, color: "var(--hf-text)" }}>Total</td>
+                        <td style={{ padding: "10px 24px", textAlign: "right", fontWeight: 700, fontSize: 13, color: "var(--hf-primary-text)" }}>
                           {fmtR(drillDown.totalDebit)}
                         </td>
-                        <td style={{ padding: "10px 24px", textAlign: "right", fontWeight: 700, fontSize: 13, color: "#0D9488" }}>
+                        <td style={{ padding: "10px 24px", textAlign: "right", fontWeight: 700, fontSize: 13, color: "var(--hf-accent-text)" }}>
                           {fmtR(drillDown.totalCredit)}
                         </td>
                       </tr>

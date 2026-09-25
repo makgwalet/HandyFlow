@@ -23,13 +23,13 @@ interface CommissionInvoiceResponse {
 }
 
 const fmtMoney = (n: number) => new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(n ?? 0)
-const inputStyle: React.CSSProperties = { width: "100%", padding: "8px 11px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
+const inputStyle: React.CSSProperties = { width: "100%", padding: "8px 11px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
 
 function badgeColor(status: string) {
-  if (status === "PAID") return { bg: "#DCFCE7", fg: "#166534" }
-  if (status.includes("PARTIAL")) return { bg: "#FEF3C7", fg: "#92400E" }
-  if (status === "OVERDUE") return { bg: "#FEE2E2", fg: "#991B1B" }
-  return { bg: "#F1F5F9", fg: "#64748B" }
+  if (status === "PAID") return { bg: "var(--hf-success-soft-strong)", fg: "var(--hf-success-text-strong)" }
+  if (status.includes("PARTIAL")) return { bg: "var(--hf-warning-soft-strong)", fg: "var(--hf-warning-text-deep)" }
+  if (status === "OVERDUE") return { bg: "var(--hf-danger-soft-strong)", fg: "var(--hf-danger-text-strong)" }
+  return { bg: "var(--hf-surface-sunken)", fg: "var(--hf-text-muted)" }
 }
 
 function RecordPaymentModal({ invoice, onClose }: { invoice: CommissionInvoiceResponse; onClose: () => void }) {
@@ -41,18 +41,18 @@ function RecordPaymentModal({ invoice, onClose }: { invoice: CommissionInvoiceRe
   })
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300 }} onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 26, width: 380 }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 26, width: 380 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0F172A", margin: 0 }}>Record payment — {invoice.invoiceNumber}</h3>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Record payment — {invoice.invoiceNumber}</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={17} color="#94A3B8" /></button>
         </div>
-        <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 12px" }}>Outstanding balance: {fmtMoney(invoice.balance)}. Internal tracking only — does not post a second GL journal.</p>
+        <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "0 0 12px" }}>Outstanding balance: {fmtMoney(invoice.balance)}. Internal tracking only — does not post a second GL journal.</p>
         <input type="number" step="0.01" style={inputStyle} value={amount} onChange={e => setAmount(e.target.value)} />
-        {save.isError && <p style={{ color: "#DC2626", fontSize: 12, marginTop: 10 }}>{(save.error as any)?.response?.data?.message ?? "Could not record this payment"}</p>}
+        {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 10 }}>{(save.error as any)?.response?.data?.message ?? "Could not record this payment"}</p>}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
-          <button onClick={onClose} style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#fff", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+          <button onClick={onClose} style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", fontSize: 13, cursor: "pointer" }}>Cancel</button>
           <button onClick={() => save.mutate()} disabled={!amount || save.isPending}
-            style={{ padding: "9px 18px", borderRadius: 8, border: "none", background: CA_ACCENT, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            style={{ padding: "9px 18px", borderRadius: 8, border: "none", background: CA_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
             {save.isPending ? "Recording…" : "Record payment"}
           </button>
         </div>
@@ -71,33 +71,33 @@ export default function CollAgencyCommissionInvoicesTab({ clientId }: { clientId
 
   return (
     <div>
-      <p style={{ fontSize: 12, color: "#94A3B8", marginBottom: 14 }}>
+      <p style={{ fontSize: 12, color: "var(--hf-text-faint)", marginBottom: 14 }}>
         Commission invoices are created automatically when a remittance is processed (Trust Ledger tab) — there's no manual create here.
       </p>
       {isLoading ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p>
       ) : invoices.length === 0 ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>No commission invoices yet.</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No commission invoices yet.</p>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {invoices.map((inv, i) => {
             const colors = badgeColor(inv.status)
             return (
-              <div key={inv.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9" }}>
+              <div key={inv.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", margin: 0 }}>{inv.invoiceNumber}</p>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{inv.invoiceNumber}</p>
                     <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: colors.bg, color: colors.fg }}>{inv.status}</span>
                   </div>
-                  <p style={{ fontSize: 12, color: "#94A3B8", margin: 0 }}>{inv.description ?? `Invoiced ${inv.invoiceDate}`} · Due {inv.dueDate}</p>
+                  <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: 0 }}>{inv.description ?? `Invoiced ${inv.invoiceDate}`} · Due {inv.dueDate}</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                   <div style={{ textAlign: "right" }}>
-                    <p style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A", margin: "0 0 2px" }}>{fmtMoney(inv.total)}</p>
-                    {inv.balance > 0 && <p style={{ fontSize: 11.5, color: "#DC2626", margin: 0 }}>{fmtMoney(inv.balance)} outstanding</p>}
+                    <p style={{ fontSize: 13.5, fontWeight: 700, color: "var(--hf-text)", margin: "0 0 2px" }}>{fmtMoney(inv.total)}</p>
+                    {inv.balance > 0 && <p style={{ fontSize: 11.5, color: "var(--hf-danger-text)", margin: 0 }}>{fmtMoney(inv.balance)} outstanding</p>}
                   </div>
                   {inv.balance > 0 && (
-                    <button onClick={() => setSelected(inv)} style={{ background: "none", border: "1px solid #E2E8F0", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: CA_ACCENT, cursor: "pointer" }}>
+                    <button onClick={() => setSelected(inv)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: CA_ACCENT, cursor: "pointer" }}>
                       Record payment
                     </button>
                   )}

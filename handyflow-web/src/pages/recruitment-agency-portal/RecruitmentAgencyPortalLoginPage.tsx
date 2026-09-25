@@ -35,7 +35,7 @@ export function RecruitmentAgencyPortalLoginPage() {
             background: `linear-gradient(135deg, ${color.navy}, ${color.navyDark})`,
             display: "flex", alignItems: "center", justifyContent: "center",
             margin: `0 auto ${space(4)}`, boxShadow: "0 4px 12px rgba(27, 58, 107, 0.25)" }}>
-            <span style={{ color: "#fff", fontWeight: 800, fontSize: 20 }}>H</span>
+            <span style={{ color: "var(--hf-text-on-solid)", fontWeight: 800, fontSize: 20 }}>H</span>
           </div>
           <h1 style={{ fontSize: 20, fontWeight: 800, color: color.ink, margin: 0, letterSpacing: "-0.02em" }}>Recruitment Portal</h1>
           <p style={{ fontSize: 13.5, color: color.muted, margin: `${space(1.5)} 0 0`, lineHeight: 1.5 }}>Sign in to view your requisitions and candidates</p>
@@ -51,9 +51,9 @@ export function RecruitmentAgencyPortalLoginPage() {
             <input type="password" required value={password} onChange={e => setPassword(e.target.value)}
               style={inputStyle} onFocus={e => (e.currentTarget.style.borderColor = color.navy)} onBlur={e => (e.currentTarget.style.borderColor = color.border)} />
           </div>
-          {error && <div style={{ marginBottom: space(4), padding: `${space(2.5)} ${space(3.5)}`, background: color.redBg, border: "1px solid #FECACA", borderRadius: radius.sm, fontSize: 13, color: color.red, lineHeight: 1.4 }}>{error}</div>}
+          {error && <div style={{ marginBottom: space(4), padding: `${space(2.5)} ${space(3.5)}`, background: color.redBg, border: "1px solid var(--hf-danger-border)", borderRadius: radius.sm, fontSize: 13, color: color.red, lineHeight: 1.4 }}>{error}</div>}
           <button type="submit" disabled={loading} style={{ width: "100%", padding: `${space(3)} 0`, background: loading ? color.navyDark : color.navy,
-            color: "#fff", border: "none", borderRadius: radius.sm, fontSize: 14, fontWeight: 700, cursor: loading ? "default" : "pointer", letterSpacing: "0.01em" }}>
+            color: "var(--hf-text-on-solid)", border: "none", borderRadius: radius.sm, fontSize: 14, fontWeight: 700, cursor: loading ? "default" : "pointer", letterSpacing: "0.01em" }}>
             {loading ? "Signing in…" : "Sign In"}
           </button>
         </form>

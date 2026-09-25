@@ -65,7 +65,7 @@ export function PortalLoginPage() {
               boxShadow: "0 4px 12px rgba(27, 58, 107, 0.25)",
             }}
           >
-            <span style={{ color: "#fff", fontWeight: 800, fontSize: 20 }}>H</span>
+            <span style={{ color: "var(--hf-text-on-solid)", fontWeight: 800, fontSize: 20 }}>H</span>
           </div>
           <h1 style={{ fontSize: 20, fontWeight: 800, color: color.ink, margin: 0, letterSpacing: "-0.02em" }}>
             Client Portal
@@ -130,7 +130,7 @@ export function PortalLoginPage() {
                 marginBottom: space(4),
                 padding: `${space(2.5)} ${space(3.5)}`,
                 background: color.redBg,
-                border: `1px solid #FECACA`,
+                border: `1px solid var(--hf-danger-border)`,
                 borderRadius: radius.sm,
                 fontSize: 13,
                 color: color.red,
@@ -148,7 +148,7 @@ export function PortalLoginPage() {
               width: "100%",
               padding: `${space(3)} 0`,
               background: loading ? color.navyDark : color.navy,
-              color: "#fff",
+              color: "var(--hf-text-on-solid)",
               border: "none",
               borderRadius: radius.sm,
               fontSize: 14,

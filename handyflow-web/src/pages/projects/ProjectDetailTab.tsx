@@ -33,9 +33,9 @@ type TabKey = 'overview'|'gantt'|'tasks'|'resources'|'budget'|'risks'|'documents
 const ACCENT = '#1B3A6B'
 const HEALTH_DOT: Record<string,string> = { GREEN:'#16A34A', AMBER:'#D97706', RED:'#DC2626' }
 const STATUS_BADGE: Record<string,{bg:string;color:string}> = {
-  PLANNING:{bg:'#F1F5F9',color:'#475569'}, ACTIVE:{bg:'#DBEAFE',color:'#1D4ED8'},
-  ON_HOLD:{bg:'#FEF3C7',color:'#92400E'}, COMPLETED:{bg:'#DCFCE7',color:'#166534'},
-  CANCELLED:{bg:'#FEE2E2',color:'#DC2626'},
+  PLANNING:{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)'}, ACTIVE:{bg:'var(--hf-info-soft-strong)',color:'var(--hf-info-text)'},
+  ON_HOLD:{bg:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)'}, COMPLETED:{bg:'var(--hf-success-soft-strong)',color:'var(--hf-success-text-strong)'},
+  CANCELLED:{bg:'var(--hf-danger-soft-strong)',color:'var(--hf-danger-text)'},
 }
 
 const TABS: { key:TabKey; label:string }[] = [
@@ -74,8 +74,8 @@ export function ProjectDetailTab({ projectId, onBack }: { projectId:string; onBa
     onSuccess: () => qc.invalidateQueries({ queryKey:['pm-project', projectId] }),
   })
 
-  if (isLoading) return <div style={{padding:'40px 0',textAlign:'center',color:'#94A3B8',fontSize:13}}>Loading project…</div>
-  if (!project)  return <div style={{padding:'40px 0',textAlign:'center',color:'#DC2626', fontSize:13}}>Project not found</div>
+  if (isLoading) return <div style={{padding:'40px 0',textAlign:'center',color:'var(--hf-text-faint)',fontSize:13}}>Loading project…</div>
+  if (!project)  return <div style={{padding:'40px 0',textAlign:'center',color:'var(--hf-danger-text)', fontSize:13}}>Project not found</div>
 
   const st   = STATUS_BADGE[project.status] ?? STATUS_BADGE.PLANNING
   const hDot = HEALTH_DOT[project.health]   ?? '#16A34A'
@@ -85,21 +85,21 @@ export function ProjectDetailTab({ projectId, onBack }: { projectId:string; onBa
       {/* Header */}
       <div style={{marginBottom:20}}>
         <button onClick={onBack}
-          style={{display:'flex',alignItems:'center',gap:4,background:'none',border:'none',cursor:'pointer',color:'#64748B',fontSize:13,marginBottom:12,padding:0}}>
+          style={{display:'flex',alignItems:'center',gap:4,background:'none',border:'none',cursor:'pointer',color:'var(--hf-text-muted)',fontSize:13,marginBottom:12,padding:0}}>
           <ChevronLeft size={15}/> All Projects
         </button>
         <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:16}}>
           <div style={{flex:1}}>
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-              <span style={{fontSize:11,color:'#94A3B8',fontWeight:500}}>{project.projectNumber}</span>
+              <span style={{fontSize:11,color:'var(--hf-text-faint)',fontWeight:500}}>{project.projectNumber}</span>
               <span style={{background:st.bg,color:st.color,fontSize:11,fontWeight:700,padding:'2px 9px',borderRadius:20}}>{project.status.replace('_',' ')}</span>
               <span style={{display:'flex',alignItems:'center',gap:4}}>
                 <span style={{width:7,height:7,borderRadius:'50%',background:hDot,display:'inline-block'}}/>
                 <span style={{fontSize:11,fontWeight:700,color:hDot}}>{project.health}</span>
               </span>
             </div>
-            <h2 style={{fontSize:20,fontWeight:800,color:'#0F172A',margin:'0 0 4px'}}>{project.name}</h2>
-            <div style={{fontSize:13,color:'#64748B'}}>
+            <h2 style={{fontSize:20,fontWeight:800,color:'var(--hf-text)',margin:'0 0 4px'}}>{project.name}</h2>
+            <div style={{fontSize:13,color:'var(--hf-text-muted)'}}>
               {project.clientName        && <span>{project.clientName} · </span>}
               {project.projectManagerName && <span>PM: {project.projectManagerName}</span>}
               {project.siteAddress        && <span> · {project.siteAddress}</span>}
@@ -114,7 +114,7 @@ export function ProjectDetailTab({ projectId, onBack }: { projectId:string; onBa
             )}
             {project.clientPortalToken && (
               <button onClick={()=>window.open(`/projects/portal/${project.clientPortalToken}`,'_blank')}
-                style={{display:'flex',alignItems:'center',gap:5,padding:'6px 12px',background:'#F8FAFC',border:'1px solid #E2E8F0',borderRadius:8,fontSize:12,cursor:'pointer',color:'#64748B'}}>
+                style={{display:'flex',alignItems:'center',gap:5,padding:'6px 12px',background:'var(--hf-surface-muted)',border:'1px solid var(--hf-border)',borderRadius:8,fontSize:12,cursor:'pointer',color:'var(--hf-text-muted)'}}>
                 <ExternalLink size={13}/> Client Portal
               </button>
             )}
@@ -123,20 +123,20 @@ export function ProjectDetailTab({ projectId, onBack }: { projectId:string; onBa
       </div>
 
       {/* Tab bar */}
-      <div style={{display:'flex',gap:2,borderBottom:'1px solid #E2E8F0',marginBottom:16,overflowX:'auto'}}>
+      <div style={{display:'flex',gap:2,borderBottom:'1px solid var(--hf-border)',marginBottom:16,overflowX:'auto'}}>
         {TABS.map(t=>(
           <button key={t.key} onClick={()=>setTab(t.key)}
             style={{
               padding:'8px 14px',background:'none',border:'none',cursor:'pointer',
               fontSize:13,whiteSpace:'nowrap',
               fontWeight:   tab===t.key ? 600 : 400,
-              color:        tab===t.key ? ACCENT : '#64748B',
+              color:        tab===t.key ? ACCENT : 'var(--hf-text-muted)',
               borderBottom: tab===t.key ? `2px solid ${ACCENT}` : '2px solid transparent',
               marginBottom:-1,
             }}>
             {t.label}
             {t.key==='risks' && project.openRiskCount > 0 && (
-              <span style={{marginLeft:5,background:'#FEF2F2',color:'#DC2626',fontSize:10,fontWeight:700,padding:'1px 5px',borderRadius:10}}>
+              <span style={{marginLeft:5,background:'var(--hf-danger-soft)',color:'var(--hf-danger-text)',fontSize:10,fontWeight:700,padding:'1px 5px',borderRadius:10}}>
                 {project.openRiskCount}
               </span>
             )}
@@ -149,13 +149,13 @@ export function ProjectDetailTab({ projectId, onBack }: { projectId:string; onBa
         <div style={{display:'flex',justifyContent:'flex-end',marginBottom:12}}>
           {tab==='risks' && (
             <button onClick={()=>downloadPdf(`/api/v1/projects/${project.id}/export/risk-register`, `risk-register-${project.projectNumber}.pdf`)}
-              style={{display:'flex',alignItems:'center',gap:5,padding:'6px 12px',background:'#F8FAFC',border:'1px solid #E2E8F0',borderRadius:8,fontSize:12,cursor:'pointer',color:'#64748B'}}>
+              style={{display:'flex',alignItems:'center',gap:5,padding:'6px 12px',background:'var(--hf-surface-muted)',border:'1px solid var(--hf-border)',borderRadius:8,fontSize:12,cursor:'pointer',color:'var(--hf-text-muted)'}}>
               <Download size={12}/> Export PDF (OHSA)
             </button>
           )}
           {tab==='field' && (
             <button onClick={()=>downloadPdf(`/api/v1/projects/${project.id}/export/snag-list`, `snag-list-${project.projectNumber}.pdf`)}
-              style={{display:'flex',alignItems:'center',gap:5,padding:'6px 12px',background:'#F8FAFC',border:'1px solid #E2E8F0',borderRadius:8,fontSize:12,cursor:'pointer',color:'#64748B'}}>
+              style={{display:'flex',alignItems:'center',gap:5,padding:'6px 12px',background:'var(--hf-surface-muted)',border:'1px solid var(--hf-border)',borderRadius:8,fontSize:12,cursor:'pointer',color:'var(--hf-text-muted)'}}>
               <Download size={12}/> Export Snag List PDF
             </button>
           )}

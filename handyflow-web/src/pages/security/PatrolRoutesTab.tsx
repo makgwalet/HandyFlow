@@ -162,8 +162,8 @@ export default function PatrolRoutesTab() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0F172A" }}>Patrol Routes</h2>
-          <div style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>Route configuration and live round-by-round monitoring</div>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "var(--hf-text)" }}>Patrol Routes</h2>
+          <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginTop: 2 }}>Route configuration and live round-by-round monitoring</div>
         </div>
         <div style={{ minWidth: 220 }}>
           <select value={siteId} onChange={e => { setSiteId(e.target.value); setShiftId("") }} style={inp}>
@@ -174,62 +174,62 @@ export default function PatrolRoutesTab() {
       </div>
 
       {!siteId ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>
           <Route size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
           <div>Select a site to configure patrol routes or monitor live rounds.</div>
         </div>
       ) : (
         <>
-          <div style={{ display: "flex", gap: 6, marginBottom: 16, borderBottom: "1px solid #E2E8F0" }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 16, borderBottom: "1px solid var(--hf-border)" }}>
             {SUB_TABS.map(t => {
               const Icon = t.icon; const active = subTab === t.id
               return (
                 <button key={t.id} onClick={() => setSubTab(t.id)}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 14px", background: "none", border: "none", borderBottom: active ? "2px solid #1B3A6B" : "2px solid transparent", color: active ? "#1B3A6B" : "#64748B", fontWeight: active ? 700 : 500, fontSize: 13, cursor: "pointer" }}>
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 14px", background: "none", border: "none", borderBottom: active ? "2px solid var(--hf-primary)" : "2px solid transparent", color: active ? "var(--hf-primary-text)" : "var(--hf-text-muted)", fontWeight: active ? 700 : 500, fontSize: 13, cursor: "pointer" }}>
                   <Icon size={14} /> {t.label}
                 </button>
               )
             })}
           </div>
 
-          {error && <div style={{ padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#DC2626", fontSize: 13, marginBottom: 14 }}>{error}</div>}
+          {error && <div style={{ padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, color: "var(--hf-danger-text)", fontSize: 13, marginBottom: 14 }}>{error}</div>}
 
           {/* ── Routes ── */}
           {subTab === "routes" && (
             <div>
               <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-                <button onClick={() => { setShowRouteForm(true); setError("") }} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                <button onClick={() => { setShowRouteForm(true); setError("") }} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                   <Plus size={14} /> New Route
                 </button>
               </div>
               {routesLoading ? (
-                <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>Loading…</div>
+                <div style={{ textAlign: "center", padding: 30, color: "var(--hf-text-faint)" }}>Loading…</div>
               ) : routes.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+                <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>
                   No patrol routes configured for this site yet.
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {routes.map(r => (
-                    <div key={r.id} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10, padding: "14px 16px" }}>
+                    <div key={r.id} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "14px 16px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                         <div>
-                          <div style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{r.name}</div>
-                          <div style={{ fontSize: 12, color: "#94A3B8" }}>Every {r.intervalMinutes} min, ±{r.toleranceMinutes} min tolerance</div>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{r.name}</div>
+                          <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Every {r.intervalMinutes} min, ±{r.toleranceMinutes} min tolerance</div>
                         </div>
                         <button onClick={() => { setAddCheckpointFor(r); setCheckpointForm({ checkpointId: "", sequence: r.checkpoints.length }); setError("") }}
-                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid #1B3A6B", background: "#EFF6FF", color: "#1B3A6B", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid var(--hf-primary)", background: "var(--hf-info-soft)", color: "var(--hf-primary-text)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                           <Plus size={12} /> Add Checkpoint
                         </button>
                       </div>
                       {r.checkpoints.length === 0 ? (
-                        <div style={{ fontSize: 12, color: "#CBD5E1" }}>No checkpoints added yet — this route has nothing to patrol.</div>
+                        <div style={{ fontSize: 12, color: "var(--hf-text-disabled)" }}>No checkpoints added yet — this route has nothing to patrol.</div>
                       ) : (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                           {[...r.checkpoints].sort((a, b) => a.sequence - b.sequence).map(cp => (
-                            <div key={cp.id} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 20, fontSize: 12 }}>
-                              <span style={{ fontWeight: 700, color: "#1B3A6B" }}>{cp.sequence + 1}.</span>
-                              <MapPin size={11} style={{ color: "#94A3B8" }} />
+                            <div key={cp.id} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 20, fontSize: 12 }}>
+                              <span style={{ fontWeight: 700, color: "var(--hf-primary-text)" }}>{cp.sequence + 1}.</span>
+                              <MapPin size={11} style={{ color: "var(--hf-text-faint)" }} />
                               {checkpointName(cp.checkpointId)}
                             </div>
                           ))}
@@ -254,18 +254,18 @@ export default function PatrolRoutesTab() {
                   ))}
                 </select>
                 {activeShiftsAtSite.length === 0 && (
-                  <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 6 }}>No active shifts at this site right now.</div>
+                  <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 6 }}>No active shifts at this site right now.</div>
                 )}
               </div>
 
               {!shiftId ? (
-                <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+                <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>
                   Select an active shift to see its round-by-round patrol status.
                 </div>
               ) : roundsLoading ? (
-                <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>Loading…</div>
+                <div style={{ textAlign: "center", padding: 30, color: "var(--hf-text-faint)" }}>Loading…</div>
               ) : rounds.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+                <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>
                   No rounds generated for this shift yet.
                 </div>
               ) : (
@@ -274,29 +274,29 @@ export default function PatrolRoutesTab() {
                     const cfg = ROUND_STATUS_CFG[r.status] ?? ROUND_STATUS_CFG.EXPECTED
                     const Icon = cfg.icon
                     return (
-                      <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", border: `1px solid ${r.offSchedule ? "#FECACA" : "#E2E8F0"}`, borderRadius: 10, padding: "12px 16px" }}>
+                      <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--hf-surface)", border: `1px solid ${r.offSchedule ? "#FECACA" : "#E2E8F0"}`, borderRadius: 10, padding: "12px 16px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                           <div style={{ width: 36, height: 36, borderRadius: 9, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                             <Icon size={16} color={cfg.color} />
                           </div>
                           <div>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>Round {r.roundNumber}</span>
+                              <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>Round {r.roundNumber}</span>
                               {r.offSchedule && (
-                                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "#FEF2F2", color: "#DC2626" }}>OFF SCHEDULE</span>
+                                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)" }}>OFF SCHEDULE</span>
                               )}
                             </div>
-                            <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                            <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>
                               Expected {fmtTime(r.expectedStartAt)}–{fmtTime(r.expectedEndAt)}
                               {r.startedAt && <> · Started {fmtTime(r.startedAt)}</>}
                               {r.completedAt && <> · Completed {fmtTime(r.completedAt)}</>}
                             </div>
-                            {r.offScheduleReason && <div style={{ fontSize: 11, color: "#C2410C", marginTop: 2 }}>{r.offScheduleReason}</div>}
-                            {r.acknowledgementNote && <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>Acknowledged: {r.acknowledgementNote}</div>}
+                            {r.offScheduleReason && <div style={{ fontSize: 11, color: "var(--hf-orange-text-strong)", marginTop: 2 }}>{r.offScheduleReason}</div>}
+                            {r.acknowledgementNote && <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>Acknowledged: {r.acknowledgementNote}</div>}
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <span style={{ fontSize: 12, color: "#64748B" }}>{r.scansCompleted}/{r.scansExpected} scanned</span>
+                          <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{r.scansCompleted}/{r.scansExpected} scanned</span>
                           <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}>{cfg.label}</span>
                         </div>
                       </div>
@@ -312,8 +312,8 @@ export default function PatrolRoutesTab() {
       {/* New Route modal */}
       {showRouteForm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: 26, width: 420 }}>
-            <h3 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>New Patrol Route</h3>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 26, width: 420 }}>
+            <h3 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>New Patrol Route</h3>
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Name *</label>
               <input value={routeForm.name} onChange={e => setRouteForm(f => ({ ...f, name: e.target.value }))} placeholder="Perimeter Round" style={inp} />
@@ -341,8 +341,8 @@ export default function PatrolRoutesTab() {
       {/* Add Checkpoint modal */}
       {addCheckpointFor && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: 26, width: 420 }}>
-            <h3 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Add Checkpoint — {addCheckpointFor.name}</h3>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 26, width: 420 }}>
+            <h3 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Add Checkpoint — {addCheckpointFor.name}</h3>
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Checkpoint *</label>
               <select value={checkpointForm.checkpointId} onChange={e => setCheckpointForm(f => ({ ...f, checkpointId: e.target.value }))} style={inp}>
@@ -350,7 +350,7 @@ export default function PatrolRoutesTab() {
                 {(siteDetail?.checkpoints ?? []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               {(siteDetail?.checkpoints ?? []).length === 0 && (
-                <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 6 }}>This site has no checkpoints registered yet — add one from the Sites tab first.</div>
+                <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 6 }}>This site has no checkpoints registered yet — add one from the Sites tab first.</div>
               )}
             </div>
             <div style={{ marginBottom: 18 }}>

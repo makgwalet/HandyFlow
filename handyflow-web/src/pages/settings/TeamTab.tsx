@@ -25,13 +25,13 @@ interface Invitation {
 }
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  ACTIVE:   { bg: '#DCFCE7', color: '#166534', label: 'Active'      },
-  INACTIVE: { bg: '#F1F5F9', color: '#64748B', label: 'Inactive'    },
-  LOCKED:   { bg: '#FEF2F2', color: '#DC2626', label: 'Locked'      },
-  PENDING:  { bg: '#FEF3C7', color: '#92400E', label: 'Pending'     },
-  ACCEPTED: { bg: '#DCFCE7', color: '#166534', label: 'Accepted'    },
-  EXPIRED:  { bg: '#F1F5F9', color: '#64748B', label: 'Expired'     },
-  CANCELLED:{ bg: '#FEF2F2', color: '#DC2626', label: 'Cancelled'   },
+  ACTIVE:   { bg: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', label: 'Active'      },
+  INACTIVE: { bg: 'var(--hf-surface-sunken)', color: 'var(--hf-text-muted)', label: 'Inactive'    },
+  LOCKED:   { bg: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', label: 'Locked'      },
+  PENDING:  { bg: 'var(--hf-warning-soft-strong)', color: 'var(--hf-warning-text-deep)', label: 'Pending'     },
+  ACCEPTED: { bg: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', label: 'Accepted'    },
+  EXPIRED:  { bg: 'var(--hf-surface-sunken)', color: 'var(--hf-text-muted)', label: 'Expired'     },
+  CANCELLED:{ bg: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', label: 'Cancelled'   },
 }
 
 const PERMISSION_GROUPS: Record<string, string[]> = {
@@ -179,14 +179,14 @@ export default function TeamTab() {
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
 
       {/* Sub-nav */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid #E2E8F0', marginBottom: 24 }}>
+      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--hf-border)', marginBottom: 24 }}>
         {[
           { id: 'users' as const,   label: `Team (${users.length})` },
           { id: 'roles' as const,   label: `Roles (${roles.length})` },
           { id: 'invites' as const, label: `Invitations${pendingInvites > 0 ? ` (${pendingInvites} pending)` : ''}` },
         ].map(t => (
           <button key={t.id} onClick={() => setActiveView(t.id)}
-            style={{ padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: activeView === t.id ? 600 : 400, color: activeView === t.id ? '#0D9488' : '#64748B', borderBottom: activeView === t.id ? '2px solid #0D9488' : '2px solid transparent', marginBottom: -1 }}>
+            style={{ padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: activeView === t.id ? 600 : 400, color: activeView === t.id ? 'var(--hf-accent-text)' : 'var(--hf-text-muted)', borderBottom: activeView === t.id ? '2px solid var(--hf-accent)' : '2px solid transparent', marginBottom: -1 }}>
             {t.label}
           </button>
         ))}
@@ -197,20 +197,20 @@ export default function TeamTab() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
             <button onClick={() => { setShowInvite(true); setError('') }}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#1B3A6B', color: 'white', border: 'none', borderRadius: 9, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 9, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
               <Plus size={15} /> Invite user
             </button>
           </div>
 
           {loadingUsers ? (
-            <div style={{ textAlign: 'center', padding: 48, color: '#94A3B8' }}>Loading team...</div>
+            <div style={{ textAlign: 'center', padding: 48, color: 'var(--hf-text-faint)' }}>Loading team...</div>
           ) : (
-            <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 14, overflow: 'hidden' }}>
+            <div style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
+                  <tr style={{ background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border-subtle)' }}>
                     {['Team member', 'Role', 'Department', 'Status', ''].map(h => (
-                      <th key={h} style={{ textAlign: 'left', padding: '10px 16px', fontSize: 11, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                      <th key={h} style={{ textAlign: 'left', padding: '10px 16px', fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -218,26 +218,26 @@ export default function TeamTab() {
                   {users.map(u => {
                     const ss = STATUS_STYLE[u.status] || STATUS_STYLE.ACTIVE
                     return (
-                      <tr key={u.id} style={{ borderBottom: '1px solid #F8FAFC' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = '#F8FAFC')}
+                      <tr key={u.id} style={{ borderBottom: '1px solid var(--hf-border-subtle)' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--hf-surface-muted)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
                         <td style={{ padding: '14px 16px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#1D4ED8', flexShrink: 0 }}>
+                            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--hf-info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--hf-info-text)', flexShrink: 0 }}>
                               {initials(u)}
                             </div>
                             <div>
-                              <div style={{ fontWeight: 700, fontSize: 14, color: '#0F172A' }}>{u.firstName} {u.lastName}</div>
-                              <div style={{ fontSize: 12, color: '#64748B' }}>{u.email}</div>
+                              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)' }}>{u.firstName} {u.lastName}</div>
+                              <div style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>{u.email}</div>
                             </div>
                           </div>
                         </td>
-                        <td style={{ padding: '14px 16px', fontSize: 13, color: '#374151' }}>
+                        <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--hf-text-secondary)' }}>
                           {u.roles.map(r => (
-                            <span key={r} style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600, marginRight: 4 }}>{r}</span>
+                            <span key={r} style={{ background: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600, marginRight: 4 }}>{r}</span>
                           ))}
                         </td>
-                        <td style={{ padding: '14px 16px', fontSize: 13, color: '#64748B' }}>
+                        <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--hf-text-muted)' }}>
                           {u.department || u.jobTitle || '—'}
                         </td>
                         <td style={{ padding: '14px 16px' }}>
@@ -250,7 +250,7 @@ export default function TeamTab() {
                               setEditForm({ firstName: u.firstName, lastName: u.lastName, jobTitle: u.jobTitle ?? '', department: u.department ?? '', roleId: '' })
                               setError('')
                             }}
-                              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 7, fontSize: 12, color: '#1D4ED8', cursor: 'pointer' }}>
+                              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: 'var(--hf-info-soft)', border: '1px solid var(--hf-info-border)', borderRadius: 7, fontSize: 12, color: 'var(--hf-info-text)', cursor: 'pointer' }}>
                               <Pencil size={12} /> Edit
                             </button>
                             {u.status === 'ACTIVE' ? (
@@ -260,12 +260,12 @@ export default function TeamTab() {
                                 confirmLabel: 'Deactivate',
                                 onConfirm: () => deactivateMutation.mutate(u.id),
                               }) }}
-                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, fontSize: 12, color: '#DC2626', cursor: 'pointer' }}>
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 7, fontSize: 12, color: 'var(--hf-danger-text)', cursor: 'pointer' }}>
                                 <UserX size={12} /> Deactivate
                               </button>
                             ) : (
                               <button onClick={() => reactivateMutation.mutate(u.id)}
-                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 7, fontSize: 12, color: '#166534', cursor: 'pointer' }}>
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: 'var(--hf-success-soft)', border: '1px solid var(--hf-success-border-subtle)', borderRadius: 7, fontSize: 12, color: 'var(--hf-success-text-strong)', cursor: 'pointer' }}>
                                 <UserCheck size={12} /> Reactivate
                               </button>
                             )}
@@ -286,7 +286,7 @@ export default function TeamTab() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
             <button onClick={() => { setShowRole(true); setSelectedPerms(new Set()); setError('') }}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#1B3A6B', color: 'white', border: 'none', borderRadius: 9, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 9, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
               <Plus size={15} /> Create role
             </button>
           </div>
@@ -296,19 +296,19 @@ export default function TeamTab() {
               const isExpanded = expandedRole === role.id
               const isAdmin = role.name === 'ADMIN'
               return (
-                <div key={role.id} style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 12, overflow: 'hidden' }}>
+                <div key={role.id} style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 12, overflow: 'hidden' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', cursor: 'pointer' }}
                     onClick={() => setExpandedRole(isExpanded ? null : role.id)}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 9, background: isAdmin ? '#EFF6FF' : '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 9, background: isAdmin ? 'var(--hf-info-soft)' : 'var(--hf-success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <Shield size={16} color={isAdmin ? '#1D4ED8' : '#0D9488'} />
                       </div>
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: 14, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)', display: 'flex', alignItems: 'center', gap: 8 }}>
                           {role.name}
-                          {isAdmin && <span style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>System</span>}
+                          {isAdmin && <span style={{ background: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>System</span>}
                         </div>
-                        <div style={{ fontSize: 12, color: '#64748B' }}>
+                        <div style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>
                           {/* FIX: role.permissions is typed (and actually serialized) as string[]
                               — plain arrays have no .size in JS/TS, only .length. `.size` was
                               always undefined here, silently falling through to .length on every
@@ -320,7 +320,7 @@ export default function TeamTab() {
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                       {!isAdmin && (
                         <button onClick={e => { e.stopPropagation(); openEditRole(role) }}
-                          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 7, fontSize: 12, color: '#1D4ED8', cursor: 'pointer' }}>
+                          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: 'var(--hf-info-soft)', border: '1px solid var(--hf-info-border)', borderRadius: 7, fontSize: 12, color: 'var(--hf-info-text)', cursor: 'pointer' }}>
                           <Pencil size={12} /> Edit permissions
                         </button>
                       )}
@@ -328,11 +328,11 @@ export default function TeamTab() {
                     </div>
                   </div>
                   {isExpanded && (
-                    <div style={{ borderTop: '1px solid #F1F5F9', padding: '14px 20px', background: '#F8FAFC' }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.06em', marginBottom: 10 }}>PERMISSIONS</div>
+                    <div style={{ borderTop: '1px solid var(--hf-border-subtle)', padding: '14px 20px', background: 'var(--hf-surface-muted)' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', letterSpacing: '0.06em', marginBottom: 10 }}>PERMISSIONS</div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         {[...(role.permissions as unknown as string[])].sort().map(pname => (
-                          <span key={pname} style={{ background: 'white', border: '1px solid #E2E8F0', padding: '3px 10px', borderRadius: 20, fontSize: 11, color: '#374151' }}>{pname}</span>
+                          <span key={pname} style={{ background: 'white', border: '1px solid var(--hf-border)', padding: '3px 10px', borderRadius: 20, fontSize: 11, color: 'var(--hf-text-secondary)' }}>{pname}</span>
                         ))}
                       </div>
                     </div>
@@ -348,18 +348,18 @@ export default function TeamTab() {
       {activeView === 'invites' && (
         <div>
           {invitations.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '48px 20px', color: '#94A3B8' }}>
+            <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--hf-text-faint)' }}>
               <Mail size={32} style={{ marginBottom: 12, opacity: 0.3 }} />
-              <div style={{ fontWeight: 600, color: '#475569' }}>No invitations sent yet</div>
+              <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No invitations sent yet</div>
               <div style={{ fontSize: 13, marginTop: 4 }}>Invite your team members from the Team tab.</div>
             </div>
           ) : (
-            <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 14, overflow: 'hidden' }}>
+            <div style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
+                  <tr style={{ background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border-subtle)' }}>
                     {['Invited person', 'Role', 'Sent', 'Expires', 'Status', ''].map(h => (
-                      <th key={h} style={{ textAlign: 'left', padding: '10px 16px', fontSize: 11, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                      <th key={h} style={{ textAlign: 'left', padding: '10px 16px', fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -367,16 +367,16 @@ export default function TeamTab() {
                   {invitations.map(inv => {
                     const ss = STATUS_STYLE[inv.status] || STATUS_STYLE.PENDING
                     return (
-                      <tr key={inv.id} style={{ borderBottom: '1px solid #F8FAFC' }}>
+                      <tr key={inv.id} style={{ borderBottom: '1px solid var(--hf-border-subtle)' }}>
                         <td style={{ padding: '14px 16px' }}>
-                          <div style={{ fontWeight: 600, fontSize: 14, color: '#0F172A' }}>{inv.firstName} {inv.lastName}</div>
-                          <div style={{ fontSize: 12, color: '#64748B' }}>{inv.email}</div>
+                          <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--hf-text)' }}>{inv.firstName} {inv.lastName}</div>
+                          <div style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>{inv.email}</div>
                         </td>
                         <td style={{ padding: '14px 16px', fontSize: 13 }}>
-                          <span style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{inv.roleName}</span>
+                          <span style={{ background: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{inv.roleName}</span>
                         </td>
-                        <td style={{ padding: '14px 16px', fontSize: 13, color: '#64748B' }}>{fmtDate(inv.createdAt)}</td>
-                        <td style={{ padding: '14px 16px', fontSize: 13, color: '#64748B' }}>
+                        <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--hf-text-muted)' }}>{fmtDate(inv.createdAt)}</td>
+                        <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--hf-text-muted)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                             <Clock size={12} /> {fmtDate(inv.expiresAt)}
                           </div>
@@ -392,7 +392,7 @@ export default function TeamTab() {
                               confirmLabel: 'Cancel invitation',
                               onConfirm: () => cancelInviteMutation.mutate(inv.id),
                             }) }}
-                              style={{ padding: '5px 10px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, fontSize: 12, color: '#DC2626', cursor: 'pointer' }}>
+                              style={{ padding: '5px 10px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 7, fontSize: 12, color: 'var(--hf-danger-text)', cursor: 'pointer' }}>
                               Cancel
                             </button>
                           )}
@@ -426,7 +426,7 @@ export default function TeamTab() {
                 {roles.map(r => <option key={r.id} value={r.id}>{r.name}{r.description ? ` — ${r.description}` : ''}</option>)}
               </select>
             </Field>
-            <div style={{ padding: '10px 14px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, fontSize: 13, color: '#166534' }}>
+            <div style={{ padding: '10px 14px', background: 'var(--hf-success-soft)', border: '1px solid var(--hf-success-border-subtle)', borderRadius: 8, fontSize: 13, color: 'var(--hf-success-text-strong)' }}>
               An invitation email will be sent. The invite expires in 72 hours. The user sets their own password on acceptance.
             </div>
           </div>
@@ -453,11 +453,11 @@ export default function TeamTab() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Field label="First name *">
                 <input value={editForm.firstName} onChange={e => setEditForm(f => ({ ...f, firstName: e.target.value }))}
-                  style={{ ...inp, borderColor: !editForm.firstName.trim() ? '#FCA5A5' : '#E2E8F0' }} />
+                  style={{ ...inp, borderColor: !editForm.firstName.trim() ? 'var(--hf-danger-border)' : 'var(--hf-border)' }} />
               </Field>
               <Field label="Last name *">
                 <input value={editForm.lastName} onChange={e => setEditForm(f => ({ ...f, lastName: e.target.value }))}
-                  style={{ ...inp, borderColor: !editForm.lastName.trim() ? '#FCA5A5' : '#E2E8F0' }} />
+                  style={{ ...inp, borderColor: !editForm.lastName.trim() ? 'var(--hf-danger-border)' : 'var(--hf-border)' }} />
               </Field>
             </div>
             <Field label="Job title">
@@ -588,7 +588,7 @@ function PermissionPicker({ permissions, selected, onToggle }: {
   // `tsc -b` error (TS6133), not just dead code left for later.
   return (
     <div>
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 12 }}>
         Permissions — {selected.size} selected
       </div>
       {Object.entries(PERMISSION_GROUPS).map(([group, permNames]) => {
@@ -596,19 +596,19 @@ function PermissionPicker({ permissions, selected, onToggle }: {
         if (groupPerms.length === 0) return null
         return (
           <div key={group} style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.06em', marginBottom: 8 }}>{group.toUpperCase()}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', letterSpacing: '0.06em', marginBottom: 8 }}>{group.toUpperCase()}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               {groupPerms.map(p => {
                 const checked = selected.has(p.id)
                 return (
                   <div key={p.id} onClick={() => onToggle(p.id)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', border: `1px solid ${checked ? '#0D9488' : '#E2E8F0'}`, borderRadius: 8, cursor: 'pointer', background: checked ? '#F0FDF4' : 'white', transition: 'all 0.12s' }}>
-                    <div style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${checked ? '#0D9488' : '#D1D5DB'}`, background: checked ? '#0D9488' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', border: `1px solid ${checked ? '#0D9488' : '#E2E8F0'}`, borderRadius: 8, cursor: 'pointer', background: checked ? 'var(--hf-success-soft)' : 'white', transition: 'all 0.12s' }}>
+                    <div style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${checked ? '#0D9488' : '#D1D5DB'}`, background: checked ? 'var(--hf-accent)' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       {checked && <Check size={10} color="white" strokeWidth={3} />}
                     </div>
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#0F172A' }}>{p.name}</div>
-                      <div style={{ fontSize: 11, color: '#94A3B8' }}>{p.description}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--hf-text)' }}>{p.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{p.description}</div>
                     </div>
                   </div>
                 )
@@ -627,8 +627,8 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
       <div style={{ background: 'white', borderRadius: 16, padding: 28, width: wide ? 680 : 520, maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={20} /></button>
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>{title}</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={20} /></button>
         </div>
         {children}
       </div>
@@ -659,22 +659,22 @@ function ConfirmModal({ title, message, confirmLabel, onConfirm, onCancel, loadi
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
       <div style={{ background: 'white', borderRadius: 16, padding: 26, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
         <div style={{ display: 'flex', gap: 14, marginBottom: 22 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--hf-danger-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <AlertTriangle size={20} color="#DC2626" />
           </div>
           <div>
-            <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700, color: '#0F172A' }}>{title}</h3>
-            <p style={{ margin: 0, fontSize: 13.5, color: '#64748B', lineHeight: 1.5 }}>{message}</p>
+            <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700, color: 'var(--hf-text)' }}>{title}</h3>
+            <p style={{ margin: 0, fontSize: 13.5, color: 'var(--hf-text-muted)', lineHeight: 1.5 }}>{message}</p>
           </div>
         </div>
         {error && <ErrMsg msg={error} />}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: error ? 16 : 0 }}>
           <button onClick={onCancel} disabled={loading}
-            style={{ padding: '10px 18px', border: '1px solid #E2E8F0', borderRadius: 9, background: 'white', fontSize: 14, cursor: loading ? 'default' : 'pointer', color: '#374151' }}>
+            style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'white', fontSize: 14, cursor: loading ? 'default' : 'pointer', color: 'var(--hf-text-secondary)' }}>
             Cancel
           </button>
           <button onClick={onConfirm} disabled={loading}
-            style={{ padding: '10px 22px', background: loading ? '#F3A6A6' : '#DC2626', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer' }}>
+            style={{ padding: '10px 22px', background: loading ? '#F3A6A6' : 'var(--hf-danger)', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer' }}>
             {loading ? 'Working...' : confirmLabel}
           </button>
         </div>
@@ -683,20 +683,20 @@ function ConfirmModal({ title, message, confirmLabel, onConfirm, onCancel, loadi
   )
 }
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>{label}</label>{children}</div>
+  return <div><label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 5 }}>{label}</label>{children}</div>
 }
 function ErrMsg({ msg }: { msg: string }) {
-  return <div style={{ marginTop: 12, padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, color: '#DC2626', fontSize: 13 }}>{msg}</div>
+  return <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, color: 'var(--hf-danger-text)', fontSize: 13 }}>{msg}</div>
 }
 function Footer({ onCancel, onSubmit, loading, disabled, label }: { onCancel: () => void; onSubmit: () => void; loading: boolean; disabled: boolean; label: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 22 }}>
-      <button onClick={onCancel} style={{ padding: '10px 18px', border: '1px solid #E2E8F0', borderRadius: 9, background: 'white', fontSize: 14, cursor: 'pointer', color: '#374151' }}>Cancel</button>
+      <button onClick={onCancel} style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'white', fontSize: 14, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>Cancel</button>
       <button onClick={onSubmit} disabled={disabled || loading}
-        style={{ padding: '10px 22px', background: disabled || loading ? '#94A3B8' : '#1B3A6B', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: disabled || loading ? 'not-allowed' : 'pointer' }}>
+        style={{ padding: '10px 22px', background: disabled || loading ? 'var(--hf-text-faint)' : 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: disabled || loading ? 'not-allowed' : 'pointer' }}>
         {loading ? 'Saving...' : label}
       </button>
     </div>
   )
 }
-const inp: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1.5px solid #E2E8F0', borderRadius: 9, fontSize: 14, boxSizing: 'border-box' as const }
+const inp: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1.5px solid var(--hf-border)', borderRadius: 9, fontSize: 14, boxSizing: 'border-box' as const }

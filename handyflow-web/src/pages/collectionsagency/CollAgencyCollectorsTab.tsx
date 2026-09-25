@@ -10,8 +10,8 @@ interface CollectorResponse {
   registrationExpiryDate: string | null; email: string | null; phone: string | null; active: boolean
 }
 
-const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
-const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5, display: "block" }
+const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
+const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5, display: "block" }
 
 function CollectorFormModal({ collector, onClose }: { collector: CollectorResponse | null; onClose: () => void }) {
   const qc = useQueryClient()
@@ -28,9 +28,9 @@ function CollectorFormModal({ collector, onClose }: { collector: CollectorRespon
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300 }} onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 440 }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 440 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0F172A", margin: 0 }}>{collector ? "Edit collector" : "Register a new collector"}</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{collector ? "Edit collector" : "Register a new collector"}</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
         </div>
         <div style={{ display: "grid", gap: 14 }}>
@@ -44,11 +44,11 @@ function CollectorFormModal({ collector, onClose }: { collector: CollectorRespon
             <div><label style={labelStyle}>Phone</label><input style={inputStyle} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
           </div>
         </div>
-        {save.isError && <p style={{ color: "#DC2626", fontSize: 12, marginTop: 10 }}>{(save.error as any)?.response?.data?.message ?? "Something went wrong"}</p>}
+        {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 10 }}>{(save.error as any)?.response?.data?.message ?? "Something went wrong"}</p>}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
-          <button onClick={onClose} style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#fff", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+          <button onClick={onClose} style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", fontSize: 13, cursor: "pointer" }}>Cancel</button>
           <button onClick={() => save.mutate()} disabled={!form.fullName || save.isPending}
-            style={{ padding: "9px 18px", borderRadius: 8, border: "none", background: CA_ACCENT, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            style={{ padding: "9px 18px", borderRadius: 8, border: "none", background: CA_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
             {save.isPending ? "Saving…" : collector ? "Save changes" : "Register collector"}
           </button>
         </div>
@@ -79,35 +79,35 @@ export default function CollAgencyCollectorsTab() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <p style={{ fontSize: 13, color: "#64748B", margin: 0 }}>{collectors.length} registered collector{collectors.length === 1 ? "" : "s"}</p>
-        <button onClick={() => setModal("new")} style={{ display: "flex", alignItems: "center", gap: 6, background: CA_ACCENT, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+        <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: 0 }}>{collectors.length} registered collector{collectors.length === 1 ? "" : "s"}</p>
+        <button onClick={() => setModal("new")} style={{ display: "flex", alignItems: "center", gap: 6, background: CA_ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={14} /> Register collector
         </button>
       </div>
 
       {isLoading ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p>
       ) : collectors.length === 0 ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>No collectors registered yet.</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No collectors registered yet.</p>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {collectors.map((c, i) => {
             const exp = c.registrationExpiryDate ? new Date(c.registrationExpiryDate) : null
             const expired = exp && exp < today
             const expiringSoon = exp && !expired && exp <= in30
             return (
-              <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9" }}>
+              <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: "#0F172A", margin: 0 }}>{c.fullName}</p>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: c.active ? "#DCFCE7" : "#F1F5F9", color: c.active ? "#166534" : "#64748B" }}>{c.active ? "ACTIVE" : "INACTIVE"}</span>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{c.fullName}</p>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: c.active ? "var(--hf-success-soft-strong)" : "var(--hf-surface-sunken)", color: c.active ? "var(--hf-success-text-strong)" : "var(--hf-text-muted)" }}>{c.active ? "ACTIVE" : "INACTIVE"}</span>
                     {(expired || expiringSoon) && (
-                      <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: expired ? "#FEE2E2" : "#FEF3C7", color: expired ? "#991B1B" : "#92400E" }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: expired ? "var(--hf-danger-soft-strong)" : "var(--hf-warning-soft-strong)", color: expired ? "var(--hf-danger-text-strong)" : "var(--hf-warning-text-deep)" }}>
                         <AlertTriangle size={11} /> {expired ? "REGISTRATION EXPIRED" : "EXPIRES SOON"}
                       </span>
                     )}
                   </div>
-                  <p style={{ fontSize: 12, color: "#94A3B8", margin: 0 }}>
+                  <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: 0 }}>
                     {c.registrationNumber ? `Reg. ${c.registrationNumber}` : "No registration number on file"}
                     {c.registrationExpiryDate ? ` · Expires ${c.registrationExpiryDate}` : ""}
                     {c.email ? ` · ${c.email}` : ""}

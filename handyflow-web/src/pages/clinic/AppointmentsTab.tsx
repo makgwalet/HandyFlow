@@ -113,8 +113,8 @@ export default function AppointmentsTab() {
           {[{ v: "", l: "All" }, ...Object.entries(STATUS_CFG).map(([v, c]) => ({ v, l: c.label }))].map(({ v, l }) => (
             <button key={v} onClick={() => setStatusFilter(v)}
               style={{ padding: "6px 12px", borderRadius: 20, border: "none", fontSize: 12, cursor: "pointer", fontWeight: statusFilter === v ? 600 : 400,
-                background: statusFilter === v ? (v ? STATUS_CFG[v].color : "#1B3A6B") : "#F1F5F9",
-                color: statusFilter === v ? "#fff" : "#64748B" }}>
+                background: statusFilter === v ? (v ? STATUS_CFG[v].color : "var(--hf-primary)") : "var(--hf-surface-sunken)",
+                color: statusFilter === v ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
               {l}
             </button>
           ))}
@@ -132,45 +132,45 @@ export default function AppointmentsTab() {
           { label: "Completed",   value: appointments.filter(a => a.status === "COMPLETED").length, color: "#166534" },
           { label: "No-shows",    value: appointments.filter(a => a.status === "NO_SHOW").length,  color: "#64748B" },
         ].map(s => (
-          <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "10px 16px" }}>
+          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "10px 16px" }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: "#64748B", marginTop: 1 }}>{s.label}</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 1 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading appointments...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading appointments...</div>
       ) : appointments.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Calendar size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No appointments found</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No appointments found</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {Object.entries(grouped).map(([day, dayAppts]) => (
             <div key={day}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", marginBottom: 10, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>{day}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-muted)", marginBottom: 10, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>{day}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {dayAppts.sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt)).map(appt => {
                   const s = STATUS_CFG[appt.status] ?? STATUS_CFG.SCHEDULED
                   const Icon = s.icon
                   return (
                     <div key={appt.id} onClick={() => { setSelected(appt); setApiError("") }}
-                      style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", border: `1px solid ${s.border}`, borderLeft: `4px solid ${s.color}`, borderRadius: 10, cursor: "pointer", background: "#fff" }}
+                      style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", border: `1px solid ${s.border}`, borderLeft: `4px solid ${s.color}`, borderRadius: 10, cursor: "pointer", background: "var(--hf-surface)" }}
                       onMouseEnter={e => (e.currentTarget.style.background = s.bg)}
-                      onMouseLeave={e => (e.currentTarget.style.background = "#fff")}>
+                      onMouseLeave={e => (e.currentTarget.style.background = "var(--hf-surface)")}>
                       <div style={{ textAlign: "center", minWidth: 48 }}>
-                        <div style={{ fontSize: 16, fontWeight: 800, color: "#0F172A" }}>{fmtT(appt.scheduledAt)}</div>
-                        <div style={{ fontSize: 10, color: "#94A3B8" }}>{appt.durationMinutes}m</div>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: "var(--hf-text)" }}>{fmtT(appt.scheduledAt)}</div>
+                        <div style={{ fontSize: 10, color: "var(--hf-text-faint)" }}>{appt.durationMinutes}m</div>
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-                          <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{appt.patientName}</span>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{appt.patientName}</span>
                           <span style={{ background: s.bg, color: s.color, padding: "1px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, border: `1px solid ${s.border}` }}>{s.label}</span>
-                          <span style={{ fontSize: 11, color: "#94A3B8" }}>{appt.appointmentType?.replace("_"," ")}</span>
+                          <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{appt.appointmentType?.replace("_"," ")}</span>
                         </div>
-                        <div style={{ fontSize: 12, color: "#64748B" }}>
+                        <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>
                           {appt.practitionerName ? `Dr. ${appt.practitionerName}` : "No practitioner assigned"}
                           {appt.reason && ` · ${appt.reason}`}
                         </div>
@@ -188,7 +188,7 @@ export default function AppointmentsTab() {
       {/* Appointment detail modal */}
       {selected && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 500, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 500, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             {(() => {
               const s = STATUS_CFG[selected.status] ?? STATUS_CFG.SCHEDULED
               const Icon = s.icon
@@ -196,12 +196,12 @@ export default function AppointmentsTab() {
                 <>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
                     <div>
-                      <h3 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "#0F172A" }}>{selected.patientName}</h3>
+                      <h3 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "var(--hf-text)" }}>{selected.patientName}</h3>
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: s.bg, color: s.color, padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700, border: `1px solid ${s.border}` }}>
                         <Icon size={11} />{s.label}
                       </span>
                     </div>
-                    <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+                    <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
                     {[
@@ -212,13 +212,13 @@ export default function AppointmentsTab() {
                       ["Reason",    selected.reason || "—"],
                       ["Notes",     selected.notes  || "—"],
                     ].map(([label, value]) => (
-                      <div key={label as string} style={{ padding: "8px 12px", background: "#F8FAFC", borderRadius: 8 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 2 }}>{label as string}</div>
-                        <div style={{ fontSize: 13, color: "#0F172A" }}>{value as string}</div>
+                      <div key={label as string} style={{ padding: "8px 12px", background: "var(--hf-surface-muted)", borderRadius: 8 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 2 }}>{label as string}</div>
+                        <div style={{ fontSize: 13, color: "var(--hf-text)" }}>{value as string}</div>
                       </div>
                     ))}
                   </div>
-                  {apiError && <div style={{ marginBottom: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{apiError}</div>}
+                  {apiError && <div style={{ marginBottom: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{apiError}</div>}
                   {(STATUS_FLOW[selected.status] ?? []).length > 0 && (
                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                       {(STATUS_FLOW[selected.status] ?? []).map(btn => (
@@ -240,23 +240,23 @@ export default function AppointmentsTab() {
       {/* Book appointment modal */}
       {showCreate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 540, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 540, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Book Appointment</h3>
-              <button onClick={() => setShowCreate(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Book Appointment</h3>
+              <button onClick={() => setShowCreate(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label style={lbl}>Patient *</label>
-                <select value={form.patientId} onChange={e => { setForm(f => ({ ...f, patientId: e.target.value })); setFieldErrors(f => omit(f,"patientId")) }} style={{ ...inp("patientId"), background: "#fff" }}>
+                <select value={form.patientId} onChange={e => { setForm(f => ({ ...f, patientId: e.target.value })); setFieldErrors(f => omit(f,"patientId")) }} style={{ ...inp("patientId"), background: "var(--hf-surface)" }}>
                   <option value="">Select patient...</option>
                   {(patients as Patient[]).map(p => <option key={p.id} value={p.id}>{p.fullName}</option>)}
                 </select>
-                {fieldErrors.patientId && <div style={{ fontSize: 12, color: "#DC2626", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}><AlertCircle size={12} />{fieldErrors.patientId}</div>}
+                {fieldErrors.patientId && <div style={{ fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}><AlertCircle size={12} />{fieldErrors.patientId}</div>}
               </div>
               <div>
                 <label style={lbl}>Practitioner</label>
-                <select value={form.practitionerId} onChange={e => setForm(f => ({ ...f, practitionerId: e.target.value }))} style={{ ...inp("practitionerId"), background: "#fff" }}>
+                <select value={form.practitionerId} onChange={e => setForm(f => ({ ...f, practitionerId: e.target.value }))} style={{ ...inp("practitionerId"), background: "var(--hf-surface)" }}>
                   <option value="">Any / unassigned</option>
                   {(practitioners as Practitioner[]).map(p => <option key={p.id} value={p.id}>{p.fullName} — {p.specialty}</option>)}
                 </select>
@@ -265,18 +265,18 @@ export default function AppointmentsTab() {
                 <div>
                   <label style={lbl}>Date & Time *</label>
                   <input type="datetime-local" value={form.scheduledAt} onChange={e => { setForm(f => ({ ...f, scheduledAt: e.target.value })); setFieldErrors(f => omit(f,"scheduledAt")) }} style={inp("scheduledAt")} />
-                  {fieldErrors.scheduledAt && <div style={{ fontSize: 12, color: "#DC2626", marginTop: 4 }}>{fieldErrors.scheduledAt}</div>}
+                  {fieldErrors.scheduledAt && <div style={{ fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>{fieldErrors.scheduledAt}</div>}
                 </div>
                 <div>
                   <label style={lbl}>Duration (minutes)</label>
                   <input type="number" min="5" max="480" value={form.durationMinutes} onChange={e => { setForm(f => ({ ...f, durationMinutes: e.target.value })); setFieldErrors(f => omit(f,"durationMinutes")) }} style={inp("durationMinutes")} />
-                  {fieldErrors.durationMinutes && <div style={{ fontSize: 12, color: "#DC2626", marginTop: 4 }}>{fieldErrors.durationMinutes}</div>}
+                  {fieldErrors.durationMinutes && <div style={{ fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>{fieldErrors.durationMinutes}</div>}
                 </div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <div>
                   <label style={lbl}>Type</label>
-                  <select value={form.appointmentType} onChange={e => setForm(f => ({ ...f, appointmentType: e.target.value }))} style={{ ...inp("appointmentType"), background: "#fff" }}>
+                  <select value={form.appointmentType} onChange={e => setForm(f => ({ ...f, appointmentType: e.target.value }))} style={{ ...inp("appointmentType"), background: "var(--hf-surface)" }}>
                     {APPT_TYPES.map(t => <option key={t} value={t}>{t.replace("_"," ")}</option>)}
                   </select>
                 </div>
@@ -287,12 +287,12 @@ export default function AppointmentsTab() {
               </div>
               {/* Duration preview */}
               {parseInt(form.durationMinutes) > 0 && form.scheduledAt && (
-                <div style={{ padding: "8px 12px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 8, fontSize: 12, color: "#166534" }}>
+                <div style={{ padding: "8px 12px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-success-text-strong)" }}>
                   ✓ Appointment from {new Date(form.scheduledAt).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })} — {new Date(new Date(form.scheduledAt).getTime() + parseInt(form.durationMinutes) * 60000).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}
                 </div>
               )}
             </div>
-            {apiError && <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{apiError}</div>}
+            {apiError && <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{apiError}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setShowCreate(false)} style={btnCancel}>Cancel</button>
               <button onClick={() => { if (validate()) createAppt.mutate({ patientId: form.patientId, practitionerId: form.practitionerId || null, scheduledAt: new Date(form.scheduledAt).toISOString(), durationMinutes: parseInt(form.durationMinutes) || 30, appointmentType: form.appointmentType, reason: form.reason || null }) }}

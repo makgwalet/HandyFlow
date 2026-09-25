@@ -26,7 +26,7 @@ interface InboundShipmentLineResponse {
 interface LocationResponse { id: string; code: string; active: boolean }
 interface ItemLite { id: string; sku: string }
 
-const inputStyle: React.CSSProperties = { padding: "7px 10px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12.5, boxSizing: "border-box", fontFamily: "inherit" }
+const inputStyle: React.CSSProperties = { padding: "7px 10px", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12.5, boxSizing: "border-box", fontFamily: "inherit" }
 
 export default function WhseInboundShipmentDetail({ shipmentId, clientId, items, onBack }: {
   shipmentId: string; clientId: string; items: ItemLite[]; onBack: () => void
@@ -68,38 +68,38 @@ export default function WhseInboundShipmentDetail({ shipmentId, clientId, items,
 
   return (
     <div>
-      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "#64748B", fontSize: 13, marginBottom: 14, padding: 0 }}>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-muted)", fontSize: 13, marginBottom: 14, padding: 0 }}>
         <ArrowLeft size={15} /> All shipments
       </button>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
         <div>
-          <h3 style={{ fontSize: 16, fontWeight: 800, color: "#0F172A", margin: "0 0 4px" }}>{shipment?.referenceNumber ?? "Shipment"}</h3>
-          <p style={{ fontSize: 12.5, color: "#94A3B8", margin: 0 }}>Status: {shipment?.status.replace(/_/g, " ")} {shipment?.expectedDate ? `· Expected ${shipment.expectedDate}` : ""}</p>
+          <h3 style={{ fontSize: 16, fontWeight: 800, color: "var(--hf-text)", margin: "0 0 4px" }}>{shipment?.referenceNumber ?? "Shipment"}</h3>
+          <p style={{ fontSize: 12.5, color: "var(--hf-text-faint)", margin: 0 }}>Status: {shipment?.status.replace(/_/g, " ")} {shipment?.expectedDate ? `· Expected ${shipment.expectedDate}` : ""}</p>
         </div>
         {!terminal && (
           <button onClick={() => { if (confirm("Cancel this shipment?")) cancelShipment.mutate() }}
-            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid #FECACA", color: "#DC2626", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--hf-danger-border)", color: "var(--hf-danger-text)", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
             <XCircle size={14} /> Cancel shipment
           </button>
         )}
       </div>
 
       {isLoading ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {lines.map((line, i) => {
             const state = receiveState[line.id] ?? { qty: "", locationId: "" }
             const outstanding = line.expectedQty - line.qtyReceived
             return (
-              <div key={line.id} style={{ padding: "14px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9" }}>
+              <div key={line.id} style={{ padding: "14px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: outstanding > 0 && !terminal ? 10 : 0 }}>
                   <div>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", margin: 0 }}>{skuOf(line.itemId)}</p>
-                    <p style={{ fontSize: 11.5, color: "#94A3B8", margin: 0 }}>{line.qtyReceived} / {line.expectedQty} received{line.notes ? ` · ${line.notes}` : ""}</p>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{skuOf(line.itemId)}</p>
+                    <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>{line.qtyReceived} / {line.expectedQty} received{line.notes ? ` · ${line.notes}` : ""}</p>
                   </div>
-                  {outstanding <= 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "#DCFCE7", color: "#166534" }}>FULLY RECEIVED</span>}
+                  {outstanding <= 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)" }}>FULLY RECEIVED</span>}
                 </div>
                 {outstanding > 0 && !terminal && (
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -113,7 +113,7 @@ export default function WhseInboundShipmentDetail({ shipmentId, clientId, items,
                     <button
                       onClick={() => receive.mutate({ lineId: line.id, qty: parseFloat(state.qty), locationId: state.locationId })}
                       disabled={!state.qty || !state.locationId || receive.isPending}
-                      style={{ display: "flex", alignItems: "center", gap: 5, background: WHSE_ACCENT, color: "#fff", border: "none", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: (!state.qty || !state.locationId) ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 5, background: WHSE_ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: (!state.qty || !state.locationId) ? 0.5 : 1, whiteSpace: "nowrap" }}>
                       <PackageCheck size={13} /> Receive
                     </button>
                   </div>

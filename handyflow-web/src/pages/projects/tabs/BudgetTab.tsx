@@ -10,12 +10,12 @@ interface EVM { totalBudget:number; totalActual:number; totalCommitted:number; t
 
 function unwrap<T>(r:any):T[]{const d=r?.data?.data??r?.data??[];return Array.isArray(d)?d as T[]:d?.content??[]}
 const fmtR=(n:number)=>`R ${Number(n??0).toLocaleString('en-ZA',{minimumFractionDigits:0,maximumFractionDigits:0})}`
-const inp:React.CSSProperties={width:'100%',padding:'9px 12px',border:'1.5px solid #E2E8F0',borderRadius:9,fontSize:14,boxSizing:'border-box' as const,outline:'none',background:'#fff'}
+const inp:React.CSSProperties={width:'100%',padding:'9px 12px',border:'1.5px solid var(--hf-border)',borderRadius:9,fontSize:14,boxSizing:'border-box' as const,outline:'none',background:'var(--hf-surface)'}
 const CATS=['LABOUR','MATERIALS','SUBCONTRACT','EQUIPMENT','OVERHEAD','CONTINGENCY']
 const CAT_COLOR:Record<string,{bg:string;color:string}>={
-  LABOUR:{bg:'#DBEAFE',color:'#1D4ED8'},MATERIALS:{bg:'#FEF3C7',color:'#92400E'},
-  SUBCONTRACT:{bg:'#EDE9FE',color:'#7C3AED'},EQUIPMENT:{bg:'#DCFCE7',color:'#166534'},
-  OVERHEAD:{bg:'#F1F5F9',color:'#475569'},CONTINGENCY:{bg:'#FEF2F2',color:'#DC2626'},
+  LABOUR:{bg:'var(--hf-info-soft-strong)',color:'var(--hf-info-text)'},MATERIALS:{bg:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)'},
+  SUBCONTRACT:{bg:'var(--hf-violet-soft-strong)',color:'var(--hf-violet-text)'},EQUIPMENT:{bg:'var(--hf-success-soft-strong)',color:'var(--hf-success-text-strong)'},
+  OVERHEAD:{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)'},CONTINGENCY:{bg:'var(--hf-danger-soft)',color:'var(--hf-danger-text)'},
 }
 
 export function BudgetTab({projectId,project}:{projectId:string;project:Project}) {
@@ -60,7 +60,7 @@ export function BudgetTab({projectId,project}:{projectId:string;project:Project}
     <div>
       {/* EVM summary */}
       {evm && (
-        <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:10,marginBottom:20,padding:'16px 20px',background:'#F8FAFC',borderRadius:12,border:'1px solid #E2E8F0'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:10,marginBottom:20,padding:'16px 20px',background:'var(--hf-surface-muted)',borderRadius:12,border:'1px solid var(--hf-border)'}}>
           <EVMStat label="Total Budget" value={fmtR(evm.totalBudget)} color="#0F172A"/>
           <EVMStat label="Actual Cost" value={fmtR(evm.totalActual)} color={evm.totalActual>evm.totalBudget?'#DC2626':'#059669'}/>
           <EVMStat label="Committed" value={fmtR(evm.totalCommitted)} color="#D97706"/>
@@ -71,60 +71,60 @@ export function BudgetTab({projectId,project}:{projectId:string;project:Project}
       )}
 
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-        <div style={{fontSize:13,color:'#64748B'}}>{lines.length} budget line{lines.length!==1?'s':''}</div>
-        <button onClick={()=>{setShowAdd(true);setErr('')}} style={{display:'flex',alignItems:'center',gap:5,padding:'8px 14px',background:'#1B3A6B',color:'#fff',border:'none',borderRadius:9,fontSize:13,fontWeight:600,cursor:'pointer'}}>
+        <div style={{fontSize:13,color:'var(--hf-text-muted)'}}>{lines.length} budget line{lines.length!==1?'s':''}</div>
+        <button onClick={()=>{setShowAdd(true);setErr('')}} style={{display:'flex',alignItems:'center',gap:5,padding:'8px 14px',background:'var(--hf-primary)',color:'var(--hf-text-on-solid)',border:'none',borderRadius:9,fontSize:13,fontWeight:600,cursor:'pointer'}}>
           <Plus size={14}/> Add Budget Line
         </button>
       </div>
 
-      {isLoading?<div style={{padding:40,textAlign:'center',color:'#94A3B8'}}>Loading…</div>
-        :lines.length===0?<div style={{textAlign:'center',padding:'50px 20px',color:'#94A3B8'}}><TrendingUp size={36} style={{marginBottom:10,opacity:.3}}/><div style={{fontWeight:600,color:'#475569'}}>No budget lines</div><div style={{fontSize:13}}>Add line items to track costs by category</div></div>
+      {isLoading?<div style={{padding:40,textAlign:'center',color:'var(--hf-text-faint)'}}>Loading…</div>
+        :lines.length===0?<div style={{textAlign:'center',padding:'50px 20px',color:'var(--hf-text-faint)'}}><TrendingUp size={36} style={{marginBottom:10,opacity:.3}}/><div style={{fontWeight:600,color:'var(--hf-text-tertiary)'}}>No budget lines</div><div style={{fontSize:13}}>Add line items to track costs by category</div></div>
         :(
-        <div style={{border:'1px solid #E2E8F0',borderRadius:12,overflow:'hidden'}}>
+        <div style={{border:'1px solid var(--hf-border)',borderRadius:12,overflow:'hidden'}}>
           <table style={{width:'100%',borderCollapse:'collapse'}}>
-            <thead><tr style={{background:'#F8FAFC'}}>
+            <thead><tr style={{background:'var(--hf-surface-muted)'}}>
               {['Category','Description','Budget','Committed','Actual','Variance','Flags',''].map(h=>(
-                <th key={h} style={{padding:'10px 14px',textAlign:'left' as const,fontSize:11,fontWeight:700,color:'#94A3B8',textTransform:'uppercase' as const,letterSpacing:'0.04em'}}>{h}</th>
+                <th key={h} style={{padding:'10px 14px',textAlign:'left' as const,fontSize:11,fontWeight:700,color:'var(--hf-text-faint)',textTransform:'uppercase' as const,letterSpacing:'0.04em'}}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
               {lines.map((l,i)=>{
-                const cc=CAT_COLOR[l.category]??{bg:'#F1F5F9',color:'#475569'}
+                const cc=CAT_COLOR[l.category]??{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)'}
                 const overBudget=l.variance<0
                 return (
-                  <tr key={l.id} style={{borderTop:'1px solid #F1F5F9',background:i%2===0?'#fff':'#FAFAFA'}}>
+                  <tr key={l.id} style={{borderTop:'1px solid var(--hf-border-subtle)',background:i%2===0?'var(--hf-surface)':'var(--hf-surface-muted)'}}>
                     <td style={{padding:'10px 14px'}}><span style={{background:cc.bg,color:cc.color,fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:20}}>{l.category}</span></td>
-                    <td style={{padding:'10px 14px',fontSize:13,color:'#374151'}}>{l.description}</td>
-                    <td style={{padding:'10px 14px',fontSize:13,fontWeight:600,color:'#0F172A'}}>{fmtR(l.budgetedAmount)}</td>
-                    <td style={{padding:'10px 14px',fontSize:13,color:'#D97706'}}>{fmtR(l.committedAmount)}</td>
-                    <td style={{padding:'10px 14px',fontSize:13,color:overBudget?'#DC2626':'#374151'}}>{fmtR(l.actualAmount)}</td>
-                    <td style={{padding:'10px 14px',fontSize:13,fontWeight:700,color:overBudget?'#DC2626':'#059669'}}>{overBudget?'':'+' }{fmtR(l.variance)}</td>
-                    <td style={{padding:'10px 14px',fontSize:11,color:'#64748B'}}>
-                      {l.isProvisional&&<span style={{background:'#FEF3C7',color:'#92400E',padding:'1px 6px',borderRadius:20,fontSize:10,fontWeight:700,marginRight:4}}>PS</span>}
-                      {l.isPrimeCost&&<span style={{background:'#EDE9FE',color:'#7C3AED',padding:'1px 6px',borderRadius:20,fontSize:10,fontWeight:700}}>PC</span>}
+                    <td style={{padding:'10px 14px',fontSize:13,color:'var(--hf-text-secondary)'}}>{l.description}</td>
+                    <td style={{padding:'10px 14px',fontSize:13,fontWeight:600,color:'var(--hf-text)'}}>{fmtR(l.budgetedAmount)}</td>
+                    <td style={{padding:'10px 14px',fontSize:13,color:'var(--hf-warning-text)'}}>{fmtR(l.committedAmount)}</td>
+                    <td style={{padding:'10px 14px',fontSize:13,color:overBudget?'var(--hf-danger-text)':'var(--hf-text-secondary)'}}>{fmtR(l.actualAmount)}</td>
+                    <td style={{padding:'10px 14px',fontSize:13,fontWeight:700,color:overBudget?'var(--hf-danger-text)':'var(--hf-success-text)'}}>{overBudget?'':'+' }{fmtR(l.variance)}</td>
+                    <td style={{padding:'10px 14px',fontSize:11,color:'var(--hf-text-muted)'}}>
+                      {l.isProvisional&&<span style={{background:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)',padding:'1px 6px',borderRadius:20,fontSize:10,fontWeight:700,marginRight:4}}>PS</span>}
+                      {l.isPrimeCost&&<span style={{background:'var(--hf-violet-soft-strong)',color:'var(--hf-violet-text)',padding:'1px 6px',borderRadius:20,fontSize:10,fontWeight:700}}>PC</span>}
                     </td>
-                    <td style={{padding:'10px 14px'}}><button onClick={()=>delMut.mutate(l.id)} style={{fontSize:11,color:'#DC2626',background:'none',border:'none',cursor:'pointer'}}>×</button></td>
+                    <td style={{padding:'10px 14px'}}><button onClick={()=>delMut.mutate(l.id)} style={{fontSize:11,color:'var(--hf-danger-text)',background:'none',border:'none',cursor:'pointer'}}>×</button></td>
                   </tr>
                 )
               })}
               {/* Totals row */}
-              <tr style={{borderTop:'2px solid #E2E8F0',background:'#F8FAFC'}}>
-                <td colSpan={2} style={{padding:'10px 14px',fontSize:13,fontWeight:700,color:'#0F172A'}}>TOTAL</td>
-                <td style={{padding:'10px 14px',fontSize:13,fontWeight:700,color:'#0F172A'}}>{fmtR(totalBudget)}</td>
-                <td style={{padding:'10px 14px',fontSize:13,fontWeight:700,color:'#D97706'}}>{fmtR(totalCommitted)}</td>
-                <td style={{padding:'10px 14px',fontSize:13,fontWeight:700,color:totalActual>totalBudget?'#DC2626':'#374151'}}>{fmtR(totalActual)}</td>
-                <td style={{padding:'10px 14px',fontSize:13,fontWeight:700,color:totalVariance<0?'#DC2626':'#059669'}}>{totalVariance<0?'':'+' }{fmtR(totalVariance)}</td>
+              <tr style={{borderTop:'2px solid var(--hf-border)',background:'var(--hf-surface-muted)'}}>
+                <td colSpan={2} style={{padding:'10px 14px',fontSize:13,fontWeight:700,color:'var(--hf-text)'}}>TOTAL</td>
+                <td style={{padding:'10px 14px',fontSize:13,fontWeight:700,color:'var(--hf-text)'}}>{fmtR(totalBudget)}</td>
+                <td style={{padding:'10px 14px',fontSize:13,fontWeight:700,color:'var(--hf-warning-text)'}}>{fmtR(totalCommitted)}</td>
+                <td style={{padding:'10px 14px',fontSize:13,fontWeight:700,color:totalActual>totalBudget?'var(--hf-danger-text)':'var(--hf-text-secondary)'}}>{fmtR(totalActual)}</td>
+                <td style={{padding:'10px 14px',fontSize:13,fontWeight:700,color:totalVariance<0?'var(--hf-danger-text)':'var(--hf-success-text)'}}>{totalVariance<0?'':'+' }{fmtR(totalVariance)}</td>
                 <td colSpan={2}/>
               </tr>
             </tbody>
           </table>
           {/* Spend bar */}
-          <div style={{padding:'12px 16px',borderTop:'1px solid #E2E8F0'}}>
-            <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#94A3B8',marginBottom:4}}>
+          <div style={{padding:'12px 16px',borderTop:'1px solid var(--hf-border)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--hf-text-faint)',marginBottom:4}}>
               <span>Budget utilisation</span><span>{spentPct.toFixed(1)}%</span>
             </div>
-            <div style={{height:8,background:'#F1F5F9',borderRadius:4}}>
-              <div style={{height:'100%',width:`${Math.min(spentPct,100)}%`,background:spentPct>100?'#EF4444':spentPct>85?'#F59E0B':'#22C55E',borderRadius:4}}/>
+            <div style={{height:8,background:'var(--hf-surface-sunken)',borderRadius:4}}>
+              <div style={{height:'100%',width:`${Math.min(spentPct,100)}%`,background:spentPct>100?'var(--hf-danger)':spentPct>85?'var(--hf-warning)':'var(--hf-success)',borderRadius:4}}/>
             </div>
           </div>
         </div>
@@ -132,28 +132,28 @@ export function BudgetTab({projectId,project}:{projectId:string;project:Project}
 
       {showAdd&&(
         <div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}>
-          <div style={{background:'#fff',borderRadius:14,padding:28,width:500,boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
+          <div style={{background:'var(--hf-surface)',borderRadius:14,padding:28,width:500,boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
               <h3 style={{margin:0,fontSize:16,fontWeight:700}}>Add Budget Line</h3>
-              <button onClick={()=>setShowAdd(false)} style={{background:'none',border:'none',cursor:'pointer',color:'#94A3B8',fontSize:20}}>×</button>
+              <button onClick={()=>setShowAdd(false)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--hf-text-faint)',fontSize:20}}>×</button>
             </div>
             <div style={{display:'flex',flexDirection:'column' as const,gap:12}}>
-              <div><label style={{display:'block',fontSize:12,fontWeight:600,color:'#374151',marginBottom:5}}>Category</label>
+              <div><label style={{display:'block',fontSize:12,fontWeight:600,color:'var(--hf-text-secondary)',marginBottom:5}}>Category</label>
                 <select value={form.category} onChange={e=>sf('category',e.target.value)} style={inp}>
                   {CATS.map(c=><option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <div><label style={{display:'block',fontSize:12,fontWeight:600,color:'#374151',marginBottom:5}}>Description *</label><input value={form.description} onChange={e=>sf('description',e.target.value)} placeholder="Labour for Phase 1 excavation" style={inp}/></div>
-              <div><label style={{display:'block',fontSize:12,fontWeight:600,color:'#374151',marginBottom:5}}>Budgeted Amount (R) *</label><input type="number" value={form.budgetedAmount} onChange={e=>sf('budgetedAmount',e.target.value)} placeholder="0.00" style={inp}/></div>
+              <div><label style={{display:'block',fontSize:12,fontWeight:600,color:'var(--hf-text-secondary)',marginBottom:5}}>Description *</label><input value={form.description} onChange={e=>sf('description',e.target.value)} placeholder="Labour for Phase 1 excavation" style={inp}/></div>
+              <div><label style={{display:'block',fontSize:12,fontWeight:600,color:'var(--hf-text-secondary)',marginBottom:5}}>Budgeted Amount (R) *</label><input type="number" value={form.budgetedAmount} onChange={e=>sf('budgetedAmount',e.target.value)} placeholder="0.00" style={inp}/></div>
               <div style={{display:'flex',gap:16}}>
-                <label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,color:'#374151',cursor:'pointer'}}><input type="checkbox" checked={form.isProvisional} onChange={e=>sf('isProvisional',e.target.checked)}/> Provisional Sum (PS)</label>
-                <label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,color:'#374151',cursor:'pointer'}}><input type="checkbox" checked={form.isPrimeCost} onChange={e=>sf('isPrimeCost',e.target.checked)}/> Prime Cost (PC)</label>
+                <label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,color:'var(--hf-text-secondary)',cursor:'pointer'}}><input type="checkbox" checked={form.isProvisional} onChange={e=>sf('isProvisional',e.target.checked)}/> Provisional Sum (PS)</label>
+                <label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,color:'var(--hf-text-secondary)',cursor:'pointer'}}><input type="checkbox" checked={form.isPrimeCost} onChange={e=>sf('isPrimeCost',e.target.checked)}/> Prime Cost (PC)</label>
               </div>
             </div>
-            {err&&<div style={{marginTop:10,padding:'8px 12px',background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:8,color:'#DC2626',fontSize:13}}>{err}</div>}
+            {err&&<div style={{marginTop:10,padding:'8px 12px',background:'var(--hf-danger-soft)',border:'1px solid var(--hf-danger-border)',borderRadius:8,color:'var(--hf-danger-text)',fontSize:13}}>{err}</div>}
             <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:20}}>
-              <button onClick={()=>setShowAdd(false)} style={{padding:'9px 16px',border:'1px solid #E2E8F0',borderRadius:9,background:'#fff',fontSize:13,cursor:'pointer'}}>Cancel</button>
-              <button onClick={()=>{if(!form.description.trim()||!form.budgetedAmount){setErr('Description and amount required');return}addMut.mutate({category:form.category,description:form.description.trim(),budgetedAmount:parseFloat(form.budgetedAmount),isProvisional:form.isProvisional,isPrimeCost:form.isPrimeCost})}} disabled={addMut.isPending} style={{padding:'9px 16px',background:'#1B3A6B',color:'#fff',border:'none',borderRadius:9,fontSize:13,fontWeight:600,cursor:'pointer',opacity:addMut.isPending?.6:1}}>{addMut.isPending?'Saving…':'Add Line'}</button>
+              <button onClick={()=>setShowAdd(false)} style={{padding:'9px 16px',border:'1px solid var(--hf-border)',borderRadius:9,background:'var(--hf-surface)',fontSize:13,cursor:'pointer'}}>Cancel</button>
+              <button onClick={()=>{if(!form.description.trim()||!form.budgetedAmount){setErr('Description and amount required');return}addMut.mutate({category:form.category,description:form.description.trim(),budgetedAmount:parseFloat(form.budgetedAmount),isProvisional:form.isProvisional,isPrimeCost:form.isPrimeCost})}} disabled={addMut.isPending} style={{padding:'9px 16px',background:'var(--hf-primary)',color:'var(--hf-text-on-solid)',border:'none',borderRadius:9,fontSize:13,fontWeight:600,cursor:'pointer',opacity:addMut.isPending?.6:1}}>{addMut.isPending?'Saving…':'Add Line'}</button>
             </div>
           </div>
         </div>
@@ -164,8 +164,8 @@ export function BudgetTab({projectId,project}:{projectId:string;project:Project}
 
 function EVMStat({label,value,color,sub}:{label:string;value:string;color:string;sub?:string}){
   return <div style={{textAlign:'center' as const}}>
-    <div style={{fontSize:10,color:'#94A3B8',fontWeight:600,textTransform:'uppercase' as const,letterSpacing:'0.04em',marginBottom:4}}>{label}</div>
+    <div style={{fontSize:10,color:'var(--hf-text-faint)',fontWeight:600,textTransform:'uppercase' as const,letterSpacing:'0.04em',marginBottom:4}}>{label}</div>
     <div style={{fontSize:16,fontWeight:800,color}}>{value}</div>
-    {sub&&<div style={{fontSize:10,color:'#CBD5E1',marginTop:2}}>{sub}</div>}
+    {sub&&<div style={{fontSize:10,color:'var(--hf-text-disabled)',marginTop:2}}>{sub}</div>}
   </div>
 }

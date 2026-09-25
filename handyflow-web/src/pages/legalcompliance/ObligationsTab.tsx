@@ -162,7 +162,7 @@ export default function ObligationsTab() {
     borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "#FFF5F5" : "#fff", outline: "none",
   })
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
-    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#DC2626", marginTop: 4 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
       <AlertCircle size={12} />{fieldErrors[k]}
     </div>
   ) : null
@@ -176,9 +176,9 @@ export default function ObligationsTab() {
     <div>
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {stats.map(s => (
-          <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
+          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{s.label}</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -188,19 +188,19 @@ export default function ObligationsTab() {
           {["ALL", ...STATUSES].map(s => (
             <button key={s} onClick={() => setFilterStatus(s)}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterStatus === s ? 600 : 400,
-                background: filterStatus === s ? (s === "ALL" ? "#4338CA" : STATUS_CFG[s]?.color ?? "#4338CA") : "#F1F5F9",
-                color: filterStatus === s ? "#fff" : "#64748B" }}>
+                background: filterStatus === s ? (s === "ALL" ? "var(--hf-indigo)" : STATUS_CFG[s]?.color ?? "var(--hf-indigo)") : "var(--hf-surface-sunken)",
+                color: filterStatus === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
               {s === "ALL" ? "All" : STATUS_CFG[s]?.label ?? s}
             </button>
           ))}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={downloadPdf} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", color: "#4338CA", border: "1px solid #E2E8F0", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          <button onClick={downloadPdf} style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-surface)", color: "var(--hf-indigo-text)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
             <Download size={14} /> Export PDF
           </button>
           {canManage && (
             <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") }}
-              style={{ display: "flex", alignItems: "center", gap: 7, background: "#4338CA", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+              style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-indigo)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
               <Plus size={15} /> New Obligation
             </button>
           )}
@@ -208,11 +208,11 @@ export default function ObligationsTab() {
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading obligations...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading obligations...</div>
       ) : obligations.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <ClipboardList size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No obligations found</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No obligations found</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -221,17 +221,17 @@ export default function ObligationsTab() {
             const cfg = STATUS_CFG[o.status] ?? STATUS_CFG.COMPLIANT
             return (
               <div key={o.id} style={{ border: `1px solid ${o.status === "NON_COMPLIANT" ? "#FECACA" : "#E2E8F0"}`, borderRadius: 12, overflow: "hidden" }}>
-                <div style={{ padding: "16px 20px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+                <div style={{ padding: "16px 20px", background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                     <div style={{ width: 44, height: 44, borderRadius: 10, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <ClipboardList size={18} color={cfg.color} />
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
-                        <span style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{o.title}</span>
-                        <span style={{ fontSize: 11, color: "#64748B", background: "#F1F5F9", padding: "1px 8px", borderRadius: 20 }}>{CATEGORY_LABELS[o.category] ?? o.category}</span>
+                        <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{o.title}</span>
+                        <span style={{ fontSize: 11, color: "var(--hf-text-muted)", background: "var(--hf-surface-sunken)", padding: "1px 8px", borderRadius: 20 }}>{CATEGORY_LABELS[o.category] ?? o.category}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                      <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>
                         Review {fmtDate(o.reviewDate)} · {o.recurrence} {o.responsibleUserName ? `· ${o.responsibleUserName}` : ""}
                       </div>
                     </div>
@@ -240,22 +240,22 @@ export default function ObligationsTab() {
                     <StatusBadge status={o.status} />
                     {canManage && (
                       <div style={{ display: "flex", gap: 5 }}>
-                        <button onClick={() => { setShowReview(o); setNoteText("") }} title="Mark reviewed" style={{ background: "#DCFCE7", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#166534" }}><CheckCircle2 size={13} /></button>
-                        <button onClick={() => { setShowNonCompliant(o); setNoteText("") }} title="Mark non-compliant" style={{ background: "#FEF2F2", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#DC2626" }}><ShieldAlert size={13} /></button>
-                        <button onClick={() => { setShowLink(o); setContractId(o.linkedContractId ?? "") }} title="Link contract" style={{ background: "#F5F3FF", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#7C3AED" }}><Link2 size={13} /></button>
-                        <button onClick={() => openEdit(o)} title="Edit" style={{ background: "#EFF6FF", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#1D4ED8" }}><Edit2 size={13} /></button>
+                        <button onClick={() => { setShowReview(o); setNoteText("") }} title="Mark reviewed" style={{ background: "var(--hf-success-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-success-text-strong)" }}><CheckCircle2 size={13} /></button>
+                        <button onClick={() => { setShowNonCompliant(o); setNoteText("") }} title="Mark non-compliant" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><ShieldAlert size={13} /></button>
+                        <button onClick={() => { setShowLink(o); setContractId(o.linkedContractId ?? "") }} title="Link contract" style={{ background: "var(--hf-violet-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-violet-text)" }}><Link2 size={13} /></button>
+                        <button onClick={() => openEdit(o)} title="Edit" style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-info-text)" }}><Edit2 size={13} /></button>
                         {canAdmin && (
-                          <button onClick={() => { if (confirm(`Delete obligation "${o.title}"?`)) deleteObligation.mutate(o.id) }} title="Delete" style={{ background: "#FEF2F2", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#DC2626" }}><Trash2 size={13} /></button>
+                          <button onClick={() => { if (confirm(`Delete obligation "${o.title}"?`)) deleteObligation.mutate(o.id) }} title="Delete" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
                         )}
                       </div>
                     )}
-                    <button onClick={() => setExpanded(isOpen ? null : o.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
+                    <button onClick={() => setExpanded(isOpen ? null : o.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}>
                       {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </button>
                   </div>
                 </div>
                 {isOpen && (
-                  <div style={{ borderTop: "1px solid #F1F5F9", padding: "16px 20px", background: "#F8FAFC" }}>
+                  <div style={{ borderTop: "1px solid var(--hf-border-subtle)", padding: "16px 20px", background: "var(--hf-surface-muted)" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 14 }}>
                       {[
                         { l: "Regulation reference", v: o.regulationReference || "—" },
@@ -263,13 +263,13 @@ export default function ObligationsTab() {
                         { l: "Last reviewed",        v: o.lastReviewedAt ? `${fmtDateTime(o.lastReviewedAt)} by ${o.lastReviewedByName ?? "—"}` : "Never" },
                       ].map(item => (
                         <div key={item.l}>
-                          <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{item.v}</div>
+                          <div style={{ fontSize: 10, color: "var(--hf-text-faint)", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{item.v}</div>
                         </div>
                       ))}
                     </div>
-                    {o.description && <div style={{ marginBottom: 10, fontSize: 13, color: "#374151" }}>{o.description}</div>}
-                    {o.notes && <div style={{ padding: "8px 12px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, fontSize: 13, color: "#78350F" }}>{o.notes}</div>}
+                    {o.description && <div style={{ marginBottom: 10, fontSize: 13, color: "var(--hf-text-secondary)" }}>{o.description}</div>}
+                    {o.notes && <div style={{ padding: "8px 12px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-warning-text-deep)" }}>{o.notes}</div>}
                   </div>
                 )}
               </div>
@@ -291,13 +291,13 @@ export default function ObligationsTab() {
               <div>
                 <label style={lbl}>Category *</label>
                 {editing ? (
-                  <div style={{ ...inp("_"), background: "#F1F5F9", color: "#64748B" }}>{CATEGORY_LABELS[editing.category]}</div>
+                  <div style={{ ...inp("_"), background: "var(--hf-surface-sunken)", color: "var(--hf-text-muted)" }}>{CATEGORY_LABELS[editing.category]}</div>
                 ) : (
-                  <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} style={{ ...inp("category"), background: "#fff" }}>
+                  <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} style={{ ...inp("category"), background: "var(--hf-surface)" }}>
                     {CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
                   </select>
                 )}
-                {editing && <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 3 }}>Category can't be changed after creation</div>}
+                {editing && <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 3 }}>Category can't be changed after creation</div>}
               </div>
               <div>
                 <label style={lbl}>Regulation reference</label>
@@ -319,12 +319,12 @@ export default function ObligationsTab() {
               </div>
               <div>
                 <label style={lbl}>Recurrence *</label>
-                <select value={form.recurrence} onChange={e => setForm(f => ({ ...f, recurrence: e.target.value }))} style={{ ...inp("recurrence"), background: "#fff" }}>
+                <select value={form.recurrence} onChange={e => setForm(f => ({ ...f, recurrence: e.target.value }))} style={{ ...inp("recurrence"), background: "var(--hf-surface)" }}>
                   {RECURRENCES.map(r => <option key={r} value={r}>{r === "ONCE" ? "One-time (does not recur)" : r.charAt(0) + r.slice(1).toLowerCase()}</option>)}
                 </select>
               </div>
             </div>
-            <div style={{ marginTop: 10, padding: "8px 12px", background: "#EEF2FF", border: "1px solid #C7D2FE", borderRadius: 7, fontSize: 12, color: "#4338CA" }}>
+            <div style={{ marginTop: 10, padding: "8px 12px", background: "var(--hf-indigo-soft)", border: "1px solid var(--hf-indigo-border)", borderRadius: 7, fontSize: 12, color: "var(--hf-indigo-text)" }}>
               Marking this reviewed rolls the review date forward by one recurrence interval automatically.
             </div>
           </Sect>
@@ -337,7 +337,7 @@ export default function ObligationsTab() {
               </div>
               {!editing && (
                 <div>
-                  <label style={lbl}>Linked contract ID <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+                  <label style={lbl}>Linked contract ID <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
                   <input value={form.linkedContractId} onChange={e => setForm(f => ({ ...f, linkedContractId: e.target.value }))} placeholder="UUID from Contracting" style={inp("linkedContractId")} />
                 </div>
               )}
@@ -367,10 +367,10 @@ export default function ObligationsTab() {
       {showReview && (
         <Overlay onClose={() => { setShowReview(null); setApiError("") }}>
           <MHead title={`Mark Reviewed — ${showReview.title}`} onClose={() => { setShowReview(null); setApiError("") }} />
-          <div style={{ padding: "10px 12px", background: "#EEF2FF", border: "1px solid #C7D2FE", borderRadius: 8, fontSize: 13, color: "#4338CA", marginBottom: 14 }}>
+          <div style={{ padding: "10px 12px", background: "var(--hf-indigo-soft)", border: "1px solid var(--hf-indigo-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-indigo-text)", marginBottom: 14 }}>
             This sets status to Compliant and rolls the review date forward by one {showReview.recurrence.toLowerCase()} interval{showReview.recurrence === "ONCE" ? " (unchanged — one-time obligation)" : ""}.
           </div>
-          <label style={lbl}>Notes <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+          <label style={lbl}>Notes <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
           <textarea value={noteText} onChange={e => setNoteText(e.target.value)} rows={3} style={{ ...inp("_"), resize: "vertical" as const, width: "100%" }} placeholder="What was checked / confirmed..." />
           {apiError && <ErrBanner msg={apiError} />}
           <MFoot onCancel={() => { setShowReview(null); setApiError("") }} onSubmit={() => markReviewed.mutate({ id: showReview.id, notes: noteText })} loading={markReviewed.isPending} label="Confirm Reviewed" />
@@ -380,7 +380,7 @@ export default function ObligationsTab() {
       {showNonCompliant && (
         <Overlay onClose={() => { setShowNonCompliant(null); setApiError("") }}>
           <MHead title={`Mark Non-Compliant — ${showNonCompliant.title}`} onClose={() => { setShowNonCompliant(null); setApiError("") }} />
-          <div style={{ padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", marginBottom: 14, display: "flex", gap: 8 }}>
+          <div style={{ padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", marginBottom: 14, display: "flex", gap: 8 }}>
             <ShieldAlert size={16} style={{ flexShrink: 0, marginTop: 1 }} />
             <span>Non-Compliant status is never cleared automatically — only a review or manual correction changes it. Record a real finding, not a routine reminder.</span>
           </div>
@@ -396,7 +396,7 @@ export default function ObligationsTab() {
           <MHead title={`Link Contract — ${showLink.title}`} onClose={() => { setShowLink(null); setApiError("") }} />
           <label style={lbl}>Contract ID</label>
           <input value={contractId} onChange={e => setContractId(e.target.value)} placeholder="UUID from Contracting module" style={{ ...inp("_"), width: "100%" }} />
-          <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 6 }}>Read-only reference — the obligation links to the contract, nothing is written back to Contracting.</div>
+          <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 6 }}>Read-only reference — the obligation links to the contract, nothing is written back to Contracting.</div>
           {apiError && <ErrBanner msg={apiError} />}
           <MFoot onCancel={() => { setShowLink(null); setApiError("") }} onSubmit={() => { if (contractId.trim()) linkContract.mutate({ id: showLink.id, contractId: contractId.trim() }) }} loading={linkContract.isPending} label="Link Contract" disabled={!contractId.trim()} />
         </Overlay>
@@ -408,21 +408,21 @@ export default function ObligationsTab() {
 function Overlay({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 620, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 620, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>
     </div>
   )
 }
 function MHead({ title, onClose }: { title: string; onClose: () => void }) {
-  return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button></div>
+  return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button></div>
 }
 function MFoot({ onCancel, onSubmit, loading, label, disabled = false }: { onCancel: () => void; onSubmit: () => void; loading: boolean; label: string; disabled?: boolean }) {
-  return <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}><button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button><button onClick={onSubmit} disabled={loading || disabled} style={{ padding: "9px 22px", background: loading || disabled ? "#94A3B8" : "#4338CA", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || disabled ? "not-allowed" : "pointer" }}>{loading ? "Saving..." : label}</button></div>
+  return <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}><button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button><button onClick={onSubmit} disabled={loading || disabled} style={{ padding: "9px 22px", background: loading || disabled ? "var(--hf-text-faint)" : "var(--hf-indigo)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || disabled ? "not-allowed" : "pointer" }}>{loading ? "Saving..." : label}</button></div>
 }
 function Sect({ title, children }: { title: string; children: React.ReactNode }) {
-  return <div style={{ marginBottom: 20 }}><div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.07em", textTransform: "uppercase" as const, marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #F1F5F9" }}>{title}</div>{children}</div>
+  return <div style={{ marginBottom: 20 }}><div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", letterSpacing: "0.07em", textTransform: "uppercase" as const, marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid var(--hf-border-subtle)" }}>{title}</div>{children}</div>
 }
 function ErrBanner({ msg }: { msg: string }) {
-  return <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{msg}</div>
+  return <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{msg}</div>
 }
 const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
 const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }

@@ -312,12 +312,12 @@ Transcript: ${transcript}`}]})
         <div style={{ display:"flex", alignItems:"center", gap:16 }}>
           <div style={{ width:48, height:48, borderRadius:"50%",
             background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center",
-            justifyContent:"center", fontSize:18, fontWeight:800, color:"#fff" }}>
+            justifyContent:"center", fontSize:18, fontWeight:800, color:"var(--hf-text-on-solid)" }}>
             {patient.fullName.split(" ").map(n=>n[0]).join("").slice(0,2)}
           </div>
           <div>
             <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:2 }}>
-              <span style={{ fontSize:18, fontWeight:800, color:"#fff" }}>{patient.fullName}</span>
+              <span style={{ fontSize:18, fontWeight:800, color:"var(--hf-text-on-solid)" }}>{patient.fullName}</span>
               <span style={{ background:"rgba(13,148,136,0.3)", color:"#5EEAD4",
                 padding:"2px 8px", borderRadius:20, fontSize:11, fontWeight:700 }}>
                 {appointment.appointmentType?.replace("_"," ")}
@@ -345,7 +345,7 @@ Transcript: ${transcript}`}]})
               background:"rgba(255,255,255,0.1)", borderRadius:10, padding:"8px 16px" }}>
               <div style={{ width:8, height:8, borderRadius:"50%", background:RED,
                 animation:"pulse 1.5s infinite" }}/>
-              <span style={{ fontSize:22, fontWeight:800, color:"#fff", fontVariantNumeric:"tabular-nums" }}>
+              <span style={{ fontSize:22, fontWeight:800, color:"var(--hf-text-on-solid)", fontVariantNumeric:"tabular-nums" }}>
                 {fmtTimer(elapsed)}
               </span>
             </div>
@@ -358,12 +358,12 @@ Transcript: ${transcript}`}]})
           <div style={{ textAlign:"center",
             background:"rgba(255,255,255,0.1)", borderRadius:10, padding:"8px 16px" }}>
             <div style={{ fontSize:11, color:"rgba(255,255,255,0.6)" }}>Running bill</div>
-            <div style={{ fontSize:18, fontWeight:800, color:"#fff" }}>{fmtR(billTotal)}</div>
+            <div style={{ fontSize:18, fontWeight:800, color:"var(--hf-text-on-solid)" }}>{fmtR(billTotal)}</div>
           </div>
 
           <button onClick={() => { setShowComplete(true); setCompleteError("") }}
             style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 20px",
-              background:TEAL, color:"#fff", border:"none", borderRadius:10,
+              background:TEAL, color:"var(--hf-text-on-solid)", border:"none", borderRadius:10,
               fontSize:14, fontWeight:700, cursor:"pointer" }}>
             <CheckCircle size={16}/> Complete
           </button>
@@ -393,12 +393,12 @@ Transcript: ${transcript}`}]})
           <button key={p.id} onClick={()=>setActivePanel(p.id as any)}
             style={{ flex:1, padding:"8px 12px", borderRadius:8, border:"none",
               background:activePanel===p.id?NAVY:LIGHT,
-              color:activePanel===p.id?"#fff":GRAY,
+              color:activePanel===p.id?"var(--hf-text-on-solid)":GRAY,
               fontWeight:activePanel===p.id?600:400, fontSize:13, cursor:"pointer",
               display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
             {p.label}
             {p.count>0 && (
-              <span style={{ background:TEAL, color:"#fff", borderRadius:"50%",
+              <span style={{ background:TEAL, color:"var(--hf-text-on-solid)", borderRadius:"50%",
                 width:18, height:18, fontSize:11, fontWeight:700,
                 display:"inline-flex", alignItems:"center", justifyContent:"center" }}>
                 {p.count}
@@ -416,7 +416,7 @@ Transcript: ${transcript}`}]})
           display: "flex" }}>
 
           {/* Voice panel */}
-          <div style={{ padding:"12px 14px", background:"#F5F3FF", border:"1px solid #DDD6FE",
+          <div style={{ padding:"12px 14px", background:"var(--hf-violet-soft)", border:"1px solid var(--hf-violet-border)",
             borderRadius:10 }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
               <span style={{ fontSize:12, fontWeight:700, color:PURPLE, display:"flex", alignItems:"center", gap:5 }}>
@@ -449,12 +449,12 @@ Transcript: ${transcript}`}]})
             )}
             <textarea value={transcript} onChange={e=>setTranscript(e.target.value)} rows={2}
               style={{ ...sinp, fontSize:11, resize:"vertical" as const,
-                background:"rgba(255,255,255,0.7)", color:"#475569" }}
+                background:"rgba(255,255,255,0.7)", color:"var(--hf-text-tertiary)" }}
               placeholder="Speak or type transcript here, then Extract SOAP…"/>
           </div>
 
           {/* Vitals */}
-          <div style={{ padding:"12px 14px", background:"#fff", border:`1px solid ${BORDER}`, borderRadius:10 }}>
+          <div style={{ padding:"12px 14px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:10 }}>
             <div style={sectionLabel}>Vitals</div>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8 }}>
               {[
@@ -510,7 +510,7 @@ Transcript: ${transcript}`}]})
           display: "flex" }}>
 
           {/* Quick-add procedures */}
-          <div style={{ padding:"12px 14px", background:"#fff", border:`1px solid ${BORDER}`, borderRadius:10 }}>
+          <div style={{ padding:"12px 14px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:10 }}>
             <div style={sectionLabel}>Quick add — procedures</div>
             <div style={{ display:"flex", gap:6, flexWrap:"wrap" as const }}>
               {QUICK_PROCEDURES.map(proc=>(
@@ -527,7 +527,7 @@ Transcript: ${transcript}`}]})
           </div>
 
           {/* Medication search — adds to bill + Rx */}
-          <div style={{ padding:"12px 14px", background:"#fff", border:`1px solid ${BORDER}`, borderRadius:10, position:"relative" }}>
+          <div style={{ padding:"12px 14px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:10, position:"relative" }}>
             <div style={sectionLabel}>Add medication (bill + Rx)</div>
             <div style={{ position:"relative" }}>
               <Search size={13} style={{ position:"absolute", left:8, top:"50%", transform:"translateY(-50%)", color:GRAY }}/>
@@ -538,7 +538,7 @@ Transcript: ${transcript}`}]})
             </div>
             {showMedSearch && (medLoading || medResults.length>0) && (
               <div style={{ position:"absolute", left:14, right:14, zIndex:50,
-                background:"#fff", border:`1px solid ${BORDER}`, borderRadius:8,
+                background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:8,
                 boxShadow:"0 8px 32px rgba(0,0,0,0.12)", maxHeight:240, overflowY:"auto" }}>
                 {medLoading && <div style={{padding:"10px 14px",fontSize:12,color:GRAY}}>Searching…</div>}
                 {medResults.map((med:any)=>(
@@ -548,15 +548,15 @@ Transcript: ${transcript}`}]})
                       nappiCode:med.nappiCode,
                       unitPrice:parseFloat(med.singleExitPrice)||0
                     })}
-                    style={{ padding:"8px 14px", cursor:"pointer", borderBottom:`1px solid #F1F5F9` }}
+                    style={{ padding:"8px 14px", cursor:"pointer", borderBottom:`1px solid var(--hf-border-subtle)` }}
                     onMouseEnter={e=>(e.currentTarget.style.background=LIGHT)}
-                    onMouseLeave={e=>(e.currentTarget.style.background="#fff")}>
-                    <div style={{fontWeight:600,fontSize:13,color:"#0F172A"}}>{med.genericName} <span style={{color:GRAY,fontWeight:400}}>{med.strength}</span></div>
+                    onMouseLeave={e=>(e.currentTarget.style.background="var(--hf-surface)")}>
+                    <div style={{fontWeight:600,fontSize:13,color:"var(--hf-text)"}}>{med.genericName} <span style={{color:GRAY,fontWeight:400}}>{med.strength}</span></div>
                     <div style={{fontSize:11,color:GRAY}}>{med.brandName} · NAPPI: {med.nappiCode} · SEP: {fmtR(parseFloat(med.singleExitPrice)||0)}</div>
                   </div>
                 ))}
                 <div onClick={()=>setShowMedSearch(false)}
-                  style={{padding:"6px 14px",fontSize:11,color:GRAY,cursor:"pointer",borderTop:`1px solid #F1F5F9`,textAlign:"center" as const}}>
+                  style={{padding:"6px 14px",fontSize:11,color:GRAY,cursor:"pointer",borderTop:`1px solid var(--hf-border-subtle)`,textAlign:"center" as const}}>
                   Close
                 </div>
               </div>
@@ -572,10 +572,10 @@ Transcript: ${transcript}`}]})
               const col = typeColor[line.type]??GRAY
               return (
                 <div key={line.id} style={{ display:"flex", alignItems:"center", gap:8,
-                  padding:"8px 12px", background:"#fff", border:`1px solid ${BORDER}`,
+                  padding:"8px 12px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`,
                   borderLeft:`3px solid ${col}`, borderRadius:8 }}>
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:12, fontWeight:600, color:"#0F172A",
+                    <div style={{ fontSize:12, fontWeight:600, color:"var(--hf-text)",
                       overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" as const }}>
                       {line.description}
                     </div>
@@ -583,7 +583,7 @@ Transcript: ${transcript}`}]})
                       {line.tariffCode||line.nappiCode||""} · qty {line.quantity}
                     </div>
                   </div>
-                  <div style={{ fontSize:13, fontWeight:700, color:"#0F172A", flexShrink:0 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:"var(--hf-text)", flexShrink:0 }}>
                     {fmtR(line.gross)}
                   </div>
                   {line.id!=="consult-0191" && (
@@ -631,7 +631,7 @@ Transcript: ${transcript}`}]})
           {/* Bill total */}
           <div style={{padding:"12px 16px",background:NAVY,borderRadius:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <span style={{fontSize:12,color:"rgba(255,255,255,0.6)"}}>Total · {billLines.length} items</span>
-            <span style={{fontSize:20,fontWeight:800,color:"#fff"}}>{fmtR(billTotal)}</span>
+            <span style={{fontSize:20,fontWeight:800,color:"var(--hf-text-on-solid)"}}>{fmtR(billTotal)}</span>
           </div>
         </div>
 
@@ -639,7 +639,7 @@ Transcript: ${transcript}`}]})
         <div style={{ flex:1, display:"flex", flexDirection:"column", gap:10,
           display: "flex" }}>
 
-          <div style={{padding:"12px 14px",background:"#fff",border:`1px solid ${BORDER}`,borderRadius:10}}>
+          <div style={{padding:"12px 14px",background:"var(--hf-surface)",border:`1px solid ${BORDER}`,borderRadius:10}}>
             <div style={{...sectionLabel,marginBottom:8}}>Prescriptions ({rxDrafts.length})</div>
             <div style={{fontSize:11,color:GRAY}}>
               Medications added via search auto-appear here. Complete dosage details before finishing.
@@ -654,15 +654,15 @@ Transcript: ${transcript}`}]})
                 <div>Medications added during the consultation appear here.</div>
               </div>
             ) : rxDrafts.map(rx=>(
-              <div key={rx.id} style={{padding:"12px 14px",background:rx.fromBill?"#F0FDF4":"#fff",
+              <div key={rx.id} style={{padding:"12px 14px",background:rx.fromBill?"var(--hf-success-soft)":"var(--hf-surface)",
                 border:`1px solid ${rx.fromBill?"#86EFAC":BORDER}`,borderRadius:10,position:"relative"}}>
                 {rx.fromBill && (
                   <div style={{position:"absolute",top:8,right:8,fontSize:10,fontWeight:700,
-                    color:GREEN,background:"#DCFCE7",padding:"1px 6px",borderRadius:20}}>
+                    color:GREEN,background:"var(--hf-success-soft-strong)",padding:"1px 6px",borderRadius:20}}>
                     Added to bill
                   </div>
                 )}
-                <div style={{fontWeight:700,fontSize:13,color:"#0F172A",marginBottom:8,paddingRight:70}}>
+                <div style={{fontWeight:700,fontSize:13,color:"var(--hf-text)",marginBottom:8,paddingRight:70}}>
                   {rx.medicationName}
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
@@ -716,10 +716,10 @@ Transcript: ${transcript}`}]})
       {showComplete && (
         <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.6)",
           display:"flex",alignItems:"center",justifyContent:"center",zIndex:1400,backdropFilter:"blur(4px)"}}>
-          <div style={{background:"#fff",borderRadius:16,padding:28,width:520,
+          <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:520,
             boxShadow:"0 24px 64px rgba(0,0,0,0.25)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <h3 style={{margin:0,fontSize:18,fontWeight:700,color:"#0F172A"}}>Complete consultation</h3>
+              <h3 style={{margin:0,fontSize:18,fontWeight:700,color:"var(--hf-text)"}}>Complete consultation</h3>
               <button onClick={()=>setShowComplete(false)} style={{background:"none",border:"none",cursor:"pointer",color:GRAY}}><X size={18}/></button>
             </div>
 
@@ -738,18 +738,18 @@ Transcript: ${transcript}`}]})
             </div>
 
             {!soap.chiefComplaint.trim() && (
-              <div style={{marginBottom:12,padding:"8px 12px",background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:8,fontSize:12,color:AMBER}}>
+              <div style={{marginBottom:12,padding:"8px 12px",background:"var(--hf-warning-soft)",border:"1px solid var(--hf-warning-border)",borderRadius:8,fontSize:12,color:AMBER}}>
                 ⚠ Chief complaint is empty — add a reason for the visit before completing.
               </div>
             )}
             {rxDrafts.some(rx=>rx.medicationName&&!rx.dosage) && (
-              <div style={{marginBottom:12,padding:"8px 12px",background:"#EFF6FF",border:"1px solid #BFDBFE",borderRadius:8,fontSize:12,color:"#1D4ED8"}}>
+              <div style={{marginBottom:12,padding:"8px 12px",background:"var(--hf-info-soft)",border:"1px solid var(--hf-info-border)",borderRadius:8,fontSize:12,color:"var(--hf-info-text)"}}>
                 ℹ Some prescriptions are missing dosage details — they will still be saved.
               </div>
             )}
 
             {completeError && (
-              <div style={{marginBottom:12,padding:"8px 12px",background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,fontSize:12,color:RED}}>
+              <div style={{marginBottom:12,padding:"8px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:12,color:RED}}>
                 {completeError}
               </div>
             )}
@@ -771,10 +771,10 @@ Transcript: ${transcript}`}]})
 }
 
 // ── Style helpers ─────────────────────────────────────────────────────────────
-const lbl:React.CSSProperties         = {display:"block",fontSize:11,fontWeight:600,color:"#374151",marginBottom:3}
+const lbl:React.CSSProperties         = {display:"block",fontSize:11,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:3}
 const sectionLabel:React.CSSProperties = {fontSize:10,fontWeight:700,color:GRAY,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}
-const sinp:React.CSSProperties        = {width:"100%",padding:"8px 10px",boxSizing:"border-box" as const,border:`1.5px solid ${BORDER}`,borderRadius:7,fontSize:13,outline:"none",background:"#fff"}
-const primaryBtn:React.CSSProperties  = {background:NAVY,color:"#fff",border:"none",borderRadius:9,padding:"9px 18px",fontSize:13,fontWeight:600,cursor:"pointer"}
-const cancelBtn:React.CSSProperties   = {padding:"9px 16px",border:`1px solid ${BORDER}`,borderRadius:9,background:"#fff",fontSize:13,cursor:"pointer",color:"#374151"}
-const voiceBtn = (bg:string):React.CSSProperties => ({display:"flex",alignItems:"center",gap:4,padding:"4px 10px",background:bg,color:"#fff",border:"none",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer"})
+const sinp:React.CSSProperties        = {width:"100%",padding:"8px 10px",boxSizing:"border-box" as const,border:`1.5px solid ${BORDER}`,borderRadius:7,fontSize:13,outline:"none",background:"var(--hf-surface)"}
+const primaryBtn:React.CSSProperties  = {background:NAVY,color:"var(--hf-text-on-solid)",border:"none",borderRadius:9,padding:"9px 18px",fontSize:13,fontWeight:600,cursor:"pointer"}
+const cancelBtn:React.CSSProperties   = {padding:"9px 16px",border:`1px solid ${BORDER}`,borderRadius:9,background:"var(--hf-surface)",fontSize:13,cursor:"pointer",color:"var(--hf-text-secondary)"}
+const voiceBtn = (bg:string):React.CSSProperties => ({display:"flex",alignItems:"center",gap:4,padding:"4px 10px",background:bg,color:"var(--hf-text-on-solid)",border:"none",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer"})
 

@@ -69,9 +69,9 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 480, maxHeight: "85vh", overflowY: "auto" }}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 480, maxHeight: "85vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", margin: 0 }}>Schedule a session</p>
+          <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Schedule a session</p>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
         </div>
         <div style={{ display: "grid", gap: 12 }}>
@@ -86,15 +86,15 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
             <label style={labelStyle}>Session type *</label>
             <div style={{ display: "flex", gap: 10 }}>
               <button type="button" onClick={() => setForm({ ...form, sessionType: "PUBLIC", clientId: "" })}
-                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", borderRadius: 8, border: form.sessionType === "PUBLIC" ? `1.5px solid ${TRAINPROV_ACCENT}` : "1px solid #E2E8F0", background: form.sessionType === "PUBLIC" ? "#FFFBEB" : "#fff", color: form.sessionType === "PUBLIC" ? TRAINPROV_ACCENT : "#64748B", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", borderRadius: 8, border: form.sessionType === "PUBLIC" ? `1.5px solid ${TRAINPROV_ACCENT}` : "1px solid var(--hf-border)", background: form.sessionType === "PUBLIC" ? "var(--hf-warning-soft)" : "var(--hf-surface)", color: form.sessionType === "PUBLIC" ? TRAINPROV_ACCENT : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                 <Globe size={14} /> Public
               </button>
               <button type="button" onClick={() => setForm({ ...form, sessionType: "CLOSED" })}
-                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", borderRadius: 8, border: form.sessionType === "CLOSED" ? `1.5px solid ${TRAINPROV_ACCENT}` : "1px solid #E2E8F0", background: form.sessionType === "CLOSED" ? "#FFFBEB" : "#fff", color: form.sessionType === "CLOSED" ? TRAINPROV_ACCENT : "#64748B", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", borderRadius: 8, border: form.sessionType === "CLOSED" ? `1.5px solid ${TRAINPROV_ACCENT}` : "1px solid var(--hf-border)", background: form.sessionType === "CLOSED" ? "var(--hf-warning-soft)" : "var(--hf-surface)", color: form.sessionType === "CLOSED" ? TRAINPROV_ACCENT : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                 <Lock size={14} /> Closed
               </button>
             </div>
-            <p style={{ fontSize: 11, color: "#94A3B8", margin: "5px 0 0" }}>
+            <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: "5px 0 0" }}>
               {form.sessionType === "PUBLIC" ? "Open to delegates from any client." : "Reserved for one client's own delegates."}
             </p>
           </div>
@@ -119,10 +119,10 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
           <div><label style={labelStyle}>Notes</label><textarea style={{ ...inputStyle, minHeight: 50, resize: "vertical" }} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
         </div>
 
-        {save.isError && <p style={{ color: "#DC2626", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not schedule this session"}</p>}
+        {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not schedule this session"}</p>}
 
         <button onClick={() => save.mutate()} disabled={!valid || save.isPending}
-          style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 8, border: "none", background: TRAINPROV_ACCENT, color: "#fff", fontSize: 13.5, fontWeight: 700, cursor: "pointer", opacity: (!valid || save.isPending) ? 0.6 : 1 }}>
+          style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 8, border: "none", background: TRAINPROV_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13.5, fontWeight: 700, cursor: "pointer", opacity: (!valid || save.isPending) ? 0.6 : 1 }}>
           {save.isPending ? "Scheduling…" : "Schedule session"}
         </button>
       </div>
@@ -149,7 +149,7 @@ export default function TrainProvSessionsTab() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <p style={{ fontSize: 13, color: "#94A3B8", margin: 0 }}>{sessions.length} session{sessions.length === 1 ? "" : "s"}</p>
+          <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0 }}>{sessions.length} session{sessions.length === 1 ? "" : "s"}</p>
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ ...inputStyle, width: "auto", padding: "5px 10px", fontSize: 12 }}>
             <option value="">All statuses</option>
             <option value="SCHEDULED">Scheduled</option>
@@ -159,39 +159,39 @@ export default function TrainProvSessionsTab() {
           </select>
         </div>
         <button onClick={() => setShowForm(true)}
-          style={{ display: "flex", alignItems: "center", gap: 6, background: TRAINPROV_ACCENT, color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 6, background: TRAINPROV_ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Schedule session
         </button>
       </div>
 
       {isLoading ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p>
       ) : sessions.length === 0 ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>No sessions scheduled yet.</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No sessions scheduled yet.</p>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {sessions.map((s, i) => (
             <button key={s.id} onClick={() => setSelectedId(s.id)}
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", textAlign: "left", padding: "13px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9", background: "none", border: "none", cursor: "pointer" }}>
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", textAlign: "left", padding: "13px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)", background: "none", border: "none", cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: "#FFFBEB", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--hf-warning-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <CalendarDays size={15} color={TRAINPROV_ACCENT} />
                 </div>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <p style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A", margin: 0 }}>{s.courseTitle}</p>
-                    <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: s.sessionType === "PUBLIC" ? "#EFF6FF" : "#F5F3FF", color: s.sessionType === "PUBLIC" ? "#1D4ED8" : "#6D28D9" }}>
+                    <p style={{ fontSize: 13.5, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{s.courseTitle}</p>
+                    <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: s.sessionType === "PUBLIC" ? "var(--hf-info-soft)" : "var(--hf-violet-soft)", color: s.sessionType === "PUBLIC" ? "var(--hf-info-text)" : "var(--hf-violet-text)" }}>
                       {s.sessionType === "PUBLIC" ? <Globe size={10} /> : <Lock size={10} />} {s.sessionType}
                     </span>
                     <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: `${STATUS_COLORS[s.status]}18`, color: STATUS_COLORS[s.status] }}>{s.status.replace("_", " ")}</span>
                   </div>
-                  <p style={{ fontSize: 11.5, color: "#94A3B8", margin: 0 }}>
+                  <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>
                     {s.startDate} → {s.endDate} {s.venue ? `· ${s.venue}` : ""} {s.clientName ? `· ${s.clientName}` : ""}
                   </p>
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#64748B" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-text-muted)" }}>
                   <Users size={13} /> {s.enrolledCount}{s.capacity != null ? ` / ${s.capacity}` : ""}
                 </span>
                 <ChevronRight size={16} color="#CBD5E1" />

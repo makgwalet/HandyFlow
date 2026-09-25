@@ -44,7 +44,7 @@ function KpiCard({ label, value, icon: Icon, color, bg, onClick, urgent }:
     <div
       onClick={onClick}
       style={{
-        background: "#fff", border: `1px solid ${urgent && value > 0 ? color : "#E2E8F0"}`,
+        background: "var(--hf-surface)", border: `1px solid ${urgent && value > 0 ? color : "#E2E8F0"}`,
         borderRadius: 12, padding: "18px 20px", cursor: onClick ? "pointer" : "default",
         transition: "box-shadow 0.15s",
         boxShadow: urgent && value > 0 ? `0 0 0 3px ${bg}` : "none",
@@ -53,14 +53,14 @@ function KpiCard({ label, value, icon: Icon, color, bg, onClick, urgent }:
       onMouseLeave={e => { if (onClick) (e.currentTarget as HTMLElement).style.boxShadow = urgent && value > 0 ? `0 0 0 3px ${bg}` : "none" }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
           {label}
         </div>
         <div style={{ width: 34, height: 34, borderRadius: 9, background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Icon size={16} color={color} />
         </div>
       </div>
-      <div style={{ fontSize: 32, fontWeight: 800, color: urgent && value > 0 ? color : "#0F172A" }}>
+      <div style={{ fontSize: 32, fontWeight: 800, color: urgent && value > 0 ? color : "var(--hf-text)" }}>
         {value}
       </div>
       {onClick && (
@@ -142,23 +142,23 @@ export function ScmDashboard({ onNav }: { onNav: (tab: ScmTab) => void }) {
         {/* Recent Purchase Orders */}
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Recent Purchase Orders</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Recent Purchase Orders</div>
             <button onClick={() => onNav("purchase-orders")}
               style={{ fontSize: 12, color: ACCENT, fontWeight: 600, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
               View all <ArrowRight size={12} />
             </button>
           </div>
           {pos.length === 0
-            ? <div style={{ textAlign: "center", padding: "40px 0", color: "#94A3B8" }}>
+            ? <div style={{ textAlign: "center", padding: "40px 0", color: "var(--hf-text-faint)" }}>
                 <ShoppingCart size={32} style={{ opacity: .3, marginBottom: 8 }} />
                 <div style={{ fontSize: 13 }}>No purchase orders yet</div>
               </div>
-            : <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden" }}>
+            : <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
-                    <tr style={{ background: "#F8FAFC" }}>
+                    <tr style={{ background: "var(--hf-surface-muted)" }}>
                       {["Order #", "Supplier", "Amount", "Required By", "Status"].map(h => (
-                        <th key={h} style={{ padding: "9px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                        <th key={h} style={{ padding: "9px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -166,11 +166,11 @@ export function ScmDashboard({ onNav }: { onNav: (tab: ScmTab) => void }) {
                     {pos.map((po, i) => {
                       const st = PO_STATUS[po.status] ?? PO_STATUS.DRAFT
                       return (
-                        <tr key={po.id} style={{ borderTop: "1px solid #F1F5F9", background: i % 2 === 0 ? "#fff" : "#FAFAFA" }}>
+                        <tr key={po.id} style={{ borderTop: "1px solid var(--hf-border-subtle)", background: i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)" }}>
                           <td style={{ padding: "10px 14px", fontSize: 12, fontWeight: 700, color: ACCENT }}>{po.orderNumber}</td>
-                          <td style={{ padding: "10px 14px", fontSize: 13, color: "#0F172A" }}>{po.supplierName}</td>
+                          <td style={{ padding: "10px 14px", fontSize: 13, color: "var(--hf-text)" }}>{po.supplierName}</td>
                           <td style={{ padding: "10px 14px", fontSize: 13, fontWeight: 600 }}>{fmtR(po.totalAmount)}</td>
-                          <td style={{ padding: "10px 14px", fontSize: 12, color: "#64748B" }}>{fmtD(po.requiredByDate)}</td>
+                          <td style={{ padding: "10px 14px", fontSize: 12, color: "var(--hf-text-muted)" }}>{fmtD(po.requiredByDate)}</td>
                           <td style={{ padding: "10px 14px" }}>
                             <span style={{ background: st.bg, color: st.color, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20 }}>
                               {st.label}
@@ -188,18 +188,18 @@ export function ScmDashboard({ onNav }: { onNav: (tab: ScmTab) => void }) {
         {/* Low Stock Panel */}
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Low Stock Alerts</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Low Stock Alerts</div>
             <button onClick={() => onNav("inventory")}
               style={{ fontSize: 12, color: ACCENT, fontWeight: 600, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
               View all <ArrowRight size={12} />
             </button>
           </div>
           {!lowStock || lowStock.length === 0
-            ? <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, padding: "32px 20px", textAlign: "center", color: "#94A3B8" }}>
+            ? <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, padding: "32px 20px", textAlign: "center", color: "var(--hf-text-faint)" }}>
                 <TrendingUp size={28} style={{ opacity: .3, marginBottom: 8 }} />
                 <div style={{ fontSize: 13 }}>All stock levels healthy</div>
               </div>
-            : <div style={{ border: "1px solid #FCD34D", borderRadius: 10, padding: "14px 10px 6px 6px", background: "#FFFBEB" }}>
+            : <div style={{ border: "1px solid var(--hf-warning-border-strong)", borderRadius: 10, padding: "14px 10px 6px 6px", background: "var(--hf-warning-soft)" }}>
                 {/* NEW: dashboard trend chart — quantity on hand vs
                     reorder point per item, real item names (not
                     truncated UUIDs). Critical items (zero on hand)

@@ -89,19 +89,19 @@ function ConfirmModal({ title, message, confirmLabel = 'Confirm', danger = false
 }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, backdropFilter: 'blur(2px)' }}>
-      <div style={{ background: '#fff', borderRadius: 14, padding: 28, width: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 14, padding: 28, width: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 22 }}>
-          <div style={{ width: 40, height: 40, borderRadius: '50%', background: danger ? '#FEF2F2' : '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ width: 40, height: 40, borderRadius: '50%', background: danger ? 'var(--hf-danger-soft)' : 'var(--hf-info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <AlertTriangle size={18} color={danger ? '#DC2626' : '#1D4ED8'} />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: '#0F172A', marginBottom: 6 }}>{title}</div>
-            <div style={{ fontSize: 13, color: '#64748B', lineHeight: 1.6 }}>{message}</div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--hf-text)', marginBottom: 6 }}>{title}</div>
+            <div style={{ fontSize: 13, color: 'var(--hf-text-muted)', lineHeight: 1.6 }}>{message}</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button onClick={onCancel} style={btnSecondary}>Cancel</button>
-          <button onClick={onConfirm} style={{ ...btnPrimary, background: danger ? '#DC2626' : '#1B3A6B' }}>{confirmLabel}</button>
+          <button onClick={onConfirm} style={{ ...btnPrimary, background: danger ? 'var(--hf-danger)' : 'var(--hf-primary)' }}>{confirmLabel}</button>
         </div>
       </div>
     </div>
@@ -148,10 +148,10 @@ function ProofFilePreview({ jobId, proofId, fileType, maxHeight = 400, onVideoRe
   }, [jobId, proofId])
 
   if (error) {
-    return <div style={{ padding: 24, textAlign: 'center', color: '#94A3B8', fontSize: 12, border: '1px dashed #E2E8F0', borderRadius: 8 }}>Preview unavailable</div>
+    return <div style={{ padding: 24, textAlign: 'center', color: 'var(--hf-text-faint)', fontSize: 12, border: '1px dashed var(--hf-border)', borderRadius: 8 }}>Preview unavailable</div>
   }
   if (!url) {
-    return <div style={{ padding: 24, textAlign: 'center', color: '#94A3B8', fontSize: 12, border: '1px dashed #E2E8F0', borderRadius: 8 }}>Loading preview…</div>
+    return <div style={{ padding: 24, textAlign: 'center', color: 'var(--hf-text-faint)', fontSize: 12, border: '1px dashed var(--hf-border)', borderRadius: 8 }}>Loading preview…</div>
   }
 
   const isImage = fileType?.startsWith('image/')
@@ -160,7 +160,7 @@ function ProofFilePreview({ jobId, proofId, fileType, maxHeight = 400, onVideoRe
   if (isImage) {
     if (!onImageClick) {
       // Non-interactive context (e.g. comparison modal) — plain image, no overlay.
-      return <img src={url} style={{ maxWidth: '100%', maxHeight, borderRadius: 8, border: '1px solid #E2E8F0', display: 'block', margin: '0 auto', objectFit: 'contain' as const }} />
+      return <img src={url} style={{ maxWidth: '100%', maxHeight, borderRadius: 8, border: '1px solid var(--hf-border)', display: 'block', margin: '0 auto', objectFit: 'contain' as const }} />
     }
     return (
       <div
@@ -170,11 +170,11 @@ function ProofFilePreview({ jobId, proofId, fileType, maxHeight = 400, onVideoRe
         }}
         title="Click anywhere on the image to pin your next comment to that spot"
         style={{ position: 'relative', display: 'inline-block', cursor: 'crosshair', lineHeight: 0, margin: '0 auto' }}>
-        <img src={url} style={{ maxWidth: '100%', maxHeight, borderRadius: 8, border: '1px solid #E2E8F0', display: 'block', objectFit: 'contain' as const }} />
+        <img src={url} style={{ maxWidth: '100%', maxHeight, borderRadius: 8, border: '1px solid var(--hf-border)', display: 'block', objectFit: 'contain' as const }} />
         {(pins ?? []).map(p => (
           <button key={p.id} onClick={ev => { ev.stopPropagation(); p.onClick() }} title={p.label}
             style={{ position: 'absolute', left: `${p.x * 100}%`, top: `${p.y * 100}%`, transform: 'translate(-50%, -50%)',
-              width: 22, height: 22, borderRadius: '50%', background: p.color, color: '#fff', border: '2px solid #fff',
+              width: 22, height: 22, borderRadius: '50%', background: p.color, color: 'var(--hf-text-on-solid)', border: '2px solid var(--hf-surface)',
               boxShadow: '0 2px 6px rgba(0,0,0,0.3)', fontSize: 10, fontWeight: 700, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
             {p.label}
@@ -183,7 +183,7 @@ function ProofFilePreview({ jobId, proofId, fileType, maxHeight = 400, onVideoRe
         {pendingPin && (
           <div style={{ position: 'absolute', left: `${pendingPin.x * 100}%`, top: `${pendingPin.y * 100}%`,
             transform: 'translate(-50%, -50%)', width: 18, height: 18, borderRadius: '50%',
-            background: 'rgba(217,119,6,0.25)', border: '2px solid #D97706', pointerEvents: 'none' }} />
+            background: 'rgba(217,119,6,0.25)', border: '2px solid var(--hf-warning)', pointerEvents: 'none' }} />
         )}
       </div>
     )
@@ -203,11 +203,11 @@ function ProofFilePreview({ jobId, proofId, fileType, maxHeight = 400, onVideoRe
   // analysis as needing server-side thumbnailing) — offer a direct download
   // of the fetched blob instead of nothing.
   return (
-    <div style={{ padding: 24, textAlign: 'center', border: '1px dashed #E2E8F0', borderRadius: 8 }}>
-      <div style={{ fontSize: 12, color: '#64748B', marginBottom: 8 }}>
+    <div style={{ padding: 24, textAlign: 'center', border: '1px dashed var(--hf-border)', borderRadius: 8 }}>
+      <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 8 }}>
         Preview not available for {fileType ?? 'this file type'}
       </div>
-      <a href={url} download style={{ fontSize: 12, color: '#1B3A6B', fontWeight: 700, textDecoration: 'none' }}>
+      <a href={url} download style={{ fontSize: 12, color: 'var(--hf-primary-text)', fontWeight: 700, textDecoration: 'none' }}>
         Download to view
       </a>
     </div>
@@ -349,32 +349,32 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, padding: '28px 20px', overflowY: 'auto' }}>
-      <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 760, boxShadow: '0 25px 80px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 16, width: '100%', maxWidth: 760, boxShadow: '0 25px 80px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #F1F5F9' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--hf-border-subtle)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
             <div style={{ flex: 1, marginRight: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#111827' }}>{job.title}</h2>
+                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--hf-text)' }}>{job.title}</h2>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
                   <span style={{ width: 5, height: 5, borderRadius: '50%', background: sc.dot }} />{sc.label}
                 </span>
-                {overdue && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#FEF2F2', color: '#DC2626', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}><AlertTriangle size={10} /> Overdue</span>}
+                {overdue && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}><AlertTriangle size={10} /> Overdue</span>}
               </div>
-              <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#64748B', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--hf-text-muted)', flexWrap: 'wrap' }}>
                 <span>{job.jobType.replace('_', ' ')}</span>
-                <span>Client: <strong style={{ color: '#374151' }}>{job.clientName}</strong></span>
-                {job.dueDate && <span style={{ color: overdue ? '#DC2626' : '#64748B' }}>Due: {fmtDate(job.dueDate)}</span>}
-                {job.quotedAmount && <span>Quoted: <strong style={{ color: '#0D9488' }}>{fmtR(job.quotedAmount)}</strong></span>}
-                <span style={{ background: PRIORITY[job.priority]?.bg ?? '#F8FAFC', color: PRIORITY[job.priority]?.color ?? '#64748B', padding: '1px 7px', borderRadius: 10, fontSize: 10, fontWeight: 700 }}>{job.priority}</span>
+                <span>Client: <strong style={{ color: 'var(--hf-text-secondary)' }}>{job.clientName}</strong></span>
+                {job.dueDate && <span style={{ color: overdue ? 'var(--hf-danger-text)' : 'var(--hf-text-muted)' }}>Due: {fmtDate(job.dueDate)}</span>}
+                {job.quotedAmount && <span>Quoted: <strong style={{ color: 'var(--hf-accent-text)' }}>{fmtR(job.quotedAmount)}</strong></span>}
+                <span style={{ background: PRIORITY[job.priority]?.bg ?? 'var(--hf-surface-muted)', color: PRIORITY[job.priority]?.color ?? 'var(--hf-text-muted)', padding: '1px 7px', borderRadius: 10, fontSize: 10, fontWeight: 700 }}>{job.priority}</span>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-              <button onClick={() => setShowDeleteConfirm(true)} style={{ background: 'none', border: '1.5px solid #E5E7EB', borderRadius: 7, padding: '6px 8px', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}>
+              <button onClick={() => setShowDeleteConfirm(true)} style={{ background: 'none', border: '1.5px solid var(--hf-border)', borderRadius: 7, padding: '6px 8px', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}>
                 <Trash2 size={14} />
               </button>
-              <button onClick={onClose} style={{ background: '#F1F5F9', border: 'none', borderRadius: 7, padding: '6px 8px', cursor: 'pointer', color: '#64748B', display: 'flex' }}>
+              <button onClick={onClose} style={{ background: 'var(--hf-surface-sunken)', border: 'none', borderRadius: 7, padding: '6px 8px', cursor: 'pointer', color: 'var(--hf-text-muted)', display: 'flex' }}>
                 <X size={16} />
               </button>
             </div>
@@ -388,8 +388,8 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
               const isPast   = PIPELINE_STATUSES.indexOf(job.status) > i
               return (
                 <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
-                  <div style={{ flex: 1, padding: '4px 8px', borderRadius: 6, background: isCurrent ? cfg.bg : isPast ? '#F0FDF4' : '#F8FAFC', border: `1px solid ${isCurrent ? cfg.border : isPast ? '#86EFAC' : '#E2E8F0'}`, textAlign: 'center' as const }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: isCurrent ? cfg.color : isPast ? '#166534' : '#94A3B8', whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ flex: 1, padding: '4px 8px', borderRadius: 6, background: isCurrent ? cfg.bg : isPast ? 'var(--hf-success-soft)' : 'var(--hf-surface-muted)', border: `1px solid ${isCurrent ? cfg.border : isPast ? '#86EFAC' : '#E2E8F0'}`, textAlign: 'center' as const }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: isCurrent ? cfg.color : isPast ? 'var(--hf-success-text-strong)' : 'var(--hf-text-faint)', whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {isPast && !isCurrent ? '✓ ' : ''}{cfg.label}
                     </div>
                   </div>
@@ -405,19 +405,19 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
               {currentActions.map(a => (
                 <button key={a.action} onClick={() => doAction.mutate(a.action)}
                   disabled={doAction.isPending}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', background: a.bg, color: a.color, border: `1px solid`, borderColor: STATUS[a.next]?.border ?? '#E2E8F0', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', background: a.bg, color: a.color, border: `1px solid`, borderColor: STATUS[a.next]?.border ?? 'var(--hf-border)', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                   <ChevronRight size={12} /> {a.label}
                 </button>
               ))}
               {!['DELIVERED','INVOICED','CANCELLED'].includes(job.status) && (
                 <button onClick={() => setShowUploadProof(true)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', background: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', border: '1px solid var(--hf-info-border)', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                   <Upload size={12} /> Upload Proof
                 </button>
               )}
               {job.status === 'APPROVED' && (
                 <button onClick={() => setShowAddDeliverable(true)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', background: '#F0FDF9', color: '#0D9488', border: '1px solid #99F6E4', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', background: 'var(--hf-accent-soft)', color: 'var(--hf-accent-text)', border: '1px solid var(--hf-accent-border)', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                   <Package size={12} /> Add Deliverable
                 </button>
               )}
@@ -428,7 +428,7 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
           <div style={{ display: 'flex', gap: 0, marginTop: 16 }}>
             {TABS.map(t => (
               <button key={t} onClick={() => setTab(t)}
-                style={{ padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t ? '#1B3A6B' : '#9CA3AF', borderBottom: `2px solid ${tab === t ? '#1B3A6B' : 'transparent'}`, marginBottom: -1, textTransform: 'capitalize' }}>
+                style={{ padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t ? 'var(--hf-primary-text)' : 'var(--hf-text-faint)', borderBottom: `2px solid ${tab === t ? '#1B3A6B' : 'transparent'}`, marginBottom: -1, textTransform: 'capitalize' }}>
                 {t === 'proofs' ? `Proofs (${(proofs as Proof[]).length})` : t === 'deliverables' ? `Deliverables (${(deliverables as Deliverable[]).length})` : t}
               </button>
             ))}
@@ -437,21 +437,21 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
 
         {/* Body */}
         <div style={{ padding: '22px 24px 26px' }}>
-          {error && <div style={{ marginBottom: 14, padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>{error}</div>}
+          {error && <div style={{ marginBottom: 14, padding: '10px 14px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>}
 
           {tab === 'details' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 24 }}>
               <div>
                 {job.description && (
                   <div style={{ marginBottom: 18 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Description</div>
-                    <div style={{ fontSize: 14, color: '#374151', lineHeight: 1.7, background: '#F9FAFB', borderRadius: 9, padding: '12px 14px' }}>{job.description}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Description</div>
+                    <div style={{ fontSize: 14, color: 'var(--hf-text-secondary)', lineHeight: 1.7, background: 'var(--hf-surface-muted)', borderRadius: 9, padding: '12px 14px' }}>{job.description}</div>
                   </div>
                 )}
                 {job.notes && (
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Internal notes</div>
-                    <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.6, background: '#FFFBEB', borderRadius: 9, padding: '12px 14px', border: '1px solid #FDE68A' }}>{job.notes}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Internal notes</div>
+                    <div style={{ fontSize: 13, color: 'var(--hf-text-secondary)', lineHeight: 1.6, background: 'var(--hf-warning-soft)', borderRadius: 9, padding: '12px 14px', border: '1px solid var(--hf-warning-border)' }}>{job.notes}</div>
                   </div>
                 )}
               </div>
@@ -468,8 +468,8 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                   { label: 'Created',   value: fmtDate(job.createdAt) },
                 ].map(r => (
                   <div key={r.label}>
-                    <div style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{r.label}</div>
-                    <div style={{ fontSize: 13, color: '#374151', fontWeight: 600, marginTop: 2 }}>{r.value}</div>
+                    <div style={{ fontSize: 10, color: 'var(--hf-text-faint)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{r.label}</div>
+                    <div style={{ fontSize: 13, color: 'var(--hf-text-secondary)', fontWeight: 600, marginTop: 2 }}>{r.value}</div>
                   </div>
                 ))}
               </div>
@@ -479,11 +479,11 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
           {tab === 'brief' && (
             <div>
               {job.brief ? (
-                <div style={{ fontSize: 14, color: '#374151', lineHeight: 1.8, background: '#F9FAFB', borderRadius: 10, padding: '16px 18px', border: '1px solid #E2E8F0', whiteSpace: 'pre-wrap' as const }}>{job.brief}</div>
+                <div style={{ fontSize: 14, color: 'var(--hf-text-secondary)', lineHeight: 1.8, background: 'var(--hf-surface-muted)', borderRadius: 10, padding: '16px 18px', border: '1px solid var(--hf-border)', whiteSpace: 'pre-wrap' as const }}>{job.brief}</div>
               ) : (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#94A3B8' }}>
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--hf-text-faint)' }}>
                   <FileText size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
-                  <div style={{ fontWeight: 600, color: '#475569' }}>No brief added yet</div>
+                  <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No brief added yet</div>
                 </div>
               )}
             </div>
@@ -504,9 +504,9 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                 )}
               </div>
               {(proofs as Proof[]).length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#94A3B8', border: '1.5px dashed #E2E8F0', borderRadius: 12 }}>
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--hf-text-faint)', border: '1.5px dashed var(--hf-border)', borderRadius: 12 }}>
                   <Upload size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
-                  <div style={{ fontWeight: 600, color: '#475569' }}>No proofs yet</div>
+                  <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No proofs yet</div>
                   <div style={{ fontSize: 13, marginTop: 4 }}>Upload the first proof version to start the approval process.</div>
                 </div>
               ) : (
@@ -517,14 +517,14 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                              : proof.status === 'SUPERSEDED' ? { color: '#94A3B8', bg: '#F8FAFC', label: 'Superseded' }
                              : { color: '#D97706', bg: '#FFFBEB', label: 'Pending review' }
                     return (
-                      <div key={proof.id} style={{ border: '1px solid #E2E8F0', borderRadius: 12, padding: '16px 18px', background: proof.status === 'APPROVED' ? '#F0FDF4' : '#fff' }}>
+                      <div key={proof.id} style={{ border: '1px solid var(--hf-border)', borderRadius: 12, padding: '16px 18px', background: proof.status === 'APPROVED' ? 'var(--hf-success-soft)' : 'var(--hf-surface)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                           <div>
-                            <div style={{ fontWeight: 700, fontSize: 14, color: '#0F172A', marginBottom: 4 }}>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)', marginBottom: 4 }}>
                               Version {proof.versionNumber}
-                              {proof.title && <span style={{ fontWeight: 400, color: '#64748B' }}> — {proof.title}</span>}
+                              {proof.title && <span style={{ fontWeight: 400, color: 'var(--hf-text-muted)' }}> — {proof.title}</span>}
                             </div>
-                            <div style={{ fontSize: 12, color: '#94A3B8' }}>
+                            <div style={{ fontSize: 12, color: 'var(--hf-text-faint)' }}>
                               {proof.fileName ?? 'No file'} · {fmtDate(proof.createdAt)}
                               {proof.sentAt && ` · Sent to ${proof.sentToEmail} on ${fmtDate(proof.sentAt)}`}
                             </div>
@@ -532,7 +532,7 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             {proof.hasFile && (
                               <button onClick={() => setExpandedPreview(expandedPreview === proof.id ? null : proof.id)}
-                                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', background: expandedPreview === proof.id ? '#EFF6FF' : '#F1F5F9', color: expandedPreview === proof.id ? '#1D4ED8' : '#64748B', border: 'none', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', background: expandedPreview === proof.id ? 'var(--hf-info-soft)' : 'var(--hf-surface-sunken)', color: expandedPreview === proof.id ? 'var(--hf-info-text)' : 'var(--hf-text-muted)', border: 'none', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
                                 <Eye size={11} /> {expandedPreview === proof.id ? 'Hide' : 'Preview'}
                               </button>
                             )}
@@ -562,13 +562,13 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                         )}
 
                         {proof.status === 'APPROVED' && (
-                          <div style={{ padding: '8px 12px', background: '#DCFCE7', borderRadius: 8, marginBottom: 12, fontSize: 12, color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ padding: '8px 12px', background: 'var(--hf-success-soft-strong)', borderRadius: 8, marginBottom: 12, fontSize: 12, color: 'var(--hf-success-text-strong)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
                             <CheckCircle size={13} /> Approved by {proof.approvedByName} on {fmtDT(proof.approvedAt)}
                           </div>
                         )}
 
                         {proof.rejectionReason && (
-                          <div style={{ padding: '8px 12px', background: '#FEF2F2', borderRadius: 8, marginBottom: 12, fontSize: 12, color: '#DC2626', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                          <div style={{ padding: '8px 12px', background: 'var(--hf-danger-soft)', borderRadius: 8, marginBottom: 12, fontSize: 12, color: 'var(--hf-danger-text)', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
                             <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: 1 }} /> <span><strong>Changes requested:</strong> {proof.rejectionReason}</span>
                           </div>
                         )}
@@ -578,11 +578,11 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                           <div style={{ marginBottom: 12 }}>
                             <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
                               <button onClick={() => { setShowSendProof(proof.id); setSendEmail(job.clientEmail ?? ''); setError('') }}
-                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#1B3A6B', color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                                 <Send size={11} /> Send to client
                               </button>
                               <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/creative/approve/${proof.approvalToken}`)}
-                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#F1F5F9', color: '#374151', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: 'var(--hf-surface-sunken)', color: 'var(--hf-text-secondary)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>
                                 <Link2 size={11} /> Copy link
                               </button>
                             </div>
@@ -590,7 +590,7 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                                 everything above stays exactly as it always has for the
                                 simple single-approver case. */}
                             <button onClick={() => { setShowConfigureApprovers(proof.id); setError('') }}
-                              style={{ background: 'none', border: 'none', padding: 0, color: '#1B3A6B', fontSize: 11, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>
+                              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--hf-primary-text)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>
                               Need more than one approver? Configure an approval chain →
                             </button>
                           </div>
@@ -598,24 +598,24 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
 
                         {proof.status === 'PENDING' && !proof.sentAt && proof.approvalMode !== 'SINGLE' && (
                           <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: 6 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>
                               {proof.approvalMode === 'SEQUENTIAL' ? 'Sequential' : 'Parallel'} approval chain configured
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
                               {proof.approvers.map(a => (
-                                <div key={a.id} style={{ fontSize: 12, color: '#374151' }}>
-                                  {a.approvalOrder}. {a.approverName} <span style={{ color: '#94A3B8' }}>({a.approverEmail})</span>
+                                <div key={a.id} style={{ fontSize: 12, color: 'var(--hf-text-secondary)' }}>
+                                  {a.approvalOrder}. {a.approverName} <span style={{ color: 'var(--hf-text-faint)' }}>({a.approverEmail})</span>
                                 </div>
                               ))}
                             </div>
                             <div style={{ display: 'flex', gap: 8 }}>
                               <button onClick={() => sendProof.mutate({ proofId: proof.id, email: proof.approvers[0]?.approverEmail, message: null })}
                                 disabled={sendProof.isPending}
-                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#1B3A6B', color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                                 <Send size={11} /> {sendProof.isPending ? 'Sending…' : 'Send for approval'}
                               </button>
                               <button onClick={() => { setShowConfigureApprovers(proof.id); setError('') }}
-                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#F1F5F9', color: '#374151', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: 'var(--hf-surface-sunken)', color: 'var(--hf-text-secondary)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>
                                 Edit approvers
                               </button>
                             </div>
@@ -624,7 +624,7 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
 
                         {proof.sentAt && proof.approvalMode !== 'SINGLE' && (
                           <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: 6 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>
                               Approval chain ({proof.approvalMode === 'SEQUENTIAL' ? 'sequential' : 'parallel'})
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -637,8 +637,8 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                                   ? { bg: '#EFF6FF', color: '#1D4ED8', label: 'Awaiting review' }
                                   : { bg: '#F1F5F9', color: '#94A3B8', label: 'Waiting for turn' }
                                 return (
-                                  <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 10px', background: '#F9FAFB', borderRadius: 6 }}>
-                                    <span style={{ fontSize: 12, color: '#374151' }}>{a.approvalOrder}. {a.approverName}</span>
+                                  <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 10px', background: 'var(--hf-surface-muted)', borderRadius: 6 }}>
+                                    <span style={{ fontSize: 12, color: 'var(--hf-text-secondary)' }}>{a.approvalOrder}. {a.approverName}</span>
                                     <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: badge.bg, color: badge.color }}>{badge.label}</span>
                                   </div>
                                 )
@@ -650,35 +650,35 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                         {/* Comments */}
                         {proof.comments.length > 0 && (
                           <div style={{ marginTop: 10 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Comments ({proof.comments.length})</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Comments ({proof.comments.length})</div>
                             {proof.comments.map(c => (
                               <div key={c.id} id={`staff-comment-${c.id}`}
                                 style={{ display: 'flex', gap: 8, marginBottom: 8, borderRadius: 8, transition: 'background 0.3s',
-                                  background: highlightedCommentId === c.id ? '#FEF3C7' : 'transparent', padding: highlightedCommentId === c.id ? 4 : 0 }}>
-                                <div style={{ width: 24, height: 24, borderRadius: '50%', background: c.authorType === 'CLIENT' ? '#0D9488' : '#1B3A6B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', fontWeight: 700, flexShrink: 0 }}>
+                                  background: highlightedCommentId === c.id ? 'var(--hf-warning-soft-strong)' : 'transparent', padding: highlightedCommentId === c.id ? 4 : 0 }}>
+                                <div style={{ width: 24, height: 24, borderRadius: '50%', background: c.authorType === 'CLIENT' ? 'var(--hf-accent)' : 'var(--hf-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--hf-text-on-solid)', fontWeight: 700, flexShrink: 0 }}>
                                   {c.authorName.charAt(0).toUpperCase()}
                                 </div>
-                                <div style={{ flex: 1, background: '#F9FAFB', borderRadius: 8, padding: '8px 12px' }}>
+                                <div style={{ flex: 1, background: 'var(--hf-surface-muted)', borderRadius: 8, padding: '8px 12px' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                                    <span style={{ fontSize: 12, fontWeight: 700, color: '#0F172A' }}>{c.authorName}</span>
-                                    <span style={{ fontSize: 10, color: '#94A3B8' }}>{c.authorType === 'CLIENT' ? 'Client' : 'Team'} · {fmtDate(c.createdAt)}</span>
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)' }}>{c.authorName}</span>
+                                    <span style={{ fontSize: 10, color: 'var(--hf-text-faint)' }}>{c.authorType === 'CLIENT' ? 'Client' : 'Team'} · {fmtDate(c.createdAt)}</span>
                                   </div>
                                   {c.timecodeSeconds != null && (
                                     <button
                                       onClick={() => { if (videoElRef.current) { videoElRef.current.currentTime = c.timecodeSeconds! } }}
                                       title={expandedPreview === proof.id ? 'Seek video to this moment' : 'Expand the preview above to seek'}
-                                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 4, marginRight: 4, padding: '1px 7px', background: '#EFF6FF', color: '#1D4ED8', border: 'none', borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
+                                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 4, marginRight: 4, padding: '1px 7px', background: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', border: 'none', borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
                                       ⏱ {formatTimecode(c.timecodeSeconds)}
                                     </button>
                                   )}
                                   {c.anchorX != null && (
                                     <span
                                       title={expandedPreview === proof.id ? 'See the pin marker on the image above' : 'Expand the preview above to see the pin'}
-                                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 4, padding: '1px 7px', background: '#F0FDF9', color: '#0D9488', borderRadius: 20, fontSize: 10, fontWeight: 700 }}>
+                                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 4, padding: '1px 7px', background: 'var(--hf-accent-soft)', color: 'var(--hf-accent-text)', borderRadius: 20, fontSize: 10, fontWeight: 700 }}>
                                       📍 Pinned
                                     </span>
                                   )}
-                                  <div style={{ fontSize: 13, color: '#374151' }}>{c.comment}</div>
+                                  <div style={{ fontSize: 13, color: 'var(--hf-text-secondary)' }}>{c.comment}</div>
                                 </div>
                               </div>
                             ))}
@@ -689,15 +689,15 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                         {['PENDING','IN_REVISION'].includes(job.status) && proof.status === 'PENDING' && (
                           <div style={{ marginTop: 10 }}>
                             {proof.fileType?.startsWith('video/') && expandedPreview === proof.id && (
-                              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#64748B', marginBottom: 6, cursor: 'pointer' }}>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--hf-text-muted)', marginBottom: 6, cursor: 'pointer' }}>
                                 <input type="checkbox" checked={tagTimecode} onChange={e => setTagTimecode(e.target.checked)} />
                                 Tag to current moment in video
                               </label>
                             )}
                             {proof.fileType?.startsWith('image/') && expandedPreview === proof.id && pendingPin && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#0D9488', fontWeight: 600, marginBottom: 6 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--hf-accent-text)', fontWeight: 600, marginBottom: 6 }}>
                                 📍 Will pin to that spot on the image
-                                <button onClick={() => setPendingPin(null)} style={{ background: 'none', border: 'none', color: '#94A3B8', fontSize: 10, cursor: 'pointer', textDecoration: 'underline', fontWeight: 400 }}>
+                                <button onClick={() => setPendingPin(null)} style={{ background: 'none', border: 'none', color: 'var(--hf-text-faint)', fontSize: 10, cursor: 'pointer', textDecoration: 'underline', fontWeight: 400 }}>
                                   Clear
                                 </button>
                               </div>
@@ -731,25 +731,25 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                 )}
               </div>
               {(deliverables as Deliverable[]).length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#94A3B8', border: '1.5px dashed #E2E8F0', borderRadius: 12 }}>
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--hf-text-faint)', border: '1.5px dashed var(--hf-border)', borderRadius: 12 }}>
                   <Package size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
-                  <div style={{ fontWeight: 600, color: '#475569' }}>No deliverables yet</div>
+                  <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No deliverables yet</div>
                   <div style={{ fontSize: 13, marginTop: 4 }}>Upload final files once the proof is approved.</div>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {(deliverables as Deliverable[]).map((d) => (
-                    <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid #E2E8F0', borderRadius: 10, background: '#F0FDF9' }}>
+                    <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid var(--hf-border)', borderRadius: 10, background: 'var(--hf-accent-soft)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 8, background: '#0D9488', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--hf-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           <FileText size={16} color="#fff" />
                         </div>
                         <div>
-                          <div style={{ fontWeight: 700, fontSize: 13, color: '#0F172A' }}>{d.fileName}</div>
-                          <div style={{ fontSize: 11, color: '#64748B' }}>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)' }}>{d.fileName}</div>
+                          <div style={{ fontSize: 11, color: 'var(--hf-text-muted)' }}>
                             {d.fileType ?? ''}{d.fileSize ? ` · ${Math.round(d.fileSize / 1024)}KB` : ''} · {fmtDate(d.createdAt)}
                           </div>
-                          {d.notes && <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 1 }}>{d.notes}</div>}
+                          {d.notes && <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 1 }}>{d.notes}</div>}
                         </div>
                       </div>
                       <CheckCircle size={16} color="#0D9488" />
@@ -765,23 +765,23 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
       {/* Send Proof Modal */}
       {showSendProof && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, backdropFilter: 'blur(2px)' }}>
-          <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
+          <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 28, width: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Send proof to client</h3>
-              <button onClick={() => setShowSendProof(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={18} /></button>
+              <button onClick={() => setShowSendProof(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={18} /></button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div><label style={lbl}>Client email *</label><input type="email" value={sendEmail} onChange={e => setSendEmail(e.target.value)} style={inp} autoFocus /></div>
               <div><label style={lbl}>Custom message (optional)</label><textarea value={sendMessage} onChange={e => setSendMessage(e.target.value)} rows={3} placeholder="Add a personal note to your client..." style={{ ...inp, resize: 'none' as const, fontFamily: 'inherit' }} /></div>
-              <div style={{ padding: '10px 12px', background: '#EFF6FF', borderRadius: 8, fontSize: 12, color: '#1D4ED8' }}>
+              <div style={{ padding: '10px 12px', background: 'var(--hf-info-soft)', borderRadius: 8, fontSize: 12, color: 'var(--hf-info-text)' }}>
                 The client will receive a secure link to view and approve the proof. No HandyFlow account required.
               </div>
               <button onClick={() => { setShowSendProof(null); setShowConfigureApprovers(showSendProof); setError('') }}
-                style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', color: '#1B3A6B', fontSize: 11, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>
+                style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', color: 'var(--hf-primary-text)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>
                 Need more than one approver instead? Configure an approval chain →
               </button>
             </div>
-            {error && <div style={{ marginTop: 10, padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>{error}</div>}
+            {error && <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
               <button onClick={() => setShowSendProof(null)} style={btnSecondary}>Cancel</button>
               <button disabled={!sendEmail || sendProof.isPending}
@@ -802,10 +802,10 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
           honest about when the action is available). */}
       {showConfigureApprovers && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, backdropFilter: 'blur(2px)' }}>
-          <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: 520, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
+          <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 28, width: 520, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Configure approval chain</h3>
-              <button onClick={() => setShowConfigureApprovers(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={18} /></button>
+              <button onClick={() => setShowConfigureApprovers(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={18} /></button>
             </div>
 
             <div style={{ marginBottom: 16 }}>
@@ -815,15 +815,15 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                   <button key={mode} onClick={() => setApprovalModeSelect(mode)}
                     style={{
                       flex: 1, padding: '10px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                      border: approvalModeSelect === mode ? '2px solid #1B3A6B' : '1px solid #E2E8F0',
-                      background: approvalModeSelect === mode ? '#EFF6FF' : '#fff',
-                      color: approvalModeSelect === mode ? '#1B3A6B' : '#64748B',
+                      border: approvalModeSelect === mode ? '2px solid var(--hf-primary)' : '1px solid var(--hf-border)',
+                      background: approvalModeSelect === mode ? 'var(--hf-info-soft)' : 'var(--hf-surface)',
+                      color: approvalModeSelect === mode ? 'var(--hf-primary-text)' : 'var(--hf-text-muted)',
                     }}>
                     {mode === 'SEQUENTIAL' ? 'Sequential — approve in order' : 'Parallel — anyone, any order'}
                   </button>
                 ))}
               </div>
-              <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 6 }}>
+              <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 6 }}>
                 {approvalModeSelect === 'SEQUENTIAL'
                   ? 'Only approver 1 is notified first — approver 2 is only emailed once approver 1 signs off, and so on.'
                   : 'All approvers are emailed at once — the proof is approved once everyone has said yes, in any order.'}
@@ -835,7 +835,7 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {approverRows.map((row, i) => (
                   <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <span style={{ fontSize: 11, color: '#94A3B8', width: 16, flexShrink: 0 }}>{i + 1}.</span>
+                    <span style={{ fontSize: 11, color: 'var(--hf-text-faint)', width: 16, flexShrink: 0 }}>{i + 1}.</span>
                     <input placeholder="Name" value={row.approverName}
                       onChange={e => setApproverRows(rows => rows.map((r, idx) => idx === i ? { ...r, approverName: e.target.value } : r))}
                       style={{ ...inp, flex: 1 }} />
@@ -844,7 +844,7 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                       style={{ ...inp, flex: 1 }} />
                     {approverRows.length > 1 && (
                       <button onClick={() => setApproverRows(rows => rows.filter((_, idx) => idx !== i))}
-                        style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer', display: 'flex', flexShrink: 0 }}>
+                        style={{ background: 'none', border: 'none', color: 'var(--hf-danger-text)', cursor: 'pointer', display: 'flex', flexShrink: 0 }}>
                         <X size={14} />
                       </button>
                     )}
@@ -852,12 +852,12 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                 ))}
               </div>
               <button onClick={() => setApproverRows(rows => [...rows, { approverName: '', approverEmail: '' }])}
-                style={{ marginTop: 8, background: 'none', border: 'none', padding: 0, color: '#1B3A6B', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                style={{ marginTop: 8, background: 'none', border: 'none', padding: 0, color: 'var(--hf-primary-text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 + Add another approver
               </button>
             </div>
 
-            {error && <div style={{ marginTop: 10, padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>{error}</div>}
+            {error && <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>}
 
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
               <button onClick={() => setShowConfigureApprovers(null)} style={btnSecondary}>Cancel</button>
@@ -879,22 +879,22 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
       {/* Upload Proof Modal */}
       {showUploadProof && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, backdropFilter: 'blur(2px)' }}>
-          <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
+          <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 28, width: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Upload Proof</h3>
-              <button onClick={() => setShowUploadProof(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={18} /></button>
+              <button onClick={() => setShowUploadProof(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={18} /></button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={lbl}>Proof file *</label>
-                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '28px 20px', border: `2px dashed ${uploadFile ? '#0D9488' : '#E2E8F0'}`, borderRadius: 10, cursor: 'pointer', background: uploadFile ? '#F0FDF9' : '#F9FAFB', transition: 'all 0.15s' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '28px 20px', border: `2px dashed ${uploadFile ? '#0D9488' : '#E2E8F0'}`, borderRadius: 10, cursor: 'pointer', background: uploadFile ? 'var(--hf-accent-soft)' : 'var(--hf-surface-muted)', transition: 'all 0.15s' }}>
                   <input type="file" style={{ display: 'none' }} onChange={e => handleFileInput(e, (b64, name, type) => { setUploadFile(b64); setUploadName(name); setUploadType(type) })} />
-                  {uploadFile ? <><CheckCircle size={24} color="#0D9488" /><span style={{ fontSize: 13, color: '#0D9488', fontWeight: 600 }}>{uploadName}</span></> : <><Upload size={24} color="#94A3B8" /><span style={{ fontSize: 13, color: '#64748B' }}>Click to select file</span><span style={{ fontSize: 11, color: '#94A3B8' }}>Images, PDFs, videos — up to your storage plan</span></>}
+                  {uploadFile ? <><CheckCircle size={24} color="#0D9488" /><span style={{ fontSize: 13, color: 'var(--hf-accent-text)', fontWeight: 600 }}>{uploadName}</span></> : <><Upload size={24} color="#94A3B8" /><span style={{ fontSize: 13, color: 'var(--hf-text-muted)' }}>Click to select file</span><span style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>Images, PDFs, videos — up to your storage plan</span></>}
                 </label>
               </div>
               <div><label style={lbl}>Version title (optional)</label><input value={uploadNotes} onChange={e => setUploadNotes(e.target.value)} placeholder="e.g. Version 2 — revised colours" style={inp} /></div>
             </div>
-            {error && <div style={{ marginTop: 10, padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>{error}</div>}
+            {error && <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
               <button onClick={() => setShowUploadProof(false)} style={btnSecondary}>Cancel</button>
               <button disabled={!uploadFile || uploadProof.isPending}
@@ -910,22 +910,22 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
       {/* Add Deliverable Modal */}
       {showAddDeliverable && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, backdropFilter: 'blur(2px)' }}>
-          <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
+          <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 28, width: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Add Deliverable</h3>
-              <button onClick={() => setShowAddDeliverable(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={18} /></button>
+              <button onClick={() => setShowAddDeliverable(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={18} /></button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={lbl}>Final file *</label>
-                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '28px 20px', border: `2px dashed ${delFile ? '#0D9488' : '#E2E8F0'}`, borderRadius: 10, cursor: 'pointer', background: delFile ? '#F0FDF9' : '#F9FAFB' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '28px 20px', border: `2px dashed ${delFile ? '#0D9488' : '#E2E8F0'}`, borderRadius: 10, cursor: 'pointer', background: delFile ? 'var(--hf-accent-soft)' : 'var(--hf-surface-muted)' }}>
                   <input type="file" style={{ display: 'none' }} onChange={e => handleFileInput(e, (b64, name, type) => { setDelFile(b64); setDelName(name) })} />
-                  {delFile ? <><CheckCircle size={24} color="#0D9488" /><span style={{ fontSize: 13, color: '#0D9488', fontWeight: 600 }}>{delName}</span></> : <><Package size={24} color="#94A3B8" /><span style={{ fontSize: 13, color: '#64748B' }}>Click to select final file</span></>}
+                  {delFile ? <><CheckCircle size={24} color="#0D9488" /><span style={{ fontSize: 13, color: 'var(--hf-accent-text)', fontWeight: 600 }}>{delName}</span></> : <><Package size={24} color="#94A3B8" /><span style={{ fontSize: 13, color: 'var(--hf-text-muted)' }}>Click to select final file</span></>}
                 </label>
               </div>
               <div><label style={lbl}>Notes (optional)</label><input value={delNotes} onChange={e => setDelNotes(e.target.value)} placeholder="e.g. Final print-ready PDF" style={inp} /></div>
             </div>
-            {error && <div style={{ marginTop: 10, padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>{error}</div>}
+            {error && <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
               <button onClick={() => setShowAddDeliverable(false)} style={btnSecondary}>Cancel</button>
               <button disabled={!delFile || addDeliverable.isPending}
@@ -978,10 +978,10 @@ function CompareVersionsModal({ jobId, proofs, onClose }: {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: 20, backdropFilter: 'blur(2px)' }}>
-      <div style={{ background: '#fff', borderRadius: 16, padding: 26, width: '100%', maxWidth: 960, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 80px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 26, width: '100%', maxWidth: 960, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 80px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Compare Versions</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={18} /></button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={18} /></button>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
@@ -996,16 +996,16 @@ function CompareVersionsModal({ jobId, proofs, onClose }: {
               </select>
               {col.proof && (
                 <>
-                  <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginBottom: 10 }}>
                     {col.proof.fileName ?? 'No file'} · {fmtDate(col.proof.createdAt)}
                     {col.proof.status === 'APPROVED' && (
-                      <span style={{ marginLeft: 6, color: '#166534', fontWeight: 700 }}>· Approved</span>
+                      <span style={{ marginLeft: 6, color: 'var(--hf-success-text-strong)', fontWeight: 700 }}>· Approved</span>
                     )}
                   </div>
                   {col.proof.hasFile ? (
                     <ProofFilePreview jobId={jobId} proofId={col.proof.id} fileType={col.proof.fileType} maxHeight={440} />
                   ) : (
-                    <div style={{ padding: 24, textAlign: 'center', color: '#94A3B8', fontSize: 12, border: '1px dashed #E2E8F0', borderRadius: 8 }}>
+                    <div style={{ padding: 24, textAlign: 'center', color: 'var(--hf-text-faint)', fontSize: 12, border: '1px dashed var(--hf-border)', borderRadius: 8 }}>
                       No file on this version
                     </div>
                   )}
@@ -1045,13 +1045,13 @@ function CreateJobModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20, backdropFilter: 'blur(2px)' }}>
-      <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: 640, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 25px 80px rgba(0,0,0,0.25)' }}>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 28, width: 640, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 25px 80px rgba(0,0,0,0.25)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
           <div>
             <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>New Creative Job</h3>
-            <p style={{ margin: '3px 0 0', fontSize: 13, color: '#64748B' }}>Create a job bag to start the creative workflow</p>
+            <p style={{ margin: '3px 0 0', fontSize: 13, color: 'var(--hf-text-muted)' }}>Create a job bag to start the creative workflow</p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={20} /></button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={20} /></button>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -1069,13 +1069,13 @@ function CreateJobModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
           </div>
           <div>
             <label style={lbl}>Job type *</label>
-            <select value={form.jobType} onChange={e => f('jobType', e.target.value)} style={{ ...inp, background: '#fff' }}>
+            <select value={form.jobType} onChange={e => f('jobType', e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
               {JOB_TYPES.map(t => <option key={t} value={t}>{t.replace('_',' ')}</option>)}
             </select>
           </div>
           <div>
             <label style={lbl}>Priority</label>
-            <select value={form.priority} onChange={e => f('priority', e.target.value)} style={{ ...inp, background: '#fff' }}>
+            <select value={form.priority} onChange={e => f('priority', e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
               {['LOW','NORMAL','HIGH','URGENT'].map(p => <option key={p}>{p}</option>)}
             </select>
           </div>
@@ -1105,7 +1105,7 @@ function CreateJobModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
           </div>
         </div>
 
-        {error && <div style={{ marginTop: 14, padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>{error}</div>}
+        {error && <div style={{ marginTop: 14, padding: '10px 14px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 22 }}>
           <button onClick={onClose} style={btnSecondary}>Cancel</button>
@@ -1178,12 +1178,12 @@ export function CreativePage() {
       <div style={{ marginBottom: 22, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--hf-violet)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Palette size={18} color="#fff" />
             </div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', margin: 0 }}>Creative Studio</h1>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>Creative Studio</h1>
           </div>
-          <p style={{ fontSize: 13, color: '#94A3B8', margin: 0, paddingLeft: 46 }}>
+          <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0, paddingLeft: 46 }}>
             Design briefs · Proof approvals · Client sign-off portal · Deliverables
           </p>
         </div>
@@ -1202,28 +1202,28 @@ export function CreativePage() {
       </div>
 
       {/* Main card */}
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 14, padding: 24 }}>
+      <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, padding: 24 }}>
         {/* Toolbar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ position: 'relative' as const }}>
-              <Search size={13} style={{ position: 'absolute' as const, left: 9, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }} />
+              <Search size={13} style={{ position: 'absolute' as const, left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--hf-text-faint)' }} />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search jobs..."
-                style={{ paddingLeft: 28, padding: '7px 10px 7px 28px', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: 13, outline: 'none', width: 200 }} />
+                style={{ paddingLeft: 28, padding: '7px 10px 7px 28px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', width: 200 }} />
             </div>
             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-              style={{ padding: '7px 10px', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: 13, outline: 'none', background: '#fff' }}>
+              style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
               <option value="">All statuses</option>
               {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
             <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
-              style={{ padding: '7px 10px', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: 13, outline: 'none', background: '#fff' }}>
+              style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
               <option value="">All types</option>
               {JOB_TYPES.map(t => <option key={t} value={t}>{t.replace('_',' ')}</option>)}
             </select>
             {(search || statusFilter || typeFilter) && (
               <button onClick={() => { setSearch(''); setStatusFilter(''); setTypeFilter('') }}
-                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '7px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 12, background: '#F8FAFC', color: '#64748B', cursor: 'pointer' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '7px 10px', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, background: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)', cursor: 'pointer' }}>
                 <X size={11} /> Clear
               </button>
             )}
@@ -1231,7 +1231,7 @@ export function CreativePage() {
           <div style={{ display: 'flex', gap: 4 }}>
             {(['grid','pipeline'] as const).map(v => (
               <button key={v} onClick={() => setView(v)}
-                style={{ padding: '6px 14px', borderRadius: 7, border: '1.5px solid #E2E8F0', background: view === v ? '#1B3A6B' : '#fff', color: view === v ? '#fff' : '#64748B', fontSize: 12, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>
+                style={{ padding: '6px 14px', borderRadius: 7, border: '1.5px solid var(--hf-border)', background: view === v ? 'var(--hf-primary)' : 'var(--hf-surface)', color: view === v ? 'var(--hf-text-on-solid)' : 'var(--hf-text-muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>
                 {v}
               </button>
             ))}
@@ -1239,12 +1239,12 @@ export function CreativePage() {
         </div>
 
         {isLoading ? (
-          <div style={{ textAlign: 'center', padding: 48, color: '#94A3B8' }}>Loading jobs...</div>
+          <div style={{ textAlign: 'center', padding: 48, color: 'var(--hf-text-faint)' }}>Loading jobs...</div>
         ) : filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-            <Palette size={40} style={{ marginBottom: 12, color: '#CBD5E1' }} />
-            <div style={{ fontWeight: 700, color: '#475569', fontSize: 16, marginBottom: 6 }}>No creative jobs yet</div>
-            <div style={{ fontSize: 13, color: '#94A3B8', marginBottom: 20 }}>Create your first job bag to start the design workflow.</div>
+            <Palette size={40} style={{ marginBottom: 12, color: 'var(--hf-text-disabled)' }} />
+            <div style={{ fontWeight: 700, color: 'var(--hf-text-tertiary)', fontSize: 16, marginBottom: 6 }}>No creative jobs yet</div>
+            <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', marginBottom: 20 }}>Create your first job bag to start the design workflow.</div>
             <button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={14} /> Create first job</button>
           </div>
         ) : view === 'grid' ? (
@@ -1255,7 +1255,7 @@ export function CreativePage() {
               const overdue = isOverdue(job.dueDate, job.status)
               return (
                 <div key={job.id} onClick={() => setSelectedJob(job)}
-                  style={{ border: `1px solid ${overdue ? '#FCA5A5' : '#E5E7EB'}`, borderLeft: `3px solid ${cfg.dot}`, borderRadius: 12, padding: '18px 20px', cursor: 'pointer', background: '#fff', transition: 'box-shadow 0.15s' }}
+                  style={{ border: `1px solid ${overdue ? '#FCA5A5' : '#E5E7EB'}`, borderLeft: `3px solid ${cfg.dot}`, borderRadius: 12, padding: '18px 20px', cursor: 'pointer', background: 'var(--hf-surface)', transition: 'box-shadow 0.15s' }}
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
@@ -1269,24 +1269,24 @@ export function CreativePage() {
                       </span>
                     </div>
                   </div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: '#111827', marginBottom: 4 }}>{job.title}</div>
-                  <div style={{ fontSize: 12, color: '#64748B', marginBottom: 10 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)', marginBottom: 4 }}>{job.title}</div>
+                  <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 10 }}>
                     {job.clientName} · {job.jobType.replace('_',' ')}
                   </div>
                   {job.description && (
-                    <div style={{ fontSize: 12, color: '#94A3B8', lineHeight: 1.4, marginBottom: 10, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>
+                    <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', lineHeight: 1.4, marginBottom: 10, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>
                       {job.description}
                     </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: '#94A3B8' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--hf-text-faint)' }}>
                     <div style={{ display: 'flex', gap: 10 }}>
                       {job.proofCount > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Eye size={10} />{job.proofCount} proofs</span>}
-                      {job.deliverableCount > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: '#0D9488' }}><Package size={10} />{job.deliverableCount} files</span>}
+                      {job.deliverableCount > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'var(--hf-accent-text)' }}><Package size={10} />{job.deliverableCount} files</span>}
                     </div>
-                    {job.dueDate && <span style={{ color: overdue ? '#DC2626' : '#94A3B8', fontWeight: overdue ? 700 : 400 }}>Due {fmtDate(job.dueDate)}</span>}
+                    {job.dueDate && <span style={{ color: overdue ? 'var(--hf-danger-text)' : 'var(--hf-text-faint)', fontWeight: overdue ? 700 : 400 }}>Due {fmtDate(job.dueDate)}</span>}
                   </div>
                   {job.quotedAmount && (
-                    <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: '#0D9488' }}>{fmtR(job.quotedAmount)}</div>
+                    <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: 'var(--hf-accent-text)' }}>{fmtR(job.quotedAmount)}</div>
                   )}
                 </div>
               )
@@ -1302,26 +1302,26 @@ export function CreativePage() {
                 <div key={status} style={{ minWidth: 260, maxWidth: 260, flexShrink: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10, padding: '0 2px' }}>
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.dot }} />
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>{cfg.label}</span>
-                    <span style={{ background: '#F1F5F9', color: '#64748B', borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>{col.length}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-secondary)' }}>{cfg.label}</span>
+                    <span style={{ background: 'var(--hf-surface-sunken)', color: 'var(--hf-text-muted)', borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>{col.length}</span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {col.map(job => (
                       <div key={job.id} onClick={() => setSelectedJob(job)}
-                        style={{ border: '1px solid #E5E7EB', borderRadius: 9, padding: '12px 14px', cursor: 'pointer', background: '#fff', transition: 'box-shadow 0.15s' }}
+                        style={{ border: '1px solid var(--hf-border)', borderRadius: 9, padding: '12px 14px', cursor: 'pointer', background: 'var(--hf-surface)', transition: 'box-shadow 0.15s' }}
                         onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'}
                         onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
-                        <div style={{ fontWeight: 700, fontSize: 13, color: '#111827', marginBottom: 3 }}>{job.title}</div>
-                        <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 6 }}>{job.clientName}</div>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)', marginBottom: 3 }}>{job.title}</div>
+                        <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginBottom: 6 }}>{job.clientName}</div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                          <span style={{ color: '#64748B' }}>{job.jobType.replace('_',' ')}</span>
-                          {isOverdue(job.dueDate, job.status) && <span style={{ color: '#DC2626', fontWeight: 700 }}>Overdue</span>}
-                          {job.quotedAmount ? <span style={{ color: '#0D9488', fontWeight: 600 }}>{fmtR(job.quotedAmount)}</span> : null}
+                          <span style={{ color: 'var(--hf-text-muted)' }}>{job.jobType.replace('_',' ')}</span>
+                          {isOverdue(job.dueDate, job.status) && <span style={{ color: 'var(--hf-danger-text)', fontWeight: 700 }}>Overdue</span>}
+                          {job.quotedAmount ? <span style={{ color: 'var(--hf-accent-text)', fontWeight: 600 }}>{fmtR(job.quotedAmount)}</span> : null}
                         </div>
                       </div>
                     ))}
                     {col.length === 0 && (
-                      <div style={{ padding: '20px', textAlign: 'center', fontSize: 12, color: '#D1D5DB', border: '1.5px dashed #E5E7EB', borderRadius: 9 }}>No jobs</div>
+                      <div style={{ padding: '20px', textAlign: 'center', fontSize: 12, color: 'var(--hf-text-disabled)', border: '1.5px dashed var(--hf-border)', borderRadius: 9 }}>No jobs</div>
                     )}
                   </div>
                 </div>

@@ -67,12 +67,12 @@ export default function DelegatePicker({ clientId, value, onChange }: { clientId
 
   if (value) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid #E2E8F0", borderRadius: 8, padding: "9px 12px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "9px 12px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <User size={14} color={TRAINPROV_ACCENT} />
           <div>
-            <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", margin: 0 }}>{value.fullName}</p>
-            <p style={{ fontSize: 11, color: "#94A3B8", margin: 0 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)", margin: 0 }}>{value.fullName}</p>
+            <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>
               {[value.delegateNumber, value.jobTitle].filter(Boolean).join(" · ")}{!clientId ? ` · Client ${value.clientId.slice(0, 8)}` : ""}
             </p>
           </div>
@@ -84,7 +84,7 @@ export default function DelegatePicker({ clientId, value, onChange }: { clientId
 
   return (
     <div ref={boxRef} style={{ position: "relative" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid #E2E8F0", borderRadius: 8, padding: "9px 12px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid var(--hf-border)", borderRadius: 8, padding: "9px 12px" }}>
         <Search size={14} color="#94A3B8" />
         <input
           value={query}
@@ -95,17 +95,17 @@ export default function DelegatePicker({ clientId, value, onChange }: { clientId
         />
       </div>
       {open && (
-        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.08)", maxHeight: 240, overflowY: "auto", zIndex: 20 }}>
+        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.08)", maxHeight: 240, overflowY: "auto", zIndex: 20 }}>
           {loading ? (
-            <p style={{ fontSize: 12, color: "#94A3B8", padding: "10px 12px", margin: 0 }}>Searching…</p>
+            <p style={{ fontSize: 12, color: "var(--hf-text-faint)", padding: "10px 12px", margin: 0 }}>Searching…</p>
           ) : results.length === 0 ? (
-            <p style={{ fontSize: 12, color: "#94A3B8", padding: "10px 12px", margin: 0 }}>No delegates found.</p>
+            <p style={{ fontSize: 12, color: "var(--hf-text-faint)", padding: "10px 12px", margin: 0 }}>No delegates found.</p>
           ) : (
             results.map(d => (
               <button key={d.id} onClick={() => { onChange(d); setOpen(false); setQuery("") }}
-                style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 12px", background: "none", border: "none", cursor: "pointer", borderTop: "1px solid #F1F5F9" }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", margin: 0 }}>{d.fullName}</p>
-                <p style={{ fontSize: 11, color: "#94A3B8", margin: 0 }}>
+                style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 12px", background: "none", border: "none", cursor: "pointer", borderTop: "1px solid var(--hf-border-subtle)" }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)", margin: 0 }}>{d.fullName}</p>
+                <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>
                   {[d.delegateNumber, d.jobTitle].filter(Boolean).join(" · ")}{!clientId ? ` · Client ${d.clientId.slice(0, 8)}` : ""}
                 </p>
               </button>

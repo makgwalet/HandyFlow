@@ -90,7 +90,7 @@ export default function SuppliersTab() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <div style={{ fontSize: 14, color: "#64748B" }}>
+        <div style={{ fontSize: 14, color: "var(--hf-text-muted)" }}>
           {suppliers.length} supplier{suppliers.length !== 1 ? "s" : ""}
         </div>
         <button onClick={() => { setShowAdd(true); setError("") }} style={btnPrimary}>
@@ -99,36 +99,36 @@ export default function SuppliersTab() {
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading suppliers...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading suppliers...</div>
       ) : suppliers.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Users size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No suppliers yet</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No suppliers yet</div>
           <div style={{ fontSize: 14, marginTop: 4 }}>Add your fuel suppliers to track receipts.</div>
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
           {suppliers.map(s => (
-            <div key={s.id} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: "18px 20px" }}>
+            <div key={s.id} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "18px 20px" }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--hf-info-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     <Users size={18} color="#1D4ED8" />
                   </div>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{s.name}</div>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{s.name}</div>
                     {s.accountNumber && (
-                      <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 1 }}>Acc: {s.accountNumber}</div>
+                      <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 1 }}>Acc: {s.accountNumber}</div>
                     )}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                   <button onClick={() => downloadStatement(s)}
-                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "#F0FDFA", border: "1px solid #99F6E4", borderRadius: 7, fontSize: 12, color: "#0D9488", cursor: "pointer" }}>
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "var(--hf-accent-soft)", border: "1px solid var(--hf-accent-border)", borderRadius: 7, fontSize: 12, color: "var(--hf-accent-text)", cursor: "pointer" }}>
                     <Download size={12} /> Statement
                   </button>
                   <button onClick={() => openEdit(s)}
-                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 7, fontSize: 12, color: "#1D4ED8", cursor: "pointer" }}>
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 7, fontSize: 12, color: "var(--hf-info-text)", cursor: "pointer" }}>
                     <Pencil size={12} /> Edit
                   </button>
                 </div>
@@ -136,17 +136,17 @@ export default function SuppliersTab() {
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {s.contactName && (
-                  <div style={{ fontSize: 13, color: "#475569" }}>
-                    <span style={{ color: "#94A3B8", marginRight: 6 }}>Contact:</span>{s.contactName}
+                  <div style={{ fontSize: 13, color: "var(--hf-text-tertiary)" }}>
+                    <span style={{ color: "var(--hf-text-faint)", marginRight: 6 }}>Contact:</span>{s.contactName}
                   </div>
                 )}
                 {s.contactPhone && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#475569" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--hf-text-tertiary)" }}>
                     <Phone size={12} color="#94A3B8" />{s.contactPhone}
                   </div>
                 )}
                 {s.contactEmail && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#475569" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--hf-text-tertiary)" }}>
                     <Mail size={12} color="#94A3B8" />{s.contactEmail}
                   </div>
                 )}
@@ -221,10 +221,10 @@ function SupplierForm({ form, onChange }: { form: any; onChange: (k: any, v: str
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-      <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 500, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 28, width: 500, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{title}</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}>
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{title}</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}>
             <X size={20} />
           </button>
         </div>
@@ -237,7 +237,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "#374151", marginBottom: 5 }}>{label}</label>
+      <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--hf-text-secondary)", marginBottom: 5 }}>{label}</label>
       {children}
     </div>
   )
@@ -245,7 +245,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function ErrMsg({ msg }: { msg: string }) {
   return (
-    <div style={{ marginTop: 10, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#DC2626", fontSize: 13 }}>
+    <div style={{ marginTop: 10, padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, color: "var(--hf-danger-text)", fontSize: 13 }}>
       {msg}
     </div>
   )
@@ -257,16 +257,16 @@ function Footer({ onCancel, onSubmit, loading, disabled, label }: {
   return (
     <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
       <button onClick={onCancel}
-        style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 8, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>
+        style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>
         Cancel
       </button>
       <button onClick={onSubmit} disabled={disabled || loading}
-        style={{ padding: "9px 20px", background: disabled || loading ? "#94A3B8" : "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: disabled || loading ? "not-allowed" : "pointer" }}>
+        style={{ padding: "9px 20px", background: disabled || loading ? "var(--hf-text-faint)" : "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: disabled || loading ? "not-allowed" : "pointer" }}>
         {loading ? "Saving..." : label}
       </button>
     </div>
   )
 }
 
-const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer" }
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }
+const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer" }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }

@@ -82,20 +82,20 @@ export function CommunicationPanel({ customerId }: { customerId: string }) {
   }
 
   return (
-    <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #F1F5F9' }}>
+    <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--hf-border-subtle)' }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         marginBottom: 12,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <MessageSquare size={13} color="#94A3B8" />
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Communications
           </span>
           {communications.length > 0 && (
             <span style={{
               fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 20,
-              background: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0',
+              background: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)', border: '1px solid var(--hf-border)',
             }}>
               {communications.length}
             </span>
@@ -104,10 +104,10 @@ export function CommunicationPanel({ customerId }: { customerId: string }) {
       </div>
 
       <div>
-        {isLoading && <p style={{ fontSize: 12, color: '#94A3B8', margin: 0 }}>Loading…</p>}
+        {isLoading && <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: 0 }}>Loading…</p>}
 
           {!isLoading && communications.length === 0 && !showAdd && (
-            <p style={{ fontSize: 12, color: '#64748B', margin: '0 0 10px', lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12, color: 'var(--hf-text-muted)', margin: '0 0 10px', lineHeight: 1.5 }}>
               No communications logged yet. Log calls, emails, and meetings here to keep
               a record separate from the system activity timeline.
             </p>
@@ -122,8 +122,8 @@ export function CommunicationPanel({ customerId }: { customerId: string }) {
               onClick={() => { setShowAdd(true); setFormError('') }}
               style={{
                 marginTop: 10, display: 'flex', alignItems: 'center', gap: 5,
-                fontSize: 12, color: '#1D4ED8', background: '#EFF6FF',
-                border: '1px solid #BFDBFE', borderRadius: 6, padding: '5px 10px',
+                fontSize: 12, color: 'var(--hf-info-text)', background: 'var(--hf-info-soft)',
+                border: '1px solid var(--hf-info-border)', borderRadius: 6, padding: '5px 10px',
                 cursor: 'pointer',
               }}>
               <Plus size={12} /> Log communication
@@ -132,22 +132,22 @@ export function CommunicationPanel({ customerId }: { customerId: string }) {
             <div style={{ marginTop: 10 }}>
               <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 3 }}>Type</label>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--hf-text-secondary)', display: 'block', marginBottom: 3 }}>Type</label>
                   <select value={type} onChange={e => setType(e.target.value as CommType)}
-                    style={{ width: '100%', padding: '6px 10px', fontSize: 13, border: '1.5px solid #E2E8F0', borderRadius: 6, fontFamily: 'inherit', background: 'white' }}>
+                    style={{ width: '100%', padding: '6px 10px', fontSize: 13, border: '1.5px solid var(--hf-border)', borderRadius: 6, fontFamily: 'inherit', background: 'white' }}>
                     {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                   </select>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 3 }}>Direction</label>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--hf-text-secondary)', display: 'block', marginBottom: 3 }}>Direction</label>
                   <div style={{ display: 'flex', gap: 4 }}>
                     {(['OUTBOUND', 'INBOUND'] as const).map(d => (
                       <button key={d} onClick={() => setDirection(d)}
                         style={{
                           flex: 1, padding: '6px 8px', fontSize: 12, borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
-                          border: direction === d ? '1.5px solid #1D4ED8' : '1.5px solid #E2E8F0',
-                          background: direction === d ? '#EFF6FF' : 'white',
-                          color: direction === d ? '#1D4ED8' : '#64748B',
+                          border: direction === d ? '1.5px solid var(--hf-info)' : '1.5px solid var(--hf-border)',
+                          background: direction === d ? 'var(--hf-info-soft)' : 'white',
+                          color: direction === d ? 'var(--hf-info-text)' : 'var(--hf-text-muted)',
                         }}>
                         {d === 'OUTBOUND' ? 'Out' : 'In'}
                       </button>
@@ -155,31 +155,31 @@ export function CommunicationPanel({ customerId }: { customerId: string }) {
                   </div>
                 </div>
               </div>
-              <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 3 }}>When</label>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--hf-text-secondary)', display: 'block', marginBottom: 3 }}>When</label>
               <input type="datetime-local" value={occurredAt} onChange={e => setOccurredAt(e.target.value)}
                 max={nowForInput()}
-                style={{ padding: '6px 10px', fontSize: 13, border: '1.5px solid #E2E8F0', borderRadius: 6, fontFamily: 'inherit', marginBottom: 8, width: '100%', boxSizing: 'border-box' }} />
-              <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 3 }}>Summary</label>
+                style={{ padding: '6px 10px', fontSize: 13, border: '1.5px solid var(--hf-border)', borderRadius: 6, fontFamily: 'inherit', marginBottom: 8, width: '100%', boxSizing: 'border-box' }} />
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--hf-text-secondary)', display: 'block', marginBottom: 3 }}>Summary</label>
               <textarea value={summary} onChange={e => setSummary(e.target.value)}
                 placeholder="e.g. Discussed renewal pricing, sending updated quote"
                 rows={2}
                 style={{
                   width: '100%', padding: '8px 10px', fontSize: 13,
-                  border: '1.5px solid #E2E8F0', borderRadius: 8,
+                  border: '1.5px solid var(--hf-border)', borderRadius: 8,
                   fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box',
                 }} />
               {formError && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, fontSize: 12, color: '#DC2626' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, fontSize: 12, color: 'var(--hf-danger-text)' }}>
                   <AlertCircle size={11} />{formError}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <button onClick={submitLog} disabled={logMutation.isPending}
-                  style={{ fontSize: 12, color: '#1D4ED8', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  style={{ fontSize: 12, color: 'var(--hf-info-text)', background: 'var(--hf-info-soft)', border: '1px solid var(--hf-info-border)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
                   {logMutation.isPending ? 'Logging…' : 'Log it'}
                 </button>
                 <button onClick={() => { setShowAdd(false); setFormError('') }}
-                  style={{ fontSize: 12, color: '#374151', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  style={{ fontSize: 12, color: 'var(--hf-text-secondary)', background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
                   Cancel
                 </button>
               </div>
@@ -193,21 +193,21 @@ export function CommunicationPanel({ customerId }: { customerId: string }) {
 function CommRow({ c, onDelete }: { c: Communication; onDelete: () => void }) {
   const { label, Icon } = TYPE_CONFIG[c.type]
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 0', borderBottom: '1px solid #F8FAFC' }}>
-      <div style={{ flexShrink: 0, marginTop: 1, width: 22, height: 22, borderRadius: 6, background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--hf-border-subtle)' }}>
+      <div style={{ flexShrink: 0, marginTop: 1, width: 22, height: 22, borderRadius: 6, background: 'var(--hf-surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Icon size={12} color="#64748B" />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: '#374151' }}>{label}</span>
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--hf-text-secondary)' }}>{label}</span>
           {c.direction === 'OUTBOUND'
             ? <ArrowUpRight size={11} color="#94A3B8" titleAccess="Outbound" />
             : <ArrowDownLeft size={11} color="#94A3B8" titleAccess="Inbound" />}
-          <span style={{ fontSize: 11, color: '#94A3B8' }}>{fmtDateTime(c.occurredAt)}</span>
+          <span style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{fmtDateTime(c.occurredAt)}</span>
         </div>
-        <p style={{ fontSize: 12.5, color: '#0F172A', margin: 0, lineHeight: 1.4 }}>{c.summary}</p>
+        <p style={{ fontSize: 12.5, color: 'var(--hf-text)', margin: 0, lineHeight: 1.4 }}>{c.summary}</p>
       </div>
-      <button onClick={onDelete} title="Delete" style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: '#CBD5E1', display: 'flex', padding: 3 }}>
+      <button onClick={onDelete} title="Delete" style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-disabled)', display: 'flex', padding: 3 }}>
         <Trash2 size={12} />
       </button>
     </div>

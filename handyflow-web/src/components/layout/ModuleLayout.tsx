@@ -134,9 +134,9 @@ export function ModuleLayout() {
   const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: 'var(--hf-surface-muted)', fontFamily: "'Inter', system-ui, sans-serif" }}>
       <header style={{
-        background: '#1B3A6B', height: 56,
+        background: 'var(--hf-primary)', height: 56,
         display: 'flex', alignItems: 'center',
         padding: '0 16px', gap: 10,
         boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
@@ -148,7 +148,7 @@ export function ModuleLayout() {
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
-          <div style={{ width: 26, height: 26, background: '#0D9488', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 26, height: 26, background: 'var(--hf-accent)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Building2 size={14} color="white" strokeWidth={2.5} />
           </div>
           <span style={{ color: 'white', fontWeight: 700, fontSize: 14 }}>HandyFlow</span>
@@ -202,7 +202,7 @@ export function ModuleLayout() {
             style={{ position: 'relative', background: notifDrawerOpen ? 'rgba(255,255,255,0.12)' : 'none', border: 'none', cursor: 'pointer', padding: '7px', borderRadius: 8, display: 'flex', alignItems: 'center', color: 'rgba(255,255,255,0.7)' }}>
             <Bell size={17} />
             {unreadCount > 0 && (
-              <span style={{ position: 'absolute', top: 4, right: 4, minWidth: 14, height: 14, padding: '0 3px', background: '#EF4444', borderRadius: 7, border: '1.5px solid #1B3A6B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white' }}>
+              <span style={{ position: 'absolute', top: 4, right: 4, minWidth: 14, height: 14, padding: '0 3px', background: 'var(--hf-danger)', borderRadius: 7, border: '1.5px solid var(--hf-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white' }}>
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}          </button>
@@ -213,7 +213,7 @@ export function ModuleLayout() {
           <div ref={profileRef} style={{ position: 'relative' }}>
             <button onClick={() => setProfileOpen(o => !o)}
               style={{ display: 'flex', alignItems: 'center', gap: 7, background: profileOpen ? 'rgba(255,255,255,0.12)' : 'none', border: 'none', cursor: 'pointer', padding: '4px 8px 4px 4px', borderRadius: 8 }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#0D9488', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 11, fontWeight: 700 }}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--hf-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 11, fontWeight: 700 }}>
                 {initials}
               </div>
               <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: 500 }}>{user?.firstName}</span>
@@ -221,10 +221,10 @@ export function ModuleLayout() {
             </button>
 
             {profileOpen && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 230, background: 'white', border: '1px solid #E2E8F0', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.12)', zIndex: 200, overflow: 'hidden' }}>
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid #F1F5F9' }}>
-                  <div style={{ fontWeight: 600, fontSize: 14, color: '#0F172A' }}>{user?.firstName} {user?.lastName}</div>
-                  <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>{user?.email}</div>
+              <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 230, background: 'white', border: '1px solid var(--hf-border)', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.12)', zIndex: 200, overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--hf-border-subtle)' }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--hf-text)' }}>{user?.firstName} {user?.lastName}</div>
+                  <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', marginTop: 2 }}>{user?.email}</div>
                 </div>
                 <div style={{ padding: '4px 0' }}>
                   {[
@@ -234,17 +234,17 @@ export function ModuleLayout() {
                     { icon: Settings,   label: 'Settings',        fn: () => { navigate('/settings'); setProfileOpen(false) } },
                   ].map(item => (
                     <button key={item.label} onClick={item.fn}
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: '#374151', textAlign: 'left' }}
-                      onMouseEnter={e => { e.currentTarget.style.background = '#F8FAFC' }}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--hf-text-secondary)', textAlign: 'left' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--hf-surface-muted)' }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'none' }}>
                       <item.icon size={15} color="#94A3B8" />
                       {item.label}
                     </button>
                   ))}
-                  <div style={{ height: 1, background: '#F1F5F9', margin: '4px 0' }} />
+                  <div style={{ height: 1, background: 'var(--hf-surface-sunken)', margin: '4px 0' }} />
                   <button onClick={() => { logout(); navigate('/login') }}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: '#DC2626', textAlign: 'left' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#FEF2F2' }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--hf-danger-text)', textAlign: 'left' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--hf-danger-soft)' }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'none' }}>
                     <LogOut size={15} color="#DC2626" /> Sign out
                   </button>

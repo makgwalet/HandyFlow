@@ -96,24 +96,24 @@ interface AdvanceSurvey {
 // ── Config ─────────────────────────────────────────────────────────────────────
 
 const THREAT_LEVEL: Record<string, { color: string; bg: string }> = {
-  LOW:      { color: "#166534", bg: "#DCFCE7" },
-  MEDIUM:   { color: "#B45309", bg: "#FFFBEB" },
-  HIGH:     { color: "#C2410C", bg: "#FFEDD5" },
-  CRITICAL: { color: "#DC2626", bg: "#FEF2F2" },
+  LOW:      { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+  MEDIUM:   { color: "var(--hf-warning-text-strong)", bg: "var(--hf-warning-soft)" },
+  HIGH:     { color: "var(--hf-orange-text-strong)", bg: "var(--hf-orange-soft)" },
+  CRITICAL: { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
 }
 
 const VEHICLE_STATUS: Record<string, { color: string; bg: string; label: string }> = {
-  AVAILABLE:      { color: "#166534", bg: "#DCFCE7", label: "Available" },
-  IN_USE:         { color: "#B45309", bg: "#FFFBEB", label: "In Use" },
-  IN_SERVICE:     { color: "#64748B", bg: "#F1F5F9", label: "In Service" },
-  DECOMMISSIONED: { color: "#94A3B8", bg: "#F8FAFC", label: "Decommissioned" },
+  AVAILABLE:      { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", label: "Available" },
+  IN_USE:         { color: "var(--hf-warning-text-strong)", bg: "var(--hf-warning-soft)", label: "In Use" },
+  IN_SERVICE:     { color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)", label: "In Service" },
+  DECOMMISSIONED: { color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)", label: "Decommissioned" },
 }
 
 const DETAIL_STATUS = {
-  PLANNED:   { color: "#1D4ED8", bg: "#EFF6FF" },
-  ACTIVE:    { color: "#166534", bg: "#DCFCE7" },
-  COMPLETED: { color: "#64748B", bg: "#F1F5F9" },
-  CANCELLED: { color: "#94A3B8", bg: "#F8FAFC" },
+  PLANNED:   { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+  ACTIVE:    { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+  COMPLETED: { color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
+  CANCELLED: { color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)" },
 }
 
 const fmtDate = (s: string | null) => s ? new Date(s).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
@@ -487,33 +487,33 @@ export default function CloseProtectionTab() {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0F172A", display: "flex", alignItems: "center", gap: 8 }}>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--hf-text)", display: "flex", alignItems: "center", gap: 8 }}>
             <Lock size={16} /> Close Protection
           </h2>
-          <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748B" }}>
+          <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--hf-text-muted)" }}>
             {details.filter(d => d.status === "ACTIVE").length} active detail{details.filter(d => d.status === "ACTIVE").length !== 1 ? "s" : ""} · {principals.length} principal{principals.length !== 1 ? "s" : ""} registered
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           {mainView === "engagements" ? (
             <button onClick={() => { setShowAddDetail(true); setApiError("") }}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "none", background: "#7C3AED", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "none", background: "var(--hf-violet)", color: "var(--hf-text-on-solid)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
               <Plus size={14} /> New Detail
             </button>
           ) : mainView === "principals" ? (
             <>
               <button onClick={() => setShowDeclinedRegister(true)}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                 Declined Register
               </button>
               <button onClick={() => { setPrincipalForm({ fullName: "", aliasCodename: "", threatLevel: "LOW", medicalNotes: "", knownThreats: "" }); setShowPrincipalForm("new"); setApiError("") }}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "none", background: "#7C3AED", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "none", background: "var(--hf-violet)", color: "var(--hf-text-on-solid)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                 <Plus size={14} /> New Principal
               </button>
             </>
           ) : (
             <button onClick={() => { setVehicleForm({ vehicleType: "PRINCIPAL_CAR", registration: "", makeModel: "", armored: false, notes: "" }); setShowVehicleForm(true); setApiError("") }}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "none", background: "#7C3AED", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "none", background: "var(--hf-violet)", color: "var(--hf-text-on-solid)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
               <Plus size={14} /> Register Vehicle
             </button>
           )}
@@ -523,10 +523,10 @@ export default function CloseProtectionTab() {
       {/* Top-level toggle — FIX (P1 backlog): Principals is new, see the
           state block near the top of this component for the fuller
           context. */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 20, borderBottom: "1px solid #E2E8F0" }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 20, borderBottom: "1px solid var(--hf-border)" }}>
         {([["engagements", "Engagements", Shield], ["principals", "Principals", Users2], ["vehicles", "Vehicles", Car]] as const).map(([id, label, Icon]) => (
           <button key={id} onClick={() => setMainView(id)}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 14px", background: "none", border: "none", borderBottom: mainView === id ? "2px solid #7C3AED" : "2px solid transparent", color: mainView === id ? "#7C3AED" : "#64748B", fontWeight: mainView === id ? 700 : 500, fontSize: 13, cursor: "pointer" }}>
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 14px", background: "none", border: "none", borderBottom: mainView === id ? "2px solid var(--hf-violet)" : "2px solid transparent", color: mainView === id ? "var(--hf-violet-text)" : "var(--hf-text-muted)", fontWeight: mainView === id ? 700 : 500, fontSize: 13, cursor: "pointer" }}>
             <Icon size={14} /> {label}
           </button>
         ))}
@@ -538,11 +538,11 @@ export default function CloseProtectionTab() {
       <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 20 }}>
         {/* Engagement list */}
         <div>
-          <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "#64748B", marginBottom: 10 }}>Engagements</p>
+          <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "var(--hf-text-muted)", marginBottom: 10 }}>Engagements</p>
           {loadingDetails ? (
-            <p style={{ fontSize: 12, color: "#94A3B8" }}>Loading…</p>
+            <p style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Loading…</p>
           ) : details.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "32px 16px", color: "#CBD5E1", border: "1px dashed #E2E8F0", borderRadius: 10 }}>
+            <div style={{ textAlign: "center", padding: "32px 16px", color: "var(--hf-text-disabled)", border: "1px dashed var(--hf-border)", borderRadius: 10 }}>
               <Lock size={24} strokeWidth={1.5} style={{ display: "block", margin: "0 auto 8px" }} />
               <p style={{ margin: 0, fontSize: 12 }}>No engagements yet</p>
             </div>
@@ -553,16 +553,16 @@ export default function CloseProtectionTab() {
                 const active = selectedDetail?.id === d.id
                 return (
                   <button key={d.id} onClick={() => setSelectedDetail(d)}
-                    style={{ padding: "12px 14px", border: `1px solid ${active ? "#7C3AED" : "#E2E8F0"}`, borderRadius: 10, background: active ? "#F5F3FF" : "#fff", cursor: "pointer", textAlign: "left" as const, width: "100%" }}>
+                    style={{ padding: "12px 14px", border: `1px solid ${active ? "#7C3AED" : "#E2E8F0"}`, borderRadius: 10, background: active ? "var(--hf-violet-soft)" : "var(--hf-surface)", cursor: "pointer", textAlign: "left" as const, width: "100%" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: active ? "#7C3AED" : "#0F172A" }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: active ? "var(--hf-violet-text)" : "var(--hf-text)" }}>
                         {d.principalCodename}
                       </span>
                       <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, color: sc.color, background: sc.bg }}>
                         {d.status}
                       </span>
                     </div>
-                    <p style={{ margin: 0, fontSize: 11, color: "#64748B" }}>
+                    <p style={{ margin: 0, fontSize: 11, color: "var(--hf-text-muted)" }}>
                       {d.detailType} · {fmtDate(d.startAt)} · {d.teamSize} guard{d.teamSize !== 1 ? "s" : ""}
                     </p>
                   </button>
@@ -575,14 +575,14 @@ export default function CloseProtectionTab() {
         {/* Detail panel */}
         <div>
           {!selectedDetail ? (
-            <div style={{ textAlign: "center", padding: "60px 0", color: "#CBD5E1", border: "1px dashed #E2E8F0", borderRadius: 12 }}>
+            <div style={{ textAlign: "center", padding: "60px 0", color: "var(--hf-text-disabled)", border: "1px dashed var(--hf-border)", borderRadius: 12 }}>
               <Shield size={32} strokeWidth={1.5} style={{ display: "block", margin: "0 auto 8px" }} />
               <p style={{ margin: 0, fontSize: 13, fontWeight: 500 }}>Select an engagement</p>
             </div>
           ) : (
-            <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
               {/* Detail header */}
-              <div style={{ background: "#7C3AED", padding: "16px 20px", color: "#fff" }}>
+              <div style={{ background: "var(--hf-violet)", padding: "16px 20px", color: "var(--hf-text-on-solid)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
                     <p style={{ margin: 0, fontSize: 11, opacity: 0.75 }}>CODENAME</p>
@@ -596,7 +596,7 @@ export default function CloseProtectionTab() {
                 <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                   {selectedDetail.status === "PLANNED" && (
                     <button onClick={() => activateDetail.mutate(selectedDetail.id)}
-                      style={{ padding: "6px 14px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.15)", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                      style={{ padding: "6px 14px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.15)", color: "var(--hf-text-on-solid)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                       Activate Detail
                     </button>
                   )}
@@ -604,10 +604,10 @@ export default function CloseProtectionTab() {
               </div>
 
               {/* Sub-tabs */}
-              <div style={{ display: "flex", borderBottom: "1px solid #E2E8F0" }}>
+              <div style={{ display: "flex", borderBottom: "1px solid var(--hf-border)" }}>
                 {(["details", "itinerary", "evidence", "armoury"] as View[]).map(v => (
                   <button key={v} onClick={() => setView(v)}
-                    style={{ padding: "10px 16px", border: "none", borderBottom: `2px solid ${view === v ? "#7C3AED" : "transparent"}`, background: "none", color: view === v ? "#7C3AED" : "#64748B", fontSize: 12, fontWeight: view === v ? 600 : 400, cursor: "pointer", marginBottom: -1, textTransform: "capitalize" as const }}>
+                    style={{ padding: "10px 16px", border: "none", borderBottom: `2px solid ${view === v ? "#7C3AED" : "transparent"}`, background: "none", color: view === v ? "var(--hf-violet-text)" : "var(--hf-text-muted)", fontSize: 12, fontWeight: view === v ? 600 : 400, cursor: "pointer", marginBottom: -1, textTransform: "capitalize" as const }}>
                     {v === "details" ? "Team" : v === "itinerary" ? "Itinerary" : v === "evidence" ? "Evidence" : "Armoury"}
                   </button>
                 ))}
@@ -617,32 +617,32 @@ export default function CloseProtectionTab() {
                 {view === "details" && (
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                      <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "#64748B", margin: 0 }}>
+                      <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "var(--hf-text-muted)", margin: 0 }}>
                         Team Roster — {(team as any[]).length} assigned
                       </p>
                       <button onClick={() => { setAssignForm({ guardId: "", role: "CPO" }); setShowAssignForm(true); setApiError("") }}
-                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid #7C3AED", background: "#F5F3FF", color: "#7C3AED", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid var(--hf-violet)", background: "var(--hf-violet-soft)", color: "var(--hf-violet-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                         <UserCheck size={12} /> Assign
                       </button>
                     </div>
                     {(team as any[]).length === 0 ? (
-                      <p style={{ color: "#94A3B8", fontSize: 12 }}>No team members assigned yet</p>
+                      <p style={{ color: "var(--hf-text-faint)", fontSize: 12 }}>No team members assigned yet</p>
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {(team as any[]).map((a: any) => (
-                          <div key={a.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 14px", border: "1px solid #E2E8F0", borderRadius: 8, opacity: a.active ? 1 : 0.5 }}>
+                          <div key={a.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 14px", border: "1px solid var(--hf-border)", borderRadius: 8, opacity: a.active ? 1 : 0.5 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                              <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#EDE9FE", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--hf-violet-soft-strong)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                 <Shield size={14} color="#7C3AED" />
                               </div>
                               <div>
-                                <p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: "#0F172A" }}>{a.guardName}</p>
-                                <p style={{ margin: 0, fontSize: 11, color: "#7C3AED" }}>{a.role.replace(/_/g, " ")}{!a.active && " · Ended"}</p>
+                                <p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: "var(--hf-text)" }}>{a.guardName}</p>
+                                <p style={{ margin: 0, fontSize: 11, color: "var(--hf-violet-text)" }}>{a.role.replace(/_/g, " ")}{!a.active && " · Ended"}</p>
                               </div>
                             </div>
                             {a.active && (
                               <button onClick={() => endAssignment.mutate(a.id)} title="End assignment"
-                                style={{ padding: "6px 8px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, cursor: "pointer", color: "#DC2626" }}>
+                                style={{ padding: "6px 8px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-danger-text)" }}>
                                 <UserMinus size={13} />
                               </button>
                             )}
@@ -656,30 +656,30 @@ export default function CloseProtectionTab() {
                 {view === "itinerary" && (
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                      <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "#64748B", margin: 0 }}>
+                      <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "var(--hf-text-muted)", margin: 0 }}>
                         Itinerary — {(itinerary as ItineraryStop[]).length} stop{(itinerary as ItineraryStop[]).length !== 1 ? "s" : ""}
                       </p>
                       <button onClick={() => { setShowAddStop(true); setApiError("") }}
-                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid #7C3AED", background: "#F5F3FF", color: "#7C3AED", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid var(--hf-violet)", background: "var(--hf-violet-soft)", color: "var(--hf-violet-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                         <Plus size={12} /> Add Stop
                       </button>
                     </div>
                     {(itinerary as ItineraryStop[]).length === 0 ? (
-                      <p style={{ color: "#94A3B8", fontSize: 12 }}>No stops added yet</p>
+                      <p style={{ color: "var(--hf-text-faint)", fontSize: 12 }}>No stops added yet</p>
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {(itinerary as ItineraryStop[]).map(stop => (
                           <div key={stop.id}>
-                          <div style={{ display: "flex", gap: 12, padding: "12px 14px", border: "1px solid #E2E8F0", borderRadius: 10 }}>
-                            <div style={{ width: 24, height: 24, borderRadius: "50%", background: stop.status === "COMPLETED" ? "#DCFCE7" : stop.status === "IN_PROGRESS" ? "#FEF3C7" : "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 10, fontWeight: 800, color: stop.status === "COMPLETED" ? "#166534" : stop.status === "IN_PROGRESS" ? "#92400E" : "#94A3B8" }}>
+                          <div style={{ display: "flex", gap: 12, padding: "12px 14px", border: "1px solid var(--hf-border)", borderRadius: 10 }}>
+                            <div style={{ width: 24, height: 24, borderRadius: "50%", background: stop.status === "COMPLETED" ? "var(--hf-success-soft-strong)" : stop.status === "IN_PROGRESS" ? "var(--hf-warning-soft-strong)" : "var(--hf-surface-sunken)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 10, fontWeight: 800, color: stop.status === "COMPLETED" ? "var(--hf-success-text-strong)" : stop.status === "IN_PROGRESS" ? "var(--hf-warning-text-deep)" : "var(--hf-text-faint)" }}>
                               {stop.sequence}
                             </div>
                             <div style={{ flex: 1 }}>
                               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
-                                <span style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{stop.locationName}</span>
-                                {stop.advanceSurveyRequired && <span style={{ fontSize: 10, color: "#92400E", background: "#FEF3C7", padding: "1px 6px", borderRadius: 4, fontWeight: 700 }}>SURVEY REQ</span>}
+                                <span style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>{stop.locationName}</span>
+                                {stop.advanceSurveyRequired && <span style={{ fontSize: 10, color: "var(--hf-warning-text-deep)", background: "var(--hf-warning-soft-strong)", padding: "1px 6px", borderRadius: 4, fontWeight: 700 }}>SURVEY REQ</span>}
                               </div>
-                              <p style={{ margin: 0, fontSize: 11, color: "#64748B" }}>
+                              <p style={{ margin: 0, fontSize: 11, color: "var(--hf-text-muted)" }}>
                                 {stop.address && `${stop.address} · `}
                                 {stop.scheduledArrival && `Scheduled ${fmtTime(stop.scheduledArrival)}`}
                                 {stop.actualArrival && ` · Arrived ${fmtTime(stop.actualArrival)}`}
@@ -687,18 +687,18 @@ export default function CloseProtectionTab() {
                             </div>
                             <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
                               <button onClick={() => setExpandedStopSurveys(expandedStopSurveys === stop.id ? null : stop.id)}
-                                style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", cursor: "pointer" }}>
+                                style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", cursor: "pointer" }}>
                                 Surveys
                               </button>
                               {stop.status === "PENDING" && (
                                 <button onClick={() => arriveStop.mutate(stop.id)}
-                                  style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid #7C3AED", background: "#F5F3FF", color: "#7C3AED", cursor: "pointer" }}>
+                                  style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--hf-violet)", background: "var(--hf-violet-soft)", color: "var(--hf-violet-text)", cursor: "pointer" }}>
                                   Arrive
                                 </button>
                               )}
                               {stop.status === "IN_PROGRESS" && (
                                 <button onClick={() => departStop.mutate(stop.id)}
-                                  style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid #166534", background: "#DCFCE7", color: "#166534", cursor: "pointer" }}>
+                                  style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--hf-success-solid-strong)", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", cursor: "pointer" }}>
                                   Depart
                                 </button>
                               )}
@@ -706,26 +706,26 @@ export default function CloseProtectionTab() {
                           </div>
 
                           {expandedStopSurveys === stop.id && (
-                            <div style={{ marginTop: 6, marginLeft: 36, padding: "10px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8 }}>
+                            <div style={{ marginTop: 6, marginLeft: 36, padding: "10px 14px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8 }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" as const }}>Advance Surveys</span>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase" as const }}>Advance Surveys</span>
                                 <button onClick={() => { setSurveyForm({ entryExitRoutesNotes: "", hazardsNoted: "", allClear: true }); setSurveyFor(stop) }}
-                                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 6, border: "1px solid #7C3AED", background: "#F5F3FF", color: "#7C3AED", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--hf-violet)", background: "var(--hf-violet-soft)", color: "var(--hf-violet-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                                   <MapPinned size={11} /> Conduct Survey
                                 </button>
                               </div>
                               {stopSurveysQuery.isLoading ? (
-                                <p style={{ color: "#94A3B8", fontSize: 12, margin: 0 }}>Loading…</p>
+                                <p style={{ color: "var(--hf-text-faint)", fontSize: 12, margin: 0 }}>Loading…</p>
                               ) : !stopSurveysQuery.data?.length ? (
-                                <p style={{ color: "#94A3B8", fontSize: 12, margin: 0 }}>No surveys conducted yet.</p>
+                                <p style={{ color: "var(--hf-text-faint)", fontSize: 12, margin: 0 }}>No surveys conducted yet.</p>
                               ) : (
                                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                                   {stopSurveysQuery.data.map(sv => (
-                                    <div key={sv.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, padding: "6px 10px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 6 }}>
+                                    <div key={sv.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, padding: "6px 10px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 6 }}>
                                       {sv.allClear ? <CheckCircle2 size={13} color="#166534" /> : <Ban size={13} color="#DC2626" />}
-                                      <span style={{ fontWeight: 600, color: sv.allClear ? "#166534" : "#DC2626" }}>{sv.allClear ? "All Clear" : "Not Clear"}</span>
-                                      <span style={{ color: "#94A3B8" }}>by {sv.surveyedByGuardName} · {fmtTime(sv.surveyedAt)}</span>
-                                      {sv.hazardsNoted && <span style={{ color: "#C2410C", marginLeft: "auto" }}>{sv.hazardsNoted}</span>}
+                                      <span style={{ fontWeight: 600, color: sv.allClear ? "var(--hf-success-text-strong)" : "var(--hf-danger-text)" }}>{sv.allClear ? "All Clear" : "Not Clear"}</span>
+                                      <span style={{ color: "var(--hf-text-faint)" }}>by {sv.surveyedByGuardName} · {fmtTime(sv.surveyedAt)}</span>
+                                      {sv.hazardsNoted && <span style={{ color: "var(--hf-orange-text-strong)", marginLeft: "auto" }}>{sv.hazardsNoted}</span>}
                                     </div>
                                   ))}
                                 </div>
@@ -751,29 +751,29 @@ export default function CloseProtectionTab() {
                 {view === "armoury" && selectedDetail && (
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                      <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "#64748B", margin: 0 }}>
+                      <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "var(--hf-text-muted)", margin: 0 }}>
                         Firearm Issue History — {detailArmoury.length} event{detailArmoury.length !== 1 ? "s" : ""}
                       </p>
                       <button onClick={() => { setIssueForm({ assignmentId: "", armouryId: "", witnessedByGuardId: "", conditionNotes: "" }); setShowIssueForm(true); setApiError("") }}
                         disabled={activeTeam.length === 0}
-                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid #7C3AED", background: activeTeam.length ? "#F5F3FF" : "#F8FAFC", color: activeTeam.length ? "#7C3AED" : "#CBD5E1", fontSize: 11, fontWeight: 600, cursor: activeTeam.length ? "pointer" : "not-allowed" }}>
+                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid var(--hf-violet)", background: activeTeam.length ? "var(--hf-violet-soft)" : "var(--hf-surface-muted)", color: activeTeam.length ? "var(--hf-violet-text)" : "var(--hf-text-disabled)", fontSize: 11, fontWeight: 600, cursor: activeTeam.length ? "pointer" : "not-allowed" }}>
                         <Crosshair size={12} /> Issue Firearm
                       </button>
                     </div>
                     {activeTeam.length === 0 && (
-                      <p style={{ color: "#CBD5E1", fontSize: 12, marginBottom: 12 }}>Assign a guard to the team first — a firearm can only be issued against an active team assignment.</p>
+                      <p style={{ color: "var(--hf-text-disabled)", fontSize: 12, marginBottom: 12 }}>Assign a guard to the team first — a firearm can only be issued against an active team assignment.</p>
                     )}
                     {detailArmoury.length === 0 ? (
-                      <p style={{ color: "#94A3B8", fontSize: 12 }}>No firearms issued for this detail yet.</p>
+                      <p style={{ color: "var(--hf-text-faint)", fontSize: 12 }}>No firearms issued for this detail yet.</p>
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         {detailArmoury.map(log => (
-                          <div key={log.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
+                          <div key={log.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
                             <Crosshair size={13} color={log.action === "ISSUE" ? "#7C3AED" : "#64748B"} />
-                            <span style={{ fontWeight: 600, color: "#0F172A" }}>{log.action}</span>
-                            <span style={{ color: "#94A3B8" }}>{firearmLabel(log.armouryId)} → {guardName(log.guardId)}</span>
-                            <span style={{ color: "#CBD5E1" }}>witnessed by {guardName(log.witnessedByGuardId)}</span>
-                            <span style={{ color: "#CBD5E1", marginLeft: "auto" }}>{fmtTime(log.occurredAt)}</span>
+                            <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{log.action}</span>
+                            <span style={{ color: "var(--hf-text-faint)" }}>{firearmLabel(log.armouryId)} → {guardName(log.guardId)}</span>
+                            <span style={{ color: "var(--hf-text-disabled)" }}>witnessed by {guardName(log.witnessedByGuardId)}</span>
+                            <span style={{ color: "var(--hf-text-disabled)", marginLeft: "auto" }}>{fmtTime(log.occurredAt)}</span>
                           </div>
                         ))}
                       </div>
@@ -812,9 +812,9 @@ export default function CloseProtectionTab() {
       {mainView === "vehicles" && (
         <div>
           {vehiclesLoading ? (
-            <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>Loading…</div>
+            <div style={{ textAlign: "center", padding: 30, color: "var(--hf-text-faint)" }}>Loading…</div>
           ) : vehicles.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+            <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>
               No protection vehicles registered yet.
             </div>
           ) : (
@@ -822,18 +822,18 @@ export default function CloseProtectionTab() {
               {vehicles.map(v => {
                 const sc = VEHICLE_STATUS[v.status] ?? VEHICLE_STATUS.AVAILABLE
                 return (
-                  <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
+                  <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 9, background: "#F5F3FF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 9, background: "var(--hf-violet-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                         <Car size={16} color="#7C3AED" />
                       </div>
                       <div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{v.registration}</span>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: "#7C3AED", background: "#F5F3FF", padding: "2px 8px", borderRadius: 4 }}>{v.vehicleType.replace(/_/g, " ")}</span>
-                          {v.armored && <span style={{ fontSize: 10, fontWeight: 700, color: "#166534", background: "#DCFCE7", padding: "2px 8px", borderRadius: 4 }}>ARMORED</span>}
+                          <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{v.registration}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-violet-text)", background: "var(--hf-violet-soft)", padding: "2px 8px", borderRadius: 4 }}>{v.vehicleType.replace(/_/g, " ")}</span>
+                          {v.armored && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-success-text-strong)", background: "var(--hf-success-soft-strong)", padding: "2px 8px", borderRadius: 4 }}>ARMORED</span>}
                         </div>
-                        <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                        <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>
                           {v.makeModel && <>{v.makeModel} · </>}
                           {v.assignedDriverName ? `Driver: ${v.assignedDriverName}` : "No driver assigned"}
                         </div>
@@ -843,23 +843,23 @@ export default function CloseProtectionTab() {
                       <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: sc.bg, color: sc.color }}>{sc.label}</span>
                       {v.status === "AVAILABLE" && (
                         <button onClick={() => { setDriverGuardId(""); setAssignDriverFor(v) }} title="Assign driver"
-                          style={{ padding: "6px 8px", background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 7, cursor: "pointer", color: "#0369A1" }}><UserCheck size={13} /></button>
+                          style={{ padding: "6px 8px", background: "var(--hf-sky-soft)", border: "1px solid var(--hf-sky-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-sky-text-strong)" }}><UserCheck size={13} /></button>
                       )}
                       {v.status === "IN_USE" && (
                         <button onClick={() => releaseDriver.mutate(v.id)} title="Release driver"
-                          style={{ padding: "6px 8px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 7, cursor: "pointer", color: "#B45309" }}><UserMinus size={13} /></button>
+                          style={{ padding: "6px 8px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-warning-text-strong)" }}><UserMinus size={13} /></button>
                       )}
                       {v.status === "AVAILABLE" && (
                         <button onClick={() => { setServiceNotes(""); setServiceFor(v) }} title="Send for service"
-                          style={{ padding: "6px 8px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, cursor: "pointer", color: "#64748B" }}><Wrench size={13} /></button>
+                          style={{ padding: "6px 8px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-text-muted)" }}><Wrench size={13} /></button>
                       )}
                       {v.status === "IN_SERVICE" && (
                         <button onClick={() => returnFromService.mutate(v.id)} title="Return from service"
-                          style={{ padding: "6px 8px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 7, cursor: "pointer", color: "#166534" }}><CheckCircle2 size={13} /></button>
+                          style={{ padding: "6px 8px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-success-text-strong)" }}><CheckCircle2 size={13} /></button>
                       )}
                       {v.status !== "DECOMMISSIONED" && (
                         <button onClick={() => { if (confirm(`Permanently decommission ${v.registration}?`)) decommissionVehicle.mutate(v.id) }} title="Decommission"
-                          style={{ padding: "6px 8px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, cursor: "pointer", color: "#DC2626" }}><Ban size={13} /></button>
+                          style={{ padding: "6px 8px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-danger-text)" }}><Ban size={13} /></button>
                       )}
                     </div>
                   </div>
@@ -875,7 +875,7 @@ export default function CloseProtectionTab() {
         <div style={modalOverlay}>
           <div style={modalBox}>
             <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>New Protection Detail</h3>
-            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            {apiError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
                 <label style={lblStyle}>Principal *</label>
@@ -905,7 +905,7 @@ export default function CloseProtectionTab() {
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setShowAddDetail(false)} style={secondaryBtn}>Cancel</button>
               <button onClick={() => createDetail.mutate({ ...detailForm, startAt: detailForm.startAt ? new Date(detailForm.startAt).toISOString() : null })}
-                style={{ ...primaryBtn, background: "#7C3AED" }}>Create</button>
+                style={{ ...primaryBtn, background: "var(--hf-violet)" }}>Create</button>
             </div>
           </div>
         </div>
@@ -916,7 +916,7 @@ export default function CloseProtectionTab() {
         <div style={modalOverlay}>
           <div style={modalBox}>
             <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Add Itinerary Stop</h3>
-            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            {apiError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
                 <label style={lblStyle}>Location Name *</label>
@@ -938,7 +938,7 @@ export default function CloseProtectionTab() {
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setShowAddStop(false)} style={secondaryBtn}>Cancel</button>
               <button onClick={() => addStop.mutate({ id: selectedDetail.id, body: { ...stopForm, scheduledArrival: stopForm.scheduledArrival ? new Date(stopForm.scheduledArrival).toISOString() : null } })}
-                style={{ ...primaryBtn, background: "#7C3AED" }}>Add Stop</button>
+                style={{ ...primaryBtn, background: "var(--hf-violet)" }}>Add Stop</button>
             </div>
           </div>
         </div>
@@ -949,7 +949,7 @@ export default function CloseProtectionTab() {
         <div style={modalOverlay}>
           <div style={modalBox}>
             <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>{showPrincipalForm === "new" ? "New Principal" : "Edit Principal"}</h3>
-            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            {apiError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
                 <label style={lblStyle}>Full Name *</label>
@@ -980,7 +980,7 @@ export default function CloseProtectionTab() {
               <button
                 onClick={() => showPrincipalForm === "new" ? createPrincipal.mutate() : updatePrincipal.mutate(showPrincipalForm.id)}
                 disabled={!principalForm.fullName.trim() || !principalForm.aliasCodename.trim() || createPrincipal.isPending || updatePrincipal.isPending}
-                style={{ ...primaryBtn, background: "#7C3AED" }}>
+                style={{ ...primaryBtn, background: "var(--hf-violet)" }}>
                 {createPrincipal.isPending || updatePrincipal.isPending ? "Saving…" : showPrincipalForm === "new" ? "Create" : "Save Changes"}
               </button>
             </div>
@@ -995,7 +995,7 @@ export default function CloseProtectionTab() {
         <div style={modalOverlay}>
           <div style={modalBox}>
             <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Upload Evidence</h3>
-            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            {apiError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
                 <label style={lblStyle}>Category</label>
@@ -1023,7 +1023,7 @@ export default function CloseProtectionTab() {
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setEvidenceUploadFor(null)} style={secondaryBtn}>Cancel</button>
-              <button onClick={() => uploadEvidence.mutate()} disabled={!evidenceForm.fileBase64 || uploadEvidence.isPending} style={{ ...primaryBtn, background: "#7C3AED" }}>
+              <button onClick={() => uploadEvidence.mutate()} disabled={!evidenceForm.fileBase64 || uploadEvidence.isPending} style={{ ...primaryBtn, background: "var(--hf-violet)" }}>
                 {uploadEvidence.isPending ? "Uploading…" : "Upload"}
               </button>
             </div>
@@ -1036,7 +1036,7 @@ export default function CloseProtectionTab() {
         <div style={modalOverlay}>
           <div style={modalBox}>
             <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Register Vehicle</h3>
-            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            {apiError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
                 <label style={lblStyle}>Type</label>
@@ -1061,7 +1061,7 @@ export default function CloseProtectionTab() {
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setShowVehicleForm(false)} style={secondaryBtn}>Cancel</button>
-              <button onClick={() => registerVehicle.mutate()} disabled={!vehicleForm.registration.trim() || registerVehicle.isPending} style={{ ...primaryBtn, background: "#7C3AED" }}>
+              <button onClick={() => registerVehicle.mutate()} disabled={!vehicleForm.registration.trim() || registerVehicle.isPending} style={{ ...primaryBtn, background: "var(--hf-violet)" }}>
                 {registerVehicle.isPending ? "Registering…" : "Register"}
               </button>
             </div>
@@ -1074,7 +1074,7 @@ export default function CloseProtectionTab() {
         <div style={modalOverlay}>
           <div style={modalBox}>
             <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Assign Driver — {assignDriverFor.registration}</h3>
-            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            {apiError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
             <div style={{ marginBottom: 4 }}>
               <label style={lblStyle}>Guard *</label>
               <select value={driverGuardId} onChange={e => setDriverGuardId(e.target.value)} style={inputStyle}>
@@ -1084,7 +1084,7 @@ export default function CloseProtectionTab() {
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setAssignDriverFor(null)} style={secondaryBtn}>Cancel</button>
-              <button onClick={() => assignDriver.mutate()} disabled={!driverGuardId || assignDriver.isPending} style={{ ...primaryBtn, background: "#7C3AED" }}>
+              <button onClick={() => assignDriver.mutate()} disabled={!driverGuardId || assignDriver.isPending} style={{ ...primaryBtn, background: "var(--hf-violet)" }}>
                 {assignDriver.isPending ? "Assigning…" : "Assign"}
               </button>
             </div>
@@ -1097,14 +1097,14 @@ export default function CloseProtectionTab() {
         <div style={modalOverlay}>
           <div style={modalBox}>
             <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Send for Service — {serviceFor.registration}</h3>
-            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            {apiError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
             <div style={{ marginBottom: 4 }}>
               <label style={lblStyle}>Notes *</label>
               <textarea value={serviceNotes} onChange={e => setServiceNotes(e.target.value)} rows={3} style={{ ...inputStyle, fontFamily: "inherit", resize: "vertical" as const }} />
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setServiceFor(null)} style={secondaryBtn}>Cancel</button>
-              <button onClick={() => sendForService.mutate()} disabled={!serviceNotes.trim() || sendForService.isPending} style={{ ...primaryBtn, background: "#7C3AED" }}>
+              <button onClick={() => sendForService.mutate()} disabled={!serviceNotes.trim() || sendForService.isPending} style={{ ...primaryBtn, background: "var(--hf-violet)" }}>
                 {sendForService.isPending ? "Saving…" : "Send for Service"}
               </button>
             </div>
@@ -1117,7 +1117,7 @@ export default function CloseProtectionTab() {
         <div style={modalOverlay}>
           <div style={modalBox}>
             <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Assign to Team</h3>
-            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            {apiError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
                 <label style={lblStyle}>Guard *</label>
@@ -1139,7 +1139,7 @@ export default function CloseProtectionTab() {
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setShowAssignForm(false)} style={secondaryBtn}>Cancel</button>
-              <button onClick={() => assignToDetail.mutate()} disabled={!assignForm.guardId || assignToDetail.isPending} style={{ ...primaryBtn, background: "#7C3AED" }}>
+              <button onClick={() => assignToDetail.mutate()} disabled={!assignForm.guardId || assignToDetail.isPending} style={{ ...primaryBtn, background: "var(--hf-violet)" }}>
                 {assignToDetail.isPending ? "Assigning…" : "Assign"}
               </button>
             </div>
@@ -1152,7 +1152,7 @@ export default function CloseProtectionTab() {
         <div style={modalOverlay}>
           <div style={modalBox}>
             <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Issue Firearm</h3>
-            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            {apiError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
                 <label style={lblStyle}>Receiving Guard (from team roster) *</label>
@@ -1167,7 +1167,7 @@ export default function CloseProtectionTab() {
                   <option value="">Select firearm…</option>
                   {availableFirearms.map(f => <option key={f.id} value={f.id}>{f.firearmSerial} — {f.firearmType}</option>)}
                 </select>
-                {availableFirearms.length === 0 && <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>No available, in-license firearms in the armoury.</div>}
+                {availableFirearms.length === 0 && <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>No available, in-license firearms in the armoury.</div>}
               </div>
               <div>
                 <label style={lblStyle}>Witness (must be a different guard) *</label>
@@ -1185,7 +1185,7 @@ export default function CloseProtectionTab() {
               <button onClick={() => setShowIssueForm(false)} style={secondaryBtn}>Cancel</button>
               <button onClick={() => issueFirearm.mutate()}
                 disabled={!issueForm.assignmentId || !issueForm.armouryId || !issueForm.witnessedByGuardId || issueFirearm.isPending}
-                style={{ ...primaryBtn, background: "#7C3AED" }}>
+                style={{ ...primaryBtn, background: "var(--hf-violet)" }}>
                 {issueFirearm.isPending ? "Issuing…" : "Issue"}
               </button>
             </div>
@@ -1198,7 +1198,7 @@ export default function CloseProtectionTab() {
         <div style={modalOverlay}>
           <div style={modalBox}>
             <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Conduct Survey — {surveyFor.locationName}</h3>
-            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            {apiError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
                 <label style={lblStyle}>Entry/Exit Routes</label>
@@ -1215,7 +1215,7 @@ export default function CloseProtectionTab() {
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setSurveyFor(null)} style={secondaryBtn}>Cancel</button>
-              <button onClick={() => conductSurvey.mutate()} disabled={conductSurvey.isPending} style={{ ...primaryBtn, background: "#7C3AED" }}>
+              <button onClick={() => conductSurvey.mutate()} disabled={conductSurvey.isPending} style={{ ...primaryBtn, background: "var(--hf-violet)" }}>
                 {conductSurvey.isPending ? "Saving…" : "Submit Survey"}
               </button>
             </div>
@@ -1228,7 +1228,7 @@ export default function CloseProtectionTab() {
         <div style={modalOverlay}>
           <div style={modalBox}>
             <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>New Vetting Check — {selectedPrincipal.aliasCodename}</h3>
-            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            {apiError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
             <div style={{ marginBottom: 4 }}>
               <label style={lblStyle}>Type</label>
               <select value={vettingTypeForm} onChange={e => setVettingTypeForm(e.target.value)} style={inputStyle}>
@@ -1242,7 +1242,7 @@ export default function CloseProtectionTab() {
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setShowVettingForm(false)} style={secondaryBtn}>Cancel</button>
-              <button onClick={() => createVettingCheck.mutate()} disabled={createVettingCheck.isPending} style={{ ...primaryBtn, background: "#7C3AED" }}>
+              <button onClick={() => createVettingCheck.mutate()} disabled={createVettingCheck.isPending} style={{ ...primaryBtn, background: "var(--hf-violet)" }}>
                 {createVettingCheck.isPending ? "Creating…" : "Initiate Check"}
               </button>
             </div>
@@ -1255,7 +1255,7 @@ export default function CloseProtectionTab() {
         <div style={modalOverlay}>
           <div style={modalBox}>
             <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Record Result — {resultFor.vettingType.replace(/_/g, " ")}</h3>
-            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            {apiError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
                 <label style={lblStyle}>Result</label>
@@ -1284,7 +1284,7 @@ export default function CloseProtectionTab() {
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setResultForVetting(null)} style={secondaryBtn}>Cancel</button>
-              <button onClick={() => recordVettingResult.mutate()} disabled={recordVettingResult.isPending} style={{ ...primaryBtn, background: "#7C3AED" }}>
+              <button onClick={() => recordVettingResult.mutate()} disabled={recordVettingResult.isPending} style={{ ...primaryBtn, background: "var(--hf-violet)" }}>
                 {recordVettingResult.isPending ? "Saving…" : "Save Result"}
               </button>
             </div>
@@ -1297,8 +1297,8 @@ export default function CloseProtectionTab() {
         <div style={modalOverlay}>
           <div style={modalBox}>
             <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Decline Engagement — {selectedPrincipal.aliasCodename}</h3>
-            <p style={{ fontSize: 12, color: "#94A3B8", marginBottom: 14 }}>Records a compliance decision not to work with this person. Does not prevent re-accepting in future — this is a compliance record, not a system block.</p>
-            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            <p style={{ fontSize: 12, color: "var(--hf-text-faint)", marginBottom: 14 }}>Records a compliance decision not to work with this person. Does not prevent re-accepting in future — this is a compliance record, not a system block.</p>
+            {apiError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
             <div style={{ marginBottom: 12 }}>
               <label style={lblStyle}>Reason *</label>
               <input value={declineForm.reason} onChange={e => setDeclineForm(f => ({ ...f, reason: e.target.value }))} style={inputStyle} />
@@ -1310,7 +1310,7 @@ export default function CloseProtectionTab() {
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setShowDeclineForm(false)} style={secondaryBtn}>Cancel</button>
               <button onClick={() => declinePrincipalMutation.mutate()} disabled={!declineForm.reason.trim() || declinePrincipalMutation.isPending}
-                style={{ ...primaryBtn, background: "#DC2626" }}>
+                style={{ ...primaryBtn, background: "var(--hf-danger)" }}>
                 {declinePrincipalMutation.isPending ? "Saving…" : "Record Decline"}
               </button>
             </div>
@@ -1324,23 +1324,23 @@ export default function CloseProtectionTab() {
           <div style={{ ...modalBox, width: 520, maxHeight: "80vh", overflowY: "auto" as const }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Declined Principals Register</h3>
-              <button onClick={() => setShowDeclinedRegister(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>✕</button>
+              <button onClick={() => setShowDeclinedRegister(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}>✕</button>
             </div>
             {declinedRegisterQuery.isLoading ? (
-              <p style={{ color: "#94A3B8", fontSize: 12 }}>Loading…</p>
+              <p style={{ color: "var(--hf-text-faint)", fontSize: 12 }}>Loading…</p>
             ) : !declinedRegisterQuery.data?.length ? (
-              <p style={{ color: "#94A3B8", fontSize: 12 }}>No declined engagements on record.</p>
+              <p style={{ color: "var(--hf-text-faint)", fontSize: 12 }}>No declined engagements on record.</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {declinedRegisterQuery.data.map((d: any) => {
                   const p = principals.find(pr => pr.id === d.principalId)
                   return (
-                    <div key={d.id} style={{ padding: "10px 14px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
+                    <div key={d.id} style={{ padding: "10px 14px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ fontWeight: 700, color: "#0F172A" }}>{p?.aliasCodename ?? d.principalId.slice(0, 8)}</span>
-                        <span style={{ color: "#94A3B8" }}>{d.declinedAt}</span>
+                        <span style={{ fontWeight: 700, color: "var(--hf-text)" }}>{p?.aliasCodename ?? d.principalId.slice(0, 8)}</span>
+                        <span style={{ color: "var(--hf-text-faint)" }}>{d.declinedAt}</span>
                       </div>
-                      <div style={{ color: "#64748B", marginTop: 3 }}>{d.reason}</div>
+                      <div style={{ color: "var(--hf-text-muted)", marginTop: 3 }}>{d.reason}</div>
                     </div>
                   )
                 })}
@@ -1381,9 +1381,9 @@ function PrincipalsView({
   return (
     <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 20 }}>
       <div>
-        <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "#64748B", marginBottom: 10 }}>Principals</p>
+        <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "var(--hf-text-muted)", marginBottom: 10 }}>Principals</p>
         {principals.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "32px 16px", color: "#CBD5E1", border: "1px dashed #E2E8F0", borderRadius: 10 }}>
+          <div style={{ textAlign: "center", padding: "32px 16px", color: "var(--hf-text-disabled)", border: "1px dashed var(--hf-border)", borderRadius: 10 }}>
             <Users2 size={24} strokeWidth={1.5} style={{ display: "block", margin: "0 auto 8px" }} />
             <p style={{ margin: 0, fontSize: 12 }}>No principals registered</p>
           </div>
@@ -1394,12 +1394,12 @@ function PrincipalsView({
               const active = selectedPrincipal?.id === p.id
               return (
                 <button key={p.id} onClick={() => { setSelectedPrincipal(p); setPrincipalView("overview") }}
-                  style={{ padding: "12px 14px", border: `1px solid ${active ? "#7C3AED" : "#E2E8F0"}`, borderRadius: 10, background: active ? "#F5F3FF" : "#fff", cursor: "pointer", textAlign: "left" as const, width: "100%", opacity: p.active ? 1 : 0.6 }}>
+                  style={{ padding: "12px 14px", border: `1px solid ${active ? "#7C3AED" : "#E2E8F0"}`, borderRadius: 10, background: active ? "var(--hf-violet-soft)" : "var(--hf-surface)", cursor: "pointer", textAlign: "left" as const, width: "100%", opacity: p.active ? 1 : 0.6 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: active ? "#7C3AED" : "#0F172A" }}>{p.aliasCodename}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: active ? "var(--hf-violet-text)" : "var(--hf-text)" }}>{p.aliasCodename}</span>
                     <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, color: tc.color, background: tc.bg }}>{p.threatLevel}</span>
                   </div>
-                  <p style={{ margin: 0, fontSize: 11, color: "#64748B" }}>{p.fullName}{!p.active && " · Inactive"}</p>
+                  <p style={{ margin: 0, fontSize: 11, color: "var(--hf-text-muted)" }}>{p.fullName}{!p.active && " · Inactive"}</p>
                 </button>
               )
             })}
@@ -1409,13 +1409,13 @@ function PrincipalsView({
 
       <div>
         {!selectedPrincipal ? (
-          <div style={{ textAlign: "center", padding: "60px 0", color: "#CBD5E1", border: "1px dashed #E2E8F0", borderRadius: 12 }}>
+          <div style={{ textAlign: "center", padding: "60px 0", color: "var(--hf-text-disabled)", border: "1px dashed var(--hf-border)", borderRadius: 12 }}>
             <Users2 size={32} strokeWidth={1.5} style={{ display: "block", margin: "0 auto 8px" }} />
             <p style={{ margin: 0, fontSize: 13, fontWeight: 500 }}>Select a principal</p>
           </div>
         ) : (
-          <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
-            <div style={{ background: "#7C3AED", padding: "16px 20px", color: "#fff" }}>
+          <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ background: "var(--hf-violet)", padding: "16px 20px", color: "var(--hf-text-on-solid)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <p style={{ margin: 0, fontSize: 11, opacity: 0.75 }}>CODENAME</p>
@@ -1424,12 +1424,12 @@ function PrincipalsView({
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button onClick={() => onEdit(selectedPrincipal)} title="Edit"
-                    style={{ padding: "7px 9px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.15)", color: "#fff", cursor: "pointer" }}>
+                    style={{ padding: "7px 9px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.15)", color: "var(--hf-text-on-solid)", cursor: "pointer" }}>
                     <Edit2 size={13} />
                   </button>
                   {selectedPrincipal.active && (
                     <button onClick={() => onDeactivate(selectedPrincipal.id)} title="Deactivate"
-                      style={{ padding: "7px 9px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.15)", color: "#fff", cursor: "pointer" }}>
+                      style={{ padding: "7px 9px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.15)", color: "var(--hf-text-on-solid)", cursor: "pointer" }}>
                       <Ban size={13} />
                     </button>
                   )}
@@ -1437,10 +1437,10 @@ function PrincipalsView({
               </div>
             </div>
 
-            <div style={{ display: "flex", borderBottom: "1px solid #E2E8F0" }}>
+            <div style={{ display: "flex", borderBottom: "1px solid var(--hf-border)" }}>
               {(["overview", "audit", "evidence", "vetting"] as const).map(v => (
                 <button key={v} onClick={() => setPrincipalView(v)}
-                  style={{ padding: "10px 16px", border: "none", borderBottom: `2px solid ${principalView === v ? "#7C3AED" : "transparent"}`, background: "none", color: principalView === v ? "#7C3AED" : "#64748B", fontSize: 12, fontWeight: principalView === v ? 600 : 400, cursor: "pointer", marginBottom: -1, textTransform: "capitalize" as const }}>
+                  style={{ padding: "10px 16px", border: "none", borderBottom: `2px solid ${principalView === v ? "#7C3AED" : "transparent"}`, background: "none", color: principalView === v ? "var(--hf-violet-text)" : "var(--hf-text-muted)", fontSize: 12, fontWeight: principalView === v ? 600 : 400, cursor: "pointer", marginBottom: -1, textTransform: "capitalize" as const }}>
                   {v}
                 </button>
               ))}
@@ -1454,7 +1454,7 @@ function PrincipalsView({
                   <Field label="Medical Notes" value={selectedPrincipal.medicalNotes ?? "—"} />
                   <Field label="Known Threats" value={selectedPrincipal.knownThreats ?? "—"} />
                   <button onClick={() => onDownloadVettingPdf(selectedPrincipal.id)}
-                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#fff", color: "#374151", fontSize: 12, fontWeight: 600, cursor: "pointer", width: "fit-content", marginTop: 6 }}>
+                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-secondary)", fontSize: 12, fontWeight: 600, cursor: "pointer", width: "fit-content", marginTop: 6 }}>
                     <FileDown size={14} /> Vetting Compliance PDF
                   </button>
                 </div>
@@ -1463,30 +1463,30 @@ function PrincipalsView({
               {principalView === "audit" && (
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "#64748B", margin: 0 }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "var(--hf-text-muted)", margin: 0 }}>
                       {auditMode === "all" ? "Full Audit Trail" : "View History"}
                     </p>
                     <div style={{ display: "flex", gap: 4 }}>
                       {(["all", "views"] as const).map(m => (
                         <button key={m} onClick={() => setAuditMode(m)}
-                          style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${auditMode === m ? "#7C3AED" : "#E2E8F0"}`, background: auditMode === m ? "#F5F3FF" : "#fff", color: auditMode === m ? "#7C3AED" : "#64748B", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                          style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${auditMode === m ? "#7C3AED" : "#E2E8F0"}`, background: auditMode === m ? "var(--hf-violet-soft)" : "var(--hf-surface)", color: auditMode === m ? "var(--hf-violet-text)" : "var(--hf-text-muted)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                           {m === "all" ? "All Events" : "Who Viewed"}
                         </button>
                       ))}
                     </div>
                   </div>
                   {auditLoading ? (
-                    <p style={{ color: "#94A3B8", fontSize: 12 }}>Loading…</p>
+                    <p style={{ color: "var(--hf-text-faint)", fontSize: 12 }}>Loading…</p>
                   ) : !auditData?.content?.length ? (
-                    <p style={{ color: "#94A3B8", fontSize: 12 }}>No audit events recorded.</p>
+                    <p style={{ color: "var(--hf-text-faint)", fontSize: 12 }}>No audit events recorded.</p>
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {auditData.content.map(e => (
-                        <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
+                        <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
                           {e.action === "VIEWED" ? <Eye size={13} color="#7C3AED" /> : <History size={13} color="#64748B" />}
-                          <span style={{ fontWeight: 600, color: "#0F172A" }}>{e.action}</span>
-                          <span style={{ color: "#94A3B8" }}>by {e.actorId ? e.actorId.slice(0, 8) : "system"}</span>
-                          <span style={{ color: "#CBD5E1", marginLeft: "auto" }}>{new Date(e.occurredAt).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                          <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{e.action}</span>
+                          <span style={{ color: "var(--hf-text-faint)" }}>by {e.actorId ? e.actorId.slice(0, 8) : "system"}</span>
+                          <span style={{ color: "var(--hf-text-disabled)", marginLeft: "auto" }}>{new Date(e.occurredAt).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                         </div>
                       ))}
                     </div>
@@ -1501,41 +1501,41 @@ function PrincipalsView({
               {principalView === "vetting" && (
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "#64748B", margin: 0 }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "var(--hf-text-muted)", margin: 0 }}>
                       Vetting Checks — {vettingHistoryQuery.data?.length ?? 0}
                     </p>
                     <div style={{ display: "flex", gap: 6 }}>
                       <button onClick={onDeclinePrincipal}
-                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid #FECACA", background: "#FEF2F2", color: "#DC2626", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid var(--hf-danger-border)", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                         Decline Engagement
                       </button>
                       <button onClick={onCreateVetting}
-                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid #7C3AED", background: "#F5F3FF", color: "#7C3AED", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid var(--hf-violet)", background: "var(--hf-violet-soft)", color: "var(--hf-violet-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                         <Plus size={12} /> New Check
                       </button>
                     </div>
                   </div>
                   {vettingHistoryQuery.isLoading ? (
-                    <p style={{ color: "#94A3B8", fontSize: 12 }}>Loading…</p>
+                    <p style={{ color: "var(--hf-text-faint)", fontSize: 12 }}>Loading…</p>
                   ) : !vettingHistoryQuery.data?.length ? (
-                    <p style={{ color: "#94A3B8", fontSize: 12 }}>No vetting checks recorded yet.</p>
+                    <p style={{ color: "var(--hf-text-faint)", fontSize: 12 }}>No vetting checks recorded yet.</p>
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {vettingHistoryQuery.data.map((v: any) => {
                         const resultColor = v.result === "CLEAR" ? "#166534" : v.result === "HIT" ? "#DC2626" : v.result === "INCONCLUSIVE" ? "#B45309" : "#64748B"
                         const resultBg = v.result === "CLEAR" ? "#DCFCE7" : v.result === "HIT" ? "#FEF2F2" : v.result === "INCONCLUSIVE" ? "#FFFBEB" : "#F1F5F9"
                         return (
-                          <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
+                          <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
                             <div>
-                              <span style={{ fontWeight: 700, color: "#0F172A" }}>{v.vettingType.replace(/_/g, " ")}</span>
-                              {v.conductedAt && <span style={{ color: "#94A3B8", marginLeft: 8 }}>Conducted {v.conductedAt}{v.conductedBy && ` by ${v.conductedBy}`}</span>}
-                              {v.nextReviewAt && <span style={{ color: "#94A3B8", marginLeft: 8 }}>· Next review {v.nextReviewAt}</span>}
+                              <span style={{ fontWeight: 700, color: "var(--hf-text)" }}>{v.vettingType.replace(/_/g, " ")}</span>
+                              {v.conductedAt && <span style={{ color: "var(--hf-text-faint)", marginLeft: 8 }}>Conducted {v.conductedAt}{v.conductedBy && ` by ${v.conductedBy}`}</span>}
+                              {v.nextReviewAt && <span style={{ color: "var(--hf-text-faint)", marginLeft: 8 }}>· Next review {v.nextReviewAt}</span>}
                             </div>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                               <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20, background: resultBg, color: resultColor }}>{v.result}</span>
                               {v.result === "PENDING" && (
                                 <button onClick={() => onRecordVettingResult(v)}
-                                  style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #7C3AED", background: "#F5F3FF", color: "#7C3AED", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                                  style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid var(--hf-violet)", background: "var(--hf-violet-soft)", color: "var(--hf-violet-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                                   Record Result
                                 </button>
                               )}
@@ -1558,8 +1558,8 @@ function PrincipalsView({
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p style={{ margin: 0, fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "#94A3B8" }}>{label}</p>
-      <p style={{ margin: "3px 0 0", fontSize: 13, color: "#0F172A" }}>{value}</p>
+      <p style={{ margin: 0, fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "var(--hf-text-faint)" }}>{label}</p>
+      <p style={{ margin: "3px 0 0", fontSize: 13, color: "var(--hf-text)" }}>{value}</p>
     </div>
   )
 }
@@ -1574,31 +1574,31 @@ function EvidenceList({ query, onUpload, onDownload, onDelete }: {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "#64748B", margin: 0 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "var(--hf-text-muted)", margin: 0 }}>
           Evidence — {evidence.length} file{evidence.length !== 1 ? "s" : ""}
         </p>
-        <button onClick={onUpload} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid #7C3AED", background: "#F5F3FF", color: "#7C3AED", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+        <button onClick={onUpload} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid var(--hf-violet)", background: "var(--hf-violet-soft)", color: "var(--hf-violet-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={12} /> Upload
         </button>
       </div>
       {isLoading ? (
-        <p style={{ color: "#94A3B8", fontSize: 12 }}>Loading…</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 12 }}>Loading…</p>
       ) : evidence.length === 0 ? (
-        <p style={{ color: "#94A3B8", fontSize: 12 }}>No evidence uploaded yet.</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 12 }}>No evidence uploaded yet.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {evidence.map(ev => (
-            <div key={ev.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8 }}>
+            <div key={ev.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <Paperclip size={15} style={{ color: "#94A3B8" }} />
+                <Paperclip size={15} style={{ color: "var(--hf-text-faint)" }} />
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{ev.fileName}</div>
-                  <div style={{ fontSize: 11, color: "#94A3B8" }}>{ev.evidenceType} · {ev.uploadedByName}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)" }}>{ev.fileName}</div>
+                  <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{ev.evidenceType} · {ev.uploadedByName}</div>
                 </div>
               </div>
               <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => onDownload(ev)} title="Download" style={{ padding: "6px 8px", background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 7, cursor: "pointer", color: "#0369A1" }}><Download size={13} /></button>
-                <button onClick={() => onDelete(ev.id)} title="Remove" style={{ padding: "6px 8px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, cursor: "pointer", color: "#DC2626" }}><Trash2 size={13} /></button>
+                <button onClick={() => onDownload(ev)} title="Download" style={{ padding: "6px 8px", background: "var(--hf-sky-soft)", border: "1px solid var(--hf-sky-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-sky-text-strong)" }}><Download size={13} /></button>
+                <button onClick={() => onDelete(ev.id)} title="Remove" style={{ padding: "6px 8px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, cursor: "pointer", color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
               </div>
             </div>
           ))}
@@ -1608,9 +1608,9 @@ function EvidenceList({ query, onUpload, onDownload, onDelete }: {
   )
 }
 
-const lblStyle    = { display: "block", fontSize: 11, fontWeight: 600, color: "#374151", marginBottom: 4 } as const
-const inputStyle  = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, background: "#fff", boxSizing: "border-box" as const } as const
-const primaryBtn  = { padding: "9px 18px", borderRadius: 8, border: "none", background: "#0D9488", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" } as const
-const secondaryBtn = { padding: "9px 18px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#fff", color: "#374151", fontSize: 13, cursor: "pointer" } as const
+const lblStyle    = { display: "block", fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 } as const
+const inputStyle  = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", boxSizing: "border-box" as const } as const
+const primaryBtn  = { padding: "9px 18px", borderRadius: 8, border: "none", background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 600, cursor: "pointer" } as const
+const secondaryBtn = { padding: "9px 18px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-secondary)", fontSize: 13, cursor: "pointer" } as const
 const modalOverlay = { position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 } as const
-const modalBox    = { background: "#fff", borderRadius: 14, padding: 24, width: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" } as const
+const modalBox    = { background: "var(--hf-surface)", borderRadius: 14, padding: 24, width: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" } as const

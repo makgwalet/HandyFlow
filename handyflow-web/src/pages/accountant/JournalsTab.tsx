@@ -9,12 +9,12 @@ const fmtR   = (n: any) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimum
 const fmtD   = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
-  DRAFT:    { label: "Draft",    color: "#64748B", bg: "#F1F5F9" },
-  PREPARED: { label: "Prepared", color: "#1D4ED8", bg: "#EFF6FF" },
-  REVIEWED: { label: "Reviewed", color: "#7C3AED", bg: "#F5F3FF" },
-  APPROVED: { label: "Approved", color: "#0D9488", bg: "#F0FDF9" },
-  POSTED:   { label: "Posted",   color: "#166534", bg: "#DCFCE7" },
-  REVERSED: { label: "Reversed", color: "#DC2626", bg: "#FEF2F2" },
+  DRAFT:    { label: "Draft",    color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
+  PREPARED: { label: "Prepared", color: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+  REVIEWED: { label: "Reviewed", color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)" },
+  APPROVED: { label: "Approved", color: "var(--hf-accent-text)", bg: "var(--hf-accent-soft)" },
+  POSTED:   { label: "Posted",   color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+  REVERSED: { label: "Reversed", color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
 }
 
 /**
@@ -161,64 +161,64 @@ export default function JournalsTab() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <select value={selClient} onChange={e => { setSelClient(e.target.value); setExpanded(null) }}
-            style={{ padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, outline: "none", background: "#fff", minWidth: 260 }}>
+            style={{ padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, outline: "none", background: "var(--hf-surface)", minWidth: 260 }}>
             <option value="">Select a client to view journals...</option>
             {(clients as any[]).map((c: any) => <option key={c.id} value={c.id}>{c.tradingName}</option>)}
           </select>
           {/* NEW: closes the "trial balance" gap. */}
-          <div style={{ display: "flex", border: "1px solid #E2E8F0", borderRadius: 8, overflow: "hidden" }}>
+          <div style={{ display: "flex", border: "1px solid var(--hf-border)", borderRadius: 8, overflow: "hidden" }}>
             <button onClick={() => setView("journals")}
-              style={{ padding: "8px 14px", border: "none", background: view === "journals" ? "#1B3A6B" : "#fff", color: view === "journals" ? "#fff" : "#64748B", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              style={{ padding: "8px 14px", border: "none", background: view === "journals" ? "var(--hf-primary)" : "var(--hf-surface)", color: view === "journals" ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               Journals
             </button>
             <button onClick={() => setView("trial-balance")}
-              style={{ padding: "8px 14px", border: "none", background: view === "trial-balance" ? "#1B3A6B" : "#fff", color: view === "trial-balance" ? "#fff" : "#64748B", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              style={{ padding: "8px 14px", border: "none", background: view === "trial-balance" ? "var(--hf-primary)" : "var(--hf-surface)", color: view === "trial-balance" ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               Trial Balance
             </button>
             {/* NEW: closes the "minimal COA-seeding capability" gap. */}
             <button onClick={() => setView("coa")}
-              style={{ padding: "8px 14px", border: "none", background: view === "coa" ? "#1B3A6B" : "#fff", color: view === "coa" ? "#fff" : "#64748B", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              style={{ padding: "8px 14px", border: "none", background: view === "coa" ? "var(--hf-primary)" : "var(--hf-surface)", color: view === "coa" ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               Chart of Accounts
             </button>
           </div>
           {view === "trial-balance" && selClient && (
             <>
               <select value={tbMonth} onChange={e => setTbMonth(parseInt(e.target.value))}
-                style={{ padding: "8px 10px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, background: "#fff" }}>
+                style={{ padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)" }}>
                 {Array.from({ length: 12 }, (_, i) => (
                   <option key={i + 1} value={i + 1}>{new Date(0, i).toLocaleString("en", { month: "long" })}</option>
                 ))}
               </select>
               <input type="number" value={tbYear} onChange={e => setTbYear(parseInt(e.target.value) || now.getFullYear())}
-                style={{ width: 80, padding: "8px 10px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13 }} />
+                style={{ width: 80, padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13 }} />
             </>
           )}
         </div>
       </div>
 
-      {error && <div style={{ marginBottom: 14, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{error}</div>}
+      {error && <div style={{ marginBottom: 14, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
 
       {!selClient ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <BookOpen size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>Select a client to view their journals</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>Select a client to view their journals</div>
         </div>
       ) : view === "trial-balance" ? (
         // NEW: closes the "trial balance" gap.
         tbLoading ? (
-          <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading trial balance...</div>
+          <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading trial balance...</div>
         ) : tbIsError ? (
           // NEW: previously a failed request rendered nothing at all —
           // confirmed via a real screenshot showing a completely blank
           // area with no loading text, no error, nothing. Fixed.
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
-            <AlertTriangle size={32} style={{ marginBottom: 10, opacity: 0.5, color: "#DC2626" }} />
-            <div style={{ fontWeight: 600, color: "#DC2626", marginBottom: 4 }}>Couldn't load trial balance</div>
-            <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 14 }}>
+            <AlertTriangle size={32} style={{ marginBottom: 10, opacity: 0.5, color: "var(--hf-danger-text)" }} />
+            <div style={{ fontWeight: 600, color: "var(--hf-danger-text)", marginBottom: 4 }}>Couldn't load trial balance</div>
+            <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginBottom: 14 }}>
               {(tbErrorObj as any)?.response?.data?.message ?? "An unexpected error occurred."}
             </div>
             <button onClick={() => refetchTb()}
-              style={{ padding: "7px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              style={{ padding: "7px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               Retry
             </button>
           </div>
@@ -228,37 +228,37 @@ export default function JournalsTab() {
           // an error — shown with proper messaging instead of a blank
           // area, matching this tab's own empty-state convention for
           // "no journals yet".
-          <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+          <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
             <BookOpen size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
-            <div style={{ fontWeight: 600, color: "#475569" }}>No chart of accounts data for {clientMap[selClient] ?? "this client"}</div>
+            <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No chart of accounts data for {clientMap[selClient] ?? "this client"}</div>
             <div style={{ fontSize: 12, marginTop: 4 }}>A trial balance needs posted journals and a chart of accounts to show anything.</div>
           </div>
         ) : (
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-              <span style={{ background: trialBalance.balanced ? "#DCFCE7" : "#FEF2F2", color: trialBalance.balanced ? "#166534" : "#DC2626", padding: "3px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ background: trialBalance.balanced ? "var(--hf-success-soft-strong)" : "var(--hf-danger-soft)", color: trialBalance.balanced ? "var(--hf-success-text-strong)" : "var(--hf-danger-text)", padding: "3px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
                 {trialBalance.balanced ? <CheckCircle size={12} /> : <AlertTriangle size={12} />}
                 {trialBalance.balanced ? "Balanced" : "Unbalanced"}
               </span>
-              <span style={{ fontSize: 12, color: "#94A3B8" }}>
+              <span style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>
                 {new Date(0, trialBalance.periodMonth - 1).toLocaleString("en", { month: "long" })} {trialBalance.periodYear}
               </span>
             </div>
-            <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden" }}>
+            <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
-                  <tr style={{ background: "#F8FAFC" }}>
+                  <tr style={{ background: "var(--hf-surface-muted)" }}>
                     {["Code", "Account", "Type", "Opening", "Period Dr", "Period Cr", "Closing"].map(h => (
-                      <th key={h} style={{ padding: "8px 12px", textAlign: h === "Code" || h === "Account" || h === "Type" ? "left" : "right", fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>{h}</th>
+                      <th key={h} style={{ padding: "8px 12px", textAlign: h === "Code" || h === "Account" || h === "Type" ? "left" : "right", fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {(trialBalance.lines ?? []).map((l: any, i: number) => (
-                    <tr key={i} style={{ borderTop: "1px solid #F1F5F9" }}>
-                      <td style={{ padding: "7px 12px", fontSize: 12, fontFamily: "monospace", color: "#64748B" }}>{l.accountCode}</td>
-                      <td style={{ padding: "7px 12px", fontSize: 12, color: "#0F172A" }}>{l.accountName}</td>
-                      <td style={{ padding: "7px 12px", fontSize: 11, color: "#94A3B8" }}>{l.accountType}</td>
+                    <tr key={i} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
+                      <td style={{ padding: "7px 12px", fontSize: 12, fontFamily: "monospace", color: "var(--hf-text-muted)" }}>{l.accountCode}</td>
+                      <td style={{ padding: "7px 12px", fontSize: 12, color: "var(--hf-text)" }}>{l.accountName}</td>
+                      <td style={{ padding: "7px 12px", fontSize: 11, color: "var(--hf-text-faint)" }}>{l.accountType}</td>
                       <td style={{ padding: "7px 12px", fontSize: 12, textAlign: "right" as const }}>{fmtR(l.openingBalance)}</td>
                       <td style={{ padding: "7px 12px", fontSize: 12, textAlign: "right" as const }}>{l.periodDebits > 0 ? fmtR(l.periodDebits) : ""}</td>
                       <td style={{ padding: "7px 12px", fontSize: 12, textAlign: "right" as const }}>{l.periodCredits > 0 ? fmtR(l.periodCredits) : ""}</td>
@@ -267,7 +267,7 @@ export default function JournalsTab() {
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr style={{ borderTop: "2px solid #E2E8F0", background: "#F8FAFC" }}>
+                  <tr style={{ borderTop: "2px solid var(--hf-border)", background: "var(--hf-surface-muted)" }}>
                     <td colSpan={6} style={{ padding: "9px 12px", fontSize: 12, fontWeight: 700, textAlign: "right" as const }}>Total Dr {fmtR(trialBalance.totalDebits)} · Total Cr {fmtR(trialBalance.totalCredits)}</td>
                     <td></td>
                   </tr>
@@ -279,48 +279,48 @@ export default function JournalsTab() {
       ) : view === "coa" ? (
         // NEW: closes the "minimal COA-seeding capability" gap.
         coaLoading ? (
-          <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading chart of accounts...</div>
+          <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading chart of accounts...</div>
         ) : (
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <div style={{ fontSize: 12, color: "#94A3B8" }}>{coaAccounts.length} account{coaAccounts.length !== 1 ? "s" : ""}</div>
+              <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>{coaAccounts.length} account{coaAccounts.length !== 1 ? "s" : ""}</div>
               <div style={{ display: "flex", gap: 8 }}>
                 {coaAccounts.length === 0 && (
                   <button onClick={() => seedMut.mutate()} disabled={seedMut.isPending}
-                    style={{ padding: "7px 14px", background: "#F0FDF9", color: "#0D9488", border: "1px solid #99F6E4", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    style={{ padding: "7px 14px", background: "var(--hf-accent-soft)", color: "var(--hf-accent-text)", border: "1px solid var(--hf-accent-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                     {seedMut.isPending ? "Seeding..." : "Seed Standard Accounts"}
                   </button>
                 )}
                 <button onClick={() => { setShowAddAccount(true); setCoaError("") }}
-                  style={{ padding: "7px 14px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                  style={{ padding: "7px 14px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                   + Add Account
                 </button>
               </div>
             </div>
 
             {coaAccounts.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+              <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
                 <BookOpen size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
-                <div style={{ fontWeight: 600, color: "#475569" }}>No chart of accounts for {clientMap[selClient] ?? "this client"}</div>
+                <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No chart of accounts for {clientMap[selClient] ?? "this client"}</div>
                 <div style={{ fontSize: 12, marginTop: 4 }}>Seed a standard starter chart, or add accounts one at a time.</div>
               </div>
             ) : (
-              <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden" }}>
+              <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
-                    <tr style={{ background: "#F8FAFC" }}>
+                    <tr style={{ background: "var(--hf-surface-muted)" }}>
                       {["Code", "Name", "Type", "VAT"].map(h => (
-                        <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>{h}</th>
+                        <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {coaAccounts.map((a: any) => (
-                      <tr key={a.id} style={{ borderTop: "1px solid #F1F5F9" }}>
-                        <td style={{ padding: "7px 12px", fontSize: 12, fontFamily: "monospace", color: "#64748B" }}>{a.accountCode}</td>
-                        <td style={{ padding: "7px 12px", fontSize: 12, color: "#0F172A" }}>{a.accountName}</td>
-                        <td style={{ padding: "7px 12px", fontSize: 11, color: "#94A3B8" }}>{a.accountType}</td>
-                        <td style={{ padding: "7px 12px", fontSize: 11, color: "#94A3B8" }}>{a.vatApplicable ? (a.vatType ?? "Yes") : "—"}</td>
+                      <tr key={a.id} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
+                        <td style={{ padding: "7px 12px", fontSize: 12, fontFamily: "monospace", color: "var(--hf-text-muted)" }}>{a.accountCode}</td>
+                        <td style={{ padding: "7px 12px", fontSize: 12, color: "var(--hf-text)" }}>{a.accountName}</td>
+                        <td style={{ padding: "7px 12px", fontSize: 11, color: "var(--hf-text-faint)" }}>{a.accountType}</td>
+                        <td style={{ padding: "7px 12px", fontSize: 11, color: "var(--hf-text-faint)" }}>{a.vatApplicable ? (a.vatType ?? "Yes") : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -335,16 +335,16 @@ export default function JournalsTab() {
               UI" gap. */}
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
             <button onClick={() => { setShowCreateJournal(true); setJournalError("") }}
-              style={{ padding: "8px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              style={{ padding: "8px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               + New Journal
             </button>
           </div>
           {isLoading ? (
-            <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading journals...</div>
+            <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading journals...</div>
           ) : (journals as any[]).length === 0 ? (
-            <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+            <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
               <BookOpen size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
-              <div style={{ fontWeight: 600, color: "#475569" }}>No journals yet for {clientMap[selClient] ?? "this client"}</div>
+              <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No journals yet for {clientMap[selClient] ?? "this client"}</div>
             </div>
           ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -353,50 +353,50 @@ export default function JournalsTab() {
             const isOpen = expanded === j.id
             const firstLineHasAccountCode = !!j.lines?.[0]?.accountCode
             return (
-              <div key={j.id} style={{ border: "1px solid #E2E8F0", borderLeft: `3px solid ${j.balanced ? sc.color : "#DC2626"}`, borderRadius: 10, overflow: "hidden" }}>
+              <div key={j.id} style={{ border: "1px solid var(--hf-border)", borderLeft: `3px solid ${j.balanced ? sc.color : "#DC2626"}`, borderRadius: 10, overflow: "hidden" }}>
                 <div onClick={() => setExpanded(isOpen ? null : j.id)}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 18px", cursor: "pointer", background: isOpen ? "#F8FAFC" : "#fff", gap: 10, flexWrap: "wrap" }}>
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 18px", cursor: "pointer", background: isOpen ? "var(--hf-surface-muted)" : "var(--hf-surface)", gap: 10, flexWrap: "wrap" }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                      <span style={{ fontFamily: "monospace", fontSize: 12, color: "#64748B" }}>{j.reference}</span>
+                      <span style={{ fontFamily: "monospace", fontSize: 12, color: "var(--hf-text-muted)" }}>{j.reference}</span>
                       <span style={{ background: sc.bg, color: sc.color, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{sc.label}</span>
-                      <span style={{ background: "#F8FAFC", color: "#64748B", padding: "1px 7px", borderRadius: 20, fontSize: 10, border: "1px solid #E2E8F0" }}>{j.journalType}</span>
+                      <span style={{ background: "var(--hf-surface-muted)", color: "var(--hf-text-muted)", padding: "1px 7px", borderRadius: 20, fontSize: 10, border: "1px solid var(--hf-border)" }}>{j.journalType}</span>
                       {!j.balanced && (
-                        <span style={{ background: "#FEF2F2", color: "#DC2626", padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", gap: 3 }}>
+                        <span style={{ background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", gap: 3 }}>
                           <AlertTriangle size={9} /> Unbalanced
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: 13, color: "#0F172A", marginBottom: 2 }}>{j.description}</div>
-                    <div style={{ fontSize: 11, color: "#94A3B8" }}>{fmtD(j.journalDate)}</div>
+                    <div style={{ fontSize: 13, color: "var(--hf-text)", marginBottom: 2 }}>{j.description}</div>
+                    <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{fmtD(j.journalDate)}</div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
                     <div style={{ textAlign: "right" as const }}>
-                      <div style={{ fontSize: 12, color: "#64748B" }}>Dr {fmtR(j.totalDebits)}</div>
-                      <div style={{ fontSize: 12, color: "#64748B" }}>Cr {fmtR(j.totalCredits)}</div>
+                      <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Dr {fmtR(j.totalDebits)}</div>
+                      <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Cr {fmtR(j.totalCredits)}</div>
                     </div>
                     {isOpen ? <ChevronUp size={16} color="#94A3B8" /> : <ChevronDown size={16} color="#94A3B8" />}
                   </div>
                 </div>
 
                 {isOpen && (
-                  <div style={{ borderTop: "1px solid #E2E8F0", padding: "14px 18px", background: "#FAFAFA" }}>
-                    <div style={{ border: "1px solid #E2E8F0", borderRadius: 8, overflow: "hidden", marginBottom: 8, background: "#fff" }}>
+                  <div style={{ borderTop: "1px solid var(--hf-border)", padding: "14px 18px", background: "var(--hf-surface-muted)" }}>
+                    <div style={{ border: "1px solid var(--hf-border)", borderRadius: 8, overflow: "hidden", marginBottom: 8, background: "var(--hf-surface)" }}>
                       <table style={{ width: "100%", borderCollapse: "collapse" }}>
                         <thead>
-                          <tr style={{ background: "#F8FAFC" }}>
+                          <tr style={{ background: "var(--hf-surface-muted)" }}>
                             {["Account", "Description", "Debit", "Credit"].map(h => (
-                              <th key={h} style={{ padding: "7px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const }}>{h}</th>
+                              <th key={h} style={{ padding: "7px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const }}>{h}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
                           {(j.lines ?? []).map((l: any) => (
-                            <tr key={l.id} style={{ borderTop: "1px solid #F1F5F9" }}>
-                              <td style={{ padding: "8px 12px", fontSize: 12, color: "#64748B", fontFamily: "monospace" }}>
+                            <tr key={l.id} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
+                              <td style={{ padding: "8px 12px", fontSize: 12, color: "var(--hf-text-muted)", fontFamily: "monospace" }}>
                                 {l.accountCode ?? `${l.accountId?.slice(0, 8)}…`}
                               </td>
-                              <td style={{ padding: "8px 12px", fontSize: 12, color: "#0F172A" }}>{l.description ?? "—"}</td>
+                              <td style={{ padding: "8px 12px", fontSize: 12, color: "var(--hf-text)" }}>{l.description ?? "—"}</td>
                               <td style={{ padding: "8px 12px", fontSize: 12, fontWeight: 600 }}>{l.debit > 0 ? fmtR(l.debit) : ""}</td>
                               <td style={{ padding: "8px 12px", fontSize: 12, fontWeight: 600 }}>{l.credit > 0 ? fmtR(l.credit) : ""}</td>
                             </tr>
@@ -405,7 +405,7 @@ export default function JournalsTab() {
                       </table>
                     </div>
                     {!firstLineHasAccountCode && (
-                      <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 12 }}>
+                      <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginBottom: 12 }}>
                         Account codes/names aren't resolved yet — showing raw account references only.
                       </div>
                     )}
@@ -414,7 +414,7 @@ export default function JournalsTab() {
                       {j.status === "PREPARED" && (
                         <button onClick={() => reviewMut.mutate({ id: j.id, clientId: selClient })}
                           disabled={reviewMut.isPending}
-                          style={{ padding: "6px 14px", background: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          style={{ padding: "6px 14px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1px solid var(--hf-info-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                           {reviewMut.isPending ? "Submitting..." : "Submit for Review"}
                         </button>
                       )}
@@ -422,7 +422,7 @@ export default function JournalsTab() {
                         <button onClick={() => postMut.mutate({ id: j.id, clientId: selClient })}
                           disabled={postMut.isPending || !j.balanced}
                           title={!j.balanced ? "Debits and credits must match before this journal can be posted" : undefined}
-                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 14px", background: j.balanced ? "#DCFCE7" : "#F1F5F9", color: j.balanced ? "#166534" : "#94A3B8", border: `1px solid ${j.balanced ? "#86EFAC" : "#E2E8F0"}`, borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: j.balanced ? "pointer" : "not-allowed" }}>
+                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 14px", background: j.balanced ? "var(--hf-success-soft-strong)" : "var(--hf-surface-sunken)", color: j.balanced ? "var(--hf-success-text-strong)" : "var(--hf-text-faint)", border: `1px solid ${j.balanced ? "#86EFAC" : "#E2E8F0"}`, borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: j.balanced ? "pointer" : "not-allowed" }}>
                           <CheckCircle size={12} />{postMut.isPending ? "Posting..." : "Approve & Post"}
                         </button>
                       )}
@@ -441,49 +441,49 @@ export default function JournalsTab() {
           capability" gap. */}
       {showAddAccount && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>Add Account</h3>
-              <button onClick={() => setShowAddAccount(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>✕</button>
+              <button onClick={() => setShowAddAccount(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}>✕</button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 10 }}>
                 <div>
-                  <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Code *</label>
+                  <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }}>Code *</label>
                   <input value={coaForm.accountCode} onChange={e => setCoaForm(p => ({ ...p, accountCode: e.target.value }))} placeholder="1000"
-                    style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
+                    style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Name *</label>
+                  <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }}>Name *</label>
                   <input value={coaForm.accountName} onChange={e => setCoaForm(p => ({ ...p, accountName: e.target.value }))} placeholder="Bank"
-                    style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
+                    style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
                 </div>
               </div>
               <div>
-                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Type *</label>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }}>Type *</label>
                 <select value={coaForm.accountType} onChange={e => setCoaForm(p => ({ ...p, accountType: e.target.value }))}
-                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, background: "#fff" }}>
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, background: "var(--hf-surface)" }}>
                   {["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"].map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <input type="checkbox" id="vat-applicable" checked={coaForm.vatApplicable} onChange={e => setCoaForm(p => ({ ...p, vatApplicable: e.target.checked }))} style={{ width: 16, height: 16 }} />
-                <label htmlFor="vat-applicable" style={{ fontSize: 13, color: "#374151", cursor: "pointer" }}>VAT applicable</label>
+                <label htmlFor="vat-applicable" style={{ fontSize: 13, color: "var(--hf-text-secondary)", cursor: "pointer" }}>VAT applicable</label>
               </div>
               {coaForm.vatApplicable && (
                 <select value={coaForm.vatType} onChange={e => setCoaForm(p => ({ ...p, vatType: e.target.value }))}
-                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, background: "#fff" }}>
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, background: "var(--hf-surface)" }}>
                   <option value="">Select VAT type...</option>
                   {["OUTPUT", "INPUT", "EXEMPT", "ZERO_RATED"].map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               )}
             </div>
-            {coaError && <div style={{ marginTop: 14, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{coaError}</div>}
+            {coaError && <div style={{ marginTop: 14, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{coaError}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-              <button onClick={() => setShowAddAccount(false)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => setShowAddAccount(false)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer" }}>Cancel</button>
               <button disabled={!coaForm.accountCode || !coaForm.accountName || addAccountMut.isPending}
                 onClick={() => addAccountMut.mutate({ ...coaForm, subType: coaForm.subType || null, vatType: coaForm.vatApplicable ? (coaForm.vatType || null) : null })}
-                style={{ padding: "9px 22px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {addAccountMut.isPending ? "Saving..." : "Add Account"}
               </button>
             </div>
@@ -497,102 +497,102 @@ export default function JournalsTab() {
           data — there was nowhere to actually post a transaction. */}
       {showCreateJournal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 640, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 640, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>New Journal</h3>
-              <button onClick={() => setShowCreateJournal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>✕</button>
+              <button onClick={() => setShowCreateJournal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}>✕</button>
             </div>
 
             {coaAccounts.length === 0 ? (
               // A journal line without a real account to reference is
               // meaningless — guard clearly rather than show a broken
               // empty dropdown.
-              <div style={{ textAlign: "center", padding: "30px 20px", color: "#94A3B8" }}>
-                <div style={{ fontWeight: 600, color: "#475569", marginBottom: 6 }}>No chart of accounts yet</div>
+              <div style={{ textAlign: "center", padding: "30px 20px", color: "var(--hf-text-faint)" }}>
+                <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)", marginBottom: 6 }}>No chart of accounts yet</div>
                 <div style={{ fontSize: 13 }}>Add accounts on the Chart of Accounts tab first, then come back to create a journal.</div>
               </div>
             ) : (
               <>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
                   <div>
-                    <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Reference *</label>
+                    <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }}>Reference *</label>
                     <input value={journalForm.reference} onChange={e => setJournalForm(p => ({ ...p, reference: e.target.value }))} placeholder="JNL-001"
-                      style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
+                      style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
                   </div>
                   <div>
-                    <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Type *</label>
+                    <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }}>Type *</label>
                     <select value={journalForm.journalType} onChange={e => setJournalForm(p => ({ ...p, journalType: e.target.value }))}
-                      style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, background: "#fff" }}>
+                      style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, background: "var(--hf-surface)" }}>
                       {["STANDARD", "ADJUSTING", "REVERSING", "OPENING", "CLOSING", "VAT"].map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Journal Date *</label>
+                    <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }}>Journal Date *</label>
                     <input type="date" value={journalForm.journalDate} onChange={e => setJournalForm(p => ({ ...p, journalDate: e.target.value }))}
-                      style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
+                      style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <div style={{ flex: 1 }}>
-                      <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Period</label>
+                      <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }}>Period</label>
                       <select value={journalForm.periodMonth} onChange={e => setJournalForm(p => ({ ...p, periodMonth: parseInt(e.target.value) }))}
-                        style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, background: "#fff" }}>
+                        style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, background: "var(--hf-surface)" }}>
                         {Array.from({ length: 12 }, (_, i) => (
                           <option key={i + 1} value={i + 1}>{new Date(0, i).toLocaleString("en", { month: "short" })}</option>
                         ))}
                       </select>
                     </div>
                     <div style={{ width: 90 }}>
-                      <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }}>&nbsp;</label>
+                      <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }}>&nbsp;</label>
                       <input type="number" value={journalForm.periodYear} onChange={e => setJournalForm(p => ({ ...p, periodYear: parseInt(e.target.value) || now.getFullYear() }))}
-                        style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
+                        style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
                     </div>
                   </div>
                   <div style={{ gridColumn: "1/-1" }}>
-                    <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Description *</label>
+                    <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }}>Description *</label>
                     <input value={journalForm.description} onChange={e => setJournalForm(p => ({ ...p, description: e.target.value }))} placeholder="What is this journal for?"
-                      style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
+                      style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }} />
                   </div>
                 </div>
 
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 8 }}>Lines</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 8 }}>Lines</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
                   {journalForm.lines.map((line, i) => (
                     <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
                       <select value={line.accountId} onChange={e => updateLine(i, "accountId", e.target.value)}
-                        style={{ flex: 2, padding: "8px 10px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 13, background: "#fff" }}>
+                        style={{ flex: 2, padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 13, background: "var(--hf-surface)" }}>
                         <option value="">Select account...</option>
                         {coaAccounts.map((a: any) => <option key={a.id} value={a.id}>{a.accountCode} — {a.accountName}</option>)}
                       </select>
                       <input value={line.description} onChange={e => updateLine(i, "description", e.target.value)} placeholder="Description"
-                        style={{ flex: 2, padding: "8px 10px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 13 }} />
+                        style={{ flex: 2, padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 13 }} />
                       <input type="number" value={line.debit} onChange={e => updateLine(i, "debit", e.target.value)}
                         onFocus={() => { if (line.credit) updateLine(i, "credit", "") }}
-                        placeholder="Debit" style={{ width: 90, padding: "8px 10px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 13 }} />
+                        placeholder="Debit" style={{ width: 90, padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 13 }} />
                       <input type="number" value={line.credit} onChange={e => updateLine(i, "credit", e.target.value)}
                         onFocus={() => { if (line.debit) updateLine(i, "debit", "") }}
-                        placeholder="Credit" style={{ width: 90, padding: "8px 10px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 13 }} />
+                        placeholder="Credit" style={{ width: 90, padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 13 }} />
                       <button onClick={() => removeLine(i)} disabled={journalForm.lines.length <= 2}
-                        style={{ background: "none", border: "none", cursor: journalForm.lines.length <= 2 ? "default" : "pointer", color: journalForm.lines.length <= 2 ? "#CBD5E1" : "#DC2626", padding: 4 }}>✕</button>
+                        style={{ background: "none", border: "none", cursor: journalForm.lines.length <= 2 ? "default" : "pointer", color: journalForm.lines.length <= 2 ? "var(--hf-text-disabled)" : "var(--hf-danger-text)", padding: 4 }}>✕</button>
                     </div>
                   ))}
                 </div>
                 <button onClick={addLine}
-                  style={{ padding: "6px 12px", background: "#F8FAFC", color: "#374151", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", marginBottom: 14 }}>
+                  style={{ padding: "6px 12px", background: "var(--hf-surface-muted)", color: "var(--hf-text-secondary)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", marginBottom: 14 }}>
                   + Add Line
                 </button>
 
                 <div style={{
                   padding: "10px 14px", borderRadius: 8, marginBottom: 14, fontSize: 13, fontWeight: 700,
-                  background: journalBalanced ? "#DCFCE7" : "#FFFBEB",
-                  color: journalBalanced ? "#166534" : "#92400E",
+                  background: journalBalanced ? "var(--hf-success-soft-strong)" : "var(--hf-warning-soft)",
+                  color: journalBalanced ? "var(--hf-success-text-strong)" : "var(--hf-warning-text-deep)",
                 }}>
                   Dr {fmtR(lineTotalDebit)} · Cr {fmtR(lineTotalCredit)}
                   {!journalBalanced && lineTotalDebit !== lineTotalCredit && " — not balanced yet"}
                 </div>
 
-                {journalError && <div style={{ marginBottom: 14, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{journalError}</div>}
+                {journalError && <div style={{ marginBottom: 14, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{journalError}</div>}
                 <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                  <button onClick={() => setShowCreateJournal(false)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer" }}>Cancel</button>
+                  <button onClick={() => setShowCreateJournal(false)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer" }}>Cancel</button>
                   <button disabled={!journalForm.reference || !journalForm.description || !journalBalanced || createJournalMut.isPending}
                     onClick={() => createJournalMut.mutate({
                       reference: journalForm.reference, description: journalForm.description,
@@ -604,7 +604,7 @@ export default function JournalsTab() {
                         vatAmount: null, vatType: null,
                       })),
                     })}
-                    style={{ padding: "9px 22px", background: !journalBalanced ? "#94A3B8" : "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: !journalBalanced ? "not-allowed" : "pointer" }}>
+                    style={{ padding: "9px 22px", background: !journalBalanced ? "var(--hf-text-faint)" : "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: !journalBalanced ? "not-allowed" : "pointer" }}>
                     {createJournalMut.isPending ? "Creating..." : "Create Journal"}
                   </button>
                 </div>

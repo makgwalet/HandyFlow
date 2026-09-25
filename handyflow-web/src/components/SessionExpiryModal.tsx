@@ -137,20 +137,20 @@ export function SessionExpiryModal() {
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
     }}>
       <div style={{ background: 'white', borderRadius: 16, padding: 32, maxWidth: 400, width: '90%', boxShadow: '0 24px 80px rgba(0,0,0,0.3)', textAlign: 'center' }}>
-        <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#FFFBEB', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 24 }}>
+        <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--hf-warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 24 }}>
           ⏱️
         </div>
-        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', margin: '0 0 8px' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 8px' }}>
           Your session is about to expire
         </h2>
-        <p style={{ fontSize: 14, color: '#64748B', margin: '0 0 4px' }}>
+        <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', margin: '0 0 4px' }}>
           You'll be logged out in
         </p>
-        <p style={{ fontSize: 28, fontWeight: 800, color: '#D97706', fontVariantNumeric: 'tabular-nums', margin: '0 0 20px' }}>
+        <p style={{ fontSize: 28, fontWeight: 800, color: 'var(--hf-warning-text)', fontVariantNumeric: 'tabular-nums', margin: '0 0 20px' }}>
           {minutes}:{seconds.toString().padStart(2, '0')}
         </p>
         <button onClick={handleContinue} disabled={extending}
-          style={{ width: '100%', padding: '12px', background: '#1B3A6B', color: 'white', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: extending ? 0.6 : 1 }}>
+          style={{ width: '100%', padding: '12px', background: 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: extending ? 0.6 : 1 }}>
           {extending ? 'Extending session...' : 'Continue working'}
         </button>
       </div>

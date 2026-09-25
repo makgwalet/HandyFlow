@@ -40,10 +40,10 @@ export default function ContractingPage() {
   const totalVal = signed.reduce((s, c) => s + (Number(c.valueAmount) || 0), 0)
 
   const KPI_STATS = [
-    { label: 'Active (signed)',     value: signed.length,  color: '#166534', bg: '#DCFCE7' },
-    { label: 'Pending signature',   value: pending.length, color: '#1D4ED8', bg: '#EFF6FF' },
-    { label: 'Drafts',              value: drafts.length,  color: '#D97706', bg: '#FFFBEB' },
-    { label: 'Active value',        value: fmtR(totalVal), color: '#1B3A6B', bg: '#EEF2FF' },
+    { label: 'Active (signed)',     value: signed.length,  color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)' },
+    { label: 'Pending signature',   value: pending.length, color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)' },
+    { label: 'Drafts',              value: drafts.length,  color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)' },
+    { label: 'Active value',        value: fmtR(totalVal), color: 'var(--hf-primary-text)', bg: 'var(--hf-indigo-soft)' },
   ]
 
   return (
@@ -51,12 +51,12 @@ export default function ContractingPage() {
       {/* Page header */}
       <div style={{ marginBottom: 22 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: '#1B3A6B', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--hf-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <FilePlus size={18} color="#fff" />
           </div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: 0 }}>Contracting</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>Contracting</h1>
         </div>
-        <p style={{ fontSize: 12, color: '#94A3B8', margin: '0 0 0 46px' }}>
+        <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: '0 0 0 46px' }}>
           Contract lifecycle · OTP signing · Template library · Audit trail
         </p>
       </div>
@@ -74,15 +74,15 @@ export default function ContractingPage() {
       )}
 
       {/* Main card */}
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 14, padding: 24 }}>
+      <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, padding: 24 }}>
         {/* Tab bar */}
-        <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid #E2E8F0', marginBottom: 26 }}>
+        <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid var(--hf-border)', marginBottom: 26 }}>
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '9px 18px', background: 'none', border: 'none',
-              borderBottom: tab === t.id ? '2px solid #1B3A6B' : '2px solid transparent',
-              color: tab === t.id ? '#1B3A6B' : '#64748B',
+              borderBottom: tab === t.id ? '2px solid var(--hf-primary)' : '2px solid transparent',
+              color: tab === t.id ? 'var(--hf-primary-text)' : 'var(--hf-text-muted)',
               fontWeight: tab === t.id ? 700 : 400,
               fontSize: 13, cursor: 'pointer', marginBottom: -1, whiteSpace: 'nowrap',
             }}>

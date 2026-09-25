@@ -77,7 +77,7 @@ export default function PractitionersTab() {
     borderRadius: 8, fontSize: 14, background: fieldErrors[key] ? "#FFF5F5" : "#fff", outline: "none",
   })
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
-    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#DC2626", marginTop: 4 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
       <AlertCircle size={12} />{fieldErrors[k]}
     </div>
   ) : null
@@ -85,18 +85,18 @@ export default function PractitionersTab() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <div style={{ fontSize: 14, color: "#64748B" }}>{practitioners.length} practitioner{practitioners.length !== 1 ? "s" : ""} registered</div>
+        <div style={{ fontSize: 14, color: "var(--hf-text-muted)" }}>{practitioners.length} practitioner{practitioners.length !== 1 ? "s" : ""} registered</div>
         <button onClick={() => { setShowCreate(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") }} style={btnPrimary}>
           <Plus size={15} /> Register Practitioner
         </button>
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading...</div>
       ) : practitioners.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Stethoscope size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No practitioners registered</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No practitioners registered</div>
           <div style={{ fontSize: 14, marginTop: 4 }}>Add practitioners to enable appointment booking.</div>
         </div>
       ) : (
@@ -104,7 +104,7 @@ export default function PractitionersTab() {
           {practitioners.map(p => {
             const color = getColor(p.specialty)
             return (
-              <div key={p.id} style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden", background: "#fff", transition: "box-shadow 0.15s" }}
+              <div key={p.id} style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden", background: "var(--hf-surface)", transition: "box-shadow 0.15s" }}
                 onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)")}
                 onMouseLeave={e => (e.currentTarget.style.boxShadow = "none")}>
                 <div style={{ height: 5, background: `linear-gradient(90deg, ${color}, ${color}99)` }} />
@@ -114,19 +114,19 @@ export default function PractitionersTab() {
                       <span style={{ fontSize: 18, fontWeight: 800, color }}>{p.firstName?.[0]}{p.lastName?.[0]}</span>
                     </div>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>Dr. {p.fullName}</div>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>Dr. {p.fullName}</div>
                       <span style={{ background: `${color}14`, color, padding: "2px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{p.specialty}</span>
                     </div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {p.email && <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "#64748B" }}><Mail size={12} color="#94A3B8" />{p.email}</div>}
-                    {p.phone && <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "#64748B" }}><Phone size={12} color="#94A3B8" />{p.phone}</div>}
-                    {p.hpcsaNumber && <div style={{ fontSize: 11, color: "#94A3B8", paddingTop: 4 }}>HPCSA: <span style={{ fontWeight: 600, color: "#64748B" }}>{p.hpcsaNumber}</span></div>}
-                    {p.practiceNumber && <div style={{ fontSize: 11, color: "#94A3B8" }}>Practice: <span style={{ fontWeight: 600, color: "#64748B" }}>{p.practiceNumber}</span></div>}
+                    {p.email && <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--hf-text-muted)" }}><Mail size={12} color="#94A3B8" />{p.email}</div>}
+                    {p.phone && <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--hf-text-muted)" }}><Phone size={12} color="#94A3B8" />{p.phone}</div>}
+                    {p.hpcsaNumber && <div style={{ fontSize: 11, color: "var(--hf-text-faint)", paddingTop: 4 }}>HPCSA: <span style={{ fontWeight: 600, color: "var(--hf-text-muted)" }}>{p.hpcsaNumber}</span></div>}
+                    {p.practiceNumber && <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>Practice: <span style={{ fontWeight: 600, color: "var(--hf-text-muted)" }}>{p.practiceNumber}</span></div>}
                   </div>
                   {!p.active && (
                     <div style={{ marginTop: 10 }}>
-                      <span style={{ background: "#F1F5F9", color: "#64748B", padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>INACTIVE</span>
+                      <span style={{ background: "var(--hf-surface-sunken)", color: "var(--hf-text-muted)", padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>INACTIVE</span>
                     </div>
                   )}
                 </div>
@@ -138,10 +138,10 @@ export default function PractitionersTab() {
 
       {showCreate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 540, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 540, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Register Practitioner</h3>
-              <button onClick={() => setShowCreate(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Register Practitioner</h3>
+              <button onClick={() => setShowCreate(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
@@ -156,7 +156,7 @@ export default function PractitionersTab() {
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
                 <label style={lbl}>Specialty *</label>
-                <select value={form.specialty} onChange={e => f("specialty", e.target.value)} style={{ ...inp("specialty"), background: "#fff" }}>
+                <select value={form.specialty} onChange={e => f("specialty", e.target.value)} style={{ ...inp("specialty"), background: "var(--hf-surface)" }}>
                   {SPECIALTIES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
@@ -180,7 +180,7 @@ export default function PractitionersTab() {
               </div>
             </div>
             {apiError && (
-              <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}>
                 <AlertCircle size={14} />{apiError}
               </div>
             )}

@@ -42,13 +42,13 @@ export default function ReceiptsTab() {
       {filtered.length > 0 && (
         <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
           {[
-            { label: "Stock-in events", value: filtered.length,                           color: "#1B3A6B" },
-            { label: "Total litres",    value: `${totalLitres.toLocaleString()} L`,       color: "#0D9488" },
-            { label: "Total cost",      value: `R ${totalCost.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`, color: "#DC2626" },
+            { label: "Stock-in events", value: filtered.length,                           color: "var(--hf-primary-text)" },
+            { label: "Total litres",    value: `${totalLitres.toLocaleString()} L`,       color: "var(--hf-accent-text)" },
+            { label: "Total cost",      value: `R ${totalCost.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`, color: "var(--hf-danger-text)" },
           ].map(s => (
-            <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
+            <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
               <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{s.label}</div>
+              <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -60,20 +60,20 @@ export default function ReceiptsTab() {
           {["ALL", ...(tanks as any[]).map(t => t.id)].map(id => (
             <button key={id} onClick={() => setFilterTank(id)}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterTank === id ? 600 : 400,
-                background: filterTank === id ? "#0D9488" : "#F1F5F9",
-                color: filterTank === id ? "#fff" : "#64748B" }}>
+                background: filterTank === id ? "var(--hf-accent)" : "var(--hf-surface-sunken)",
+                color: filterTank === id ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
               {id === "ALL" ? "All tanks" : tankMap[id] ?? id}
             </button>
           ))}
         </div>
-        <div style={{ display: "flex", gap: 2, background: "#F1F5F9", borderRadius: 8, padding: 3 }}>
+        <div style={{ display: "flex", gap: 2, background: "var(--hf-surface-sunken)", borderRadius: 8, padding: 3 }}>
           {([
             { key: "history", label: "History", icon: List },
             { key: "trend", label: "Price Trend", icon: TrendingUp },
           ] as const).map(v => (
             <button key={v.key} onClick={() => setView(v.key)}
               style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700,
-                background: view === v.key ? "#fff" : "transparent", color: view === v.key ? "#1B3A6B" : "#64748B",
+                background: view === v.key ? "var(--hf-surface)" : "transparent", color: view === v.key ? "var(--hf-primary-text)" : "var(--hf-text-muted)",
                 boxShadow: view === v.key ? "0 1px 2px rgba(0,0,0,0.08)" : "none" }}>
               <v.icon size={13} /> {v.label}
             </button>
@@ -82,39 +82,39 @@ export default function ReceiptsTab() {
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading receipts...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading receipts...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <ArrowDownToLine size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No stock-in records</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No stock-in records</div>
           <div style={{ fontSize: 13, marginTop: 4 }}>Use the Tanks tab to receive fuel into a tank.</div>
         </div>
       ) : view === "trend" ? (
         <PriceTrendChart receipts={filtered} tankFuelType={tankFuelType} />
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
-              <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
+              <tr style={{ background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border)" }}>
                 {["Date","Tank","Litres","Price/L","Total Cost","Delivery Note","Invoice","Level Before → After"].map(h => (
-                  <th key={h} style={{ padding: "11px 14px", textAlign: "left", fontWeight: 700, fontSize: 11, color: "#64748B", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
+                  <th key={h} style={{ padding: "11px 14px", textAlign: "left", fontWeight: 700, fontSize: 11, color: "var(--hf-text-muted)", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtered.map((r, i) => (
-                <tr key={r.id} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #F1F5F9" : "none", background: "#fff" }}>
-                  <td style={{ padding: "12px 14px", fontWeight: 600, color: "#0F172A", whiteSpace: "nowrap" }}>{fmtDate(r.receivedAt)}</td>
-                  <td style={{ padding: "12px 14px", color: "#475569" }}>{tankMap[r.tankId] ?? "—"}</td>
-                  <td style={{ padding: "12px 14px", fontWeight: 700, color: "#0D9488" }}>{Number(r.litresReceived).toLocaleString()} L</td>
-                  <td style={{ padding: "12px 14px", color: "#475569" }}>{r.pricePerLitre ? `R ${Number(r.pricePerLitre).toFixed(3)}` : "—"}</td>
-                  <td style={{ padding: "12px 14px", fontWeight: 700, color: "#0F172A" }}>{fmtR(r.totalCost)}</td>
-                  <td style={{ padding: "12px 14px", color: "#475569", fontSize: 12 }}>{r.deliveryNote || "—"}</td>
-                  <td style={{ padding: "12px 14px", color: "#94A3B8", fontSize: 12 }}>{r.invoiceRef || "—"}</td>
-                  <td style={{ padding: "12px 14px", fontSize: 12, color: "#64748B", whiteSpace: "nowrap" }}>
+                <tr key={r.id} style={{ borderBottom: i < filtered.length - 1 ? "1px solid var(--hf-border-subtle)" : "none", background: "var(--hf-surface)" }}>
+                  <td style={{ padding: "12px 14px", fontWeight: 600, color: "var(--hf-text)", whiteSpace: "nowrap" }}>{fmtDate(r.receivedAt)}</td>
+                  <td style={{ padding: "12px 14px", color: "var(--hf-text-tertiary)" }}>{tankMap[r.tankId] ?? "—"}</td>
+                  <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--hf-accent-text)" }}>{Number(r.litresReceived).toLocaleString()} L</td>
+                  <td style={{ padding: "12px 14px", color: "var(--hf-text-tertiary)" }}>{r.pricePerLitre ? `R ${Number(r.pricePerLitre).toFixed(3)}` : "—"}</td>
+                  <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--hf-text)" }}>{fmtR(r.totalCost)}</td>
+                  <td style={{ padding: "12px 14px", color: "var(--hf-text-tertiary)", fontSize: 12 }}>{r.deliveryNote || "—"}</td>
+                  <td style={{ padding: "12px 14px", color: "var(--hf-text-faint)", fontSize: 12 }}>{r.invoiceRef || "—"}</td>
+                  <td style={{ padding: "12px 14px", fontSize: 12, color: "var(--hf-text-muted)", whiteSpace: "nowrap" }}>
                     {r.levelBefore != null ? `${Number(r.levelBefore).toLocaleString()} L` : "—"}
-                    <span style={{ margin: "0 6px", color: "#CBD5E1" }}>→</span>
-                    {r.levelAfter != null ? <strong style={{ color: "#0D9488" }}>{Number(r.levelAfter).toLocaleString()} L</strong> : "—"}
+                    <span style={{ margin: "0 6px", color: "var(--hf-text-disabled)" }}>→</span>
+                    {r.levelAfter != null ? <strong style={{ color: "var(--hf-accent-text)" }}>{Number(r.levelAfter).toLocaleString()} L</strong> : "—"}
                   </td>
                 </tr>
               ))}
@@ -146,9 +146,9 @@ function PriceTrendChart({ receipts, tankFuelType }: { receipts: any[]; tankFuel
 
   if (points.length === 0) {
     return (
-      <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+      <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
         <TrendingUp size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-        <div style={{ fontWeight: 600, color: "#475569" }}>No priced receipts to chart</div>
+        <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No priced receipts to chart</div>
         <div style={{ fontSize: 13, marginTop: 4 }}>Receipts need a price per litre recorded to appear here.</div>
       </div>
     )
@@ -208,7 +208,7 @@ function PriceTrendChart({ receipts, tankFuelType }: { receipts: any[]; tankFuel
       </svg>
 
       {/* Legend — latest price per fuel type */}
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 14, paddingTop: 14, borderTop: "1px solid #F1F5F9" }}>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--hf-border-subtle)" }}>
         {Object.entries(seriesByType).map(([fuelType, series]) => {
           const latest = series[series.length - 1]
           const first = series[0]
@@ -217,11 +217,11 @@ function PriceTrendChart({ receipts, tankFuelType }: { receipts: any[]; tankFuel
             <div key={fuelType} style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{ width: 10, height: 10, borderRadius: "50%", background: FUEL_COLORS[fuelType] ?? "#64748B" }} />
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>{fuelType}</div>
-                <div style={{ fontSize: 11, color: "#64748B" }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text)" }}>{fuelType}</div>
+                <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>
                   R{latest.price.toFixed(3)}/L latest
                   {series.length > 1 && (
-                    <span style={{ marginLeft: 6, color: change > 0 ? "#DC2626" : change < 0 ? "#166534" : "#94A3B8", fontWeight: 600 }}>
+                    <span style={{ marginLeft: 6, color: change > 0 ? "var(--hf-danger-text)" : change < 0 ? "var(--hf-success-text-strong)" : "var(--hf-text-faint)", fontWeight: 600 }}>
                       {change > 0 ? "▲" : change < 0 ? "▼" : "—"} R{Math.abs(change).toFixed(3)} over period
                     </span>
                   )}

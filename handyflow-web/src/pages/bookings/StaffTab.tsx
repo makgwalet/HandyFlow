@@ -127,11 +127,11 @@ export default function StaffTab() {
     width: "100%", padding: "9px 12px",
     border: `1.5px solid ${errors[key] ? "#DC2626" : "#E2E8F0"}`,
     borderRadius: 8, fontSize: 14, boxSizing: "border-box",
-    background: errors[key] ? "#FFF5F5" : "#fff",
+    background: errors[key] ? "var(--hf-danger-soft)" : "var(--hf-surface)",
   })
 
-  if (isLoading) return <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading staff…</div>
-  if (isError)   return <div style={{ textAlign: "center", padding: 40, color: "#DC2626" }}>Failed to load staff: {String(error)}</div>
+  if (isLoading) return <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading staff…</div>
+  if (isError)   return <div style={{ textAlign: "center", padding: 40, color: "var(--hf-danger-text)" }}>Failed to load staff: {String(error)}</div>
 
   return (
     <div>
@@ -141,45 +141,45 @@ export default function StaffTab() {
       </div>
 
       {staff.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Users size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
-          <div style={{ fontWeight: 600, color: "#475569", marginBottom: 4 }}>No staff members yet</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)", marginBottom: 4 }}>No staff members yet</div>
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
           {staff.map(s => (
-            <div key={s.id} style={{ border: "1px solid #E2E8F0", borderRadius: 12, padding: "18px 20px", background: "#fff", opacity: s.active ? 1 : 0.6 }}>
+            <div key={s.id} style={{ border: "1px solid var(--hf-border)", borderRadius: 12, padding: "18px 20px", background: "var(--hf-surface)", opacity: s.active ? 1 : 0.6 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
-                <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, fontWeight: 800, color: "#1D4ED8", flexShrink: 0 }}>
+                <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--hf-info-soft)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, fontWeight: 800, color: "var(--hf-info-text)", flexShrink: 0 }}>
                   {s.name.charAt(0).toUpperCase()}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{s.name}</div>
-                  {!s.active && <span style={{ fontSize: 10, color: "#94A3B8", background: "#F8FAFC", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>INACTIVE</span>}
+                  <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{s.name}</div>
+                  {!s.active && <span style={{ fontSize: 10, color: "var(--hf-text-faint)", background: "var(--hf-surface-muted)", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>INACTIVE</span>}
                 </div>
                 {s.active && (
                   <div style={{ display: "flex", gap: 4 }}>
                     <button onClick={() => openEdit(s)}
                       title="Edit"
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "#64748B", padding: 4, display: "flex" }}>
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-muted)", padding: 4, display: "flex" }}>
                       <Pencil size={14} />
                     </button>
                     <button onClick={() => { setSkillsFor(s); setSelectedSkills([]) }}
                       title="Manage skills"
-                      style={{ background: "#EFF6FF", border: "none", cursor: "pointer", color: "#1D4ED8", padding: "3px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600 }}>
+                      style={{ background: "var(--hf-info-soft)", border: "none", cursor: "pointer", color: "var(--hf-info-text)", padding: "3px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600 }}>
                       Skills
                     </button>
                     <button onClick={() => setConfirmDeactivate(s)}
                       title="Deactivate"
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "#DC2626", padding: 4, display: "flex" }}>
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-danger-text)", padding: 4, display: "flex" }}>
                       <Trash2 size={14} />
                     </button>
                   </div>
                 )}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                {s.email && <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "#64748B" }}><Mail size={12} color="#94A3B8" />{s.email}</div>}
-                {s.phone && <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "#64748B" }}><Phone size={12} color="#94A3B8" />{s.phone}</div>}
+                {s.email && <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--hf-text-muted)" }}><Mail size={12} color="#94A3B8" />{s.email}</div>}
+                {s.phone && <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--hf-text-muted)" }}><Phone size={12} color="#94A3B8" />{s.phone}</div>}
               </div>
             </div>
           ))}
@@ -191,7 +191,7 @@ export default function StaffTab() {
         <div style={overlay}>
           <div style={{ ...modal, width: 420 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 22 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{editing ? "Edit Staff Member" : "Add Staff Member"}</h3>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{editing ? "Edit Staff Member" : "Add Staff Member"}</h3>
               <button onClick={close} style={iconBtn}><X size={20} /></button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -202,23 +202,23 @@ export default function StaffTab() {
                 {errors.name && <div style={errStyle}><AlertCircle size={12} />{errors.name}</div>}
               </div>
               <div>
-                <label style={lbl}>Email <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+                <label style={lbl}>Email <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
                 <input type="email" value={form.email} onChange={e => { setForm(f => ({ ...f, email: e.target.value })); setErrors(f => { const n = { ...f }; delete n.email; return n }) }}
                   placeholder="jane@company.co.za" style={inpStyle("email")} />
                 {errors.email && <div style={errStyle}><AlertCircle size={12} />{errors.email}</div>}
               </div>
               <div>
-                <label style={lbl}>Phone <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+                <label style={lbl}>Phone <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
                 <input value={form.phone} onChange={e => { setForm(f => ({ ...f, phone: e.target.value.replace(/[^\d\s\-+]/g, "") })); setErrors(f => { const n = { ...f }; delete n.phone; return n }) }}
                   placeholder="+27 82 123 4567" style={inpStyle("phone")} />
                 {errors.phone && <div style={errStyle}><AlertCircle size={12} />{errors.phone}</div>}
               </div>
             </div>
-            {apiError && <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", gap: 8 }}><AlertCircle size={15} />{apiError}</div>}
+            {apiError && <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", gap: 8 }}><AlertCircle size={15} />{apiError}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-              <button onClick={close} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
+              <button onClick={close} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending}
-                style={{ padding: "9px 22px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {editing ? "Save changes" : "Add staff"}
               </button>
             </div>
@@ -232,8 +232,8 @@ export default function StaffTab() {
           <div style={{ ...modal, width: 460 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
               <div>
-                <h3 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Skills — {skillsFor.name}</h3>
-                <p style={{ margin: 0, fontSize: 13, color: "#64748B" }}>Select which services this staff member can perform. If none selected, they can perform all services.</p>
+                <h3 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Skills — {skillsFor.name}</h3>
+                <p style={{ margin: 0, fontSize: 13, color: "var(--hf-text-muted)" }}>Select which services this staff member can perform. If none selected, they can perform all services.</p>
               </div>
               <button onClick={() => setSkillsFor(null)} style={iconBtn}><X size={20} /></button>
             </div>
@@ -244,23 +244,23 @@ export default function StaffTab() {
                   <button key={svc.id}
                     onClick={() => setSelectedSkills(prev => assigned ? prev.filter(id => id !== svc.id) : [...prev, svc.id])}
                     style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 9, cursor: "pointer",
-                      border: assigned ? "2px solid #0D9488" : "1.5px solid #E2E8F0",
-                      background: assigned ? "#F0FDF4" : "#FAFAFA", textAlign: "left" }}>
-                    <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${assigned ? "#0D9488" : "#CBD5E1"}`, background: assigned ? "#0D9488" : "white", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      border: assigned ? "2px solid var(--hf-accent)" : "1.5px solid var(--hf-border)",
+                      background: assigned ? "var(--hf-success-soft)" : "var(--hf-surface-muted)", textAlign: "left" }}>
+                    <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${assigned ? "#0D9488" : "#CBD5E1"}`, background: assigned ? "var(--hf-accent)" : "white", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       {assigned && <Check size={10} color="white" />}
                     </div>
                     <div style={{ width: 10, height: 10, borderRadius: "50%", background: svc.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 14, fontWeight: 500, color: "#0F172A" }}>{svc.name}</span>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: "var(--hf-text)" }}>{svc.name}</span>
                   </button>
                 )
               })}
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button onClick={() => setSkillsFor(null)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
+              <button onClick={() => setSkillsFor(null)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button
                 onClick={() => saveSkillsMutation.mutate({ staffId: skillsFor.id, serviceIds: selectedSkills })}
                 disabled={saveSkillsMutation.isPending}
-                style={{ padding: "9px 22px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {saveSkillsMutation.isPending ? "Saving…" : "Save skills"}
               </button>
             </div>
@@ -271,27 +271,27 @@ export default function StaffTab() {
       {/* Styled deactivate confirmation modal */}
       {confirmDeactivate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", textAlign: "center" }}>
-            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#FEF2F2", border: "2px solid #FECACA", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", textAlign: "center" }}>
+            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--hf-danger-soft)", border: "2px solid var(--hf-danger-border)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
               <Trash2 size={22} color="#DC2626" />
             </div>
-            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Deactivate Staff Member?</h3>
-            <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 6px" }}>
+            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Deactivate Staff Member?</h3>
+            <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: "0 0 6px" }}>
               <strong>{confirmDeactivate.name}</strong>
             </p>
-            <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 20px", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "0 0 20px", lineHeight: 1.5 }}>
               They will no longer appear in the staff picker for new bookings.
               Existing bookings are not affected.
             </p>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setConfirmDeactivate(null)}
-                style={{ flex: 1, padding: "10px", border: "1.5px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#374151" }}>
+                style={{ flex: 1, padding: "10px", border: "1.5px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "var(--hf-text-secondary)" }}>
                 Keep active
               </button>
               <button
                 onClick={() => { deactivateMutation.mutate(confirmDeactivate.id); setConfirmDeactivate(null) }}
                 disabled={deactivateMutation.isPending}
-                style={{ flex: 1, padding: "10px", border: "none", borderRadius: 9, background: "#DC2626", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ flex: 1, padding: "10px", border: "none", borderRadius: 9, background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 Yes, deactivate
               </button>
             </div>
@@ -302,9 +302,9 @@ export default function StaffTab() {
   )
 }
 
-const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }
-const lbl: React.CSSProperties        = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
-const errStyle: React.CSSProperties   = { display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#DC2626", marginTop: 4 }
+const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }
+const lbl: React.CSSProperties        = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
+const errStyle: React.CSSProperties   = { display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }
 const overlay: React.CSSProperties    = { position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }
-const modal: React.CSSProperties      = { background: "#fff", borderRadius: 16, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }
-const iconBtn: React.CSSProperties    = { background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }
+const modal: React.CSSProperties      = { background: "var(--hf-surface)", borderRadius: 16, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }
+const iconBtn: React.CSSProperties    = { background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }

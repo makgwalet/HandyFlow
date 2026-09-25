@@ -88,10 +88,10 @@ export const TD: React.CSSProperties = {
 export function Modal({ title, children, onClose, wide }: { title: React.ReactNode; children: React.ReactNode; onClose: () => void; wide?: boolean }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-      <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: wide ? 720 : 600, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 28, width: wide ? 720 : 600, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0F172A" }}>{title}</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", padding: 4 }}><X size={18} /></button>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>{title}</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", padding: 4 }}><X size={18} /></button>
         </div>
         {children}
       </div>
@@ -102,8 +102,8 @@ export function Modal({ title, children, onClose, wide }: { title: React.ReactNo
 export function ModalFooter({ onCancel, onConfirm, label, loading, accent }: { onCancel: () => void; onConfirm: () => void; label: string; loading?: boolean; accent?: string }) {
   return (
     <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24 }}>
-      <button onClick={onCancel} style={{ padding: "8px 16px", border: "1px solid #E2E8F0", borderRadius: 8, background: "#fff", fontSize: 13, cursor: "pointer", color: "#374151" }}>Cancel</button>
-      <button onClick={onConfirm} disabled={loading} style={{ padding: "8px 16px", background: accent ?? "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? .6 : 1 }}>{label}</button>
+      <button onClick={onCancel} style={{ padding: "8px 16px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
+      <button onClick={onConfirm} disabled={loading} style={{ padding: "8px 16px", background: accent ?? "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? .6 : 1 }}>{label}</button>
     </div>
   )
 }
@@ -111,25 +111,25 @@ export function ModalFooter({ onCancel, onConfirm, label, loading, accent }: { o
 export function Field({ label, children, span }: { label: string; children: React.ReactNode; span?: number }) {
   return (
     <div style={span ? { gridColumn: `span ${span}` } : undefined}>
-      <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>{label}</label>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }}>{label}</label>
       {children}
     </div>
   )
 }
 
 export function ErrBox({ msg }: { msg: string }) {
-  return <div style={{ marginTop: 10, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#DC2626", fontSize: 13 }}>{msg}</div>
+  return <div style={{ marginTop: 10, padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, color: "var(--hf-danger-text)", fontSize: 13 }}>{msg}</div>
 }
 
 export function Spinner() {
-  return <div style={{ padding: "48px 0", textAlign: "center", color: "#94A3B8", fontSize: 13 }}>Loading…</div>
+  return <div style={{ padding: "48px 0", textAlign: "center", color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</div>
 }
 
 export function EmptyState({ icon: Icon, title, sub }: { icon: React.ElementType; title: string; sub: string }) {
   return (
-    <div style={{ textAlign: "center", padding: "56px 20px", color: "#94A3B8" }}>
+    <div style={{ textAlign: "center", padding: "56px 20px", color: "var(--hf-text-faint)" }}>
       <Icon size={38} style={{ marginBottom: 12, opacity: .25 }} />
-      <div style={{ fontWeight: 600, color: "#475569", marginBottom: 4 }}>{title}</div>
+      <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)", marginBottom: 4 }}>{title}</div>
       <div style={{ fontSize: 13 }}>{sub}</div>
     </div>
   )

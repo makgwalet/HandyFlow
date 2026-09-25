@@ -51,19 +51,19 @@ export function BookingsPage() {
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: "#0F172A", margin: "0 0 4px" }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--hf-text)", margin: "0 0 4px" }}>
           Bookings &amp; Appointments
         </h1>
-        <p style={{ fontSize: 13, color: "#94A3B8", margin: 0 }}>
+        <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0 }}>
           Schedule appointments, manage staff and track your calendar
         </p>
       </div>
 
-      <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 14, padding: 24 }}>
+      <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: 24 }}>
         {/* Tab bar */}
         <div style={{
           display: "flex", gap: 2,
-          borderBottom: "1px solid #E2E8F0",
+          borderBottom: "1px solid var(--hf-border)",
           marginBottom: 28, overflowX: "auto",
         }}>
           {tabs.map(tab => {
@@ -77,8 +77,8 @@ export function BookingsPage() {
                   display: "flex", alignItems: "center", gap: 7,
                   whiteSpace: "nowrap", padding: "10px 16px",
                   background: "none", border: "none",
-                  borderBottom: active ? "2px solid #0D9488" : "2px solid transparent",
-                  color: active ? "#0D9488" : "#64748B",
+                  borderBottom: active ? "2px solid var(--hf-accent)" : "2px solid transparent",
+                  color: active ? "var(--hf-accent-text)" : "var(--hf-text-muted)",
                   fontWeight: active ? 600 : 400, fontSize: 13,
                   cursor: "pointer", marginBottom: -1, transition: "all 0.15s",
                 }}>
@@ -89,7 +89,7 @@ export function BookingsPage() {
                     (no need to remind them what they're already looking at) */}
                 {tab.badge != null && tab.badge > 0 && activeTab !== "bookings" && (
                   <span style={{
-                    background: "#DC2626", color: "#fff",
+                    background: "var(--hf-danger)", color: "var(--hf-text-on-solid)",
                     fontSize: 10, fontWeight: 700,
                     padding: "1px 6px", borderRadius: 20,
                     lineHeight: 1.5, minWidth: 18, textAlign: "center",

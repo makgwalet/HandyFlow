@@ -10,9 +10,9 @@ interface Branch {
   active: boolean; createdAt: string; updatedAt: string
 }
 
-const inp = { width:"100%", padding:"8px 12px", borderRadius:8, border:"1px solid #E2E8F0", fontSize:13, outline:"none", boxSizing:"border-box" as const }
+const inp = { width:"100%", padding:"8px 12px", borderRadius:8, border:"1px solid var(--hf-border)", fontSize:13, outline:"none", boxSizing:"border-box" as const }
 const btn = (bg: string, color="white") => ({ padding:"8px 16px", borderRadius:8, border:"none", background:bg, color, fontSize:13, cursor:"pointer", fontWeight:600 as const })
-const sbtn = { padding:"8px 16px", borderRadius:8, border:"1px solid #E2E8F0", background:"#fff", fontSize:13, cursor:"pointer", color:"#374151" as const }
+const sbtn = { padding:"8px 16px", borderRadius:8, border:"1px solid var(--hf-border)", background:"var(--hf-surface)", fontSize:13, cursor:"pointer", color:"var(--hf-text-secondary)" as const }
 
 const ZA_REGIONS = ["Gauteng","Western Cape","KwaZulu-Natal","Eastern Cape","Limpopo","Mpumalanga","North West","Free State","Northern Cape"]
 
@@ -55,7 +55,7 @@ export default function BranchesTab() {
   }
 
   const th = (l: string) => (
-    <th key={l} style={{textAlign:"left",padding:"9px 14px",fontSize:11,fontWeight:700,color:"#94A3B8",textTransform:"uppercase" as const,letterSpacing:"0.5px"}}>{l}</th>
+    <th key={l} style={{textAlign:"left",padding:"9px 14px",fontSize:11,fontWeight:700,color:"var(--hf-text-faint)",textTransform:"uppercase" as const,letterSpacing:"0.5px"}}>{l}</th>
   )
 
   const REGION_COLORS: Record<string,string> = {
@@ -68,10 +68,10 @@ export default function BranchesTab() {
     <div style={{fontFamily:"'Inter',system-ui,sans-serif"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{background:"#2563EB",borderRadius:10,padding:8}}><GitBranch size={18} color="#fff"/></div>
+          <div style={{background:"var(--hf-info)",borderRadius:10,padding:8}}><GitBranch size={18} color="#fff"/></div>
           <div>
-            <h2 style={{margin:0,fontSize:18,fontWeight:700,color:"#0F172A"}}>Branches</h2>
-            <p style={{margin:0,fontSize:12,color:"#94A3B8"}}>Regional / operational subdivisions — assign sites and guards per branch</p>
+            <h2 style={{margin:0,fontSize:18,fontWeight:700,color:"var(--hf-text)"}}>Branches</h2>
+            <p style={{margin:0,fontSize:12,color:"var(--hf-text-faint)"}}>Regional / operational subdivisions — assign sites and guards per branch</p>
           </div>
         </div>
         <button style={{...btn("#2563EB"),display:"flex",alignItems:"center",gap:6}} onClick={openCreate}>
@@ -80,29 +80,29 @@ export default function BranchesTab() {
       </div>
 
       {err && (
-        <div style={{background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:13,color:"#991B1B",display:"flex",alignItems:"center",gap:8}}>
+        <div style={{background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:13,color:"var(--hf-danger-text-strong)",display:"flex",alignItems:"center",gap:8}}>
           <AlertTriangle size={14}/> {err}
         </div>
       )}
 
       {/* FORM */}
       {(view==="create"||view==="edit") && (
-        <div style={{background:"#fff",border:"1px solid #E2E8F0",borderRadius:12,padding:24,marginBottom:20}}>
-          <h3 style={{margin:"0 0 20px",fontSize:16,fontWeight:700,color:"#0F172A"}}>{view==="edit"?"Edit Branch":"New Branch"}</h3>
+        <div style={{background:"var(--hf-surface)",border:"1px solid var(--hf-border)",borderRadius:12,padding:24,marginBottom:20}}>
+          <h3 style={{margin:"0 0 20px",fontSize:16,fontWeight:700,color:"var(--hf-text)"}}>{view==="edit"?"Edit Branch":"New Branch"}</h3>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
             <div>
-              <label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:5}}>Branch Name *</label>
+              <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}}>Branch Name *</label>
               <input placeholder="e.g. Gauteng Region, VIP/CP Division" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} style={inp}/>
             </div>
             <div>
-              <label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:5}}>Region</label>
-              <select value={form.region} onChange={e=>setForm(p=>({...p,region:e.target.value}))} style={{...inp,background:"#fff"}}>
+              <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}}>Region</label>
+              <select value={form.region} onChange={e=>setForm(p=>({...p,region:e.target.value}))} style={{...inp,background:"var(--hf-surface)"}}>
                 <option value="">— Select region —</option>
                 {ZA_REGIONS.map(r=><option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div style={{gridColumn:"1/-1"}}>
-              <label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:5}}>Description</label>
+              <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}}>Description</label>
               <input placeholder="Optional — describe the branch scope" value={form.description} onChange={e=>setForm(p=>({...p,description:e.target.value}))} style={inp}/>
             </div>
           </div>
@@ -117,52 +117,52 @@ export default function BranchesTab() {
 
       {/* LIST */}
       {isLoading
-        ? <div style={{textAlign:"center",padding:"40px 0",color:"#94A3B8"}}>Loading…</div>
+        ? <div style={{textAlign:"center",padding:"40px 0",color:"var(--hf-text-faint)"}}>Loading…</div>
         : branches.length===0
-          ? <div style={{textAlign:"center",padding:"60px 0",color:"#94A3B8"}}>
+          ? <div style={{textAlign:"center",padding:"60px 0",color:"var(--hf-text-faint)"}}>
               <GitBranch size={32} strokeWidth={1.5} style={{margin:"0 auto 12px",display:"block"}}/>
-              <p style={{margin:"0 0 4px",fontWeight:600,color:"#374151"}}>No branches yet</p>
+              <p style={{margin:"0 0 4px",fontWeight:600,color:"var(--hf-text-secondary)"}}>No branches yet</p>
               <p style={{margin:0,fontSize:13}}>Create branches to scope regional managers, payroll, and site assignments.</p>
             </div>
-          : <div style={{background:"#fff",border:"1px solid #E2E8F0",borderRadius:12,overflow:"hidden"}}>
+          : <div style={{background:"var(--hf-surface)",border:"1px solid var(--hf-border)",borderRadius:12,overflow:"hidden"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-                <thead><tr style={{borderBottom:"2px solid #E2E8F0",background:"#F8FAFC"}}>
+                <thead><tr style={{borderBottom:"2px solid var(--hf-border)",background:"var(--hf-surface-muted)"}}>
                   {["Branch Name","Region","Description","Status","Actions"].map(th)}
                 </tr></thead>
                 <tbody>{branches.map(b=>(
-                  <tr key={b.id} style={{borderBottom:"1px solid #F1F5F9"}}>
+                  <tr key={b.id} style={{borderBottom:"1px solid var(--hf-border-subtle)"}}>
                     <td style={{padding:"11px 14px"}}>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <div style={{width:32,height:32,borderRadius:8,background:"#EFF6FF",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        <div style={{width:32,height:32,borderRadius:8,background:"var(--hf-info-soft)",display:"flex",alignItems:"center",justifyContent:"center"}}>
                           <GitBranch size={14} color="#2563EB"/>
                         </div>
-                        <span style={{fontWeight:600,color:"#0F172A"}}>{b.name}</span>
+                        <span style={{fontWeight:600,color:"var(--hf-text)"}}>{b.name}</span>
                       </div>
                     </td>
                     <td style={{padding:"11px 14px"}}>
                       {b.region
-                        ? <span style={{display:"flex",alignItems:"center",gap:4,fontSize:12,color:REGION_COLORS[b.region]??"#374151",fontWeight:600}}>
+                        ? <span style={{display:"flex",alignItems:"center",gap:4,fontSize:12,color:REGION_COLORS[b.region]??"var(--hf-text-secondary)",fontWeight:600}}>
                             <MapPin size={11}/> {b.region}
                           </span>
-                        : <span style={{color:"#CBD5E1",fontSize:12}}>—</span>
+                        : <span style={{color:"var(--hf-text-disabled)",fontSize:12}}>—</span>
                       }
                     </td>
-                    <td style={{padding:"11px 14px",color:"#64748B",fontSize:12,maxWidth:260}}>
+                    <td style={{padding:"11px 14px",color:"var(--hf-text-muted)",fontSize:12,maxWidth:260}}>
                       <span style={{display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" as const}}>{b.description ?? "—"}</span>
                     </td>
                     <td style={{padding:"11px 14px"}}>
-                      <span style={{background:b.active?"#DCFCE7":"#F3F4F6",color:b.active?"#166534":"#6B7280",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>
+                      <span style={{background:b.active?"var(--hf-success-soft-strong)":"var(--hf-surface-sunken)",color:b.active?"var(--hf-success-text-strong)":"var(--hf-text-muted)",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>
                         {b.active?"Active":"Inactive"}
                       </span>
                     </td>
                     <td style={{padding:"11px 14px"}}>
                       <div style={{display:"flex",gap:6}}>
-                        <button style={{display:"flex",alignItems:"center",gap:4,padding:"5px 10px",borderRadius:7,border:"1px solid #E2E8F0",background:"#F8FAFC",fontSize:12,cursor:"pointer",color:"#374151"}}
+                        <button style={{display:"flex",alignItems:"center",gap:4,padding:"5px 10px",borderRadius:7,border:"1px solid var(--hf-border)",background:"var(--hf-surface-muted)",fontSize:12,cursor:"pointer",color:"var(--hf-text-secondary)"}}
                           onClick={()=>openEdit(b)}>
                           <Pencil size={11}/> Edit
                         </button>
                         {b.active && (
-                          <button style={{display:"flex",alignItems:"center",gap:4,padding:"5px 10px",borderRadius:7,border:"1px solid #FECACA",background:"#FEF2F2",fontSize:12,cursor:"pointer",color:"#991B1B"}}
+                          <button style={{display:"flex",alignItems:"center",gap:4,padding:"5px 10px",borderRadius:7,border:"1px solid var(--hf-danger-border)",background:"var(--hf-danger-soft)",fontSize:12,cursor:"pointer",color:"var(--hf-danger-text-strong)"}}
                             onClick={()=>{ if(confirm(`Deactivate branch "${b.name}"?`)) deleteMut.mutate(b.id) }}>
                             <Trash2 size={11}/> Deactivate
                           </button>
@@ -175,8 +175,8 @@ export default function BranchesTab() {
             </div>
       }
 
-      <div style={{marginTop:20,padding:"14px 16px",background:"#F8FAFC",border:"1px solid #E2E8F0",borderRadius:10,fontSize:12,color:"#64748B"}}>
-        <strong style={{color:"#374151"}}>Note:</strong> Assigning sites and guards to branches is done via their respective edit forms (Sites tab → edit site → Branch, Guards tab → edit guard → Primary Branch).
+      <div style={{marginTop:20,padding:"14px 16px",background:"var(--hf-surface-muted)",border:"1px solid var(--hf-border)",borderRadius:10,fontSize:12,color:"var(--hf-text-muted)"}}>
+        <strong style={{color:"var(--hf-text-secondary)"}}>Note:</strong> Assigning sites and guards to branches is done via their respective edit forms (Sites tab → edit site → Branch, Guards tab → edit guard → Primary Branch).
         Branch-level query scoping for regional managers is a follow-on enforcement step — all current views return tenant-wide data regardless of branch.
       </div>
     </div>

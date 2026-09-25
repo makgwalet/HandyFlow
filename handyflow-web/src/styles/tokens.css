@@ -1,0 +1,218 @@
+/*
+ * HandyFlow design tokens — Phase 0
+ *
+ * Every colour used by the app should come from this file.
+ * Light values are exact matches for the hex literals they replaced, so the
+ * light theme renders unchanged after the codemod (see docs/THEME-TOKENS.md).
+ *
+ * Naming per colour family:
+ *   --hf-{family}              solid fill (buttons, dots, bars, solid badges)
+ *   --hf-{family}-text         text/icon on a neutral or soft surface
+ *   --hf-{family}-text-strong  darker text, usually on the family's soft surface
+ *   --hf-{family}-soft         tinted background
+ *   --hf-{family}-border       tinted border
+ *
+ * Fills and text are separate tokens on purpose: in dark mode text must get
+ * lighter to stay readable while fills keep enough contrast for white labels.
+ *
+ * Theme is selected by <html data-theme="light|dark">, set before React
+ * mounts by the bootstrap script in index.html.
+ */
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+
+  /* Neutrals */
+  --hf-canvas: #f8fafc;
+  --hf-surface: #ffffff;
+  --hf-surface-muted: #f8fafc;
+  --hf-surface-sunken: #f1f5f9;
+  --hf-surface-strong: #e2e8f0;
+  --hf-inverse-surface: #0f172a;
+
+  --hf-border: #e2e8f0;
+  --hf-border-subtle: #f1f5f9;
+  --hf-border-strong: #cbd5e1;
+
+  --hf-text: #0f172a;
+  --hf-text-secondary: #374151;
+  --hf-text-tertiary: #475569;
+  --hf-text-muted: #64748b;
+  --hf-text-faint: #94a3b8;
+  --hf-text-disabled: #cbd5e1;
+  --hf-text-on-solid: #ffffff;
+
+  /* Brand */
+  --hf-primary: #1b3a6b;
+  --hf-primary-hover: #0f2a52;
+  --hf-primary-text: #1b3a6b;
+  --hf-primary-border: #e8edf5;
+
+  --hf-accent: #0d9488;
+  --hf-accent-text: #0d9488;
+  --hf-accent-text-strong: #0f766e;
+  --hf-accent-soft: #f0fdf9;
+  --hf-accent-border: #99f6e4;
+
+  /* Danger (red) */
+  --hf-danger: #dc2626;
+  --hf-danger-text: #dc2626;
+  --hf-danger-text-strong: #991b1b;
+  --hf-danger-soft: #fef2f2;
+  --hf-danger-soft-strong: #fee2e2;
+  --hf-danger-border: #fecaca;
+
+  /* Success (green) */
+  --hf-success: #16a34a;
+  --hf-success-solid-strong: #166534;
+  --hf-success-text: #16a34a;
+  --hf-success-text-strong: #166534;
+  --hf-success-soft: #f0fdf4;
+  --hf-success-soft-strong: #dcfce7;
+  --hf-success-border: #86efac;
+  --hf-success-border-subtle: #bbf7d0;
+
+  /* Warning (amber) */
+  --hf-warning: #d97706;
+  --hf-warning-text: #d97706;
+  --hf-warning-text-strong: #b45309;
+  --hf-warning-text-deep: #92400e;
+  --hf-warning-soft: #fffbeb;
+  --hf-warning-soft-strong: #fef3c7;
+  --hf-warning-border: #fde68a;
+  --hf-warning-border-strong: #fcd34d;
+
+  /* Orange */
+  --hf-orange: #ea580c;
+  --hf-orange-text: #ea580c;
+  --hf-orange-text-strong: #9a3412;
+  --hf-orange-soft: #fff7ed;
+  --hf-orange-border: #fed7aa;
+
+  /* Info (blue) */
+  --hf-info: #1d4ed8;
+  --hf-info-text: #1d4ed8;
+  --hf-info-text-strong: #1e40af;
+  --hf-info-soft: #eff6ff;
+  --hf-info-soft-strong: #dbeafe;
+  --hf-info-border: #bfdbfe;
+
+  /* Sky */
+  --hf-sky: #0284c7;
+  --hf-sky-text: #0284c7;
+  --hf-sky-text-strong: #0369a1;
+  --hf-sky-soft: #f0f9ff;
+  --hf-sky-soft-strong: #e0f2fe;
+  --hf-sky-border: #bae6fd;
+
+  /* Violet */
+  --hf-violet: #7c3aed;
+  --hf-violet-text: #7c3aed;
+  --hf-violet-text-strong: #5b21b6;
+  --hf-violet-soft: #f5f3ff;
+  --hf-violet-soft-strong: #ede9fe;
+  --hf-violet-border: #ddd6fe;
+
+  /* Indigo */
+  --hf-indigo: #4338ca;
+  --hf-indigo-text: #4338ca;
+  --hf-indigo-soft: #eef2ff;
+  --hf-indigo-border: #c7d2fe;
+
+  /* Shape (consumed by the Phase 1 customizer) */
+  --hf-radius-sm: 6px;
+  --hf-radius: 10px;
+  --hf-radius-lg: 14px;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --hf-canvas: #0b1120;
+  --hf-surface: #111a2b;
+  --hf-surface-muted: #162033;
+  --hf-surface-sunken: #1b2638;
+  --hf-surface-strong: #243044;
+  --hf-inverse-surface: #e5e9f0;
+
+  --hf-border: #263246;
+  --hf-border-subtle: #1c2739;
+  --hf-border-strong: #334155;
+
+  --hf-text: #e5e9f0;
+  --hf-text-secondary: #c3cad6;
+  --hf-text-tertiary: #a9b3c3;
+  --hf-text-muted: #8b96a9;
+  --hf-text-faint: #6e7a8e;
+  --hf-text-disabled: #4b5669;
+  --hf-text-on-solid: #ffffff;
+
+  --hf-primary: #3563ae;
+  --hf-primary-hover: #2b5596;
+  --hf-primary-text: #8fb2ec;
+  --hf-primary-border: #26395a;
+
+  --hf-accent: #0d9488;
+  --hf-accent-text: #2dd4bf;
+  --hf-accent-text-strong: #5eead4;
+  --hf-accent-soft: rgba(45, 212, 191, 0.1);
+  --hf-accent-border: rgba(45, 212, 191, 0.32);
+
+  --hf-danger: #dc2626;
+  --hf-danger-text: #f87171;
+  --hf-danger-text-strong: #fca5a5;
+  --hf-danger-soft: rgba(248, 113, 113, 0.1);
+  --hf-danger-soft-strong: rgba(248, 113, 113, 0.18);
+  --hf-danger-border: rgba(248, 113, 113, 0.32);
+
+  --hf-success: #16a34a;
+  --hf-success-solid-strong: #15803d;
+  --hf-success-text: #4ade80;
+  --hf-success-text-strong: #86efac;
+  --hf-success-soft: rgba(74, 222, 128, 0.1);
+  --hf-success-soft-strong: rgba(74, 222, 128, 0.18);
+  --hf-success-border: rgba(74, 222, 128, 0.4);
+  --hf-success-border-subtle: rgba(74, 222, 128, 0.25);
+
+  --hf-warning: #d97706;
+  --hf-warning-text: #fbbf24;
+  --hf-warning-text-strong: #fcd34d;
+  --hf-warning-text-deep: #fde68a;
+  --hf-warning-soft: rgba(251, 191, 36, 0.1);
+  --hf-warning-soft-strong: rgba(251, 191, 36, 0.18);
+  --hf-warning-border: rgba(251, 191, 36, 0.32);
+  --hf-warning-border-strong: rgba(251, 191, 36, 0.5);
+
+  --hf-orange: #ea580c;
+  --hf-orange-text: #fb923c;
+  --hf-orange-text-strong: #fdba74;
+  --hf-orange-soft: rgba(251, 146, 60, 0.1);
+  --hf-orange-border: rgba(251, 146, 60, 0.32);
+
+  --hf-info: #2563eb;
+  --hf-info-text: #60a5fa;
+  --hf-info-text-strong: #93c5fd;
+  --hf-info-soft: rgba(96, 165, 250, 0.1);
+  --hf-info-soft-strong: rgba(96, 165, 250, 0.18);
+  --hf-info-border: rgba(96, 165, 250, 0.32);
+
+  --hf-sky: #0284c7;
+  --hf-sky-text: #38bdf8;
+  --hf-sky-text-strong: #7dd3fc;
+  --hf-sky-soft: rgba(56, 189, 248, 0.1);
+  --hf-sky-soft-strong: rgba(56, 189, 248, 0.18);
+  --hf-sky-border: rgba(56, 189, 248, 0.32);
+
+  --hf-violet: #7c3aed;
+  --hf-violet-text: #a78bfa;
+  --hf-violet-text-strong: #c4b5fd;
+  --hf-violet-soft: rgba(167, 139, 250, 0.1);
+  --hf-violet-soft-strong: rgba(167, 139, 250, 0.18);
+  --hf-violet-border: rgba(167, 139, 250, 0.32);
+
+  --hf-indigo: #4f46e5;
+  --hf-indigo-text: #818cf8;
+  --hf-indigo-soft: rgba(129, 140, 248, 0.1);
+  --hf-indigo-border: rgba(129, 140, 248, 0.32);
+}

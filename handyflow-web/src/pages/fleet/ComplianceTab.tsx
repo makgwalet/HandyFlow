@@ -10,21 +10,21 @@ const daysUntil = (d: string | null) => d ? Math.ceil((new Date(d).getTime() - D
 const ICONS: Record<string, string> = { SEDAN:"🚗", SUV:"🚙", BAKKIE:"🛻", TRUCK:"🚛", MINIBUS:"🚐", VAN:"🚌", MOTORCYCLE:"🏍️", OTHER:"🚘" }
 
 function ExpiryStatus({ days, date }: { days: number; date: string | null }) {
-  if (!date) return <span style={{ color: "#94A3B8", fontSize: 13 }}>Not set</span>
-  if (days < 0) return <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#DC2626" }}><AlertCircle size={12} />Expired {Math.abs(days)}d ago</span>
-  if (days <= 7)  return <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#DC2626" }}><AlertTriangle size={12} />{days} days — Critical</span>
-  if (days <= 30) return <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#D97706" }}><AlertTriangle size={12} />{days} days</span>
-  if (days <= 60) return <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 600, color: "#64748B" }}><Clock size={12} />{days} days</span>
-  return <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#166534" }}><CheckCircle size={12} />Valid — {days}d</span>
+  if (!date) return <span style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Not set</span>
+  if (days < 0) return <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "var(--hf-danger-text)" }}><AlertCircle size={12} />Expired {Math.abs(days)}d ago</span>
+  if (days <= 7)  return <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "var(--hf-danger-text)" }}><AlertTriangle size={12} />{days} days — Critical</span>
+  if (days <= 30) return <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "var(--hf-warning-text)" }}><AlertTriangle size={12} />{days} days</span>
+  if (days <= 60) return <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 600, color: "var(--hf-text-muted)" }}><Clock size={12} />{days} days</span>
+  return <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-success-text-strong)" }}><CheckCircle size={12} />Valid — {days}d</span>
 }
 
 function DocRow({ label, date }: { label: string; date: string | null }) {
   const days = daysUntil(date)
   const urgent = date && days <= 30
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "140px 1fr 1fr", gap: 12, padding: "10px 0", borderBottom: "1px solid #F1F5F9", alignItems: "center" }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B" }}>{label}</div>
-      <div style={{ fontSize: 13, color: urgent ? "#D97706" : "#0F172A", fontWeight: urgent ? 600 : 400 }}>{fmtDate(date)}</div>
+    <div style={{ display: "grid", gridTemplateColumns: "140px 1fr 1fr", gap: 12, padding: "10px 0", borderBottom: "1px solid var(--hf-border-subtle)", alignItems: "center" }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--hf-text-muted)" }}>{label}</div>
+      <div style={{ fontSize: 13, color: urgent ? "var(--hf-warning-text)" : "var(--hf-text)", fontWeight: urgent ? 600 : 400 }}>{fmtDate(date)}</div>
       <ExpiryStatus days={days} date={date} />
     </div>
   )
@@ -45,10 +45,10 @@ export default function ComplianceTab() {
   const current  = vs.filter(v => !expired.includes(v) && !critical.includes(v) && !warning.includes(v) && !upcoming.includes(v))
 
   const summaryStats = [
-    { label: "Expired",      value: expired.length,  color: "#DC2626", bg: "#FEF2F2" },
-    { label: "Critical (7d)",value: critical.length,  color: "#DC2626", bg: "#FEF2F2" },
-    { label: "Expiring 30d", value: warning.length,   color: "#D97706", bg: "#FFFBEB" },
-    { label: "All current",  value: current.length + upcoming.length, color: "#166534", bg: "#DCFCE7" },
+    { label: "Expired",      value: expired.length,  color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
+    { label: "Critical (7d)",value: critical.length,  color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
+    { label: "Expiring 30d", value: warning.length,   color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+    { label: "All current",  value: current.length + upcoming.length, color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
   ]
 
   const AlertGroup = ({ title, vList, color }: { title: string; vList: any[]; color: string }) => {
@@ -58,12 +58,12 @@ export default function ComplianceTab() {
         <div style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>{title} ({vList.length})</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {vList.map(v => (
-            <div key={v.id} style={{ border: `1px solid ${color === "#DC2626" ? "#FECACA" : color === "#D97706" ? "#FDE68A" : "#E2E8F0"}`, borderRadius: 12, padding: "16px 20px", background: "#fff" }}>
+            <div key={v.id} style={{ border: `1px solid ${color === "#DC2626" ? "#FECACA" : color === "#D97706" ? "#FDE68A" : "#E2E8F0"}`, borderRadius: 12, padding: "16px 20px", background: "var(--hf-surface)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
                 <div style={{ fontSize: 24 }}>{ICONS[v.vehicleType] ?? "🚘"}</div>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{v.registration}</div>
-                  <div style={{ fontSize: 12, color: "#64748B" }}>{v.make} {v.model}{v.year ? ` (${v.year})` : ""}</div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{v.registration}</div>
+                  <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{v.make} {v.model}{v.year ? ` (${v.year})` : ""}</div>
                 </div>
               </div>
               <DocRow label="Licence Disc"   date={v.licenceDiscExpiry} />
@@ -89,20 +89,20 @@ export default function ComplianceTab() {
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading...</div>
       ) : vs.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Shield size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No vehicles registered</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No vehicles registered</div>
         </div>
       ) : (
         <>
           {(expired.length === 0 && critical.length === 0 && warning.length === 0) && (
-            <div style={{ marginBottom: 20, padding: "16px 20px", background: "#DCFCE7", border: "1px solid #86EFAC", borderRadius: 12, display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ marginBottom: 20, padding: "16px 20px", background: "var(--hf-success-soft-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 12, display: "flex", alignItems: "center", gap: 12 }}>
               <CheckCircle size={22} color="#166534" />
               <div>
-                <div style={{ fontWeight: 700, color: "#166534" }}>All documents current</div>
-                <div style={{ fontSize: 13, color: "#166534" }}>No licences, roadworthy certificates, or insurance policies are expiring within 30 days.</div>
+                <div style={{ fontWeight: 700, color: "var(--hf-success-text-strong)" }}>All documents current</div>
+                <div style={{ fontSize: 13, color: "var(--hf-success-text-strong)" }}>No licences, roadworthy certificates, or insurance policies are expiring within 30 days.</div>
               </div>
             </div>
           )}
@@ -114,12 +114,12 @@ export default function ComplianceTab() {
 
           {current.length > 0 && (
             <div style={{ marginTop: 20 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#166534", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>Fully current ({current.length})</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-success-text-strong)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>Fully current ({current.length})</div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 {current.map(v => (
-                  <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 8 }}>
+                  <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", borderRadius: 8 }}>
                     <span style={{ fontSize: 16 }}>{ICONS[v.vehicleType] ?? "🚘"}</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: "#166534" }}>{v.registration}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-success-text-strong)" }}>{v.registration}</span>
                     <CheckCircle size={13} color="#166534" />
                   </div>
                 ))}

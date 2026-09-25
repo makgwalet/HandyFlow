@@ -38,19 +38,19 @@ export default function TrainProvPage() {
   const [tab, setTab] = useState<Tab>("dashboard")
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F8FAFC", fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "var(--hf-surface-muted)", fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 24px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
           <div style={{ width: 40, height: 40, borderRadius: 11, background: TRAINPROV_ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <GraduationCap size={20} color="#fff" />
           </div>
           <div>
-            <h1 style={{ fontSize: 19, fontWeight: 800, color: "#0F172A", margin: 0 }}>Training Provider</h1>
-            <p style={{ fontSize: 12.5, color: "#94A3B8", margin: 0 }}>Client portfolio · Accredited courses · Sessions & delegates · Certification · Billing</p>
+            <h1 style={{ fontSize: 19, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Training Provider</h1>
+            <p style={{ fontSize: 12.5, color: "var(--hf-text-faint)", margin: 0 }}>Client portfolio · Accredited courses · Sessions & delegates · Certification · Billing</p>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #E2E8F0", marginBottom: 24, overflowX: "auto" }}>
+        <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--hf-border)", marginBottom: 24, overflowX: "auto" }}>
           {TABS.map(t => {
             const Icon = t.icon
             const active = tab === t.key
@@ -59,7 +59,7 @@ export default function TrainProvPage() {
                 style={{
                   display: "flex", alignItems: "center", gap: 7, padding: "10px 16px", border: "none",
                   background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap",
-                  color: active ? TRAINPROV_ACCENT : "#64748B",
+                  color: active ? TRAINPROV_ACCENT : "var(--hf-text-muted)",
                   borderBottom: active ? `2px solid ${TRAINPROV_ACCENT}` : "2px solid transparent",
                   marginBottom: -1,
                 }}>

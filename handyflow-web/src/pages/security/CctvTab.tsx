@@ -81,34 +81,34 @@ export default function CctvTab() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0F172A" }}>CCTV Registry</h2>
-          <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748B" }}>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>CCTV Registry</h2>
+          <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--hf-text-muted)" }}>
             {cameras.filter(c => c.status === "ACTIVE").length} active · {cameras.filter(c => c.status === "OFFLINE").length} offline
           </p>
         </div>
         <button onClick={() => setShowAdd(true)}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "none", background: "#0D9488", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "none", background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={14} /> Add Camera
         </button>
       </div>
 
       {/* Secret reveal */}
       {secret && (
-        <div style={{ background: "#ECFDF5", border: "1px solid #6EE7B7", borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
-          <p style={{ margin: "0 0 6px", fontWeight: 700, fontSize: 12, color: "#065F46" }}>Webhook Secret — copy now, it won't be shown again</p>
-          <code style={{ fontSize: 11, background: "#D1FAE5", padding: "6px 10px", borderRadius: 6, display: "block", wordBreak: "break-all" as const }}>
+        <div style={{ background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
+          <p style={{ margin: "0 0 6px", fontWeight: 700, fontSize: 12, color: "var(--hf-success-text-strong)" }}>Webhook Secret — copy now, it won't be shown again</p>
+          <code style={{ fontSize: 11, background: "var(--hf-success-soft-strong)", padding: "6px 10px", borderRadius: 6, display: "block", wordBreak: "break-all" as const }}>
             {secret.webhookSecret}
           </code>
-          <button onClick={() => setSecret(null)} style={{ marginTop: 10, fontSize: 11, padding: "4px 10px", border: "1px solid #059669", borderRadius: 6, background: "#fff", color: "#065F46", cursor: "pointer" }}>
+          <button onClick={() => setSecret(null)} style={{ marginTop: 10, fontSize: 11, padding: "4px 10px", border: "1px solid var(--hf-success)", borderRadius: 6, background: "var(--hf-surface)", color: "var(--hf-success-text-strong)", cursor: "pointer" }}>
             Done, I've copied it
           </button>
         </div>
       )}
 
       {isLoading ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading cameras…</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading cameras…</p>
       ) : cameras.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "48px 0", color: "#CBD5E1" }}>
+        <div style={{ textAlign: "center", padding: "48px 0", color: "var(--hf-text-disabled)" }}>
           <Camera size={32} strokeWidth={1.5} style={{ display: "block", margin: "0 auto 8px" }} />
           <p style={{ margin: 0, fontWeight: 500 }}>No cameras registered</p>
           <p style={{ margin: "4px 0 0", fontSize: 12 }}>Add a camera and generate a webhook secret to start receiving motion events</p>
@@ -119,32 +119,32 @@ export default function CctvTab() {
             const sc = STATUS_CONFIG[c.status]
             const Icon = sc.Icon
             return (
-              <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", border: "1px solid #E2E8F0", borderRadius: 10, background: "#fff" }}>
+              <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", border: "1px solid var(--hf-border)", borderRadius: 10, background: "var(--hf-surface)" }}>
                 <Icon size={18} color={sc.color} />
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 2 }}>
-                    <span style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{c.name}</span>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>{c.name}</span>
                     <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, color: sc.color, background: sc.bg }}>{sc.label}</span>
-                    <span style={{ fontSize: 10, color: "#94A3B8", padding: "2px 6px", border: "1px solid #E2E8F0", borderRadius: 4 }}>{c.provider}</span>
+                    <span style={{ fontSize: 10, color: "var(--hf-text-faint)", padding: "2px 6px", border: "1px solid var(--hf-border)", borderRadius: 4 }}>{c.provider}</span>
                   </div>
-                  <p style={{ margin: 0, fontSize: 11, color: "#64748B" }}>
+                  <p style={{ margin: 0, fontSize: 11, color: "var(--hf-text-muted)" }}>
                     {c.siteName} · <Clock size={10} style={{ verticalAlign: "middle" }} /> Last event: {fmtDate(c.lastEventAt)}
                   </p>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button onClick={() => genSecret.mutate(c.id)}
-                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 10px", borderRadius: 7, border: "1px solid #E2E8F0", background: "#F8FAFC", color: "#374151", fontSize: 11, cursor: "pointer" }}>
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 10px", borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface-muted)", color: "var(--hf-text-secondary)", fontSize: 11, cursor: "pointer" }}>
                     <Key size={11} /> Secret
                   </button>
                   {c.status === "ACTIVE" && (
                     <button onClick={() => markOffline.mutate(c.id)}
-                      style={{ padding: "6px 10px", borderRadius: 7, border: "1px solid #FECACA", background: "#FEF2F2", color: "#991B1B", fontSize: 11, cursor: "pointer" }}>
+                      style={{ padding: "6px 10px", borderRadius: 7, border: "1px solid var(--hf-danger-border)", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text-strong)", fontSize: 11, cursor: "pointer" }}>
                       Offline
                     </button>
                   )}
                   {c.status === "OFFLINE" && (
                     <button onClick={() => markActive.mutate(c.id)}
-                      style={{ padding: "6px 10px", borderRadius: 7, border: "1px solid #6EE7B7", background: "#ECFDF5", color: "#065F46", fontSize: 11, cursor: "pointer" }}>
+                      style={{ padding: "6px 10px", borderRadius: 7, border: "1px solid var(--hf-success-border)", background: "var(--hf-success-soft)", color: "var(--hf-success-text-strong)", fontSize: 11, cursor: "pointer" }}>
                       Activate
                     </button>
                   )}
@@ -160,7 +160,7 @@ export default function CctvTab() {
         <div style={modalOverlay}>
           <div style={modalBox}>
             <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Register Camera</h3>
-            {apiError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+            {apiError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
                 <label style={labelStyle}>Site *</label>

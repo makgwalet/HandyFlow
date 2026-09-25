@@ -10,8 +10,8 @@ interface ProfileResponse {
   contactEmail: string | null; contactPhone: string | null; physicalAddress: string | null
 }
 
-const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
-const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5, display: "block" }
+const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
+const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5, display: "block" }
 
 export default function CollAgencyProfileTab() {
   const qc = useQueryClient()
@@ -40,11 +40,11 @@ export default function CollAgencyProfileTab() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ca-profile"] }),
   })
 
-  if (isLoading) return <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+  if (isLoading) return <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p>
 
   return (
     <div style={{ maxWidth: 560 }}>
-      <p style={{ fontSize: 12, color: "#94A3B8", marginBottom: 20 }}>
+      <p style={{ fontSize: 12, color: "var(--hf-text-faint)", marginBottom: 20 }}>
         The agency's own practice profile, including its firm Debt Collectors Act registration — tracked separately from each individual collector's own registration (see the Collectors tab).
       </p>
       <div style={{ display: "grid", gap: 14 }}>
@@ -57,7 +57,7 @@ export default function CollAgencyProfileTab() {
           <label style={labelStyle}>Default commission rate (%) *</label>
           <input type="number" step="0.5" min="0" max="100" style={{ ...inputStyle, maxWidth: 160 }} value={form.defaultCommissionPct}
             onChange={e => setForm({ ...form, defaultCommissionPct: parseFloat(e.target.value) || 0 })} />
-          <p style={{ fontSize: 11, color: "#94A3B8", margin: "4px 0 0" }}>Used when a client doesn't have its own commission rate override.</p>
+          <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: "4px 0 0" }}>Used when a client doesn't have its own commission rate override.</p>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div><label style={labelStyle}>Contact email</label><input type="email" style={inputStyle} value={form.contactEmail} onChange={e => setForm({ ...form, contactEmail: e.target.value })} /></div>
@@ -66,11 +66,11 @@ export default function CollAgencyProfileTab() {
         <div><label style={labelStyle}>Physical address</label><textarea style={{ ...inputStyle, minHeight: 70, resize: "vertical" }} value={form.physicalAddress} onChange={e => setForm({ ...form, physicalAddress: e.target.value })} /></div>
       </div>
 
-      {save.isError && <p style={{ color: "#DC2626", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not save the profile"}</p>}
-      {save.isSuccess && <p style={{ color: "#059669", fontSize: 12, marginTop: 12 }}>Profile saved.</p>}
+      {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not save the profile"}</p>}
+      {save.isSuccess && <p style={{ color: "var(--hf-success-text)", fontSize: 12, marginTop: 12 }}>Profile saved.</p>}
 
       <button onClick={() => save.mutate()} disabled={!form.agencyName || save.isPending}
-        style={{ marginTop: 20, padding: "10px 20px", borderRadius: 8, border: "none", background: CA_ACCENT, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+        style={{ marginTop: 20, padding: "10px 20px", borderRadius: 8, border: "none", background: CA_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
         {save.isPending ? "Saving…" : "Save profile"}
       </button>
     </div>

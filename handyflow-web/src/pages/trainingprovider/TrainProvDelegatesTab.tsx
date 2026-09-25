@@ -20,8 +20,8 @@ interface DelegateResponse {
 }
 interface DelegatePage { content: DelegateResponse[] }
 
-const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
-const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5, display: "block" }
+const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
+const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5, display: "block" }
 
 function DelegateFormModal({ clientId, initial, onClose }: { clientId: string; initial?: DelegateResponse; onClose: () => void }) {
   const qc = useQueryClient()
@@ -42,9 +42,9 @@ function DelegateFormModal({ clientId, initial, onClose }: { clientId: string; i
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 440 }}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 440 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", margin: 0 }}>{initial ? "Edit delegate" : "Add a delegate"}</p>
+          <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>{initial ? "Edit delegate" : "Add a delegate"}</p>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
         </div>
         <div style={{ display: "grid", gap: 12 }}>
@@ -56,9 +56,9 @@ function DelegateFormModal({ clientId, initial, onClose }: { clientId: string; i
           </div>
           <div><label style={labelStyle}>Job title</label><input style={inputStyle} value={form.jobTitle} onChange={e => setForm({ ...form, jobTitle: e.target.value })} /></div>
         </div>
-        {save.isError && <p style={{ color: "#DC2626", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not save this delegate"}</p>}
+        {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not save this delegate"}</p>}
         <button onClick={() => save.mutate()} disabled={!form.fullName || save.isPending}
-          style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 8, border: "none", background: TRAINPROV_ACCENT, color: "#fff", fontSize: 13.5, fontWeight: 700, cursor: "pointer", opacity: (!form.fullName || save.isPending) ? 0.6 : 1 }}>
+          style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 8, border: "none", background: TRAINPROV_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13.5, fontWeight: 700, cursor: "pointer", opacity: (!form.fullName || save.isPending) ? 0.6 : 1 }}>
           {save.isPending ? "Saving…" : initial ? "Save changes" : "Add delegate"}
         </button>
       </div>
@@ -94,50 +94,50 @@ export default function TrainProvDelegatesTab({ clientId }: { clientId: string }
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <p style={{ fontSize: 13, color: "#94A3B8", margin: 0 }}>{delegates.length} delegate{delegates.length === 1 ? "" : "s"}</p>
+        <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0 }}>{delegates.length} delegate{delegates.length === 1 ? "" : "s"}</p>
         <button onClick={() => setShowForm(true)}
-          style={{ display: "flex", alignItems: "center", gap: 6, background: TRAINPROV_ACCENT, color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 6, background: TRAINPROV_ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Add delegate
         </button>
       </div>
 
       {isLoading ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p>
       ) : delegates.length === 0 ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>No delegates nominated yet.</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No delegates nominated yet.</p>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {delegates.map((d, i) => (
-            <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9" }}>
+            <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 30, height: 30, borderRadius: 8, background: "#FFFBEB", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--hf-warning-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <User size={14} color={TRAINPROV_ACCENT} />
                 </div>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", margin: 0 }}>{d.fullName}</p>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8" }}>{d.delegateNumber}</span>
-                    {d.status === "INACTIVE" && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "#F1F5F9", color: "#64748B" }}>INACTIVE</span>}
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)", margin: 0 }}>{d.fullName}</p>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)" }}>{d.delegateNumber}</span>
+                    {d.status === "INACTIVE" && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "var(--hf-surface-sunken)", color: "var(--hf-text-muted)" }}>INACTIVE</span>}
                   </div>
-                  <p style={{ fontSize: 11, color: "#94A3B8", margin: 0 }}>{[d.jobTitle, d.email].filter(Boolean).join(" · ") || "No further details"}</p>
+                  <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>{[d.jobTitle, d.email].filter(Boolean).join(" · ") || "No further details"}</p>
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <button onClick={() => setEditing(d)} title="Edit"
-                  style={{ background: "none", border: "1px solid #E2E8F0", borderRadius: 7, padding: "6px 10px", fontSize: 11.5, fontWeight: 600, color: "#64748B", cursor: "pointer" }}>
+                  style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "6px 10px", fontSize: 11.5, fontWeight: 600, color: "var(--hf-text-muted)", cursor: "pointer" }}>
                   Edit
                 </button>
                 {d.status === "ACTIVE" ? (
-                  <button onClick={() => deactivate.mutate(d.id)} title="Deactivate" style={{ background: "none", border: "1px solid #E2E8F0", borderRadius: 7, padding: 6, cursor: "pointer" }}>
+                  <button onClick={() => deactivate.mutate(d.id)} title="Deactivate" style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
                     <PowerOff size={13} color="#94A3B8" />
                   </button>
                 ) : (
-                  <button onClick={() => reactivate.mutate(d.id)} title="Reactivate" style={{ background: "none", border: "1px solid #E2E8F0", borderRadius: 7, padding: 6, cursor: "pointer" }}>
+                  <button onClick={() => reactivate.mutate(d.id)} title="Reactivate" style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
                     <Power size={13} color="#059669" />
                   </button>
                 )}
                 <button onClick={() => { if (confirm(`Delete ${d.fullName}? This cannot be undone.`)) remove.mutate(d.id) }} title="Delete"
-                  style={{ background: "none", border: "1px solid #E2E8F0", borderRadius: 7, padding: 6, cursor: "pointer" }}>
+                  style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
                   <Trash2 size={13} color="#DC2626" />
                 </button>
               </div>

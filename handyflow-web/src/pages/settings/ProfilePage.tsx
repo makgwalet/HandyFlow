@@ -16,24 +16,24 @@ interface Me {
 }
 
 const inp: React.CSSProperties = {
-  width: '100%', padding: '10px 13px', border: '1.5px solid #E2E8F0',
+  width: '100%', padding: '10px 13px', border: '1.5px solid var(--hf-border)',
   borderRadius: 9, fontSize: 14, boxSizing: 'border-box' as const,
-  background: '#fff', outline: 'none', fontFamily: 'inherit', color: '#0F172A',
+  background: 'var(--hf-surface)', outline: 'none', fontFamily: 'inherit', color: 'var(--hf-text)',
 }
 const lbl: React.CSSProperties = {
-  display: 'block', fontSize: 12, fontWeight: 700, color: '#6B7280',
+  display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--hf-text-muted)',
   textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6,
 }
 const btnP: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 7,
-  background: '#1B3A6B', color: '#fff', border: 'none',
+  background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none',
   borderRadius: 9, padding: '11px 22px', fontSize: 14,
   fontWeight: 600, cursor: 'pointer',
 }
 
 function Toast({ msg, ok }: { msg: string; ok: boolean }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 16px', background: ok ? '#DCFCE7' : '#FEF2F2', border: `1px solid ${ok ? '#86EFAC' : '#FECACA'}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: ok ? '#166534' : '#DC2626' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 16px', background: ok ? 'var(--hf-success-soft-strong)' : 'var(--hf-danger-soft)', border: `1px solid ${ok ? '#86EFAC' : '#FECACA'}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: ok ? 'var(--hf-success-text-strong)' : 'var(--hf-danger-text)' }}>
       {ok ? <CheckCircle size={15} /> : <AlertTriangle size={15} />}
       {msg}
     </div>
@@ -42,12 +42,12 @@ function Toast({ msg, ok }: { msg: string; ok: boolean }) {
 
 function Card({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '18px 24px', borderBottom: '1px solid #F1F5F9' }}>
-        <div style={{ width: 34, height: 34, borderRadius: 9, background: '#F0F9FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '18px 24px', borderBottom: '1px solid var(--hf-border-subtle)' }}>
+        <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--hf-sky-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {icon}
         </div>
-        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0F172A' }}>{title}</h2>
+        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--hf-text)' }}>{title}</h2>
       </div>
       <div style={{ padding: '22px 24px' }}>{children}</div>
     </div>
@@ -139,8 +139,8 @@ export function ProfilePage() {
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       {/* Header */}
       <div style={{ marginBottom: 26 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', margin: '0 0 5px' }}>My Profile</h1>
-        <p style={{ fontSize: 13, color: '#94A3B8', margin: 0 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 5px' }}>My Profile</h1>
+        <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0 }}>
           Manage your personal details and account security
         </p>
       </div>
@@ -150,14 +150,14 @@ export function ProfilePage() {
         {/* ── Profile card ── */}
         <Card title="Personal information" icon={<User size={16} color="#0D9488" />}>
           {/* Avatar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, padding: '14px 18px', background: '#F8FAFC', borderRadius: 10, border: '1px solid #E2E8F0' }}>
-            <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#1B3A6B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, padding: '14px 18px', background: 'var(--hf-surface-muted)', borderRadius: 10, border: '1px solid var(--hf-border)' }}>
+            <div style={{ width: 54, height: 54, borderRadius: '50%', background: 'var(--hf-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800, color: 'var(--hf-text-on-solid)', flexShrink: 0 }}>
               {pf.firstName.charAt(0)}{pf.lastName.charAt(0)}
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 16, color: '#0F172A' }}>{pf.firstName} {pf.lastName}</div>
-              <div style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>{me?.email}</div>
-              {pf.jobTitle && <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 1 }}>{pf.jobTitle}{pf.department ? ` · ${pf.department}` : ''}</div>}
+              <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--hf-text)' }}>{pf.firstName} {pf.lastName}</div>
+              <div style={{ fontSize: 13, color: 'var(--hf-text-muted)', marginTop: 2 }}>{me?.email}</div>
+              {pf.jobTitle && <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', marginTop: 1 }}>{pf.jobTitle}{pf.department ? ` · ${pf.department}` : ''}</div>}
             </div>
           </div>
 
@@ -184,8 +184,8 @@ export function ProfilePage() {
             </div>
             <div>
               <label style={lbl}>Email address</label>
-              <input value={me?.email ?? ''} disabled style={{ ...inp, background: '#F8FAFC', color: '#94A3B8', cursor: 'not-allowed' }} />
-              <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 4 }}>Contact support to change your email</div>
+              <input value={me?.email ?? ''} disabled style={{ ...inp, background: 'var(--hf-surface-muted)', color: 'var(--hf-text-faint)', cursor: 'not-allowed' }} />
+              <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 4 }}>Contact support to change your email</div>
             </div>
           </div>
 
@@ -211,7 +211,7 @@ export function ProfilePage() {
                   onChange={e => setPw(p => ({ ...p, current: e.target.value }))}
                   placeholder="Your current password" style={{ ...inp, paddingRight: 44 }} />
                 <button onClick={() => toggle('current')}
-                  style={{ position: 'absolute' as const, right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: 0, display: 'flex' }}>
+                  style={{ position: 'absolute' as const, right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', padding: 0, display: 'flex' }}>
                   {show.current ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
@@ -225,7 +225,7 @@ export function ProfilePage() {
                   onChange={e => setPw(p => ({ ...p, next: e.target.value }))}
                   placeholder="Create a strong password" style={{ ...inp, paddingRight: 44 }} />
                 <button onClick={() => toggle('next')}
-                  style={{ position: 'absolute' as const, right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: 0, display: 'flex' }}>
+                  style={{ position: 'absolute' as const, right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', padding: 0, display: 'flex' }}>
                   {show.next ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
@@ -235,7 +235,7 @@ export function ProfilePage() {
                 <div style={{ marginTop: 8 }}>
                   <div style={{ display: 'flex', gap: 4, marginBottom: 5 }}>
                     {[1,2,3,4].map(i => (
-                      <div key={i} style={{ flex: 1, height: 4, borderRadius: 4, background: i <= pwStrength ? strengthColor : '#E2E8F0', transition: 'background 0.2s' }} />
+                      <div key={i} style={{ flex: 1, height: 4, borderRadius: 4, background: i <= pwStrength ? strengthColor : 'var(--hf-surface-strong)', transition: 'background 0.2s' }} />
                     ))}
                   </div>
                   {strengthLabel && <div style={{ fontSize: 12, color: strengthColor, fontWeight: 600 }}>{strengthLabel}</div>}
@@ -251,7 +251,7 @@ export function ProfilePage() {
                   onChange={e => setPw(p => ({ ...p, confirm: e.target.value }))}
                   placeholder="Re-enter new password" style={{ ...inp, paddingRight: 44 }} />
                 <button onClick={() => toggle('confirm')}
-                  style={{ position: 'absolute' as const, right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: 0, display: 'flex' }}>
+                  style={{ position: 'absolute' as const, right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', padding: 0, display: 'flex' }}>
                   {show.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
@@ -261,8 +261,8 @@ export function ProfilePage() {
             {pw.next.length > 0 && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                 {rules.map(r => (
-                  <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: r.ok ? '#166534' : '#94A3B8' }}>
-                    <div style={{ width: 14, height: 14, borderRadius: '50%', background: r.ok ? '#DCFCE7' : '#F1F5F9', border: `1.5px solid ${r.ok ? '#22C55E' : '#E2E8F0'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: r.ok ? 'var(--hf-success-text-strong)' : 'var(--hf-text-faint)' }}>
+                    <div style={{ width: 14, height: 14, borderRadius: '50%', background: r.ok ? 'var(--hf-success-soft-strong)' : 'var(--hf-surface-sunken)', border: `1.5px solid ${r.ok ? '#22C55E' : '#E2E8F0'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       {r.ok && <CheckCircle size={9} color="#166534" />}
                     </div>
                     {r.label}
@@ -275,13 +275,13 @@ export function ProfilePage() {
           {pwToast && <div style={{ marginTop: 16 }}><Toast msg={pwToast.msg} ok={pwToast.ok} /></div>}
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#64748B' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--hf-text-muted)' }}>
               <ShieldCheck size={13} color="#0D9488" />
               Use a unique password not used on other sites
             </div>
             <button onClick={() => changePassword.mutate()}
               disabled={!pwValid || changePassword.isPending}
-              style={{ ...btnP, background: pwValid ? '#1B3A6B' : '#94A3B8', cursor: pwValid ? 'pointer' : 'default' }}>
+              style={{ ...btnP, background: pwValid ? 'var(--hf-primary)' : 'var(--hf-text-faint)', cursor: pwValid ? 'pointer' : 'default' }}>
               {changePassword.isPending ? 'Changing...' : <><Lock size={14} /> Change password</>}
             </button>
           </div>

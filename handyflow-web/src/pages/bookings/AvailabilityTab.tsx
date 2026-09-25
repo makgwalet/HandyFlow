@@ -88,12 +88,12 @@ export default function AvailabilityTab() {
 
         {/* ── Working hours ──────────────────────────────────────────────── */}
         <div>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0F172A", margin: "0 0 4px" }}>Working Hours</h3>
-          <p style={{ fontSize: 13, color: "#94A3B8", margin: "0 0 20px" }}>Set when bookings can be made for each day of the week</p>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--hf-text)", margin: "0 0 4px" }}>Working Hours</h3>
+          <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: "0 0 20px" }}>Set when bookings can be made for each day of the week</p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
-              <label style={lbl}>Staff member <span style={{ fontWeight: 400, color: "#94A3B8" }}>(leave blank for all staff)</span></label>
+              <label style={lbl}>Staff member <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(leave blank for all staff)</span></label>
               <select value={availForm.staffId} onChange={e => setAvailForm(f => ({ ...f, staffId: e.target.value }))} style={inp}>
                 <option value="">All staff / Business hours</option>
                 {staff.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -107,8 +107,8 @@ export default function AvailabilityTab() {
                   <button key={d.value} onClick={() => setAvailForm(f => ({ ...f, dayOfWeek: d.value }))}
                     style={{
                       padding: "8px 4px", borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: "pointer", border: "none",
-                      background: availForm.dayOfWeek === d.value ? "#1B3A6B" : "#F1F5F9",
-                      color: availForm.dayOfWeek === d.value ? "#fff" : "#64748B",
+                      background: availForm.dayOfWeek === d.value ? "var(--hf-primary)" : "var(--hf-surface-sunken)",
+                      color: availForm.dayOfWeek === d.value ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)",
                     }}>
                     {d.label.slice(0, 3)}
                   </button>
@@ -132,12 +132,12 @@ export default function AvailabilityTab() {
             </div>
 
             {availError && (
-              <div style={{ padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}>
                 <AlertCircle size={14} />{availError}
               </div>
             )}
             {availSuccess && (
-              <div style={{ padding: "10px 12px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 8, fontSize: 13, color: "#166534", display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ padding: "10px 12px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-success-text-strong)", display: "flex", alignItems: "center", gap: 8 }}>
                 <CheckCircle size={14} />{availSuccess}
               </div>
             )}
@@ -145,7 +145,7 @@ export default function AvailabilityTab() {
             <button
               onClick={handleSaveAvailability}
               disabled={setAvailability.isPending}
-              style={{ padding: "10px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+              style={{ padding: "10px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
               {setAvailability.isPending ? "Saving…" : "Save working hours"}
             </button>
           </div>
@@ -155,19 +155,19 @@ export default function AvailabilityTab() {
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
             <div>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0F172A", margin: "0 0 4px" }}>Time Blocks</h3>
-              <p style={{ fontSize: 13, color: "#94A3B8", margin: 0 }}>Block time for lunch, leave, holidays or maintenance</p>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--hf-text)", margin: "0 0 4px" }}>Time Blocks</h3>
+              <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0 }}>Block time for lunch, leave, holidays or maintenance</p>
             </div>
             <button
               onClick={() => setShowBlockModal(true)}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               <Plus size={13} /> Add block
             </button>
           </div>
 
           {/* Quick presets */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" }}>Quick presets</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--hf-text-faint)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Quick presets</div>
             {[
               { label: "Lunch break",    start: "12:00", end: "13:00", reason: "Lunch" },
               { label: "Public holiday", start: "",      end: "",      reason: "Public holiday — full day" },
@@ -176,13 +176,13 @@ export default function AvailabilityTab() {
               <button
                 key={preset.label}
                 onClick={() => { setBlockForm(f => ({ ...f, startTime: preset.start, endTime: preset.end, reason: preset.reason })); setShowBlockModal(true) }}
-                style={{ padding: "10px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer", textAlign: "left", color: "#374151", fontWeight: 500 }}>
+                style={{ padding: "10px 14px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, cursor: "pointer", textAlign: "left", color: "var(--hf-text-secondary)", fontWeight: 500 }}>
                 {preset.label}
               </button>
             ))}
           </div>
 
-          <div style={{ padding: "14px 16px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 8, fontSize: 12, color: "#92400E", lineHeight: 1.6 }}>
+          <div style={{ padding: "14px 16px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 8, fontSize: 12, color: "var(--hf-warning-text-deep)", lineHeight: 1.6 }}>
             <strong>Tip:</strong> Leave start and end time empty to block the entire day.
             Blocks prevent new bookings but do not affect existing confirmed bookings.
           </div>
@@ -192,15 +192,15 @@ export default function AvailabilityTab() {
       {/* ── Block modal ─────────────────────────────────────────────────── */}
       {showBlockModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 28, width: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 22 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Block Time</h3>
-              <button onClick={() => setShowBlockModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Block Time</h3>
+              <button onClick={() => setShowBlockModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
-                <label style={lbl}>Staff member <span style={{ fontWeight: 400, color: "#94A3B8" }}>(blank = all staff)</span></label>
+                <label style={lbl}>Staff member <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(blank = all staff)</span></label>
                 <select value={blockForm.staffId} onChange={e => setBlockForm(f => ({ ...f, staffId: e.target.value }))} style={inp}>
                   <option value="">All staff</option>
                   {staff.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -212,7 +212,7 @@ export default function AvailabilityTab() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label style={lbl}>Start time <span style={{ fontWeight: 400, color: "#94A3B8" }}>(blank = full day)</span></label>
+                  <label style={lbl}>Start time <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(blank = full day)</span></label>
                   <select value={blockForm.startTime} onChange={e => setBlockForm(f => ({ ...f, startTime: e.target.value }))} style={inp}>
                     <option value="">Full day</option>
                     {TIME_SLOTS.map(t => <option key={t} value={t}>{t}</option>)}
@@ -234,14 +234,14 @@ export default function AvailabilityTab() {
             </div>
 
             {blockError && (
-              <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}>
                 <AlertCircle size={14} />{blockError}
               </div>
             )}
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setShowBlockModal(false)}
-                style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>
+                style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>
                 Cancel
               </button>
               <button
@@ -253,7 +253,7 @@ export default function AvailabilityTab() {
                   reason:    blockForm.reason    || null,
                 })}
                 disabled={!blockForm.blockDate || addBlock.isPending}
-                style={{ padding: "9px 20px", background: "#DC2626", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                style={{ padding: "9px 20px", background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
                 {addBlock.isPending ? "Blocking…" : "Block time"}
               </button>
             </div>
@@ -264,5 +264,5 @@ export default function AvailabilityTab() {
   )
 }
 
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box", background: "#fff", outline: "none" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box", background: "var(--hf-surface)", outline: "none" }

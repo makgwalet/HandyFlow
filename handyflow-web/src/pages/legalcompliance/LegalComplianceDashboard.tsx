@@ -118,16 +118,16 @@ export default function LegalComplianceDashboard({ onNavigate }: { onNavigate: (
       <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 18 }}>
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Upcoming (next 30 days)</span>
-            <button onClick={() => onNavigate("calendar")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#4338CA", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Upcoming (next 30 days)</span>
+            <button onClick={() => onNavigate("calendar")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-indigo-text)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
               Full calendar <ArrowRight size={13} />
             </button>
           </div>
 
           {upcoming.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed #E2E8F0", borderRadius: 12, color: "#94A3B8" }}>
+            <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed var(--hf-border)", borderRadius: 12, color: "var(--hf-text-faint)" }}>
               <CheckCircle size={32} color="#CBD5E1" style={{ marginBottom: 10 }} />
-              <div style={{ fontWeight: 600, color: "#475569" }}>Nothing due in the next 30 days</div>
+              <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>Nothing due in the next 30 days</div>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -135,17 +135,17 @@ export default function LegalComplianceDashboard({ onNavigate }: { onNavigate: (
                 const cfg = SOURCE_CFG[e.sourceType] ?? SOURCE_CFG.OBLIGATION
                 const days = daysUntil(e.date)
                 return (
-                  <div key={`${e.sourceType}-${e.sourceId}-${i}`} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", border: "1px solid #E2E8F0", borderRadius: 10, background: "#fff" }}>
+                  <div key={`${e.sourceType}-${e.sourceId}-${i}`} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", border: "1px solid var(--hf-border)", borderRadius: 10, background: "var(--hf-surface)" }}>
                     <div style={{ padding: "3px 9px", borderRadius: 20, background: cfg.bg, color: cfg.color, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{cfg.label}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{e.title}</div>
-                      <div style={{ fontSize: 12, color: "#64748B" }}>{e.detail}</div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>{e.title}</div>
+                      <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{e.detail}</div>
                     </div>
                     <div style={{ textAlign: "right" as const, flexShrink: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 12, color: days < 0 ? "#DC2626" : days <= 7 ? "#D97706" : "#0F172A" }}>
+                      <div style={{ fontWeight: 700, fontSize: 12, color: days < 0 ? "var(--hf-danger-text)" : days <= 7 ? "var(--hf-warning-text)" : "var(--hf-text)" }}>
                         {days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? "Today" : `${days}d`}
                       </div>
-                      <div style={{ fontSize: 11, color: "#94A3B8" }}>{fmtDate(e.date)}</div>
+                      <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{fmtDate(e.date)}</div>
                     </div>
                   </div>
                 )
@@ -157,16 +157,16 @@ export default function LegalComplianceDashboard({ onNavigate }: { onNavigate: (
             <div style={{ marginTop: 24 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
                 <AlertTriangle size={15} color="#DC2626" />
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Needs attention</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Needs attention</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {[...nonCompliant, ...overdue].slice(0, 6).map(o => (
-                  <div key={o.id} onClick={() => onNavigate("obligations")} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", border: "1px solid #FECACA", borderRadius: 10, background: "#FEF2F2", cursor: "pointer" }}>
+                  <div key={o.id} onClick={() => onNavigate("obligations")} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", border: "1px solid var(--hf-danger-border)", borderRadius: 10, background: "var(--hf-danger-soft)", cursor: "pointer" }}>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{o.title}</div>
-                      <div style={{ fontSize: 11, color: "#94A3B8" }}>{o.category} · Review date {fmtDate(o.reviewDate)}</div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>{o.title}</div>
+                      <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{o.category} · Review date {fmtDate(o.reviewDate)}</div>
                     </div>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", background: "#FFF", padding: "3px 9px", borderRadius: 20, border: "1px solid #FECACA" }}>{o.status.replace("_", " ")}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-danger-text)", background: "var(--hf-surface)", padding: "3px 9px", borderRadius: 20, border: "1px solid var(--hf-danger-border)" }}>{o.status.replace("_", " ")}</span>
                   </div>
                 ))}
               </div>
@@ -175,7 +175,7 @@ export default function LegalComplianceDashboard({ onNavigate }: { onNavigate: (
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ background: "#4338CA", borderRadius: 12, padding: 20, color: "#fff" }}>
+          <div style={{ background: "var(--hf-indigo)", borderRadius: 12, padding: 20, color: "var(--hf-text-on-solid)" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 14, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>At a glance</div>
             {[
               { label: "Regulatory obligations", value: obs.length },
@@ -186,23 +186,23 @@ export default function LegalComplianceDashboard({ onNavigate }: { onNavigate: (
             ].map(s => (
               <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
                 <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)" }}>{s.label}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{s.value}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text-on-solid)" }}>{s.value}</span>
               </div>
             ))}
           </div>
 
           {dueSoon.length > 0 && (
-            <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", marginBottom: 6 }}>{dueSoon.length} obligation{dueSoon.length === 1 ? "" : "s"} due soon</div>
-              <div style={{ fontSize: 12, color: "#92400E" }}>Review before they roll to overdue.</div>
-              <button onClick={() => onNavigate("obligations")} style={{ marginTop: 10, width: "100%", padding: "7px", background: "#fff", color: "#D97706", border: "1px solid #FDE68A", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            <div style={{ background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-warning-text-deep)", marginBottom: 6 }}>{dueSoon.length} obligation{dueSoon.length === 1 ? "" : "s"} due soon</div>
+              <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>Review before they roll to overdue.</div>
+              <button onClick={() => onNavigate("obligations")} style={{ marginTop: 10, width: "100%", padding: "7px", background: "var(--hf-surface)", color: "var(--hf-warning-text)", border: "1px solid var(--hf-warning-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                 Review obligations →
               </button>
             </div>
           )}
 
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 10 }}>Quick actions</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 10 }}>Quick actions</div>
             {[
               { label: "New obligation",   tab: "obligations" as Tab, color: "#4338CA", icon: ClipboardList },
               { label: "Open matter",      tab: "litigation"  as Tab, color: "#BE123C", icon: Gavel         },
@@ -210,7 +210,7 @@ export default function LegalComplianceDashboard({ onNavigate }: { onNavigate: (
               { label: "Log DSAR",         tab: "dsar"        as Tab, color: "#D97706", icon: FileSearch    },
             ].map(a => (
               <button key={a.label} onClick={() => onNavigate(a.tab)}
-                style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left" as const, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left" as const, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 {a.label} <ArrowRight size={13} />
               </button>
             ))}

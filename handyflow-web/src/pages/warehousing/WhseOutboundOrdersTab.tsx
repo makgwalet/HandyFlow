@@ -23,12 +23,12 @@ interface ItemResponse { id: string; sku: string; description: string | null }
 interface OrderPage { content: OutboundOrderResponse[] }
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
-  PENDING: { bg: "#F1F5F9", fg: "#475569" }, PICKING: { bg: "#DBEAFE", fg: "#1D4ED8" },
-  PACKED: { bg: "#FEF3C7", fg: "#92400E" }, SHIPPED: { bg: "#DCFCE7", fg: "#166534" },
-  CANCELLED: { bg: "#F1F5F9", fg: "#94A3B8" },
+  PENDING: { bg: "var(--hf-surface-sunken)", fg: "var(--hf-text-tertiary)" }, PICKING: { bg: "var(--hf-info-soft-strong)", fg: "var(--hf-info-text)" },
+  PACKED: { bg: "var(--hf-warning-soft-strong)", fg: "var(--hf-warning-text-deep)" }, SHIPPED: { bg: "var(--hf-success-soft-strong)", fg: "var(--hf-success-text-strong)" },
+  CANCELLED: { bg: "var(--hf-surface-sunken)", fg: "var(--hf-text-faint)" },
 }
-const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
-const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5, display: "block" }
+const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
+const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5, display: "block" }
 
 function NewOrderModal({ clientId, items, onClose }: { clientId: string; items: ItemResponse[]; onClose: () => void }) {
   const qc = useQueryClient()
@@ -56,9 +56,9 @@ function NewOrderModal({ clientId, items, onClose }: { clientId: string; items: 
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 560, maxHeight: "85vh", overflowY: "auto" }}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 560, maxHeight: "85vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", margin: 0 }}>New outbound order</p>
+          <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>New outbound order</p>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
@@ -69,7 +69,7 @@ function NewOrderModal({ clientId, items, onClose }: { clientId: string; items: 
         <div style={{ marginBottom: 12 }}><label style={labelStyle}>Ship-to address</label><textarea style={{ ...inputStyle, minHeight: 50, resize: "vertical" }} value={shipToAddress} onChange={e => setShipToAddress(e.target.value)} /></div>
         <div><label style={labelStyle}>Notes</label><textarea style={{ ...inputStyle, minHeight: 40, resize: "vertical" }} value={notes} onChange={e => setNotes(e.target.value)} /></div>
 
-        <p style={{ fontSize: 12.5, fontWeight: 700, color: "#0F172A", margin: "16px 0 8px" }}>Ordered lines</p>
+        <p style={{ fontSize: 12.5, fontWeight: 700, color: "var(--hf-text)", margin: "16px 0 8px" }}>Ordered lines</p>
         {lines.map((line, i) => (
           <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
             <select style={{ ...inputStyle, flex: 2 }} value={line.itemId} onChange={e => updateLine(i, "itemId", e.target.value)}>
@@ -82,14 +82,14 @@ function NewOrderModal({ clientId, items, onClose }: { clientId: string; items: 
             )}
           </div>
         ))}
-        <button onClick={addLine} style={{ background: "none", border: "1px dashed #CBD5E1", borderRadius: 8, padding: "7px 12px", fontSize: 12, fontWeight: 600, color: "#64748B", cursor: "pointer", marginTop: 4 }}>
+        <button onClick={addLine} style={{ background: "none", border: "1px dashed var(--hf-border-strong)", borderRadius: 8, padding: "7px 12px", fontSize: 12, fontWeight: 600, color: "var(--hf-text-muted)", cursor: "pointer", marginTop: 4 }}>
           + Add line
         </button>
 
-        {create.isError && <p style={{ color: "#DC2626", fontSize: 12, marginTop: 12 }}>{(create.error as any)?.response?.data?.message ?? "Could not create this order"}</p>}
+        {create.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(create.error as any)?.response?.data?.message ?? "Could not create this order"}</p>}
 
         <button onClick={() => create.mutate()} disabled={!valid || create.isPending}
-          style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 8, border: "none", background: WHSE_ACCENT, color: "#fff", fontSize: 13.5, fontWeight: 700, cursor: "pointer", opacity: (!valid || create.isPending) ? 0.6 : 1 }}>
+          style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 8, border: "none", background: WHSE_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13.5, fontWeight: 700, cursor: "pointer", opacity: (!valid || create.isPending) ? 0.6 : 1 }}>
           {create.isPending ? "Creating…" : "Create order"}
         </button>
       </div>
@@ -117,32 +117,32 @@ export default function WhseOutboundOrdersTab({ clientId }: { clientId: string }
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <p style={{ fontSize: 13, color: "#94A3B8", margin: 0 }}>{orders.length} order{orders.length === 1 ? "" : "s"}</p>
+        <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0 }}>{orders.length} order{orders.length === 1 ? "" : "s"}</p>
         <button onClick={() => setShowForm(true)} disabled={items.length === 0} title={items.length === 0 ? "Add an item to this client's catalogue first" : undefined}
-          style={{ display: "flex", alignItems: "center", gap: 6, background: WHSE_ACCENT, color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: items.length === 0 ? 0.5 : 1 }}>
+          style={{ display: "flex", alignItems: "center", gap: 6, background: WHSE_ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: items.length === 0 ? 0.5 : 1 }}>
           <Plus size={15} /> New order
         </button>
       </div>
 
       {isLoading ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p>
       ) : orders.length === 0 ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>No outbound orders yet.</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No outbound orders yet.</p>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {orders.map((o, i) => {
-            const colors = STATUS_COLORS[o.status] ?? { bg: "#F1F5F9", fg: "#64748B" }
+            const colors = STATUS_COLORS[o.status] ?? { bg: "var(--hf-surface-sunken)", fg: "var(--hf-text-muted)" }
             return (
               <button key={o.id} onClick={() => setSelectedId(o.id)}
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <PackageCheck size={15} color={WHSE_ACCENT} />
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <p style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", margin: 0 }}>{o.orderReference ?? `Order ${o.id.slice(0, 8)}`}</p>
+                      <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{o.orderReference ?? `Order ${o.id.slice(0, 8)}`}</p>
                       <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: colors.bg, color: colors.fg }}>{o.status}</span>
                     </div>
-                    <p style={{ fontSize: 11.5, color: "#94A3B8", margin: 0 }}>{o.shipToName ?? "No ship-to set"}{o.requestedShipDate ? ` · Requested ${o.requestedShipDate}` : ""}</p>
+                    <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>{o.shipToName ?? "No ship-to set"}{o.requestedShipDate ? ` · Requested ${o.requestedShipDate}` : ""}</p>
                   </div>
                 </div>
                 <ChevronRight size={16} color="#CBD5E1" />

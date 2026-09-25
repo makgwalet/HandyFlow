@@ -82,28 +82,28 @@ function EvidenceSection({ matterId, canManage }: { matterId: string; canManage:
   })
 
   return (
-    <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #E2E8F0" }}>
-      <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>Evidence — filings & correspondence</div>
+    <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--hf-border)" }}>
+      <div style={{ fontSize: 10, color: "var(--hf-text-faint)", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>Evidence — filings & correspondence</div>
       {evidence.length === 0 ? (
-        <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 10 }}>No documents attached yet.</div>
+        <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginBottom: 10 }}>No documents attached yet.</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
           {evidence.map(ev => (
-            <div key={ev.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12 }}>
+            <div key={ev.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12 }}>
               <FileText size={13} color="#64748B" />
-              <span style={{ fontWeight: 600, color: "#0F172A" }}>{ev.fileName}</span>
-              <span style={{ color: "#94A3B8" }}>{ev.evidenceType} · {fmtBytes(ev.fileSizeBytes)}</span>
-              <span style={{ marginLeft: "auto", color: "#94A3B8" }}>{ev.uploadedByName} · {fmtDate(ev.createdAt)}</span>
+              <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{ev.fileName}</span>
+              <span style={{ color: "var(--hf-text-faint)" }}>{ev.evidenceType} · {fmtBytes(ev.fileSizeBytes)}</span>
+              <span style={{ marginLeft: "auto", color: "var(--hf-text-faint)" }}>{ev.uploadedByName} · {fmtDate(ev.createdAt)}</span>
             </div>
           ))}
         </div>
       )}
       {canManage && (
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input type="text" value={evidenceType} onChange={e => setEvidenceType(e.target.value)} placeholder="Type e.g. COURT_FILING" style={{ flex: 1, padding: "7px 10px", border: "1.5px solid #E2E8F0", borderRadius: 7, fontSize: 12 }} />
+          <input type="text" value={evidenceType} onChange={e => setEvidenceType(e.target.value)} placeholder="Type e.g. COURT_FILING" style={{ flex: 1, padding: "7px 10px", border: "1.5px solid var(--hf-border)", borderRadius: 7, fontSize: 12 }} />
           <input type="file" onChange={e => setFile(e.target.files?.[0] ?? null)} style={{ fontSize: 12, flex: 1 }} />
           <button onClick={() => attach.mutate()} disabled={!file || !evidenceType.trim() || attach.isPending}
-            style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: (!file || !evidenceType.trim()) ? "#CBD5E1" : "#4338CA", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: (!file || !evidenceType.trim()) ? "not-allowed" : "pointer" }}>
+            style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: (!file || !evidenceType.trim()) ? "#CBD5E1" : "var(--hf-indigo)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: (!file || !evidenceType.trim()) ? "not-allowed" : "pointer" }}>
             <Paperclip size={12} /> {attach.isPending ? "Uploading..." : "Attach"}
           </button>
         </div>
@@ -211,7 +211,7 @@ export default function LitigationTab() {
     borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "#FFF5F5" : "#fff", outline: "none",
   })
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
-    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#DC2626", marginTop: 4 }}><AlertCircle size={12} />{fieldErrors[k]}</div>
+    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}><AlertCircle size={12} />{fieldErrors[k]}</div>
   ) : null
 
   const StatusBadge = ({ status }: { status: string }) => {
@@ -229,9 +229,9 @@ export default function LitigationTab() {
     <div>
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {stats.map(s => (
-          <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
+          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{s.label}</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -241,19 +241,19 @@ export default function LitigationTab() {
           {["ALL", ...STATUSES].map(s => (
             <button key={s} onClick={() => setFilterStatus(s)}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterStatus === s ? 600 : 400,
-                background: filterStatus === s ? (s === "ALL" ? "#4338CA" : STATUS_CFG[s]?.color ?? "#4338CA") : "#F1F5F9",
-                color: filterStatus === s ? "#fff" : "#64748B" }}>
+                background: filterStatus === s ? (s === "ALL" ? "var(--hf-indigo)" : STATUS_CFG[s]?.color ?? "var(--hf-indigo)") : "var(--hf-surface-sunken)",
+                color: filterStatus === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
               {s === "ALL" ? "All" : STATUS_CFG[s]?.label ?? s}
             </button>
           ))}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={downloadPdf} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", color: "#4338CA", border: "1px solid #E2E8F0", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          <button onClick={downloadPdf} style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-surface)", color: "var(--hf-indigo-text)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
             <Download size={14} /> Export PDF
           </button>
           {canManage && (
             <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") }}
-              style={{ display: "flex", alignItems: "center", gap: 7, background: "#4338CA", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+              style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-indigo)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
               <Plus size={15} /> Open Matter
             </button>
           )}
@@ -261,11 +261,11 @@ export default function LitigationTab() {
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading matters...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading matters...</div>
       ) : matters.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Gavel size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No litigation matters found</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No litigation matters found</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -274,19 +274,19 @@ export default function LitigationTab() {
             const cfg = STATUS_CFG[m.status] ?? STATUS_CFG.OPEN
             const isTerminal = TERMINAL_STATUSES.includes(m.status)
             return (
-              <div key={m.id} style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
-                <div style={{ padding: "16px 20px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+              <div key={m.id} style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ padding: "16px 20px", background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                     <div style={{ width: 44, height: 44, borderRadius: 10, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <Gavel size={18} color={cfg.color} />
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
-                        <span style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{m.matterNumber}</span>
-                        <span style={{ fontSize: 14, color: "#64748B" }}>{m.title}</span>
-                        <span style={{ fontSize: 11, color: "#64748B", background: "#F1F5F9", padding: "1px 8px", borderRadius: 20 }}>{m.matterType}</span>
+                        <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{m.matterNumber}</span>
+                        <span style={{ fontSize: 14, color: "var(--hf-text-muted)" }}>{m.title}</span>
+                        <span style={{ fontSize: 11, color: "var(--hf-text-muted)", background: "var(--hf-surface-sunken)", padding: "1px 8px", borderRadius: 20 }}>{m.matterType}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                      <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>
                         vs. {m.opposingParty}{m.ourSide ? ` (we are ${m.ourSide})` : ""} · Opened {fmtDate(m.openedDate)}
                         {m.nextKeyDate ? ` · Next date ${fmtDate(m.nextKeyDate)}` : ""}
                       </div>
@@ -294,28 +294,28 @@ export default function LitigationTab() {
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                     <div style={{ textAlign: "right" as const }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{fmtR(m.estimatedExposure)}</div>
-                      <div style={{ fontSize: 11, color: "#94A3B8" }}>exposure</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)" }}>{fmtR(m.estimatedExposure)}</div>
+                      <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>exposure</div>
                     </div>
                     <StatusBadge status={m.status} />
                     {canManage && (
                       <div style={{ display: "flex", gap: 5 }}>
-                        {!isTerminal && <button onClick={() => { setShowAdvance(m); setNewStatus("") }} title="Advance status" style={{ background: "#EFF6FF", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#1D4ED8" }}><ArrowRightCircle size={13} /></button>}
-                        {!isTerminal && <button onClick={() => { setShowClose(m); setFinalStatus("SETTLED"); setOutcomeNotes("") }} title="Close matter" style={{ background: "#F1F5F9", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#334155" }}><Flag size={13} /></button>}
-                        <button onClick={() => { setShowLink(m); setContractId(m.linkedContractId ?? "") }} title="Link contract" style={{ background: "#F5F3FF", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#7C3AED" }}><Link2 size={13} /></button>
-                        <button onClick={() => openEdit(m)} title="Edit" style={{ background: "#EFF6FF", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#1D4ED8" }}><Edit2 size={13} /></button>
+                        {!isTerminal && <button onClick={() => { setShowAdvance(m); setNewStatus("") }} title="Advance status" style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-info-text)" }}><ArrowRightCircle size={13} /></button>}
+                        {!isTerminal && <button onClick={() => { setShowClose(m); setFinalStatus("SETTLED"); setOutcomeNotes("") }} title="Close matter" style={{ background: "var(--hf-surface-sunken)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-text-secondary)" }}><Flag size={13} /></button>}
+                        <button onClick={() => { setShowLink(m); setContractId(m.linkedContractId ?? "") }} title="Link contract" style={{ background: "var(--hf-violet-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-violet-text)" }}><Link2 size={13} /></button>
+                        <button onClick={() => openEdit(m)} title="Edit" style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-info-text)" }}><Edit2 size={13} /></button>
                         {canAdmin && (
-                          <button onClick={() => { if (confirm(`Delete matter "${m.matterNumber}"?`)) deleteMatter.mutate(m.id) }} title="Delete" style={{ background: "#FEF2F2", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#DC2626" }}><Trash2 size={13} /></button>
+                          <button onClick={() => { if (confirm(`Delete matter "${m.matterNumber}"?`)) deleteMatter.mutate(m.id) }} title="Delete" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
                         )}
                       </div>
                     )}
-                    <button onClick={() => setExpanded(isOpen ? null : m.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
+                    <button onClick={() => setExpanded(isOpen ? null : m.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}>
                       {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </button>
                   </div>
                 </div>
                 {isOpen && (
-                  <div style={{ borderTop: "1px solid #F1F5F9", padding: "16px 20px", background: "#F8FAFC" }}>
+                  <div style={{ borderTop: "1px solid var(--hf-border-subtle)", padding: "16px 20px", background: "var(--hf-surface-muted)" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 14 }}>
                       {[
                         { l: "Legal representative", v: m.legalRepresentative || "—" },
@@ -325,13 +325,13 @@ export default function LitigationTab() {
                         { l: "Closed date",           v: fmtDate(m.closedDate) },
                       ].map(item => (
                         <div key={item.l}>
-                          <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{item.v}</div>
+                          <div style={{ fontSize: 10, color: "var(--hf-text-faint)", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{item.v}</div>
                         </div>
                       ))}
                     </div>
-                    {m.description && <div style={{ marginBottom: 10, fontSize: 13, color: "#374151" }}>{m.description}</div>}
-                    {m.outcomeNotes && <div style={{ padding: "8px 12px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 8, fontSize: 13, color: "#166534" }}>Outcome: {m.outcomeNotes}</div>}
+                    {m.description && <div style={{ marginBottom: 10, fontSize: 13, color: "var(--hf-text-secondary)" }}>{m.description}</div>}
+                    {m.outcomeNotes && <div style={{ padding: "8px 12px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-success-text-strong)" }}>Outcome: {m.outcomeNotes}</div>}
                     <EvidenceSection matterId={m.id} canManage={canManage} />
                   </div>
                 )}
@@ -353,8 +353,8 @@ export default function LitigationTab() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
                 <label style={lbl}>Matter type *</label>
-                {editing ? <div style={{ ...inp("_"), background: "#F1F5F9", color: "#64748B" }}>{editing.matterType}</div> : (
-                  <select value={form.matterType} onChange={e => setForm(f => ({ ...f, matterType: e.target.value }))} style={{ ...inp("matterType"), background: "#fff" }}>
+                {editing ? <div style={{ ...inp("_"), background: "var(--hf-surface-sunken)", color: "var(--hf-text-muted)" }}>{editing.matterType}</div> : (
+                  <select value={form.matterType} onChange={e => setForm(f => ({ ...f, matterType: e.target.value }))} style={{ ...inp("matterType"), background: "var(--hf-surface)" }}>
                     {MATTER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 )}
@@ -391,7 +391,7 @@ export default function LitigationTab() {
               </div>
               <div>
                 <label style={lbl}>{editing ? "Opened date" : "Opened date *"}</label>
-                {editing ? <div style={{ ...inp("_"), background: "#F1F5F9", color: "#64748B" }}>{fmtDate(editing.openedDate)}</div> : (
+                {editing ? <div style={{ ...inp("_"), background: "var(--hf-surface-sunken)", color: "var(--hf-text-muted)" }}>{fmtDate(editing.openedDate)}</div> : (
                   <><input type="date" value={form.openedDate} onChange={e => { setForm(f => ({ ...f, openedDate: e.target.value })); setFieldErrors(f => omit(f, "openedDate")) }} style={inp("openedDate")} /><FErr k="openedDate" /></>
                 )}
               </div>
@@ -401,7 +401,7 @@ export default function LitigationTab() {
               </div>
               {!editing && (
                 <div>
-                  <label style={lbl}>Linked contract ID <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+                  <label style={lbl}>Linked contract ID <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
                   <input value={form.linkedContractId} onChange={e => setForm(f => ({ ...f, linkedContractId: e.target.value }))} style={inp("linkedContractId")} />
                 </div>
               )}
@@ -442,8 +442,8 @@ export default function LitigationTab() {
               const cfg = STATUS_CFG[s]; const sel = newStatus === s
               return (
                 <button key={s} onClick={() => setNewStatus(s)}
-                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `2px solid ${sel ? cfg.color : "#E2E8F0"}`, borderRadius: 10, cursor: "pointer", background: sel ? cfg.bg : "#fff", textAlign: "left" as const, width: "100%" }}>
-                  <span style={{ fontWeight: 600, color: sel ? cfg.color : "#0F172A" }}>{cfg.label}</span>
+                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `2px solid ${sel ? cfg.color : "#E2E8F0"}`, borderRadius: 10, cursor: "pointer", background: sel ? cfg.bg : "var(--hf-surface)", textAlign: "left" as const, width: "100%" }}>
+                  <span style={{ fontWeight: 600, color: sel ? cfg.color : "var(--hf-text)" }}>{cfg.label}</span>
                 </button>
               )
             })}
@@ -458,10 +458,10 @@ export default function LitigationTab() {
           <MHead title={`Close Matter — ${showClose.matterNumber}`} onClose={() => { setShowClose(null); setApiError("") }} />
           <div style={{ marginBottom: 14 }}>
             <label style={lbl}>Final status *</label>
-            <select value={finalStatus} onChange={e => setFinalStatus(e.target.value)} style={{ ...inp("_"), width: "100%", background: "#fff" }}>
+            <select value={finalStatus} onChange={e => setFinalStatus(e.target.value)} style={{ ...inp("_"), width: "100%", background: "var(--hf-surface)" }}>
               {TERMINAL_STATUSES.map(s => <option key={s} value={s}>{STATUS_CFG[s].label}</option>)}
             </select>
-            <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>Must be a terminal status — enforced by the backend.</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>Must be a terminal status — enforced by the backend.</div>
           </div>
           <label style={lbl}>Outcome notes</label>
           <textarea value={outcomeNotes} onChange={e => setOutcomeNotes(e.target.value)} rows={3} style={{ ...inp("_"), width: "100%", resize: "vertical" as const }} />
@@ -486,21 +486,21 @@ export default function LitigationTab() {
 function Overlay({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 640, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 640, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>
     </div>
   )
 }
 function MHead({ title, onClose }: { title: string; onClose: () => void }) {
-  return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button></div>
+  return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button></div>
 }
 function MFoot({ onCancel, onSubmit, loading, label, disabled = false }: { onCancel: () => void; onSubmit: () => void; loading: boolean; label: string; disabled?: boolean }) {
-  return <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}><button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button><button onClick={onSubmit} disabled={loading || disabled} style={{ padding: "9px 22px", background: loading || disabled ? "#94A3B8" : "#4338CA", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || disabled ? "not-allowed" : "pointer" }}>{loading ? "Saving..." : label}</button></div>
+  return <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}><button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button><button onClick={onSubmit} disabled={loading || disabled} style={{ padding: "9px 22px", background: loading || disabled ? "var(--hf-text-faint)" : "var(--hf-indigo)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || disabled ? "not-allowed" : "pointer" }}>{loading ? "Saving..." : label}</button></div>
 }
 function Sect({ title, children }: { title: string; children: React.ReactNode }) {
-  return <div style={{ marginBottom: 20 }}><div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.07em", textTransform: "uppercase" as const, marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #F1F5F9" }}>{title}</div>{children}</div>
+  return <div style={{ marginBottom: 20 }}><div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", letterSpacing: "0.07em", textTransform: "uppercase" as const, marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid var(--hf-border-subtle)" }}>{title}</div>{children}</div>
 }
 function ErrBanner({ msg }: { msg: string }) {
-  return <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{msg}</div>
+  return <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{msg}</div>
 }
 const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
 const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }

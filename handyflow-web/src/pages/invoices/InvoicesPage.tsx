@@ -26,12 +26,12 @@ interface Invoice {
 }
 
 const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }> = {
-  DRAFT:     { bg: '#F1F5F9', color: '#475569', label: 'Draft'     },
-  ISSUED:    { bg: '#EFF6FF', color: '#1D4ED8', label: 'Issued'    },
-  SENT:      { bg: '#EFF6FF', color: '#1D4ED8', label: 'Sent'      },
-  PAID:      { bg: '#F0FDF4', color: '#166534', label: 'Paid'      },
-  OVERDUE:   { bg: '#FEF2F2', color: '#DC2626', label: 'Overdue'   },
-  CANCELLED: { bg: '#F8FAFC', color: '#94A3B8', label: 'Cancelled' },
+  DRAFT:     { bg: 'var(--hf-surface-sunken)', color: 'var(--hf-text-tertiary)', label: 'Draft'     },
+  ISSUED:    { bg: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', label: 'Issued'    },
+  SENT:      { bg: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', label: 'Sent'      },
+  PAID:      { bg: 'var(--hf-success-soft)', color: 'var(--hf-success-text-strong)', label: 'Paid'      },
+  OVERDUE:   { bg: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', label: 'Overdue'   },
+  CANCELLED: { bg: 'var(--hf-surface-muted)', color: 'var(--hf-text-faint)', label: 'Cancelled' },
 }
 
 function fmtR(n: number | null | undefined) {
@@ -106,21 +106,21 @@ export function InvoicesPage() {
 
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', margin: '0 0 4px' }}>Invoices</h1>
-        <p style={{ fontSize: 13, color: '#94A3B8', margin: 0 }}>Tax invoices generated from accepted quotes</p>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 4px' }}>Invoices</h1>
+        <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0 }}>Tax invoices generated from accepted quotes</p>
       </div>
 
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
         {[
-          { label: 'Total invoices',  value: invoices.length,  fmt: false, color: '#1B3A6B' },
-          { label: 'Paid',            value: invoices.filter(i => i.status === 'PAID').length, fmt: false, color: '#166534' },
-          { label: 'Total revenue',   value: fmtR(totalRevenue),    fmt: true, color: '#0D9488' },
-          { label: 'Outstanding',     value: fmtR(totalOutstanding), fmt: true, color: overdueCount > 0 ? '#DC2626' : '#D97706' },
+          { label: 'Total invoices',  value: invoices.length,  fmt: false, color: 'var(--hf-primary-text)' },
+          { label: 'Paid',            value: invoices.filter(i => i.status === 'PAID').length, fmt: false, color: 'var(--hf-success-text-strong)' },
+          { label: 'Total revenue',   value: fmtR(totalRevenue),    fmt: true, color: 'var(--hf-accent-text)' },
+          { label: 'Outstanding',     value: fmtR(totalOutstanding), fmt: true, color: overdueCount > 0 ? 'var(--hf-danger-text)' : 'var(--hf-warning-text)' },
         ].map(s => (
-          <div key={s.label} style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 12, padding: '16px 20px' }}>
+          <div key={s.label} style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '16px 20px' }}>
             <div style={{ fontSize: s.fmt ? 18 : 26, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 12, color: '#64748B', marginTop: 3 }}>{s.label}</div>
+            <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 3 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -130,8 +130,8 @@ export function InvoicesPage() {
         {['ALL', 'DRAFT', 'ISSUED', 'PAID', 'OVERDUE', 'CANCELLED'].map(s => (
           <button key={s} onClick={() => setStatusFilter(s)}
             style={{ padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
-              background: statusFilter === s ? '#1B3A6B' : '#F1F5F9',
-              color:      statusFilter === s ? 'white'   : '#64748B',
+              background: statusFilter === s ? 'var(--hf-primary)' : 'var(--hf-surface-sunken)',
+              color:      statusFilter === s ? 'white'   : 'var(--hf-text-muted)',
             }}>
             {s === 'ALL' ? 'All' : (STATUS_STYLES[s]?.label ?? s)}
             {s !== 'ALL' && ` (${invoices.filter(i => i.status === s).length})`}
@@ -140,21 +140,21 @@ export function InvoicesPage() {
       </div>
 
       {/* Table */}
-      <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
         {isLoading ? (
-          <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8' }}>Loading invoices...</div>
+          <div style={{ padding: 60, textAlign: 'center', color: 'var(--hf-text-faint)' }}>Loading invoices...</div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8' }}>
+          <div style={{ padding: 60, textAlign: 'center', color: 'var(--hf-text-faint)' }}>
             <FileText size={36} style={{ marginBottom: 12, opacity: 0.3 }} />
-            <div style={{ fontWeight: 600, color: '#475569', marginBottom: 4 }}>No invoices</div>
+            <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)', marginBottom: 4 }}>No invoices</div>
             <div style={{ fontSize: 13 }}>Convert an accepted quote to generate an invoice.</div>
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
+              <tr style={{ borderBottom: '1px solid var(--hf-border-subtle)', background: 'var(--hf-surface-muted)' }}>
                 {['Invoice #', 'Customer', 'Issued', 'Due', 'Total', 'Status', 'Actions'].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                  <th key={h} style={{ textAlign: 'left', padding: '11px 16px', fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -166,25 +166,25 @@ export function InvoicesPage() {
                   <>
                     <tr key={inv.id}
                       onClick={() => setExpanded(isExpanded ? null : inv.id)}
-                      style={{ borderBottom: '1px solid #F8FAFC', cursor: 'pointer', background: isExpanded ? '#FAFBFF' : 'white' }}
-                      onMouseEnter={e => { if (!isExpanded) (e.currentTarget as HTMLElement).style.background = '#F8FAFC' }}
+                      style={{ borderBottom: '1px solid var(--hf-border-subtle)', cursor: 'pointer', background: isExpanded ? 'var(--hf-surface-muted)' : 'white' }}
+                      onMouseEnter={e => { if (!isExpanded) (e.currentTarget as HTMLElement).style.background = 'var(--hf-surface-muted)' }}
                       onMouseLeave={e => { if (!isExpanded) (e.currentTarget as HTMLElement).style.background = 'white' }}
                     >
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <FileText size={14} color="#0D9488" />
-                          <span style={{ fontWeight: 700, fontSize: 14, color: '#0F172A' }}>{inv.invoiceNumber}</span>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)' }}>{inv.invoiceNumber}</span>
                           {isExpanded ? <ChevronUp size={13} color="#94A3B8" /> : <ChevronDown size={13} color="#94A3B8" />}
                         </div>
                       </td>
-                      <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                      <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)' }}>
                         {customerMap[inv.customerId] ?? inv.customerId.slice(0, 8) + '…'}
                       </td>
-                      <td style={{ padding: '14px 16px', fontSize: 13, color: '#64748B' }}>{fmtDate(inv.issuedAt)}</td>
-                      <td style={{ padding: '14px 16px', fontSize: 13, color: inv.status === 'OVERDUE' ? '#DC2626' : '#64748B' }}>
+                      <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--hf-text-muted)' }}>{fmtDate(inv.issuedAt)}</td>
+                      <td style={{ padding: '14px 16px', fontSize: 13, color: inv.status === 'OVERDUE' ? 'var(--hf-danger-text)' : 'var(--hf-text-muted)' }}>
                         {fmtDate(inv.dueDate)}
                       </td>
-                      <td style={{ padding: '14px 16px', fontSize: 14, fontWeight: 700, color: '#0F172A' }}>{fmtR(inv.total)}</td>
+                      <td style={{ padding: '14px 16px', fontSize: 14, fontWeight: 700, color: 'var(--hf-text)' }}>{fmtR(inv.total)}</td>
                       <td style={{ padding: '14px 16px' }}>
                         <span style={{ background: ss.bg, color: ss.color, padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
                           {ss.label}
@@ -197,7 +197,7 @@ export function InvoicesPage() {
                             <button
                               disabled={issueInvoice.isPending}
                               onClick={() => issueInvoice.mutate(inv.id)}
-                              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', border: '1px solid var(--hf-info-border)', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                               <Send size={12} /> Issue
                             </button>
                           )}
@@ -205,7 +205,7 @@ export function InvoicesPage() {
                           {['ISSUED', 'SENT', 'OVERDUE'].includes(inv.status) && (
                             <button
                               onClick={() => { setPayModal(inv); setPayForm(f => ({ ...f, amount: String(inv.total) })) }}
-                              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: 'var(--hf-success-soft)', color: 'var(--hf-success-text-strong)', border: '1px solid var(--hf-success-border-subtle)', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                               <CheckCircle size={12} /> Mark paid
                             </button>
                           )}
@@ -213,7 +213,7 @@ export function InvoicesPage() {
                           <button
                             disabled={downloading === inv.id}
                             onClick={() => downloadPdf(inv)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+                            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
                             <Download size={12} />
                             {downloading === inv.id ? '…' : 'PDF'}
                           </button>
@@ -225,24 +225,24 @@ export function InvoicesPage() {
                     {isExpanded && (
                       <tr key={`${inv.id}-lines`}>
                         <td colSpan={7} style={{ padding: 0 }}>
-                          <div style={{ background: '#F8FAFC', borderBottom: '1px solid #F1F5F9', padding: '16px 24px' }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.06em', marginBottom: 10 }}>LINE ITEMS</div>
+                          <div style={{ background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border-subtle)', padding: '16px 24px' }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', letterSpacing: '0.06em', marginBottom: 10 }}>LINE ITEMS</div>
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                               <thead>
-                                <tr style={{ borderBottom: '1px solid #E2E8F0' }}>
+                                <tr style={{ borderBottom: '1px solid var(--hf-border)' }}>
                                   {['Description', 'Qty', 'Unit Price', 'VAT %', 'Total'].map(h => (
-                                    <th key={h} style={{ textAlign: 'left', padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#64748B', textTransform: 'uppercase' as const }}>{h}</th>
+                                    <th key={h} style={{ textAlign: 'left', padding: '6px 12px', fontSize: 11, fontWeight: 600, color: 'var(--hf-text-muted)', textTransform: 'uppercase' as const }}>{h}</th>
                                   ))}
                                 </tr>
                               </thead>
                               <tbody>
                                 {inv.lineItems.map((li, i) => (
-                                  <tr key={i} style={{ borderBottom: i < inv.lineItems.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
-                                    <td style={{ padding: '8px 12px', color: '#374151' }}>{li.description}</td>
-                                    <td style={{ padding: '8px 12px', color: '#64748B' }}>{li.quantity}</td>
-                                    <td style={{ padding: '8px 12px', color: '#64748B' }}>{fmtR(li.unitPrice)}</td>
-                                    <td style={{ padding: '8px 12px', color: '#64748B' }}>{li.vatRate ?? 15}%</td>
-                                    <td style={{ padding: '8px 12px', fontWeight: 600, color: '#0F172A' }}>{fmtR(li.lineTotal)}</td>
+                                  <tr key={i} style={{ borderBottom: i < inv.lineItems.length - 1 ? '1px solid var(--hf-border-subtle)' : 'none' }}>
+                                    <td style={{ padding: '8px 12px', color: 'var(--hf-text-secondary)' }}>{li.description}</td>
+                                    <td style={{ padding: '8px 12px', color: 'var(--hf-text-muted)' }}>{li.quantity}</td>
+                                    <td style={{ padding: '8px 12px', color: 'var(--hf-text-muted)' }}>{fmtR(li.unitPrice)}</td>
+                                    <td style={{ padding: '8px 12px', color: 'var(--hf-text-muted)' }}>{li.vatRate ?? 15}%</td>
+                                    <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--hf-text)' }}>{fmtR(li.lineTotal)}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -250,11 +250,11 @@ export function InvoicesPage() {
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
                               <div style={{ minWidth: 240 }}>
                                 {[['Subtotal', fmtR(inv.subtotal)], ['VAT (15%)', fmtR(inv.vatTotal)]].map(([label, value]) => (
-                                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, color: '#64748B' }}>
+                                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, color: 'var(--hf-text-muted)' }}>
                                     <span>{label}</span><span>{value}</span>
                                   </div>
                                 ))}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 0', fontSize: 15, fontWeight: 700, color: '#0F172A', borderTop: '1px solid #E2E8F0', marginTop: 4 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 0', fontSize: 15, fontWeight: 700, color: 'var(--hf-text)', borderTop: '1px solid var(--hf-border)', marginTop: 4 }}>
                                   <span>Total</span><span>{fmtR(inv.total)}</span>
                                 </div>
                               </div>
@@ -277,10 +277,10 @@ export function InvoicesPage() {
           <div style={{ background: 'white', borderRadius: 16, padding: 28, width: 460, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>Mark as Paid</h3>
-                <p style={{ margin: '3px 0 0', fontSize: 13, color: '#94A3B8' }}>{payModal.invoiceNumber} · {fmtR(payModal.total)}</p>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>Mark as Paid</h3>
+                <p style={{ margin: '3px 0 0', fontSize: 13, color: 'var(--hf-text-faint)' }}>{payModal.invoiceNumber} · {fmtR(payModal.total)}</p>
               </div>
-              <button onClick={() => setPayModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}><X size={20} /></button>
+              <button onClick={() => setPayModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)' }}><X size={20} /></button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -305,7 +305,7 @@ export function InvoicesPage() {
 
             <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
               <button onClick={() => setPayModal(null)}
-                style={{ padding: '10px 18px', border: '1px solid #E2E8F0', borderRadius: 9, background: 'white', fontSize: 14, cursor: 'pointer', color: '#374151' }}>
+                style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'white', fontSize: 14, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
                 Cancel
               </button>
               <button
@@ -314,7 +314,7 @@ export function InvoicesPage() {
                   id: payModal.id,
                   body: { amount: Number(payForm.amount), paymentMethod: payForm.paymentMethod, reference: payForm.reference, note: payForm.note },
                 })}
-                style={{ padding: '10px 22px', background: '#16A34A', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                style={{ padding: '10px 22px', background: 'var(--hf-success)', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
                 {markPaid.isPending ? 'Saving...' : '✓ Confirm payment'}
               </button>
             </div>
@@ -328,13 +328,13 @@ export function InvoicesPage() {
 function MField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>{label}</label>
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 5 }}>{label}</label>
       {children}
     </div>
   )
 }
 
 const inp: React.CSSProperties = {
-  width: '100%', padding: '10px 12px', border: '1.5px solid #E2E8F0',
+  width: '100%', padding: '10px 12px', border: '1.5px solid var(--hf-border)',
   borderRadius: 9, fontSize: 14, boxSizing: 'border-box' as const, background: 'white',
 }

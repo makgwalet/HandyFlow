@@ -21,7 +21,7 @@ interface ImportResult { imported: number; skippedDuplicates: number; failed: nu
 const fmtR  = (n: number) => `R ${(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
 const fmtDt = (d: string) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
 const inp: React.CSSProperties = {
-  width: "100%", padding: "8px 12px", border: "1.5px solid #E2E8F0",
+  width: "100%", padding: "8px 12px", border: "1.5px solid var(--hf-border)",
   borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box",
 }
 
@@ -186,30 +186,30 @@ export default function BankAccountsTab() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#0F172A", margin: 0 }}>Bank Accounts</h2>
-          <p style={{ fontSize: 12, color: "#94A3B8", margin: "3px 0 0" }}>
-            Total cash position: <strong style={{ color: totalBalance >= 0 ? "#166534" : "#DC2626" }}>{fmtR(totalBalance)}</strong>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Bank Accounts</h2>
+          <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "3px 0 0" }}>
+            Total cash position: <strong style={{ color: totalBalance >= 0 ? "var(--hf-success-text-strong)" : "var(--hf-danger-text)" }}>{fmtR(totalBalance)}</strong>
           </p>
         </div>
         <button onClick={() => { setShowCreate(true); setError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 6, background: "#1B3A6B", color: "white",
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-primary)", color: "white",
             border: "none", borderRadius: 9, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={14} /> Add Bank Account
         </button>
       </div>
 
       {isLoading ? (
-        <div style={{ padding: 60, textAlign: "center", color: "#94A3B8" }}>Loading bank accounts...</div>
+        <div style={{ padding: 60, textAlign: "center", color: "var(--hf-text-faint)" }}>Loading bank accounts...</div>
       ) : accounts.length === 0 ? (
-        <div style={{ padding: 60, textAlign: "center", color: "#94A3B8", background: "white",
-          border: "1px solid #E2E8F0", borderRadius: 12 }}>
+        <div style={{ padding: 60, textAlign: "center", color: "var(--hf-text-faint)", background: "white",
+          border: "1px solid var(--hf-border)", borderRadius: 12 }}>
           No bank accounts yet — add one to start tracking your cash position.
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
           {accounts.map(acc => (
             <div key={acc.id}
-              style={{ background: "#1B3A6B", borderRadius: 14, padding: "20px 22px", cursor: "pointer",
+              style={{ background: "var(--hf-primary)", borderRadius: 14, padding: "20px 22px", cursor: "pointer",
                 boxShadow: "0 2px 8px rgba(27,58,107,0.15)" }}
               onClick={() => setShowTx(acc)}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
@@ -238,7 +238,7 @@ export default function BankAccountsTab() {
           justifyContent: "flex-end", zIndex: 1000, backdropFilter: "blur(2px)" }}>
           <div style={{ background: "white", width: 560, height: "100%", overflowY: "auto",
             boxShadow: "-4px 0 24px rgba(0,0,0,0.12)" }}>
-            <div style={{ background: "#1B3A6B", padding: "20px 24px", display: "flex",
+            <div style={{ background: "var(--hf-primary)", padding: "20px 24px", display: "flex",
               justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: "white" }}>{showTx.accountName}</div>
@@ -249,21 +249,21 @@ export default function BankAccountsTab() {
                 <X size={20} />
               </button>
             </div>
-            <div style={{ padding: 20, borderBottom: "1px solid #F1F5F9", display: "flex",
+            <div style={{ padding: 20, borderBottom: "1px solid var(--hf-border-subtle)", display: "flex",
               justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div style={{ fontSize: 11, color: "#94A3B8" }}>Current Balance</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: showTx.currentBalance >= 0 ? "#166534" : "#DC2626" }}>
+                <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>Current Balance</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: showTx.currentBalance >= 0 ? "var(--hf-success-text-strong)" : "var(--hf-danger-text)" }}>
                   {fmtR(showTx.currentBalance)}
                 </div>
-                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2, display: "flex", alignItems: "center", gap: 5 }}>
+                <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 2, display: "flex", alignItems: "center", gap: 5 }}>
                   {showTx.lowBalanceThreshold != null ? (
                     <>Low-balance alert at {fmtR(showTx.lowBalanceThreshold)}</>
                   ) : (
                     <>No low-balance alert set</>
                   )}
                   <button onClick={() => { setShowThreshold(true); setThresholdInput(showTx.lowBalanceThreshold?.toString() ?? ""); setError("") }}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "#7C3AED",
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-violet-text)",
                       fontSize: 11, fontWeight: 600, padding: 0, textDecoration: "underline" }}>
                     {showTx.lowBalanceThreshold != null ? "Change" : "Set alert"}
                   </button>
@@ -271,12 +271,12 @@ export default function BankAccountsTab() {
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => { setShowImport(true); setError(""); setImportResult(null) }}
-                  style={{ display: "flex", alignItems: "center", gap: 5, background: "white", color: "#1B3A6B",
-                    border: "1.5px solid #1B3A6B", borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                  style={{ display: "flex", alignItems: "center", gap: 5, background: "white", color: "var(--hf-primary-text)",
+                    border: "1.5px solid var(--hf-primary)", borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                   <Upload size={12} /> Import CSV
                 </button>
                 <button onClick={() => { setShowAddTx(true); setError("") }}
-                  style={{ display: "flex", alignItems: "center", gap: 5, background: "#0D9488", color: "white",
+                  style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-accent)", color: "white",
                     border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                   <Plus size={12} /> Add Transaction
                 </button>
@@ -284,34 +284,34 @@ export default function BankAccountsTab() {
             </div>
 
             {showTx.lowBalanceThreshold != null && showTx.currentBalance < showTx.lowBalanceThreshold && (
-              <div style={{ padding: "10px 20px", background: "#FEF2F2", borderBottom: "1px solid #FECACA",
+              <div style={{ padding: "10px 20px", background: "var(--hf-danger-soft)", borderBottom: "1px solid var(--hf-danger-border)",
                 display: "flex", alignItems: "center", gap: 8 }}>
                 <BellRing size={13} color="#DC2626" />
-                <span style={{ fontSize: 12, color: "#DC2626" }}>
+                <span style={{ fontSize: 12, color: "var(--hf-danger-text)" }}>
                   <strong>Below threshold.</strong> A daily alert email will keep sending until the balance recovers or the threshold is changed.
                 </span>
               </div>
             )}
 
             {showThreshold && (
-              <div style={{ padding: 16, background: "#F5F3FF", borderBottom: "1px solid #DDD6FE" }}>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 5 }}>
+              <div style={{ padding: 16, background: "var(--hf-violet-soft)", borderBottom: "1px solid var(--hf-violet-border)" }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 5 }}>
                   Alert when balance drops below (leave blank to disable)
                 </label>
                 <input type="number" value={thresholdInput} onChange={e => setThresholdInput(e.target.value)}
                   placeholder="e.g. 10000" style={{ ...inp, marginBottom: 10 }} />
                 {error && (
-                  <div style={{ padding: "8px 10px", background: "#FEF2F2", borderRadius: 7,
-                    fontSize: 12, color: "#DC2626", marginBottom: 10 }}>{error}</div>
+                  <div style={{ padding: "8px 10px", background: "var(--hf-danger-soft)", borderRadius: 7,
+                    fontSize: 12, color: "var(--hf-danger-text)", marginBottom: 10 }}>{error}</div>
                 )}
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                   <button onClick={() => setShowThreshold(false)}
-                    style={{ padding: "7px 14px", border: "1px solid #E2E8F0", borderRadius: 7,
-                      background: "white", fontSize: 12, cursor: "pointer", color: "#374151" }}>Cancel</button>
+                    style={{ padding: "7px 14px", border: "1px solid var(--hf-border)", borderRadius: 7,
+                      background: "white", fontSize: 12, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
                   <button disabled={setThreshold.isPending}
                     onClick={() => setThreshold.mutate()}
                     style={{ padding: "7px 14px", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600,
-                      background: "#7C3AED", color: "white", cursor: "pointer" }}>
+                      background: "var(--hf-violet)", color: "white", cursor: "pointer" }}>
                     {setThreshold.isPending ? "Saving..." : "Save"}
                   </button>
                 </div>
@@ -319,15 +319,15 @@ export default function BankAccountsTab() {
             )}
 
             {!showTx.accountId && (
-              <div style={{ padding: "12px 20px", background: "#FEF3C7", borderBottom: "1px solid #FDE68A",
+              <div style={{ padding: "12px 20px", background: "var(--hf-warning-soft-strong)", borderBottom: "1px solid var(--hf-warning-border)",
                 display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ fontSize: 12, color: "#92400E" }}>
+                <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>
                   <strong>Not linked to the Chart of Accounts.</strong> Reconciliation can't search for matching
                   journal entries until this is linked to the GL account it represents.
                 </div>
                 <button onClick={() => { setShowLinkAccount(true); setError("") }}
-                  style={{ padding: "6px 12px", border: "1.5px solid #92400E", borderRadius: 7,
-                    background: "white", fontSize: 11, fontWeight: 700, color: "#92400E", cursor: "pointer",
+                  style={{ padding: "6px 12px", border: "1.5px solid var(--hf-warning-text-deep)", borderRadius: 7,
+                    background: "white", fontSize: 11, fontWeight: 700, color: "var(--hf-warning-text-deep)", cursor: "pointer",
                     whiteSpace: "nowrap" as const, marginLeft: 12 }}>
                   Link now
                 </button>
@@ -335,8 +335,8 @@ export default function BankAccountsTab() {
             )}
 
             {showLinkAccount && (
-              <div style={{ padding: 16, background: "#FFFBEB", borderBottom: "1px solid #FDE68A" }}>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 5 }}>
+              <div style={{ padding: 16, background: "var(--hf-warning-soft)", borderBottom: "1px solid var(--hf-warning-border)" }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 5 }}>
                   Which Chart of Accounts entry is this bank account? *
                 </label>
                 <select value={linkAccountId} onChange={e => setLinkAccountId(e.target.value)} style={{ ...inp, marginBottom: 10 }}>
@@ -346,17 +346,17 @@ export default function BankAccountsTab() {
                   ))}
                 </select>
                 {error && (
-                  <div style={{ padding: "8px 10px", background: "#FEF2F2", borderRadius: 7,
-                    fontSize: 12, color: "#DC2626", marginBottom: 10 }}>{error}</div>
+                  <div style={{ padding: "8px 10px", background: "var(--hf-danger-soft)", borderRadius: 7,
+                    fontSize: 12, color: "var(--hf-danger-text)", marginBottom: 10 }}>{error}</div>
                 )}
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                   <button onClick={() => { setShowLinkAccount(false); setLinkAccountId("") }}
-                    style={{ padding: "7px 14px", border: "1px solid #E2E8F0", borderRadius: 7,
-                      background: "white", fontSize: 12, cursor: "pointer", color: "#374151" }}>Cancel</button>
+                    style={{ padding: "7px 14px", border: "1px solid var(--hf-border)", borderRadius: 7,
+                      background: "white", fontSize: 12, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
                   <button disabled={!linkAccountId || linkAccount.isPending}
                     onClick={() => linkAccount.mutate()}
                     style={{ padding: "7px 14px", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600,
-                      background: "#92400E", color: "white", cursor: "pointer", opacity: !linkAccountId ? 0.5 : 1 }}>
+                      background: "var(--hf-warning-text-deep)", color: "white", cursor: "pointer", opacity: !linkAccountId ? 0.5 : 1 }}>
                     {linkAccount.isPending ? "Linking..." : "Link account"}
                   </button>
                 </div>
@@ -365,9 +365,9 @@ export default function BankAccountsTab() {
 
 
             {showImport && (
-              <div style={{ padding: 16, background: "#EFF6FF", borderBottom: "1px solid #E2E8F0" }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 6 }}>Import bank statement (CSV)</div>
-                <div style={{ fontSize: 11, color: "#64748B", marginBottom: 12 }}>
+              <div style={{ padding: 16, background: "var(--hf-info-soft)", borderBottom: "1px solid var(--hf-border)" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 6 }}>Import bank statement (CSV)</div>
+                <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginBottom: 12 }}>
                   4 columns with a header row: Date, Description, Reference, Amount. Amount is signed —
                   positive = money in, negative = money out. Duplicate rows are skipped automatically.
                 </div>
@@ -376,17 +376,17 @@ export default function BankAccountsTab() {
                     <input type="file" accept=".csv,text/csv" onChange={handleImportFile}
                       style={{ fontSize: 12, marginBottom: 12 }} />
                     {error && (
-                      <div style={{ padding: "8px 10px", background: "#FEF2F2", borderRadius: 7,
-                        fontSize: 12, color: "#DC2626", marginBottom: 10 }}>{error}</div>
+                      <div style={{ padding: "8px 10px", background: "var(--hf-danger-soft)", borderRadius: 7,
+                        fontSize: 12, color: "var(--hf-danger-text)", marginBottom: 10 }}>{error}</div>
                     )}
                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                       <button onClick={() => { setShowImport(false); setImportFileName(""); setImportCsvBase64("") }}
-                        style={{ padding: "7px 14px", border: "1px solid #E2E8F0", borderRadius: 7,
-                          background: "white", fontSize: 12, cursor: "pointer", color: "#374151" }}>Cancel</button>
+                        style={{ padding: "7px 14px", border: "1px solid var(--hf-border)", borderRadius: 7,
+                          background: "white", fontSize: 12, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
                       <button disabled={!importCsvBase64 || importTx.isPending}
                         onClick={() => importTx.mutate()}
                         style={{ padding: "7px 14px", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600,
-                          background: "#1B3A6B", color: "white", cursor: "pointer",
+                          background: "var(--hf-primary)", color: "white", cursor: "pointer",
                           opacity: !importCsvBase64 ? 0.5 : 1 }}>
                         {importTx.isPending ? "Importing..." : `Import ${importFileName || "file"}`}
                       </button>
@@ -395,31 +395,31 @@ export default function BankAccountsTab() {
                 ) : (
                   <>
                     <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-                      <div style={{ flex: 1, background: "#F0FDF4", borderRadius: 8, padding: "10px 12px" }}>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: "#166534" }}>{importResult.imported}</div>
-                        <div style={{ fontSize: 10, color: "#166534" }}>Imported</div>
+                      <div style={{ flex: 1, background: "var(--hf-success-soft)", borderRadius: 8, padding: "10px 12px" }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "var(--hf-success-text-strong)" }}>{importResult.imported}</div>
+                        <div style={{ fontSize: 10, color: "var(--hf-success-text-strong)" }}>Imported</div>
                       </div>
-                      <div style={{ flex: 1, background: "#FFFBEB", borderRadius: 8, padding: "10px 12px" }}>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: "#92400E" }}>{importResult.skippedDuplicates}</div>
-                        <div style={{ fontSize: 10, color: "#92400E" }}>Skipped (duplicate)</div>
+                      <div style={{ flex: 1, background: "var(--hf-warning-soft)", borderRadius: 8, padding: "10px 12px" }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "var(--hf-warning-text-deep)" }}>{importResult.skippedDuplicates}</div>
+                        <div style={{ fontSize: 10, color: "var(--hf-warning-text-deep)" }}>Skipped (duplicate)</div>
                       </div>
-                      <div style={{ flex: 1, background: importResult.failed > 0 ? "#FEF2F2" : "#F8FAFC", borderRadius: 8, padding: "10px 12px" }}>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: importResult.failed > 0 ? "#DC2626" : "#94A3B8" }}>{importResult.failed}</div>
-                        <div style={{ fontSize: 10, color: importResult.failed > 0 ? "#DC2626" : "#94A3B8" }}>Failed</div>
+                      <div style={{ flex: 1, background: importResult.failed > 0 ? "var(--hf-danger-soft)" : "var(--hf-surface-muted)", borderRadius: 8, padding: "10px 12px" }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: importResult.failed > 0 ? "var(--hf-danger-text)" : "var(--hf-text-faint)" }}>{importResult.failed}</div>
+                        <div style={{ fontSize: 10, color: importResult.failed > 0 ? "var(--hf-danger-text)" : "var(--hf-text-faint)" }}>Failed</div>
                       </div>
                     </div>
                     {importResult.errors.length > 0 && (
-                      <div style={{ maxHeight: 100, overflowY: "auto", background: "#FEF2F2", borderRadius: 7,
+                      <div style={{ maxHeight: 100, overflowY: "auto", background: "var(--hf-danger-soft)", borderRadius: 7,
                         padding: "8px 10px", marginBottom: 12 }}>
                         {importResult.errors.map((e, i) => (
-                          <div key={i} style={{ fontSize: 11, color: "#DC2626" }}>{e}</div>
+                          <div key={i} style={{ fontSize: 11, color: "var(--hf-danger-text)" }}>{e}</div>
                         ))}
                       </div>
                     )}
                     <div style={{ display: "flex", justifyContent: "flex-end" }}>
                       <button onClick={() => { setShowImport(false); setImportResult(null) }}
                         style={{ padding: "7px 14px", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600,
-                          background: "#1B3A6B", color: "white", cursor: "pointer" }}>Done</button>
+                          background: "var(--hf-primary)", color: "white", cursor: "pointer" }}>Done</button>
                     </div>
                   </>
                 )}
@@ -427,16 +427,16 @@ export default function BankAccountsTab() {
             )}
 
             {showAddTx && (
-              <div style={{ padding: 16, background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 12 }}>New Transaction</div>
+              <div style={{ padding: 16, background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border)" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 12 }}>New Transaction</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                   <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 4 }}>Date</label>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 4 }}>Date</label>
                     <input type="date" value={txForm.transactionDate}
                       onChange={e => setTxForm(p => ({ ...p, transactionDate: e.target.value }))} style={inp} />
                   </div>
                   <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 4 }}>Type</label>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 4 }}>Type</label>
                     <select value={txForm.transactionType}
                       onChange={e => setTxForm(p => ({ ...p, transactionType: e.target.value }))}
                       style={{ ...inp }}>
@@ -446,35 +446,35 @@ export default function BankAccountsTab() {
                   </div>
                 </div>
                 <div style={{ marginBottom: 10 }}>
-                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 4 }}>Description *</label>
+                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 4 }}>Description *</label>
                   <input value={txForm.description} onChange={e => setTxForm(p => ({ ...p, description: e.target.value }))}
                     placeholder="e.g. Client payment — INV-001" style={inp} />
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
                   <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 4 }}>Amount (R) *</label>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 4 }}>Amount (R) *</label>
                     <input type="number" value={txForm.amount}
                       onChange={e => setTxForm(p => ({ ...p, amount: e.target.value }))}
                       placeholder="0.00" style={inp} />
                   </div>
                   <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 4 }}>Reference</label>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 4 }}>Reference</label>
                     <input value={txForm.reference} onChange={e => setTxForm(p => ({ ...p, reference: e.target.value }))}
                       placeholder="e.g. EFT-001" style={inp} />
                   </div>
                 </div>
                 {error && (
-                  <div style={{ padding: "8px 10px", background: "#FEF2F2", borderRadius: 7,
-                    fontSize: 12, color: "#DC2626", marginBottom: 10 }}>{error}</div>
+                  <div style={{ padding: "8px 10px", background: "var(--hf-danger-soft)", borderRadius: 7,
+                    fontSize: 12, color: "var(--hf-danger-text)", marginBottom: 10 }}>{error}</div>
                 )}
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                   <button onClick={() => setShowAddTx(false)}
-                    style={{ padding: "7px 14px", border: "1px solid #E2E8F0", borderRadius: 7,
-                      background: "white", fontSize: 12, cursor: "pointer", color: "#374151" }}>Cancel</button>
+                    style={{ padding: "7px 14px", border: "1px solid var(--hf-border)", borderRadius: 7,
+                      background: "white", fontSize: 12, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
                   <button disabled={addTx.isPending || !txForm.description || !txForm.amount}
                     onClick={() => addTx.mutate()}
                     style={{ padding: "7px 14px", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600,
-                      background: "#0D9488", color: "white", cursor: "pointer" }}>
+                      background: "var(--hf-accent)", color: "white", cursor: "pointer" }}>
                     {addTx.isPending ? "Saving..." : "Record Transaction"}
                   </button>
                 </div>
@@ -483,23 +483,23 @@ export default function BankAccountsTab() {
 
             <div style={{ padding: "0 20px" }}>
               {!txData || txData.length === 0 ? (
-                <div style={{ padding: 40, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>
+                <div style={{ padding: 40, textAlign: "center", color: "var(--hf-text-faint)", fontSize: 13 }}>
                   No transactions yet
                 </div>
               ) : txData.map((tx, i) => (
-                <div key={tx.id} style={{ padding: "14px 0", borderBottom: i < txData.length - 1 ? "1px solid #F1F5F9" : "none",
+                <div key={tx.id} style={{ padding: "14px 0", borderBottom: i < txData.length - 1 ? "1px solid var(--hf-border-subtle)" : "none",
                   display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div style={{ width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center",
                       justifyContent: "center",
-                      background: tx.transactionType === "CREDIT" ? "#F0FDF4" : "#FEF2F2" }}>
+                      background: tx.transactionType === "CREDIT" ? "var(--hf-success-soft)" : "var(--hf-danger-soft)" }}>
                       {tx.transactionType === "CREDIT"
                         ? <TrendingUp size={14} color="#166534" />
                         : <TrendingDown size={14} color="#DC2626" />}
                     </div>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{tx.description}</div>
-                      <div style={{ fontSize: 11, color: "#94A3B8" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{tx.description}</div>
+                      <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>
                         {fmtDt(tx.transactionDate)}{tx.reference ? ` · ${tx.reference}` : ""}
                       </div>
                     </div>
@@ -507,21 +507,21 @@ export default function BankAccountsTab() {
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontSize: 14, fontWeight: 700,
-                        color: tx.transactionType === "CREDIT" ? "#166534" : "#DC2626" }}>
+                        color: tx.transactionType === "CREDIT" ? "var(--hf-success-text-strong)" : "var(--hf-danger-text)" }}>
                         {tx.transactionType === "CREDIT" ? "+" : "-"}{fmtR(tx.amount)}
                       </div>
-                      <div style={{ fontSize: 11, color: "#94A3B8" }}>Balance: {fmtR(tx.balanceAfter)}</div>
+                      <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>Balance: {fmtR(tx.balanceAfter)}</div>
                     </div>
                     {tx.reconciled ? (
                       <span title="Reconciled" style={{ display: "flex", alignItems: "center", gap: 4,
-                        fontSize: 11, fontWeight: 600, color: "#166534", background: "#F0FDF4",
+                        fontSize: 11, fontWeight: 600, color: "var(--hf-success-text-strong)", background: "var(--hf-success-soft)",
                         padding: "4px 8px", borderRadius: 20 }}>
                         <CheckCircle size={11} /> Reconciled
                       </span>
                     ) : (
                       <button onClick={() => { setReconcileTx(tx); setReconcileMode("match"); setError("") }}
                         style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600,
-                          color: "#7C3AED", background: "#F5F3FF", border: "1px solid #DDD6FE",
+                          color: "var(--hf-violet-text)", background: "var(--hf-violet-soft)", border: "1px solid var(--hf-violet-border)",
                           padding: "4px 10px", borderRadius: 20, cursor: "pointer" }}>
                         <Link2 size={11} /> Reconcile
                       </button>
@@ -543,49 +543,49 @@ export default function BankAccountsTab() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Reconcile transaction</h3>
-                <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>
+                <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--hf-text-faint)" }}>
                   {reconcileTx.description} · {fmtDt(reconcileTx.transactionDate)} ·{" "}
-                  <strong style={{ color: reconcileTx.transactionType === "CREDIT" ? "#166534" : "#DC2626" }}>
+                  <strong style={{ color: reconcileTx.transactionType === "CREDIT" ? "var(--hf-success-text-strong)" : "var(--hf-danger-text)" }}>
                     {reconcileTx.transactionType === "CREDIT" ? "+" : "-"}{fmtR(reconcileTx.amount)}
                   </strong>
                 </p>
               </div>
               <button onClick={() => setReconcileTx(null)}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={18} /></button>
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}><X size={18} /></button>
             </div>
 
             <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
               <button onClick={() => setReconcileMode("match")}
                 style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                  background: reconcileMode === "match" ? "#7C3AED" : "#F1F5F9",
-                  color: reconcileMode === "match" ? "white" : "#64748B" }}>
+                  background: reconcileMode === "match" ? "var(--hf-violet)" : "var(--hf-surface-sunken)",
+                  color: reconcileMode === "match" ? "white" : "var(--hf-text-muted)" }}>
                 <Link2 size={12} style={{ marginRight: 5, verticalAlign: -2 }} />Match existing
               </button>
               <button onClick={() => setReconcileMode("new")}
                 style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                  background: reconcileMode === "new" ? "#7C3AED" : "#F1F5F9",
-                  color: reconcileMode === "new" ? "white" : "#64748B" }}>
+                  background: reconcileMode === "new" ? "var(--hf-violet)" : "var(--hf-surface-sunken)",
+                  color: reconcileMode === "new" ? "white" : "var(--hf-text-muted)" }}>
                 <FilePlus2 size={12} style={{ marginRight: 5, verticalAlign: -2 }} />Create new journal
               </button>
             </div>
 
             {error && (
-              <div style={{ padding: "8px 10px", background: "#FEF2F2", borderRadius: 7,
-                fontSize: 12, color: "#DC2626", marginBottom: 12 }}>{error}</div>
+              <div style={{ padding: "8px 10px", background: "var(--hf-danger-soft)", borderRadius: 7,
+                fontSize: 12, color: "var(--hf-danger-text)", marginBottom: 12 }}>{error}</div>
             )}
 
             {reconcileMode === "match" ? (
               candidatesLoading ? (
-                <div style={{ padding: 30, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>Searching for matching journal entries...</div>
+                <div style={{ padding: 30, textAlign: "center", color: "var(--hf-text-faint)", fontSize: 13 }}>Searching for matching journal entries...</div>
               ) : candidatesError ? (
-                <div style={{ padding: 20, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 9, textAlign: "center" as const }}>
-                  <div style={{ fontSize: 13, color: "#DC2626", fontWeight: 600, marginBottom: 4 }}>Couldn't search for matches</div>
-                  <div style={{ fontSize: 12, color: "#991B1B" }}>
+                <div style={{ padding: 20, background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 9, textAlign: "center" as const }}>
+                  <div style={{ fontSize: 13, color: "var(--hf-danger-text)", fontWeight: 600, marginBottom: 4 }}>Couldn't search for matches</div>
+                  <div style={{ fontSize: 12, color: "var(--hf-danger-text-strong)" }}>
                     {(candidatesErrorObj as any)?.response?.data?.message ?? "This bank account may not be linked to the Chart of Accounts yet — close this and use \"Link now\" first."}
                   </div>
                 </div>
               ) : matchCandidates.length === 0 ? (
-                <div style={{ padding: 30, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>
+                <div style={{ padding: 30, textAlign: "center", color: "var(--hf-text-faint)", fontSize: 13 }}>
                   No matching journal lines found within 30 days.<br />Try "Create new journal" instead.
                 </div>
               ) : (
@@ -594,19 +594,19 @@ export default function BankAccountsTab() {
                     <div key={c.journalLineId}
                       style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
                         padding: "10px 12px", border: `1.5px solid ${c.exactMatch ? "#86EFAC" : "#E2E8F0"}`,
-                        background: c.exactMatch ? "#F0FDF4" : "white", borderRadius: 9 }}>
+                        background: c.exactMatch ? "var(--hf-success-soft)" : "white", borderRadius: 9 }}>
                       <div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A", display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text)", display: "flex", alignItems: "center", gap: 6 }}>
                           {c.journalEntryNumber}
-                          {c.exactMatch && <span style={{ fontSize: 9, fontWeight: 700, color: "#166534", background: "#DCFCE7", padding: "1px 6px", borderRadius: 10 }}>EXACT MATCH</span>}
+                          {c.exactMatch && <span style={{ fontSize: 9, fontWeight: 700, color: "var(--hf-success-text-strong)", background: "var(--hf-success-soft-strong)", padding: "1px 6px", borderRadius: 10 }}>EXACT MATCH</span>}
                         </div>
-                        <div style={{ fontSize: 11, color: "#64748B" }}>{c.description}</div>
-                        <div style={{ fontSize: 11, color: "#94A3B8" }}>{fmtDt(c.entryDate)} · {fmtR(c.amount)}</div>
+                        <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{c.description}</div>
+                        <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{fmtDt(c.entryDate)} · {fmtR(c.amount)}</div>
                       </div>
                       <button disabled={reconcileExisting.isPending}
                         onClick={() => reconcileExisting.mutate(c.journalLineId)}
                         style={{ padding: "6px 12px", border: "none", borderRadius: 7, fontSize: 11, fontWeight: 600,
-                          background: "#166534", color: "white", cursor: "pointer" }}>
+                          background: "var(--hf-success-solid-strong)", color: "white", cursor: "pointer" }}>
                         Link
                       </button>
                     </div>
@@ -615,11 +615,11 @@ export default function BankAccountsTab() {
               )
             ) : (
               <div>
-                <div style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>
+                <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 12 }}>
                   No existing journal explains this transaction? Categorize it directly — the bank's own account
                   is filled in automatically on the correct side.
                 </div>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 5 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 5 }}>
                   Other account (the {reconcileTx.transactionType === "CREDIT" ? "income" : "expense"} this represents) *
                 </label>
                 <select value={newJournalAccountId} onChange={e => setNewJournalAccountId(e.target.value)} style={{ ...inp, marginBottom: 12 }}>
@@ -628,7 +628,7 @@ export default function BankAccountsTab() {
                     <option key={a.id} value={a.id}>{a.accountCode} — {a.accountName}</option>
                   ))}
                 </select>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 5 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 5 }}>
                   Description (optional — defaults to the transaction's own description)
                 </label>
                 <input value={newJournalDescription} onChange={e => setNewJournalDescription(e.target.value)}
@@ -637,7 +637,7 @@ export default function BankAccountsTab() {
                   <button disabled={!newJournalAccountId || reconcileNew.isPending}
                     onClick={() => reconcileNew.mutate()}
                     style={{ padding: "8px 16px", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                      background: "#166534", color: "white", cursor: "pointer", opacity: !newJournalAccountId ? 0.5 : 1 }}>
+                      background: "var(--hf-success-solid-strong)", color: "white", cursor: "pointer", opacity: !newJournalAccountId ? 0.5 : 1 }}>
                     {reconcileNew.isPending ? "Creating..." : "Create journal & reconcile"}
                   </button>
                 </div>
@@ -655,7 +655,7 @@ export default function BankAccountsTab() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Add Bank Account</h3>
               <button onClick={() => setShowCreate(false)}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={18} /></button>
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}><X size={18} /></button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {[
@@ -665,13 +665,13 @@ export default function BankAccountsTab() {
                 { label: "Branch Code", key: "branchCode", placeholder: "e.g. 250655" },
               ].map(f => (
                 <div key={f.key}>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 5 }}>{f.label}</label>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 5 }}>{f.label}</label>
                   <input value={(bankForm as any)[f.key]} placeholder={f.placeholder}
                     onChange={e => setBankForm(p => ({ ...p, [f.key]: e.target.value }))} style={inp} />
                 </div>
               ))}
               <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 5 }}>Account Type</label>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 5 }}>Account Type</label>
                 <select value={bankForm.accountType} onChange={e => setBankForm(p => ({ ...p, accountType: e.target.value }))} style={inp}>
                   <option value="CURRENT">Current / Cheque</option>
                   <option value="SAVINGS">Savings</option>
@@ -680,16 +680,16 @@ export default function BankAccountsTab() {
               </div>
             </div>
             {error && (
-              <div style={{ padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA",
-                borderRadius: 8, fontSize: 12, color: "#DC2626", marginTop: 12 }}>{error}</div>
+              <div style={{ padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)",
+                borderRadius: 8, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 12 }}>{error}</div>
             )}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setShowCreate(false)}
-                style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "white", fontSize: 13, cursor: "pointer", color: "#374151" }}>Cancel</button>
+                style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "white", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button disabled={createAccount.isPending || !bankForm.bankName || !bankForm.accountName || !bankForm.accountNumber}
                 onClick={() => createAccount.mutate()}
                 style={{ padding: "9px 20px", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700,
-                  background: "#1B3A6B", color: "white", cursor: "pointer" }}>
+                  background: "var(--hf-primary)", color: "white", cursor: "pointer" }}>
                 {createAccount.isPending ? "Adding..." : "Add Account"}
               </button>
             </div>

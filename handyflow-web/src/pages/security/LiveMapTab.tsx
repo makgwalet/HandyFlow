@@ -135,30 +135,30 @@ export default function LiveMapTab() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Live Operations Map</h3>
-          <p style={{ margin: 0, fontSize: 13, color: "#94A3B8" }}>Real-time guard positions and checkpoint scans</p>
+          <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Live Operations Map</h3>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--hf-text-faint)" }}>Real-time guard positions and checkpoint scans</p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 14px", background: "#DCFCE7", border: "1px solid #86EFAC", borderRadius: 20 }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22C55E" }} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#166534" }}>{activeCount} guards on duty</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 14px", background: "var(--hf-success-soft-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 20 }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--hf-success)" }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-success-text-strong)" }}>{activeCount} guards on duty</span>
         </div>
       </div>
 
       <div style={{ marginBottom: 16, maxWidth: 320 }}>
-        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Site</label>
+        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }}>Site</label>
         <select value={siteId} onChange={e => setSiteId(e.target.value)}
-          style={{ width: "100%", padding: "8px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, background: "#fff" }}>
+          style={{ width: "100%", padding: "8px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)" }}>
           <option value="">Select a site to view live positions…</option>
           {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
       </div>
 
       {/* Supported scan types */}
-      <div style={{ marginBottom: 20, padding: "14px 18px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#1D4ED8", marginBottom: 6 }}>Supported scan types</div>
+      <div style={{ marginBottom: 20, padding: "14px 18px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 10 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-info-text)", marginBottom: 6 }}>Supported scan types</div>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
           {Object.entries(SCAN_TYPE_CONFIG).map(([key, cfg]) => (
-            <div key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569" }}>
+            <div key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--hf-text-tertiary)" }}>
               <div style={{ width: 22, height: 22, borderRadius: 6, background: `${cfg.color}18`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <cfg.icon size={12} color={cfg.color} />
               </div>
@@ -166,24 +166,24 @@ export default function LiveMapTab() {
             </div>
           ))}
         </div>
-        <div style={{ marginTop: 8, fontSize: 12, color: "#64748B" }}>
+        <div style={{ marginTop: 8, fontSize: 12, color: "var(--hf-text-muted)" }}>
           GPS pings every ~5 minutes during active shifts. A pin greys out if a guard hasn't pinged in over 5 minutes.
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16 }}>
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden", minHeight: 500 }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden", minHeight: 500 }}>
           {!siteId ? (
-            <div style={{ minHeight: 500, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 10, background: "#F8FAFC", color: "#94A3B8" }}>
+            <div style={{ minHeight: 500, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 10, background: "var(--hf-surface-muted)", color: "var(--hf-text-faint)" }}>
               <MapPin size={36} color="#CBD5E1" />
-              <div style={{ fontWeight: 600, color: "#475569" }}>Select a site above</div>
+              <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>Select a site above</div>
             </div>
           ) : locationsLoading ? (
-            <div style={{ minHeight: 500, display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8" }}>Loading positions…</div>
+            <div style={{ minHeight: 500, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--hf-text-faint)" }}>Loading positions…</div>
           ) : locations.length === 0 ? (
-            <div style={{ minHeight: 500, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 10, background: "#F8FAFC", color: "#94A3B8" }}>
+            <div style={{ minHeight: 500, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 10, background: "var(--hf-surface-muted)", color: "var(--hf-text-faint)" }}>
               <MapPin size={36} color="#CBD5E1" />
-              <div style={{ fontWeight: 600, color: "#475569" }}>No guard positions yet at this site</div>
+              <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No guard positions yet at this site</div>
               <div style={{ fontSize: 13 }}>Positions appear once a guard's app records a GPS ping during an open shift</div>
             </div>
           ) : (
@@ -198,7 +198,7 @@ export default function LiveMapTab() {
                   eventHandlers={{ click: () => setSelectedGuard(selectedGuard === loc.guardId ? null : loc.guardId) }}>
                   <Popup>
                     <strong>{loc.guardName}</strong><br />
-                    {loc.stale ? <span style={{ color: "#B45309" }}>Stale — </span> : null}
+                    {loc.stale ? <span style={{ color: "var(--hf-warning-text-strong)" }}>Stale — </span> : null}
                     Last ping {fmtRelative(loc.recordedAt)}
                   </Popup>
                 </Marker>
@@ -209,10 +209,10 @@ export default function LiveMapTab() {
 
         {/* Active guards list */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 4 }}>Active Guards</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 4 }}>Active Guards</div>
 
           {shifts.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "30px 16px", border: "1px dashed #E2E8F0", borderRadius: 10, color: "#94A3B8", fontSize: 13 }}>
+            <div style={{ textAlign: "center", padding: "30px 16px", border: "1px dashed var(--hf-border)", borderRadius: 10, color: "var(--hf-text-faint)", fontSize: 13 }}>
               No guards currently on shift
             </div>
           ) : (
@@ -224,35 +224,35 @@ export default function LiveMapTab() {
               return (
                 <div key={shift.id}
                   onClick={() => setSelectedGuard(selectedGuard === shift.guardId ? null : shift.guardId)}
-                  style={{ padding: "14px 16px", border: `2px solid ${selectedGuard === shift.guardId ? "#0D9488" : "#E2E8F0"}`, borderRadius: 10, background: selectedGuard === shift.guardId ? "#F0FDF4" : "#fff", cursor: "pointer" }}>
+                  style={{ padding: "14px 16px", border: `2px solid ${selectedGuard === shift.guardId ? "#0D9488" : "#E2E8F0"}`, borderRadius: 10, background: selectedGuard === shift.guardId ? "var(--hf-success-soft)" : "var(--hf-surface)", cursor: "pointer" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                     <div style={{ position: "relative", flexShrink: 0 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "#1D4ED8", fontSize: 13 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--hf-info-soft)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "var(--hf-info-text)", fontSize: 13 }}>
                         {guard ? `${guard.firstName?.[0]}${guard.lastName?.[0]}` : "?"}
                       </div>
-                      <div style={{ position: "absolute", bottom: 0, right: 0, width: 10, height: 10, borderRadius: "50%", background: loc && !loc.stale ? "#22C55E" : "#CBD5E1", border: "2px solid #fff" }} />
+                      <div style={{ position: "absolute", bottom: 0, right: 0, width: 10, height: 10, borderRadius: "50%", background: loc && !loc.stale ? "var(--hf-success)" : "#CBD5E1", border: "2px solid var(--hf-surface)" }} />
                     </div>
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: "#0F172A" }}>{guard?.fullName ?? `Guard ${i + 1}`}</div>
-                      <div style={{ fontSize: 11, color: "#94A3B8" }}>Grade {guard?.grade ?? "—"}</div>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: "var(--hf-text)" }}>{guard?.fullName ?? `Guard ${i + 1}`}</div>
+                      <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>Grade {guard?.grade ?? "—"}</div>
                     </div>
                   </div>
 
-                  <div style={{ fontSize: 11, color: "#64748B" }}>
+                  <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>
                     Shift: {fmtTime(shift.startAt)} – {fmtTime(shift.endAt)}
                   </div>
 
-                  <div style={{ marginTop: 6, fontSize: 11, color: loc ? (loc.stale ? "#B45309" : "#166534") : "#94A3B8" }}>
+                  <div style={{ marginTop: 6, fontSize: 11, color: loc ? (loc.stale ? "var(--hf-warning-text-strong)" : "var(--hf-success-text-strong)") : "var(--hf-text-faint)" }}>
                     {loc ? `Position: ${fmtRelative(loc.recordedAt)}${loc.stale ? " (stale)" : ""}` : "No GPS ping yet"}
                   </div>
 
-                  <div style={{ marginTop: 8, padding: "6px 10px", background: "#F8FAFC", borderRadius: 6, fontSize: 11, color: "#64748B" }}>
+                  <div style={{ marginTop: 8, padding: "6px 10px", background: "var(--hf-surface-muted)", borderRadius: 6, fontSize: 11, color: "var(--hf-text-muted)" }}>
                     {lastScan ? (
                       <span>
-                        Last: <strong style={{ color: "#0F172A" }}>{lastScan.checkpointName}</strong>
+                        Last: <strong style={{ color: "var(--hf-text)" }}>{lastScan.checkpointName}</strong>
                         {" · "}{fmtTime(lastScan.scannedAt)}
                         {lastScan.scanType && lastScan.scanType !== "QR" && (
-                          <span style={{ marginLeft: 6, background: `${SCAN_TYPE_CONFIG[lastScan.scanType]?.color ?? "#64748B"}18`, color: SCAN_TYPE_CONFIG[lastScan.scanType]?.color ?? "#64748B", padding: "1px 5px", borderRadius: 10, fontSize: 10, fontWeight: 600 }}>
+                          <span style={{ marginLeft: 6, background: `${SCAN_TYPE_CONFIG[lastScan.scanType]?.color ?? "#64748B"}18`, color: SCAN_TYPE_CONFIG[lastScan.scanType]?.color ?? "var(--hf-text-muted)", padding: "1px 5px", borderRadius: 10, fontSize: 10, fontWeight: 600 }}>
                             {SCAN_TYPE_CONFIG[lastScan.scanType]?.label ?? lastScan.scanType}
                           </span>
                         )}

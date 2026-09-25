@@ -77,8 +77,8 @@ function HtmlPreview({ html, maxHeight = 280 }: { html: string; maxHeight?: numb
       style={{
         maxHeight, overflowY: 'auto',
         padding: '14px 16px',
-        background: '#fff', border: '1px solid #E2E8F0',
-        borderRadius: 7, fontSize: 13, lineHeight: 1.8, color: '#374151',
+        background: 'var(--hf-surface)', border: '1px solid var(--hf-border)',
+        borderRadius: 7, fontSize: 13, lineHeight: 1.8, color: 'var(--hf-text-secondary)',
       }}
       dangerouslySetInnerHTML={{ __html: html }}
     />
@@ -100,7 +100,7 @@ function TemplateCard({ template, onCopyVar, copied }: {
   const typeLabel = CONTRACT_TYPES.find(t => t.value === template.contractType)?.label ?? template.contractType.replace(/_/g, ' ')
 
   return (
-    <div style={{ border: '1px solid #E2E8F0', borderRadius: 12, overflow: 'hidden' }}>
+    <div style={{ border: '1px solid var(--hf-border)', borderRadius: 12, overflow: 'hidden' }}>
       {/* Colour stripe */}
       <div style={{ height: 3, background: color }} />
 
@@ -108,20 +108,20 @@ function TemplateCard({ template, onCopyVar, copied }: {
       <div style={{ padding: '14px 16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: '#0F172A', marginBottom: 5 }}>{template.name}</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)', marginBottom: 5 }}>{template.name}</div>
             <span style={{ background: `${color}18`, color, border: `1px solid ${color}30`, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
               {typeLabel}
             </span>
           </div>
           {template.isSystem && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#F1F5F9', color: '#64748B', padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--hf-surface-sunken)', color: 'var(--hf-text-muted)', padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
               <Lock size={9} /> SYSTEM
             </div>
           )}
         </div>
 
         {template.description && (
-          <div style={{ fontSize: 12, color: '#64748B', lineHeight: 1.5, marginBottom: 10 }}>
+          <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', lineHeight: 1.5, marginBottom: 10 }}>
             {template.description}
           </div>
         )}
@@ -136,10 +136,10 @@ function TemplateCard({ template, onCopyVar, copied }: {
                 title={`Click to copy {{${v}}}`}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 3,
-                  background: '#F8FAFC', color: '#475569',
+                  background: 'var(--hf-surface-muted)', color: 'var(--hf-text-tertiary)',
                   padding: '2px 7px', borderRadius: 4,
                   fontSize: 10, fontFamily: 'monospace',
-                  border: '1px solid #E2E8F0', cursor: 'pointer',
+                  border: '1px solid var(--hf-border)', cursor: 'pointer',
                   transition: 'background 0.1s',
                 }}>
                 {copied === v ? <Check size={9} color="#166534" /> : <Copy size={9} />}
@@ -151,7 +151,7 @@ function TemplateCard({ template, onCopyVar, copied }: {
 
         {/* Preview toggle */}
         {template.bodyTemplate && (
-          <button onClick={() => setExpanded(!expanded)} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: '#1B3A6B', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>
+          <button onClick={() => setExpanded(!expanded)} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: 'var(--hf-primary-text)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>
             {expanded ? <EyeOff size={13} /> : <Eye size={13} />}
             {expanded ? 'Hide preview' : 'Preview'}
           </button>
@@ -160,29 +160,29 @@ function TemplateCard({ template, onCopyVar, copied }: {
 
       {/* Expanded preview */}
       {expanded && template.bodyTemplate && (
-        <div style={{ borderTop: '1px solid #E2E8F0' }}>
+        <div style={{ borderTop: '1px solid var(--hf-border)' }}>
           {/* Rendered / Source tabs */}
-          <div style={{ display: 'flex', borderBottom: '1px solid #E2E8F0' }}>
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--hf-border)' }}>
             {(['rendered', 'source'] as const).map(m => (
               <button key={m} onClick={() => setMode(m)} style={{
                 flex: 1, padding: '7px 0',
                 fontSize: 11, fontWeight: mode === m ? 700 : 400,
-                cursor: 'pointer', background: mode === m ? '#F8FAFC' : '#fff',
-                color: mode === m ? '#1B3A6B' : '#94A3B8',
+                cursor: 'pointer', background: mode === m ? 'var(--hf-surface-muted)' : 'var(--hf-surface)',
+                color: mode === m ? 'var(--hf-primary-text)' : 'var(--hf-text-faint)',
                 border: 'none',
-                borderBottom: mode === m ? '2px solid #1B3A6B' : '2px solid transparent',
+                borderBottom: mode === m ? '2px solid var(--hf-primary)' : '2px solid transparent',
               }}>
                 {m === 'rendered' ? 'Rendered' : 'HTML source'}
               </button>
             ))}
           </div>
 
-          <div style={{ padding: '14px 16px', background: '#FAFAFA' }}>
+          <div style={{ padding: '14px 16px', background: 'var(--hf-surface-muted)' }}>
             {mode === 'rendered' ? (
               /* FIX: renders HTML properly — original was showing raw tags in <pre> */
               <HtmlPreview html={template.bodyTemplate} />
             ) : (
-              <pre style={{ margin: 0, fontSize: 11, color: '#475569', fontFamily: 'monospace', whiteSpace: 'pre-wrap', lineHeight: 1.6, maxHeight: 280, overflowY: 'auto' }}>
+              <pre style={{ margin: 0, fontSize: 11, color: 'var(--hf-text-tertiary)', fontFamily: 'monospace', whiteSpace: 'pre-wrap', lineHeight: 1.6, maxHeight: 280, overflowY: 'auto' }}>
                 {template.bodyTemplate}
               </pre>
             )}
@@ -242,19 +242,19 @@ export default function TemplatesTab() {
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   if (isLoading) return (
-    <div style={{ textAlign: 'center', padding: 40, color: '#94A3B8' }}>Loading templates…</div>
+    <div style={{ textAlign: 'center', padding: 40, color: 'var(--hf-text-faint)' }}>Loading templates…</div>
   )
 
   return (
     <div>
       {/* Toolbar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-        <div style={{ fontSize: 13, color: '#64748B' }}>
-          <span style={{ fontWeight: 700, color: '#0F172A' }}>{systemTemplates.length}</span> system templates ·{' '}
-          <span style={{ fontWeight: 700, color: '#0F172A' }}>{customTemplates.length}</span> custom templates
+        <div style={{ fontSize: 13, color: 'var(--hf-text-muted)' }}>
+          <span style={{ fontWeight: 700, color: 'var(--hf-text)' }}>{systemTemplates.length}</span> system templates ·{' '}
+          <span style={{ fontWeight: 700, color: 'var(--hf-text)' }}>{customTemplates.length}</span> custom templates
         </div>
         <button onClick={() => { setShowCreate(true); setError('') }}
-          style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#1B3A6B', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
           <Plus size={15} /> New Template
         </button>
       </div>
@@ -264,7 +264,7 @@ export default function TemplatesTab() {
         <div style={{ marginBottom: 28 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14 }}>
             <Lock size={11} color="#94A3B8" />
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--hf-text-faint)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>
               System Templates — SA standard contracts
             </span>
           </div>
@@ -279,7 +279,7 @@ export default function TemplatesTab() {
       {/* Custom templates */}
       {customTemplates.length > 0 && (
         <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 14 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--hf-text-faint)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 14 }}>
             Custom Templates
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
@@ -291,9 +291,9 @@ export default function TemplatesTab() {
       )}
 
       {templates.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94A3B8' }}>
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--hf-text-faint)' }}>
           <div style={{ fontSize: 36, marginBottom: 12, opacity: 0.3 }}>📋</div>
-          <div style={{ fontWeight: 600, color: '#475569' }}>No templates yet</div>
+          <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No templates yet</div>
           <div style={{ fontSize: 13, marginTop: 4 }}>System templates seed automatically on first contract creation.</div>
         </div>
       )}
@@ -301,9 +301,9 @@ export default function TemplatesTab() {
       {/* ── Create template modal ── */}
       {showCreate && (
         <div style={MODAL}>
-          <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: 720, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}>
+          <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 28, width: 720, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>New Contract Template</h3>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>New Contract Template</h3>
               <button onClick={() => setShowCreate(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}>
                 <X size={20} color="#94A3B8" />
               </button>
@@ -316,7 +316,7 @@ export default function TemplatesTab() {
               </div>
               <div>
                 <label style={lbl}>Contract Type *</label>
-                <select value={form.contractType} onChange={e => setForm(f => ({ ...f, contractType: e.target.value }))} style={{ ...inp2, background: '#fff' }}>
+                <select value={form.contractType} onChange={e => setForm(f => ({ ...f, contractType: e.target.value }))} style={{ ...inp2, background: 'var(--hf-surface)' }}>
                   {CONTRACT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
@@ -329,13 +329,13 @@ export default function TemplatesTab() {
             {/* Body editor */}
             <div>
               <label style={lbl}>Template Body *</label>
-              <div style={{ marginBottom: 8, padding: '10px 12px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 7, fontSize: 12, color: '#1D4ED8', lineHeight: 1.6 }}>
+              <div style={{ marginBottom: 8, padding: '10px 12px', background: 'var(--hf-info-soft)', border: '1px solid var(--hf-info-border)', borderRadius: 7, fontSize: 12, color: 'var(--hf-info-text)', lineHeight: 1.6 }}>
                 <strong>Variables:</strong>{' '}
-                Use <code style={{ background: '#fff', padding: '1px 4px', borderRadius: 3 }}>{'{{variable_name}}'}</code> for dynamic fields.
-                Supports HTML: <code style={{ background: '#fff', padding: '1px 4px', borderRadius: 3 }}>{'<h2>'}</code>{' '}
-                <code style={{ background: '#fff', padding: '1px 4px', borderRadius: 3 }}>{'<strong>'}</code>{' '}
-                <code style={{ background: '#fff', padding: '1px 4px', borderRadius: 3 }}>{'<p>'}</code>.{' '}
-                <code style={{ background: '#fff', padding: '1px 4px', borderRadius: 3 }}>{'{{date}}'}</code> auto-resolves to today.
+                Use <code style={{ background: 'var(--hf-surface)', padding: '1px 4px', borderRadius: 3 }}>{'{{variable_name}}'}</code> for dynamic fields.
+                Supports HTML: <code style={{ background: 'var(--hf-surface)', padding: '1px 4px', borderRadius: 3 }}>{'<h2>'}</code>{' '}
+                <code style={{ background: 'var(--hf-surface)', padding: '1px 4px', borderRadius: 3 }}>{'<strong>'}</code>{' '}
+                <code style={{ background: 'var(--hf-surface)', padding: '1px 4px', borderRadius: 3 }}>{'<p>'}</code>.{' '}
+                <code style={{ background: 'var(--hf-surface)', padding: '1px 4px', borderRadius: 3 }}>{'{{date}}'}</code> auto-resolves to today.
               </div>
               <textarea
                 value={form.bodyTemplate}
@@ -349,31 +349,31 @@ export default function TemplatesTab() {
             {/* Live rendered preview */}
             {form.bodyTemplate && (
               <div style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 7 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 7 }}>
                   Rendered preview
                 </div>
                 {/* FIX: dangerouslySetInnerHTML renders HTML — original showed raw tags */}
                 <div
-                  style={{ maxHeight: 240, overflowY: 'auto', padding: '14px 16px', background: '#FAFAFA', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: 13, lineHeight: 1.8, color: '#374151' }}
+                  style={{ maxHeight: 240, overflowY: 'auto', padding: '14px 16px', background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 13, lineHeight: 1.8, color: 'var(--hf-text-secondary)' }}
                   dangerouslySetInnerHTML={{ __html: form.bodyTemplate }}
                 />
               </div>
             )}
 
             {error && (
-              <div style={{ marginTop: 14, padding: '10px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>
+              <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>
                 {error}
               </div>
             )}
 
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
-              <button onClick={() => setShowCreate(false)} style={{ padding: '9px 18px', border: '1px solid #E2E8F0', borderRadius: 9, background: '#fff', fontSize: 13, cursor: 'pointer', color: '#374151' }}>
+              <button onClick={() => setShowCreate(false)} style={{ padding: '9px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'var(--hf-surface)', fontSize: 13, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
                 Cancel
               </button>
               <button
                 onClick={() => createTemplate.mutate(form)}
                 disabled={!form.name || !form.bodyTemplate || createTemplate.isPending}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 22px', background: !form.name || !form.bodyTemplate ? '#94A3B8' : '#1B3A6B', color: '#fff', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 22px', background: !form.name || !form.bodyTemplate ? 'var(--hf-text-faint)' : 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
                 {createTemplate.isPending ? 'Creating…' : 'Create Template'}
               </button>
             </div>

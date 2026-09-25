@@ -108,7 +108,7 @@ const mBox = (w = 480): React.CSSProperties => ({
 
 const ErrBox = ({ msg }: { msg: string }) =>
   msg ? (
-    <div style={{ marginTop: 12, padding: '9px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>
+    <div style={{ marginTop: 12, padding: '9px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>
       {msg}
     </div>
   ) : null
@@ -172,16 +172,16 @@ function SignatureCanvas({ onCapture }: { onCapture: (data: string | null) => vo
 
   return (
     <div>
-      <div style={{ fontSize: 12, color: '#64748B', marginBottom: 5 }}>
+      <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 5 }}>
         Draw your signature below (optional — OTP is the legally binding element)
       </div>
-      <div style={{ border: '1.5px solid #E2E8F0', borderRadius: 8, background: '#FAFAFA', position: 'relative' }}>
+      <div style={{ border: '1.5px solid var(--hf-border)', borderRadius: 8, background: 'var(--hf-surface-muted)', position: 'relative' }}>
         <canvas ref={canvasRef} width={440} height={100}
           onMouseDown={start} onMouseMove={move}
           onMouseUp={end} onMouseLeave={end}
           style={{ display: 'block', cursor: 'crosshair', borderRadius: 8 }} />
         {has && (
-          <button onClick={clear} style={{ position: 'absolute', top: 6, right: 8, background: 'none', border: 'none', fontSize: 11, color: '#94A3B8', cursor: 'pointer' }}>
+          <button onClick={clear} style={{ position: 'absolute', top: 6, right: 8, background: 'none', border: 'none', fontSize: 11, color: 'var(--hf-text-faint)', cursor: 'pointer' }}>
             Clear
           </button>
         )}
@@ -195,7 +195,7 @@ function SignatureCanvas({ onCapture }: { onCapture: (data: string | null) => vo
 function Sect({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid #F1F5F9' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid var(--hf-border-subtle)' }}>
         {title}
       </div>
       {children}
@@ -424,16 +424,16 @@ export default function ContractsTab() {
             <button key={s.key} onClick={() => setStatus(s.key)} style={{
               padding: '5px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer',
               border: 'none', fontWeight: statusFilter === s.key ? 600 : 400,
-              background: statusFilter === s.key ? '#1B3A6B' : '#F1F5F9',
-              color: statusFilter === s.key ? '#fff' : '#64748B',
+              background: statusFilter === s.key ? 'var(--hf-primary)' : 'var(--hf-surface-sunken)',
+              color: statusFilter === s.key ? 'var(--hf-text-on-solid)' : 'var(--hf-text-muted)',
             }}>
               {s.label}
             </button>
           ))}
           <div style={{ position: 'relative' }}>
-            <Search size={12} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+            <Search size={12} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--hf-text-faint)' }} />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search contracts…"
-              style={{ paddingLeft: 28, padding: '7px 10px 7px 28px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 12, outline: 'none', width: 190 }} />
+              style={{ paddingLeft: 28, padding: '7px 10px 7px 28px', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, outline: 'none', width: 190 }} />
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -448,11 +448,11 @@ export default function ContractsTab() {
 
       {/* Contract list */}
       {isLoading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: '#94A3B8' }}>Loading contracts…</div>
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--hf-text-faint)' }}>Loading contracts…</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '50px 20px', color: '#94A3B8' }}>
+        <div style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--hf-text-faint)' }}>
           <FileText size={36} style={{ marginBottom: 12, opacity: 0.3 }} />
-          <div style={{ fontWeight: 600, color: '#475569' }}>No contracts found</div>
+          <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No contracts found</div>
           <div style={{ fontSize: 13, marginTop: 4 }}>Create your first contract from a template or from scratch.</div>
         </div>
       ) : (
@@ -466,24 +466,24 @@ export default function ContractsTab() {
             return (
               <div key={c.id} style={{ border: `1px solid ${cfg.border}`, borderLeft: `3px solid ${cfg.color}`, borderRadius: 10, overflow: 'hidden' }}>
                 {/* Row header */}
-                <div onClick={() => { setExpanded(isOpen ? null : c.id); setError('') }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 18px', cursor: 'pointer', background: isOpen ? '#F8FAFC' : '#fff' }}>
+                <div onClick={() => { setExpanded(isOpen ? null : c.id); setError('') }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 18px', cursor: 'pointer', background: isOpen ? 'var(--hf-surface-muted)' : 'var(--hf-surface)' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4, flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 700, fontSize: 14, color: '#0F172A' }}>{c.title}</span>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)' }}>{c.title}</span>
                       <span style={{ background: cfg.bg, color: cfg.color, padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{cfg.label}</span>
-                      <span style={{ background: '#F8FAFC', color: '#64748B', padding: '1px 7px', borderRadius: 20, fontSize: 11, border: '1px solid #E2E8F0' }}>
+                      <span style={{ background: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)', padding: '1px 7px', borderRadius: 20, fontSize: 11, border: '1px solid var(--hf-border)' }}>
                         {CONTRACT_TYPES.find(t => t.value === c.contractType)?.label ?? c.contractType}
                       </span>
                       {unresolvedAmendments > 0 && (
-                        <span style={{ background: '#FEF3C7', color: '#D97706', padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700 }}>
+                        <span style={{ background: 'var(--hf-warning-soft-strong)', color: 'var(--hf-warning-text)', padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700 }}>
                           ✎ {unresolvedAmendments} amendment{unresolvedAmendments > 1 ? 's' : ''}
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: 12, color: '#64748B', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                       <span>{c.contractNumber}</span>
                       {c.startDate && <span><Calendar size={10} style={{ verticalAlign: 'middle', marginRight: 2 }} />{fmtDate(c.startDate)} → {fmtDate(c.endDate)}</span>}
-                      {(c.valueAmount ?? 0) > 0 && <span style={{ fontWeight: 700, color: '#0D9488' }}>{fmtR(c.valueAmount)}</span>}
+                      {(c.valueAmount ?? 0) > 0 && <span style={{ fontWeight: 700, color: 'var(--hf-accent-text)' }}>{fmtR(c.valueAmount)}</span>}
                       {(c.parties?.length ?? c.signedPartyCount != null) && (
                         <span>{c.signedPartyCount ?? 0}/{c.totalPartyCount ?? c.parties?.length ?? 0} signed</span>
                       )}
@@ -492,7 +492,7 @@ export default function ContractsTab() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0, marginLeft: 12 }}>
                     {canPdf && (
                       <button onClick={e => { e.stopPropagation(); downloadPdf(c.id, c.contractNumber) }}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', border: '1px solid var(--hf-info-border)', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
                         <Download size={11} /> PDF
                       </button>
                     )}
@@ -502,7 +502,7 @@ export default function ContractsTab() {
 
                 {/* Expanded detail */}
                 {isOpen && (
-                  <div style={{ borderTop: `1px solid ${cfg.border}`, padding: '16px 18px', background: '#FAFAFA' }}>
+                  <div style={{ borderTop: `1px solid ${cfg.border}`, padding: '16px 18px', background: 'var(--hf-surface-muted)' }}>
                     {/* Metadata grid */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
                       {[
@@ -513,15 +513,15 @@ export default function ContractsTab() {
                         c.sentAt   && { l: 'Sent',    v: fmtDT(c.sentAt)   },
                         c.signedAt && { l: 'Signed',  v: fmtDT(c.signedAt) },
                       ].filter(Boolean).map((item: any) => (
-                        <div key={item.l} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 7, padding: '8px 12px' }}>
-                          <div style={{ fontSize: 9, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 2 }}>{item.l}</div>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#0F172A' }}>{item.v}</div>
+                        <div key={item.l} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 7, padding: '8px 12px' }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', marginBottom: 2 }}>{item.l}</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--hf-text)' }}>{item.v}</div>
                         </div>
                       ))}
                     </div>
 
                     {c.notes && (
-                      <div style={{ marginBottom: 14, padding: '9px 12px', background: '#fff', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: 13, color: '#475569' }}>
+                      <div style={{ marginBottom: 14, padding: '9px 12px', background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 13, color: 'var(--hf-text-tertiary)' }}>
                         {c.notes}
                       </div>
                     )}
@@ -529,12 +529,12 @@ export default function ContractsTab() {
                     {/* Contract body preview */}
                     <div style={{ marginBottom: 14 }}>
                       <button onClick={() => setShowBodyId(showBodyId === c.id ? null : c.id)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', color: '#1B3A6B', fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-primary-text)', fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
                         {showBodyId === c.id ? <EyeOff size={13} /> : <Eye size={13} />}
                         {showBodyId === c.id ? 'Hide contract body' : 'Preview contract body'}
                       </button>
                       {showBodyId === c.id && (
-                        <div style={{ border: '1px solid #E2E8F0', borderRadius: 8, padding: '14px 16px', background: '#fff', maxHeight: 320, overflowY: 'auto', fontSize: 13, lineHeight: 1.8, color: '#374151' }}
+                        <div style={{ border: '1px solid var(--hf-border)', borderRadius: 8, padding: '14px 16px', background: 'var(--hf-surface)', maxHeight: 320, overflowY: 'auto', fontSize: 13, lineHeight: 1.8, color: 'var(--hf-text-secondary)' }}
                           dangerouslySetInnerHTML={{ __html: (contractDetail?.id === c.id ? contractDetail?.body : null) ?? c.body ?? '<p style="color:#94A3B8">Loading body…</p>' }}
                         />
                       )}
@@ -543,12 +543,12 @@ export default function ContractsTab() {
                     {/* Parties */}
                     <div style={{ marginBottom: 14 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--hf-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                           Parties & Signing
                         </div>
                         {(c.status === 'DRAFT' || c.status === 'UNDER_REVIEW') && (
                           <button onClick={() => { setShowParty(c.id); setError('') }}
-                            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#374151' }}>
+                            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
                             <Plus size={11} /> Add Party
                           </button>
                         )}
@@ -561,11 +561,11 @@ export default function ContractsTab() {
                           : (c.parties ?? [])
                         const totalCount = c.totalPartyCount ?? parties.length ?? 0
                         return totalCount === 0 && parties.length === 0 ? (
-                          <div style={{ fontSize: 13, color: '#94A3B8', padding: '10px 0' }}>
+                          <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', padding: '10px 0' }}>
                             No parties added yet. Add at least one before sending for signing.
                           </div>
                         ) : parties.length === 0 ? (
-                          <div style={{ fontSize: 13, color: '#94A3B8', padding: '10px 0' }}>
+                          <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', padding: '10px 0' }}>
                             Loading parties… ({totalCount} expected)
                           </div>
                         ) : (
@@ -581,19 +581,19 @@ export default function ContractsTab() {
                               : null
 
                             return (
-                              <div key={party.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8 }}>
+                              <div key={party.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 8 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--hf-info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                     <User size={14} color="#1D4ED8" />
                                   </div>
                                   <div>
-                                    <div style={{ fontWeight: 600, fontSize: 13, color: '#0F172A' }}>
+                                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--hf-text)' }}>
                                       {party.fullName}
-                                      <span style={{ marginLeft: 6, fontSize: 10, color: '#94A3B8', fontWeight: 400 }}>
+                                      <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--hf-text-faint)', fontWeight: 400 }}>
                                         order {party.signingOrder}
                                       </span>
                                     </div>
-                                    <div style={{ fontSize: 11, color: '#94A3B8' }}>
+                                    <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>
                                       {party.partyRole} · {party.partyType}
                                       {party.companyName && ` · ${party.companyName}`}
                                       {party.email && ` · ${party.email}`}
@@ -608,11 +608,11 @@ export default function ContractsTab() {
                                       {party.signingStatus === 'SENT' ? 'OTP SENT' : party.signingStatus}
                                     </span>
                                   </div>
-                                  {party.signedAt && <span style={{ fontSize: 11, color: '#94A3B8' }}>{fmtDT(party.signedAt)}</span>}
+                                  {party.signedAt && <span style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{fmtDT(party.signedAt)}</span>}
 
                                   {/* OTP expiry countdown */}
                                   {party.signingStatus === 'SENT' && minsLeft !== null && (
-                                    <span style={{ fontSize: 10, color: otpExpired ? '#DC2626' : '#D97706', fontWeight: 600 }}>
+                                    <span style={{ fontSize: 10, color: otpExpired ? 'var(--hf-danger-text)' : 'var(--hf-warning-text)', fontWeight: 600 }}>
                                       {otpExpired ? 'OTP EXPIRED' : `~${minsLeft}m left`}
                                     </span>
                                   )}
@@ -629,7 +629,7 @@ export default function ContractsTab() {
                                   {c.status === 'SENT' && party.signingStatus === 'SENT' && (
                                     <button
                                       onClick={() => { setShowOtp({ contractId: c.id, partyId: party.id, name: party.fullName, isResend: true }); setError('') }}
-                                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: otpExpired ? '#FEF2F2' : '#FFFBEB', color: otpExpired ? '#DC2626' : '#D97706', border: `1px solid ${otpExpired ? '#FECACA' : '#FDE68A'}`, borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: otpExpired ? 'var(--hf-danger-soft)' : 'var(--hf-warning-soft)', color: otpExpired ? 'var(--hf-danger-text)' : 'var(--hf-warning-text)', border: `1px solid ${otpExpired ? '#FECACA' : '#FDE68A'}`, borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
                                       <RefreshCw size={11} />
                                       {otpExpired ? 'Resend OTP' : 'Resend OTP'}
                                     </button>
@@ -657,7 +657,7 @@ export default function ContractsTab() {
                     {/* Comments thread */}
                     <div style={{ marginBottom: 14 }}>
                       <button onClick={() => { setShowComments(showComments === c.id ? null : c.id); setError('') }}
-                        style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', fontSize: 12, fontWeight: 500, marginBottom: showComments === c.id ? 10 : 0 }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-muted)', fontSize: 12, fontWeight: 500, marginBottom: showComments === c.id ? 10 : 0 }}>
                         <MessageSquare size={13} />
                         {showComments === c.id ? 'Hide comments' : `Comments${(c.comments?.length ?? 0) > 0 ? ` (${c.comments.length})` : ''}`}
                       </button>
@@ -666,40 +666,40 @@ export default function ContractsTab() {
                         <div>
                           {/* Existing comments */}
                           {(contractDetail?.comments ?? c.comments ?? []).length === 0 ? (
-                            <div style={{ fontSize: 13, color: '#94A3B8', padding: '10px 0' }}>No comments yet.</div>
+                            <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', padding: '10px 0' }}>No comments yet.</div>
                           ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
                               {(contractDetail?.comments ?? c.comments ?? []).map((cm: any) => (
-                                <div key={cm.id} style={{ padding: '10px 14px', background: cm.isAmendmentRequest ? '#FFFBEB' : '#F8FAFC', border: `1px solid ${cm.isAmendmentRequest ? '#FDE68A' : '#E2E8F0'}`, borderRadius: 8 }}>
+                                <div key={cm.id} style={{ padding: '10px 14px', background: cm.isAmendmentRequest ? 'var(--hf-warning-soft)' : 'var(--hf-surface-muted)', border: `1px solid ${cm.isAmendmentRequest ? '#FDE68A' : '#E2E8F0'}`, borderRadius: 8 }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                      <span style={{ fontWeight: 600, fontSize: 12, color: '#0F172A' }}>{cm.authorName ?? 'Internal'}</span>
-                                      <span style={{ fontSize: 10, color: '#94A3B8' }}>{cm.authorRole}</span>
+                                      <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--hf-text)' }}>{cm.authorName ?? 'Internal'}</span>
+                                      <span style={{ fontSize: 10, color: 'var(--hf-text-faint)' }}>{cm.authorRole}</span>
                                       {cm.isAmendmentRequest && (
-                                        <span style={{ background: '#FEF3C7', color: '#D97706', padding: '1px 7px', borderRadius: 20, fontSize: 10, fontWeight: 700 }}>
+                                        <span style={{ background: 'var(--hf-warning-soft-strong)', color: 'var(--hf-warning-text)', padding: '1px 7px', borderRadius: 20, fontSize: 10, fontWeight: 700 }}>
                                           Amendment request
                                         </span>
                                       )}
                                       {cm.resolved && (
-                                        <span style={{ background: '#DCFCE7', color: '#166534', padding: '1px 7px', borderRadius: 20, fontSize: 10, fontWeight: 600 }}>
+                                        <span style={{ background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', padding: '1px 7px', borderRadius: 20, fontSize: 10, fontWeight: 600 }}>
                                           Resolved
                                         </span>
                                       )}
                                     </div>
-                                    <span style={{ fontSize: 11, color: '#94A3B8' }}>{fmtDT(cm.createdAt)}</span>
+                                    <span style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{fmtDT(cm.createdAt)}</span>
                                   </div>
                                   {cm.clauseRef && (
-                                    <div style={{ fontSize: 11, color: '#64748B', marginBottom: 4 }}>Re: {cm.clauseRef}</div>
+                                    <div style={{ fontSize: 11, color: 'var(--hf-text-muted)', marginBottom: 4 }}>Re: {cm.clauseRef}</div>
                                   )}
-                                  <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{cm.comment}</div>
+                                  <div style={{ fontSize: 13, color: 'var(--hf-text-secondary)', lineHeight: 1.6 }}>{cm.comment}</div>
                                 </div>
                               ))}
                             </div>
                           )}
 
                           {/* Post new comment (internal — admin/owner) */}
-                          <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, padding: '12px 14px' }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Post internal comment</div>
+                          <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 8, padding: '12px 14px' }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-secondary)', marginBottom: 8 }}>Post internal comment</div>
                             <textarea
                               value={commentText}
                               onChange={e => setCommentText(e.target.value)}
@@ -713,7 +713,7 @@ export default function ContractsTab() {
                                 <input value={clauseRef} onChange={e => setClauseRef(e.target.value)} placeholder="e.g. Clause 3.2" style={inp} />
                               </div>
                               <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 2 }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 500, color: '#374151', cursor: 'pointer' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 500, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
                                   <input type="checkbox" checked={isAmendment} onChange={e => setIsAmendment(e.target.checked)} />
                                   Flag as amendment request
                                 </label>
@@ -753,7 +753,7 @@ export default function ContractsTab() {
                             setShowEditContract(c.id)
                             setError('')
                           }}
-                          style={{ padding: '8px 16px', borderRadius: 7, fontSize: 13, cursor: 'pointer', border: '1px solid #E2E8F0', fontWeight: 600, background: '#F8FAFC', color: '#374151' }}>
+                          style={{ padding: '8px 16px', borderRadius: 7, fontSize: 13, cursor: 'pointer', border: '1px solid var(--hf-border)', fontWeight: 600, background: 'var(--hf-surface-muted)', color: 'var(--hf-text-secondary)' }}>
                           Edit
                         </button>
                       )}
@@ -779,7 +779,7 @@ export default function ContractsTab() {
                     <ErrBox msg={humanizeActionError(error)} />
 
                     {c.terminationReason && (
-                      <div style={{ marginTop: 10, padding: '9px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, fontSize: 12, color: '#DC2626' }}>
+                      <div style={{ marginTop: 10, padding: '9px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 7, fontSize: 12, color: 'var(--hf-danger-text)' }}>
                         <strong>Termination reason:</strong> {c.terminationReason}
                         {c.terminatedAt && ` · ${fmtDT(c.terminatedAt)}`}
                       </div>
@@ -801,14 +801,14 @@ export default function ContractsTab() {
         <div style={MODAL}>
           <div style={mBox(700)}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>New Contract</h3>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>New Contract</h3>
               <button onClick={() => setShowCreate(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={20} color="#94A3B8" /></button>
             </div>
 
             <Sect title="Template">
               <div>
                 <label style={lbl}>Start from template (optional)</label>
-                <select value={form.templateId} onChange={e => handleTemplateChange(e.target.value)} style={{ ...inp, background: '#fff' }}>
+                <select value={form.templateId} onChange={e => handleTemplateChange(e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
                   <option value="">Blank contract</option>
                   {templates.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
@@ -823,7 +823,7 @@ export default function ContractsTab() {
                 </div>
                 <div>
                   <label style={lbl}>Contract Type *</label>
-                  <select value={form.contractType} onChange={e => sf('contractType', e.target.value)} style={{ ...inp, background: '#fff' }}>
+                  <select value={form.contractType} onChange={e => sf('contractType', e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
                     {CONTRACT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
                 </div>
@@ -844,15 +844,15 @@ export default function ContractsTab() {
                   <textarea value={form.notes} onChange={e => sf('notes', e.target.value)} rows={2} style={{ ...inp, resize: 'vertical' }} />
                 </div>
                 <div style={{ gridColumn: '1/-1', display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 500, color: '#374151', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 500, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
                     <input type="checkbox" checked={form.autoRenew} onChange={e => sf('autoRenew', e.target.checked)} />
                     Auto-renew on expiry
                   </label>
                   {form.autoRenew && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <span style={{ fontSize: 12, color: '#64748B' }}>Renewal notice</span>
+                      <span style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>Renewal notice</span>
                       <input type="number" value={form.renewalNoticeDays} onChange={e => sf('renewalNoticeDays', e.target.value)} style={{ ...inp, width: 70 }} />
-                      <span style={{ fontSize: 12, color: '#64748B' }}>days</span>
+                      <span style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>days</span>
                     </div>
                   )}
                 </div>
@@ -873,9 +873,9 @@ export default function ContractsTab() {
                     part of this workflow, not something to prevent. */}
                 <div style={{
                   marginBottom: 10, padding: '9px 12px', borderRadius: 8, fontSize: 12,
-                  background: unfilledVarKeys.length > 0 ? '#FFFBEB' : '#F0FDF4',
+                  background: unfilledVarKeys.length > 0 ? 'var(--hf-warning-soft)' : 'var(--hf-success-soft)',
                   border: `1px solid ${unfilledVarKeys.length > 0 ? '#FDE68A' : '#BBF7D0'}`,
-                  color: unfilledVarKeys.length > 0 ? '#92400E' : '#166534',
+                  color: unfilledVarKeys.length > 0 ? 'var(--hf-warning-text-deep)' : 'var(--hf-success-text-strong)',
                 }}>
                   {unfilledVarKeys.length > 0 ? (
                     <>
@@ -891,7 +891,7 @@ export default function ContractsTab() {
                     <div key={key}>
                       <label style={lbl}>
                         {key.replace(/_/g, ' ')}
-                        <span style={{ fontWeight: 400, color: '#94A3B8', marginLeft: 4 }}>({type})</span>
+                        <span style={{ fontWeight: 400, color: 'var(--hf-text-faint)', marginLeft: 4 }}>({type})</span>
                       </label>
                       <input
                         type={type === 'date' ? 'date' : type === 'number' ? 'number' : 'text'}
@@ -937,13 +937,13 @@ export default function ContractsTab() {
         <div style={MODAL}>
           <div style={mBox(520)}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>Add Party</h3>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>Add Party</h3>
               <button onClick={() => setShowParty(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={20} color="#94A3B8" /></button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <div>
                 <label style={lbl}>Party Type</label>
-                <select value={partyForm.partyType} onChange={e => spf('partyType', e.target.value)} style={{ ...inp, background: '#fff' }}>
+                <select value={partyForm.partyType} onChange={e => spf('partyType', e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
                   <option value="INDIVIDUAL">Individual</option>
                   <option value="COMPANY">Company</option>
                   <option value="TRUST">Trust</option>
@@ -952,7 +952,7 @@ export default function ContractsTab() {
               </div>
               <div>
                 <label style={lbl}>Role</label>
-                <select value={partyForm.partyRole} onChange={e => spf('partyRole', e.target.value)} style={{ ...inp, background: '#fff' }}>
+                <select value={partyForm.partyRole} onChange={e => spf('partyRole', e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
                   <option value="COUNTERPARTY">Counterparty</option>
                   <option value="WITNESS">Witness</option>
                   <option value="GUARANTOR">Guarantor</option>
@@ -986,7 +986,7 @@ export default function ContractsTab() {
               <div>
                 <label style={lbl}>Signing Order</label>
                 <input type="number" min="1" value={partyForm.signingOrder} onChange={e => spf('signingOrder', e.target.value)} style={inp} />
-                <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 3 }}>
+                <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 3 }}>
                   Parties sign in numerical order. Same number = can sign simultaneously.
                 </div>
               </div>
@@ -1026,20 +1026,20 @@ export default function ContractsTab() {
         <div style={MODAL}>
           <div style={mBox(440)}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>
                 {showOtp.isResend ? 'Resend OTP' : 'Send OTP to Signer'}
               </h3>
               <button onClick={() => setShowOtp(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={20} color="#94A3B8" /></button>
             </div>
 
-            <div style={{ padding: '12px 14px', background: showOtp.isResend ? '#FFFBEB' : '#EFF6FF', border: `1px solid ${showOtp.isResend ? '#FDE68A' : '#BFDBFE'}`, borderRadius: 8, fontSize: 13, color: showOtp.isResend ? '#92400E' : '#1D4ED8', marginBottom: 16 }}>
+            <div style={{ padding: '12px 14px', background: showOtp.isResend ? 'var(--hf-warning-soft)' : 'var(--hf-info-soft)', border: `1px solid ${showOtp.isResend ? '#FDE68A' : '#BFDBFE'}`, borderRadius: 8, fontSize: 13, color: showOtp.isResend ? 'var(--hf-warning-text-deep)' : 'var(--hf-info-text)', marginBottom: 16 }}>
               {showOtp.isResend
                 ? <>The previous OTP for <strong>{showOtp.name}</strong> may have expired. A new 6-digit code will be generated and sent to their registered phone. The old OTP is invalidated.</>
                 : <>A 6-digit OTP will be sent via SMS to <strong>{showOtp.name}</strong>'s registered phone. The code expires in 10 minutes.</>
               }
             </div>
 
-            <div style={{ padding: '10px 14px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, fontSize: 12, color: '#92400E', marginBottom: 18 }}>
+            <div style={{ padding: '10px 14px', background: 'var(--hf-warning-soft)', border: '1px solid var(--hf-warning-border)', borderRadius: 8, fontSize: 12, color: 'var(--hf-warning-text-deep)', marginBottom: 18 }}>
               ECT Act 25 of 2002 §13: OTP-based electronic signatures are legally binding.
               IP address, user-agent, phone last-4 and timestamp are captured in the audit trail.
             </div>
@@ -1064,12 +1064,12 @@ export default function ContractsTab() {
         <div style={MODAL}>
           <div style={mBox(500)}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--hf-success-soft-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <PenLine size={18} color="#166534" />
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>Sign Contract</h3>
-                <div style={{ fontSize: 12, color: '#64748B' }}>OTP sent — enter the 6-digit code to sign</div>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>Sign Contract</h3>
+                <div style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>OTP sent — enter the 6-digit code to sign</div>
               </div>
               <button onClick={() => { setShowSign(null); setOtpCode(''); setSignatureData(null); setError('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: 'auto', display: 'flex' }}>
                 <X size={20} color="#94A3B8" />
@@ -1087,11 +1087,11 @@ export default function ContractsTab() {
                 maxLength={6}
                 style={{ ...inp, fontSize: 24, letterSpacing: '0.35em', textAlign: 'center', fontWeight: 700, padding: '14px' }}
               />
-              <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 5, textAlign: 'center' }}>
+              <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', marginTop: 5, textAlign: 'center' }}>
                 OTP expires in 10 minutes. Request a new one if needed.
               </div>
               {devOtp && (
-                <div style={{ marginTop: 8, padding: '6px 10px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 6, fontSize: 11, color: '#92400E', fontWeight: 600, textAlign: 'center' }}>
+                <div style={{ marginTop: 8, padding: '6px 10px', background: 'var(--hf-warning-soft)', border: '1px solid var(--hf-warning-border)', borderRadius: 6, fontSize: 11, color: 'var(--hf-warning-text-deep)', fontWeight: 600, textAlign: 'center' }}>
                   Dev mode — OTP auto-filled (SMS not yet configured)
                 </div>
               )}
@@ -1102,7 +1102,7 @@ export default function ContractsTab() {
               <SignatureCanvas onCapture={setSignatureData} />
             </div>
 
-            <div style={{ padding: '10px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 12, color: '#64748B', marginBottom: 16, lineHeight: 1.6 }}>
+            <div style={{ padding: '10px 14px', background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 16, lineHeight: 1.6 }}>
               By entering the OTP you confirm you have read and agree to be legally bound by this contract
               under the Electronic Communications and Transactions Act 25 of 2002.
             </div>
@@ -1127,10 +1127,10 @@ export default function ContractsTab() {
         <div style={MODAL}>
           <div style={mBox(440)}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#DC2626' }}>Terminate Contract</h3>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-danger-text)' }}>Terminate Contract</h3>
               <button onClick={() => setShowTerminate(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={20} color="#94A3B8" /></button>
             </div>
-            <div style={{ marginBottom: 16, padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#B91C1C' }}>
+            <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text-strong)' }}>
               This permanently terminates the contract. A reason is required for the audit trail.
             </div>
             <div style={{ marginBottom: 14 }}>
@@ -1163,7 +1163,7 @@ export default function ContractsTab() {
         <div style={MODAL}>
           <div style={mBox(620)}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>Edit Contract</h3>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>Edit Contract</h3>
               <button onClick={() => setShowEditContract(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={20} color="#94A3B8" /></button>
             </div>
 
@@ -1193,7 +1193,7 @@ export default function ContractsTab() {
                 <>
                   {remainingTokens.length > 0 && (
                     <Sect title="Remaining Placeholders">
-                      <div style={{ marginBottom: 10, padding: '9px 12px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, fontSize: 12, color: '#92400E' }}>
+                      <div style={{ marginBottom: 10, padding: '9px 12px', background: 'var(--hf-warning-soft)', border: '1px solid var(--hf-warning-border)', borderRadius: 8, fontSize: 12, color: 'var(--hf-warning-text-deep)' }}>
                         Still blank in the contract body. Leave any blank to fill in later — only the ones you enter here get updated.
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -1232,15 +1232,15 @@ export default function ContractsTab() {
                         <textarea value={editForm.notes} onChange={e => ef('notes', e.target.value)} rows={2} style={{ ...inp, resize: 'vertical' }} />
                       </div>
                       <div style={{ gridColumn: '1/-1', display: 'flex', alignItems: 'center', gap: 14 }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 500, color: '#374151', cursor: 'pointer' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 500, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
                           <input type="checkbox" checked={editForm.autoRenew} onChange={e => ef('autoRenew', e.target.checked)} />
                           Auto-renew on expiry
                         </label>
                         {editForm.autoRenew && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                            <span style={{ fontSize: 12, color: '#64748B' }}>Renewal notice</span>
+                            <span style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>Renewal notice</span>
                             <input type="number" value={editForm.renewalNoticeDays} onChange={e => ef('renewalNoticeDays', e.target.value)} style={{ ...inp, width: 70 }} />
-                            <span style={{ fontSize: 12, color: '#64748B' }}>days</span>
+                            <span style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>days</span>
                           </div>
                         )}
                       </div>

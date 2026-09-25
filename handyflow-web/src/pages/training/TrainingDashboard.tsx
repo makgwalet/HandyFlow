@@ -14,9 +14,9 @@ interface Page<T> { content: T[]; totalElements: number }
 interface SessionResponse { id: string; courseTitle: string; startDate: string; endDate: string; status: string; enrolledCount: number }
 interface CertificateResponse { id: string; employeeNameSnapshot: string; courseTitleSnapshot: string; expiryDate: string | null; status: string }
 
-const card: React.CSSProperties = { background: "#fff", border: "1px solid #E2E8F0", borderRadius: 14, padding: "18px 20px" }
-const label: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "#94A3B8", letterSpacing: 0.4, textTransform: "uppercase", margin: "0 0 8px" }
-const value: React.CSSProperties = { fontSize: 26, fontWeight: 800, color: "#0F172A", margin: 0 }
+const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: "18px 20px" }
+const label: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", letterSpacing: 0.4, textTransform: "uppercase", margin: "0 0 8px" }
+const value: React.CSSProperties = { fontSize: 26, fontWeight: 800, color: "var(--hf-text)", margin: 0 }
 
 export default function TrainingDashboard() {
   const { data: courses } = useQuery<Page<unknown>>({
@@ -67,33 +67,33 @@ export default function TrainingDashboard() {
         <div style={card}>
           <p style={label}>Certificates expiring (30d)</p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <p style={{ ...value, color: expiringSoon.length > 0 ? "#D97706" : "#0F172A" }}>{expiringSoon.length}</p>
+            <p style={{ ...value, color: expiringSoon.length > 0 ? "var(--hf-warning-text)" : "var(--hf-text)" }}>{expiringSoon.length}</p>
             <Award size={22} color={expiringSoon.length > 0 ? "#D97706" : TRAINING_ACCENT} />
           </div>
         </div>
       </div>
 
       {expiringSoon.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <TriangleAlert size={18} color="#D97706" />
             <div>
-              <p style={{ fontSize: 13, fontWeight: 700, color: "#92400E", margin: 0 }}>{expiringSoon.length} certificate{expiringSoon.length === 1 ? "" : "s"} expiring within 30 days</p>
-              <p style={{ fontSize: 11.5, color: "#B45309", margin: 0 }}>Refresher training may be needed — see the Certificates tab.</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-warning-text-deep)", margin: 0 }}>{expiringSoon.length} certificate{expiringSoon.length === 1 ? "" : "s"} expiring within 30 days</p>
+              <p style={{ fontSize: 11.5, color: "var(--hf-warning-text-strong)", margin: 0 }}>Refresher training may be needed — see the Certificates tab.</p>
             </div>
           </div>
         </div>
       )}
 
-      <p style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", margin: "0 0 10px" }}>Upcoming sessions</p>
+      <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: "0 0 10px" }}>Upcoming sessions</p>
       {!scheduledSessions || scheduledSessions.content.length === 0 ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>Nothing scheduled.</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Nothing scheduled.</p>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {scheduledSessions.content.map((s, i) => (
-            <div key={s.id} style={{ display: "flex", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9" }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", margin: 0 }}>{s.courseTitle}</p>
-              <span style={{ fontSize: 12, color: "#64748B" }}>{s.startDate} → {s.endDate} · {s.enrolledCount} enrolled</span>
+            <div key={s.id} style={{ display: "flex", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)", margin: 0 }}>{s.courseTitle}</p>
+              <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{s.startDate} → {s.endDate} · {s.enrolledCount} enrolled</span>
             </div>
           ))}
         </div>

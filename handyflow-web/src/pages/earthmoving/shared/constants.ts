@@ -4,12 +4,12 @@ import {
 } from "lucide-react"
 
 export const STATUS_CFG: Record<string, { color: string; bg: string; border: string; label: string; icon: React.ElementType }> = {
-  AVAILABLE:   { color: "#166534", bg: "#DCFCE7", border: "#86EFAC", label: "Available",   icon: CheckCircle  },
-  DEPLOYED:    { color: "#1D4ED8", bg: "#EFF6FF", border: "#BFDBFE", label: "Deployed",    icon: MapPin       },
-  MAINTENANCE: { color: "#D97706", bg: "#FFFBEB", border: "#FDE68A", label: "Maintenance", icon: Wrench       },
-  BREAKDOWN:   { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", label: "Breakdown",   icon: AlertTriangle },
-  HIRED_OUT:   { color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE", label: "Hired Out",   icon: Truck        },
-  RETIRED:     { color: "#94A3B8", bg: "#F8FAFC", border: "#E2E8F0", label: "Retired",     icon: Clock        },
+  AVAILABLE:   { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", border: "var(--hf-success-border)", label: "Available",   icon: CheckCircle  },
+  DEPLOYED:    { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", border: "var(--hf-info-border)", label: "Deployed",    icon: MapPin       },
+  MAINTENANCE: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)", label: "Maintenance", icon: Wrench       },
+  BREAKDOWN:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)", label: "Breakdown",   icon: AlertTriangle },
+  HIRED_OUT:   { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", border: "var(--hf-violet-border)", label: "Hired Out",   icon: Truck        },
+  RETIRED:     { color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)", label: "Retired",     icon: Clock        },
 }
 
 export const STATUS_DESCRIPTIONS: Record<string, string> = {
@@ -22,9 +22,9 @@ export const STATUS_DESCRIPTIONS: Record<string, string> = {
 }
 
 export const OWN_TYPE_CFG: Record<string, { color: string; bg: string; label: string }> = {
-  OWN:       { color: "#1B3A6B", bg: "#EFF6FF", label: "Owned"     },
-  HIRED_IN:  { color: "#7C3AED", bg: "#F5F3FF", label: "Hired In"  },
-  HIRED_OUT: { color: "#D97706", bg: "#FFFBEB", label: "Hired Out" },
+  OWN:       { color: "var(--hf-primary-text)", bg: "var(--hf-info-soft)", label: "Owned"     },
+  HIRED_IN:  { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", label: "Hired In"  },
+  HIRED_OUT: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", label: "Hired Out" },
 }
 
 export const ASSET_TYPES = [
@@ -49,23 +49,23 @@ export const MAINTENANCE_TYPES = [
 ]
 
 export const MAINTENANCE_TYPE_CFG: Record<string, { color: string; bg: string }> = {
-  SERVICE:    { color: "#166534", bg: "#DCFCE7" },
-  REPAIR:     { color: "#DC2626", bg: "#FEF2F2" },
-  INSPECTION: { color: "#1D4ED8", bg: "#EFF6FF" },
-  TYRE:       { color: "#D97706", bg: "#FFFBEB" },
-  BATTERY:    { color: "#7C3AED", bg: "#F3E8FF" },
-  ELECTRICAL: { color: "#0369A1", bg: "#F0F9FF" },
-  HYDRAULICS: { color: "#0891B2", bg: "#ECFEFF" },
-  ENGINE:     { color: "#B45309", bg: "#FEF3C7" },
-  TRACKS:     { color: "#374151", bg: "#F9FAFB" },
-  OTHER:      { color: "#64748B", bg: "#F8FAFC" },
+  SERVICE:    { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+  REPAIR:     { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
+  INSPECTION: { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+  TYRE:       { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+  BATTERY:    { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft-strong)" },
+  ELECTRICAL: { color: "var(--hf-sky-text-strong)", bg: "var(--hf-sky-soft)" },
+  HYDRAULICS: { color: "var(--hf-sky-text)", bg: "var(--hf-sky-soft)" },
+  ENGINE:     { color: "var(--hf-warning-text-strong)", bg: "var(--hf-warning-soft-strong)" },
+  TRACKS:     { color: "var(--hf-text-secondary)", bg: "var(--hf-surface-muted)" },
+  OTHER:      { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)" },
 }
 
 export const INCIDENT_TYPES = ["BREAKDOWN", "ACCIDENT", "THEFT", "FIRE", "ROLLOVER", "NEAR_MISS", "FUEL_SPILL", "OTHER"]
 
 export const SEVERITY_CFG: Record<string, { color: string; bg: string; border: string }> = {
-  CRITICAL: { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" },
-  HIGH:     { color: "#EA580C", bg: "#FFF7ED", border: "#FED7AA" },
-  MEDIUM:   { color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
-  LOW:      { color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0" },
+  CRITICAL: { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)" },
+  HIGH:     { color: "var(--hf-orange-text)", bg: "var(--hf-orange-soft)", border: "var(--hf-orange-border)" },
+  MEDIUM:   { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)" },
+  LOW:      { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)" },
 }

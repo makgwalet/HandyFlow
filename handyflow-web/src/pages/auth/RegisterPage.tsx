@@ -153,7 +153,7 @@ export function RegisterPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0F172A 0%, #1B3A6B 50%, #0D9488 100%)',
+      background: 'linear-gradient(135deg, var(--hf-inverse-surface) 0%, var(--hf-primary) 50%, var(--hf-accent) 100%)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: '24px 16px', fontFamily: "'Inter', system-ui, sans-serif",
     }}>
@@ -162,7 +162,7 @@ export function RegisterPage() {
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-            <div style={{ width: 38, height: 38, background: '#0D9488', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 38, height: 38, background: 'var(--hf-accent)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Building2 size={19} color="white" strokeWidth={2.5} />
             </div>
             <span style={{ fontSize: 20, fontWeight: 800, color: 'white', letterSpacing: '-0.5px' }}>HandyFlow</span>
@@ -180,14 +180,14 @@ export function RegisterPage() {
               return (
                 <div key={label} style={{ display: 'flex', alignItems: 'center' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: done ? '#0D9488' : active ? 'white' : 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: done ? 'var(--hf-accent)' : active ? 'white' : 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {done ? <Check size={12} color="white" strokeWidth={3} />
-                        : <span style={{ fontSize: 12, fontWeight: 700, color: active ? '#1B3A6B' : 'rgba(255,255,255,0.4)' }}>{sn}</span>}
+                        : <span style={{ fontSize: 12, fontWeight: 700, color: active ? 'var(--hf-primary-text)' : 'rgba(255,255,255,0.4)' }}>{sn}</span>}
                     </div>
                     <span style={{ fontSize: 10, fontWeight: active ? 600 : 400, color: active ? 'white' : 'rgba(255,255,255,0.4)' }}>{label}</span>
                   </div>
                   {i < steps.length - 2 && (
-                    <div style={{ width: 48, height: 2, background: done ? '#0D9488' : 'rgba(255,255,255,0.15)', margin: '0 6px', marginBottom: 18 }} />
+                    <div style={{ width: 48, height: 2, background: done ? 'var(--hf-accent)' : 'rgba(255,255,255,0.15)', margin: '0 6px', marginBottom: 18 }} />
                   )}
                 </div>
               )
@@ -201,8 +201,8 @@ export function RegisterPage() {
           {/* STEP 0 — Plan selection */}
           {step === 0 && (
             <div>
-              <h2 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: '0 0 4px' }}>Get started with HandyFlow</h2>
-              <p style={{ fontSize: 14, color: '#64748B', margin: '0 0 24px' }}>Choose how you'd like to begin. You can always upgrade later.</p>
+              <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 4px' }}>Get started with HandyFlow</h2>
+              <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', margin: '0 0 24px' }}>Choose how you'd like to begin. You can always upgrade later.</p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {[
@@ -231,18 +231,18 @@ export function RegisterPage() {
                   const Icon = opt.icon
                   return (
                     <div key={opt.type} onClick={() => setPlanType(opt.type)}
-                      style={{ border: `2px solid ${sel ? opt.selectedBorder : '#E2E8F0'}`, borderRadius: 14, padding: '18px 20px', cursor: 'pointer', background: sel ? opt.selectedBg : '#fff', transition: 'all 0.15s' }}>
+                      style={{ border: `2px solid ${sel ? opt.selectedBorder : '#E2E8F0'}`, borderRadius: 14, padding: '18px 20px', cursor: 'pointer', background: sel ? opt.selectedBg : 'var(--hf-surface)', transition: 'all 0.15s' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                           <div style={{ width: 40, height: 40, borderRadius: 10, background: opt.iconBg, border: `2px solid ${opt.iconBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             <Icon size={18} color={opt.iconColor} />
                           </div>
                           <div>
-                            <div style={{ fontWeight: 700, fontSize: 15, color: '#0F172A', marginBottom: 3 }}>
+                            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--hf-text)', marginBottom: 3 }}>
                               {opt.title}
                               <span style={{ marginLeft: 8, background: opt.badgeBg, color: opt.badgeColor, fontSize: 11, padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>{opt.badge}</span>
                             </div>
-                            <div style={{ fontSize: 13, color: '#64748B', lineHeight: 1.5, maxWidth: 380 }}>{opt.desc}</div>
+                            <div style={{ fontSize: 13, color: 'var(--hf-text-muted)', lineHeight: 1.5, maxWidth: 380 }}>{opt.desc}</div>
                             <div style={{ display: 'flex', gap: 14, marginTop: 10, flexWrap: 'wrap' }}>
                               {opt.features.map(f => (
                                 <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: opt.featColor }}>
@@ -266,9 +266,9 @@ export function RegisterPage() {
                 Continue <ChevronRight size={16} />
               </button>
 
-              <p style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: '#94A3B8' }}>
+              <p style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: 'var(--hf-text-faint)' }}>
                 Already have an account?{' '}
-                <a href="/login" style={{ color: '#1B3A6B', fontWeight: 600, textDecoration: 'none' }}>Sign in</a>
+                <a href="/login" style={{ color: 'var(--hf-primary-text)', fontWeight: 600, textDecoration: 'none' }}>Sign in</a>
               </p>
             </div>
           )}
@@ -276,8 +276,8 @@ export function RegisterPage() {
           {/* STEP 1 — Company */}
           {step === 1 && (
             <div>
-              <h2 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: '0 0 4px' }}>Set up your company</h2>
-              <p style={{ fontSize: 14, color: '#64748B', margin: '0 0 24px' }}>You can update these details later in Settings.</p>
+              <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 4px' }}>Set up your company</h2>
+              <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', margin: '0 0 24px' }}>You can update these details later in Settings.</p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <Field label="Company Name *">
@@ -289,7 +289,7 @@ export function RegisterPage() {
                     onChange={e => cf('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                     placeholder="zeta-earthmoving" style={inputStyle} />
                   {company.slug && (
-                    <div style={{ marginTop: 5, fontSize: 12, color: '#0D9488' }}>Login slug: <strong>{company.slug}</strong></div>
+                    <div style={{ marginTop: 5, fontSize: 12, color: 'var(--hf-accent-text)' }}>Login slug: <strong>{company.slug}</strong></div>
                   )}
                 </Field>
                 <Field label="Phone Number">
@@ -313,9 +313,9 @@ export function RegisterPage() {
           {/* STEP 2 — Pilot: pick 1 module */}
           {step === 2 && planType === 'pilot' && (
             <div>
-              <h2 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: '0 0 4px' }}>Choose your pilot module</h2>
-              <p style={{ fontSize: 14, color: '#64748B', margin: '0 0 8px' }}>Select <strong>one module</strong> to trial. CRM, Invoicing & Catalogue are always free.</p>
-              <div style={{ padding: '10px 14px', background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 8, fontSize: 13, color: '#166534', marginBottom: 20 }}>
+              <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 4px' }}>Choose your pilot module</h2>
+              <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', margin: '0 0 8px' }}>Select <strong>one module</strong> to trial. CRM, Invoicing & Catalogue are always free.</p>
+              <div style={{ padding: '10px 14px', background: 'var(--hf-success-soft)', border: '1px solid var(--hf-success-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-success-text-strong)', marginBottom: 20 }}>
                 After your 60-day pilot you can add more modules. Your data is always kept safe.
               </div>
 
@@ -326,7 +326,7 @@ export function RegisterPage() {
                   const c = MODULE_COLORS[m.moduleKey] || { bg: '#F8FAFC', color: '#64748B' }
                   return (
                     <div key={m.moduleKey} onClick={() => setPilotModule(m.moduleKey)}
-                      style={{ border: sel ? `2px solid ${c.color}` : '2px solid #E2E8F0', borderRadius: 12, padding: '14px 16px', cursor: 'pointer', background: sel ? c.bg : '#fff', position: 'relative', transition: 'all 0.15s' }}>
+                      style={{ border: sel ? `2px solid ${c.color}` : '2px solid var(--hf-border)', borderRadius: 12, padding: '14px 16px', cursor: 'pointer', background: sel ? c.bg : 'var(--hf-surface)', position: 'relative', transition: 'all 0.15s' }}>
                       {sel && (
                         <div style={{ position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <Check size={10} color="white" strokeWidth={3} />
@@ -335,8 +335,8 @@ export function RegisterPage() {
                       <div style={{ width: 32, height: 32, borderRadius: 8, background: c.bg, border: `1px solid ${c.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
                         <Icon size={16} color={c.color} />
                       </div>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: '#0F172A', marginBottom: 2 }}>{m.name}</div>
-                      <div style={{ fontSize: 11, color: '#94A3B8', lineHeight: 1.4, marginBottom: 6 }}>{m.description}</div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)', marginBottom: 2 }}>{m.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', lineHeight: 1.4, marginBottom: 6 }}>{m.description}</div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: c.color }}>R {m.monthlyPrice}/mo after trial</div>
                     </div>
                   )
@@ -360,23 +360,23 @@ export function RegisterPage() {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                 <div>
-                  <h2 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: '0 0 4px' }}>Choose your modules</h2>
-                  <p style={{ fontSize: 14, color: '#64748B', margin: 0 }}>All modules start on a 60-day free trial. Add or remove anytime in Billing.</p>
+                  <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 4px' }}>Choose your modules</h2>
+                  <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', margin: 0 }}>All modules start on a 60-day free trial. Add or remove anytime in Billing.</p>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 20 }}>
-                  <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 2 }}>AFTER 60-DAY TRIAL</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: '#1B3A6B' }}>R {monthlyTotal.toLocaleString('en-ZA')}/mo</div>
-                  <div style={{ fontSize: 11, color: '#94A3B8' }}>{selectedModules.size} modules · Free now</div>
+                  <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginBottom: 2 }}>AFTER 60-DAY TRIAL</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-primary-text)' }}>R {monthlyTotal.toLocaleString('en-ZA')}/mo</div>
+                  <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{selectedModules.size} modules · Free now</div>
                 </div>
               </div>
 
-              <div style={{ padding: '10px 14px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 8, fontSize: 13, color: '#1D4ED8', marginBottom: 20 }}>
+              <div style={{ padding: '10px 14px', background: 'var(--hf-info-soft)', border: '1px solid var(--hf-info-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-info-text)', marginBottom: 20 }}>
                 CRM, Invoicing and Catalogue are free in every plan.
               </div>
 
               {['Core', 'Industry', 'Business'].map(cat => (
                 <div key={cat} style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.06em', marginBottom: 10 }}>{cat.toUpperCase()}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', letterSpacing: '0.06em', marginBottom: 10 }}>{cat.toUpperCase()}</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))', gap: 10 }}>
                     {ALL_MODULES.filter(m => m.category === cat).map(m => {
                       const isCore = CORE_KEYS.includes(m.moduleKey)
@@ -385,19 +385,19 @@ export function RegisterPage() {
                       const c = MODULE_COLORS[m.moduleKey] || { bg: '#F8FAFC', color: '#64748B' }
                       return (
                         <div key={m.moduleKey} onClick={() => !isCore && togglePaidModule(m.moduleKey)}
-                          style={{ border: sel ? `2px solid ${c.color}` : '2px solid #E2E8F0', borderRadius: 12, padding: '14px 16px', cursor: isCore ? 'default' : 'pointer', background: sel ? c.bg : '#fff', position: 'relative', transition: 'all 0.15s' }}>
+                          style={{ border: sel ? `2px solid ${c.color}` : '2px solid var(--hf-border)', borderRadius: 12, padding: '14px 16px', cursor: isCore ? 'default' : 'pointer', background: sel ? c.bg : 'var(--hf-surface)', position: 'relative', transition: 'all 0.15s' }}>
                           {sel && !isCore && (
                             <div style={{ position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               <Check size={10} color="white" strokeWidth={3} />
                             </div>
                           )}
-                          {isCore && <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 9, background: '#F1F5F9', color: '#64748B', padding: '1px 5px', borderRadius: 4, fontWeight: 600 }}>FREE</div>}
+                          {isCore && <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 9, background: 'var(--hf-surface-sunken)', color: 'var(--hf-text-muted)', padding: '1px 5px', borderRadius: 4, fontWeight: 600 }}>FREE</div>}
                           <div style={{ width: 32, height: 32, borderRadius: 8, background: c.bg, border: `1px solid ${c.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
                             <Icon size={16} color={c.color} />
                           </div>
-                          <div style={{ fontWeight: 700, fontSize: 13, color: '#0F172A', marginBottom: 2 }}>{m.name}</div>
-                          <div style={{ fontSize: 11, color: '#94A3B8', lineHeight: 1.4, marginBottom: 6 }}>{m.description}</div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: m.monthlyPrice === 0 ? '#166534' : c.color }}>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)', marginBottom: 2 }}>{m.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', lineHeight: 1.4, marginBottom: 6 }}>{m.description}</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: m.monthlyPrice === 0 ? 'var(--hf-success-text-strong)' : c.color }}>
                             {m.monthlyPrice === 0 ? 'Included free' : `R ${m.monthlyPrice}/mo after trial`}
                           </div>
                         </div>
@@ -421,8 +421,8 @@ export function RegisterPage() {
           {/* STEP 3 — Account (both plan types) */}
           {step === 3 && (
             <div>
-              <h2 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: '0 0 4px' }}>Create your account</h2>
-              <p style={{ fontSize: 14, color: '#64748B', margin: '0 0 24px' }}>
+              <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 4px' }}>Create your account</h2>
+              <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', margin: '0 0 24px' }}>
                 You'll use this to sign in to <strong>{company.companyName}</strong>.
               </p>
 
@@ -444,7 +444,7 @@ export function RegisterPage() {
                       onChange={e => af('password', e.target.value)} placeholder="At least 8 characters"
                       style={{ ...inputStyle, paddingRight: 44 }} />
                     <button type="button" onClick={() => setShowPass(s => !s)}
-                      style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+                      style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)' }}>
                       {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
@@ -453,21 +453,21 @@ export function RegisterPage() {
                   <div style={{ position: 'relative' }}>
                     <input type={showConfirmPass ? 'text' : 'password'} value={account.confirmPassword}
                       onChange={e => af('confirmPassword', e.target.value)} placeholder="Re-enter your password"
-                      style={{ ...inputStyle, paddingRight: 44, borderColor: account.confirmPassword && account.password !== account.confirmPassword ? '#DC2626' : '#E2E8F0' }} />
+                      style={{ ...inputStyle, paddingRight: 44, borderColor: account.confirmPassword && account.password !== account.confirmPassword ? 'var(--hf-danger)' : 'var(--hf-border)' }} />
                     <button type="button" onClick={() => setShowConfirmPass(s => !s)}
-                      style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+                      style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)' }}>
                       {showConfirmPass ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                   {account.confirmPassword && account.password !== account.confirmPassword && (
-                    <div style={{ marginTop: 4, fontSize: 12, color: '#DC2626' }}>Passwords do not match</div>
+                    <div style={{ marginTop: 4, fontSize: 12, color: 'var(--hf-danger-text)' }}>Passwords do not match</div>
                   )}
                 </Field>
               </div>
 
               {/* Summary */}
-              <div style={{ marginTop: 20, padding: '14px 16px', background: '#F8FAFC', borderRadius: 10, border: '1px solid #E2E8F0' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#64748B', marginBottom: 10, letterSpacing: '0.05em' }}>YOUR PLAN SUMMARY</div>
+              <div style={{ marginTop: 20, padding: '14px 16px', background: 'var(--hf-surface-muted)', borderRadius: 10, border: '1px solid var(--hf-border)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', marginBottom: 10, letterSpacing: '0.05em' }}>YOUR PLAN SUMMARY</div>
                 {[
                   ['Company', company.companyName],
                   ['Plan type', planType === 'pilot' ? '60-day Pilot (1 industry module)' : 'Full signup'],
@@ -475,13 +475,13 @@ export function RegisterPage() {
                   ['Trial period', '60 days free on all modules'],
                 ].map(([label, value]) => (
                   <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5 }}>
-                    <span style={{ color: '#64748B' }}>{label}</span>
-                    <span style={{ fontWeight: 600, color: '#0F172A' }}>{value}</span>
+                    <span style={{ color: 'var(--hf-text-muted)' }}>{label}</span>
+                    <span style={{ fontWeight: 600, color: 'var(--hf-text)' }}>{value}</span>
                   </div>
                 ))}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderTop: '1px solid #E2E8F0', paddingTop: 8, marginTop: 4 }}>
-                  <span style={{ color: '#64748B' }}>After trial</span>
-                  <span style={{ fontWeight: 700, color: monthlyTotal === 0 ? '#166534' : '#0F172A' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderTop: '1px solid var(--hf-border)', paddingTop: 8, marginTop: 4 }}>
+                  <span style={{ color: 'var(--hf-text-muted)' }}>After trial</span>
+                  <span style={{ fontWeight: 700, color: monthlyTotal === 0 ? 'var(--hf-success-text-strong)' : 'var(--hf-text)' }}>
                     {monthlyTotal === 0 ? 'Free' : `R ${monthlyTotal.toLocaleString('en-ZA')}/month`}
                   </span>
                 </div>
@@ -489,15 +489,15 @@ export function RegisterPage() {
 
               {/* Terms */}
               <div onClick={() => setAgreedToTerms(t => !t)}
-                style={{ marginTop: 16, padding: '12px 14px', background: agreedToTerms ? '#F0FDF4' : '#F8FAFC', border: `1px solid ${agreedToTerms ? '#86EFAC' : '#E2E8F0'}`, borderRadius: 10, cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                <div style={{ width: 18, height: 18, borderRadius: 5, flexShrink: 0, marginTop: 1, border: `2px solid ${agreedToTerms ? '#0D9488' : '#D1D5DB'}`, background: agreedToTerms ? '#0D9488' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                style={{ marginTop: 16, padding: '12px 14px', background: agreedToTerms ? 'var(--hf-success-soft)' : 'var(--hf-surface-muted)', border: `1px solid ${agreedToTerms ? '#86EFAC' : '#E2E8F0'}`, borderRadius: 10, cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <div style={{ width: 18, height: 18, borderRadius: 5, flexShrink: 0, marginTop: 1, border: `2px solid ${agreedToTerms ? '#0D9488' : '#D1D5DB'}`, background: agreedToTerms ? 'var(--hf-accent)' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {agreedToTerms && <Check size={11} color="white" strokeWidth={3} />}
                 </div>
-                <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.5 }}>
+                <div style={{ fontSize: 13, color: 'var(--hf-text-tertiary)', lineHeight: 1.5 }}>
                   I agree to HandyFlow's{' '}
-                  <a href="/terms" target="_blank" onClick={e => e.stopPropagation()} style={{ color: '#1B3A6B', fontWeight: 600, textDecoration: 'none' }}>Terms of Service <ExternalLink size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /></a>
+                  <a href="/terms" target="_blank" onClick={e => e.stopPropagation()} style={{ color: 'var(--hf-primary-text)', fontWeight: 600, textDecoration: 'none' }}>Terms of Service <ExternalLink size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /></a>
                   {' '}and{' '}
-                  <a href="/privacy" target="_blank" onClick={e => e.stopPropagation()} style={{ color: '#1B3A6B', fontWeight: 600, textDecoration: 'none' }}>Privacy Policy <ExternalLink size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /></a>.
+                  <a href="/privacy" target="_blank" onClick={e => e.stopPropagation()} style={{ color: 'var(--hf-primary-text)', fontWeight: 600, textDecoration: 'none' }}>Privacy Policy <ExternalLink size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /></a>.
                   {' '}My data will be processed in accordance with POPIA.
                   {planType === 'paid' && ' After the 60-day trial, selected modules will be billed monthly.'}
                 </div>
@@ -513,9 +513,9 @@ export function RegisterPage() {
                 </button>
               </div>
 
-              <p style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: '#94A3B8' }}>
+              <p style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: 'var(--hf-text-faint)' }}>
                 Already have an account?{' '}
-                <a href="/login" style={{ color: '#1B3A6B', fontWeight: 600, textDecoration: 'none' }}>Sign in</a>
+                <a href="/login" style={{ color: 'var(--hf-primary-text)', fontWeight: 600, textDecoration: 'none' }}>Sign in</a>
               </p>
             </div>
           )}
@@ -528,16 +528,16 @@ export function RegisterPage() {
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>{label}</label>
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 6 }}>{label}</label>
       {children}
-      {hint && <div style={{ marginTop: 5, fontSize: 12, color: '#94A3B8' }}>{hint}</div>}
+      {hint && <div style={{ marginTop: 5, fontSize: 12, color: 'var(--hf-text-faint)' }}>{hint}</div>}
     </div>
   )
 }
 
 function ErrMsg({ msg }: { msg: string }) {
   return (
-    <div style={{ marginTop: 12, padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>{msg}</div>
+    <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>{msg}</div>
   )
 }
 

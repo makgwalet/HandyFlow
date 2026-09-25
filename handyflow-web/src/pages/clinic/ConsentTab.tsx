@@ -81,7 +81,7 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
 
   return (
     <div>
-      <div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 16px",background:"#EFF6FF",border:"1px solid #BFDBFE",borderRadius:10,marginBottom:20,fontSize:12,color:"#1E40AF"}}>
+      <div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 16px",background:"var(--hf-info-soft)",border:"1px solid var(--hf-info-border)",borderRadius:10,marginBottom:20,fontSize:12,color:"var(--hf-info-text-strong)"}}>
         <Info size={15} style={{flexShrink:0,marginTop:1}}/>
         <div>
           Tracks consent for processing this patient's health information under POPIA
@@ -92,14 +92,14 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
       </div>
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-        <div style={{fontSize:14,fontWeight:700,color:"#0F172A"}}>Consent status</div>
+        <div style={{fontSize:14,fontWeight:700,color:"var(--hf-text)"}}>Consent status</div>
         <div style={{display:"flex",gap:8}}>
           <button onClick={()=>setShowHistory(true)}
-            style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",border:`1px solid ${BORDER}`,borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",background:"#fff",color:NAVY}}>
+            style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",border:`1px solid ${BORDER}`,borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",background:"var(--hf-surface)",color:NAVY}}>
             <Clock size={14}/> History
           </button>
           <button onClick={()=>{setShowRecord(true);setApiError("")}}
-            style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",border:"none",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",background:NAVY,color:"#fff"}}>
+            style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",border:"none",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",background:NAVY,color:"var(--hf-text-on-solid)"}}>
             <Plus size={14}/> Record consent
           </button>
         </div>
@@ -117,7 +117,7 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
                   <Icon size={18} color={c.color}/>
                   <div>
-                    <div style={{fontSize:13,fontWeight:600,color:"#0F172A"}}>{TYPE_LABELS[s.consentType] ?? s.consentType}</div>
+                    <div style={{fontSize:13,fontWeight:600,color:"var(--hf-text)"}}>{TYPE_LABELS[s.consentType] ?? s.consentType}</div>
                     {s.lastActionAt && (
                       <div style={{fontSize:11,color:GRAY,marginTop:2}}>
                         {fmtDT(s.lastActionAt)}{s.method ? ` · ${METHOD_LABELS[s.method] ?? s.method}` : ""}
@@ -125,7 +125,7 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
                     )}
                   </div>
                 </div>
-                <span style={{background:c.color,color:"#fff",padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700}}>{c.label}</span>
+                <span style={{background:c.color,color:"var(--hf-text-on-solid)",padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700}}>{c.label}</span>
               </div>
             )
           })}
@@ -134,10 +134,10 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
 
       {showRecord && (
         <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
-          <div style={{background:"#fff",borderRadius:16,padding:28,width:460,boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
+          <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:460,boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"#0F172A"}}>Record Consent</h3>
-              <button onClick={()=>setShowRecord(false)} style={{background:"none",border:"none",cursor:"pointer",color:"#94A3B8"}}><X size={20}/></button>
+              <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"var(--hf-text)"}}>Record Consent</h3>
+              <button onClick={()=>setShowRecord(false)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--hf-text-faint)"}}><X size={20}/></button>
             </div>
 
             <label style={lbl}>Consent type *</label>
@@ -151,7 +151,7 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
                 <button key={a} onClick={()=>setForm(f=>({...f,action:a}))}
                   style={{flex:1,padding:"9px",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",
                     border: form.action===a ? `2px solid ${a==="GRANTED"?GREEN:RED}` : `1.5px solid ${BORDER}`,
-                    background: form.action===a ? (a==="GRANTED"?"#F0FDF4":"#FEF2F2") : "#fff",
+                    background: form.action===a ? (a==="GRANTED"?"var(--hf-success-soft)":"var(--hf-danger-soft)") : "var(--hf-surface)",
                     color: form.action===a ? (a==="GRANTED"?GREEN:RED) : GRAY}}>
                   {a==="GRANTED"?"Grant":"Revoke"}
                 </button>
@@ -172,13 +172,13 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
               placeholder="e.g. Signed consent form on file" style={inp}/>
 
             {apiError && (
-              <div style={{marginTop:4,marginBottom:14,padding:"10px 12px",background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,fontSize:13,color:RED}}>{apiError}</div>
+              <div style={{marginTop:4,marginBottom:14,padding:"10px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:RED}}>{apiError}</div>
             )}
 
             <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:6}}>
-              <button onClick={()=>setShowRecord(false)} style={{padding:"9px 18px",border:"1px solid #E2E8F0",borderRadius:9,background:"#fff",fontSize:14,cursor:"pointer"}}>Cancel</button>
+              <button onClick={()=>setShowRecord(false)} style={{padding:"9px 18px",border:"1px solid var(--hf-border)",borderRadius:9,background:"var(--hf-surface)",fontSize:14,cursor:"pointer"}}>Cancel</button>
               <button onClick={()=>recordConsent.mutate()} disabled={recordConsent.isPending}
-                style={{padding:"9px 20px",border:"none",borderRadius:9,background:NAVY,color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer"}}>
+                style={{padding:"9px 20px",border:"none",borderRadius:9,background:NAVY,color:"var(--hf-text-on-solid)",fontSize:14,fontWeight:600,cursor:"pointer"}}>
                 {recordConsent.isPending ? "Saving..." : "Record"}
               </button>
             </div>
@@ -188,10 +188,10 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
 
       {showHistory && (
         <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
-          <div style={{background:"#fff",borderRadius:16,padding:28,width:560,maxHeight:"80vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
+          <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:560,maxHeight:"80vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"#0F172A"}}>Consent History</h3>
-              <button onClick={()=>setShowHistory(false)} style={{background:"none",border:"none",cursor:"pointer",color:"#94A3B8"}}><X size={20}/></button>
+              <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"var(--hf-text)"}}>Consent History</h3>
+              <button onClick={()=>setShowHistory(false)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--hf-text-faint)"}}><X size={20}/></button>
             </div>
             {history.length === 0 ? (
               <div style={{textAlign:"center",padding:30,color:GRAY,fontSize:13}}>No consent events recorded yet.</div>
@@ -204,7 +204,7 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
                     <div key={h.id} style={{display:"flex",gap:10,padding:"10px 14px",background:LIGHT,borderRadius:8}}>
                       <Icon size={16} color={c.color} style={{flexShrink:0,marginTop:2}}/>
                       <div style={{flex:1}}>
-                        <div style={{fontSize:13,fontWeight:600,color:"#0F172A"}}>
+                        <div style={{fontSize:13,fontWeight:600,color:"var(--hf-text)"}}>
                           {TYPE_LABELS[h.consentType] ?? h.consentType} — <span style={{color:c.color}}>{c.label}</span>
                         </div>
                         <div style={{fontSize:11,color:GRAY,marginTop:2}}>
@@ -212,7 +212,7 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
                           {h.method ? ` · ${METHOD_LABELS[h.method] ?? h.method}` : ""}
                           {h.capturedByName ? ` · by ${h.capturedByName}` : ""}
                         </div>
-                        {h.notes && <div style={{fontSize:12,color:"#374151",marginTop:4}}>{h.notes}</div>}
+                        {h.notes && <div style={{fontSize:12,color:"var(--hf-text-secondary)",marginTop:4}}>{h.notes}</div>}
                       </div>
                     </div>
                   )

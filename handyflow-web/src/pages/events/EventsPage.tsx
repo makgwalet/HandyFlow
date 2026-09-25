@@ -51,12 +51,12 @@ export function EventsPage() {
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: "#0284C7", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--hf-sky)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <PartyPopper size={18} color="#fff" />
           </div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#0F172A", margin: 0 }}>Events</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Events</h1>
         </div>
-        <p style={{ fontSize: 13, color: "#94A3B8", margin: 0, paddingLeft: 46 }}>
+        <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0, paddingLeft: 46 }}>
           Ticketing · QR check-in · Vendor coordination · Analytics
         </p>
       </div>
@@ -64,10 +64,10 @@ export function EventsPage() {
       {/* KPI strip */}
       <div style={{ display: "flex", gap: 12, marginBottom: 22, flexWrap: "wrap" }}>
         {[
-          { label: "Total events",   value: total,     color: "#0284C7", bg: "#F0F9FF" },
-          { label: "Live now",       value: live,      color: live > 0 ? "#DC2626" : "#64748B",      bg: live > 0 ? "#FEF2F2" : "#F8FAFC" },
-          { label: "Open for reg",   value: published, color: "#166534", bg: "#DCFCE7" },
-          { label: "Upcoming",       value: upcoming,  color: "#D97706", bg: "#FFFBEB" },
+          { label: "Total events",   value: total,     color: "var(--hf-sky-text)", bg: "var(--hf-sky-soft)" },
+          { label: "Live now",       value: live,      color: live > 0 ? "var(--hf-danger-text)" : "var(--hf-text-muted)",      bg: live > 0 ? "var(--hf-danger-soft)" : "var(--hf-surface-muted)" },
+          { label: "Open for reg",   value: published, color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+          { label: "Upcoming",       value: upcoming,  color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: "12px 18px", minWidth: 130 }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: k.color }}>{k.value}</div>
@@ -77,8 +77,8 @@ export function EventsPage() {
       </div>
 
       {/* Main card */}
-      <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 14, padding: 24 }}>
-        <div style={{ display: "flex", gap: 2, borderBottom: "1px solid #E2E8F0", marginBottom: 28, overflowX: "auto" }}>
+      <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: 24 }}>
+        <div style={{ display: "flex", gap: 2, borderBottom: "1px solid var(--hf-border)", marginBottom: 28, overflowX: "auto" }}>
           {TABS.map(tab => {
             const Icon   = tab.icon
             const active = activeTab === tab.id
@@ -89,12 +89,12 @@ export function EventsPage() {
                   padding: "10px 18px", background: "none", border: "none",
                   whiteSpace: "nowrap" as const,
                   borderBottom: active ? "2px solid #0284C7" : "2px solid transparent",
-                  color: active ? "#0284C7" : "#64748B",
+                  color: active ? "var(--hf-sky-text)" : "var(--hf-text-muted)",
                   fontWeight: active ? 600 : 400, fontSize: 14, cursor: "pointer", marginBottom: -1,
                 }}>
                 <Icon size={15} />{tab.label}
                 {tab.id !== "events" && tab.id !== "analytics" && selectedEventId && (
-                  <span style={{ background: "#E0F2FE", color: "#0284C7", fontSize: 10, padding: "1px 7px", borderRadius: 10, fontWeight: 700 }}>
+                  <span style={{ background: "var(--hf-sky-soft-strong)", color: "var(--hf-sky-text)", fontSize: 10, padding: "1px 7px", borderRadius: 10, fontWeight: 700 }}>
                     {selectedEventTitle.length > 14 ? selectedEventTitle.slice(0, 14) + "…" : selectedEventTitle}
                   </span>
                 )}

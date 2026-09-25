@@ -40,15 +40,15 @@ export function AuditorPortalHomePage() {
   }, [navigate])
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F8FAFC", fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 32px", background: "#fff", borderBottom: `1px solid ${BORDER}` }}>
+    <div style={{ minHeight: "100vh", background: "var(--hf-surface-muted)", fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 32px", background: "var(--hf-surface)", borderBottom: `1px solid ${BORDER}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: NAVY, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13 }}>H</div>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: NAVY, color: "var(--hf-text-on-solid)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13 }}>H</div>
           <span style={{ fontSize: 14, fontWeight: 800, color: INK }}>Auditor Access</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 13, color: MUTED }}>{user?.fullName ?? user?.email}</span>
-          <button onClick={logout} style={{ padding: "6px 12px", background: "#fff", color: NAVY, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Log out</button>
+          <button onClick={logout} style={{ padding: "6px 12px", background: "var(--hf-surface)", color: NAVY, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Log out</button>
         </div>
       </div>
 
@@ -61,14 +61,14 @@ export function AuditorPortalHomePage() {
         {loading ? (
           <div style={{ color: FAINT, fontSize: 13 }}>Loading…</div>
         ) : tenants.length === 0 ? (
-          <div style={{ padding: 40, textAlign: "center" as const, color: FAINT, fontSize: 14, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
+          <div style={{ padding: 40, textAlign: "center" as const, color: FAINT, fontSize: 14, background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
             No businesses have granted you access yet.
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 480 }}>
             {tenants.map(t => (
               <button key={t.tenantId} onClick={() => navigate(`/auditor/portal/tenants/${t.tenantId}`)}
-                style={{ textAlign: "left" as const, padding: "14px 16px", background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, cursor: "pointer" }}>
+                style={{ textAlign: "left" as const, padding: "14px 16px", background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, cursor: "pointer" }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: INK }}>Business Access #{t.tenantId.slice(0, 8)}</div>
                 <div style={{ fontSize: 12, color: FAINT, marginTop: 2 }}>Access granted {fmtD(t.acceptedAt)}</div>
               </button>

@@ -100,14 +100,14 @@ export default function DeadlinesTab() {
         ))}
         {filterStatus !== "ALL" && (
           <button onClick={() => setFilterStatus("ALL")}
-            style={{ alignSelf: "center", padding: "6px 12px", border: "1px solid #E2E8F0", borderRadius: 7, background: "#fff", fontSize: 12, cursor: "pointer", color: "#64748B" }}>
+            style={{ alignSelf: "center", padding: "6px 12px", border: "1px solid var(--hf-border)", borderRadius: 7, background: "var(--hf-surface)", fontSize: 12, cursor: "pointer", color: "var(--hf-text-muted)" }}>
             Clear filter
           </button>
         )}
         {/* NEW: closes the audit's "bulk deadline generation" gap. */}
         <button onClick={() => { setBulkResult(null); generateAllMutation.mutate() }}
           disabled={generateAllMutation.isPending}
-          style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+          style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
           <Layers size={14} />
           {generateAllMutation.isPending ? "Generating..." : `Generate ${new Date().getFullYear()} Deadlines — All Clients`}
         </button>
@@ -116,14 +116,14 @@ export default function DeadlinesTab() {
       {bulkResult && (
         <div style={{
           marginBottom: 20, padding: "12px 16px", borderRadius: 10,
-          background: bulkResult.failures?.length > 0 ? "#FFFBEB" : "#DCFCE7",
+          background: bulkResult.failures?.length > 0 ? "var(--hf-warning-soft)" : "var(--hf-success-soft-strong)",
           border: `1px solid ${bulkResult.failures?.length > 0 ? "#FDE68A" : "#86EFAC"}`,
         }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: bulkResult.failures?.length > 0 ? "#92400E" : "#166534", marginBottom: bulkResult.failures?.length > 0 ? 6 : 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: bulkResult.failures?.length > 0 ? "var(--hf-warning-text-deep)" : "var(--hf-success-text-strong)", marginBottom: bulkResult.failures?.length > 0 ? 6 : 0 }}>
             Generated deadlines for {bulkResult.succeeded} of {bulkResult.totalClients} client{bulkResult.totalClients !== 1 ? "s" : ""}.
           </div>
           {bulkResult.failures?.length > 0 && (
-            <div style={{ fontSize: 12, color: "#92400E" }}>
+            <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>
               {bulkResult.failures.map((f: string, i: number) => <div key={i}>{"\u26a0"} {f}</div>)}
             </div>
           )}
@@ -133,21 +133,21 @@ export default function DeadlinesTab() {
       {/* Filters */}
       <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
         <select value={filterType} onChange={e => setFilterType(e.target.value)}
-          style={{ padding: "7px 10px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none", background: "#fff" }}>
+          style={{ padding: "7px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", background: "var(--hf-surface)" }}>
           <option value="ALL">All types</option>
           {Object.keys(TYPE_COLOR).map(t => <option key={t} value={t}>{t}</option>)}
         </select>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          style={{ padding: "7px 10px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none", background: "#fff" }}>
+          style={{ padding: "7px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", background: "var(--hf-surface)" }}>
           <option value="ALL">All statuses</option>
           {Object.keys(STATUS_CFG).map(s => <option key={s} value={s}>{STATUS_CFG[s].label}</option>)}
         </select>
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading deadlines...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading deadlines...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "50px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "50px 20px", color: "var(--hf-text-faint)" }}>
           <Calendar size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
           <div>No deadlines found for the selected filters.</div>
           <div style={{ fontSize: 12, marginTop: 6 }}>Generate deadlines from the Clients tab.</div>
@@ -156,7 +156,7 @@ export default function DeadlinesTab() {
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           {Object.entries(grouped).map(([client, items]: any) => (
             <div key={client}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 8 }}>{client}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 8 }}>{client}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {items.sort((a: any, b: any) => new Date(a.adjustedDueDate).getTime() - new Date(b.adjustedDueDate).getTime())
                   .map((d: any) => {
@@ -168,16 +168,16 @@ export default function DeadlinesTab() {
                         display: "flex", alignItems: "center", justifyContent: "space-between",
                         padding: "11px 16px", border: `1px solid ${overdue ? "#FECACA" : "#E2E8F0"}`,
                         borderLeft: `3px solid ${overdue ? "#DC2626" : tc}`,
-                        borderRadius: 8, background: overdue ? "#FFF8F8" : "#fff", gap: 10,
+                        borderRadius: 8, background: overdue ? "#FFF8F8" : "var(--hf-surface)", gap: 10,
                       }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3, flexWrap: "wrap" }}>
                             <span style={{ background: `${tc}18`, color: tc, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{d.deadlineType}</span>
                             <span style={{ background: sc.bg, color: sc.color, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{sc.label}</span>
-                            {d.periodMonth ? <span style={{ fontSize: 12, color: "#64748B" }}>Period: {d.periodMonth}/{d.periodYear}</span>
-                              : <span style={{ fontSize: 12, color: "#64748B" }}>Year: {d.periodYear}</span>}
+                            {d.periodMonth ? <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Period: {d.periodMonth}/{d.periodYear}</span>
+                              : <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Year: {d.periodYear}</span>}
                           </div>
-                          <div style={{ fontSize: 11, color: "#94A3B8" }}>
+                          <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>
                             Due: {fmtD(d.adjustedDueDate)}
                             {d.statutoryDueDate !== d.adjustedDueDate && ` (statutory: ${fmtD(d.statutoryDueDate)})`}
                             {d.filedDate && ` · Filed: ${fmtD(d.filedDate)}`}
@@ -185,12 +185,12 @@ export default function DeadlinesTab() {
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                          <span style={{ fontWeight: 700, fontSize: 13, color: overdue ? "#DC2626" : d.daysUntilDue <= 7 ? "#D97706" : "#64748B" }}>
+                          <span style={{ fontWeight: 700, fontSize: 13, color: overdue ? "var(--hf-danger-text)" : d.daysUntilDue <= 7 ? "var(--hf-warning-text)" : "var(--hf-text-muted)" }}>
                             {d.status === "FILED" ? "✓" : overdue ? `${Math.abs(d.daysUntilDue)}d late` : `${d.daysUntilDue}d`}
                           </span>
                           {d.status !== "FILED" && d.status !== "WAIVED" && (
                             <button onClick={() => { setFiling(d); setFileForm({ filedDate: today, sarsReference: "", filingAmount: "", notes: "" }) }}
-                              style={{ padding: "5px 12px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                              style={{ padding: "5px 12px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                               File
                             </button>
                           )}
@@ -207,9 +207,9 @@ export default function DeadlinesTab() {
       {/* File modal */}
       {filing && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700 }}>Record Filing</h3>
-            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#64748B" }}>
+            <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--hf-text-muted)" }}>
               {filing.deadlineType} · {filing.clientName} · {filing.periodMonth ? `${filing.periodMonth}/${filing.periodYear}` : filing.periodYear}
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -230,12 +230,12 @@ export default function DeadlinesTab() {
                 <textarea value={fileForm.notes} onChange={e => setFileForm(p => ({ ...p, notes: e.target.value }))} rows={2} style={{ ...inp, resize: "vertical" as const }} />
               </div>
             </div>
-            {error && <div style={{ marginTop: 12, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{error}</div>}
+            {error && <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-              <button onClick={() => setFiling(null)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => setFiling(null)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer" }}>Cancel</button>
               <button disabled={!fileForm.filedDate || fileMutation.isPending}
                 onClick={() => fileMutation.mutate({ clientId: filing.clientId, deadlineId: filing.id, body: { filedDate: fileForm.filedDate, sarsReference: fileForm.sarsReference || null, filingAmount: fileForm.filingAmount ? parseFloat(fileForm.filingAmount) : null, notes: fileForm.notes || null } })}
-                style={{ padding: "9px 22px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {fileMutation.isPending ? "Saving..." : "Record Filing"}
               </button>
             </div>

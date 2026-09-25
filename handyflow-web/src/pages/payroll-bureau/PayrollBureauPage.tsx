@@ -167,13 +167,13 @@ export function PayrollBureauPage() {
 
   return (
     <div style={{ display: "flex", height: "calc(100vh - 60px)", fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <div style={{ width: 300, borderRight: `1px solid ${BORDER}`, background: "#fff", display: "flex", flexDirection: "column" }}>
+      <div style={{ width: 300, borderRight: `1px solid ${BORDER}`, background: "var(--hf-surface)", display: "flex", flexDirection: "column" }}>
         <div style={{ padding: 16, borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 style={{ fontSize: 15, fontWeight: 800, color: INK, margin: 0 }}>Payroll Clients</h2>
           <div style={{ display: "flex", gap: 6 }}>
             <button onClick={() => setShowBureauProfile(true)} style={btnSecondary}>Bureau Profile</button>
             <button onClick={() => setShowNewClient(true)}
-              style={{ padding: "5px 10px", background: NAVY, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              style={{ padding: "5px 10px", background: NAVY, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
               + New
             </button>
           </div>
@@ -193,7 +193,7 @@ export function PayrollBureauPage() {
             visibleClients.map(c => (
               <button key={c.id} onClick={() => { setSelected(c); setTab("employees") }}
                 style={{ display: "block", width: "100%", textAlign: "left" as const, padding: "12px 16px",
-                  background: selected?.id === c.id ? "#EFF6FF" : "none", border: "none",
+                  background: selected?.id === c.id ? "var(--hf-info-soft)" : "none", border: "none",
                   borderBottom: `1px solid ${BORDER}`, cursor: "pointer",
                   opacity: c.status === "OFFBOARDED" ? 0.55 : 1 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 700, color: INK }}>{c.tradingName}</div>
@@ -221,8 +221,8 @@ export function PayrollBureauPage() {
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => setShowEditClient(true)} style={btnSecondary}>Edit</button>
                 <button onClick={toggleArchive} disabled={archiving}
-                  style={{ ...btnSecondary, color: selected.status === "OFFBOARDED" ? "#166534" : "#DC2626",
-                    borderColor: selected.status === "OFFBOARDED" ? "#166534" : "#DC2626" }}>
+                  style={{ ...btnSecondary, color: selected.status === "OFFBOARDED" ? "var(--hf-success-text-strong)" : "var(--hf-danger-text)",
+                    borderColor: selected.status === "OFFBOARDED" ? "var(--hf-success-solid-strong)" : "var(--hf-danger)" }}>
                   {archiving ? "…" : selected.status === "OFFBOARDED" ? "Reactivate" : "Offboard"}
                 </button>
               </div>
@@ -833,7 +833,7 @@ function PayRunsTab({ client }: { client: PayClient }) {
       {loading ? <Empty text="Loading…" /> : payRuns.length === 0 ? <Empty text="No pay runs yet." /> : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {payRuns.map(r => (
-            <div key={r.id} style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
+            <div key={r.id} style={{ background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", cursor: "pointer" }}
                 onClick={() => handleExpand(r)}>
                 <div>
@@ -899,7 +899,7 @@ function PayRunsTab({ client }: { client: PayClient }) {
             <strong>{emailResult.sent}</strong> payslip{emailResult.sent !== 1 ? "s" : ""} emailed successfully.
           </p>
           {emailResult.skippedNoEmail > 0 && (
-            <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 6, padding: 12, fontSize: 12.5, color: "#92400E" }}>
+            <div style={{ background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 6, padding: 12, fontSize: 12.5, color: "var(--hf-warning-text-deep)" }}>
               <strong>{emailResult.skippedNoEmail}</strong> employee{emailResult.skippedNoEmail !== 1 ? "s have" : " has"} no email on file
               and {emailResult.skippedNoEmail !== 1 ? "were" : "was"} skipped — use "Download / Print" for{" "}
               {emailResult.skippedEmployeeNames.join(", ")}.
@@ -1180,7 +1180,7 @@ function PortalAccessTab({ client }: { client: PayClient }) {
               <td style={cellStyle}>
                 {g.status !== "REVOKED" && (
                   <button onClick={() => handleRevoke(g.id)} disabled={revokingId === g.id}
-                    style={{ ...btnSecondary, color: "#DC2626", borderColor: "#DC2626" }}>
+                    style={{ ...btnSecondary, color: "var(--hf-danger-text)", borderColor: "var(--hf-danger)" }}>
                     {revokingId === g.id ? "…" : "Revoke"}
                   </button>
                 )}
@@ -1197,12 +1197,12 @@ function PortalAccessTab({ client }: { client: PayClient }) {
 
 function StatusBadge({ status }: { status: string }) {
   const tones: Record<string, { c: string; bg: string }> = {
-    ACTIVE: { c: "#166534", bg: "#DCFCE7" }, PROCESSED: { c: "#166534", bg: "#DCFCE7" },
-    PAID: { c: "#166534", bg: "#DCFCE7" }, FILED: { c: "#166534", bg: "#DCFCE7" },
-    DRAFT: { c: "#64748B", bg: "#F1F5F9" }, PENDING: { c: "#D97706", bg: "#FFFBEB" },
-    SENT: { c: "#1D4ED8", bg: "#EFF6FF" }, PARTIAL: { c: "#1D4ED8", bg: "#EFF6FF" },
-    OVERDUE: { c: "#DC2626", bg: "#FEF2F2" }, OFFBOARDED: { c: "#64748B", bg: "#F1F5F9" },
-    TERMINATED: { c: "#64748B", bg: "#F1F5F9" }, REVOKED: { c: "#DC2626", bg: "#FEF2F2" },
+    ACTIVE: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" }, PROCESSED: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+    PAID: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" }, FILED: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+    DRAFT: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" }, PENDING: { c: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+    SENT: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" }, PARTIAL: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+    OVERDUE: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" }, OFFBOARDED: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
+    TERMINATED: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" }, REVOKED: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
   }
   const t = tones[status] ?? tones.DRAFT
   return <span style={{ background: t.bg, color: t.c, padding: "2px 8px", borderRadius: 20, fontSize: 10.5, fontWeight: 700 }}>{status}</span>
@@ -1210,7 +1210,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function Table({ headers, children }: { headers: string[]; children: React.ReactNode }) {
   return (
-    <table style={{ width: "100%", borderCollapse: "collapse" as const, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
+    <table style={{ width: "100%", borderCollapse: "collapse" as const, background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
       <thead>
         <tr style={{ background: CANVAS }}>
           {headers.map(h => <th key={h} style={{ textAlign: "left" as const, padding: "8px 12px", fontSize: 11, fontWeight: 600, color: MUTED, textTransform: "uppercase" as const, letterSpacing: "0.03em" }}>{h}</th>)}
@@ -1229,7 +1229,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
       onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 460, maxHeight: "85vh", overflowY: "auto" as const, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
+      <div style={{ background: "var(--hf-surface)", borderRadius: 12, padding: 24, width: 460, maxHeight: "85vh", overflowY: "auto" as const, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
         onClick={e => e.stopPropagation()}>
         <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 800, color: INK }}>{title}</h3>
         {children}
@@ -1249,11 +1249,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function FieldError({ text }: { text?: string }) {
   if (!text) return null
-  return <div style={{ fontSize: 11, color: "#DC2626", marginTop: 3 }}>{text}</div>
+  return <div style={{ fontSize: 11, color: "var(--hf-danger-text)", marginTop: 3 }}>{text}</div>
 }
 
 function ErrorBox({ text }: { text: string }) {
-  return <div style={{ padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, fontSize: 12.5, color: "#DC2626", marginBottom: 12 }}>{text}</div>
+  return <div style={{ padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 12.5, color: "var(--hf-danger-text)", marginBottom: 12 }}>{text}</div>
 }
 
 function ModalActions({ onClose, onSubmit, saving, submitLabel }: { onClose: () => void; onSubmit: () => void; saving: boolean; submitLabel: string }) {
@@ -1266,9 +1266,9 @@ function ModalActions({ onClose, onSubmit, saving, submitLabel }: { onClose: () 
 }
 
 const inputStyle: React.CSSProperties = { width: "100%", padding: "8px 10px", border: `1.5px solid ${BORDER}`, borderRadius: 6, fontSize: 13, boxSizing: "border-box" }
-const errorInputStyle: React.CSSProperties = { borderColor: "#DC2626" }
-const btnPrimary: React.CSSProperties = { padding: "7px 14px", background: NAVY, color: "#fff", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
+const errorInputStyle: React.CSSProperties = { borderColor: "var(--hf-danger)" }
+const btnPrimary: React.CSSProperties = { padding: "7px 14px", background: NAVY, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
 const btnPrimarySmall: React.CSSProperties = { ...btnPrimary, padding: "4px 10px", fontSize: 11.5 }
-const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "#fff", color: NAVY, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }
+const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "var(--hf-surface)", color: NAVY, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }
 const rowStyle: React.CSSProperties = { borderTop: `1px solid ${BORDER}` }
 const cellStyle: React.CSSProperties = { padding: "8px 12px", fontSize: 12.5, color: INK }

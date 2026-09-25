@@ -35,7 +35,7 @@ export function AuditorPortalTenantDetailPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: CANVAS, fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 32px", background: "#fff", borderBottom: `1px solid ${BORDER}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 32px", background: "var(--hf-surface)", borderBottom: `1px solid ${BORDER}` }}>
         <button onClick={() => navigate("/auditor/portal")} style={{ background: "none", border: "none", color: MUTED, fontSize: 13, cursor: "pointer" }}>← Back</button>
         <span style={{ fontSize: 13, color: FAINT }}>Business Access #{tenantId?.slice(0, 8)}</span>
       </div>
@@ -61,7 +61,7 @@ export function AuditorPortalTenantDetailPage() {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {exceptions.map(e => (
-                <div key={e.id} style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "14px 16px" }}>
+                <div key={e.id} style={{ background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "14px 16px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -91,7 +91,7 @@ export function AuditorPortalTenantDetailPage() {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {evidence.map(e => (
-                <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "10px 14px" }}>
+                <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "10px 14px" }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: INK }}>{e.fileName}</div>
                     <div style={{ fontSize: 11, color: FAINT, marginTop: 2 }}>
@@ -110,8 +110,8 @@ export function AuditorPortalTenantDetailPage() {
 
 function SeverityBadge({ severity }: { severity: string }) {
   const tones: Record<string, { c: string; bg: string }> = {
-    WARNING: { c: "#D97706", bg: "#FFFBEB" },
-    CRITICAL: { c: "#DC2626", bg: "#FEF2F2" },
+    WARNING: { c: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+    CRITICAL: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
   }
   const t = tones[severity] ?? tones.WARNING
   return <span style={{ background: t.bg, color: t.c, padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>{severity}</span>
@@ -119,14 +119,14 @@ function SeverityBadge({ severity }: { severity: string }) {
 
 function StatusBadge({ status }: { status: string }) {
   const tones: Record<string, { c: string; bg: string }> = {
-    OPEN: { c: "#DC2626", bg: "#FEF2F2" },
-    RESOLVED: { c: "#166534", bg: "#DCFCE7" },
-    DISMISSED: { c: "#64748B", bg: "#F1F5F9" },
+    OPEN: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
+    RESOLVED: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+    DISMISSED: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
   }
   const t = tones[status] ?? tones.OPEN
   return <span style={{ background: t.bg, color: t.c, padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>{status}</span>
 }
 
 function Empty({ text }: { text: string }) {
-  return <div style={{ padding: 40, textAlign: "center" as const, color: FAINT, fontSize: 14, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8 }}>{text}</div>
+  return <div style={{ padding: 40, textAlign: "center" as const, color: FAINT, fontSize: 14, background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8 }}>{text}</div>
 }

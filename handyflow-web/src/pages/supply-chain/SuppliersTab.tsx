@@ -14,23 +14,23 @@ interface Supplier {
 }
 
 const ACCENT = "#D97706"
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 9, fontSize: 14, boxSizing: "border-box", outline: "none", background: "#fff" }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 9, fontSize: 14, boxSizing: "border-box", outline: "none", background: "var(--hf-surface)" }
 
 const STATUS_BADGE: Record<string, { bg: string; color: string }> = {
-  ACTIVE:      { bg: "#DCFCE7", color: "#166534" },
-  INACTIVE:    { bg: "#F1F5F9", color: "#475569" },
-  BLACKLISTED: { bg: "#FEE2E2", color: "#DC2626" },
+  ACTIVE:      { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)" },
+  INACTIVE:    { bg: "var(--hf-surface-sunken)", color: "var(--hf-text-tertiary)" },
+  BLACKLISTED: { bg: "var(--hf-danger-soft-strong)", color: "var(--hf-danger-text)" },
 }
 
 function BbbeeBar({ level }: { level: number | null }) {
-  if (!level) return <span style={{ fontSize: 12, color: "#94A3B8" }}>—</span>
+  if (!level) return <span style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>—</span>
   const colour = level <= 2 ? "#059669" : level <= 4 ? "#D97706" : "#DC2626"
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
       <span style={{ fontSize: 13, fontWeight: 700, color: colour }}>L{level}</span>
       <div style={{ display: "flex", gap: 2 }}>
         {[1,2,3,4,5,6,7,8].map(l => (
-          <div key={l} style={{ width: 6, height: 6, borderRadius: 2, background: l <= level ? colour : "#E2E8F0" }} />
+          <div key={l} style={{ width: 6, height: 6, borderRadius: 2, background: l <= level ? colour : "var(--hf-surface-strong)" }} />
         ))}
       </div>
     </div>
@@ -108,46 +108,46 @@ export function SuppliersTab() {
           </div>
           {["", "ACTIVE", "INACTIVE", "BLACKLISTED"].map(s => (
             <button key={s} onClick={() => setStatus(s)}
-              style={{ padding: "6px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: status === s ? 700 : 400, border: status === s ? `1.5px solid ${ACCENT}` : "1px solid #E2E8F0", background: status === s ? "#FEF3C7" : "#fff", color: status === s ? ACCENT : "#64748B" }}>
+              style={{ padding: "6px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: status === s ? 700 : 400, border: status === s ? `1.5px solid ${ACCENT}` : "1px solid var(--hf-border)", background: status === s ? "var(--hf-warning-soft-strong)" : "var(--hf-surface)", color: status === s ? ACCENT : "var(--hf-text-muted)" }}>
               {s || "All"}
             </button>
           ))}
         </div>
         <button onClick={() => { setShowCreate(true); setErr("") }}
-          style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: ACCENT, color: "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={14} /> Add Supplier
         </button>
       </div>
 
       {/* Supplier list */}
       {isLoading
-        ? <div style={{ padding: 40, textAlign: "center", color: "#94A3B8" }}>Loading…</div>
+        ? <div style={{ padding: 40, textAlign: "center", color: "var(--hf-text-faint)" }}>Loading…</div>
         : suppliers.length === 0
-          ? <div style={{ textAlign: "center", padding: "50px 0", color: "#94A3B8" }}>
+          ? <div style={{ textAlign: "center", padding: "50px 0", color: "var(--hf-text-faint)" }}>
               <Users size={36} style={{ opacity: .3, marginBottom: 10 }} />
-              <div style={{ fontWeight: 600, color: "#475569" }}>No suppliers found</div>
+              <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No suppliers found</div>
             </div>
-          : <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+          : <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
               {suppliers.map((s, i) => {
                 const sb = STATUS_BADGE[s.status] ?? STATUS_BADGE.ACTIVE
                 const isOpen = expanded === s.id
                 return (
-                  <div key={s.id} style={{ borderTop: i > 0 ? "1px solid #F1F5F9" : "none" }}>
+                  <div key={s.id} style={{ borderTop: i > 0 ? "1px solid var(--hf-border-subtle)" : "none" }}>
                     <div onClick={() => setExpanded(isOpen ? null : s.id)}
-                      style={{ display: "flex", alignItems: "center", padding: "12px 16px", cursor: "pointer", background: isOpen ? "#FFFBEB" : i % 2 === 0 ? "#fff" : "#FAFAFA" }}
+                      style={{ display: "flex", alignItems: "center", padding: "12px 16px", cursor: "pointer", background: isOpen ? "var(--hf-warning-soft)" : i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)" }}
                       onMouseEnter={e => { if (!isOpen) (e.currentTarget as HTMLElement).style.background = "#F0F7FF" }}
-                      onMouseLeave={e => { if (!isOpen) (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? "#fff" : "#FAFAFA" }}
+                      onMouseLeave={e => { if (!isOpen) (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)" }}
                     >
                       {/* Avatar */}
-                      <div style={{ width: 38, height: 38, borderRadius: 10, background: "#FEF3C7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 12, fontSize: 14, fontWeight: 800, color: ACCENT }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--hf-warning-soft-strong)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 12, fontSize: 14, fontWeight: 800, color: ACCENT }}>
                         {s.name.charAt(0).toUpperCase()}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-                          <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>{s.name}</span>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>{s.name}</span>
                           <span style={{ background: sb.bg, color: sb.color, fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 20 }}>{s.status}</span>
                         </div>
-                        <div style={{ fontSize: 12, color: "#64748B", display: "flex", gap: 12 }}>
+                        <div style={{ fontSize: 12, color: "var(--hf-text-muted)", display: "flex", gap: 12 }}>
                           {s.contactEmail && <span style={{ display: "flex", alignItems: "center", gap: 3 }}><Mail size={10} />{s.contactEmail}</span>}
                           {s.contactPhone && <span style={{ display: "flex", alignItems: "center", gap: 3 }}><Phone size={10} />{s.contactPhone}</span>}
                           {s.city && <span>{s.city}{s.province ? `, ${s.province}` : ""}</span>}
@@ -155,16 +155,16 @@ export function SuppliersTab() {
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 20, flexShrink: 0 }}>
                         <div style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 600, marginBottom: 3 }}>BBBEE</div>
+                          <div style={{ fontSize: 10, color: "var(--hf-text-faint)", fontWeight: 600, marginBottom: 3 }}>BBBEE</div>
                           <BbbeeBar level={s.bbbeeLevel} />
                         </div>
                         <div style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 600, marginBottom: 3 }}>TERMS</div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>Net {s.paymentTermsDays}</div>
+                          <div style={{ fontSize: 10, color: "var(--hf-text-faint)", fontWeight: 600, marginBottom: 3 }}>TERMS</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)" }}>Net {s.paymentTermsDays}</div>
                         </div>
                         <div style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 600, marginBottom: 3 }}>ON-TIME</div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: s.onTimeRate != null && s.onTimeRate >= 80 ? "#059669" : "#D97706" }}>
+                          <div style={{ fontSize: 10, color: "var(--hf-text-faint)", fontWeight: 600, marginBottom: 3 }}>ON-TIME</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: s.onTimeRate != null && s.onTimeRate >= 80 ? "var(--hf-success-text)" : "var(--hf-warning-text)" }}>
                             {s.onTimeRate != null ? `${s.onTimeRate.toFixed(0)}%` : "—"}
                           </div>
                         </div>
@@ -174,7 +174,7 @@ export function SuppliersTab() {
 
                     {/* Expanded detail */}
                     {isOpen && (
-                      <div style={{ padding: "16px 20px", background: "#FFFBEB", borderTop: "1px solid #FEF3C7" }}>
+                      <div style={{ padding: "16px 20px", background: "var(--hf-warning-soft)", borderTop: "1px solid var(--hf-warning-border)" }}>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
                           <Detail label="Reg Number"   value={s.registrationNumber} />
                           <Detail label="VAT Number"   value={s.vatNumber} />
@@ -202,8 +202,8 @@ export function SuppliersTab() {
             <Field label="BBBEE Level (1–8)"><input type="number" min={1} max={8} value={form.bbbeeLevel} onChange={e => sf("bbbeeLevel", e.target.value)} placeholder="1" style={inp} /></Field>
             <Field label="Payment Terms (days)"><input type="number" value={form.paymentTermsDays} onChange={e => sf("paymentTermsDays", e.target.value)} placeholder="30" style={inp} /></Field>
 
-            <div style={{ gridColumn: "span 2", borderTop: "1px solid #F1F5F9", paddingTop: 12, marginTop: 4 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Contact</div>
+            <div style={{ gridColumn: "span 2", borderTop: "1px solid var(--hf-border-subtle)", paddingTop: 12, marginTop: 4 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Contact</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <Field label="Contact Name"><input value={form.contactName} onChange={e => sf("contactName", e.target.value)} style={inp} /></Field>
                 <Field label="Phone"><input value={form.contactPhone} onChange={e => sf("contactPhone", e.target.value)} placeholder="011 234 5678" style={inp} /></Field>
@@ -211,8 +211,8 @@ export function SuppliersTab() {
               </div>
             </div>
 
-            <div style={{ gridColumn: "span 2", borderTop: "1px solid #F1F5F9", paddingTop: 12, marginTop: 4 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Banking</div>
+            <div style={{ gridColumn: "span 2", borderTop: "1px solid var(--hf-border-subtle)", paddingTop: 12, marginTop: 4 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Banking</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
                 <Field label="Bank Name"><input value={form.bankName} onChange={e => sf("bankName", e.target.value)} placeholder="FNB" style={inp} /></Field>
                 <Field label="Account Number"><input value={form.bankAccount} onChange={e => sf("bankAccount", e.target.value)} style={inp} /></Field>
@@ -232,5 +232,5 @@ export function SuppliersTab() {
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 function Detail({ label, value }: { label: string; value: string | null | undefined }) {
-  return <div><div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>{label}</div><div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{value || "—"}</div></div>
+  return <div><div style={{ fontSize: 10, color: "var(--hf-text-faint)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>{label}</div><div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{value || "—"}</div></div>
 }

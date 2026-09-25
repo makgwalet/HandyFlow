@@ -14,8 +14,8 @@ export interface ClientResponse {
 
 const fmtMoney = (n: number) => new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(n ?? 0)
 
-const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
-const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5, display: "block" }
+const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
+const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5, display: "block" }
 
 function ClientFormModal({ client, onClose }: { client: ClientResponse | null; onClose: () => void }) {
   const qc = useQueryClient()
@@ -42,9 +42,9 @@ function ClientFormModal({ client, onClose }: { client: ClientResponse | null; o
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300 }} onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 480, maxHeight: "85vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 480, maxHeight: "85vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0F172A", margin: 0 }}>{client ? "Edit client" : "Onboard a new creditor client"}</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{client ? "Edit client" : "Onboard a new creditor client"}</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
         </div>
 
@@ -90,12 +90,12 @@ function ClientFormModal({ client, onClose }: { client: ClientResponse | null; o
           )}
         </div>
 
-        {save.isError && <p style={{ color: "#DC2626", fontSize: 12, marginTop: 10 }}>{(save.error as any)?.response?.data?.message ?? "Something went wrong"}</p>}
+        {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 10 }}>{(save.error as any)?.response?.data?.message ?? "Something went wrong"}</p>}
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
-          <button onClick={onClose} style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#fff", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+          <button onClick={onClose} style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", fontSize: 13, cursor: "pointer" }}>Cancel</button>
           <button onClick={() => save.mutate()} disabled={!form.tradingName || save.isPending}
-            style={{ padding: "9px 18px", borderRadius: 8, border: "none", background: CA_ACCENT, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: save.isPending ? 0.6 : 1 }}>
+            style={{ padding: "9px 18px", borderRadius: 8, border: "none", background: CA_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: save.isPending ? 0.6 : 1 }}>
             {save.isPending ? "Saving…" : client ? "Save changes" : "Onboard client"}
           </button>
         </div>
@@ -133,35 +133,35 @@ export default function CollAgencyClientsTab() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <p style={{ fontSize: 13, color: "#64748B", margin: 0 }}>{clients.length} creditor client{clients.length === 1 ? "" : "s"}</p>
+        <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: 0 }}>{clients.length} creditor client{clients.length === 1 ? "" : "s"}</p>
         <button onClick={() => setModalClient("new")}
-          style={{ display: "flex", alignItems: "center", gap: 6, background: CA_ACCENT, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 6, background: CA_ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={14} /> Onboard client
         </button>
       </div>
 
       {isLoading ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p>
       ) : clients.length === 0 ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>No creditor clients yet. Onboard one to start placing debtor accounts.</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No creditor clients yet. Onboard one to start placing debtor accounts.</p>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {clients.map((c, i) => (
             <div key={c.id}
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9" }}>
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div style={{ cursor: "pointer", flex: 1 }} onClick={() => setSelectedId(c.id)}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-                  <p style={{ fontSize: 14, fontWeight: 700, color: "#0F172A", margin: 0 }}>{c.tradingName}</p>
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: c.status === "ACTIVE" ? "#DCFCE7" : "#F1F5F9", color: c.status === "ACTIVE" ? "#166534" : "#64748B" }}>{c.status}</span>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{c.tradingName}</p>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: c.status === "ACTIVE" ? "var(--hf-success-soft-strong)" : "var(--hf-surface-sunken)", color: c.status === "ACTIVE" ? "var(--hf-success-text-strong)" : "var(--hf-text-muted)" }}>{c.status}</span>
                 </div>
-                <p style={{ fontSize: 12, color: "#94A3B8", margin: 0 }}>
+                <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: 0 }}>
                   {c.commissionRatePct}% commission{c.contactName ? ` · ${c.contactName}` : ""}{c.contactEmail ? ` · ${c.contactEmail}` : ""}
                 </p>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
                 <div style={{ textAlign: "right" }}>
-                  <p style={{ fontSize: 11, color: "#94A3B8", margin: "0 0 2px" }}>Trust held</p>
-                  <p style={{ fontSize: 14, fontWeight: 700, color: "#059669", margin: 0 }}>{fmtMoney(c.trustBalance)}</p>
+                  <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: "0 0 2px" }}>Trust held</p>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-success-text)", margin: 0 }}>{fmtMoney(c.trustBalance)}</p>
                 </div>
                 <div style={{ display: "flex", gap: 4 }}>
                   <button title="Edit" onClick={() => setModalClient(c)} style={{ background: "none", border: "none", cursor: "pointer", padding: 6 }}><Pencil size={15} color="#64748B" /></button>

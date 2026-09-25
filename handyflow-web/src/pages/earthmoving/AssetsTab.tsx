@@ -74,7 +74,7 @@ export default function AssetsTab() {
   ]
 
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
-    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#DC2626", marginTop: 4 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
       <AlertCircle size={12} />{fieldErrors[k]}
     </div>
   ) : null
@@ -94,19 +94,19 @@ export default function AssetsTab() {
       {/* Stats row */}
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {stats.map(s => (
-          <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
+          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{s.label}</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       {assets.filter(a => a.status === "BREAKDOWN").length > 0 && (
-        <div style={{ marginBottom: 16, padding: "12px 16px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
           <AlertTriangle size={17} color="#DC2626" style={{ flexShrink: 0 }} />
           <div>
-            <div style={{ fontWeight: 700, fontSize: 13, color: "#DC2626" }}>Active Breakdowns</div>
-            <div style={{ fontSize: 12, color: "#B91C1C" }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-danger-text)" }}>Active Breakdowns</div>
+            <div style={{ fontSize: 12, color: "var(--hf-danger-text-strong)" }}>
               {assets.filter(a => a.status === "BREAKDOWN").map(a => a.fleetNumber ?? a.name).join(", ")} — currently unserviceable
             </div>
           </div>
@@ -114,11 +114,11 @@ export default function AssetsTab() {
       )}
 
       {assets.filter(a => a.dueForService).length > 0 && (
-        <div style={{ marginBottom: 16, padding: "12px 16px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
           <AlertTriangle size={17} color="#D97706" style={{ flexShrink: 0 }} />
           <div>
-            <div style={{ fontWeight: 700, fontSize: 13, color: "#D97706" }}>Service Due</div>
-            <div style={{ fontSize: 12, color: "#92400E" }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-warning-text)" }}>Service Due</div>
+            <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>
               {assets.filter(a => a.dueForService).map(a => a.fleetNumber ?? a.name).join(", ")} — schedule maintenance
             </div>
           </div>
@@ -130,14 +130,14 @@ export default function AssetsTab() {
           {["ALL", ...STATUSES].map(s => (
             <button key={s} onClick={() => setFilterStatus(s)}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterStatus === s ? 600 : 400,
-                background: filterStatus === s ? (s === "ALL" ? "#1B3A6B" : STATUS_CFG[s]?.color ?? "#1B3A6B") : "#F1F5F9",
-                color: filterStatus === s ? "#fff" : "#64748B" }}>
+                background: filterStatus === s ? (s === "ALL" ? "var(--hf-primary)" : STATUS_CFG[s]?.color ?? "var(--hf-primary)") : "var(--hf-surface-sunken)",
+                color: filterStatus === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
               {s === "ALL" ? "All" : STATUS_CFG[s]?.label ?? s}
             </button>
           ))}
         </div>
         <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Register Equipment
         </button>
       </div>
@@ -146,20 +146,20 @@ export default function AssetsTab() {
         {["ALL", ...ASSET_TYPES].map(t => (
           <button key={t} onClick={() => setFilterType(t)}
             style={{ padding: "4px 10px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: "1px solid",
-              borderColor: filterType === t ? "#D97706" : "#E2E8F0",
-              background: filterType === t ? "#FFFBEB" : "#fff",
-              color: filterType === t ? "#D97706" : "#64748B", fontWeight: filterType === t ? 600 : 400 }}>
+              borderColor: filterType === t ? "var(--hf-warning)" : "var(--hf-border)",
+              background: filterType === t ? "var(--hf-warning-soft)" : "var(--hf-surface)",
+              color: filterType === t ? "var(--hf-warning-text)" : "var(--hf-text-muted)", fontWeight: filterType === t ? 600 : 400 }}>
             {t === "ALL" ? "All types" : `${EMOJI[t] ?? "🚧"} ${t}`}
           </button>
         ))}
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading fleet...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading fleet...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Truck size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No assets found</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No assets found</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -170,31 +170,31 @@ export default function AssetsTab() {
 
             return (
               <div key={asset.id} style={{ border: `1px solid ${asset.status === "BREAKDOWN" ? "#FECACA" : "#E2E8F0"}`, borderRadius: 12, overflow: "hidden" }}>
-                <div style={{ padding: "16px 20px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+                <div style={{ padding: "16px 20px", background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
-                    <div style={{ width: 48, height: 48, borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>
+                    <div style={{ width: 48, height: 48, borderRadius: 12, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>
                       {EMOJI[asset.assetType] ?? "🚧"}
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
                         {asset.fleetNumber && (
-                          <span style={{ fontWeight: 800, fontSize: 13, color: "#D97706", background: "#FFFBEB", border: "1px solid #FDE68A", padding: "1px 8px", borderRadius: 6, flexShrink: 0 }}>
+                          <span style={{ fontWeight: 800, fontSize: 13, color: "var(--hf-warning-text)", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", padding: "1px 8px", borderRadius: 6, flexShrink: 0 }}>
                             {asset.fleetNumber}
                           </span>
                         )}
-                        <span style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{asset.name}</span>
+                        <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{asset.name}</span>
                         {asset.dueForService && (
-                          <span style={{ display: "flex", alignItems: "center", gap: 3, background: "#FEF3C7", color: "#D97706", padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700, border: "1px solid #FDE68A", flexShrink: 0 }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: 3, background: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text)", padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700, border: "1px solid var(--hf-warning-border)", flexShrink: 0 }}>
                             <AlertTriangle size={9} /> SVC DUE
                           </span>
                         )}
                         {asset.ownershipType !== "OWN" && (
-                          <span style={{ fontSize: 10, fontWeight: 700, background: OWN_TYPE_CFG[asset.ownershipType]?.bg ?? "#F1F5F9", color: OWN_TYPE_CFG[asset.ownershipType]?.color ?? "#64748B", padding: "1px 7px", borderRadius: 20, flexShrink: 0 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, background: OWN_TYPE_CFG[asset.ownershipType]?.bg ?? "var(--hf-surface-sunken)", color: OWN_TYPE_CFG[asset.ownershipType]?.color ?? "var(--hf-text-muted)", padding: "1px 7px", borderRadius: 20, flexShrink: 0 }}>
                             {OWN_TYPE_CFG[asset.ownershipType]?.label}
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                      <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>
                         {[asset.make, asset.model, asset.year].filter(Boolean).join(" · ")}
                         {asset.registration && ` · ${asset.registration}`}
                         {asset.currentSite && ` · 📍 ${asset.currentSite}`}
@@ -204,44 +204,44 @@ export default function AssetsTab() {
 
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{Number(asset.currentHours ?? 0).toLocaleString()} hrs</div>
-                      <div style={{ fontSize: 11, color: "#94A3B8" }}>{fmtCurrency(asset.dailyRate)}/day</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{Number(asset.currentHours ?? 0).toLocaleString()} hrs</div>
+                      <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{fmtCurrency(asset.dailyRate)}/day</div>
                     </div>
                     <StatusBadge status={asset.status} />
                     <div style={{ display: "flex", gap: 5 }}>
                       <button onClick={() => setViewing(asset)} title="View profile" aria-label="View profile"
-                        style={{ background: "#EFF6FF", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#1D4ED8" }}>
+                        style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-info-text)" }}>
                         <Eye size={13} />
                       </button>
                       <button onClick={() => { setShowHours(asset); setNewHours(String(asset.currentHours ?? 0)) }} title="Update hour meter" aria-label="Update hour meter"
-                        style={{ background: "#F0FDF4", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#166534" }}>
+                        style={{ background: "var(--hf-success-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-success-text-strong)" }}>
                         <Clock size={13} />
                       </button>
                       <button onClick={() => { setShowStatus(asset); setNewStatus(asset.status); setStatusNote(""); setApiError("") }} title="Change status" aria-label="Change status"
-                        style={{ background: "#FEF3C7", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#D97706" }}>
+                        style={{ background: "var(--hf-warning-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-warning-text)" }}>
                         <Edit2 size={13} />
                       </button>
                     </div>
                     <button onClick={() => setExpanded(isOpen ? null : asset.id)} aria-label={isOpen ? "Collapse details" : "Expand details"}
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}>
                       {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </button>
                   </div>
                 </div>
 
-                <div style={{ padding: "0 20px 12px", background: "#fff" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#94A3B8", marginBottom: 3 }}>
+                <div style={{ padding: "0 20px 12px", background: "var(--hf-surface)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--hf-text-faint)", marginBottom: 3 }}>
                     <span>Service interval</span>
                     <span>{hoursUsed.toFixed(0)} / {asset.serviceIntervalHours || 250} hrs since last service</span>
                   </div>
-                  <div style={{ height: 5, background: "#F1F5F9", borderRadius: 99, overflow: "hidden" }}>
+                  <div style={{ height: 5, background: "var(--hf-surface-sunken)", borderRadius: 99, overflow: "hidden" }}>
                     <div style={{ height: "100%", width: `${svcPct}%`, borderRadius: 99, transition: "width 0.4s",
-                      background: svcPct >= 100 ? "#DC2626" : svcPct >= 80 ? "#D97706" : "#0D9488" }} />
+                      background: svcPct >= 100 ? "var(--hf-danger)" : svcPct >= 80 ? "var(--hf-warning)" : "var(--hf-accent)" }} />
                   </div>
                 </div>
 
                 {isOpen && (
-                  <div style={{ borderTop: "1px solid #F1F5F9", padding: "16px 20px", background: "#F8FAFC" }}>
+                  <div style={{ borderTop: "1px solid var(--hf-border-subtle)", padding: "16px 20px", background: "var(--hf-surface-muted)" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14 }}>
                       {[
                         { l: "Fleet No.", v: asset.fleetNumber || "—" },
@@ -254,19 +254,19 @@ export default function AssetsTab() {
                         { l: "Hourly Rate", v: fmtCurrency(asset.hourlyRate) },
                       ].map(item => (
                         <div key={item.l}>
-                          <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: "#0F172A" }}>{item.v}</div>
+                          <div style={{ fontSize: 10, color: "var(--hf-text-faint)", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--hf-text)" }}>{item.v}</div>
                         </div>
                       ))}
                     </div>
                     {asset.ownershipType === "HIRED_IN" && asset.hireSupplier && (
-                      <div style={{ marginTop: 12, padding: "8px 12px", background: "#F5F3FF", border: "1px solid #DDD6FE", borderRadius: 8, fontSize: 12, color: "#5B21B6" }}>
+                      <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--hf-violet-soft)", border: "1px solid var(--hf-violet-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-violet-text-strong)" }}>
                         <strong>Hired from:</strong> {asset.hireSupplier}
                         {asset.hireEndDate && ` · Hire ends ${new Date(asset.hireEndDate).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}`}
                       </div>
                     )}
                     {asset.notes && (
-                      <div style={{ marginTop: 10, padding: "8px 12px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, fontSize: 13, color: "#78350F" }}>
+                      <div style={{ marginTop: 10, padding: "8px 12px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-warning-text-deep)" }}>
                         {asset.notes}
                       </div>
                     )}
@@ -296,19 +296,19 @@ export default function AssetsTab() {
                 <label style={lbl}>Fleet / Unit Number</label>
                 <input value={form.fleetNumber} onChange={e => setForm(f => ({ ...f, fleetNumber: e.target.value }))}
                   placeholder="D9-001" style={inputStyle()} />
-                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 3 }}>
+                <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 3 }}>
                   Identifies this machine in a fleet of similar units (e.g. D9-001, D9-002)
                 </div>
               </div>
               <div>
                 <label style={lbl}>Equipment Type *</label>
-                <select value={form.assetType} onChange={e => setForm(f => ({ ...f, assetType: e.target.value }))} style={{ ...inputStyle(), background: "#fff" }}>
+                <select value={form.assetType} onChange={e => setForm(f => ({ ...f, assetType: e.target.value }))} style={{ ...inputStyle(), background: "var(--hf-surface)" }}>
                   {ASSET_TYPES.map(t => <option key={t} value={t}>{EMOJI[t] ?? "🚧"} {t}</option>)}
                 </select>
               </div>
               <div>
                 <label style={lbl}>Ownership</label>
-                <select value={form.ownershipType} onChange={e => setForm(f => ({ ...f, ownershipType: e.target.value }))} style={{ ...inputStyle(), background: "#fff" }}>
+                <select value={form.ownershipType} onChange={e => setForm(f => ({ ...f, ownershipType: e.target.value }))} style={{ ...inputStyle(), background: "var(--hf-surface)" }}>
                   <option value="OWN">Own asset</option>
                   <option value="HIRED_IN">Hired in (from external supplier)</option>
                 </select>
@@ -427,13 +427,13 @@ export default function AssetsTab() {
               const sel = newStatus === s
               return (
                 <button key={s} onClick={() => setNewStatus(s)}
-                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `2px solid ${sel ? cfg.color : "#E2E8F0"}`, borderRadius: 10, cursor: "pointer", background: sel ? cfg.bg : "#fff", textAlign: "left" as const, width: "100%" }}>
+                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `2px solid ${sel ? cfg.color : "#E2E8F0"}`, borderRadius: 10, cursor: "pointer", background: sel ? cfg.bg : "var(--hf-surface)", textAlign: "left" as const, width: "100%" }}>
                   <div style={{ width: 32, height: 32, borderRadius: "50%", background: `${cfg.color}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     <Icon size={15} color={cfg.color} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14, color: sel ? cfg.color : "#0F172A" }}>{cfg.label}</div>
-                    <div style={{ fontSize: 11, color: "#94A3B8" }}>{STATUS_DESCRIPTIONS[s]}</div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: sel ? cfg.color : "var(--hf-text)" }}>{cfg.label}</div>
+                    <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{STATUS_DESCRIPTIONS[s]}</div>
                   </div>
                   {sel && <CheckCircle size={16} color={cfg.color} />}
                 </button>
@@ -441,7 +441,7 @@ export default function AssetsTab() {
             })}
           </div>
           <div style={{ marginBottom: 14 }}>
-            <label style={lbl}>Note <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+            <label style={lbl}>Note <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
             <input value={statusNote} onChange={e => setStatusNote(e.target.value)}
               placeholder={newStatus === "BREAKDOWN" ? "Describe the breakdown..." : newStatus === "DEPLOYED" ? "Site name and client..." : ""}
               style={{ ...inputStyle(), width: "100%" }} />
@@ -464,9 +464,9 @@ export default function AssetsTab() {
       {showHours && (
         <Overlay onClose={() => { setShowHours(null); setApiError("") }}>
           <ModalHead title={`Hour Meter — ${showHours.fleetNumber ?? showHours.name}`} onClose={() => { setShowHours(null); setApiError("") }} />
-          <div style={{ marginBottom: 20, padding: "16px 18px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, marginBottom: 4 }}>Current reading</div>
-            <div style={{ fontSize: 30, fontWeight: 800, color: "#1B3A6B" }}>{Number(showHours.currentHours ?? 0).toLocaleString()} hrs</div>
+          <div style={{ marginBottom: 20, padding: "16px 18px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, marginBottom: 4 }}>Current reading</div>
+            <div style={{ fontSize: 30, fontWeight: 800, color: "var(--hf-primary-text)" }}>{Number(showHours.currentHours ?? 0).toLocaleString()} hrs</div>
           </div>
           <div style={{ marginBottom: 14 }}>
             <label style={lbl}>New Hour Meter Reading *</label>
@@ -474,14 +474,14 @@ export default function AssetsTab() {
               placeholder="Enter current meter reading"
               style={{ ...inputStyle(), width: "100%", fontSize: 20, fontWeight: 700 }} />
             {Number(newHours) < Number(showHours.currentHours ?? 0) && newHours !== "" && (
-              <div style={{ marginTop: 8, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, fontSize: 12, color: "#DC2626", display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 12, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 6 }}>
                 {/* NOTE: the backend now rejects this outright (hour meters only count up) —
                     this banner is a pre-submit hint, the real enforcement lives server-side. */}
                 <AlertCircle size={12} /> New reading is lower than current — the server will reject this.
               </div>
             )}
           </div>
-          <div style={{ padding: "10px 14px", background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 8, fontSize: 12, color: "#0369A1", marginBottom: 16 }}>
+          <div style={{ padding: "10px 14px", background: "var(--hf-sky-soft)", border: "1px solid var(--hf-sky-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-sky-text-strong)", marginBottom: 16 }}>
             ℹ️ Update when the operator returns the machine or at the end of each shift. This drives service interval calculations.
           </div>
           {apiError && <ErrBanner msg={apiError} />}
@@ -503,7 +503,7 @@ export default function AssetsTab() {
       {/* ── View Asset Modal ────────────────────────────────────────────── */}
       {viewing && (
         <Overlay onClose={() => setViewing(null)}>
-          <div style={{ background: "linear-gradient(135deg, #1B3A6B 0%, #0F2A52 100%)", margin: "-28px -28px 24px", padding: "24px 28px", borderRadius: "16px 16px 0 0" }}>
+          <div style={{ background: "linear-gradient(135deg, var(--hf-primary) 0%, var(--hf-primary-hover) 100%)", margin: "-28px -28px 24px", padding: "24px 28px", borderRadius: "16px 16px 0 0" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                 <div style={{ width: 56, height: 56, borderRadius: 14, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>
@@ -512,9 +512,9 @@ export default function AssetsTab() {
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                     {viewing.fleetNumber && (
-                      <span style={{ background: "#D97706", color: "#fff", padding: "2px 10px", borderRadius: 6, fontSize: 13, fontWeight: 800 }}>{viewing.fleetNumber}</span>
+                      <span style={{ background: "var(--hf-warning)", color: "var(--hf-text-on-solid)", padding: "2px 10px", borderRadius: 6, fontSize: 13, fontWeight: 800 }}>{viewing.fleetNumber}</span>
                     )}
-                    <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#fff" }}>{viewing.name}</h3>
+                    <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--hf-text-on-solid)" }}>{viewing.name}</h3>
                   </div>
                   <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
                     {[viewing.make, viewing.model, viewing.year].filter(Boolean).join(" · ")}
@@ -522,17 +522,17 @@ export default function AssetsTab() {
                   </div>
                 </div>
               </div>
-              <button onClick={() => setViewing(null)} aria-label="Close dialog" style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, cursor: "pointer", color: "#fff", padding: 6, display: "flex" }}><X size={18} /></button>
+              <button onClick={() => setViewing(null)} aria-label="Close dialog" style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, cursor: "pointer", color: "var(--hf-text-on-solid)", padding: 6, display: "flex" }}><X size={18} /></button>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
               <StatusBadge status={viewing.status} />
               {viewing.ownershipType !== "OWN" && (
-                <span style={{ background: "rgba(255,255,255,0.2)", color: "#fff", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                <span style={{ background: "rgba(255,255,255,0.2)", color: "var(--hf-text-on-solid)", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
                   {OWN_TYPE_CFG[viewing.ownershipType]?.label}
                 </span>
               )}
               {viewing.dueForService && (
-                <span style={{ background: "#FEF3C7", color: "#D97706", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: "1px solid #FDE68A" }}>⚠ Service Due</span>
+                <span style={{ background: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text)", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: "1px solid var(--hf-warning-border)" }}>⚠ Service Due</span>
               )}
             </div>
           </div>
@@ -546,35 +546,35 @@ export default function AssetsTab() {
               { l: "Current Site", v: viewing.currentSite || "—" },
               { l: "Current Client", v: viewing.currentClient || "—" },
             ].map(item => (
-              <div key={item.l} style={{ padding: "10px 14px", background: "#F8FAFC", borderRadius: 8 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#0F172A" }}>{item.v}</div>
+              <div key={item.l} style={{ padding: "10px 14px", background: "var(--hf-surface-muted)", borderRadius: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--hf-text)" }}>{item.v}</div>
               </div>
             ))}
           </div>
 
           <div style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748B", marginBottom: 6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 6 }}>
               <span>Service interval progress</span>
               <span>{(Number(viewing.currentHours ?? 0) - Number(viewing.lastServiceHours ?? 0)).toFixed(0)} / {viewing.serviceIntervalHours || 250} hrs</span>
             </div>
-            <div style={{ height: 8, background: "#F1F5F9", borderRadius: 99, overflow: "hidden" }}>
+            <div style={{ height: 8, background: "var(--hf-surface-sunken)", borderRadius: 99, overflow: "hidden" }}>
               {(() => {
                 const pct = Math.min(100, (Number(viewing.currentHours ?? 0) - Number(viewing.lastServiceHours ?? 0)) / (viewing.serviceIntervalHours || 250) * 100)
-                return <div style={{ height: "100%", width: `${pct}%`, background: pct >= 100 ? "#DC2626" : pct >= 80 ? "#D97706" : "#0D9488", borderRadius: 99 }} />
+                return <div style={{ height: "100%", width: `${pct}%`, background: pct >= 100 ? "var(--hf-danger)" : pct >= 80 ? "var(--hf-warning)" : "var(--hf-accent)", borderRadius: 99 }} />
               })()}
             </div>
           </div>
 
           {viewing.ownershipType === "HIRED_IN" && viewing.hireSupplier && (
-            <div style={{ marginBottom: 14, padding: "10px 14px", background: "#F5F3FF", border: "1px solid #DDD6FE", borderRadius: 8, fontSize: 13, color: "#5B21B6" }}>
+            <div style={{ marginBottom: 14, padding: "10px 14px", background: "var(--hf-violet-soft)", border: "1px solid var(--hf-violet-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-violet-text-strong)" }}>
               <strong>Hired from:</strong> {viewing.hireSupplier}
               {viewing.hireEndDate && ` · Hire ends ${new Date(viewing.hireEndDate).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}`}
             </div>
           )}
 
           {viewing.notes && (
-            <div style={{ marginBottom: 14, padding: "10px 14px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, fontSize: 13, color: "#78350F" }}>
+            <div style={{ marginBottom: 14, padding: "10px 14px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-warning-text-deep)" }}>
               <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 3, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>Notes</div>
               {viewing.notes}
             </div>
@@ -582,14 +582,14 @@ export default function AssetsTab() {
 
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => { setViewing(null); setShowHours(viewing); setNewHours(String(viewing.currentHours ?? 0)) }}
-              style={{ flex: 1, padding: "10px", background: "#F0FDF4", color: "#166534", border: "1px solid #86EFAC", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              style={{ flex: 1, padding: "10px", background: "var(--hf-success-soft)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               Update Hours
             </button>
             <button onClick={() => { setViewing(null); setShowStatus(viewing); setNewStatus(viewing.status); setStatusNote("") }}
-              style={{ flex: 1, padding: "10px", background: "#FFFBEB", color: "#D97706", border: "1px solid #FDE68A", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              style={{ flex: 1, padding: "10px", background: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", border: "1px solid var(--hf-warning-border)", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               Change Status
             </button>
-            <button onClick={() => setViewing(null)} style={{ padding: "10px 16px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 13, cursor: "pointer", color: "#374151" }}>Close</button>
+            <button onClick={() => setViewing(null)} style={{ padding: "10px 16px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Close</button>
           </div>
         </Overlay>
       )}

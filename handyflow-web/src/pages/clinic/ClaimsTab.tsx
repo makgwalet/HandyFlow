@@ -169,8 +169,8 @@ export default function ClaimsTab() {
               <button key={s} onClick={()=>setStatusFilter(s)}
                 style={{padding:"5px 12px",borderRadius:20,border:"none",fontSize:12,cursor:"pointer",
                   fontWeight:statusFilter===s?600:400,
-                  background:statusFilter===s?(cfg?.color??NAVY):"#F1F5F9",
-                  color:statusFilter===s?"#fff":GRAY}}>
+                  background:statusFilter===s?(cfg?.color??NAVY):"var(--hf-surface-sunken)",
+                  color:statusFilter===s?"var(--hf-text-on-solid)":GRAY}}>
                 {s==="all"?"All":cfg?.label}
               </button>
             )
@@ -179,19 +179,19 @@ export default function ClaimsTab() {
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           {selected.size > 0 && (
             <button onClick={()=>batchSubmit.mutate(Array.from(selected))} disabled={batchSubmit.isPending}
-              style={{display:"flex",alignItems:"center",gap:6,background:AMBER,color:"#fff",border:"none",borderRadius:9,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+              style={{display:"flex",alignItems:"center",gap:6,background:AMBER,color:"var(--hf-text-on-solid)",border:"none",borderRadius:9,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
               <Send size={14}/> {batchSubmit.isPending ? "Submitting..." : `Submit batch (${selected.size})`}
             </button>
           )}
           <button onClick={()=>{setShowCreate(true);setApiError("")}}
-            style={{display:"flex",alignItems:"center",gap:6,background:NAVY,color:"#fff",border:"none",borderRadius:9,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+            style={{display:"flex",alignItems:"center",gap:6,background:NAVY,color:"var(--hf-text-on-solid)",border:"none",borderRadius:9,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
             <Plus size={14}/> New claim
           </button>
         </div>
       </div>
 
       {batchResult && (
-        <div style={{marginBottom:16,padding:"10px 16px",background:batchResult.failed>0?"#FFFBEB":"#F0FDF4",
+        <div style={{marginBottom:16,padding:"10px 16px",background:batchResult.failed>0?"var(--hf-warning-soft)":"var(--hf-success-soft)",
           border:`1px solid ${batchResult.failed>0?"#FDE68A":"#86EFAC"}`,borderRadius:8,fontSize:13,
           color:batchResult.failed>0?AMBER:GREEN,display:"flex",alignItems:"center",gap:8}}>
           <CheckCircle size={14}/> {batchResult.submitted} submitted{batchResult.failed>0?`, ${batchResult.failed} failed — check individual claims for details`:""}
@@ -203,7 +203,7 @@ export default function ClaimsTab() {
       : displayedClaims.length===0 ? (
         <div style={{textAlign:"center",padding:"60px 20px",color:GRAY,border:`1px dashed ${BORDER}`,borderRadius:12}}>
           <CreditCard size={36} style={{marginBottom:12,opacity:0.4}}/>
-          <div style={{fontWeight:600,color:"#475569",fontSize:15}}>
+          <div style={{fontWeight:600,color:"var(--hf-text-tertiary)",fontSize:15}}>
             {statusFilter==="all"?"No claims yet":"No "+STATUS_CFG[statusFilter]?.label+" claims"}
           </div>
           <div style={{fontSize:13,marginTop:4}}>Create a claim from a completed consultation.</div>
@@ -216,10 +216,10 @@ export default function ClaimsTab() {
             const isOpen = expanded===claim.id
             const actions = getClaimActions(claim.status)
             return (
-              <div key={claim.id} style={{border:`1px solid ${s.border}`,borderLeft:`4px solid ${s.color}`,borderRadius:10,overflow:"hidden",background:"#fff"}}>
+              <div key={claim.id} style={{border:`1px solid ${s.border}`,borderLeft:`4px solid ${s.color}`,borderRadius:10,overflow:"hidden",background:"var(--hf-surface)"}}>
                 {/* Header row */}
                 <div onClick={()=>setExpanded(isOpen?null:claim.id)}
-                  style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 18px",cursor:"pointer",background:isOpen?LIGHT:"#fff"}}>
+                  style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 18px",cursor:"pointer",background:isOpen?LIGHT:"var(--hf-surface)"}}>
                   <div style={{display:"flex",alignItems:"center",gap:12}}>
                     {["DRAFT","REJECTED"].includes(claim.status) && (
                       <button onClick={e=>{
@@ -239,7 +239,7 @@ export default function ClaimsTab() {
                     </div>
                     <div>
                       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
-                        <span style={{fontWeight:700,fontSize:14,color:"#0F172A"}}>{claim.patientName||"Patient"}</span>
+                        <span style={{fontWeight:700,fontSize:14,color:"var(--hf-text)"}}>{claim.patientName||"Patient"}</span>
                         <span style={{background:s.bg,color:s.color,padding:"1px 8px",borderRadius:20,fontSize:11,fontWeight:700,border:`1px solid ${s.border}`}}>{s.label}</span>
                         {claim.referenceNumber && <span style={{fontSize:11,color:GRAY}}>Ref: {claim.referenceNumber}</span>}
                       </div>
@@ -251,7 +251,7 @@ export default function ClaimsTab() {
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:16}}>
                     <div style={{textAlign:"right"}}>
-                      <div style={{fontSize:15,fontWeight:800,color:"#0F172A"}}>{fmtR(claim.grossAmount)}</div>
+                      <div style={{fontSize:15,fontWeight:800,color:"var(--hf-text)"}}>{fmtR(claim.grossAmount)}</div>
                       <div style={{fontSize:11,color:GRAY}}>Scheme: {fmtR(claim.schemePortion)} · Patient: {fmtR(claim.patientPortion)}</div>
                     </div>
                     {isOpen ? <ChevronUp size={16} color={GRAY}/> : <ChevronDown size={16} color={GRAY}/>}
@@ -260,10 +260,10 @@ export default function ClaimsTab() {
 
                 {/* Expanded detail */}
                 {isOpen && (
-                  <div style={{borderTop:`1px solid ${BORDER}`,padding:"16px 18px",background:"#FAFAFA"}}>
+                  <div style={{borderTop:`1px solid ${BORDER}`,padding:"16px 18px",background:"var(--hf-surface-muted)"}}>
                     {/* Rejection reason */}
                     {claim.rejectionReason && (
-                      <div style={{marginBottom:14,padding:"10px 14px",background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,fontSize:13,color:RED}}>
+                      <div style={{marginBottom:14,padding:"10px 14px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:RED}}>
                         <span style={{fontWeight:700}}>Rejection reason: </span>{claim.rejectionReason}
                       </div>
                     )}
@@ -272,13 +272,13 @@ export default function ClaimsTab() {
                     <div style={{marginBottom:14,display:"flex",gap:8,flexWrap:"wrap"}} onClick={e=>e.stopPropagation()}>
                       {(claim.patientPortion ?? 0) > 0 && (
                         <button onClick={()=>downloadPatientInvoice(claim.id)}
-                          style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:"#fff",color:NAVY,border:`1px solid ${BORDER}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                          style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:"var(--hf-surface)",color:NAVY,border:`1px solid ${BORDER}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
                           <Download size={13}/> Patient invoice (R {claim.patientPortion.toLocaleString("en-ZA",{minimumFractionDigits:2})}) PDF
                         </button>
                       )}
                       {claim.status !== "DRAFT" && (
                         <button onClick={()=>downloadSubmissionRecord(claim.id)}
-                          style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:"#fff",color:NAVY,border:`1px solid ${BORDER}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                          style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:"var(--hf-surface)",color:NAVY,border:`1px solid ${BORDER}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
                           <Download size={13}/> Submission record PDF
                         </button>
                       )}
@@ -299,9 +299,9 @@ export default function ClaimsTab() {
                             </thead>
                             <tbody>
                               {claim.lines.map((line,i)=>(
-                                <tr key={line.id} style={{borderTop:i>0?`1px solid #F1F5F9`:"none"}}>
+                                <tr key={line.id} style={{borderTop:i>0?`1px solid var(--hf-border-subtle)`:"none"}}>
                                   <td style={{padding:"8px 12px"}}><span style={{fontSize:11,fontWeight:600,color:NAVY}}>{line.lineType}</span></td>
-                                  <td style={{padding:"8px 12px",fontSize:13,color:"#0F172A"}}>{line.description}</td>
+                                  <td style={{padding:"8px 12px",fontSize:13,color:"var(--hf-text)"}}>{line.description}</td>
                                   <td style={{padding:"8px 12px",fontSize:12,color:GRAY}}>{line.tariffCode||line.nappiCode||"—"}</td>
                                   <td style={{padding:"8px 12px",fontSize:13}}>{line.quantity}</td>
                                   <td style={{padding:"8px 12px",fontSize:13}}>{fmtR(line.unitPrice)}</td>
@@ -317,7 +317,7 @@ export default function ClaimsTab() {
                     )}
 
                     {/* Action buttons */}
-                    {apiError && <div style={{marginBottom:10,padding:"8px 12px",background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,fontSize:13,color:RED}}>{apiError}</div>}
+                    {apiError && <div style={{marginBottom:10,padding:"8px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:RED}}>{apiError}</div>}
                     {actions.length > 0 && (
                       <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
                         {actions.map(btn=>(
@@ -345,9 +345,9 @@ export default function ClaimsTab() {
       {/* ── Reject reason modal ──────────────────────────────────────────── */}
       {showReject && (
         <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(3px)"}}>
-          <div style={{background:"#fff",borderRadius:16,padding:28,width:440,boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
+          <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:440,boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <h3 style={{margin:0,fontSize:16,fontWeight:700,color:"#0F172A"}}>Reject claim</h3>
+              <h3 style={{margin:0,fontSize:16,fontWeight:700,color:"var(--hf-text)"}}>Reject claim</h3>
               <button onClick={()=>setShowReject(null)} style={{background:"none",border:"none",cursor:"pointer",color:GRAY,display:"flex"}}><X size={18}/></button>
             </div>
             <label style={lbl}>Rejection reason *</label>
@@ -396,9 +396,9 @@ function CreateClaimModal({ consultations, onClose, onCreated }:
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(3px)"}}>
-      <div style={{background:"#fff",borderRadius:16,padding:28,width:680,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 24px 64px rgba(0,0,0,0.22)"}}>
+      <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:680,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 24px 64px rgba(0,0,0,0.22)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
-          <h3 style={{margin:0,fontSize:18,fontWeight:700,color:"#0F172A"}}>New medical aid claim</h3>
+          <h3 style={{margin:0,fontSize:18,fontWeight:700,color:"var(--hf-text)"}}>New medical aid claim</h3>
           <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:GRAY,display:"flex"}}><X size={20}/></button>
         </div>
 
@@ -410,7 +410,7 @@ function CreateClaimModal({ consultations, onClose, onCreated }:
             ))}
           </select>
           {selectedConsult && (
-            <div style={{marginTop:8,padding:"8px 12px",background:"#F0FDF4",border:"1px solid #86EFAC",borderRadius:8,fontSize:12,color:GREEN}}>
+            <div style={{marginTop:8,padding:"8px 12px",background:"var(--hf-success-soft)",border:"1px solid var(--hf-success-border)",borderRadius:8,fontSize:12,color:GREEN}}>
               ✓ {selectedConsult.chiefComplaint}{selectedConsult.diagnosis?` · Dx: ${selectedConsult.diagnosis}`:""}{selectedConsult.icd10Codes?.length?` · ICD-10: ${selectedConsult.icd10Codes.join(", ")}`:""}
             </div>
           )}
@@ -503,7 +503,7 @@ function CreateClaimModal({ consultations, onClose, onCreated }:
 
         {/* Total preview */}
         {form.consultationRate && (
-          <div style={{marginBottom:16,padding:"12px 16px",background:NAVY,borderRadius:10,color:"#fff",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{marginBottom:16,padding:"12px 16px",background:NAVY,borderRadius:10,color:"var(--hf-text-on-solid)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <span style={{fontSize:13,color:"rgba(255,255,255,0.7)"}}>Estimated claim total</span>
             <span style={{fontSize:20,fontWeight:800}}>
               {fmtR((parseFloat(form.consultationRate)||0) + lines.reduce((s,l)=>(parseFloat(l.unitPrice)||0)*(parseFloat(l.quantity)||1)+s,0))}
@@ -511,7 +511,7 @@ function CreateClaimModal({ consultations, onClose, onCreated }:
           </div>
         )}
 
-        {apiError && <div style={{marginBottom:14,padding:"10px 12px",background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,fontSize:13,color:RED,display:"flex",alignItems:"center",gap:8}}><AlertCircle size={14}/>{apiError}</div>}
+        {apiError && <div style={{marginBottom:14,padding:"10px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:RED,display:"flex",alignItems:"center",gap:8}}><AlertCircle size={14}/>{apiError}</div>}
 
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
           <button onClick={onClose} style={btnCancel}>Cancel</button>

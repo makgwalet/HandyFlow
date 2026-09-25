@@ -134,27 +134,27 @@ export default function SecurityDashboard({ onNavigate }: { onNavigate: (tab: an
         {/* Active shifts */}
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Active Shifts</span>
-            <button onClick={() => onNavigate("shifts")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#0D9488", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Active Shifts</span>
+            <button onClick={() => onNavigate("shifts")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-accent-text)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
               View all <ArrowRight size={13} />
             </button>
           </div>
 
           {activeShifts.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed #E2E8F0", borderRadius: 12, color: "#94A3B8" }}>
+            <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed var(--hf-border)", borderRadius: 12, color: "var(--hf-text-faint)" }}>
               <Shield size={32} color="#CBD5E1" style={{ marginBottom: 10 }} />
-              <div style={{ fontWeight: 600, color: "#475569" }}>No active shifts</div>
+              <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No active shifts</div>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {activeShifts.slice(0, 6).map((shift: any) => (
-                <div key={shift.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", border: "1px solid #E2E8F0", borderRadius: 10, background: "#fff" }}>
-                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#22C55E", flexShrink: 0, boxShadow: "0 0 0 3px #BBF7D0" }} />
+                <div key={shift.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", border: "1px solid var(--hf-border)", borderRadius: 10, background: "var(--hf-surface)" }}>
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--hf-success)", flexShrink: 0, boxShadow: "0 0 0 3px var(--hf-success-border-subtle)" }} />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14, color: "#0F172A" }}>{guardName(shift.guardId)}</div>
-                    <div style={{ fontSize: 12, color: "#94A3B8" }}>Since {fmtTime(shift.startAt)} · ends {fmtTime(shift.endAt)}</div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: "var(--hf-text)" }}>{guardName(shift.guardId)}</div>
+                    <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Since {fmtTime(shift.startAt)} · ends {fmtTime(shift.endAt)}</div>
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 600, background: "#DCFCE7", color: "#166534", padding: "2px 8px", borderRadius: 20 }}>ACTIVE</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", padding: "2px 8px", borderRadius: 20 }}>ACTIVE</span>
                 </div>
               ))}
             </div>
@@ -164,8 +164,8 @@ export default function SecurityDashboard({ onNavigate }: { onNavigate: (tab: an
           {openIncidents.length > 0 && (
             <div style={{ marginTop: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Open Incidents</span>
-                <button onClick={() => onNavigate("incidents")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#DC2626", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Open Incidents</span>
+                <button onClick={() => onNavigate("incidents")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
                   View all <ArrowRight size={13} />
                 </button>
               </div>
@@ -173,11 +173,11 @@ export default function SecurityDashboard({ onNavigate }: { onNavigate: (tab: an
                 {openIncidents.slice(0, 3).map((inc: any) => {
                   const sevColor = ({ CRITICAL: "#DC2626", HIGH: "#EA580C", MEDIUM: "#D97706", LOW: "#64748B" } as any)[inc.severity] ?? "#64748B"
                   return (
-                    <div key={inc.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `1px solid ${sevColor}30`, borderLeft: `3px solid ${sevColor}`, borderRadius: 10, background: "#fff" }}>
+                    <div key={inc.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `1px solid ${sevColor}30`, borderLeft: `3px solid ${sevColor}`, borderRadius: 10, background: "var(--hf-surface)" }}>
                       <AlertTriangle size={16} color={sevColor} />
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: "#0F172A" }}>{inc.title}</div>
-                        <div style={{ fontSize: 11, color: "#94A3B8" }}>{fmtDate(inc.reportedAt)}{inc.siteName && ` · ${inc.siteName}`}</div>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: "var(--hf-text)" }}>{inc.title}</div>
+                        <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{fmtDate(inc.reportedAt)}{inc.siteName && ` · ${inc.siteName}`}</div>
                       </div>
                       <span style={{ fontSize: 10, fontWeight: 700, background: `${sevColor}18`, color: sevColor, padding: "2px 8px", borderRadius: 20 }}>{inc.severity}</span>
                     </div>
@@ -191,7 +191,7 @@ export default function SecurityDashboard({ onNavigate }: { onNavigate: (tab: an
         {/* Sidebar */}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* Operations summary */}
-          <div style={{ background: "#1B3A6B", borderRadius: 12, padding: 20, color: "#fff" }}>
+          <div style={{ background: "var(--hf-primary)", borderRadius: 12, padding: 20, color: "var(--hf-text-on-solid)" }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.6)", marginBottom: 14, textTransform: "uppercase" as const }}>Operations Summary</div>
             {[
               { label: "Total guards",   value: totalGuards },
@@ -201,14 +201,14 @@ export default function SecurityDashboard({ onNavigate }: { onNavigate: (tab: an
             ].map(s => (
               <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
                 <span style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>{s.label}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{s.value}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text-on-solid)" }}>{s.value}</span>
               </div>
             ))}
           </div>
 
           {/* Quick actions */}
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 10 }}>Quick actions</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 10 }}>Quick actions</div>
             {[
               { label: "Schedule a shift", tab: "shifts",    color: "#1B3A6B" },
               { label: "Report incident",  tab: "incidents", color: "#DC2626" },
@@ -216,7 +216,7 @@ export default function SecurityDashboard({ onNavigate }: { onNavigate: (tab: an
               { label: "View live map",    tab: "live",      color: "#7C3AED" },
             ].map(a => (
               <button key={a.label} onClick={() => onNavigate(a.tab)}
-                style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left" as const, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left" as const, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 {a.label} <ArrowRight size={13} />
               </button>
             ))}

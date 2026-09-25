@@ -14,8 +14,8 @@ interface LocationResponse {
   capacityUnits: number | null; active: boolean
 }
 
-const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
-const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5, display: "block" }
+const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
+const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5, display: "block" }
 
 function LocationFormModal({ initial, onClose }: { initial?: LocationResponse; onClose: () => void }) {
   const qc = useQueryClient()
@@ -39,9 +39,9 @@ function LocationFormModal({ initial, onClose }: { initial?: LocationResponse; o
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 420 }}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 420 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", margin: 0 }}>{initial ? "Edit location" : "Add a location"}</p>
+          <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>{initial ? "Edit location" : "Add a location"}</p>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
         </div>
         <div style={{ display: "grid", gap: 12 }}>
@@ -50,9 +50,9 @@ function LocationFormModal({ initial, onClose }: { initial?: LocationResponse; o
           <div><label style={labelStyle}>Description</label><input style={inputStyle} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
           <div><label style={labelStyle}>Capacity (units)</label><input type="number" style={inputStyle} value={form.capacityUnits} onChange={e => setForm({ ...form, capacityUnits: e.target.value })} /></div>
         </div>
-        {save.isError && <p style={{ color: "#DC2626", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not save this location"}</p>}
+        {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not save this location"}</p>}
         <button onClick={() => save.mutate()} disabled={!form.code || save.isPending}
-          style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 8, border: "none", background: WHSE_ACCENT, color: "#fff", fontSize: 13.5, fontWeight: 700, cursor: "pointer", opacity: (!form.code || save.isPending) ? 0.6 : 1 }}>
+          style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 8, border: "none", background: WHSE_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13.5, fontWeight: 700, cursor: "pointer", opacity: (!form.code || save.isPending) ? 0.6 : 1 }}>
           {save.isPending ? "Saving…" : initial ? "Save changes" : "Add location"}
         </button>
       </div>
@@ -86,36 +86,36 @@ export default function WhseLocationsTab() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <p style={{ fontSize: 13, color: "#94A3B8", margin: 0 }}>{locations.length} location{locations.length === 1 ? "" : "s"}</p>
+        <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0 }}>{locations.length} location{locations.length === 1 ? "" : "s"}</p>
         <button onClick={() => setShowForm(true)}
-          style={{ display: "flex", alignItems: "center", gap: 6, background: WHSE_ACCENT, color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 6, background: WHSE_ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Add location
         </button>
       </div>
 
       {isLoading ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p>
       ) : locations.length === 0 ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>No locations set up yet.</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No locations set up yet.</p>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
           {locations.map(l => (
-            <div key={l.id} style={{ border: "1px solid #E2E8F0", borderRadius: 12, padding: 14, opacity: l.active ? 1 : 0.55 }}>
+            <div key={l.id} style={{ border: "1px solid var(--hf-border)", borderRadius: 12, padding: 14, opacity: l.active ? 1 : 0.55 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                 <MapPin size={14} color={WHSE_ACCENT} />
-                <p style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A", margin: 0 }}>{l.code}</p>
+                <p style={{ fontSize: 13.5, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{l.code}</p>
               </div>
-              {l.zone && <p style={{ fontSize: 11.5, color: "#64748B", margin: "0 0 2px" }}>{l.zone}</p>}
-              {l.description && <p style={{ fontSize: 11, color: "#94A3B8", margin: "0 0 8px" }}>{l.description}</p>}
-              {l.capacityUnits != null && <p style={{ fontSize: 11, color: "#94A3B8", margin: "0 0 8px" }}>Capacity: {l.capacityUnits} units</p>}
+              {l.zone && <p style={{ fontSize: 11.5, color: "var(--hf-text-muted)", margin: "0 0 2px" }}>{l.zone}</p>}
+              {l.description && <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: "0 0 8px" }}>{l.description}</p>}
+              {l.capacityUnits != null && <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: "0 0 8px" }}>Capacity: {l.capacityUnits} units</p>}
               <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                <button onClick={() => setEditing(l)} style={{ background: "none", border: "1px solid #E2E8F0", borderRadius: 6, padding: 5, cursor: "pointer" }}><Pencil size={12} color="#64748B" /></button>
+                <button onClick={() => setEditing(l)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer" }}><Pencil size={12} color="#64748B" /></button>
                 {l.active ? (
-                  <button onClick={() => deactivate.mutate(l.id)} style={{ background: "none", border: "1px solid #E2E8F0", borderRadius: 6, padding: 5, cursor: "pointer" }}><PowerOff size={12} color="#94A3B8" /></button>
+                  <button onClick={() => deactivate.mutate(l.id)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer" }}><PowerOff size={12} color="#94A3B8" /></button>
                 ) : (
-                  <button onClick={() => reactivate.mutate(l.id)} style={{ background: "none", border: "1px solid #E2E8F0", borderRadius: 6, padding: 5, cursor: "pointer" }}><Power size={12} color="#059669" /></button>
+                  <button onClick={() => reactivate.mutate(l.id)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer" }}><Power size={12} color="#059669" /></button>
                 )}
-                <button onClick={() => { if (confirm(`Delete location ${l.code}?`)) remove.mutate(l.id) }} style={{ background: "none", border: "1px solid #E2E8F0", borderRadius: 6, padding: 5, cursor: "pointer" }}><Trash2 size={12} color="#DC2626" /></button>
+                <button onClick={() => { if (confirm(`Delete location ${l.code}?`)) remove.mutate(l.id) }} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer" }}><Trash2 size={12} color="#DC2626" /></button>
               </div>
             </div>
           ))}

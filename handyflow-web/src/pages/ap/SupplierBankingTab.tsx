@@ -10,10 +10,10 @@ interface Banking {
   vatNumber: string | null; notes: string | null; createdAt: string
 }
 
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "#fff", outline: "none" }
-const lbl: React.CSSProperties = { display: "block", fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }
-const btnP: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }
-const btnS: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 14px", border: "1.5px solid #E2E8F0", borderRadius: 8, background: "#fff", fontSize: 13, cursor: "pointer", color: "#374151", fontWeight: 500 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "var(--hf-surface)", outline: "none" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }
+const btnP: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }
+const btnS: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 14px", border: "1.5px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)", fontWeight: 500 }
 
 export function SupplierBankingTab() {
   const qc = useQueryClient()
@@ -74,8 +74,8 @@ export function SupplierBankingTab() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#0F172A", margin: 0 }}>Supplier Banking Details</h2>
-          <p style={{ fontSize: 12, color: "#94A3B8", margin: "3px 0 0" }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Supplier Banking Details</h2>
+          <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "3px 0 0" }}>
             Matched to bills by supplier name — used to fill in account number and branch code when exporting an EFT batch CSV
           </p>
         </div>
@@ -83,9 +83,9 @@ export function SupplierBankingTab() {
       </div>
 
       {unconfiguredNames.length > 0 && (
-        <div style={{ padding: "12px 16px", background: "#FFFBEB", border: "1.5px solid #FDE68A", borderRadius: 10, marginBottom: 16, display: "flex", gap: 10, alignItems: "flex-start" }}>
+        <div style={{ padding: "12px 16px", background: "var(--hf-warning-soft)", border: "1.5px solid var(--hf-warning-border)", borderRadius: 10, marginBottom: 16, display: "flex", gap: 10, alignItems: "flex-start" }}>
           <AlertTriangle size={15} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
-          <div style={{ fontSize: 12, color: "#92400E" }}>
+          <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>
             <strong>{unconfiguredNames.length} supplier{unconfiguredNames.length === 1 ? "" : "s"} with bills but no banking details:</strong>{" "}
             {unconfiguredNames.slice(0, 6).join(", ")}{unconfiguredNames.length > 6 ? `, +${unconfiguredNames.length - 6} more` : ""}.
             {" "}Their EFT batch CSV rows will export with blank account/branch columns until added here.
@@ -94,39 +94,39 @@ export function SupplierBankingTab() {
       )}
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 48, color: "#94A3B8" }}>Loading...</div>
+        <div style={{ textAlign: "center", padding: 48, color: "var(--hf-text-faint)" }}>Loading...</div>
       ) : entries.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px" }}>
-          <Landmark size={40} style={{ marginBottom: 12, color: "#CBD5E1" }} />
-          <div style={{ fontWeight: 700, color: "#475569", fontSize: 15, marginBottom: 6 }}>No supplier banking details yet</div>
-          <div style={{ fontSize: 13, color: "#94A3B8", marginBottom: 16 }}>Add account details for suppliers you pay via EFT batch.</div>
+          <Landmark size={40} style={{ marginBottom: 12, color: "var(--hf-text-disabled)" }} />
+          <div style={{ fontWeight: 700, color: "var(--hf-text-tertiary)", fontSize: 15, marginBottom: 6 }}>No supplier banking details yet</div>
+          <div style={{ fontSize: 13, color: "var(--hf-text-faint)", marginBottom: 16 }}>Add account details for suppliers you pay via EFT batch.</div>
           <button onClick={() => setShowForm(true)} style={{ ...btnP, margin: "0 auto" }}><Plus size={14} /> Add first supplier</button>
         </div>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" as const, fontSize: 13 }}>
             <thead>
-              <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
+              <tr style={{ background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border)" }}>
                 {["Supplier", "Bank", "Account Number", "Branch Code", "VAT Number", ""].map(h => (
-                  <th key={h} style={{ padding: "10px 16px", textAlign: "left" as const, fontSize: 11, fontWeight: 700, color: "#64748B", letterSpacing: "0.05em" }}>{h}</th>
+                  <th key={h} style={{ padding: "10px 16px", textAlign: "left" as const, fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", letterSpacing: "0.05em" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {entries.map((b, i) => (
-                <tr key={b.id} style={{ background: i % 2 === 0 ? "#fff" : "#FAFAFA" }}>
+                <tr key={b.id} style={{ background: i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)" }}>
                   <td style={{ padding: "12px 16px" }}>
-                    <div style={{ fontWeight: 700, color: "#0F172A" }}>{b.supplierName}</div>
-                    {b.accountHolder && <div style={{ fontSize: 11, color: "#94A3B8" }}>{b.accountHolder}</div>}
+                    <div style={{ fontWeight: 700, color: "var(--hf-text)" }}>{b.supplierName}</div>
+                    {b.accountHolder && <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{b.accountHolder}</div>}
                   </td>
-                  <td style={{ padding: "12px 16px", fontSize: 12, color: "#64748B" }}>{b.bankName || "—"}</td>
-                  <td style={{ padding: "12px 16px", fontFamily: "monospace", fontSize: 12, color: "#374151" }}>{b.accountNumber}</td>
-                  <td style={{ padding: "12px 16px", fontFamily: "monospace", fontSize: 12, color: "#374151" }}>{b.branchCode}</td>
-                  <td style={{ padding: "12px 16px", fontSize: 12, color: "#64748B" }}>{b.vatNumber || "—"}</td>
+                  <td style={{ padding: "12px 16px", fontSize: 12, color: "var(--hf-text-muted)" }}>{b.bankName || "—"}</td>
+                  <td style={{ padding: "12px 16px", fontFamily: "monospace", fontSize: 12, color: "var(--hf-text-secondary)" }}>{b.accountNumber}</td>
+                  <td style={{ padding: "12px 16px", fontFamily: "monospace", fontSize: 12, color: "var(--hf-text-secondary)" }}>{b.branchCode}</td>
+                  <td style={{ padding: "12px 16px", fontSize: 12, color: "var(--hf-text-muted)" }}>{b.vatNumber || "—"}</td>
                   <td style={{ padding: "12px 16px" }}>
                     <div style={{ display: "flex", gap: 6 }}>
-                      <button onClick={() => startEdit(b)} title="Edit" style={{ padding: "5px 8px", background: "#F8FAFC", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 6, cursor: "pointer", display: "flex" }}><Edit3 size={11} /></button>
-                      <button onClick={() => remove.mutate(b.id)} title="Remove" style={{ padding: "5px 8px", background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 6, cursor: "pointer", display: "flex" }}><Trash2 size={11} /></button>
+                      <button onClick={() => startEdit(b)} title="Edit" style={{ padding: "5px 8px", background: "var(--hf-surface-muted)", color: "var(--hf-text-muted)", border: "1px solid var(--hf-border)", borderRadius: 6, cursor: "pointer", display: "flex" }}><Edit3 size={11} /></button>
+                      <button onClick={() => remove.mutate(b.id)} title="Remove" style={{ padding: "5px 8px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, cursor: "pointer", display: "flex" }}><Trash2 size={11} /></button>
                     </div>
                   </td>
                 </tr>
@@ -138,10 +138,10 @@ export function SupplierBankingTab() {
 
       {showForm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 20, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 560, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 25px 80px rgba(0,0,0,0.25)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 560, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 25px 80px rgba(0,0,0,0.25)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 22 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>{editing ? "Edit Supplier" : "Add Supplier Banking"}</h3>
-              <button onClick={() => { setShowForm(false); setEditing(null); setError("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+              <button onClick={() => { setShowForm(false); setEditing(null); setError("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div style={{ gridColumn: "1/-1" }}>
@@ -179,7 +179,7 @@ export function SupplierBankingTab() {
                 <textarea value={form.notes} onChange={e => f("notes", e.target.value)} rows={2} style={{ ...inp, resize: "vertical" as const, fontFamily: "inherit" }} />
               </div>
             </div>
-            {error && <div style={{ marginTop: 12, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{error}</div>}
+            {error && <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
               <button onClick={() => { setShowForm(false); setEditing(null); setError("") }} style={btnS}>Cancel</button>
               <button

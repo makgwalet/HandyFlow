@@ -72,8 +72,8 @@ export default function AgAnimalDetail({ animal, onBack }: { animal: AnimalRespo
             <PawPrint size={19} color="#fff" />
           </div>
           <div>
-            <h2 style={{ fontSize: 17, fontWeight: 800, color: "#0F172A", margin: 0 }}>{a.tagNumber}{a.name ? ` — ${a.name}` : ""}</h2>
-            <p style={{ fontSize: 12, color: "#94A3B8", margin: 0 }}>{a.breed ?? "Breed unknown"} · {a.sex}{a.currentWeightKg ? ` · ${a.currentWeightKg} kg` : ""}{a.acquisitionCost ? ` · Acquired ${fmtMoney(a.acquisitionCost)}` : ""}</p>
+            <h2 style={{ fontSize: 17, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>{a.tagNumber}{a.name ? ` — ${a.name}` : ""}</h2>
+            <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: 0 }}>{a.breed ?? "Breed unknown"} · {a.sex}{a.currentWeightKg ? ` · ${a.currentWeightKg} kg` : ""}{a.acquisitionCost ? ` · Acquired ${fmtMoney(a.acquisitionCost)}` : ""}</p>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -81,12 +81,12 @@ export default function AgAnimalDetail({ animal, onBack }: { animal: AnimalRespo
             {ANIMAL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <button onClick={() => setEditing(v => !v)} title="Edit" style={iconBtn}><Pencil size={13} /></button>
-          <button onClick={() => { if (confirm(`Delete animal ${a.tagNumber}?`)) deleteMut.mutate() }} title="Delete" style={{ ...iconBtn, color: "#DC2626" }}><Trash2 size={13} /></button>
+          <button onClick={() => { if (confirm(`Delete animal ${a.tagNumber}?`)) deleteMut.mutate() }} title="Delete" style={{ ...iconBtn, color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
         </div>
       </div>
 
       {editing && (
-        <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 2fr", gap: 10, marginBottom: 12 }}>
             <div><label style={lbl}>Name</label><input value={name} onChange={e => setName(e.target.value)} style={inp} /></div>
             <div><label style={lbl}>Breed</label><input value={breed} onChange={e => setBreed(e.target.value)} style={inp} /></div>
@@ -99,13 +99,13 @@ export default function AgAnimalDetail({ animal, onBack }: { animal: AnimalRespo
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #E2E8F0", marginBottom: 18, overflowX: "auto" }}>
+      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--hf-border)", marginBottom: 18, overflowX: "auto" }}>
         {SUB_TABS.map(t => {
           const active = sub === t.key
           return (
             <button key={t.key} onClick={() => setSub(t.key)}
               style={{ padding: "9px 14px", border: "none", background: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap",
-                color: active ? AG_ACCENT : "#64748B", borderBottom: active ? `2px solid ${AG_ACCENT}` : "2px solid transparent", marginBottom: -1 }}>
+                color: active ? AG_ACCENT : "var(--hf-text-muted)", borderBottom: active ? `2px solid ${AG_ACCENT}` : "2px solid transparent", marginBottom: -1 }}>
               {t.label}
             </button>
           )
@@ -123,9 +123,9 @@ export default function AgAnimalDetail({ animal, onBack }: { animal: AnimalRespo
   )
 }
 
-const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#374151", marginBottom: 4, display: "block" }
-const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12.5, boxSizing: "border-box" }
-const btnPrimary: React.CSSProperties = { padding: "8px 14px", borderRadius: 8, border: "none", background: AG_ACCENT, color: "#fff", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
-const btnGhost: React.CSSProperties = { padding: "8px 14px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }
-const iconBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 7, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", cursor: "pointer" }
-const backBtn: React.CSSProperties = { display: "inline-flex", alignItems: "center", background: "none", border: "none", color: "#64748B", fontSize: 12.5, fontWeight: 600, cursor: "pointer", padding: 0 }
+const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4, display: "block" }
+const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12.5, boxSizing: "border-box" }
+const btnPrimary: React.CSSProperties = { padding: "8px 14px", borderRadius: 8, border: "none", background: AG_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
+const btnGhost: React.CSSProperties = { padding: "8px 14px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }
+const iconBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", cursor: "pointer" }
+const backBtn: React.CSSProperties = { display: "inline-flex", alignItems: "center", background: "none", border: "none", color: "var(--hf-text-muted)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", padding: 0 }

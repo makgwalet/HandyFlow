@@ -85,7 +85,7 @@ const Badge = ({ priority }: { priority: string }) => {
 }
 
 const Avatar = ({ name, size = 26 }: { name: string | null; size?: number }) => (
-  <div style={{ width: size, height: size, borderRadius: '50%', background: '#1B3A6B', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.38, fontWeight: 700, flexShrink: 0 }}>
+  <div style={{ width: size, height: size, borderRadius: '50%', background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.38, fontWeight: 700, flexShrink: 0 }}>
     {initials(name)}
   </div>
 )
@@ -93,7 +93,7 @@ const Avatar = ({ name, size = 26 }: { name: string | null; size?: number }) => 
 const ProgressBar = ({ value, max, color = '#1B3A6B' }: { value: number; max: number; color?: string }) => {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0
   return (
-    <div style={{ height: 4, background: '#F1F5F9', borderRadius: 99, overflow: 'hidden' }}>
+    <div style={{ height: 4, background: 'var(--hf-surface-sunken)', borderRadius: 99, overflow: 'hidden' }}>
       <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 99, transition: 'width 0.3s' }} />
     </div>
   )
@@ -115,19 +115,19 @@ function ConfirmModal({ title, message, confirmLabel = 'Confirm', danger = false
 }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, backdropFilter: 'blur(2px)' }}>
-      <div style={{ background: '#fff', borderRadius: 14, padding: 28, width: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 14, padding: 28, width: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 22 }}>
-          <div style={{ width: 40, height: 40, borderRadius: '50%', background: danger ? '#FEF2F2' : '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ width: 40, height: 40, borderRadius: '50%', background: danger ? 'var(--hf-danger-soft)' : 'var(--hf-info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <AlertTriangle size={18} color={danger ? '#DC2626' : '#1D4ED8'} />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: '#0F172A', marginBottom: 6 }}>{title}</div>
-            <div style={{ fontSize: 13, color: '#64748B', lineHeight: 1.6 }}>{message}</div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--hf-text)', marginBottom: 6 }}>{title}</div>
+            <div style={{ fontSize: 13, color: 'var(--hf-text-muted)', lineHeight: 1.6 }}>{message}</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button onClick={onCancel} style={btnSecondary}>Cancel</button>
-          <button onClick={onConfirm} style={{ ...btnPrimary, background: danger ? '#DC2626' : '#1B3A6B' }}>{confirmLabel}</button>
+          <button onClick={onConfirm} style={{ ...btnPrimary, background: danger ? 'var(--hf-danger)' : 'var(--hf-primary)' }}>{confirmLabel}</button>
         </div>
       </div>
     </div>
@@ -274,36 +274,36 @@ function TaskDetailModal({ task, columns, users, onClose, onUpdate, onDelete, on
   return (
     <>
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, padding: '32px 20px', overflowY: 'auto' }}>
-        <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 720, boxShadow: '0 25px 80px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ background: 'var(--hf-surface)', borderRadius: 16, width: '100%', maxWidth: 720, boxShadow: '0 25px 80px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
 
           {/* Header */}
-          <div style={{ padding: '20px 24px 0', borderBottom: '1px solid #F1F5F9' }}>
+          <div style={{ padding: '20px 24px 0', borderBottom: '1px solid var(--hf-border-subtle)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
               <div style={{ flex: 1, marginRight: 12 }}>
                 {editTitle ? (
                   <input value={title} onChange={e => setTitle(e.target.value)}
                     onBlur={() => { onUpdate({ title }); setEditTitle(false) }}
                     onKeyDown={e => { if (e.key === 'Enter') { onUpdate({ title }); setEditTitle(false) } if (e.key === 'Escape') setEditTitle(false) }}
-                    style={{ ...inp, fontSize: 18, fontWeight: 700, border: '2px solid #1B3A6B', padding: '4px 8px', width: '100%' }} autoFocus />
+                    style={{ ...inp, fontSize: 18, fontWeight: 700, border: '2px solid var(--hf-primary)', padding: '4px 8px', width: '100%' }} autoFocus />
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', group: 'true' } as any} onClick={() => setEditTitle(true)}>
-                    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#111827', lineHeight: 1.3, textDecoration: task.completedAt ? 'line-through' : 'none', color: task.completedAt ? '#94A3B8' : '#111827' } as any}>{task.title}</h2>
+                    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--hf-text)', lineHeight: 1.3, textDecoration: task.completedAt ? 'line-through' : 'none', color: task.completedAt ? 'var(--hf-text-faint)' : 'var(--hf-text)' } as any}>{task.title}</h2>
                     <Edit3 size={13} color="#CBD5E1" />
                   </div>
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' as const }}>
                   <Badge priority={task.priority} />
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: STATUS_COLOR[task.status] || '#94A3B8', fontWeight: 700 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_COLOR[task.status] || '#94A3B8' }} />
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: STATUS_COLOR[task.status] || 'var(--hf-text-faint)', fontWeight: 700 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_COLOR[task.status] || 'var(--hf-text-faint)' }} />
                     {task.status?.replace('_', ' ')}
                   </span>
                   {overdueFlag && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#EF4444', fontWeight: 700, background: '#FEF2F2', padding: '2px 8px', borderRadius: 20 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--hf-danger-text)', fontWeight: 700, background: 'var(--hf-danger-soft)', padding: '2px 8px', borderRadius: 20 }}>
                       <AlertTriangle size={11} /> Overdue
                     </span>
                   )}
                   {task.completedAt && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#10B981', fontWeight: 700, background: '#F0FDF4', padding: '2px 8px', borderRadius: 20 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--hf-success-text)', fontWeight: 700, background: 'var(--hf-success-soft)', padding: '2px 8px', borderRadius: 20 }}>
                       <CheckCircle2 size={11} /> Completed
                     </span>
                   )}
@@ -312,14 +312,14 @@ function TaskDetailModal({ task, columns, users, onClose, onUpdate, onDelete, on
 
               <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                 {!task.completedAt && (
-                  <button onClick={onComplete} style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#166534', borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  <button onClick={onComplete} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--hf-success-soft)', border: '1px solid var(--hf-success-border-subtle)', color: 'var(--hf-success-text-strong)', borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                     <Check size={13} /> Mark done
                   </button>
                 )}
-                <button onClick={() => setShowDelete(true)} style={{ background: 'none', border: '1.5px solid #E5E7EB', cursor: 'pointer', color: '#94A3B8', padding: '6px 8px', borderRadius: 7, display: 'flex' }}>
+                <button onClick={() => setShowDelete(true)} style={{ background: 'none', border: '1.5px solid var(--hf-border)', cursor: 'pointer', color: 'var(--hf-text-faint)', padding: '6px 8px', borderRadius: 7, display: 'flex' }}>
                   <Trash2 size={14} />
                 </button>
-                <button onClick={onClose} style={{ background: '#F1F5F9', border: 'none', cursor: 'pointer', color: '#64748B', padding: '6px 8px', borderRadius: 7, display: 'flex' }}>
+                <button onClick={onClose} style={{ background: 'var(--hf-surface-sunken)', border: 'none', cursor: 'pointer', color: 'var(--hf-text-muted)', padding: '6px 8px', borderRadius: 7, display: 'flex' }}>
                   <X size={16} />
                 </button>
               </div>
@@ -328,11 +328,11 @@ function TaskDetailModal({ task, columns, users, onClose, onUpdate, onDelete, on
             {/* Move to column buttons */}
             {columns.filter(c => c.id !== task.columnId).length > 0 && (
               <div style={{ display: 'flex', gap: 5, paddingBottom: 6, flexWrap: 'wrap' as const }}>
-                <span style={{ fontSize: 11, color: '#94A3B8', alignSelf: 'center', marginRight: 4 }}>Move to:</span>
+                <span style={{ fontSize: 11, color: 'var(--hf-text-faint)', alignSelf: 'center', marginRight: 4 }}>Move to:</span>
                 {columns.filter(c => c.id !== task.columnId).map(c => (
                   <button key={c.id} onClick={() => onMove(c.id)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 10px', borderRadius: 20, border: '1px solid #E5E7EB', background: '#F9FAFB', cursor: 'pointer', color: '#374151', fontWeight: 600, transition: 'all 0.1s' }}>
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: c.color || '#94A3B8' }} />
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 10px', borderRadius: 20, border: '1px solid var(--hf-border)', background: 'var(--hf-surface-muted)', cursor: 'pointer', color: 'var(--hf-text-secondary)', fontWeight: 600, transition: 'all 0.1s' }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: c.color || 'var(--hf-text-faint)' }} />
                     {c.name}
                   </button>
                 ))}
@@ -342,7 +342,7 @@ function TaskDetailModal({ task, columns, users, onClose, onUpdate, onDelete, on
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 0, marginTop: 6 }}>
               {(['details', 'comments', 'time', 'files'] as const).map(t => (
-                <button key={t} onClick={() => setTab(t)} style={{ padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t ? '#1B3A6B' : '#9CA3AF', borderBottom: `2px solid ${tab === t ? '#1B3A6B' : 'transparent'}`, marginBottom: -1, transition: 'all 0.15s' }}>
+                <button key={t} onClick={() => setTab(t)} style={{ padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t ? 'var(--hf-primary-text)' : 'var(--hf-text-faint)', borderBottom: `2px solid ${tab === t ? '#1B3A6B' : 'transparent'}`, marginBottom: -1, transition: 'all 0.15s' }}>
                   {t === 'comments' ? `Comments (${task.commentCount})` : t === 'time' ? `Time (${logged}h)` : t === 'files' ? 'Files' : 'Details'}
                 </button>
               ))}
@@ -366,8 +366,8 @@ function TaskDetailModal({ task, columns, users, onClose, onUpdate, onDelete, on
                       </div>
                     </div>
                   ) : (
-                    <div onClick={() => setEditDesc(true)} style={{ fontSize: 14, color: task.description ? '#374151' : '#CBD5E1', lineHeight: 1.7, background: '#F9FAFB', borderRadius: 9, padding: '12px 14px', minHeight: 80, cursor: 'pointer', border: '1.5px solid transparent', transition: 'border-color 0.15s' }}
-                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = '#CBD5E1'}
+                    <div onClick={() => setEditDesc(true)} style={{ fontSize: 14, color: task.description ? 'var(--hf-text-secondary)' : 'var(--hf-text-disabled)', lineHeight: 1.7, background: 'var(--hf-surface-muted)', borderRadius: 9, padding: '12px 14px', minHeight: 80, cursor: 'pointer', border: '1.5px solid transparent', transition: 'border-color 0.15s' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--hf-border-strong)'}
                       onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'transparent'}>
                       {task.description || 'Click to add a description...'}
                     </div>
@@ -378,7 +378,7 @@ function TaskDetailModal({ task, columns, users, onClose, onUpdate, onDelete, on
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <label style={lbl}>Checklist</label>
                       {checklistItems.length > 0 && (
-                        <span style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 700 }}>
+                        <span style={{ fontSize: 11, color: 'var(--hf-text-faint)', fontWeight: 700 }}>
                           {checklistItems.filter(i => i.completed).length}/{checklistItems.length}
                         </span>
                       )}
@@ -394,16 +394,16 @@ function TaskDetailModal({ task, columns, users, onClose, onUpdate, onDelete, on
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
                       {checklistItems.map(item => (
                         <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 6px', borderRadius: 7 }}
-                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#F9FAFB'}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--hf-surface-muted)'}
                           onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
                           <input type="checkbox" checked={item.completed}
                             onChange={e => toggleChecklistItem.mutate({ itemId: item.id, completed: e.target.checked })}
-                            style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#1B3A6B', flexShrink: 0 }} />
-                          <span style={{ flex: 1, fontSize: 13, color: item.completed ? '#9CA3AF' : '#374151', textDecoration: item.completed ? 'line-through' : 'none' }}>
+                            style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--hf-primary)', flexShrink: 0 }} />
+                          <span style={{ flex: 1, fontSize: 13, color: item.completed ? 'var(--hf-text-faint)' : 'var(--hf-text-secondary)', textDecoration: item.completed ? 'line-through' : 'none' }}>
                             {item.text}
                           </span>
                           <button onClick={() => deleteChecklistItem.mutate(item.id)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#CBD5E1', padding: 2, display: 'flex', flexShrink: 0 }}>
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-disabled)', padding: 2, display: 'flex', flexShrink: 0 }}>
                             <X size={13} />
                           </button>
                         </div>
@@ -423,13 +423,13 @@ function TaskDetailModal({ task, columns, users, onClose, onUpdate, onDelete, on
 
                   {/* Time progress */}
                   {estimated > 0 && (
-                    <div style={{ marginTop: 20, padding: '14px 16px', background: '#F8FAFC', borderRadius: 10, border: '1px solid #E2E8F0' }}>
+                    <div style={{ marginTop: 20, padding: '14px 16px', background: 'var(--hf-surface-muted)', borderRadius: 10, border: '1px solid var(--hf-border)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 8 }}>
-                        <span style={{ fontWeight: 700, color: '#374151' }}>Time progress</span>
+                        <span style={{ fontWeight: 700, color: 'var(--hf-text-secondary)' }}>Time progress</span>
                         <span style={{ color: timeColor, fontWeight: 800 }}>{logged}h / {estimated}h {overBudget ? '— over budget' : ''}</span>
                       </div>
                       <ProgressBar value={logged} max={estimated} color={timeColor} />
-                      <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 6 }}>
+                      <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 6 }}>
                         {overBudget ? `${(logged - estimated).toFixed(1)}h over estimate` : `${Math.max(0, estimated - logged).toFixed(1)}h remaining`}
                       </div>
                     </div>
@@ -437,10 +437,10 @@ function TaskDetailModal({ task, columns, users, onClose, onUpdate, onDelete, on
 
                   {/* Linked entity */}
                   {task.linkedEntityType && (
-                    <div style={{ marginTop: 16, padding: '10px 14px', background: '#EFF6FF', borderRadius: 9, border: '1px solid #BFDBFE', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ marginTop: 16, padding: '10px 14px', background: 'var(--hf-info-soft)', borderRadius: 9, border: '1px solid var(--hf-info-border)', display: 'flex', alignItems: 'center', gap: 8 }}>
                       <Link2 size={13} color="#1D4ED8" />
-                      <span style={{ fontSize: 12, color: '#1D4ED8', fontWeight: 600 }}>Linked to {task.linkedEntityType.replace('_', ' ')}</span>
-                      <span style={{ fontSize: 11, color: '#64748B', fontFamily: 'monospace' }}>{task.linkedEntityId?.slice(0, 8)}...</span>
+                      <span style={{ fontSize: 12, color: 'var(--hf-info-text)', fontWeight: 600 }}>Linked to {task.linkedEntityType.replace('_', ' ')}</span>
+                      <span style={{ fontSize: 11, color: 'var(--hf-text-muted)', fontFamily: 'monospace' }}>{task.linkedEntityId?.slice(0, 8)}...</span>
                     </div>
                   )}
                 </div>
@@ -448,13 +448,13 @@ function TaskDetailModal({ task, columns, users, onClose, onUpdate, onDelete, on
                 {/* Right — metadata sidebar */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                    <div style={{ color: '#9CA3AF', marginTop: 4, flexShrink: 0 }}><User size={13} /></div>
+                    <div style={{ color: 'var(--hf-text-faint)', marginTop: 4, flexShrink: 0 }}><User size={13} /></div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Assignee</div>
+                      <div style={{ fontSize: 10, color: 'var(--hf-text-faint)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Assignee</div>
                       <select
                         value={task.assigneeId || ''}
                         onChange={e => onUpdate({ assigneeId: e.target.value || null })}
-                        style={{ ...inp, fontSize: 13, fontWeight: 600, color: '#374151', padding: '5px 6px', background: '#fff', border: '1.5px solid #E5E7EB' }}>
+                        style={{ ...inp, fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', padding: '5px 6px', background: 'var(--hf-surface)', border: '1.5px solid var(--hf-border)' }}>
                         <option value="">Unassigned</option>
                         {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                       </select>
@@ -468,21 +468,21 @@ function TaskDetailModal({ task, columns, users, onClose, onUpdate, onDelete, on
                     { icon: <Clock size={13} />,    label: 'Logged',    value: logged > 0 ? `${logged}h` : '—' },
                   ].map(({ icon, label, value, warn }) => (
                     <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                      <div style={{ color: '#9CA3AF', marginTop: 1, flexShrink: 0 }}>{icon}</div>
+                      <div style={{ color: 'var(--hf-text-faint)', marginTop: 1, flexShrink: 0 }}>{icon}</div>
                       <div>
-                        <div style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-                        <div style={{ fontSize: 13, color: warn ? '#EF4444' : '#374151', fontWeight: 600, marginTop: 2 }}>{value}</div>
+                        <div style={{ fontSize: 10, color: 'var(--hf-text-faint)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+                        <div style={{ fontSize: 13, color: warn ? 'var(--hf-danger-text)' : 'var(--hf-text-secondary)', fontWeight: 600, marginTop: 2 }}>{value}</div>
                       </div>
                     </div>
                   ))}
-                  <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: 14 }}>
-                    <div style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Created</div>
-                    <div style={{ fontSize: 12, color: '#64748B' }}>{fmtDateFull(task.createdAt)}</div>
+                  <div style={{ borderTop: '1px solid var(--hf-border-subtle)', paddingTop: 14 }}>
+                    <div style={{ fontSize: 10, color: 'var(--hf-text-faint)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Created</div>
+                    <div style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>{fmtDateFull(task.createdAt)}</div>
                   </div>
                   {task.completedAt && (
                     <div>
-                      <div style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Completed</div>
-                      <div style={{ fontSize: 12, color: '#10B981', fontWeight: 600 }}>{fmtDateFull(task.completedAt)}</div>
+                      <div style={{ fontSize: 10, color: 'var(--hf-text-faint)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Completed</div>
+                      <div style={{ fontSize: 12, color: 'var(--hf-success-text)', fontWeight: 600 }}>{fmtDateFull(task.completedAt)}</div>
                     </div>
                   )}
                 </div>
@@ -493,19 +493,19 @@ function TaskDetailModal({ task, columns, users, onClose, onUpdate, onDelete, on
               <div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20, maxHeight: 340, overflowY: 'auto' }}>
                   {task.comments.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '32px 0', color: '#CBD5E1' }}>
+                    <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--hf-text-disabled)' }}>
                       <MessageSquare size={28} style={{ marginBottom: 8, opacity: 0.5 }} />
                       <div style={{ fontSize: 13 }}>No comments yet — be the first</div>
                     </div>
                   ) : task.comments.map(c => (
                     <div key={c.id} style={{ display: 'flex', gap: 10 }}>
                       <Avatar name={c.authorName} size={32} />
-                      <div style={{ flex: 1, background: '#F8FAFC', borderRadius: 10, padding: '11px 14px', border: '1px solid #E2E8F0' }}>
+                      <div style={{ flex: 1, background: 'var(--hf-surface-muted)', borderRadius: 10, padding: '11px 14px', border: '1px solid var(--hf-border)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{c.authorName}</span>
-                          <span style={{ fontSize: 11, color: '#9CA3AF' }}>{fmtDate(c.createdAt)}</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--hf-text)' }}>{c.authorName}</span>
+                          <span style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{fmtDate(c.createdAt)}</span>
                         </div>
-                        <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{c.body}</div>
+                        <div style={{ fontSize: 13, color: 'var(--hf-text-secondary)', lineHeight: 1.6 }}>{c.body}</div>
                       </div>
                     </div>
                   ))}
@@ -528,14 +528,14 @@ function TaskDetailModal({ task, columns, users, onClose, onUpdate, onDelete, on
             {tab === 'time' && (
               <div>
                 {/* Summary */}
-                <div style={{ display: 'flex', gap: 1, marginBottom: 20, background: '#F8FAFC', borderRadius: 12, overflow: 'hidden', border: '1px solid #E2E8F0' }}>
+                <div style={{ display: 'flex', gap: 1, marginBottom: 20, background: 'var(--hf-surface-muted)', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--hf-border)' }}>
                   {[
                     { label: 'Logged',    value: `${logged}h`,                                           color: '#1B3A6B' },
                     { label: 'Estimated', value: estimated > 0 ? `${estimated}h` : '—',                  color: '#374151' },
                     { label: 'Remaining', value: estimated > 0 ? `${Math.max(0, estimated - logged).toFixed(1)}h` : '—', color: overBudget ? '#EF4444' : '#10B981' },
                   ].map((s, i) => (
-                    <div key={s.label} style={{ flex: 1, padding: '16px 18px', borderLeft: i > 0 ? '1px solid #E2E8F0' : 'none' }}>
-                      <div style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
+                    <div key={s.label} style={{ flex: 1, padding: '16px 18px', borderLeft: i > 0 ? '1px solid var(--hf-border)' : 'none' }}>
+                      <div style={{ fontSize: 10, color: 'var(--hf-text-faint)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
                       <div style={{ fontSize: 22, fontWeight: 800, color: s.color, marginTop: 4 }}>{s.value}</div>
                     </div>
                   ))}
@@ -564,19 +564,19 @@ function TaskDetailModal({ task, columns, users, onClose, onUpdate, onDelete, on
                 {/* Time log history */}
                 {(timeLogs as TimeLog[]).length > 0 && (
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Log history</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Log history</div>
                     {(timeLogs as TimeLog[]).map(l => (
-                      <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', borderBottom: '1px solid #F1F5F9', fontSize: 13 }}>
+                      <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', borderBottom: '1px solid var(--hf-border-subtle)', fontSize: 13 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <Avatar name={l.userName} size={24} />
                           <div>
-                            <div style={{ fontWeight: 600, color: '#111827' }}>{l.userName}</div>
-                            {l.description && <div style={{ fontSize: 12, color: '#94A3B8' }}>{l.description}</div>}
+                            <div style={{ fontWeight: 600, color: 'var(--hf-text)' }}>{l.userName}</div>
+                            {l.description && <div style={{ fontSize: 12, color: 'var(--hf-text-faint)' }}>{l.description}</div>}
                           </div>
                         </div>
                         <div style={{ textAlign: 'right' as const }}>
-                          <div style={{ fontWeight: 700, color: '#1B3A6B' }}>{Number(l.hours).toFixed(1)}h</div>
-                          <div style={{ fontSize: 11, color: '#9CA3AF' }}>{fmtDate(l.loggedDate)}</div>
+                          <div style={{ fontWeight: 700, color: 'var(--hf-primary-text)' }}>{Number(l.hours).toFixed(1)}h</div>
+                          <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{fmtDate(l.loggedDate)}</div>
                         </div>
                       </div>
                     ))}
@@ -594,32 +594,32 @@ function TaskDetailModal({ task, columns, users, onClose, onUpdate, onDelete, on
                   {uploadAttachment.isPending ? <><Loader2 size={13} /> Uploading...</> : <><Paperclip size={13} /> Upload file</>}
                 </button>
                 {uploadError && (
-                  <div style={{ fontSize: 12, color: '#EF4444', marginBottom: 12 }}>{uploadError}</div>
+                  <div style={{ fontSize: 12, color: 'var(--hf-danger-text)', marginBottom: 12 }}>{uploadError}</div>
                 )}
 
                 {attachments.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '32px 0', color: '#CBD5E1' }}>
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--hf-text-disabled)' }}>
                     <Paperclip size={28} style={{ marginBottom: 8, opacity: 0.5 }} />
                     <div style={{ fontSize: 13 }}>No files attached yet</div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {attachments.map(a => (
-                      <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: '#F8FAFC', borderRadius: 9, border: '1px solid #E2E8F0' }}>
+                      <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--hf-surface-muted)', borderRadius: 9, border: '1px solid var(--hf-border)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                           <FileText size={16} color="#64748B" style={{ flexShrink: 0 }} />
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.fileName}</div>
-                            <div style={{ fontSize: 11, color: '#94A3B8' }}>{fmtFileSize(a.sizeBytes)} · {a.uploadedByName} · {fmtDate(a.createdAt)}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.fileName}</div>
+                            <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{fmtFileSize(a.sizeBytes)} · {a.uploadedByName} · {fmtDate(a.createdAt)}</div>
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                           <button onClick={() => downloadAttachment(a)} title="Download"
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', padding: 6, borderRadius: 6, display: 'flex' }}>
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-muted)', padding: 6, borderRadius: 6, display: 'flex' }}>
                             <Download size={14} />
                           </button>
                           <button onClick={() => deleteAttachment.mutate(a.id)} title="Delete"
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: 6, borderRadius: 6, display: 'flex' }}>
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', padding: 6, borderRadius: 6, display: 'flex' }}>
                             <Trash2 size={14} />
                           </button>
                         </div>
@@ -675,10 +675,10 @@ function CreateTaskModal({ columns, boardId, defaultColumnId, users, onClose, on
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
-      <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 540, boxShadow: '0 25px 80px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#111827' }}>Create Task</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', display: 'flex' }}><X size={18} /></button>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 16, width: '100%', maxWidth: 540, boxShadow: '0 25px 80px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--hf-border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--hf-text)' }}>Create Task</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={18} /></button>
         </div>
         <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
@@ -688,13 +688,13 @@ function CreateTaskModal({ columns, boardId, defaultColumnId, users, onClose, on
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={lbl}>Priority</label>
-              <select value={form.priority} onChange={e => f('priority', e.target.value)} style={{ ...inp, background: '#fff' }}>
+              <select value={form.priority} onChange={e => f('priority', e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
                 {Object.entries(PRIORITY).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
             <div>
               <label style={lbl}>Column</label>
-              <select value={form.columnId} onChange={e => f('columnId', e.target.value)} style={{ ...inp, background: '#fff' }}>
+              <select value={form.columnId} onChange={e => f('columnId', e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
                 {columns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
@@ -702,7 +702,7 @@ function CreateTaskModal({ columns, boardId, defaultColumnId, users, onClose, on
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={lbl}>Assignee</label>
-              <select value={form.assigneeId} onChange={e => f('assigneeId', e.target.value)} style={{ ...inp, background: '#fff' }}>
+              <select value={form.assigneeId} onChange={e => f('assigneeId', e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
                 <option value="">Unassigned</option>
                 {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
@@ -722,13 +722,13 @@ function CreateTaskModal({ columns, boardId, defaultColumnId, users, onClose, on
           </div>
 
           {/* Cross-module link */}
-          <div style={{ padding: '12px 14px', background: '#F8FAFC', borderRadius: 9, border: '1px solid #E2E8F0' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ padding: '12px 14px', background: 'var(--hf-surface-muted)', borderRadius: 9, border: '1px solid var(--hf-border)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Link2 size={11} /> Link to entity (optional)
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div>
-                <select value={form.linkedEntityType} onChange={e => f('linkedEntityType', e.target.value)} style={{ ...inp, background: '#fff', fontSize: 13 }}>
+                <select value={form.linkedEntityType} onChange={e => f('linkedEntityType', e.target.value)} style={{ ...inp, background: 'var(--hf-surface)', fontSize: 13 }}>
                   <option value="">No link</option>
                   {ENTITY_TYPES.map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
                 </select>
@@ -740,9 +740,9 @@ function CreateTaskModal({ columns, boardId, defaultColumnId, users, onClose, on
           </div>
 
           {error && (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '10px 12px' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, padding: '10px 12px' }}>
               <AlertCircle size={13} color="#EF4444" />
-              <span style={{ fontSize: 13, color: '#DC2626' }}>{error}</span>
+              <span style={{ fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</span>
             </div>
           )}
         </div>
@@ -770,10 +770,10 @@ function CreateBoardModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
   const BOARD_COLORS = ['#1B3A6B','#0D9488','#D97706','#7C3AED','#DC2626','#0284C7','#166534','#374151']
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
-      <div style={{ background: '#fff', borderRadius: 16, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 16, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--hf-border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>New Board</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', display: 'flex' }}><X size={18} /></button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={18} /></button>
         </div>
         <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
@@ -789,11 +789,11 @@ function CreateBoardModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
             <div style={{ display: 'flex', gap: 8 }}>
               {BOARD_COLORS.map(c => (
                 <div key={c} onClick={() => setForm(p => ({ ...p, color: c }))}
-                  style={{ width: 28, height: 28, borderRadius: '50%', background: c, cursor: 'pointer', border: form.color === c ? '3px solid #1B3A6B' : '2px solid transparent', boxSizing: 'border-box', transition: 'transform 0.1s' }} />
+                  style={{ width: 28, height: 28, borderRadius: '50%', background: c, cursor: 'pointer', border: form.color === c ? '3px solid var(--hf-primary)' : '2px solid transparent', boxSizing: 'border-box', transition: 'transform 0.1s' }} />
               ))}
             </div>
           </div>
-          {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '9px 12px', fontSize: 13, color: '#DC2626' }}>{error}</div>}
+          {error && <div style={{ background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, padding: '9px 12px', fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>}
         </div>
         <div style={{ padding: '0 24px 22px', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
           <button onClick={onClose} style={btnSecondary}>Cancel</button>
@@ -825,18 +825,18 @@ function TaskCard({ task, columns, onMoveTask, onClick, isDragging, onDragStart,
       draggable
       onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', task.id); onDragStart() }}
       onDragEnd={onDragEnd}
-      style={{ background: '#fff', border: `1px solid ${overdue ? '#FCA5A5' : '#E5E7EB'}`, borderRadius: 10, padding: '13px 14px', cursor: isDragging ? 'grabbing' : 'grab', opacity: isDragging ? 0.4 : 1, transition: 'box-shadow 0.15s, opacity 0.15s', borderLeft: `3px solid ${overdue ? '#EF4444' : (columns.find(c => c.id === task.columnId)?.color || '#E5E7EB')}` }}
+      style={{ background: 'var(--hf-surface)', border: `1px solid ${overdue ? '#FCA5A5' : '#E5E7EB'}`, borderRadius: 10, padding: '13px 14px', cursor: isDragging ? 'grabbing' : 'grab', opacity: isDragging ? 0.4 : 1, transition: 'box-shadow 0.15s, opacity 0.15s', borderLeft: `3px solid ${overdue ? '#EF4444' : (columns.find(c => c.id === task.columnId)?.color || '#E5E7EB')}` }}
       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.1)' }}
       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}>
 
       {/* Title */}
-      <div style={{ fontSize: 13, fontWeight: 700, color: task.completedAt ? '#9CA3AF' : '#111827', marginBottom: task.description ? 6 : 10, lineHeight: 1.4, textDecoration: task.completedAt ? 'line-through' : 'none', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: task.completedAt ? 'var(--hf-text-faint)' : 'var(--hf-text)', marginBottom: task.description ? 6 : 10, lineHeight: 1.4, textDecoration: task.completedAt ? 'line-through' : 'none', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
         <span>{task.title}</span>
         {task.completedAt && <CheckCircle2 size={13} color="#10B981" style={{ flexShrink: 0, marginTop: 1 }} />}
       </div>
 
       {task.description && (
-        <div style={{ fontSize: 12, color: '#94A3B8', marginBottom: 10, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>
+        <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', marginBottom: 10, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>
           {task.description}
         </div>
       )}
@@ -853,17 +853,17 @@ function TaskCard({ task, columns, onMoveTask, onClick, isDragging, onDragStart,
         <Badge priority={task.priority} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {task.checklistTotal > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: task.checklistCompleted === task.checklistTotal ? '#10B981' : '#9CA3AF', fontWeight: task.checklistCompleted === task.checklistTotal ? 700 : 400 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: task.checklistCompleted === task.checklistTotal ? 'var(--hf-success-text)' : 'var(--hf-text-faint)', fontWeight: task.checklistCompleted === task.checklistTotal ? 700 : 400 }}>
               <CheckSquare size={10} />{task.checklistCompleted}/{task.checklistTotal}
             </span>
           )}
           {task.commentCount > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#9CA3AF' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--hf-text-faint)' }}>
               <MessageSquare size={10} />{task.commentCount}
             </span>
           )}
           {due && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: overdue ? '#EF4444' : '#9CA3AF', fontWeight: overdue ? 700 : 400 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: overdue ? 'var(--hf-danger-text)' : 'var(--hf-text-faint)', fontWeight: overdue ? 700 : 400 }}>
               <Clock size={10} />{fmtDate(task.dueDate)}
             </span>
           )}
@@ -876,16 +876,16 @@ function TaskCard({ task, columns, onMoveTask, onClick, isDragging, onDragStart,
         {task.assigneeName ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <Avatar name={task.assigneeName} size={20} />
-            <span style={{ fontSize: 11, color: '#6B7280' }}>{task.assigneeName}</span>
+            <span style={{ fontSize: 11, color: 'var(--hf-text-muted)' }}>{task.assigneeName}</span>
           </div>
         ) : <div />}
         {otherCols.length > 0 && (
           <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
             {otherCols.slice(0, 3).map(c => (
               <button key={c.id} onClick={() => onMoveTask(task.id, c.id)}
-                style={{ fontSize: 10, padding: '3px 8px', borderRadius: 20, border: '1px solid #E5E7EB', background: '#F9FAFB', cursor: 'pointer', color: '#6B7280', display: 'flex', alignItems: 'center', gap: 3, transition: 'all 0.1s' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${c.color || '#94A3B8'}20`; (e.currentTarget as HTMLElement).style.color = c.color || '#374151' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#F9FAFB'; (e.currentTarget as HTMLElement).style.color = '#6B7280' }}>
+                style={{ fontSize: 10, padding: '3px 8px', borderRadius: 20, border: '1px solid var(--hf-border)', background: 'var(--hf-surface-muted)', cursor: 'pointer', color: 'var(--hf-text-muted)', display: 'flex', alignItems: 'center', gap: 3, transition: 'all 0.1s' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${c.color || '#94A3B8'}20`; (e.currentTarget as HTMLElement).style.color = c.color || 'var(--hf-text-secondary)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hf-surface-muted)'; (e.currentTarget as HTMLElement).style.color = 'var(--hf-text-muted)' }}>
                 <ArrowRight size={9} />{c.name}
               </button>
             ))}
@@ -929,48 +929,48 @@ function CalendarView({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (tas
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#111827' }}>
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: 'var(--hf-text)' }}>
           {monthDate.toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}
         </h3>
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={() => setMonthDate(new Date())} style={{ ...btnSecondary, padding: '6px 12px', fontSize: 12 }}>Today</button>
           <button onClick={() => setMonthDate(new Date(year, month - 1, 1))}
-            style={{ background: '#F1F5F9', border: 'none', borderRadius: 8, padding: '6px 9px', cursor: 'pointer', display: 'flex' }}>
+            style={{ background: 'var(--hf-surface-sunken)', border: 'none', borderRadius: 8, padding: '6px 9px', cursor: 'pointer', display: 'flex' }}>
             <ChevronLeft size={14} />
           </button>
           <button onClick={() => setMonthDate(new Date(year, month + 1, 1))}
-            style={{ background: '#F1F5F9', border: 'none', borderRadius: 8, padding: '6px 9px', cursor: 'pointer', display: 'flex' }}>
+            style={{ background: 'var(--hf-surface-sunken)', border: 'none', borderRadius: 8, padding: '6px 9px', cursor: 'pointer', display: 'flex' }}>
             <ChevronRight size={14} />
           </button>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: '#E5E7EB', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: 'var(--hf-surface-strong)', border: '1px solid var(--hf-border)', borderRadius: 10, overflow: 'hidden' }}>
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-          <div key={d} style={{ background: '#F8FAFC', padding: '7px', fontSize: 11, fontWeight: 700, color: '#64748B', textAlign: 'center' }}>{d}</div>
+          <div key={d} style={{ background: 'var(--hf-surface-muted)', padding: '7px', fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', textAlign: 'center' }}>{d}</div>
         ))}
         {cells.map(({ date, inMonth }, i) => {
           const key      = dateKey(date)
           const dayTasks = tasksByDate.get(key) || []
           const isToday  = key === todayKey
           return (
-            <div key={i} style={{ background: '#fff', minHeight: 96, padding: 6, opacity: inMonth ? 1 : 0.4 }}>
+            <div key={i} style={{ background: 'var(--hf-surface)', minHeight: 96, padding: 6, opacity: inMonth ? 1 : 0.4 }}>
               <div style={{ marginBottom: 4 }}>
                 {isToday ? (
-                  <span style={{ background: '#1B3A6B', color: '#fff', borderRadius: '50%', width: 19, height: 19, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800 }}>{date.getDate()}</span>
+                  <span style={{ background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', borderRadius: '50%', width: 19, height: 19, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800 }}>{date.getDate()}</span>
                 ) : (
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#9CA3AF' }}>{date.getDate()}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--hf-text-faint)' }}>{date.getDate()}</span>
                 )}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {dayTasks.slice(0, 3).map(t => (
                   <div key={t.id} onClick={() => onTaskClick(t)} title={t.title}
-                    style={{ fontSize: 10, padding: '2px 5px', borderRadius: 4, background: t.overdue ? '#FEF2F2' : (PRIORITY[t.priority]?.bg || '#F1F5F9'), color: t.overdue ? '#DC2626' : (PRIORITY[t.priority]?.color || '#475569'), cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                    style={{ fontSize: 10, padding: '2px 5px', borderRadius: 4, background: t.overdue ? 'var(--hf-danger-soft)' : (PRIORITY[t.priority]?.bg || 'var(--hf-surface-sunken)'), color: t.overdue ? 'var(--hf-danger-text)' : (PRIORITY[t.priority]?.color || 'var(--hf-text-tertiary)'), cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
                     {t.title}
                   </div>
                 ))}
                 {dayTasks.length > 3 && (
-                  <div style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 600 }}>+{dayTasks.length - 3} more</div>
+                  <div style={{ fontSize: 10, color: 'var(--hf-text-faint)', fontWeight: 600 }}>+{dayTasks.length - 3} more</div>
                 )}
               </div>
             </div>
@@ -991,7 +991,7 @@ function TimelineView({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (tas
 
   if (dated.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '60px 0', color: '#CBD5E1' }}>
+      <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--hf-text-disabled)' }}>
         <GanttChart size={32} style={{ marginBottom: 10, opacity: 0.5 }} />
         <div style={{ fontSize: 13 }}>No tasks with due dates to show on the timeline</div>
       </div>
@@ -1012,16 +1012,16 @@ function TimelineView({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (tas
   for (let i = 0; i <= totalDays; i++) axisDates.push(new Date(minTime + i * DAY_MS))
 
   return (
-    <div style={{ border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'auto' }}>
+    <div style={{ border: '1px solid var(--hf-border)', borderRadius: 10, overflow: 'auto' }}>
       <div style={{ minWidth: 220 + (totalDays + 1) * dayWidth }}>
         {/* Date axis */}
-        <div style={{ display: 'flex', borderBottom: '1px solid #E5E7EB', background: '#F8FAFC', position: 'sticky' as const, top: 0, zIndex: 1 }}>
-          <div style={{ width: 220, flexShrink: 0, padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#64748B', borderRight: '1px solid #E5E7EB' }}>Task</div>
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--hf-border)', background: 'var(--hf-surface-muted)', position: 'sticky' as const, top: 0, zIndex: 1 }}>
+          <div style={{ width: 220, flexShrink: 0, padding: '8px 12px', fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', borderRight: '1px solid var(--hf-border)' }}>Task</div>
           <div style={{ position: 'relative' as const, flex: 1, height: 32 }}>
             {axisDates.map((d, i) => {
               const isWeekend = d.getDay() === 0 || d.getDay() === 6
               return (
-                <div key={i} style={{ position: 'absolute' as const, left: i * dayWidth, width: dayWidth, textAlign: 'center' as const, fontSize: 10, fontWeight: 600, color: isWeekend ? '#CBD5E1' : '#94A3B8', paddingTop: 8, borderLeft: '1px solid #F1F5F9', height: '100%' }}>
+                <div key={i} style={{ position: 'absolute' as const, left: i * dayWidth, width: dayWidth, textAlign: 'center' as const, fontSize: 10, fontWeight: 600, color: isWeekend ? 'var(--hf-text-disabled)' : 'var(--hf-text-faint)', paddingTop: 8, borderLeft: '1px solid var(--hf-border-subtle)', height: '100%' }}>
                   {d.getDate()}
                 </div>
               )
@@ -1031,15 +1031,15 @@ function TimelineView({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (tas
 
         {/* Rows */}
         {dated.map(t => (
-          <div key={t.id} style={{ display: 'flex', borderBottom: '1px solid #F1F5F9' }}>
+          <div key={t.id} style={{ display: 'flex', borderBottom: '1px solid var(--hf-border-subtle)' }}>
             <div onClick={() => onTaskClick(t)} title={t.title}
-              style={{ width: 220, flexShrink: 0, padding: '9px 12px', fontSize: 12, fontWeight: 600, color: '#374151', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', borderRight: '1px solid #F1F5F9' }}>
+              style={{ width: 220, flexShrink: 0, padding: '9px 12px', fontSize: 12, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', borderRight: '1px solid var(--hf-border-subtle)' }}>
               {t.title}
             </div>
             <div style={{ position: 'relative' as const, flex: 1, height: 38 }}>
               <div onClick={() => onTaskClick(t)} title={`${t.title} — ${fmtDate(t.dueDate)}`}
                 style={{ position: 'absolute' as const, left: xFor(t.dueDate!) + 3, top: 8, width: dayWidth - 6, height: 22, borderRadius: 6, cursor: 'pointer',
-                  background: t.overdue ? '#FEE2E2' : (PRIORITY[t.priority]?.bg || '#F1F5F9'),
+                  background: t.overdue ? 'var(--hf-danger-soft-strong)' : (PRIORITY[t.priority]?.bg || 'var(--hf-surface-sunken)'),
                   border: `1.5px solid ${t.overdue ? '#EF4444' : (PRIORITY[t.priority]?.border || '#E2E8F0')}` }} />
             </div>
           </div>
@@ -1203,12 +1203,12 @@ export function TasksPage() {
       <div style={{ marginBottom: 22, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: '#1B3A6B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--hf-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <CheckSquare size={18} color="#fff" />
             </div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', margin: 0 }}>Tasks</h1>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>Tasks</h1>
           </div>
-          <p style={{ fontSize: 13, color: '#94A3B8', margin: 0, paddingLeft: 46 }}>Kanban boards · Assignment · Time tracking · Cross-module links</p>
+          <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0, paddingLeft: 46 }}>Kanban boards · Assignment · Time tracking · Cross-module links</p>
         </div>
         <button onClick={() => setShowCreateBoard(true)} style={{ ...btnSecondary, display: 'flex', alignItems: 'center', gap: 6 }}>
           <Plus size={14} /> New Board
@@ -1218,11 +1218,11 @@ export function TasksPage() {
       {/* Stats strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 24 }}>
         {statCards.map(s => (
-          <div key={s.label} style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div key={s.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 36, height: 36, borderRadius: 9, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: s.color, flexShrink: 0 }}>{s.icon}</div>
             <div>
               <div style={{ fontSize: 22, fontWeight: 800, color: s.color, letterSpacing: '-0.02em' }}>{s.value}</div>
-              <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1 }}>{s.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 1 }}>{s.label}</div>
             </div>
           </div>
         ))}
@@ -1230,43 +1230,43 @@ export function TasksPage() {
 
       {/* Board selection / Kanban view */}
       {!selectedBoard ? (
-        <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 14, padding: 24 }}>
+        <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, padding: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Select a board</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Select a board</div>
           </div>
           {boardsLoading ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 48, color: '#9CA3AF', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 48, color: 'var(--hf-text-faint)', gap: 10 }}>
               <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Loading boards...
             </div>
           ) : boards.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '56px 20px' }}>
-              <div style={{ width: 60, height: 60, borderRadius: 16, background: '#F1F5F9', margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 60, height: 60, borderRadius: 16, background: 'var(--hf-surface-sunken)', margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <CheckSquare size={26} color="#CBD5E1" />
               </div>
-              <div style={{ fontWeight: 700, color: '#374151', fontSize: 16, marginBottom: 6 }}>No boards yet</div>
-              <div style={{ color: '#9CA3AF', fontSize: 14, marginBottom: 20 }}>Create a board to start managing tasks as a team</div>
+              <div style={{ fontWeight: 700, color: 'var(--hf-text-secondary)', fontSize: 16, marginBottom: 6 }}>No boards yet</div>
+              <div style={{ color: 'var(--hf-text-faint)', fontSize: 14, marginBottom: 20 }}>Create a board to start managing tasks as a team</div>
               <button onClick={() => setShowCreateBoard(true)} style={btnPrimary}><Plus size={14} /> Create first board</button>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
               {(boards as Board[]).map(board => (
                 <div key={board.id} onClick={() => loadBoard(board)}
-                  style={{ border: '1px solid #E5E7EB', borderLeft: `4px solid ${board.color || '#1B3A6B'}`, borderRadius: 12, padding: '18px 20px', cursor: 'pointer', transition: 'all 0.15s', background: '#FAFAFA' }}
+                  style={{ border: '1px solid var(--hf-border)', borderLeft: `4px solid ${board.color || '#1B3A6B'}`, borderRadius: 12, padding: '18px 20px', cursor: 'pointer', transition: 'all 0.15s', background: 'var(--hf-surface-muted)' }}
                   onMouseEnter={e => Object.assign((e.currentTarget as HTMLElement).style, { background: '#fff', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' })}
                   onMouseLeave={e => Object.assign((e.currentTarget as HTMLElement).style, { background: '#FAFAFA', boxShadow: 'none' })}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                    <div style={{ fontWeight: 800, fontSize: 15, color: '#111827' }}>
+                    <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--hf-text)' }}>
                       {board.name}
-                      {board.isDefault && <span style={{ marginLeft: 8, fontSize: 10, background: '#EEF2FF', color: '#1B3A6B', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>Default</span>}
+                      {board.isDefault && <span style={{ marginLeft: 8, fontSize: 10, background: 'var(--hf-indigo-soft)', color: 'var(--hf-primary-text)', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>Default</span>}
                     </div>
                     <ChevronRight size={15} color="#CBD5E1" />
                   </div>
-                  {board.description && <div style={{ fontSize: 13, color: '#9CA3AF', marginBottom: 12, lineHeight: 1.5 }}>{board.description}</div>}
+                  {board.description && <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', marginBottom: 12, lineHeight: 1.5 }}>{board.description}</div>}
                   <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
                     {board.columns?.slice(0, 8).map(col => (
-                      <div key={col.id} title={col.name} style={{ width: 8, height: 8, borderRadius: '50%', background: col.color || '#94A3B8' }} />
+                      <div key={col.id} title={col.name} style={{ width: 8, height: 8, borderRadius: '50%', background: col.color || 'var(--hf-text-faint)' }} />
                     ))}
-                    <span style={{ fontSize: 11, color: '#9CA3AF', marginLeft: 4 }}>{board.columns?.length ?? 0} columns</span>
+                    <span style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginLeft: 4 }}>{board.columns?.length ?? 0} columns</span>
                   </div>
                 </div>
               ))}
@@ -1279,20 +1279,20 @@ export function TasksPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <button onClick={() => { setSelectedBoard(null); setTasks([]) }}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#F1F5F9', border: 'none', borderRadius: 8, padding: '7px 12px', fontSize: 13, cursor: 'pointer', color: '#374151', fontWeight: 600 }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--hf-surface-sunken)', border: 'none', borderRadius: 8, padding: '7px 12px', fontSize: 13, cursor: 'pointer', color: 'var(--hf-text-secondary)', fontWeight: 600 }}>
                 <ChevronLeft size={14} /> Boards
               </button>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: selectedBoard.color || '#1B3A6B' }} />
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#111827' }}>{selectedBoard.name}</h2>
-              <span style={{ fontSize: 13, color: '#94A3B8' }}>{filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''}</span>
-              <div style={{ display: 'flex', gap: 2, background: '#F1F5F9', borderRadius: 8, padding: 3, marginLeft: 6 }}>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: selectedBoard.color || 'var(--hf-primary)' }} />
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--hf-text)' }}>{selectedBoard.name}</h2>
+              <span style={{ fontSize: 13, color: 'var(--hf-text-faint)' }}>{filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''}</span>
+              <div style={{ display: 'flex', gap: 2, background: 'var(--hf-surface-sunken)', borderRadius: 8, padding: 3, marginLeft: 6 }}>
                 {([
                   { key: 'kanban', label: 'Board', icon: <LayoutGrid size={13} /> },
                   { key: 'calendar', label: 'Calendar', icon: <CalendarDays size={13} /> },
                   { key: 'timeline', label: 'Timeline', icon: <GanttChart size={13} /> },
                 ] as const).map(v => (
                   <button key={v.key} onClick={() => setView(v.key)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: view === v.key ? '#fff' : 'transparent', color: view === v.key ? '#1B3A6B' : '#64748B', boxShadow: view === v.key ? '0 1px 2px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.1s' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: view === v.key ? 'var(--hf-surface)' : 'transparent', color: view === v.key ? 'var(--hf-primary-text)' : 'var(--hf-text-muted)', boxShadow: view === v.key ? '0 1px 2px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.1s' }}>
                     {v.icon} {v.label}
                   </button>
                 ))}
@@ -1301,32 +1301,32 @@ export function TasksPage() {
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {/* Search */}
               <div style={{ position: 'relative' as const }}>
-                <Search size={13} style={{ position: 'absolute' as const, left: 9, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }} />
+                <Search size={13} style={{ position: 'absolute' as const, left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--hf-text-faint)' }} />
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tasks..."
-                  style={{ paddingLeft: 28, padding: '7px 10px 7px 28px', border: '1.5px solid #E5E7EB', borderRadius: 8, fontSize: 13, outline: 'none', width: 190 }} />
+                  style={{ paddingLeft: 28, padding: '7px 10px 7px 28px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', width: 190 }} />
               </div>
               {/* Priority filter */}
               <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
-                style={{ padding: '7px 10px', border: '1.5px solid #E5E7EB', borderRadius: 8, fontSize: 13, outline: 'none', background: '#fff' }}>
+                style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
                 <option value="ALL">All priorities</option>
                 {Object.entries(PRIORITY).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
               {/* Assignee filter */}
               {assignees.length > 0 && (
                 <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
-                  style={{ padding: '7px 10px', border: '1.5px solid #E5E7EB', borderRadius: 8, fontSize: 13, outline: 'none', background: '#fff' }}>
+                  style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
                   <option value="ALL">All assignees</option>
                   {assignees.map(a => <option key={a!} value={a!}>{a}</option>)}
                 </select>
               )}
               {/* Overdue toggle */}
               <button onClick={() => setFilterOverdue(p => !p)}
-                style={{ padding: '7px 12px', border: `1.5px solid ${filterOverdue ? '#FECACA' : '#E5E7EB'}`, borderRadius: 8, fontSize: 12, fontWeight: 600, background: filterOverdue ? '#FEF2F2' : '#fff', color: filterOverdue ? '#DC2626' : '#64748B', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                style={{ padding: '7px 12px', border: `1.5px solid ${filterOverdue ? '#FECACA' : '#E5E7EB'}`, borderRadius: 8, fontSize: 12, fontWeight: 600, background: filterOverdue ? 'var(--hf-danger-soft)' : 'var(--hf-surface)', color: filterOverdue ? 'var(--hf-danger-text)' : 'var(--hf-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
                 <AlertTriangle size={12} /> Overdue
               </button>
               {activeFilters > 0 && (
                 <button onClick={() => { setSearch(''); setFilterPriority('ALL'); setFilterAssignee('ALL'); setFilterOverdue(false) }}
-                  style={{ padding: '7px 10px', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: 12, background: '#F8FAFC', color: '#64748B', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  style={{ padding: '7px 10px', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, background: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                   <X size={11} /> Clear ({activeFilters})
                 </button>
               )}
@@ -1338,7 +1338,7 @@ export function TasksPage() {
 
           {/* Kanban / Calendar / Timeline */}
           {loadingTasks ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 60, color: '#9CA3AF', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 60, color: 'var(--hf-text-faint)', gap: 10 }}>
               <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> Loading tasks...
             </div>
           ) : view === 'calendar' ? (
@@ -1365,19 +1365,19 @@ export function TasksPage() {
                     {/* Column header */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, padding: '0 2px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                        <div style={{ width: 9, height: 9, borderRadius: '50%', background: col.color || '#94A3B8' }} />
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>{col.name}</span>
-                        <span style={{ background: '#F1F5F9', color: '#64748B', borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>{colTasks.length}</span>
+                        <div style={{ width: 9, height: 9, borderRadius: '50%', background: col.color || 'var(--hf-text-faint)' }} />
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--hf-text-secondary)' }}>{col.name}</span>
+                        <span style={{ background: 'var(--hf-surface-sunken)', color: 'var(--hf-text-muted)', borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>{colTasks.length}</span>
                         {doneCol && <CheckCircle2 size={12} color="#10B981" />}
                       </div>
                       <button onClick={() => { setCreateCol(col.id); setShowCreateTask(true) }}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 4, borderRadius: 6, display: 'flex' }}>
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', padding: 4, borderRadius: 6, display: 'flex' }}>
                         <Plus size={15} />
                       </button>
                     </div>
 
                     {/* Cards */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 9, minHeight: 80, padding: 6, margin: -6, borderRadius: 12, border: `1.5px dashed ${isDragOver ? '#1B3A6B' : 'transparent'}`, background: isDragOver ? '#EFF6FF' : 'transparent', transition: 'background 0.1s, border-color 0.1s' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 9, minHeight: 80, padding: 6, margin: -6, borderRadius: 12, border: `1.5px dashed ${isDragOver ? '#1B3A6B' : 'transparent'}`, background: isDragOver ? 'var(--hf-info-soft)' : 'transparent', transition: 'background 0.1s, border-color 0.1s' }}>
                       {colTasks.map(task => (
                         <TaskCard key={task.id} task={task} columns={columns}
                           onMoveTask={(taskId, columnId) => moveTask.mutate({ taskId, columnId })}
@@ -1387,7 +1387,7 @@ export function TasksPage() {
                           onDragEnd={() => { setDraggedTaskId(null); setDragOverColId(null) }} />
                       ))}
                       <div onClick={() => { setCreateCol(col.id); setShowCreateTask(true) }}
-                        style={{ padding: '14px 0', textAlign: 'center', fontSize: 12, color: '#D1D5DB', border: '1.5px dashed #E5E7EB', borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s' }}
+                        style={{ padding: '14px 0', textAlign: 'center', fontSize: 12, color: 'var(--hf-text-disabled)', border: '1.5px dashed var(--hf-border)', borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s' }}
                         onMouseEnter={e => Object.assign((e.currentTarget as HTMLElement).style, { color: '#9CA3AF', borderColor: '#D1D5DB', background: '#FAFAFA' })}
                         onMouseLeave={e => Object.assign((e.currentTarget as HTMLElement).style, { color: '#D1D5DB', borderColor: '#E5E7EB', background: 'transparent' })}>
                         + Add task

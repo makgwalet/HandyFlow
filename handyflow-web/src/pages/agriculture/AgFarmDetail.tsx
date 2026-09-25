@@ -40,18 +40,18 @@ export default function AgFarmDetail({ farm, onBack }: { farm: FarmResponse; onB
           <Tractor size={19} color="#fff" />
         </div>
         <div>
-          <h2 style={{ fontSize: 17, fontWeight: 800, color: "#0F172A", margin: 0 }}>{farm.name}</h2>
-          <p style={{ fontSize: 12, color: "#94A3B8", margin: 0 }}>{farm.farmType}{farm.province ? ` · ${farm.province}` : ""}{farm.totalHectares ? ` · ${farm.totalHectares} ha` : ""}{farm.managerName ? ` · Manager: ${farm.managerName}` : ""}</p>
+          <h2 style={{ fontSize: 17, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>{farm.name}</h2>
+          <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: 0 }}>{farm.farmType}{farm.province ? ` · ${farm.province}` : ""}{farm.totalHectares ? ` · ${farm.totalHectares} ha` : ""}{farm.managerName ? ` · Manager: ${farm.managerName}` : ""}</p>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #E2E8F0", marginBottom: 20, overflowX: "auto" }}>
+      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--hf-border)", marginBottom: 20, overflowX: "auto" }}>
         {TABS.map(t => {
           const active = tab === t.key
           return (
             <button key={t.key} onClick={() => setTab(t.key)}
               style={{ padding: "10px 16px", border: "none", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap",
-                color: active ? AG_ACCENT : "#64748B", borderBottom: active ? `2px solid ${AG_ACCENT}` : "2px solid transparent", marginBottom: -1 }}>
+                color: active ? AG_ACCENT : "var(--hf-text-muted)", borderBottom: active ? `2px solid ${AG_ACCENT}` : "2px solid transparent", marginBottom: -1 }}>
               {t.label}
             </button>
           )
@@ -67,4 +67,4 @@ export default function AgFarmDetail({ farm, onBack }: { farm: FarmResponse; onB
   )
 }
 
-const backBtn: React.CSSProperties = { display: "inline-flex", alignItems: "center", background: "none", border: "none", color: "#64748B", fontSize: 12.5, fontWeight: 600, cursor: "pointer", padding: 0 }
+const backBtn: React.CSSProperties = { display: "inline-flex", alignItems: "center", background: "none", border: "none", color: "var(--hf-text-muted)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", padding: 0 }

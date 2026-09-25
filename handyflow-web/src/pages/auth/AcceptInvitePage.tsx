@@ -72,7 +72,7 @@ export function AcceptInvitePage() {
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <div style={{ width: 38, height: 38, background: '#0D9488', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 38, height: 38, background: 'var(--hf-accent)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Building2 size={19} color="white" strokeWidth={2.5} />
             </div>
             <span style={{ fontSize: 20, fontWeight: 800, color: 'white', fontFamily: "'Syne', sans-serif", letterSpacing: '-0.5px' }}>HandyFlow</span>
@@ -81,43 +81,43 @@ export function AcceptInvitePage() {
 
         {/* Card */}
         <div style={{ background: 'white', borderRadius: 20, padding: 32, boxShadow: '0 24px 80px rgba(0,0,0,0.3)' }}>
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: '0 0 6px' }}>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 6px' }}>
             You've been invited 🎉
           </h2>
-          <p style={{ fontSize: 14, color: '#64748B', margin: '0 0 24px' }}>
+          <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', margin: '0 0 24px' }}>
             Set your password to join as <strong>{invitation?.firstName} {invitation?.lastName}</strong> with role <strong>{invitation?.roleName}</strong>.
           </p>
 
           {/* Pre-filled email */}
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Email</label>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 5 }}>Email</label>
             <input value={invitation?.email ?? ''} disabled
-              style={{ width: '100%', padding: '11px 14px', border: '1.5px solid #E2E8F0', borderRadius: 10, fontSize: 14, boxSizing: 'border-box' as const, background: '#F8FAFC', color: '#64748B' }} />
+              style={{ width: '100%', padding: '11px 14px', border: '1.5px solid var(--hf-border)', borderRadius: 10, fontSize: 14, boxSizing: 'border-box' as const, background: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)' }} />
           </div>
 
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Password *</label>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 5 }}>Password *</label>
             <div style={{ position: 'relative' }}>
               <input type={showPass ? 'text' : 'password'} value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="At least 8 characters"
-                style={{ width: '100%', padding: '11px 44px 11px 14px', border: '1.5px solid #E2E8F0', borderRadius: 10, fontSize: 14, boxSizing: 'border-box' as const }}
+                style={{ width: '100%', padding: '11px 44px 11px 14px', border: '1.5px solid var(--hf-border)', borderRadius: 10, fontSize: 14, boxSizing: 'border-box' as const }}
                 autoFocus />
               <button type="button" onClick={() => setShowPass(s => !s)}
-                style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+                style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)' }}>
                 {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
 
           <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Confirm password *</label>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 5 }}>Confirm password *</label>
             <input type="password" value={confirmPassword}
               onChange={e => setConfirmPassword(e.target.value)}
               placeholder="Re-enter your password"
               style={{ width: '100%', padding: '11px 14px', border: `1.5px solid ${confirmPassword && password !== confirmPassword ? '#DC2626' : '#E2E8F0'}`, borderRadius: 10, fontSize: 14, boxSizing: 'border-box' as const }} />
             {confirmPassword && password !== confirmPassword && (
-              <div style={{ marginTop: 4, fontSize: 12, color: '#DC2626' }}>Passwords do not match</div>
+              <div style={{ marginTop: 4, fontSize: 12, color: 'var(--hf-danger-text)' }}>Passwords do not match</div>
             )}
           </div>
 
@@ -127,8 +127,8 @@ export function AcceptInvitePage() {
               { label: '8+ chars', ok: password.length >= 8 },
               { label: 'Passwords match', ok: password === confirmPassword && confirmPassword.length > 0 },
             ].map(h => (
-              <div key={h.label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: h.ok ? '#0D9488' : '#94A3B8' }}>
-                <div style={{ width: 14, height: 14, borderRadius: '50%', background: h.ok ? '#0D9488' : '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div key={h.label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: h.ok ? 'var(--hf-accent-text)' : 'var(--hf-text-faint)' }}>
+                <div style={{ width: 14, height: 14, borderRadius: '50%', background: h.ok ? 'var(--hf-accent)' : 'var(--hf-surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {h.ok && <Check size={9} color="white" strokeWidth={3} />}
                 </div>
                 {h.label}
@@ -137,12 +137,12 @@ export function AcceptInvitePage() {
           </div>
 
           {error && (
-            <div style={{ marginBottom: 16, padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>{error}</div>
+            <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>
           )}
 
           <button onClick={handleSubmit}
             disabled={accept.isPending || !password || !confirmPassword}
-            style={{ width: '100%', padding: '13px', background: '#1B3A6B', color: 'white', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: !password || !confirmPassword ? 0.5 : 1 }}>
+            style={{ width: '100%', padding: '13px', background: 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: !password || !confirmPassword ? 0.5 : 1 }}>
             {accept.isPending ? 'Creating account...' : 'Create account & sign in →'}
           </button>
         </div>
@@ -158,10 +158,10 @@ function ErrorPage({ message }: { message: string }) {
       <div style={{ width: '100%', maxWidth: 420 }}>
         <div style={{ background: 'white', borderRadius: 20, padding: 32, textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>🔗</div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#0F172A', marginBottom: 10 }}>Invalid invitation</h2>
-          <p style={{ fontSize: 14, color: '#64748B', marginBottom: 24, lineHeight: 1.6 }}>{message}</p>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--hf-text)', marginBottom: 10 }}>Invalid invitation</h2>
+          <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', marginBottom: 24, lineHeight: 1.6 }}>{message}</p>
           <button onClick={() => navigate('/login')}
-            style={{ padding: '10px 24px', background: '#1B3A6B', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '10px 24px', background: 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             Go to sign in
           </button>
         </div>
@@ -172,7 +172,7 @@ function ErrorPage({ message }: { message: string }) {
 
 const pageStyle: React.CSSProperties = {
   minHeight: '100vh',
-  background: 'linear-gradient(135deg, #0F172A 0%, #1B3A6B 50%, #0D9488 100%)',
+  background: 'linear-gradient(135deg, var(--hf-inverse-surface) 0%, var(--hf-primary) 50%, var(--hf-accent) 100%)',
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   padding: '24px 16px', fontFamily: "'Inter', system-ui, sans-serif",
 }

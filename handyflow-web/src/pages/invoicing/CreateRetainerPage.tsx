@@ -10,24 +10,24 @@ import { apiClient } from '../../api/client'
 interface Customer { id: string; name: string; email: string }
 
 const inp: React.CSSProperties = {
-  width: '100%', padding: '10px 14px', border: '1.5px solid #E2E8F0',
-  borderRadius: 10, fontSize: 14, color: '#0F172A', outline: 'none',
+  width: '100%', padding: '10px 14px', border: '1.5px solid var(--hf-border)',
+  borderRadius: 10, fontSize: 14, color: 'var(--hf-text)', outline: 'none',
   boxSizing: 'border-box', background: 'white',
 }
-const inpErr: React.CSSProperties = { ...inp, borderColor: '#DC2626', background: '#FFF5F5' }
+const inpErr: React.CSSProperties = { ...inp, borderColor: 'var(--hf-danger)', background: 'var(--hf-danger-soft)' }
 
 function Field({ label, required, error, hint, children }: {
   label: string; required?: boolean; error?: string; hint?: string; children: React.ReactNode
 }) {
   return (
     <div style={{ marginBottom: 18 }}>
-      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-        {label}{required && <span style={{ color: '#DC2626', marginLeft: 2 }}>*</span>}
+      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--hf-text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        {label}{required && <span style={{ color: 'var(--hf-danger-text)', marginLeft: 2 }}>*</span>}
       </label>
       {children}
-      {hint  && <p style={{ fontSize: 11, color: '#94A3B8', margin: '4px 0 0' }}>{hint}</p>}
+      {hint  && <p style={{ fontSize: 11, color: 'var(--hf-text-faint)', margin: '4px 0 0' }}>{hint}</p>}
       {error && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#DC2626', marginTop: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--hf-danger-text)', marginTop: 4 }}>
           <AlertCircle size={12} />{error}
         </div>
       )}
@@ -114,17 +114,17 @@ export function CreateRetainerPage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
         <button onClick={() => navigate('/invoices')}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', border: '1px solid #E2E8F0', borderRadius: 9, padding: '7px 12px', fontSize: 13, fontWeight: 600, color: '#374151', cursor: 'pointer' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', border: '1px solid var(--hf-border)', borderRadius: 9, padding: '7px 12px', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
           <ArrowLeft size={15} /> Back
         </button>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: 0 }}>New Retainer Invoice</h1>
-          <p style={{ fontSize: 12, color: '#94A3B8', margin: 0 }}>Upfront committed hours — client pays before machine is released</p>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>New Retainer Invoice</h1>
+          <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: 0 }}>Upfront committed hours — client pays before machine is released</p>
         </div>
       </div>
 
       {submitError && (
-        <div style={{ marginBottom: 20, padding: '12px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, fontSize: 13, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ marginBottom: 20, padding: '12px 16px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 10, fontSize: 13, color: 'var(--hf-danger-text)', display: 'flex', alignItems: 'center', gap: 10 }}>
           <AlertCircle size={16} style={{ flexShrink: 0 }} />{submitError}
         </div>
       )}
@@ -135,18 +135,18 @@ export function CreateRetainerPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* Client card */}
-          <div style={{ background: 'white', border: '1px solid #E8EDF5', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', margin: '0 0 18px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Client</p>
+          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', margin: '0 0 18px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Client</p>
 
             <div style={{ marginBottom: 18 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Client type</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--hf-text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Client type</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 {([['existing', Users, 'Saved customer'], ['walkin', UserPlus, 'Walk-in client']] as const).map(([type, Icon, label]) => (
                   <button key={type} onClick={() => setClientType(type)}
                     style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px', borderRadius: 10,
-                      border: clientType === type ? '2px solid #7C3AED' : '1.5px solid #E2E8F0',
-                      background: clientType === type ? '#F5F3FF' : 'white',
-                      color: clientType === type ? '#7C3AED' : '#64748B',
+                      border: clientType === type ? '2px solid var(--hf-violet)' : '1.5px solid var(--hf-border)',
+                      background: clientType === type ? 'var(--hf-violet-soft)' : 'white',
+                      color: clientType === type ? 'var(--hf-violet-text)' : 'var(--hf-text-muted)',
                       fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
                     <Icon size={15} />{label}
                   </button>
@@ -166,8 +166,8 @@ export function CreateRetainerPage() {
                 </div>
               </Field>
             ) : (
-              <div style={{ background: '#F8FAFC', borderRadius: 10, padding: 16, border: '1px solid #E2E8F0' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.05em', marginBottom: 12 }}>WALK-IN CLIENT DETAILS</div>
+              <div style={{ background: 'var(--hf-surface-muted)', borderRadius: 10, padding: 16, border: '1px solid var(--hf-border)' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-faint)', letterSpacing: '0.05em', marginBottom: 12 }}>WALK-IN CLIENT DETAILS</div>
                 <Field label="Name" required error={errors.walkinName}>
                   <input style={errors.walkinName ? inpErr : inp} value={walkinName}
                     onChange={e => { setWalkinName(e.target.value); setErrors(f => { const n = { ...f }; delete n.walkinName; return n }) }}
@@ -198,10 +198,10 @@ export function CreateRetainerPage() {
           </div>
 
           {/* Hours & Rate card */}
-          <div style={{ background: 'white', border: '1px solid #E8EDF5', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
               <Gauge size={16} color="#7C3AED" />
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Commitment Terms</p>
+              <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Commitment Terms</p>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
@@ -226,8 +226,8 @@ export function CreateRetainerPage() {
 
             {/* Live preview */}
             {hours > 0 && rate > 0 && (
-              <div style={{ marginTop: 8, background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 10, padding: '14px 18px' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#7C3AED', letterSpacing: '0.05em', marginBottom: 10 }}>COMMITMENT PREVIEW</div>
+              <div style={{ marginTop: 8, background: 'var(--hf-violet-soft)', border: '1px solid var(--hf-violet-border)', borderRadius: 10, padding: '14px 18px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-violet-text)', letterSpacing: '0.05em', marginBottom: 10 }}>COMMITMENT PREVIEW</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 8 }}>
                   {[
                     { label: 'Hours', value: `${hours}h` },
@@ -235,16 +235,16 @@ export function CreateRetainerPage() {
                     { label: 'VAT',   value: `${vat}%` },
                   ].map(m => (
                     <div key={m.label}>
-                      <div style={{ fontSize: 11, color: '#7C3AED', marginBottom: 2 }}>{m.label}</div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: '#4C1D95' }}>{m.value}</div>
+                      <div style={{ fontSize: 11, color: 'var(--hf-violet-text)', marginBottom: 2 }}>{m.label}</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--hf-violet-text-strong)' }}>{m.value}</div>
                     </div>
                   ))}
                 </div>
-                <div style={{ borderTop: '1px solid #DDD6FE', paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ borderTop: '1px solid var(--hf-violet-border)', paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: 11, color: '#7C3AED' }}>Subtotal {fmtR(subtotal)} + VAT {fmtR(vatAmount)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--hf-violet-text)' }}>Subtotal {fmtR(subtotal)} + VAT {fmtR(vatAmount)}</div>
                   </div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#4C1D95' }}>{fmtR(total)}</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--hf-violet-text-strong)' }}>{fmtR(total)}</div>
                 </div>
               </div>
             )}
@@ -253,8 +253,8 @@ export function CreateRetainerPage() {
 
         {/* Right — summary & submit */}
         <div style={{ position: 'sticky', top: 80 }}>
-          <div style={{ background: 'white', border: '1px solid #E8EDF5', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Summary</p>
+          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Summary</p>
 
             {[['Committed hours', hours > 0 ? `${hours}h` : '—'],
               ['Rate/hr', rate > 0 ? fmtR(rate) : '—'],
@@ -262,26 +262,26 @@ export function CreateRetainerPage() {
               ['VAT', hours > 0 && rate > 0 ? fmtR(vatAmount) : '—'],
             ].map(([l, v]) => (
               <div key={l} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 13, color: '#64748B' }}>{l}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#0F172A' }}>{v}</span>
+                <span style={{ fontSize: 13, color: 'var(--hf-text-muted)' }}>{l}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-text)' }}>{v}</span>
               </div>
             ))}
 
-            <div style={{ height: 1, background: '#F1F5F9', margin: '12px 0' }} />
+            <div style={{ height: 1, background: 'var(--hf-surface-sunken)', margin: '12px 0' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Total due</span>
-              <span style={{ fontSize: 20, fontWeight: 800, color: '#7C3AED' }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--hf-text)' }}>Total due</span>
+              <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--hf-violet-text)' }}>
                 {hours > 0 && rate > 0 ? fmtR(total) : '—'}
               </span>
             </div>
 
-            <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#92400E', marginBottom: 16 }}>
+            <div style={{ background: 'var(--hf-warning-soft-strong)', border: '1px solid var(--hf-warning-border-strong)', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: 'var(--hf-warning-text-deep)', marginBottom: 16 }}>
               Machine will not be released until this invoice is paid in full.
             </div>
 
             <button onClick={handleSubmit} disabled={create.isPending}
               style={{ width: '100%', padding: 12, border: 'none', borderRadius: 10,
-                background: create.isPending ? '#C4B5FD' : '#7C3AED',
+                background: create.isPending ? '#C4B5FD' : 'var(--hf-violet)',
                 color: 'white', fontSize: 14, fontWeight: 700,
                 cursor: create.isPending ? 'not-allowed' : 'pointer' }}>
               {create.isPending ? 'Creating...' : 'Create retainer invoice'}
@@ -289,7 +289,7 @@ export function CreateRetainerPage() {
 
             <div style={{ marginTop: 10 }}>
               {Object.values(errors).map((e, i) => (
-                <p key={i} style={{ fontSize: 11, color: '#DC2626', margin: '2px 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <p key={i} style={{ fontSize: 11, color: 'var(--hf-danger-text)', margin: '2px 0', display: 'flex', alignItems: 'center', gap: 4 }}>
                   <AlertCircle size={11} />{e}
                 </p>
               ))}

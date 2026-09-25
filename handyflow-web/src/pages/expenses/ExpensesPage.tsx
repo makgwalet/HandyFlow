@@ -60,19 +60,19 @@ function ConfirmModal({ title, message, confirmLabel, danger, onConfirm, onCance
 }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 28, width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 22 }}>
-          <div style={{ width: 40, height: 40, borderRadius: "50%", background: danger ? "#FEF2F2" : "#DCFCE7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <div style={{ width: 40, height: 40, borderRadius: "50%", background: danger ? "var(--hf-danger-soft)" : "var(--hf-success-soft-strong)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             {danger ? <AlertTriangle size={18} color="#DC2626" /> : <CheckCircle size={18} color="#166534" />}
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: "#0F172A", marginBottom: 6 }}>{title}</div>
-            <div style={{ fontSize: 13, color: "#64748B", lineHeight: 1.6 }}>{message}</div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)", marginBottom: 6 }}>{title}</div>
+            <div style={{ fontSize: 13, color: "var(--hf-text-muted)", lineHeight: 1.6 }}>{message}</div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button onClick={onCancel} style={btnSecondary}>Cancel</button>
-          <button onClick={onConfirm} style={{ ...btnPrimary, background: danger ? "#DC2626" : "#166534" }}>{confirmLabel}</button>
+          <button onClick={onConfirm} style={{ ...btnPrimary, background: danger ? "var(--hf-danger)" : "var(--hf-success-solid-strong)" }}>{confirmLabel}</button>
         </div>
       </div>
     </div>
@@ -217,12 +217,12 @@ export function ExpensesPage() {
       <div style={{ marginBottom: 22, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: "#D97706", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--hf-warning)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Receipt size={18} color="#fff" />
             </div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: "#0F172A", margin: 0 }}>Expenses</h1>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Expenses</h1>
           </div>
-          <p style={{ fontSize: 13, color: "#94A3B8", margin: 0, paddingLeft: 46 }}>
+          <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0, paddingLeft: 46 }}>
             Staff expense claims · Approval workflow · Accounting integration
           </p>
         </div>
@@ -241,11 +241,11 @@ export function ExpensesPage() {
           { label: "Total claims", value: `${allClaims.length}`, sub: "all time", color: "#1B3A6B", bg: "#EEF2FF", icon: <Receipt size={16} /> },
           { label: "Top category", value: topCategory ? CATEGORIES[topCategory[0]]?.label ?? topCategory[0] : "—", sub: topCategory ? fmtR(topCategory[1]) : "No data", color: "#0D9488", bg: "#F0FDF9", icon: <BarChart2 size={16} /> },
         ].map(k => (
-          <div key={k.label} style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 12, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12 }}>
+          <div key={k.label} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 36, height: 36, borderRadius: 9, background: k.bg, display: "flex", alignItems: "center", justifyContent: "center", color: k.color, flexShrink: 0 }}>{k.icon}</div>
             <div>
               <div style={{ fontSize: 16, fontWeight: 800, color: k.color, letterSpacing: "-0.02em" }}>{k.value}</div>
-              <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 1 }}>{k.label}</div>
+              <div style={{ fontSize: 10, color: "var(--hf-text-faint)", marginTop: 1 }}>{k.label}</div>
               <div style={{ fontSize: 10, color: k.color, opacity: 0.7 }}>{k.sub}</div>
             </div>
           </div>
@@ -253,7 +253,7 @@ export function ExpensesPage() {
       </div>
 
       {/* Main card */}
-      <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 14, padding: 24 }}>
+      <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: 24 }}>
         {/* Toolbar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -263,7 +263,7 @@ export function ExpensesPage() {
               const active = statusFilter === s
               return (
                 <button key={s} onClick={() => setStatus(s)}
-                  style={{ padding: "6px 13px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: active ? 700 : 500, border: `1.5px solid ${active && cfg ? cfg.border : "#E2E8F0"}`, background: active && cfg ? cfg.bg : "#fff", color: active && cfg ? cfg.color : "#64748B", display: "flex", alignItems: "center", gap: 5 }}>
+                  style={{ padding: "6px 13px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: active ? 700 : 500, border: `1.5px solid ${active && cfg ? cfg.border : "#E2E8F0"}`, background: active && cfg ? cfg.bg : "var(--hf-surface)", color: active && cfg ? cfg.color : "var(--hf-text-muted)", display: "flex", alignItems: "center", gap: 5 }}>
                   {s && cfg && <span style={{ width: 6, height: 6, borderRadius: "50%", background: cfg.dot }} />}
                   {s ? cfg.label : "All claims"}
                 </button>
@@ -272,14 +272,14 @@ export function ExpensesPage() {
 
             {/* Search */}
             <div style={{ position: "relative" as const }}>
-              <Search size={13} style={{ position: "absolute" as const, left: 9, top: "50%", transform: "translateY(-50%)", color: "#94A3B8" }} />
+              <Search size={13} style={{ position: "absolute" as const, left: 9, top: "50%", transform: "translateY(-50%)", color: "var(--hf-text-faint)" }} />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search claims..."
-                style={{ paddingLeft: 28, padding: "7px 10px 7px 28px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none", width: 180 }} />
+                style={{ paddingLeft: 28, padding: "7px 10px 7px 28px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", width: 180 }} />
             </div>
 
             {/* Category filter */}
             <select value={catFilter} onChange={e => setCat(e.target.value)}
-              style={{ padding: "7px 10px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none", background: "#fff" }}>
+              style={{ padding: "7px 10px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", background: "var(--hf-surface)" }}>
               <option value="">All categories</option>
               {Object.entries(CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
@@ -287,7 +287,7 @@ export function ExpensesPage() {
             {/* Employee filter */}
             {employees.length > 0 && (
               <select value={empFilter} onChange={e => setEmp(e.target.value)}
-                style={{ padding: "7px 10px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none", background: "#fff" }}>
+                style={{ padding: "7px 10px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", background: "var(--hf-surface)" }}>
                 <option value="">All employees</option>
                 {employees.map((e: Employee) => <option key={e.id} value={e.id}>{e.fullName}</option>)}
               </select>
@@ -295,18 +295,18 @@ export function ExpensesPage() {
 
             {(search || catFilter || empFilter) && (
               <button onClick={() => { setSearch(""); setCat(""); setEmp("") }}
-                style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, background: "#F8FAFC", color: "#64748B", cursor: "pointer" }}>
+                style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12, background: "var(--hf-surface-muted)", color: "var(--hf-text-muted)", cursor: "pointer" }}>
                 <X size={11} /> Clear
               </button>
             )}
           </div>
-          <div style={{ fontSize: 12, color: "#94A3B8" }}>{filtered.length} claim{filtered.length !== 1 ? "s" : ""}</div>
+          <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>{filtered.length} claim{filtered.length !== 1 ? "s" : ""}</div>
         </div>
 
         {/* Category spending bar */}
         {Object.keys(byCategory).length > 0 && (
-          <div style={{ marginBottom: 18, padding: "12px 16px", background: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Approved spend by category</div>
+          <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--hf-surface-muted)", borderRadius: 10, border: "1px solid var(--hf-border)" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Approved spend by category</div>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
               {Object.entries(byCategory).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([cat, total]) => {
                 const cfg = CATEGORIES[cat]
@@ -317,8 +317,8 @@ export function ExpensesPage() {
                       <Icon size={12} color={cfg?.color ?? "#64748B"} />
                     </div>
                     <div>
-                      <div style={{ fontSize: 10, color: "#9CA3AF" }}>{cfg?.label ?? cat}</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>{fmtR(total)}</div>
+                      <div style={{ fontSize: 10, color: "var(--hf-text-faint)" }}>{cfg?.label ?? cat}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text)" }}>{fmtR(total)}</div>
                     </div>
                   </div>
                 )
@@ -329,21 +329,21 @@ export function ExpensesPage() {
 
         {/* Claims table */}
         {isLoading ? (
-          <div style={{ textAlign: "center", padding: 48, color: "#94A3B8" }}>Loading claims...</div>
+          <div style={{ textAlign: "center", padding: 48, color: "var(--hf-text-faint)" }}>Loading claims...</div>
         ) : filtered.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+          <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
             <Receipt size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
-            <div style={{ fontWeight: 700, color: "#475569", fontSize: 15, marginBottom: 6 }}>No expense claims found</div>
+            <div style={{ fontWeight: 700, color: "var(--hf-text-tertiary)", fontSize: 15, marginBottom: 6 }}>No expense claims found</div>
             <div style={{ fontSize: 13, marginBottom: 20 }}>Submit your first claim or adjust the filters above.</div>
             <button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={14} /> Submit Claim</button>
           </div>
         ) : (
-          <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" as const, fontSize: 13 }}>
               <thead>
-                <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
+                <tr style={{ background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border)" }}>
                   {["Claim", "Employee", "Category", "Date", "Amount", "Status", ""].map(h => (
-                    <th key={h} style={{ padding: "10px 16px", textAlign: "left" as const, fontSize: 11, fontWeight: 700, color: "#64748B", letterSpacing: "0.05em", whiteSpace: "nowrap" as const }}>{h}</th>
+                    <th key={h} style={{ padding: "10px 16px", textAlign: "left" as const, fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", letterSpacing: "0.05em", whiteSpace: "nowrap" as const }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -354,20 +354,20 @@ export function ExpensesPage() {
                   const Icon   = catCfg?.icon ?? Tag
                   return (
                     <tr key={c.id}
-                      style={{ background: i % 2 === 0 ? "#fff" : "#FAFAFA", cursor: "pointer", transition: "background 0.1s" }}
+                      style={{ background: i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)", cursor: "pointer", transition: "background 0.1s" }}
                       onClick={() => setSelected(c)}
-                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#F0F9FF"}
-                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? "#fff" : "#FAFAFA"}>
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--hf-sky-soft)"}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)"}>
                       <td style={{ padding: "12px 16px" }}>
-                        <div style={{ fontWeight: 700, color: "#0F172A" }}>{c.description}</div>
-                        <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 1 }}>#{c.claimNumber}</div>
+                        <div style={{ fontWeight: 700, color: "var(--hf-text)" }}>{c.description}</div>
+                        <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 1 }}>#{c.claimNumber}</div>
                       </td>
                       <td style={{ padding: "12px 16px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                          <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#1B3A6B", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                            <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>{c.employeeName.charAt(0).toUpperCase()}</span>
+                          <div style={{ width: 26, height: 26, borderRadius: "50%", background: "var(--hf-primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <span style={{ fontSize: 10, color: "var(--hf-text-on-solid)", fontWeight: 700 }}>{c.employeeName.charAt(0).toUpperCase()}</span>
                           </div>
-                          <span style={{ color: "#374151" }}>{c.employeeName}</span>
+                          <span style={{ color: "var(--hf-text-secondary)" }}>{c.employeeName}</span>
                         </div>
                       </td>
                       <td style={{ padding: "12px 16px" }}>
@@ -375,11 +375,11 @@ export function ExpensesPage() {
                           <div style={{ width: 22, height: 22, borderRadius: 5, background: `${catCfg?.color ?? "#94A3B8"}18`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                             <Icon size={11} color={catCfg?.color ?? "#94A3B8"} />
                           </div>
-                          <span style={{ fontSize: 12, color: "#64748B" }}>{catCfg?.label ?? c.category}</span>
+                          <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{catCfg?.label ?? c.category}</span>
                         </div>
                       </td>
-                      <td style={{ padding: "12px 16px", color: "#64748B", fontSize: 12 }}>{fmtDate(c.claimDate)}</td>
-                      <td style={{ padding: "12px 16px", fontWeight: 800, color: "#0F172A", fontSize: 14 }}>{fmtR(c.amount)}</td>
+                      <td style={{ padding: "12px 16px", color: "var(--hf-text-muted)", fontSize: 12 }}>{fmtDate(c.claimDate)}</td>
+                      <td style={{ padding: "12px 16px", fontWeight: 800, color: "var(--hf-text)", fontSize: 14 }}>{fmtR(c.amount)}</td>
                       <td style={{ padding: "12px 16px" }}>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, padding: "2px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
                           <span style={{ width: 5, height: 5, borderRadius: "50%", background: sc.dot }} />{sc.label}
@@ -390,18 +390,18 @@ export function ExpensesPage() {
                           {c.status === "PENDING" && (
                             <>
                               <button onClick={e => { e.stopPropagation(); setSelected(c); setShowApproveConfirm(true) }}
-                                style={{ display: "flex", alignItems: "center", gap: 3, padding: "4px 10px", background: "#DCFCE7", color: "#166534", border: "1px solid #86EFAC", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                                style={{ display: "flex", alignItems: "center", gap: 3, padding: "4px 10px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                                 <CheckCircle size={10} /> Approve
                               </button>
                               <button onClick={e => { e.stopPropagation(); setSelected(c); setShowReject(true); setError("") }}
-                                style={{ display: "flex", alignItems: "center", gap: 3, padding: "4px 8px", background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>
+                                style={{ display: "flex", alignItems: "center", gap: 3, padding: "4px 8px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>
                                 <XCircle size={10} />
                               </button>
                             </>
                           )}
                           {c.status === "APPROVED" && (
                             <button onClick={e => { e.stopPropagation(); setSelected(c); setShowReimburseConfirm(true) }}
-                              style={{ display: "flex", alignItems: "center", gap: 3, padding: "4px 10px", background: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                              style={{ display: "flex", alignItems: "center", gap: 3, padding: "4px 10px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1px solid var(--hf-info-border)", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                               <DollarSign size={10} /> Pay
                             </button>
                           )}
@@ -415,11 +415,11 @@ export function ExpensesPage() {
               {/* Totals footer */}
               {filtered.length > 1 && (
                 <tfoot>
-                  <tr style={{ background: "#F8FAFC", borderTop: "1px solid #E2E8F0" }}>
-                    <td colSpan={4} style={{ padding: "10px 16px", fontSize: 12, color: "#64748B", fontWeight: 600 }}>
+                  <tr style={{ background: "var(--hf-surface-muted)", borderTop: "1px solid var(--hf-border)" }}>
+                    <td colSpan={4} style={{ padding: "10px 16px", fontSize: 12, color: "var(--hf-text-muted)", fontWeight: 600 }}>
                       {filtered.length} claims shown
                     </td>
-                    <td style={{ padding: "10px 16px", fontWeight: 800, color: "#0F172A", fontSize: 14 }}>
+                    <td style={{ padding: "10px 16px", fontWeight: 800, color: "var(--hf-text)", fontSize: 14 }}>
                       {fmtR(filtered.reduce((s, c) => s + Number(c.amount), 0))}
                     </td>
                     <td colSpan={2} />
@@ -434,10 +434,10 @@ export function ExpensesPage() {
       {/* ── Claim detail slide-over ─────────────────────────────────────── */}
       {selected && !showReject && !showApproveConfirm && !showReimburseConfirm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "flex-end", zIndex: 1000 }}>
-          <div style={{ background: "#fff", width: 480, height: "100%", overflowY: "auto", boxShadow: "-8px 0 40px rgba(0,0,0,0.15)", padding: 28 }}>
+          <div style={{ background: "var(--hf-surface)", width: 480, height: "100%", overflowY: "auto", boxShadow: "-8px 0 40px rgba(0,0,0,0.15)", padding: 28 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 22 }}>
               <div>
-                <div style={{ fontWeight: 800, fontSize: 17, color: "#0F172A", marginBottom: 6 }}>{selected.description}</div>
+                <div style={{ fontWeight: 800, fontSize: 17, color: "var(--hf-text)", marginBottom: 6 }}>{selected.description}</div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   {(() => {
                     const sc = STATUS[selected.status] ?? STATUS.PENDING
@@ -445,18 +445,18 @@ export function ExpensesPage() {
                       <span style={{ width: 5, height: 5, borderRadius: "50%", background: sc.dot }} />{sc.label}
                     </span>
                   })()}
-                  <span style={{ fontSize: 12, color: "#94A3B8" }}>#{selected.claimNumber}</span>
+                  <span style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>#{selected.claimNumber}</span>
                 </div>
               </div>
-              <button onClick={() => setSelected(null)} style={{ background: "#F1F5F9", border: "none", borderRadius: "50%", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#64748B" }}>
+              <button onClick={() => setSelected(null)} style={{ background: "var(--hf-surface-sunken)", border: "none", borderRadius: "50%", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--hf-text-muted)" }}>
                 <X size={14} />
               </button>
             </div>
 
             {/* Amount hero */}
-            <div style={{ background: "#F8FAFC", borderRadius: 12, padding: "18px 20px", marginBottom: 22, textAlign: "center" as const, border: "1px solid #E2E8F0" }}>
-              <div style={{ fontSize: 32, fontWeight: 900, color: "#0F172A", letterSpacing: "-0.03em" }}>{fmtR(selected.amount)}</div>
-              <div style={{ fontSize: 13, color: "#64748B", marginTop: 4 }}>
+            <div style={{ background: "var(--hf-surface-muted)", borderRadius: 12, padding: "18px 20px", marginBottom: 22, textAlign: "center" as const, border: "1px solid var(--hf-border)" }}>
+              <div style={{ fontSize: 32, fontWeight: 900, color: "var(--hf-text)", letterSpacing: "-0.03em" }}>{fmtR(selected.amount)}</div>
+              <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginTop: 4 }}>
                 {CATEGORIES[selected.category]?.label ?? selected.category} · {fmtDate(selected.claimDate)}
               </div>
             </div>
@@ -471,60 +471,60 @@ export function ExpensesPage() {
                 { label: "Approved",   value: selected.approvedAt ? fmtDT(selected.approvedAt) : "—", icon: <CheckCircle size={13} /> },
                 { label: "Reimbursed", value: selected.reimbursedAt ? fmtDT(selected.reimbursedAt) : "—", icon: <DollarSign size={13} /> },
               ].map(row => (
-                <div key={row.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #F1F5F9", fontSize: 13 }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#94A3B8", fontWeight: 600 }}>
+                <div key={row.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--hf-border-subtle)", fontSize: 13 }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--hf-text-faint)", fontWeight: 600 }}>
                     {row.icon}{row.label}
                   </span>
-                  <span style={{ color: "#374151", fontWeight: 500 }}>{row.value}</span>
+                  <span style={{ color: "var(--hf-text-secondary)", fontWeight: 500 }}>{row.value}</span>
                 </div>
               ))}
             </div>
 
             {selected.notes && (
-              <div style={{ marginBottom: 16, padding: "12px 14px", background: "#FFFBEB", borderRadius: 9, border: "1px solid #FDE68A" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#D97706", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Notes</div>
-                <div style={{ fontSize: 13, color: "#374151" }}>{selected.notes}</div>
+              <div style={{ marginBottom: 16, padding: "12px 14px", background: "var(--hf-warning-soft)", borderRadius: 9, border: "1px solid var(--hf-warning-border)" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-warning-text)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Notes</div>
+                <div style={{ fontSize: 13, color: "var(--hf-text-secondary)" }}>{selected.notes}</div>
               </div>
             )}
 
             {selected.rejectionReason && (
-              <div style={{ marginBottom: 16, padding: "12px 14px", background: "#FEF2F2", borderRadius: 9, border: "1px solid #FECACA" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Rejection reason</div>
-                <div style={{ fontSize: 13, color: "#DC2626" }}>{selected.rejectionReason}</div>
+              <div style={{ marginBottom: 16, padding: "12px 14px", background: "var(--hf-danger-soft)", borderRadius: 9, border: "1px solid var(--hf-danger-border)" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-danger-text)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Rejection reason</div>
+                <div style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>{selected.rejectionReason}</div>
               </div>
             )}
 
             {selected.journalEntryId && (
-              <div style={{ marginBottom: 16, padding: "10px 14px", background: "#F0FDF4", borderRadius: 9, border: "1px solid #86EFAC", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#166534", fontWeight: 600 }}>
+              <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--hf-success-soft)", borderRadius: 9, border: "1px solid var(--hf-success-border)", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--hf-success-text-strong)", fontWeight: 600 }}>
                 <CheckCircle size={14} /> Journal entry posted to Accounting
               </div>
             )}
 
             {selected.receiptUrl && (
               <a href={selected.receiptUrl} target="_blank" rel="noreferrer"
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 20, fontSize: 13, color: "#1D4ED8", fontWeight: 600 }}>
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 20, fontSize: 13, color: "var(--hf-info-text)", fontWeight: 600 }}>
                 <FileText size={14} /> View receipt
               </a>
             )}
 
-            {error && <div style={{ marginBottom: 14, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{error}</div>}
+            {error && <div style={{ marginBottom: 14, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
 
             {/* Actions */}
             {selected.status === "PENDING" && (
               <div style={{ display: "flex", gap: 10 }}>
                 <button onClick={() => { setShowReject(true); setError("") }}
-                  style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "11px", background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                  style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "11px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                   <XCircle size={14} /> Reject
                 </button>
                 <button onClick={() => setShowApproveConfirm(true)}
-                  style={{ flex: 2, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "11px", background: "#DCFCE7", color: "#166534", border: "1px solid #86EFAC", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                  style={{ flex: 2, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "11px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                   <CheckCircle size={14} /> Approve claim
                 </button>
               </div>
             )}
             {selected.status === "APPROVED" && (
               <button onClick={() => setShowReimburseConfirm(true)}
-                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "12px", background: "#EFF6FF", color: "#1D4ED8", border: "1.5px solid #BFDBFE", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "12px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1.5px solid var(--hf-info-border)", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 <DollarSign size={14} /> Mark as reimbursed
               </button>
             )}
@@ -535,14 +535,14 @@ export function ExpensesPage() {
       {/* ── Reject modal ───────────────────────────────────────────────── */}
       {showReject && selected && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 20 }}>
-              <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#FEF2F2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--hf-danger-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <XCircle size={18} color="#DC2626" />
               </div>
               <div>
-                <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: "#DC2626" }}>Reject claim</h3>
-                <p style={{ margin: 0, fontSize: 13, color: "#64748B" }}>
+                <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: "var(--hf-danger-text)" }}>Reject claim</h3>
+                <p style={{ margin: 0, fontSize: 13, color: "var(--hf-text-muted)" }}>
                   {selected.description} — <strong>{fmtR(selected.amount)}</strong>
                 </p>
               </div>
@@ -552,14 +552,14 @@ export function ExpensesPage() {
               <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} rows={4} autoFocus
                 placeholder="Explain why this claim is being rejected so the employee can resubmit or understand the decision..."
                 style={{ ...inp, resize: "vertical" as const, fontFamily: "inherit" }} />
-              <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 5 }}>The employee will see this reason on their claim.</div>
+              <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 5 }}>The employee will see this reason on their claim.</div>
             </div>
-            {error && <div style={{ marginTop: 10, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{error}</div>}
+            {error && <div style={{ marginTop: 10, padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => { setShowReject(false); setRejectReason(""); setError("") }} style={btnSecondary}>Cancel</button>
               <button disabled={!rejectReason.trim() || rejectClaim.isPending}
                 onClick={() => rejectClaim.mutate({ id: selected.id, reason: rejectReason })}
-                style={{ ...btnPrimary, background: !rejectReason.trim() ? "#94A3B8" : "#DC2626", opacity: !rejectReason.trim() ? 0.7 : 1 }}>
+                style={{ ...btnPrimary, background: !rejectReason.trim() ? "var(--hf-text-faint)" : "var(--hf-danger)", opacity: !rejectReason.trim() ? 0.7 : 1 }}>
                 {rejectClaim.isPending ? "Rejecting..." : "Reject claim"}
               </button>
             </div>
@@ -570,13 +570,13 @@ export function ExpensesPage() {
       {/* ── Submit claim modal ─────────────────────────────────────────── */}
       {showCreate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 580, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 25px 80px rgba(0,0,0,0.25)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 580, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 25px 80px rgba(0,0,0,0.25)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>Submit Expense Claim</h3>
-                <p style={{ margin: "3px 0 0", fontSize: 13, color: "#64748B" }}>Claims require approval before reimbursement</p>
+                <p style={{ margin: "3px 0 0", fontSize: 13, color: "var(--hf-text-muted)" }}>Claims require approval before reimbursement</p>
               </div>
-              <button onClick={() => { setShowCreate(false); setForm(initForm()) }} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+              <button onClick={() => { setShowCreate(false); setForm(initForm()) }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -587,7 +587,7 @@ export function ExpensesPage() {
                     const emp = employees.find((x: Employee) => x.id === e.target.value) as Employee | undefined
                     f("employeeId", e.target.value)
                     f("employeeName", emp?.fullName ?? "")
-                  }} style={{ ...inp, background: "#fff" }}>
+                  }} style={{ ...inp, background: "var(--hf-surface)" }}>
                     <option value="">Select employee...</option>
                     {employees.map((e: Employee) => <option key={e.id} value={e.id}>{e.fullName}</option>)}
                   </select>
@@ -602,7 +602,7 @@ export function ExpensesPage() {
               </div>
               <div>
                 <label style={lbl}>Category *</label>
-                <select value={form.category} onChange={e => f("category", e.target.value)} style={{ ...inp, background: "#fff" }}>
+                <select value={form.category} onChange={e => f("category", e.target.value)} style={{ ...inp, background: "var(--hf-surface)" }}>
                   {Object.entries(CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
               </div>
@@ -620,7 +620,7 @@ export function ExpensesPage() {
               <div>
                 <label style={lbl}>Receipt URL</label>
                 <input value={form.receiptUrl} onChange={e => f("receiptUrl", e.target.value)} placeholder="https://drive.google.com/..." style={inp} />
-                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>Paste a link to the uploaded receipt image</div>
+                <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>Paste a link to the uploaded receipt image</div>
               </div>
 
               <div style={{ gridColumn: "1/-1" }}>
@@ -630,11 +630,11 @@ export function ExpensesPage() {
               </div>
             </div>
 
-            <div style={{ marginTop: 14, padding: "11px 14px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 9, fontSize: 12, color: "#166534" }}>
+            <div style={{ marginTop: 14, padding: "11px 14px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", borderRadius: 9, fontSize: 12, color: "var(--hf-success-text-strong)" }}>
               Once approved, a journal entry (DR Expenses / CR Accounts Payable) will automatically be posted to Accounting.
             </div>
 
-            {error && <div style={{ marginTop: 12, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{error}</div>}
+            {error && <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
               <button onClick={() => { setShowCreate(false); setForm(initForm()) }} style={btnSecondary}>Cancel</button>

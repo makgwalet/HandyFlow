@@ -30,10 +30,10 @@ export function AuditorPortalLoginPage() {
   }
 
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#F8FAFC", fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <form onSubmit={submit} style={{ background: "#fff", padding: 32, borderRadius: 12, width: 360, boxShadow: "0 20px 60px rgba(0,0,0,0.08)" }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "var(--hf-surface-muted)", fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <form onSubmit={submit} style={{ background: "var(--hf-surface)", padding: 32, borderRadius: 12, width: 360, boxShadow: "0 20px 60px rgba(0,0,0,0.08)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: NAVY, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 15 }}>H</div>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: NAVY, color: "var(--hf-text-on-solid)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 15 }}>H</div>
           <span style={{ fontSize: 15, fontWeight: 800, color: INK }}>Auditor Access</span>
         </div>
         <h1 style={{ fontSize: 18, fontWeight: 800, color: INK, marginBottom: 4 }}>Sign in</h1>
@@ -47,10 +47,10 @@ export function AuditorPortalLoginPage() {
         <input type="password" required value={password} onChange={e => setPassword(e.target.value)}
           style={{ width: "100%", padding: "11px 13px", border: `1.5px solid ${BORDER}`, borderRadius: 8, fontSize: 14, marginBottom: 18, boxSizing: "border-box" as const }} />
 
-        {error && <div style={{ padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, fontSize: 12.5, color: "#DC2626", marginBottom: 14 }}>{error}</div>}
+        {error && <div style={{ padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 12.5, color: "var(--hf-danger-text)", marginBottom: 14 }}>{error}</div>}
 
         <button type="submit" disabled={loading}
-          style={{ width: "100%", padding: "11px 13px", background: NAVY, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+          style={{ width: "100%", padding: "11px 13px", background: NAVY, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
           {loading ? "Signing in…" : "Sign In"}
         </button>
       </form>

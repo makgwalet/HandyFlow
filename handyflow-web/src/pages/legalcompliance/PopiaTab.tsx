@@ -122,28 +122,28 @@ export default function PopiaTab() {
   const filtered = activities.filter(a => filterActive === "ALL" || (filterActive === "ACTIVE" ? a.active : !a.active))
 
   const stats = [
-    { label: "Total",              value: activities.length,                                    color: "#4338CA" },
-    { label: "Active",             value: activities.filter(a => a.active).length,                color: "#166534" },
-    { label: "Cross-border",       value: activities.filter(a => a.active && a.crossBorderTransfer).length, color: "#D97706" },
-    { label: "Consent-based",      value: activities.filter(a => a.active && a.lawfulBasis === "CONSENT").length, color: "#1D4ED8" },
+    { label: "Total",              value: activities.length,                                    color: "var(--hf-indigo-text)" },
+    { label: "Active",             value: activities.filter(a => a.active).length,                color: "var(--hf-success-text-strong)" },
+    { label: "Cross-border",       value: activities.filter(a => a.active && a.crossBorderTransfer).length, color: "var(--hf-warning-text)" },
+    { label: "Consent-based",      value: activities.filter(a => a.active && a.lawfulBasis === "CONSENT").length, color: "var(--hf-info-text)" },
   ]
 
   const inp = (k: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
     border: `1.5px solid ${fieldErrors[k] ? "#DC2626" : "#E2E8F0"}`,
-    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "#FFF5F5" : "#fff", outline: "none",
+    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
-    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#DC2626", marginTop: 4 }}><AlertCircle size={12} />{fieldErrors[k]}</div>
+    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}><AlertCircle size={12} />{fieldErrors[k]}</div>
   ) : null
 
   return (
     <div>
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {stats.map(s => (
-          <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
+          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{s.label}</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -153,18 +153,18 @@ export default function PopiaTab() {
           {(["ACTIVE", "INACTIVE", "ALL"] as const).map(s => (
             <button key={s} onClick={() => setFilterActive(s)}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterActive === s ? 600 : 400,
-                background: filterActive === s ? "#4338CA" : "#F1F5F9", color: filterActive === s ? "#fff" : "#64748B" }}>
+                background: filterActive === s ? "var(--hf-indigo)" : "var(--hf-surface-sunken)", color: filterActive === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
               {s === "ALL" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
             </button>
           ))}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={downloadPdf} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", color: "#4338CA", border: "1px solid #E2E8F0", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          <button onClick={downloadPdf} style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-surface)", color: "var(--hf-indigo-text)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
             <Download size={14} /> Export PDF
           </button>
           {canManage && (
             <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") }}
-              style={{ display: "flex", alignItems: "center", gap: 7, background: "#4338CA", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+              style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-indigo)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
               <Plus size={15} /> Register Activity
             </button>
           )}
@@ -172,11 +172,11 @@ export default function PopiaTab() {
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading register...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading register...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Lock size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No processing activities found</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No processing activities found</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -184,19 +184,19 @@ export default function PopiaTab() {
             const isOpen = expanded === a.id
             return (
               <div key={a.id} style={{ border: `1px solid ${!a.active ? "#E2E8F0" : "#E2E8F0"}`, borderRadius: 12, overflow: "hidden", opacity: a.active ? 1 : 0.65 }}>
-                <div style={{ padding: "16px 20px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+                <div style={{ padding: "16px 20px", background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 10, background: "#EEF2FF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 10, background: "var(--hf-indigo-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <Lock size={18} color="#4338CA" />
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
-                        <span style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{a.activityName}</span>
-                        <span style={{ fontSize: 11, color: "#64748B", background: "#F1F5F9", padding: "1px 8px", borderRadius: 20 }}>{a.dataCategory}</span>
-                        {a.crossBorderTransfer && <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, background: "#FFFBEB", color: "#D97706", padding: "1px 7px", borderRadius: 20, border: "1px solid #FDE68A" }}><Globe2 size={10} />CROSS-BORDER</span>}
-                        {!a.active && <span style={{ fontSize: 10, fontWeight: 700, background: "#F1F5F9", color: "#64748B", padding: "1px 7px", borderRadius: 20 }}>INACTIVE</span>}
+                        <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{a.activityName}</span>
+                        <span style={{ fontSize: 11, color: "var(--hf-text-muted)", background: "var(--hf-surface-sunken)", padding: "1px 8px", borderRadius: 20 }}>{a.dataCategory}</span>
+                        {a.crossBorderTransfer && <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, background: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", padding: "1px 7px", borderRadius: 20, border: "1px solid var(--hf-warning-border)" }}><Globe2 size={10} />CROSS-BORDER</span>}
+                        {!a.active && <span style={{ fontSize: 10, fontWeight: 700, background: "var(--hf-surface-sunken)", color: "var(--hf-text-muted)", padding: "1px 7px", borderRadius: 20 }}>INACTIVE</span>}
                       </div>
-                      <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                      <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>
                         {LAWFUL_BASIS_LABELS[a.lawfulBasis] ?? a.lawfulBasis}{a.responsibleDepartment ? ` · ${a.responsibleDepartment}` : ""}{a.reviewDate ? ` · Review ${fmtDate(a.reviewDate)}` : ""}
                       </div>
                     </div>
@@ -205,22 +205,22 @@ export default function PopiaTab() {
                     {canManage && (
                       <div style={{ display: "flex", gap: 5 }}>
                         <button onClick={() => toggleActive.mutate({ id: a.id, active: !a.active })} title={a.active ? "Deactivate" : "Reactivate"}
-                          style={{ background: a.active ? "#F1F5F9" : "#DCFCE7", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: a.active ? "#64748B" : "#166534" }}>
+                          style={{ background: a.active ? "var(--hf-surface-sunken)" : "var(--hf-success-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: a.active ? "var(--hf-text-muted)" : "var(--hf-success-text-strong)" }}>
                           {a.active ? <PowerOff size={13} /> : <Power size={13} />}
                         </button>
-                        <button onClick={() => openEdit(a)} title="Edit" style={{ background: "#EFF6FF", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#1D4ED8" }}><Edit2 size={13} /></button>
+                        <button onClick={() => openEdit(a)} title="Edit" style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-info-text)" }}><Edit2 size={13} /></button>
                         {canAdmin && (
-                          <button onClick={() => { if (confirm(`Delete "${a.activityName}"?`)) deleteActivity.mutate(a.id) }} title="Delete" style={{ background: "#FEF2F2", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#DC2626" }}><Trash2 size={13} /></button>
+                          <button onClick={() => { if (confirm(`Delete "${a.activityName}"?`)) deleteActivity.mutate(a.id) }} title="Delete" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
                         )}
                       </div>
                     )}
-                    <button onClick={() => setExpanded(isOpen ? null : a.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
+                    <button onClick={() => setExpanded(isOpen ? null : a.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}>
                       {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </button>
                   </div>
                 </div>
                 {isOpen && (
-                  <div style={{ borderTop: "1px solid #F1F5F9", padding: "16px 20px", background: "#F8FAFC" }}>
+                  <div style={{ borderTop: "1px solid var(--hf-border-subtle)", padding: "16px 20px", background: "var(--hf-surface-muted)" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 14, marginBottom: 14 }}>
                       {[
                         { l: "Purpose",                    v: a.purpose || "—" },
@@ -229,13 +229,13 @@ export default function PopiaTab() {
                         { l: "Security measures",          v: a.securityMeasures || "—" },
                       ].map(item => (
                         <div key={item.l}>
-                          <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{item.v}</div>
+                          <div style={{ fontSize: 10, color: "var(--hf-text-faint)", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{item.v}</div>
                         </div>
                       ))}
                     </div>
                     {a.crossBorderTransfer && a.crossBorderDetails && (
-                      <div style={{ padding: "8px 12px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, fontSize: 13, color: "#78350F" }}>
+                      <div style={{ padding: "8px 12px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-warning-text-deep)" }}>
                         <strong>Cross-border transfer details:</strong> {a.crossBorderDetails}
                       </div>
                     )}
@@ -259,13 +259,13 @@ export default function PopiaTab() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
                 <label style={lbl}>Data category *</label>
-                <select value={form.dataCategory} onChange={e => setForm(f => ({ ...f, dataCategory: e.target.value }))} style={{ ...inp("dataCategory"), background: "#fff" }}>
+                <select value={form.dataCategory} onChange={e => setForm(f => ({ ...f, dataCategory: e.target.value }))} style={{ ...inp("dataCategory"), background: "var(--hf-surface)" }}>
                   {DATA_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>
                 <label style={lbl}>Lawful basis *</label>
-                <select value={form.lawfulBasis} onChange={e => setForm(f => ({ ...f, lawfulBasis: e.target.value }))} style={{ ...inp("lawfulBasis"), background: "#fff" }}>
+                <select value={form.lawfulBasis} onChange={e => setForm(f => ({ ...f, lawfulBasis: e.target.value }))} style={{ ...inp("lawfulBasis"), background: "var(--hf-surface)" }}>
                   {LAWFUL_BASES.map(b => <option key={b} value={b}>{LAWFUL_BASIS_LABELS[b]}</option>)}
                 </select>
               </div>
@@ -304,14 +304,14 @@ export default function PopiaTab() {
           <Sect title="Cross-Border Transfer">
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 12 }}>
               <input type="checkbox" checked={form.crossBorderTransfer} onChange={e => { setForm(f => ({ ...f, crossBorderTransfer: e.target.checked })); if (!e.target.checked) setFieldErrors(f => omit(f, "crossBorderDetails")) }} style={{ width: 16, height: 16 }} />
-              <span style={{ fontSize: 13, color: "#374151" }}>This activity involves transferring personal information outside South Africa</span>
+              <span style={{ fontSize: 13, color: "var(--hf-text-secondary)" }}>This activity involves transferring personal information outside South Africa</span>
             </label>
             {form.crossBorderTransfer && (
               <div>
                 <label style={lbl}>Cross-border details *</label>
                 <textarea value={form.crossBorderDetails} onChange={e => { setForm(f => ({ ...f, crossBorderDetails: e.target.value })); setFieldErrors(f => omit(f, "crossBorderDetails")) }} rows={2} style={{ ...inp("crossBorderDetails"), resize: "vertical" as const }} placeholder="Destination country, safeguards in place, recipient..." />
                 <FErr k="crossBorderDetails" />
-                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>Required under POPIA s72 whenever cross-border transfer is enabled.</div>
+                <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>Required under POPIA s72 whenever cross-border transfer is enabled.</div>
               </div>
             )}
           </Sect>
@@ -344,21 +344,21 @@ export default function PopiaTab() {
 function Overlay({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 640, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 640, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>
     </div>
   )
 }
 function MHead({ title, onClose }: { title: string; onClose: () => void }) {
-  return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button></div>
+  return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button></div>
 }
 function MFoot({ onCancel, onSubmit, loading, label, disabled = false }: { onCancel: () => void; onSubmit: () => void; loading: boolean; label: string; disabled?: boolean }) {
-  return <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}><button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button><button onClick={onSubmit} disabled={loading || disabled} style={{ padding: "9px 22px", background: loading || disabled ? "#94A3B8" : "#4338CA", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || disabled ? "not-allowed" : "pointer" }}>{loading ? "Saving..." : label}</button></div>
+  return <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}><button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button><button onClick={onSubmit} disabled={loading || disabled} style={{ padding: "9px 22px", background: loading || disabled ? "var(--hf-text-faint)" : "var(--hf-indigo)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || disabled ? "not-allowed" : "pointer" }}>{loading ? "Saving..." : label}</button></div>
 }
 function Sect({ title, children }: { title: string; children: React.ReactNode }) {
-  return <div style={{ marginBottom: 20 }}><div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.07em", textTransform: "uppercase" as const, marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #F1F5F9" }}>{title}</div>{children}</div>
+  return <div style={{ marginBottom: 20 }}><div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", letterSpacing: "0.07em", textTransform: "uppercase" as const, marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid var(--hf-border-subtle)" }}>{title}</div>{children}</div>
 }
 function ErrBanner({ msg }: { msg: string }) {
-  return <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{msg}</div>
+  return <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{msg}</div>
 }
 const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }

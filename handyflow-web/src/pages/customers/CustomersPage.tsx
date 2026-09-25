@@ -36,33 +36,33 @@ interface TagDefinition {
 }
 
 const TAG_CATALOGUE: TagDefinition[] = [
-  { value: 'vip',              label: 'VIP',              color: '#7C3AED' },
-  { value: 'key-account',      label: 'Key Account',      color: '#1D4ED8' },
-  { value: 'enterprise',       label: 'Enterprise',       color: '#0891B2' },
-  { value: 'new-lead',         label: 'New Lead',         color: '#16A34A' },
-  { value: 'at-risk',          label: 'At Risk',          color: '#DC2626' },
-  { value: 'overdue',          label: 'Overdue',          color: '#EA580C' },
-  { value: 'bad-debt',         label: 'Bad Debt',         color: '#991B1B' },
-  { value: 'blocked',          label: 'Blocked',          color: '#6B7280' },
-  { value: 'follow-up',        label: 'Follow Up',        color: '#B45309' },
-  { value: 'seasonal',         label: 'Seasonal',         color: '#0D9488' },
-  { value: 'trade-show',       label: 'Trade Show',       color: '#7C3AED' },
-  { value: 'agri',             label: 'Agriculture',      color: '#15803D' },
-  { value: 'mining',           label: 'Mining',           color: '#92400E' },
-  { value: 'construction',     label: 'Construction',     color: '#B45309' },
-  { value: 'retail',           label: 'Retail',           color: '#0369A1' },
-  { value: 'manufacturing',    label: 'Manufacturing',    color: '#4338CA' },
-  { value: 'steel',            label: 'Steel',            color: '#374151' },
+  { value: 'vip',              label: 'VIP',              color: 'var(--hf-violet-text)' },
+  { value: 'key-account',      label: 'Key Account',      color: 'var(--hf-info-text)' },
+  { value: 'enterprise',       label: 'Enterprise',       color: 'var(--hf-sky-text)' },
+  { value: 'new-lead',         label: 'New Lead',         color: 'var(--hf-success-text)' },
+  { value: 'at-risk',          label: 'At Risk',          color: 'var(--hf-danger-text)' },
+  { value: 'overdue',          label: 'Overdue',          color: 'var(--hf-orange-text)' },
+  { value: 'bad-debt',         label: 'Bad Debt',         color: 'var(--hf-danger-text-strong)' },
+  { value: 'blocked',          label: 'Blocked',          color: 'var(--hf-text-muted)' },
+  { value: 'follow-up',        label: 'Follow Up',        color: 'var(--hf-warning-text-strong)' },
+  { value: 'seasonal',         label: 'Seasonal',         color: 'var(--hf-accent-text)' },
+  { value: 'trade-show',       label: 'Trade Show',       color: 'var(--hf-violet-text)' },
+  { value: 'agri',             label: 'Agriculture',      color: 'var(--hf-success-text-strong)' },
+  { value: 'mining',           label: 'Mining',           color: 'var(--hf-warning-text-deep)' },
+  { value: 'construction',     label: 'Construction',     color: 'var(--hf-warning-text-strong)' },
+  { value: 'retail',           label: 'Retail',           color: 'var(--hf-sky-text-strong)' },
+  { value: 'manufacturing',    label: 'Manufacturing',    color: 'var(--hf-indigo-text)' },
+  { value: 'steel',            label: 'Steel',            color: 'var(--hf-text-secondary)' },
   // Common freeform tags that may already exist in your DB:
-  { value: 'jse-listed',       label: 'JSE Listed',       color: '#1D4ED8' },
-  { value: 'annual-contract',  label: 'Annual Contract',  color: '#0891B2' },
-  { value: 'preferred',        label: 'Preferred',        color: '#7C3AED' },
-  { value: 'new',              label: 'New',              color: '#16A34A' },
-  { value: 'inactive',         label: 'Inactive',         color: '#6B7280' },
-  { value: 'prospect',         label: 'Prospect',         color: '#B45309' },
-  { value: 'referral',         label: 'Referral',         color: '#0D9488' },
-  { value: 'government',       label: 'Government',       color: '#374151' },
-  { value: 'ngo',              label: 'NGO',              color: '#15803D' },
+  { value: 'jse-listed',       label: 'JSE Listed',       color: 'var(--hf-info-text)' },
+  { value: 'annual-contract',  label: 'Annual Contract',  color: 'var(--hf-sky-text)' },
+  { value: 'preferred',        label: 'Preferred',        color: 'var(--hf-violet-text)' },
+  { value: 'new',              label: 'New',              color: 'var(--hf-success-text)' },
+  { value: 'inactive',         label: 'Inactive',         color: 'var(--hf-text-muted)' },
+  { value: 'prospect',         label: 'Prospect',         color: 'var(--hf-warning-text-strong)' },
+  { value: 'referral',         label: 'Referral',         color: 'var(--hf-accent-text)' },
+  { value: 'government',       label: 'Government',       color: 'var(--hf-text-secondary)' },
+  { value: 'ngo',              label: 'NGO',              color: 'var(--hf-success-text-strong)' },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -194,7 +194,7 @@ function validateForm(f: typeof EMPTY_FORM): Record<string, string> {
 }
 
 const tagDef = (value: string): TagDefinition =>
-  TAG_CATALOGUE.find(t => t.value === value) ?? { value, label: value, color: '#94A3B8' }
+  TAG_CATALOGUE.find(t => t.value === value) ?? { value, label: value, color: 'var(--hf-text-faint)' }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TagPicker — dropdown of predefined options, filterable by typing
@@ -937,7 +937,7 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
             that same decision consistently instead of leaving two
             different patterns (a separate view vs. inline collapsible
             panels) side by side. */}
-        <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid #E2E8F0', marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--hf-border)', marginBottom: 16 }}>
           {([
             { key: 'overview', label: 'Overview' },
             { key: 'followups', label: 'Follow-ups' },
@@ -947,9 +947,9 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
               style={{
                 padding: '8px 4px', marginRight: 16, background: 'none', border: 'none',
-                borderBottom: activeTab === tab.key ? '2px solid #1D4ED8' : '2px solid transparent',
+                borderBottom: activeTab === tab.key ? '2px solid var(--hf-info)' : '2px solid transparent',
                 fontSize: 13, fontWeight: activeTab === tab.key ? 700 : 500,
-                color: activeTab === tab.key ? '#1D4ED8' : '#64748B',
+                color: activeTab === tab.key ? 'var(--hf-info-text)' : 'var(--hf-text-muted)',
                 cursor: 'pointer', fontFamily: 'inherit',
               }}>
               {tab.label}
@@ -1012,8 +1012,8 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
         {popiaError && (
           <div style={{
             display: 'flex', alignItems: 'flex-start', gap: 8,
-            background: '#FEF2F2', border: '1px solid #FECACA',
-            borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#DC2626',
+            background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)',
+            borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--hf-danger-text)',
             marginBottom: 12,
           }} role="alert">
             <AlertCircle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
@@ -1043,18 +1043,18 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
             {popiaMenuOpen && (
               <div role="menu" style={{
                 position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
-                background: 'white', border: '1px solid #E2E8F0', borderRadius: 10,
+                background: 'white', border: '1px solid var(--hf-border)', borderRadius: 10,
                 boxShadow: '0 4px 16px rgba(0,0,0,.1)', minWidth: 160, zIndex: 200, overflow: 'hidden',
               }}>
                 <button role="menuitem" onClick={() => downloadPopiaExport(c.id, c.name, 'pdf')}
-                  style={{ display: 'block', width: '100%', padding: '9px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#0F172A', borderBottom: '1px solid #F1F5F9' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#F8FAFC')}
+                  style={{ display: 'block', width: '100%', padding: '9px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: 'var(--hf-text)', borderBottom: '1px solid var(--hf-border-subtle)' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--hf-surface-muted)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
                   PDF (readable document)
                 </button>
                 <button role="menuitem" onClick={() => downloadPopiaExport(c.id, c.name, 'json')}
-                  style={{ display: 'block', width: '100%', padding: '9px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#0F172A' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#F8FAFC')}
+                  style={{ display: 'block', width: '100%', padding: '9px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: 'var(--hf-text)' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--hf-surface-muted)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
                   JSON (machine-readable)
                 </button>

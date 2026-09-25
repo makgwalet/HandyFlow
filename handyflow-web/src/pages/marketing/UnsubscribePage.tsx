@@ -44,37 +44,37 @@ export default function UnsubscribePage() {
   }, [token])
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: 'system-ui, sans-serif' }}>
-      <div style={{ maxWidth: 460, width: '100%', background: '#fff', borderRadius: 16, padding: 40, textAlign: 'center' as const, border: '1px solid #E2E8F0', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--hf-surface-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: 'system-ui, sans-serif' }}>
+      <div style={{ maxWidth: 460, width: '100%', background: 'var(--hf-surface)', borderRadius: 16, padding: 40, textAlign: 'center' as const, border: '1px solid var(--hf-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
 
         {status === 'loading' && (
           <>
-            <div style={{ width: 40, height: 40, border: '3px solid #E2E8F0', borderTopColor: '#0D9488', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 20px' }} />
-            <div style={{ color: '#64748B', fontSize: 14 }}>Processing your request…</div>
+            <div style={{ width: 40, height: 40, border: '3px solid var(--hf-border)', borderTopColor: 'var(--hf-accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 20px' }} />
+            <div style={{ color: 'var(--hf-text-muted)', fontSize: 14 }}>Processing your request…</div>
           </>
         )}
 
         {status === 'success' && (
           <>
-            <div style={{ width: 60, height: 60, borderRadius: '50%', background: '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+            <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'var(--hf-success-soft-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
               <CheckCircle size={28} color="#166534" />
             </div>
-            <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', marginBottom: 10 }}>You've been unsubscribed</h2>
-            <p style={{ fontSize: 14, color: '#64748B', lineHeight: 1.7 }}>{message}</p>
+            <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--hf-text)', marginBottom: 10 }}>You've been unsubscribed</h2>
+            <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', lineHeight: 1.7 }}>{message}</p>
           </>
         )}
 
         {status === 'error' && (
           <>
-            <div style={{ width: 60, height: 60, borderRadius: '50%', background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+            <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'var(--hf-danger-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
               <XCircle size={28} color="#DC2626" />
             </div>
-            <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', marginBottom: 10 }}>Link not valid</h2>
-            <p style={{ fontSize: 14, color: '#64748B', lineHeight: 1.7 }}>{message}</p>
+            <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--hf-text)', marginBottom: 10 }}>Link not valid</h2>
+            <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', lineHeight: 1.7 }}>{message}</p>
           </>
         )}
 
-        <div style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#CBD5E1', fontSize: 11 }}>
+        <div style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--hf-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: 'var(--hf-text-disabled)', fontSize: 11 }}>
           <MailX size={12} /> HandyFlow Marketing
         </div>
       </div>

@@ -137,7 +137,7 @@ export default function DeliveriesTab() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
         <div style={{ display: "flex", gap: 6 }}>
           {["ALL", "SCHEDULED", "IN_TRANSIT", "DELIVERED", "CANCELLED"].map(s => (
-            <button key={s} onClick={() => setFilterStatus(s)} style={{ padding: "6px 12px", borderRadius: 20, border: "1px solid", borderColor: filterStatus === s ? "#1B3A6B" : "#E2E8F0", background: filterStatus === s ? "#1B3A6B" : "#fff", color: filterStatus === s ? "#fff" : "#64748B", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
+            <button key={s} onClick={() => setFilterStatus(s)} style={{ padding: "6px 12px", borderRadius: 20, border: "1px solid", borderColor: filterStatus === s ? "var(--hf-primary)" : "var(--hf-border)", background: filterStatus === s ? "var(--hf-primary)" : "var(--hf-surface)", color: filterStatus === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
               {s === "ALL" ? "All" : STATUS_CONFIG[s as keyof typeof STATUS_CONFIG]?.label}
             </button>
           ))}
@@ -149,18 +149,18 @@ export default function DeliveriesTab() {
 
       {/* Delivery list */}
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading deliveries...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading deliveries...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Truck size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No deliveries found</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No deliveries found</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {filtered.map(d => {
             const cfg = STATUS_CONFIG[d.status]
             return (
-              <div key={d.id} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: "16px 20px" }}>
+              <div key={d.id} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "16px 20px" }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                   <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
                     <div style={{ width: 42, height: 42, borderRadius: 10, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -168,28 +168,28 @@ export default function DeliveriesTab() {
                     </div>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-                        <span style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{d.fuelType}</span>
-                        <span style={{ color: "#94A3B8" }}>·</span>
-                        <span style={{ fontWeight: 600, color: "#0D9488" }}>{d.litresOrdered.toLocaleString()} L ordered</span>
+                        <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{d.fuelType}</span>
+                        <span style={{ color: "var(--hf-text-faint)" }}>·</span>
+                        <span style={{ fontWeight: 600, color: "var(--hf-accent-text)" }}>{d.litresOrdered.toLocaleString()} L ordered</span>
                         {d.litresDelivered && d.litresDelivered !== d.litresOrdered && (
-                          <span style={{ color: "#64748B", fontSize: 13 }}>({d.litresDelivered.toLocaleString()} L delivered)</span>
+                          <span style={{ color: "var(--hf-text-muted)", fontSize: 13 }}>({d.litresDelivered.toLocaleString()} L delivered)</span>
                         )}
                       </div>
-                      <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                      <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>
                         {fmtDate(d.scheduledAt)}
                         {d.driverName && ` · Driver: ${d.driverName}`}
                         {d.vehicleReg && ` (${d.vehicleReg})`}
                       </div>
                       {d.deliveryAddress && (
-                        <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 2 }}>
                           📍 {d.deliveryAddress.street}, {d.deliveryAddress.city}
                         </div>
                       )}
                       {d.receiverName && (
-                        <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: "var(--hf-text-tertiary)", marginTop: 2 }}>
                           Received by: <strong>{d.receiverName}</strong>
                           {d.signedOnBehalf && d.onBehalfOf && (
-                            <span style={{ color: "#EA580C" }}> (on behalf of {d.onBehalfOf})</span>
+                            <span style={{ color: "var(--hf-orange-text)" }}> (on behalf of {d.onBehalfOf})</span>
                           )}
                         </div>
                       )}
@@ -198,27 +198,27 @@ export default function DeliveriesTab() {
 
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontWeight: 700, color: "#0F172A" }}>{fmtR(d.totalAmount)}</div>
-                      {d.receiptNumber && <div style={{ fontSize: 11, color: "#94A3B8" }}>{d.receiptNumber}</div>}
+                      <div style={{ fontWeight: 700, color: "var(--hf-text)" }}>{fmtR(d.totalAmount)}</div>
+                      {d.receiptNumber && <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{d.receiptNumber}</div>}
                     </div>
                     <span style={{ background: cfg.bg, color: cfg.color, padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>{cfg.label}</span>
                     {d.status === "SCHEDULED" && (
-                      <button onClick={() => { setShowDispatch(d); setError("") }} style={{ display: "flex", alignItems: "center", gap: 5, background: "#FFFBEB", color: "#B45309", border: "1px solid #FDE68A", borderRadius: 7, padding: "7px 14px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+                      <button onClick={() => { setShowDispatch(d); setError("") }} style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-warning-soft)", color: "var(--hf-warning-text-strong)", border: "1px solid var(--hf-warning-border)", borderRadius: 7, padding: "7px 14px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
                         <Truck size={13} /> Mark In Transit
                       </button>
                     )}
                     {(d.status === "SCHEDULED" || d.status === "IN_TRANSIT") && (
-                      <button onClick={() => { setShowComplete(d); setCompleteForm(f => ({ ...f, litresDelivered: d.litresOrdered.toString() })); setError("") }} style={{ display: "flex", alignItems: "center", gap: 5, background: "#166534", color: "#fff", border: "none", borderRadius: 7, padding: "7px 14px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+                      <button onClick={() => { setShowComplete(d); setCompleteForm(f => ({ ...f, litresDelivered: d.litresOrdered.toString() })); setError("") }} style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-success-solid-strong)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, padding: "7px 14px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
                         <CheckCircle size={13} /> Complete
                       </button>
                     )}
                     {(d.status === "SCHEDULED" || d.status === "IN_TRANSIT") && (
-                      <button onClick={() => { if (confirm("Cancel this delivery?")) cancelDelivery.mutate(d.id) }} disabled={cancelDelivery.isPending} style={{ display: "flex", alignItems: "center", gap: 5, background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      <button onClick={() => { if (confirm("Cancel this delivery?")) cancelDelivery.mutate(d.id) }} disabled={cancelDelivery.isPending} style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                         <X size={13} /> Cancel
                       </button>
                     )}
                     {d.status === "DELIVERED" && d.receiptNumber && (
-                      <button onClick={() => downloadReceipt(d.id, d.receiptNumber!)} style={{ display: "flex", alignItems: "center", gap: 5, background: "#F0F9FF", color: "#0369A1", border: "1px solid #BAE6FD", borderRadius: 7, padding: "7px 12px", fontSize: 13, cursor: "pointer" }}>
+                      <button onClick={() => downloadReceipt(d.id, d.receiptNumber!)} style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-sky-soft)", color: "var(--hf-sky-text-strong)", border: "1px solid var(--hf-sky-border)", borderRadius: 7, padding: "7px 12px", fontSize: 13, cursor: "pointer" }}>
                         <Download size={13} /> Receipt
                       </button>
                     )}
@@ -269,8 +269,8 @@ export default function DeliveriesTab() {
                 <input value={scheduleForm.vehicleReg} onChange={e => setScheduleForm(f => ({ ...f, vehicleReg: e.target.value }))} placeholder="GP-45-67-JHB" style={inputStyle} />
               </div>
             </div>
-            <div style={{ borderTop: "1px solid #F1F5F9", paddingTop: 14 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 10, letterSpacing: "0.05em" }}>DELIVERY ADDRESS</div>
+            <div style={{ borderTop: "1px solid var(--hf-border-subtle)", paddingTop: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--hf-text-muted)", marginBottom: 10, letterSpacing: "0.05em" }}>DELIVERY ADDRESS</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div><label style={labelStyle}>Street</label><input value={scheduleForm.street} onChange={e => setScheduleForm(f => ({ ...f, street: e.target.value }))} placeholder="Mine Gate 3, Shaft Road" style={inputStyle} /></div>
                 <div><label style={labelStyle}>Suburb</label><input value={scheduleForm.suburb} onChange={e => setScheduleForm(f => ({ ...f, suburb: e.target.value }))} placeholder="Carletonville" style={inputStyle} /></div>
@@ -279,7 +279,7 @@ export default function DeliveriesTab() {
               </div>
             </div>
           </div>
-          {error && <div style={{ marginTop: 10, color: "#DC2626", fontSize: 13 }}>{error}</div>}
+          {error && <div style={{ marginTop: 10, color: "var(--hf-danger-text)", fontSize: 13 }}>{error}</div>}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
             <button onClick={() => { setShowSchedule(false); setError("") }} style={cancelBtn}>Cancel</button>
             <button
@@ -314,9 +314,9 @@ export default function DeliveriesTab() {
               <label style={labelStyle}>Vehicle Registration *</label>
               <input value={dispatchForm.vehicleReg} onChange={e => setDispatchForm(f => ({ ...f, vehicleReg: e.target.value }))} placeholder="CA 123-456" style={inputStyle} />
             </div>
-            {error && <div style={{ color: "#DC2626", fontSize: 13 }}>{error}</div>}
+            {error && <div style={{ color: "var(--hf-danger-text)", fontSize: 13 }}>{error}</div>}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 6 }}>
-              <button onClick={() => { setShowDispatch(null); setError("") }} style={{ padding: "9px 16px", background: "#F1F5F9", border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", color: "#64748B" }}>Cancel</button>
+              <button onClick={() => { setShowDispatch(null); setError("") }} style={{ padding: "9px 16px", background: "var(--hf-surface-sunken)", border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", color: "var(--hf-text-muted)" }}>Cancel</button>
               <button
                 onClick={() => dispatchDelivery.mutate({ id: showDispatch.id, body: dispatchForm })}
                 disabled={dispatchDelivery.isPending || !dispatchForm.driverName.trim() || !dispatchForm.vehicleReg.trim()}
@@ -356,10 +356,10 @@ export default function DeliveriesTab() {
             </div>
 
             {/* On behalf toggle */}
-            <div style={{ padding: "12px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8 }}>
+            <div style={{ padding: "12px 14px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
                 <input type="checkbox" checked={completeForm.signedOnBehalf} onChange={e => setCompleteForm(f => ({ ...f, signedOnBehalf: e.target.checked }))} style={{ width: 16, height: 16 }} />
-                <span style={{ fontSize: 14, fontWeight: 500, color: "#374151" }}>Signing on behalf of designated receiver</span>
+                <span style={{ fontSize: 14, fontWeight: 500, color: "var(--hf-text-secondary)" }}>Signing on behalf of designated receiver</span>
               </label>
               {completeForm.signedOnBehalf && (
                 <div style={{ marginTop: 10 }}>
@@ -369,12 +369,12 @@ export default function DeliveriesTab() {
               )}
             </div>
 
-            <div style={{ padding: "10px 14px", background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 8, fontSize: 13, color: "#0369A1" }}>
+            <div style={{ padding: "10px 14px", background: "var(--hf-sky-soft)", border: "1px solid var(--hf-sky-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-sky-text-strong)" }}>
               💡 A PDF delivery receipt (FDR-YYYY-NNNNN) will be generated automatically.
             </div>
           </div>
 
-          {error && <div style={{ marginTop: 10, color: "#DC2626", fontSize: 13 }}>{error}</div>}
+          {error && <div style={{ marginTop: 10, color: "var(--hf-danger-text)", fontSize: 13 }}>{error}</div>}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
             <button onClick={() => { setShowComplete(null); setError("") }} style={cancelBtn}>Cancel</button>
             <button
@@ -405,10 +405,10 @@ export default function DeliveriesTab() {
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-      <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 560, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 28, width: 560, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{title}</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={20} /></button>
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{title}</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}><X size={20} /></button>
         </div>
         {children}
       </div>

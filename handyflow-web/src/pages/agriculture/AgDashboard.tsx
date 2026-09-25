@@ -16,9 +16,9 @@ import { AG_ACCENT } from "./constants"
 
 interface Page<T> { content: T[]; totalElements: number }
 
-const card: React.CSSProperties = { background: "#fff", border: "1px solid #E2E8F0", borderRadius: 14, padding: "18px 20px" }
-const label: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "#94A3B8", letterSpacing: 0.4, textTransform: "uppercase", margin: "0 0 8px" }
-const value: React.CSSProperties = { fontSize: 26, fontWeight: 800, color: "#0F172A", margin: 0 }
+const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: "18px 20px" }
+const label: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", letterSpacing: 0.4, textTransform: "uppercase", margin: "0 0 8px" }
+const value: React.CSSProperties = { fontSize: 26, fontWeight: 800, color: "var(--hf-text)", margin: 0 }
 
 export default function AgDashboard() {
   const { data: farms } = useQuery<Page<unknown>>({
@@ -49,9 +49,9 @@ export default function AgDashboard() {
         </div>
       </div>
 
-      <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: "16px 18px" }}>
-        <p style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", margin: "0 0 6px" }}>Getting started</p>
-        <p style={{ fontSize: 12.5, color: "#64748B", margin: 0, lineHeight: 1.6 }}>
+      <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "16px 18px" }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: "0 0 6px" }}>Getting started</p>
+        <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: 0, lineHeight: 1.6 }}>
           Register a farm, add species to the catalogue, then open a farm to add production areas, enterprises,
           and register your animals or groups. Feed/health/breeding/movement/mortality history and evidence
           photos live under each animal or group. Crop cycles and cost-reporting views ship as a follow-up

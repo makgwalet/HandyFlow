@@ -20,21 +20,21 @@ interface Movement {
 interface CatalogueItem { id: string; name: string; description: string | null; unit: string | null; defaultPrice: number | null; categoryName: string | null }
 
 const ACCENT = "#D97706"
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 9, fontSize: 14, boxSizing: "border-box", outline: "none", background: "#fff" }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 9, fontSize: 14, boxSizing: "border-box", outline: "none", background: "var(--hf-surface)" }
 const fmtR = (n: number) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtD = (d: string) => new Date(d).toLocaleDateString("en-ZA")
 
 const MOVE_TYPE_COLOR: Record<string, { bg: string; color: string }> = {
-  OPENING:         { bg: "#F1F5F9", color: "#475569" },
-  PURCHASE:        { bg: "#DCFCE7", color: "#166534" },
-  SALE:            { bg: "#FEE2E2", color: "#DC2626" },
-  TRANSFER_IN:     { bg: "#DBEAFE", color: "#1D4ED8" },
-  TRANSFER_OUT:    { bg: "#EDE9FE", color: "#7C3AED" },
-  ADJUSTMENT_UP:   { bg: "#D1FAE5", color: "#065F46" },
-  ADJUSTMENT_DOWN: { bg: "#FEF3C7", color: "#92400E" },
-  WASTE:           { bg: "#FEE2E2", color: "#DC2626" },
-  RETURN_IN:       { bg: "#DCFCE7", color: "#166534" },
-  RETURN_OUT:      { bg: "#FEF3C7", color: "#92400E" },
+  OPENING:         { bg: "var(--hf-surface-sunken)", color: "var(--hf-text-tertiary)" },
+  PURCHASE:        { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)" },
+  SALE:            { bg: "var(--hf-danger-soft-strong)", color: "var(--hf-danger-text)" },
+  TRANSFER_IN:     { bg: "var(--hf-info-soft-strong)", color: "var(--hf-info-text)" },
+  TRANSFER_OUT:    { bg: "var(--hf-violet-soft-strong)", color: "var(--hf-violet-text)" },
+  ADJUSTMENT_UP:   { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)" },
+  ADJUSTMENT_DOWN: { bg: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text-deep)" },
+  WASTE:           { bg: "var(--hf-danger-soft-strong)", color: "var(--hf-danger-text)" },
+  RETURN_IN:       { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)" },
+  RETURN_OUT:      { bg: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text-deep)" },
 }
 
 export function InventoryTab() {
@@ -110,24 +110,24 @@ export function InventoryTab() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <button onClick={() => setSelectedLocation("")}
-            style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: !selectedLocation ? 700 : 400, border: !selectedLocation ? `1.5px solid ${ACCENT}` : "1px solid #E2E8F0", background: !selectedLocation ? "#FEF3C7" : "#fff", color: !selectedLocation ? ACCENT : "#64748B" }}>
+            style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: !selectedLocation ? 700 : 400, border: !selectedLocation ? `1.5px solid ${ACCENT}` : "1px solid var(--hf-border)", background: !selectedLocation ? "var(--hf-warning-soft-strong)" : "var(--hf-surface)", color: !selectedLocation ? ACCENT : "var(--hf-text-muted)" }}>
             All Locations
           </button>
           {locations.map(l => (
             <button key={l.id} onClick={() => setSelectedLocation(l.id)}
-              style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: selectedLocation === l.id ? 700 : 400, border: selectedLocation === l.id ? `1.5px solid ${ACCENT}` : "1px solid #E2E8F0", background: selectedLocation === l.id ? "#FEF3C7" : "#fff", color: selectedLocation === l.id ? ACCENT : "#64748B" }}>
+              style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: selectedLocation === l.id ? 700 : 400, border: selectedLocation === l.id ? `1.5px solid ${ACCENT}` : "1px solid var(--hf-border)", background: selectedLocation === l.id ? "var(--hf-warning-soft-strong)" : "var(--hf-surface)", color: selectedLocation === l.id ? ACCENT : "var(--hf-text-muted)" }}>
               {l.name}
             </button>
           ))}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           {lowCount > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#FEF3C7", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "#92400E" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-warning-soft-strong)", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "var(--hf-warning-text-deep)" }}>
               <AlertTriangle size={13} /> {lowCount} low stock
             </div>
           )}
           <button onClick={() => { setShowOpening(true); setErr(""); setItemQuery(""); setShowItemDropdown(false) }}
-            style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: ACCENT, color: "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
             <Plus size={14} /> Set Opening Stock
           </button>
         </div>
@@ -135,38 +135,38 @@ export function InventoryTab() {
 
       {/* Inventory table */}
       {isLoading
-        ? <div style={{ padding: 40, textAlign: "center", color: "#94A3B8" }}>Loading…</div>
+        ? <div style={{ padding: 40, textAlign: "center", color: "var(--hf-text-faint)" }}>Loading…</div>
         : inventory.length === 0
-          ? <div style={{ textAlign: "center", padding: "50px 0", color: "#94A3B8" }}>
+          ? <div style={{ textAlign: "center", padding: "50px 0", color: "var(--hf-text-faint)" }}>
               <Package size={36} style={{ opacity: .3, marginBottom: 10 }} />
-              <div style={{ fontWeight: 600, color: "#475569" }}>No inventory</div>
+              <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No inventory</div>
               <div style={{ fontSize: 13 }}>Set opening stock to start tracking quantities</div>
             </div>
-          : <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+          : <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
               {inventory.map((item, i) => {
                 const isLow = item.reorderPoint > 0 && item.qtyOnHand <= item.reorderPoint
                 const isCritical = isLow && item.qtyOnHand <= 0
                 const isOpen = expandedItem === item.id
                 const stockPct = item.reorderPoint > 0 ? Math.min((item.qtyOnHand / item.reorderPoint) * 100, 200) : 100
                 return (
-                  <div key={item.id} style={{ borderTop: i > 0 ? "1px solid #F1F5F9" : "none" }}>
+                  <div key={item.id} style={{ borderTop: i > 0 ? "1px solid var(--hf-border-subtle)" : "none" }}>
                     <div
                       onClick={() => setExpandedItem(isOpen ? null : item.id)}
-                      style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", background: isCritical ? "#FEF2F2" : isLow ? "#FFFBEB" : i % 2 === 0 ? "#fff" : "#FAFAFA" }}
+                      style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", background: isCritical ? "var(--hf-danger-soft)" : isLow ? "var(--hf-warning-soft)" : i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)" }}
                     >
                       {/* Status indicator */}
-                      <div style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, background: isCritical ? "#EF4444" : isLow ? "#F59E0B" : "#22C55E" }} />
+                      <div style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, background: isCritical ? "var(--hf-danger)" : isLow ? "var(--hf-warning)" : "var(--hf-success)" }} />
 
                       {/* Item identity */}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", marginBottom: 2 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)", marginBottom: 2 }}>
                           {itemNameById.get(item.catalogueItemId) ?? `Item ${item.catalogueItemId.slice(0, 12)}…`}
-                          {item.binLocation && <span style={{ fontSize: 11, color: "#94A3B8", marginLeft: 8 }}>Bin: {item.binLocation}</span>}
-                          {isLow && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, background: isCritical ? "#FEE2E2" : "#FEF3C7", color: isCritical ? "#DC2626" : "#92400E", padding: "1px 6px", borderRadius: 20 }}>{isCritical ? "OUT OF STOCK" : "LOW STOCK"}</span>}
+                          {item.binLocation && <span style={{ fontSize: 11, color: "var(--hf-text-faint)", marginLeft: 8 }}>Bin: {item.binLocation}</span>}
+                          {isLow && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, background: isCritical ? "var(--hf-danger-soft-strong)" : "var(--hf-warning-soft-strong)", color: isCritical ? "var(--hf-danger-text)" : "var(--hf-warning-text-deep)", padding: "1px 6px", borderRadius: 20 }}>{isCritical ? "OUT OF STOCK" : "LOW STOCK"}</span>}
                         </div>
                         {/* Stock bar */}
-                        <div style={{ height: 4, background: "#F1F5F9", borderRadius: 2, marginTop: 4 }}>
-                          <div style={{ height: "100%", width: `${Math.min(stockPct, 100)}%`, background: isCritical ? "#EF4444" : isLow ? "#F59E0B" : "#22C55E", borderRadius: 2 }} />
+                        <div style={{ height: 4, background: "var(--hf-surface-sunken)", borderRadius: 2, marginTop: 4 }}>
+                          <div style={{ height: "100%", width: `${Math.min(stockPct, 100)}%`, background: isCritical ? "var(--hf-danger)" : isLow ? "var(--hf-warning)" : "var(--hf-success)", borderRadius: 2 }} />
                         </div>
                       </div>
 
@@ -183,31 +183,31 @@ export function InventoryTab() {
 
                     {/* Movement history */}
                     {isOpen && (
-                      <div style={{ padding: "12px 20px", background: "#F8FAFC", borderTop: "1px solid #E2E8F0" }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ padding: "12px 20px", background: "var(--hf-surface-muted)", borderTop: "1px solid var(--hf-border)" }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-tertiary)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
                           <TrendingUp size={13} /> Movement History (last 20)
                         </div>
                         {movements.length === 0
-                          ? <div style={{ fontSize: 12, color: "#94A3B8" }}>No movements recorded</div>
+                          ? <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>No movements recorded</div>
                           : <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                               <thead><tr>
                                 {["Date", "Type", "Change", "Before", "After", "Unit Cost", "Reference", "By"].map(h => (
-                                  <th key={h} style={{ textAlign: "left", padding: "5px 10px", color: "#94A3B8", fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</th>
+                                  <th key={h} style={{ textAlign: "left", padding: "5px 10px", color: "var(--hf-text-faint)", fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</th>
                                 ))}
                               </tr></thead>
                               <tbody>
                                 {movements.map(m => {
-                                  const mc = MOVE_TYPE_COLOR[m.movementType] ?? { bg: "#F1F5F9", color: "#475569" }
+                                  const mc = MOVE_TYPE_COLOR[m.movementType] ?? { bg: "var(--hf-surface-sunken)", color: "var(--hf-text-tertiary)" }
                                   return (
-                                    <tr key={m.id} style={{ borderTop: "1px solid #F1F5F9" }}>
+                                    <tr key={m.id} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
                                       <td style={{ padding: "6px 10px" }}>{fmtD(m.createdAt)}</td>
                                       <td style={{ padding: "6px 10px" }}><span style={{ background: mc.bg, color: mc.color, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 12 }}>{m.movementType.replace(/_/g," ")}</span></td>
-                                      <td style={{ padding: "6px 10px", fontWeight: 700, color: m.qtyChange > 0 ? "#059669" : "#DC2626" }}>{m.qtyChange > 0 ? "+" : ""}{m.qtyChange.toFixed(2)}</td>
-                                      <td style={{ padding: "6px 10px", color: "#64748B" }}>{m.qtyBefore.toFixed(2)}</td>
+                                      <td style={{ padding: "6px 10px", fontWeight: 700, color: m.qtyChange > 0 ? "var(--hf-success-text)" : "var(--hf-danger-text)" }}>{m.qtyChange > 0 ? "+" : ""}{m.qtyChange.toFixed(2)}</td>
+                                      <td style={{ padding: "6px 10px", color: "var(--hf-text-muted)" }}>{m.qtyBefore.toFixed(2)}</td>
                                       <td style={{ padding: "6px 10px", fontWeight: 600 }}>{m.qtyAfter.toFixed(2)}</td>
-                                      <td style={{ padding: "6px 10px", color: "#64748B" }}>{m.unitCost != null ? fmtR(m.unitCost) : "—"}</td>
-                                      <td style={{ padding: "6px 10px", color: "#64748B" }}>{m.referenceNumber ?? "—"}</td>
-                                      <td style={{ padding: "6px 10px", color: "#94A3B8" }}>{m.createdByName ?? "—"}</td>
+                                      <td style={{ padding: "6px 10px", color: "var(--hf-text-muted)" }}>{m.unitCost != null ? fmtR(m.unitCost) : "—"}</td>
+                                      <td style={{ padding: "6px 10px", color: "var(--hf-text-muted)" }}>{m.referenceNumber ?? "—"}</td>
+                                      <td style={{ padding: "6px 10px", color: "var(--hf-text-faint)" }}>{m.createdByName ?? "—"}</td>
                                     </tr>
                                   )
                                 })}
@@ -243,18 +243,18 @@ export function InventoryTab() {
                   style={inp}
                 />
                 {showItemDropdown && (
-                  <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, marginTop: 4, maxHeight: 220, overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
+                  <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, marginTop: 4, maxHeight: 220, overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
                     {filteredItems.length === 0
-                      ? <div style={{ padding: "10px 12px", fontSize: 13, color: "#94A3B8" }}>No matching items</div>
+                      ? <div style={{ padding: "10px 12px", fontSize: 13, color: "var(--hf-text-faint)" }}>No matching items</div>
                       : filteredItems.slice(0, 30).map(i => (
                         <div key={i.id}
                           onMouseDown={() => { sf("catalogueItemId", i.id); setItemQuery(""); setShowItemDropdown(false) }}
-                          style={{ padding: "9px 12px", fontSize: 13, cursor: "pointer", borderBottom: "1px solid #F1F5F9" }}
-                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#FFFBEB"}
-                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "#fff"}>
-                          <div style={{ fontWeight: 600, color: "#0F172A" }}>{i.name}</div>
+                          style={{ padding: "9px 12px", fontSize: 13, cursor: "pointer", borderBottom: "1px solid var(--hf-border-subtle)" }}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--hf-warning-soft)"}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "var(--hf-surface)"}>
+                          <div style={{ fontWeight: 600, color: "var(--hf-text)" }}>{i.name}</div>
                           {(i.categoryName || i.unit) && (
-                            <div style={{ fontSize: 11, color: "#94A3B8" }}>{[i.categoryName, i.unit].filter(Boolean).join(" · ")}</div>
+                            <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{[i.categoryName, i.unit].filter(Boolean).join(" · ")}</div>
                           )}
                         </div>
                       ))
@@ -299,8 +299,8 @@ export function InventoryTab() {
 function Metric({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div style={{ textAlign: "right" }}>
-      <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: color ?? "#0F172A" }}>{value}</div>
+      <div style={{ fontSize: 10, color: "var(--hf-text-faint)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: color ?? "var(--hf-text)" }}>{value}</div>
     </div>
   )
 }

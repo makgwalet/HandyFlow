@@ -215,7 +215,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
             style={{...navBtn, fontWeight:600, padding:"6px 14px", fontSize:13}}>Today</button>
           <button onClick={()=>setAnchor(d=>{const n=new Date(d);n.setDate(d.getDate()+(view==="week"?7:1));return n})}
             style={navBtn}><ChevronRight size={16}/></button>
-          <div style={{fontSize:15,fontWeight:700,color:"#0F172A",marginLeft:6}}>
+          <div style={{fontSize:15,fontWeight:700,color:"var(--hf-text)",marginLeft:6}}>
             {view==="week"
               ? `${fmtDate(days[0])} — ${fmtDate(days[6])}`
               : anchor.toLocaleDateString("en-ZA",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}
@@ -226,7 +226,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
           {/* Doctor filter */}
           <select value={doctorFilter} onChange={e=>setDoctorFilter(e.target.value)}
-            style={{padding:"7px 12px",border:`1px solid ${BORDER}`,borderRadius:8,fontSize:13,outline:"none",background:"#fff",maxWidth:220}}>
+            style={{padding:"7px 12px",border:`1px solid ${BORDER}`,borderRadius:8,fontSize:13,outline:"none",background:"var(--hf-surface)",maxWidth:220}}>
             <option value="all">All practitioners</option>
             {(practitioners as Practitioner[]).map(p=>(
               <option key={p.id} value={p.id}>Dr. {p.fullName}</option>
@@ -238,31 +238,31 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
             {(["day","week"] as const).map(v=>(
               <button key={v} onClick={()=>setView(v)}
                 style={{padding:"7px 14px",border:"none",fontSize:13,cursor:"pointer",
-                  background:view===v?NAVY:"#fff", color:view===v?"#fff":GRAY, fontWeight:view===v?600:400}}>
+                  background:view===v?NAVY:"var(--hf-surface)", color:view===v?"var(--hf-text-on-solid)":GRAY, fontWeight:view===v?600:400}}>
                 {v.charAt(0).toUpperCase()+v.slice(1)}
               </button>
             ))}
           </div>
 
           <button onClick={()=>{setShowBook(true);setBookForm(f=>({...f,scheduledAt:"",practitionerId:doctorFilter==="all"?"":doctorFilter}));setApiError("")}}
-            style={{display:"flex",alignItems:"center",gap:6,background:NAVY,color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+            style={{display:"flex",alignItems:"center",gap:6,background:NAVY,color:"var(--hf-text-on-solid)",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
             <Plus size={14}/> Book appointment
           </button>
         </div>
       </div>
 
       {/* ── Calendar grid ───────────────────────────────────────────────── */}
-      <div style={{border:`1px solid ${BORDER}`,borderRadius:12,overflow:"hidden",background:"#fff"}}>
+      <div style={{border:`1px solid ${BORDER}`,borderRadius:12,overflow:"hidden",background:"var(--hf-surface)"}}>
         {/* Day headers */}
         <div style={{display:"grid",gridTemplateColumns:`64px repeat(${days.length},1fr)`,borderBottom:`1px solid ${BORDER}`}}>
           <div style={{padding:"12px 8px",background:LIGHT}}/>
           {days.map(day=>{
             const isToday = isSameDay(day, today)
             return (
-              <div key={day.toISOString()} style={{padding:"12px 8px",textAlign:"center",background:isToday?"#EFF6FF":LIGHT,borderLeft:`1px solid ${BORDER}`}}>
-                <div style={{fontSize:11,fontWeight:600,color:isToday?"#1D4ED8":GRAY,textTransform:"uppercase",letterSpacing:"0.06em"}}>{fmtDay(day)}</div>
-                <div style={{fontSize:isToday?20:16,fontWeight:isToday?800:600,color:isToday?"#1D4ED8":"#0F172A",marginTop:2,
-                  ...(isToday?{width:32,height:32,borderRadius:"50%",background:"#1D4ED8",color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center"}:{})}}>
+              <div key={day.toISOString()} style={{padding:"12px 8px",textAlign:"center",background:isToday?"var(--hf-info-soft)":LIGHT,borderLeft:`1px solid ${BORDER}`}}>
+                <div style={{fontSize:11,fontWeight:600,color:isToday?"var(--hf-info-text)":GRAY,textTransform:"uppercase",letterSpacing:"0.06em"}}>{fmtDay(day)}</div>
+                <div style={{fontSize:isToday?20:16,fontWeight:isToday?800:600,color:isToday?"var(--hf-info-text)":"var(--hf-text)",marginTop:2,
+                  ...(isToday?{width:32,height:32,borderRadius:"50%",background:"var(--hf-info)",color:"var(--hf-text-on-solid)",display:"inline-flex",alignItems:"center",justifyContent:"center"}:{})}}>
                   {day.getDate()}
                 </div>
               </div>
@@ -275,7 +275,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
           {/* Hour labels */}
           <div style={{gridColumn:"1",gridRow:"1"}}>
             {HOURS.map(h=>(
-              <div key={h} style={{height:HOUR_HEIGHT,borderBottom:`1px solid #F1F5F9`,padding:"4px 8px",display:"flex",alignItems:"flex-start"}}>
+              <div key={h} style={{height:HOUR_HEIGHT,borderBottom:`1px solid var(--hf-border-subtle)`,padding:"4px 8px",display:"flex",alignItems:"flex-start"}}>
                 <span style={{fontSize:11,color:GRAY,fontWeight:500}}>{fmtHour(h)}</span>
               </div>
             ))}
@@ -292,8 +292,8 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
                 {HOURS.map(h=>(
                   <div key={h}
                     onClick={()=>handleSlotClick(day,h)}
-                    style={{height:HOUR_HEIGHT,borderBottom:`1px solid #F1F5F9`,cursor:"pointer"}}
-                    onMouseEnter={e=>(e.currentTarget.style.background="#F0FDF4")}
+                    style={{height:HOUR_HEIGHT,borderBottom:`1px solid var(--hf-border-subtle)`,cursor:"pointer"}}
+                    onMouseEnter={e=>(e.currentTarget.style.background="var(--hf-success-soft)")}
                     onMouseLeave={e=>(e.currentTarget.style.background="")}
                   />
                 ))}
@@ -353,7 +353,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
               ].map(([label,value])=>(
                 <div key={label as string} style={{padding:"9px 12px",background:LIGHT,borderRadius:8}}>
                   <div style={{fontSize:10,fontWeight:700,color:GRAY,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>{label}</div>
-                  <div style={{fontSize:13,color:"#0F172A",fontWeight:500}}>{value}</div>
+                  <div style={{fontSize:13,color:"var(--hf-text)",fontWeight:500}}>{value}</div>
                 </div>
               ))}
             </div>
@@ -362,13 +362,13 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
               <div style={{display:"flex",gap:8}}>
                 {["SCHEDULED","CONFIRMED"].includes(selected.status) && (
                   <button onClick={()=>sendReminder.mutate(selected.id)} disabled={sendReminder.isPending}
-                    style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",border:`1px solid ${BORDER}`,borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",background:"#fff",color:reminderSent===selected.id?GREEN:TEAL}}>
+                    style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",border:`1px solid ${BORDER}`,borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",background:"var(--hf-surface)",color:reminderSent===selected.id?GREEN:TEAL}}>
                     {reminderSent===selected.id ? <><CheckCircle size={14}/> Reminder sent</> : <><Mail size={14}/> {sendReminder.isPending?"Sending...":"Send reminder"}</>}
                   </button>
                 )}
                 {selected.appointmentType==="TELEHEALTH" && ["SCHEDULED","CONFIRMED","IN_PROGRESS"].includes(selected.status) && (
                   <button onClick={()=>joinVideoCall.mutate(selected.id)} disabled={joinVideoCall.isPending}
-                    style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",border:"none",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",background:PURPLE,color:"#fff"}}>
+                    style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",border:"none",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",background:PURPLE,color:"var(--hf-text-on-solid)"}}>
                     <Video size={14}/> {joinVideoCall.isPending?"Starting...":"Join video call"}
                   </button>
                 )}
@@ -433,7 +433,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
               </div>
             </div>
             {bookForm.scheduledAt && bookForm.durationMinutes && (
-              <div style={{padding:"8px 12px",background:"#F0FDF4",border:"1px solid #86EFAC",borderRadius:8,fontSize:13,color:GREEN}}>
+              <div style={{padding:"8px 12px",background:"var(--hf-success-soft)",border:"1px solid var(--hf-success-border)",borderRadius:8,fontSize:13,color:GREEN}}>
                 ✓ {new Date(bookForm.scheduledAt).toLocaleString("en-ZA",{dateStyle:"medium",timeStyle:"short"})} · {bookForm.durationMinutes} min
               </div>
             )}
@@ -475,9 +475,9 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
 function Modal({title,onClose,children}:{title:string;onClose:()=>void;children:React.ReactNode}) {
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(3px)"}}>
-      <div style={{background:"#fff",borderRadius:16,padding:28,width:480,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
+      <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:480,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"#0F172A"}}>{title}</h3>
+          <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"var(--hf-text)"}}>{title}</h3>
           <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:GRAY,display:"flex"}}><X size={20}/></button>
         </div>
         {children}
@@ -489,7 +489,7 @@ function ModalFooter({onCancel,onConfirm,confirmLabel,loading}:{onCancel:()=>voi
   return <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}><button onClick={onCancel} style={btnCancel}>Cancel</button><button onClick={onConfirm} disabled={loading} style={btnPrimary}>{loading?"Saving...":confirmLabel}</button></div>
 }
 function ErrBox({msg}:{msg:string}) {
-  return <div style={{marginTop:10,padding:"8px 12px",background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,fontSize:13,color:RED,display:"flex",alignItems:"center",gap:8}}><AlertCircle size={13}/>{msg}</div>
+  return <div style={{marginTop:10,padding:"8px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:RED,display:"flex",alignItems:"center",gap:8}}><AlertCircle size={13}/>{msg}</div>
 }
 
 const lbl:React.CSSProperties      = {display:"block",fontSize:13,fontWeight:600,color:"#374151",marginBottom:5}

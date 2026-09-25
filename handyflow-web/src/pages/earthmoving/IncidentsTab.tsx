@@ -66,14 +66,14 @@ export default function IncidentsTab() {
     <div>
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {[
-          { label: "Total incidents", value: incidents.length, color: "#1B3A6B" },
-          { label: "Open", value: incidents.filter(i => i.status === "OPEN").length, color: "#DC2626" },
-          { label: "Critical", value: incidents.filter(i => i.severity === "CRITICAL").length, color: "#DC2626" },
-          { label: "Breakdowns active", value: assets.filter(a => a.status === "BREAKDOWN").length, color: "#D97706" },
+          { label: "Total incidents", value: incidents.length, color: "var(--hf-primary-text)" },
+          { label: "Open", value: incidents.filter(i => i.status === "OPEN").length, color: "var(--hf-danger-text)" },
+          { label: "Critical", value: incidents.filter(i => i.severity === "CRITICAL").length, color: "var(--hf-danger-text)" },
+          { label: "Breakdowns active", value: assets.filter(a => a.status === "BREAKDOWN").length, color: "var(--hf-warning-text)" },
         ].map(s => (
-          <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
+          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{s.label}</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -83,24 +83,24 @@ export default function IncidentsTab() {
           {["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW"].map(s => (
             <button key={s} onClick={() => setSevFilter(s)}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: sevFilter === s ? 600 : 400,
-                background: sevFilter === s ? (SEVERITY_CFG[s]?.color ?? "#1B3A6B") : "#F1F5F9",
-                color: sevFilter === s ? "#fff" : "#64748B" }}>
+                background: sevFilter === s ? (SEVERITY_CFG[s]?.color ?? "var(--hf-primary)") : "var(--hf-surface-sunken)",
+                color: sevFilter === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
               {s === "ALL" ? "All" : s}
             </button>
           ))}
         </div>
         <button onClick={() => { setShowCreate(true); setApiError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 7, background: "#DC2626", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Report Incident
         </button>
       </div>
 
       {assets.filter(a => a.status === "BREAKDOWN").length > 0 && (
-        <div style={{ marginBottom: 16, padding: "12px 16px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
           <AlertTriangle size={18} color="#DC2626" style={{ flexShrink: 0 }} />
           <div>
-            <div style={{ fontWeight: 700, fontSize: 13, color: "#DC2626" }}>Active Breakdowns</div>
-            <div style={{ fontSize: 12, color: "#B91C1C" }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-danger-text)" }}>Active Breakdowns</div>
+            <div style={{ fontSize: 12, color: "var(--hf-danger-text-strong)" }}>
               {assets.filter(a => a.status === "BREAKDOWN").map(a => a.fleetNumber ?? a.name).join(", ")} — currently unserviceable
             </div>
           </div>
@@ -110,11 +110,11 @@ export default function IncidentsTab() {
       {apiError && <ErrBanner msg={apiError} />}
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading incidents...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading incidents...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", border: "1px dashed #E2E8F0", borderRadius: 12, color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", border: "1px dashed var(--hf-border)", borderRadius: 12, color: "var(--hf-text-faint)" }}>
           <AlertTriangle size={36} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#166534" }}>No incidents — all clear</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-success-text-strong)" }}>No incidents — all clear</div>
           <div style={{ fontSize: 13, marginTop: 4 }}>Report breakdowns, accidents or near-misses here.</div>
         </div>
       ) : (
@@ -123,31 +123,31 @@ export default function IncidentsTab() {
             const sev = SEVERITY_CFG[inc.severity] ?? SEVERITY_CFG.LOW
             const asset = assetFor(inc.assetId)
             return (
-              <div key={inc.id} style={{ border: `1px solid ${sev.border}`, borderLeft: `4px solid ${sev.color}`, borderRadius: 10, padding: "16px 20px", background: "#fff" }}>
+              <div key={inc.id} style={{ border: `1px solid ${sev.border}`, borderLeft: `4px solid ${sev.color}`, borderRadius: 10, padding: "16px 20px", background: "var(--hf-surface)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{inc.title}</span>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{inc.title}</span>
                       <span style={{ fontSize: 10, fontWeight: 700, background: sev.bg, color: sev.color, padding: "1px 7px", borderRadius: 20, border: `1px solid ${sev.border}` }}>{inc.severity}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, background: "#F8FAFC", color: "#64748B", padding: "1px 7px", borderRadius: 20 }}>{inc.type}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, background: "var(--hf-surface-muted)", color: "var(--hf-text-muted)", padding: "1px 7px", borderRadius: 20 }}>{inc.type}</span>
                       {inc.status === "RESOLVED" && (
-                        <span style={{ fontSize: 10, fontWeight: 700, background: "#DCFCE7", color: "#166534", padding: "1px 7px", borderRadius: 20 }}>RESOLVED</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", padding: "1px 7px", borderRadius: 20 }}>RESOLVED</span>
                       )}
                     </div>
-                    <div style={{ fontSize: 13, color: "#64748B", marginBottom: 4 }}>
+                    <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginBottom: 4 }}>
                       {asset ? <>{EMOJI[asset.assetType] ?? "🚧"} {asset.fleetNumber ? `${asset.fleetNumber} — ` : ""}{asset.name}</> : "Unknown asset"}
                       {inc.siteName && ` · 📍 ${inc.siteName}`}
                       {inc.operatorName && ` · 👷 ${inc.operatorName}`}
                     </div>
-                    {inc.description && <div style={{ fontSize: 13, color: "#475569" }}>{inc.description}</div>}
-                    <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>
+                    {inc.description && <div style={{ fontSize: 13, color: "var(--hf-text-tertiary)" }}>{inc.description}</div>}
+                    <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>
                       Reported {fmtDateTime(inc.reportedAt)}
                       {inc.resolvedAt && ` · Resolved ${fmtDateTime(inc.resolvedAt)}`}
                     </div>
                   </div>
                   {inc.status === "OPEN" && (
                     <button onClick={() => handleResolve(inc.id)} disabled={resolveIncident.isPending}
-                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 14px", background: "#DCFCE7", color: "#166534", border: "1px solid #86EFAC", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 14px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
                       <CheckCircle2 size={13} /> Resolve
                     </button>
                   )}
@@ -161,10 +161,10 @@ export default function IncidentsTab() {
       {showCreate && (
         <Overlay onClose={() => setShowCreate(false)} width={560}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 8, background: "#FEF2F2", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--hf-danger-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <AlertTriangle size={18} color="#DC2626" />
             </div>
-            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Report Incident</h3>
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Report Incident</h3>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -175,14 +175,14 @@ export default function IncidentsTab() {
                   const cfg = SEVERITY_CFG[s]
                   return (
                     <button key={s} onClick={() => setForm(f => ({ ...f, severity: s }))}
-                      style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: `2px solid ${form.severity === s ? cfg.color : "#E2E8F0"}`, background: form.severity === s ? cfg.bg : "#fff", color: form.severity === s ? cfg.color : "#64748B", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                      style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: `2px solid ${form.severity === s ? cfg.color : "#E2E8F0"}`, background: form.severity === s ? cfg.bg : "var(--hf-surface)", color: form.severity === s ? cfg.color : "var(--hf-text-muted)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                       {s}
                     </button>
                   )
                 })}
               </div>
               {form.severity === "CRITICAL" && (
-                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 5 }}>
+                <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 5 }}>
                   Critical incidents notify fleet managers by SMS and email immediately, not just in-app.
                 </div>
               )}
@@ -191,14 +191,14 @@ export default function IncidentsTab() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
                 <label style={lbl}>Equipment *</label>
-                <select value={form.assetId} onChange={e => setForm(f => ({ ...f, assetId: e.target.value }))} style={{ ...inputStyle(), background: "#fff" }}>
+                <select value={form.assetId} onChange={e => setForm(f => ({ ...f, assetId: e.target.value }))} style={{ ...inputStyle(), background: "var(--hf-surface)" }}>
                   <option value="">Select equipment...</option>
                   {assets.map(a => <option key={a.id} value={a.id}>{a.fleetNumber ? `${a.fleetNumber} — ` : ""}{a.name}</option>)}
                 </select>
               </div>
               <div>
                 <label style={lbl}>Incident Type</label>
-                <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={{ ...inputStyle(), background: "#fff" }}>
+                <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={{ ...inputStyle(), background: "var(--hf-surface)" }}>
                   {INCIDENT_TYPES.map(t => <option key={t} value={t}>{t.replace("_", " ")}</option>)}
                 </select>
               </div>
@@ -228,7 +228,7 @@ export default function IncidentsTab() {
             </div>
 
             {(form.type === "BREAKDOWN" || form.type === "ACCIDENT") && (
-              <div style={{ padding: "10px 14px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 8, fontSize: 12, color: "#92400E", display: "flex", gap: 8 }}>
+              <div style={{ padding: "10px 14px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 8, fontSize: 12, color: "var(--hf-warning-text-deep)", display: "flex", gap: 8 }}>
                 <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
                 This will automatically set the machine status to Breakdown, if that's a valid transition from its current status.
               </div>

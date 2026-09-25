@@ -212,19 +212,19 @@ export function SettingsPage() {
   const currentLogo = logoPreview || profile?.logoUrl
 
   if (isLoading) return (
-    <div style={{ textAlign: "center", padding: 60, color: "#94A3B8" }}>Loading settings...</div>
+    <div style={{ textAlign: "center", padding: 60, color: "var(--hf-text-faint)" }}>Loading settings...</div>
   )
 
   return (
     <div>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: "#0F172A", margin: "0 0 4px" }}>Settings</h1>
-        <p style={{ fontSize: 14, color: "#64748B", margin: 0 }}>Manage your company profile and team</p>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--hf-text)", margin: "0 0 4px" }}>Settings</h1>
+        <p style={{ fontSize: 14, color: "var(--hf-text-muted)", margin: 0 }}>Manage your company profile and team</p>
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #E2E8F0", marginBottom: 28 }}>
+      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--hf-border)", marginBottom: 28 }}>
         {[
           { id: "company" as Tab, label: "Company",      icon: Building2 },
           { id: "team"    as Tab, label: "Team & Roles", icon: Users     },
@@ -233,8 +233,8 @@ export function SettingsPage() {
             style={{
               display: "flex", alignItems: "center", gap: 7,
               padding: "10px 18px", background: "none", border: "none",
-              borderBottom: activeTab === id ? "2px solid #0D9488" : "2px solid transparent",
-              color: activeTab === id ? "#0D9488" : "#64748B",
+              borderBottom: activeTab === id ? "2px solid var(--hf-accent)" : "2px solid transparent",
+              color: activeTab === id ? "var(--hf-accent-text)" : "var(--hf-text-muted)",
               fontWeight: activeTab === id ? 700 : 400,
               fontSize: 14, cursor: "pointer", marginBottom: -1,
             }}>
@@ -249,22 +249,22 @@ export function SettingsPage() {
           <Section title="Company Identity" icon={Building2}>
             <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
               <div style={{ flexShrink: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 500, color: "#374151", marginBottom: 8 }}>Company Logo</div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: "var(--hf-text-secondary)", marginBottom: 8 }}>Company Logo</div>
                 <div
                   onClick={() => fileRef.current?.click()}
-                  style={{ width: 120, height: 120, borderRadius: 12, border: "2px dashed #CBD5E1", background: "#F8FAFC", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", overflow: "hidden", transition: "border-color 0.15s" }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = "#0D9488")}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = "#CBD5E1")}
+                  style={{ width: 120, height: 120, borderRadius: 12, border: "2px dashed var(--hf-border-strong)", background: "var(--hf-surface-muted)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", overflow: "hidden", transition: "border-color 0.15s" }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--hf-accent)")}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = "var(--hf-border-strong)")}
                 >
                   {currentLogo ? (
                     <img src={currentLogo} alt="Company logo" style={{ width: "100%", height: "100%", objectFit: "contain", padding: 8 }} />
                   ) : (
-                    <><Upload size={24} color="#94A3B8" style={{ marginBottom: 6 }} /><span style={{ fontSize: 11, color: "#94A3B8", textAlign: "center", padding: "0 8px" }}>Click to upload</span></>
+                    <><Upload size={24} color="#94A3B8" style={{ marginBottom: 6 }} /><span style={{ fontSize: 11, color: "var(--hf-text-faint)", textAlign: "center", padding: "0 8px" }}>Click to upload</span></>
                   )}
                 </div>
                 <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/svg+xml" style={{ display: "none" }} onChange={handleLogoChange} />
-                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 6, textAlign: "center" }}>PNG, JPG or SVG · max 200KB</div>
-                {saved === "logo" && <div style={{ fontSize: 11, color: "#0D9488", marginTop: 4, textAlign: "center", display: "flex", alignItems: "center", gap: 4, justifyContent: "center" }}><Check size={12} /> Logo saved</div>}
+                <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 6, textAlign: "center" }}>PNG, JPG or SVG · max 200KB</div>
+                {saved === "logo" && <div style={{ fontSize: 11, color: "var(--hf-accent-text)", marginTop: 4, textAlign: "center", display: "flex", alignItems: "center", gap: 4, justifyContent: "center" }}><Check size={12} /> Logo saved</div>}
                 {currentLogo && <button onClick={() => { setLogoPreview(null); uploadLogo.mutate({ logoBase64: "", mimeType: "image/png" }) }} style={{ ...btnOutline, width: "100%", marginTop: 6, fontSize: 11, padding: "4px 8px" }}><X size={11} /> Remove</button>}
               </div>
               <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -279,9 +279,9 @@ export function SettingsPage() {
                 <Field label="Phone Number" error={fieldErrors.phone}>
                   <Input value={form.phone} onChange={v => { setForm(f => ({ ...f, phone: v })); setFieldErrors(e => ({ ...e, phone: "" })) }} placeholder="+27 11 555 0100" error={!!fieldErrors.phone} />
                 </Field>
-                <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "#94A3B8", padding: "8px 12px", background: "#F8FAFC", borderRadius: 8 }}>
-                  Email: <strong style={{ color: "#475569" }}>{profile?.email}</strong> · Slug: <strong style={{ color: "#475569" }}>{profile?.slug}</strong>
-                  <span style={{ marginLeft: 8, color: "#94A3B8" }}>(contact support to change these)</span>
+                <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--hf-text-faint)", padding: "8px 12px", background: "var(--hf-surface-muted)", borderRadius: 8 }}>
+                  Email: <strong style={{ color: "var(--hf-text-tertiary)" }}>{profile?.email}</strong> · Slug: <strong style={{ color: "var(--hf-text-tertiary)" }}>{profile?.slug}</strong>
+                  <span style={{ marginLeft: 8, color: "var(--hf-text-faint)" }}>(contact support to change these)</span>
                 </div>
               </div>
             </div>
@@ -305,7 +305,7 @@ export function SettingsPage() {
           </Section>
 
           <Section title="Banking Details" icon={CreditCard}>
-            <div style={{ marginBottom: 12, fontSize: 13, color: "#64748B", padding: "10px 14px", background: "#F0F9FF", borderRadius: 8, borderLeft: "3px solid #0D9488" }}>
+            <div style={{ marginBottom: 12, fontSize: 13, color: "var(--hf-text-muted)", padding: "10px 14px", background: "var(--hf-sky-soft)", borderRadius: 8, borderLeft: "3px solid var(--hf-accent)" }}>
               These details appear on all invoices and payment requests sent to clients.
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -327,14 +327,14 @@ export function SettingsPage() {
           <Section title="Invoice Payment Terms" icon={Phone}>
             <Field label="Default payment terms (printed on every invoice)" error={fieldErrors.paymentTerms}>
               <textarea value={form.paymentTerms} onChange={e => { setForm(f => ({ ...f, paymentTerms: e.target.value })); setFieldErrors(er => ({ ...er, paymentTerms: "" })) }} placeholder="Payment due within 30 days of invoice date. EFT payments only." rows={3}
-                style={{ width: "100%", padding: "9px 12px", border: `1px solid ${fieldErrors.paymentTerms ? "#FCA5A5" : "#E2E8F0"}`, borderRadius: 8, fontSize: 14, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit", color: "#0F172A" }} />
+                style={{ width: "100%", padding: "9px 12px", border: `1px solid ${fieldErrors.paymentTerms ? "#FCA5A5" : "#E2E8F0"}`, borderRadius: 8, fontSize: 14, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit", color: "var(--hf-text)" }} />
             </Field>
           </Section>
 
-          {error && <div style={{ padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#DC2626", fontSize: 13 }}>{error}</div>}
+          {error && <div style={{ padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, color: "var(--hf-danger-text)", fontSize: 13 }}>{error}</div>}
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-            {saved === "profile" && <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#0D9488", fontSize: 14, fontWeight: 500 }}><Check size={16} /> Changes saved</div>}
+            {saved === "profile" && <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--hf-accent-text)", fontSize: 14, fontWeight: 500 }}><Check size={16} /> Changes saved</div>}
             <button onClick={handleSave} disabled={updateProfile.isPending} style={btnPrimary}>
               <Save size={15} />{updateProfile.isPending ? "Saving..." : "Save Changes"}
             </button>
@@ -351,7 +351,7 @@ export function SettingsPage() {
               via its own mutation, matching how Logo already saves
               separately from the rest of the Company form. */}
           <Section title="Billing Contact" icon={Receipt}>
-            <div style={{ marginBottom: 12, fontSize: 13, color: "#64748B", padding: "10px 14px", background: "#F0F9FF", borderRadius: 8, borderLeft: "3px solid #0D9488" }}>
+            <div style={{ marginBottom: 12, fontSize: 13, color: "var(--hf-text-muted)", padding: "10px 14px", background: "var(--hf-sky-soft)", borderRadius: 8, borderLeft: "3px solid var(--hf-accent)" }}>
               Subscription invoices, payment receipts, and billing notices go here instead of every team member's inbox. Leave blank to use the company email above.
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -368,7 +368,7 @@ export function SettingsPage() {
               </Field>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
-              {saved === "billing" && <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#0D9488", fontSize: 14, fontWeight: 500 }}><Check size={16} /> Billing contact saved</div>}
+              {saved === "billing" && <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--hf-accent-text)", fontSize: 14, fontWeight: 500 }}><Check size={16} /> Billing contact saved</div>}
               <button onClick={handleSaveBilling} disabled={updateBillingContact.isPending} style={btnPrimary}>
                 <Save size={15} />{updateBillingContact.isPending ? "Saving..." : "Save Billing Contact"}
               </button>
@@ -387,12 +387,12 @@ export function SettingsPage() {
 
 function Section({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid #F1F5F9" }}>
-        <div style={{ width: 32, height: 32, borderRadius: 8, background: "#F0FDF4", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--hf-border-subtle)" }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--hf-success-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Icon size={16} color="#0D9488" />
         </div>
-        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "#0F172A" }}>{title}</h2>
+        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "var(--hf-text)" }}>{title}</h2>
       </div>
       {children}
     </div>
@@ -402,9 +402,9 @@ function Section({ title, icon: Icon, children }: { title: string; icon: React.E
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "#374151", marginBottom: 5 }}>{label}</label>
+      <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--hf-text-secondary)", marginBottom: 5 }}>{label}</label>
       {children}
-      {error && <div style={{ marginTop: 4, fontSize: 12, color: "#DC2626" }}>{error}</div>}
+      {error && <div style={{ marginTop: 4, fontSize: 12, color: "var(--hf-danger-text)" }}>{error}</div>}
     </div>
   )
 }
@@ -412,10 +412,10 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 function Input({ value, onChange, placeholder, type = "text", error }: { value: string; onChange: (v: string) => void; placeholder?: string; type?: string; error?: boolean }) {
   return (
     <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-      style={{ width: "100%", padding: "9px 12px", border: `1px solid ${error ? "#FCA5A5" : "#E2E8F0"}`, borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, color: "#0F172A" }} />
+      style={{ width: "100%", padding: "9px 12px", border: `1px solid ${error ? "#FCA5A5" : "#E2E8F0"}`, borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, color: "var(--hf-text)" }} />
   )
 }
 
-const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 14, fontWeight: 500, cursor: "pointer" }
-const btnOutline: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 6, padding: "6px 12px", fontSize: 13, cursor: "pointer" }
-const selectStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, background: "#fff", color: "#0F172A" }
+const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 14, fontWeight: 500, cursor: "pointer" }
+const btnOutline: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: "var(--hf-surface)", color: "var(--hf-text-muted)", border: "1px solid var(--hf-border)", borderRadius: 6, padding: "6px 12px", fontSize: 13, cursor: "pointer" }
+const selectStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 14, background: "var(--hf-surface)", color: "var(--hf-text)" }

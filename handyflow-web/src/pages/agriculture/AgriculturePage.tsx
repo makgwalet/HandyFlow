@@ -31,15 +31,15 @@ export default function AgriculturePage() {
   const [selectedFarm, setSelectedFarm] = useState<FarmResponse | null>(null)
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F8FAFC", fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "var(--hf-surface-muted)", fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 24px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
           <div style={{ width: 40, height: 40, borderRadius: 11, background: AG_ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Tractor size={20} color="#fff" />
           </div>
           <div>
-            <h1 style={{ fontSize: 19, fontWeight: 800, color: "#0F172A", margin: 0 }}>Agriculture</h1>
-            <p style={{ fontSize: 12.5, color: "#94A3B8", margin: 0 }}>Farms · Species catalogue · Livestock — animals &amp; groups · Inventory</p>
+            <h1 style={{ fontSize: 19, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Agriculture</h1>
+            <p style={{ fontSize: 12.5, color: "var(--hf-text-faint)", margin: 0 }}>Farms · Species catalogue · Livestock — animals &amp; groups · Inventory</p>
           </div>
         </div>
 
@@ -47,7 +47,7 @@ export default function AgriculturePage() {
           <AgFarmDetail farm={selectedFarm} onBack={() => setSelectedFarm(null)} />
         ) : (
           <>
-            <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #E2E8F0", marginBottom: 24, overflowX: "auto" }}>
+            <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--hf-border)", marginBottom: 24, overflowX: "auto" }}>
               {TABS.map(t => {
                 const Icon = t.icon
                 const active = tab === t.key
@@ -56,7 +56,7 @@ export default function AgriculturePage() {
                     style={{
                       display: "flex", alignItems: "center", gap: 7, padding: "10px 16px", border: "none",
                       background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap",
-                      color: active ? AG_ACCENT : "#64748B",
+                      color: active ? AG_ACCENT : "var(--hf-text-muted)",
                       borderBottom: active ? `2px solid ${AG_ACCENT}` : "2px solid transparent",
                       marginBottom: -1,
                     }}>

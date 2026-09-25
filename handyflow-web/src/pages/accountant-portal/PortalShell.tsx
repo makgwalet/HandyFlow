@@ -73,7 +73,7 @@ export function PortalShell({
                 flexShrink: 0,
               }}
             >
-              <span style={{ color: "#fff", fontWeight: 800, fontSize: 14 }}>H</span>
+              <span style={{ color: "var(--hf-text-on-solid)", fontWeight: 800, fontSize: 14 }}>H</span>
             </div>
             <div style={{ fontWeight: 800, fontSize: 15, color: color.ink, letterSpacing: "-0.01em" }}>
               Client Portal

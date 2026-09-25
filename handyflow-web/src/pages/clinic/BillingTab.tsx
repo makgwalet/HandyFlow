@@ -136,7 +136,7 @@ export default function BillingTab() {
             return (
               <button key={v.id} onClick={()=>setActiveView(v.id)}
                 style={{display:"flex",alignItems:"center",gap:6,padding:"8px 16px",border:"none",fontSize:13,cursor:"pointer",
-                  background:active?NAVY:"#fff",color:active?"#fff":GRAY,fontWeight:active?600:400}}>
+                  background:active?NAVY:"var(--hf-surface)",color:active?"var(--hf-text-on-solid)":GRAY,fontWeight:active?600:400}}>
                 <Icon size={14}/>{v.label}
               </button>
             )
@@ -146,7 +146,7 @@ export default function BillingTab() {
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           {activeView!=="outstanding" && (
             <select value={period} onChange={e=>setPeriod(e.target.value)}
-              style={{padding:"7px 12px",border:`1px solid ${BORDER}`,borderRadius:8,fontSize:13,outline:"none",background:"#fff"}}>
+              style={{padding:"7px 12px",border:`1px solid ${BORDER}`,borderRadius:8,fontSize:13,outline:"none",background:"var(--hf-surface)"}}>
               <option value="week">This week</option>
               <option value="month">This month</option>
               <option value="quarter">This quarter</option>
@@ -154,7 +154,7 @@ export default function BillingTab() {
             </select>
           )}
           <button onClick={()=>{setShowPayment(true);setPayError("")}}
-            style={{display:"flex",alignItems:"center",gap:6,background:TEAL,color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+            style={{display:"flex",alignItems:"center",gap:6,background:TEAL,color:"var(--hf-text-on-solid)",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
             <Plus size={14}/> Record payment
           </button>
         </div>
@@ -182,13 +182,13 @@ export default function BillingTab() {
                 </thead>
                 <tbody>
                   {filteredOut.sort((a,b)=>b.balance-a.balance).map((b,i)=>(
-                    <tr key={b.patientId} style={{borderBottom:i<filteredOut.length-1?`1px solid #F1F5F9`:"none"}}>
+                    <tr key={b.patientId} style={{borderBottom:i<filteredOut.length-1?`1px solid var(--hf-border-subtle)`:"none"}}>
                       <td style={{padding:"12px 16px"}}>
-                        <div style={{fontWeight:700,fontSize:14,color:"#0F172A"}}>{b.patientName}</div>
+                        <div style={{fontWeight:700,fontSize:14,color:"var(--hf-text)"}}>{b.patientName}</div>
                         {b.oldestUnpaid && <div style={{fontSize:11,color:AMBER}}>Since {fmtDT(b.oldestUnpaid)}</div>}
                       </td>
                       <td style={{padding:"12px 16px",fontSize:13,color:GRAY}}>{b.phone||"—"}</td>
-                      <td style={{padding:"12px 16px",fontSize:13,color:"#0F172A"}}>{fmtR(b.totalBilled)}</td>
+                      <td style={{padding:"12px 16px",fontSize:13,color:"var(--hf-text)"}}>{fmtR(b.totalBilled)}</td>
                       <td style={{padding:"12px 16px",fontSize:13,color:GREEN,fontWeight:600}}>{fmtR(b.totalPaid)}</td>
                       <td style={{padding:"12px 16px"}}>
                         <span style={{fontSize:14,fontWeight:800,color:b.balance>0?RED:GREEN}}>{fmtR(b.balance)}</span>
@@ -197,7 +197,7 @@ export default function BillingTab() {
                       <td style={{padding:"12px 16px"}}>
                         <div style={{display:"flex",gap:6}}>
                           <button onClick={()=>{setPayForm(f=>({...f,patientId:b.patientId}));setShowPayment(true)}}
-                            style={{padding:"5px 12px",border:`1px solid ${TEAL}`,borderRadius:7,background:"#F0FDF4",color:TEAL,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                            style={{padding:"5px 12px",border:`1px solid ${TEAL}`,borderRadius:7,background:"var(--hf-success-soft)",color:TEAL,fontSize:12,fontWeight:600,cursor:"pointer"}}>
                             Pay
                           </button>
                           {/* FIX: "no patient statement of account" gap. */}
@@ -210,7 +210,7 @@ export default function BillingTab() {
                               setTimeout(() => URL.revokeObjectURL(url), 60_000)
                             } catch (e) { console.error("Failed to download statement", e) }
                           }}
-                            style={{display:"flex",alignItems:"center",gap:4,padding:"5px 12px",border:`1px solid ${BORDER}`,borderRadius:7,background:"#fff",color:"#1B3A6B",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                            style={{display:"flex",alignItems:"center",gap:4,padding:"5px 12px",border:`1px solid ${BORDER}`,borderRadius:7,background:"var(--hf-surface)",color:"var(--hf-primary-text)",fontSize:12,fontWeight:600,cursor:"pointer"}}>
                             <Download size={12}/> Statement
                           </button>
                         </div>
@@ -242,9 +242,9 @@ export default function BillingTab() {
                     const methodColor: Record<string,string> = {CASH:"#166534",EFT:"#1D4ED8",CARD:"#7C3AED",MEDICAL_AID:"#D97706",FAMILY_ACCOUNT:"#0D9488"}
                     const color = methodColor[p.method]??GRAY
                     return (
-                      <tr key={p.id} style={{borderBottom:i<paymentsList.length-1?`1px solid #F1F5F9`:"none"}}>
+                      <tr key={p.id} style={{borderBottom:i<paymentsList.length-1?`1px solid var(--hf-border-subtle)`:"none"}}>
                         <td style={{padding:"11px 16px",fontSize:13,color:GRAY}}>{fmtDT(p.recordedAt)}</td>
-                        <td style={{padding:"11px 16px",fontWeight:600,fontSize:14,color:"#0F172A"}}>{p.patientName||"—"}</td>
+                        <td style={{padding:"11px 16px",fontWeight:600,fontSize:14,color:"var(--hf-text)"}}>{p.patientName||"—"}</td>
                         <td style={{padding:"11px 16px"}}>
                           <span style={{background:`${color}14`,color,padding:"2px 8px",borderRadius:20,fontSize:11,fontWeight:700}}>
                             {p.method.replace("_"," ")}
@@ -275,7 +275,7 @@ export default function BillingTab() {
             <>
               {/* Bar chart */}
               <div style={{border:`1px solid ${BORDER}`,borderRadius:12,padding:24,marginBottom:20}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#0F172A",marginBottom:16}}>Revenue by period</div>
+                <div style={{fontSize:13,fontWeight:700,color:"var(--hf-text)",marginBottom:16}}>Revenue by period</div>
                 {/*
                   FIX: "revenue chart overlapping" — with up to 30 daily
                   points (this codebase's getRevenue() buckets "month" as a
@@ -342,15 +342,15 @@ export default function BillingTab() {
                     {revenueList.map((r,i)=>{
                       const rate = r.grossBilled > 0 ? ((r.schemePaid+r.patientPaid)/r.grossBilled*100).toFixed(0) : "0"
                       return (
-                        <tr key={r.period} style={{borderBottom:i<revenueList.length-1?`1px solid #F1F5F9`:"none"}}>
-                          <td style={{padding:"11px 16px",fontWeight:600,fontSize:14,color:"#0F172A"}}>{r.period}</td>
+                        <tr key={r.period} style={{borderBottom:i<revenueList.length-1?`1px solid var(--hf-border-subtle)`:"none"}}>
+                          <td style={{padding:"11px 16px",fontWeight:600,fontSize:14,color:"var(--hf-text)"}}>{r.period}</td>
                           <td style={{padding:"11px 16px",fontSize:13,color:GRAY}}>{r.consultations}</td>
-                          <td style={{padding:"11px 16px",fontSize:13,fontWeight:700,color:"#0F172A"}}>{fmtR(r.grossBilled)}</td>
+                          <td style={{padding:"11px 16px",fontSize:13,fontWeight:700,color:"var(--hf-text)"}}>{fmtR(r.grossBilled)}</td>
                           <td style={{padding:"11px 16px",fontSize:13,color:TEAL,fontWeight:600}}>{fmtR(r.schemePaid)}</td>
                           <td style={{padding:"11px 16px",fontSize:13,color:AMBER,fontWeight:600}}>{fmtR(r.patientPaid)}</td>
                           <td style={{padding:"11px 16px"}}>
                             <div style={{display:"flex",alignItems:"center",gap:8}}>
-                              <div style={{flex:1,height:6,background:"#F1F5F9",borderRadius:3}}>
+                              <div style={{flex:1,height:6,background:"var(--hf-surface-sunken)",borderRadius:3}}>
                                 <div style={{width:`${rate}%`,height:"100%",background:+rate>=80?GREEN:+rate>=50?AMBER:RED,borderRadius:3}}/>
                               </div>
                               <span style={{fontSize:12,fontWeight:700,color:+rate>=80?GREEN:+rate>=50?AMBER:RED}}>{rate}%</span>
@@ -363,9 +363,9 @@ export default function BillingTab() {
                   {/* Totals */}
                   <tfoot>
                     <tr style={{borderTop:`2px solid ${BORDER}`,background:LIGHT}}>
-                      <td style={{padding:"11px 16px",fontWeight:700,fontSize:13,color:"#0F172A"}}>Total</td>
+                      <td style={{padding:"11px 16px",fontWeight:700,fontSize:13,color:"var(--hf-text)"}}>Total</td>
                       <td style={{padding:"11px 16px",fontSize:13,fontWeight:600}}>{totalConsults}</td>
-                      <td style={{padding:"11px 16px",fontSize:13,fontWeight:800,color:"#0F172A"}}>{fmtR(totalBilled)}</td>
+                      <td style={{padding:"11px 16px",fontSize:13,fontWeight:800,color:"var(--hf-text)"}}>{fmtR(totalBilled)}</td>
                       <td style={{padding:"11px 16px",fontSize:13,fontWeight:700,color:TEAL}}>{fmtR(revenueList.reduce((s,r)=>s+r.schemePaid,0))}</td>
                       <td style={{padding:"11px 16px",fontSize:13,fontWeight:700,color:AMBER}}>{fmtR(revenueList.reduce((s,r)=>s+r.patientPaid,0))}</td>
                       <td style={{padding:"11px 16px"}}/>
@@ -381,9 +381,9 @@ export default function BillingTab() {
       {/* ── Record payment modal ─────────────────────────────────────────── */}
       {showPayment && (
         <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(3px)"}}>
-          <div style={{background:"#fff",borderRadius:16,padding:28,width:460,boxShadow:"0 24px 64px rgba(0,0,0,0.22)"}}>
+          <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:460,boxShadow:"0 24px 64px rgba(0,0,0,0.22)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
-              <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"#0F172A"}}>Record payment</h3>
+              <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"var(--hf-text)"}}>Record payment</h3>
               <button onClick={()=>setShowPayment(false)} style={{background:"none",border:"none",cursor:"pointer",color:GRAY,display:"flex"}}><X size={20}/></button>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -422,7 +422,7 @@ export default function BillingTab() {
                   return (
                     <button key={m} onClick={()=>setPayForm(f=>({...f,method:m}))}
                       style={{padding:"4px 12px",borderRadius:20,border:`1.5px solid ${payForm.method===m?c:BORDER}`,
-                        background:payForm.method===m?`${c}14`:"#fff",color:payForm.method===m?c:GRAY,
+                        background:payForm.method===m?`${c}14`:"var(--hf-surface)",color:payForm.method===m?c:GRAY,
                         fontSize:12,fontWeight:payForm.method===m?700:400,cursor:"pointer"}}>
                       {m.replace("_"," ")}
                     </button>
@@ -430,7 +430,7 @@ export default function BillingTab() {
                 })}
               </div>
             </div>
-            {payError && <div style={{marginTop:12,padding:"8px 12px",background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,fontSize:13,color:RED,display:"flex",alignItems:"center",gap:8}}><AlertCircle size={13}/>{payError}</div>}
+            {payError && <div style={{marginTop:12,padding:"8px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:RED,display:"flex",alignItems:"center",gap:8}}><AlertCircle size={13}/>{payError}</div>}
             <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}>
               <button onClick={()=>setShowPayment(false)} style={btnCancel}>Cancel</button>
               <button onClick={()=>{
@@ -451,7 +451,7 @@ export default function BillingTab() {
 
 function Loading() { return <div style={{textAlign:"center",padding:40,color:GRAY}}>Loading...</div> }
 function Empty({icon:Icon,msg,color=GRAY}:{icon:React.ElementType;msg:string;color?:string}) {
-  return <div style={{textAlign:"center",padding:"60px 20px",color:GRAY,border:`1px dashed ${BORDER}`,borderRadius:12}}><Icon size={36} color={color} style={{marginBottom:12,opacity:0.4}}/><div style={{fontWeight:600,color:"#475569",fontSize:15}}>{msg}</div></div>
+  return <div style={{textAlign:"center",padding:"60px 20px",color:GRAY,border:`1px dashed ${BORDER}`,borderRadius:12}}><Icon size={36} color={color} style={{marginBottom:12,opacity:0.4}}/><div style={{fontWeight:600,color:"var(--hf-text-tertiary)",fontSize:15}}>{msg}</div></div>
 }
 const lbl:React.CSSProperties      = {display:"block",fontSize:13,fontWeight:600,color:"#374151",marginBottom:5}
 const sinp:React.CSSProperties     = {width:"100%",padding:"9px 12px",boxSizing:"border-box" as const,border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:14,outline:"none",background:"#fff"}

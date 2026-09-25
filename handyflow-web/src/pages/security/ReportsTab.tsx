@@ -40,10 +40,10 @@ const SEV_COLORS: Record<string, string> = {
 
 function StatBox({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
-    <div style={{ background: "#F8FAFC", borderRadius: 10, padding: "14px 16px", border: "1px solid #E2E8F0" }}>
-      <p style={{ margin: "0 0 4px", fontSize: 11, color: "#64748B", fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>{label}</p>
-      <p style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0F172A" }}>{value}</p>
-      {sub && <p style={{ margin: "2px 0 0", fontSize: 11, color: "#94A3B8" }}>{sub}</p>}
+    <div style={{ background: "var(--hf-surface-muted)", borderRadius: 10, padding: "14px 16px", border: "1px solid var(--hf-border)" }}>
+      <p style={{ margin: "0 0 4px", fontSize: 11, color: "var(--hf-text-muted)", fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>{label}</p>
+      <p style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "var(--hf-text)" }}>{value}</p>
+      {sub && <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--hf-text-faint)" }}>{sub}</p>}
     </div>
   )
 }
@@ -119,12 +119,12 @@ export default function ReportsTab() {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Reports</h2>
-        <p style={{ margin: 0, fontSize: 12, color: "#64748B" }}>Monthly security performance reports — JSON view or PDF download</p>
+        <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Reports</h2>
+        <p style={{ margin: 0, fontSize: 12, color: "var(--hf-text-muted)" }}>Monthly security performance reports — JSON view or PDF download</p>
       </div>
 
       {/* Controls */}
-      <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" as const, padding: "16px 20px", background: "#F8FAFC", borderRadius: 12, border: "1px solid #E2E8F0", marginBottom: 24 }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" as const, padding: "16px 20px", background: "var(--hf-surface-muted)", borderRadius: 12, border: "1px solid var(--hf-border)", marginBottom: 24 }}>
         <div>
           <label style={lblStyle}>Report type</label>
           <select value={reportType} onChange={e => { setReportType(e.target.value as ReportType); setTriggered(false) }} style={selStyle}>
@@ -156,20 +156,20 @@ export default function ReportsTab() {
           </div>
         )}
         <button onClick={run} disabled={!canFetch}
-          style={{ padding: "9px 20px", borderRadius: 8, border: "none", background: canFetch ? "#0D9488" : "#E2E8F0", color: canFetch ? "#fff" : "#94A3B8", fontSize: 13, fontWeight: 600, cursor: canFetch ? "pointer" : "not-allowed", alignSelf: "flex-end" }}>
+          style={{ padding: "9px 20px", borderRadius: 8, border: "none", background: canFetch ? "var(--hf-accent)" : "var(--hf-surface-strong)", color: canFetch ? "var(--hf-text-on-solid)" : "var(--hf-text-faint)", fontSize: 13, fontWeight: 600, cursor: canFetch ? "pointer" : "not-allowed", alignSelf: "flex-end" }}>
           Generate Report
         </button>
         {report && (
           <button onClick={downloadPdf}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "1px solid #2563EB", background: "#EFF6FF", color: "#1D4ED8", fontSize: 13, fontWeight: 600, cursor: "pointer", alignSelf: "flex-end" }}>
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "1px solid var(--hf-info)", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", fontSize: 13, fontWeight: 600, cursor: "pointer", alignSelf: "flex-end" }}>
             <Download size={14} /> Download PDF
           </button>
         )}
       </div>
 
       {/* Results */}
-      {isLoading && <p style={{ color: "#94A3B8", fontSize: 13 }}>Generating report…</p>}
-      {error && <p style={{ color: "#DC2626", fontSize: 13 }}>Failed to generate report. Check that the selected site/guard has data for this month.</p>}
+      {isLoading && <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Generating report…</p>}
+      {error && <p style={{ color: "var(--hf-danger-text)", fontSize: 13 }}>Failed to generate report. Check that the selected site/guard has data for this month.</p>}
 
       {report && reportType === "monthly-summary" && (() => {
         const r = report as MonthlySummaryReport
@@ -185,33 +185,33 @@ export default function ReportsTab() {
             </div>
             {r.siteSummaries?.length > 0 && (
               <div>
-                <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "#374151", marginBottom: 10 }}>Site Breakdown</p>
-                <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden" }}>
+                <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "var(--hf-text-secondary)", marginBottom: 10 }}>Site Breakdown</p>
+                <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse" as const, fontSize: 12 }}>
                     <thead>
-                      <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
+                      <tr style={{ background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border)" }}>
                         {["Site", "Shifts", "Done", "Missed", "Hours", "Coverage", "Incidents"].map(h => (
-                          <th key={h} style={{ padding: "10px 14px", textAlign: "left" as const, fontWeight: 600, color: "#374151", fontSize: 11 }}>{h}</th>
+                          <th key={h} style={{ padding: "10px 14px", textAlign: "left" as const, fontWeight: 600, color: "var(--hf-text-secondary)", fontSize: 11 }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {r.siteSummaries.map((s, i) => (
-                        <tr key={i} style={{ borderBottom: "1px solid #F1F5F9", background: i % 2 === 0 ? "#fff" : "#FAFAFA" }}>
-                          <td style={{ padding: "10px 14px", fontWeight: 600, color: "#0F172A" }}>{s.siteName}</td>
-                          <td style={{ padding: "10px 14px", color: "#374151" }}>{s.totalShifts}</td>
-                          <td style={{ padding: "10px 14px", color: "#166534" }}>{s.completedShifts}</td>
-                          <td style={{ padding: "10px 14px", color: s.missedShifts > 0 ? "#DC2626" : "#374151" }}>{s.missedShifts}</td>
-                          <td style={{ padding: "10px 14px", color: "#374151" }}>{s.guardHours}h</td>
+                        <tr key={i} style={{ borderBottom: "1px solid var(--hf-border-subtle)", background: i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)" }}>
+                          <td style={{ padding: "10px 14px", fontWeight: 600, color: "var(--hf-text)" }}>{s.siteName}</td>
+                          <td style={{ padding: "10px 14px", color: "var(--hf-text-secondary)" }}>{s.totalShifts}</td>
+                          <td style={{ padding: "10px 14px", color: "var(--hf-success-text-strong)" }}>{s.completedShifts}</td>
+                          <td style={{ padding: "10px 14px", color: s.missedShifts > 0 ? "var(--hf-danger-text)" : "var(--hf-text-secondary)" }}>{s.missedShifts}</td>
+                          <td style={{ padding: "10px 14px", color: "var(--hf-text-secondary)" }}>{s.guardHours}h</td>
                           <td style={{ padding: "10px 14px" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                              <div style={{ flex: 1, height: 6, background: "#E2E8F0", borderRadius: 3 }}>
-                                <div style={{ width: `${Math.min(s.coverageRatePct, 100)}%`, height: "100%", background: s.coverageRatePct >= 90 ? "#0D9488" : s.coverageRatePct >= 70 ? "#F59E0B" : "#DC2626", borderRadius: 3 }} />
+                              <div style={{ flex: 1, height: 6, background: "var(--hf-surface-strong)", borderRadius: 3 }}>
+                                <div style={{ width: `${Math.min(s.coverageRatePct, 100)}%`, height: "100%", background: s.coverageRatePct >= 90 ? "var(--hf-accent)" : s.coverageRatePct >= 70 ? "var(--hf-warning)" : "var(--hf-danger)", borderRadius: 3 }} />
                               </div>
-                              <span style={{ fontSize: 11, color: "#374151", whiteSpace: "nowrap" as const }}>{s.coverageRatePct}%</span>
+                              <span style={{ fontSize: 11, color: "var(--hf-text-secondary)", whiteSpace: "nowrap" as const }}>{s.coverageRatePct}%</span>
                             </div>
                           </td>
-                          <td style={{ padding: "10px 14px", color: s.incidents > 0 ? "#DC2626" : "#94A3B8" }}>{s.incidents}</td>
+                          <td style={{ padding: "10px 14px", color: s.incidents > 0 ? "var(--hf-danger-text)" : "var(--hf-text-faint)" }}>{s.incidents}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -227,7 +227,7 @@ export default function ReportsTab() {
         const r = report as SiteCoverageReport
         return (
           <div>
-            <p style={{ fontWeight: 700, fontSize: 15, color: "#0F172A", marginBottom: 16 }}>{r.siteName} — {r.month}</p>
+            <p style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)", marginBottom: 16 }}>{r.siteName} — {r.month}</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 24 }}>
               <StatBox label="Total Shifts"   value={r.totalShifts} />
               <StatBox label="Completed"      value={r.completedShifts} sub={`${r.shiftCompletionRatePct}%`} />
@@ -240,9 +240,9 @@ export default function ReportsTab() {
             {Object.keys(r.incidentsBySeverity ?? {}).length > 0 && (
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
                 {Object.entries(r.incidentsBySeverity).map(([sev, count]) => (
-                  <div key={sev} style={{ padding: "8px 14px", borderRadius: 8, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", gap: 8, alignItems: "center" }}>
+                  <div key={sev} style={{ padding: "8px 14px", borderRadius: 8, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", display: "flex", gap: 8, alignItems: "center" }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: SEV_COLORS[sev] ?? "#64748B", display: "inline-block" }} />
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>{count} {sev}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)" }}>{count} {sev}</span>
                   </div>
                 ))}
               </div>
@@ -255,7 +255,7 @@ export default function ReportsTab() {
         const r = report as GuardAttendanceReport
         return (
           <div>
-            <p style={{ fontWeight: 700, fontSize: 15, color: "#0F172A", marginBottom: 16 }}>{r.guardName} — {r.month}</p>
+            <p style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)", marginBottom: 16 }}>{r.guardName} — {r.month}</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 24 }}>
               <StatBox label="Total Shifts"    value={r.totalShifts} />
               <StatBox label="Attended"        value={r.completedShifts} sub={`${r.attendanceRatePct}%`} />
@@ -266,11 +266,11 @@ export default function ReportsTab() {
             </div>
             {r.siteBreakdown?.length > 0 && (
               <div>
-                <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "#374151", marginBottom: 10 }}>By Site</p>
+                <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "var(--hf-text-secondary)", marginBottom: 10 }}>By Site</p>
                 {r.siteBreakdown.map((s, i) => (
-                  <div key={i} style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 0", borderBottom: "1px solid #F1F5F9" }}>
+                  <div key={i} style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 0", borderBottom: "1px solid var(--hf-border-subtle)" }}>
                     <Building2 size={14} color="#94A3B8" />
-                    <div style={{ flex: 1, fontSize: 12, color: "#374151" }}>
+                    <div style={{ flex: 1, fontSize: 12, color: "var(--hf-text-secondary)" }}>
                       <strong>{s.siteName}</strong> · {s.completedShifts}/{s.totalShifts} shifts · {s.hoursWorked}h
                     </div>
                   </div>
@@ -282,7 +282,7 @@ export default function ReportsTab() {
       })()}
 
       {!triggered && (
-        <div style={{ textAlign: "center", padding: "48px 0", color: "#CBD5E1" }}>
+        <div style={{ textAlign: "center", padding: "48px 0", color: "var(--hf-text-disabled)" }}>
           <FileBarChart size={32} strokeWidth={1.5} style={{ display: "block", margin: "0 auto 8px" }} />
           <p style={{ margin: 0, fontWeight: 500 }}>Configure the report above and click Generate</p>
         </div>
@@ -291,5 +291,5 @@ export default function ReportsTab() {
   )
 }
 
-const lblStyle = { display: "block", fontSize: 11, fontWeight: 600, color: "#374151", marginBottom: 4 } as const
-const selStyle = { padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, background: "#fff", minWidth: 160 } as const
+const lblStyle = { display: "block", fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 } as const
+const selStyle = { padding: "8px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12, background: "var(--hf-surface)", minWidth: 160 } as const

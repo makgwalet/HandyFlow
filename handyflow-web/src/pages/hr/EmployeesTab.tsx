@@ -199,7 +199,7 @@ export default function EmployeesTab() {
   })
   const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
   const FErr = ({ k }: { k: string }) => fieldErrors[k]
-    ? <div style={{ fontSize: 12, color: "#DC2626", marginTop: 3, display: "flex", alignItems: "center", gap: 3 }}><AlertCircle size={11} />{fieldErrors[k]}</div>
+    ? <div style={{ fontSize: 12, color: "var(--hf-danger-text)", marginTop: 3, display: "flex", alignItems: "center", gap: 3 }}><AlertCircle size={11} />{fieldErrors[k]}</div>
     : null
 
   const EmployeeForm = () => (
@@ -211,28 +211,28 @@ export default function EmployeesTab() {
           <div>
             <label style={lbl}>SA ID Number</label>
             <input value={form.idNumber} onChange={e => handleIdChange(e.target.value)} placeholder="13 digits"
-              style={{ ...inp("idNumber"), borderColor: idState.valid === false ? "#DC2626" : idState.valid === true ? "#22C55E" : "#E2E8F0" }} />
-            {idState.msg && <div style={{ fontSize: 12, marginTop: 3, color: idState.valid ? "#166534" : "#DC2626", display: "flex", alignItems: "center", gap: 3 }}><AlertCircle size={11} />{idState.msg}</div>}
+              style={{ ...inp("idNumber"), borderColor: idState.valid === false ? "var(--hf-danger)" : idState.valid === true ? "#22C55E" : "var(--hf-border)" }} />
+            {idState.msg && <div style={{ fontSize: 12, marginTop: 3, color: idState.valid ? "var(--hf-success-text-strong)" : "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 3 }}><AlertCircle size={11} />{idState.msg}</div>}
           </div>
           <div><label style={lbl}>Tax / SARS Number</label><input value={form.taxNumber} onChange={e => setForm(f => ({ ...f, taxNumber: e.target.value }))} placeholder="10-digit SARS number" style={inp("taxNumber")} /></div>
           <div>
             <label style={lbl}>Date of Birth</label>
             <input type="date" value={form.dateOfBirth} onChange={e => setForm(f => ({ ...f, dateOfBirth: e.target.value }))} style={inp("dateOfBirth")} />
-            <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>Auto-filled from SA ID</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 2 }}>Auto-filled from SA ID</div>
           </div>
           <div>
             <label style={lbl}>Gender</label>
-            <select value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))} style={{ ...inp("gender"), background: "#fff" }}>
+            <select value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))} style={{ ...inp("gender"), background: "var(--hf-surface)" }}>
               <option value="">Select...</option>{GENDERS.map(g => <option key={g}>{g}</option>)}
             </select>
-            <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>Auto-filled from SA ID</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 2 }}>Auto-filled from SA ID</div>
           </div>
           <div>
             <label style={lbl}>Race</label>
-            <select value={form.race} onChange={e => setForm(f => ({ ...f, race: e.target.value }))} style={{ ...inp("race"), background: "#fff" }}>
+            <select value={form.race} onChange={e => setForm(f => ({ ...f, race: e.target.value }))} style={{ ...inp("race"), background: "var(--hf-surface)" }}>
               <option value="">Select...</option>{RACES.map(r => <option key={r}>{r}</option>)}
             </select>
-            <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>Required for Employment Equity</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 2 }}>Required for Employment Equity</div>
           </div>
           <div><label style={lbl}>Email</label><input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="employee@co.za" style={inp("email")} /></div>
           <div><label style={lbl}>Phone</label><input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+27 82 555 1234" style={inp("phone")} /></div>
@@ -242,9 +242,9 @@ export default function EmployeesTab() {
       <Sect title="Employment">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <div><label style={lbl}>Start Date *</label><input type="date" value={form.startDate} onChange={e => { setForm(f => ({ ...f, startDate: e.target.value })); setFieldErrors(f => omit(f,"startDate")) }} style={inp("startDate")} /><FErr k="startDate" /></div>
-          <div><label style={lbl}>Employment Type</label><select value={form.employmentType} onChange={e => setForm(f => ({ ...f, employmentType: e.target.value }))} style={{ ...inp("employmentType"), background: "#fff" }}>{EMP_TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
+          <div><label style={lbl}>Employment Type</label><select value={form.employmentType} onChange={e => setForm(f => ({ ...f, employmentType: e.target.value }))} style={{ ...inp("employmentType"), background: "var(--hf-surface)" }}>{EMP_TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
           <div><label style={lbl}>Job Title</label><input value={form.jobTitle} onChange={e => setForm(f => ({ ...f, jobTitle: e.target.value }))} placeholder="Operations Manager" style={inp("jobTitle")} /></div>
-          <div><label style={lbl}>Department</label><select value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))} style={{ ...inp("department"), background: "#fff" }}><option value="">Select...</option>{DEPARTMENTS.map(d => <option key={d}>{d}</option>)}</select></div>
+          <div><label style={lbl}>Department</label><select value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))} style={{ ...inp("department"), background: "var(--hf-surface)" }}><option value="">Select...</option>{DEPARTMENTS.map(d => <option key={d}>{d}</option>)}</select></div>
         </div>
       </Sect>
 
@@ -255,27 +255,27 @@ export default function EmployeesTab() {
             <input type="number" value={form.grossSalary} onChange={e => { setForm(f => ({ ...f, grossSalary: e.target.value })); setFieldErrors(f => omit(f,"grossSalary")) }} placeholder="25000" style={inp("grossSalary")} />
             <FErr k="grossSalary" />
           </div>
-          <div><label style={lbl}>Pay Frequency</label><select value={form.payFrequency} onChange={e => setForm(f => ({ ...f, payFrequency: e.target.value }))} style={{ ...inp("payFrequency"), background: "#fff" }}>{PAY_FREQS.map(p => <option key={p}>{p}</option>)}</select></div>
+          <div><label style={lbl}>Pay Frequency</label><select value={form.payFrequency} onChange={e => setForm(f => ({ ...f, payFrequency: e.target.value }))} style={{ ...inp("payFrequency"), background: "var(--hf-surface)" }}>{PAY_FREQS.map(p => <option key={p}>{p}</option>)}</select></div>
           <div>
             <label style={lbl}>Travel Allowance (R/month)</label>
             <input type="number" value={form.travelAllowance} onChange={e => setForm(f => ({ ...f, travelAllowance: e.target.value }))} placeholder="0" style={inp("travelAllowance")} />
-            <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>80% is taxable per SARS ITA s.8(1)(b)</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 2 }}>80% is taxable per SARS ITA s.8(1)(b)</div>
           </div>
           <div>
             <label style={lbl}>Medical Aid (R/month)</label>
             <input type="number" value={form.medicalAidContribution} onChange={e => setForm(f => ({ ...f, medicalAidContribution: e.target.value }))} placeholder="0" style={inp("medicalAidContribution")} />
-            <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>Medical Tax Credit applied to PAYE</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 2 }}>Medical Tax Credit applied to PAYE</div>
           </div>
           <div>
             <label style={lbl}>Pension / Provident (R/month)</label>
             <input type="number" value={form.pensionContribution} onChange={e => setForm(f => ({ ...f, pensionContribution: e.target.value }))} placeholder="0" style={inp("pensionContribution")} />
-            <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>Deducted from taxable income — s.11(k)</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 2 }}>Deducted from taxable income — s.11(k)</div>
           </div>
           {net !== null && (
-            <div style={{ gridColumn: "1/-1", padding: "12px 14px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#166534", marginBottom: 3 }}>ESTIMATED TAKE-HOME</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: "#0D9488" }}>R {Math.max(0, net).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</div>
-              <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>Approximate — exact amount calculated during payroll processing</div>
+            <div style={{ gridColumn: "1/-1", padding: "12px 14px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border-subtle)", borderRadius: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-success-text-strong)", marginBottom: 3 }}>ESTIMATED TAKE-HOME</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "var(--hf-accent-text)" }}>R {Math.max(0, net).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</div>
+              <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>Approximate — exact amount calculated during payroll processing</div>
             </div>
           )}
         </div>
@@ -283,7 +283,7 @@ export default function EmployeesTab() {
 
       <Sect title="Banking">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <div><label style={lbl}>Bank</label><select value={form.bankName} onChange={e => setForm(f => ({ ...f, bankName: e.target.value }))} style={{ ...inp("bankName"), background: "#fff" }}><option value="">Select...</option>{SA_BANKS.map(b => <option key={b}>{b}</option>)}</select></div>
+          <div><label style={lbl}>Bank</label><select value={form.bankName} onChange={e => setForm(f => ({ ...f, bankName: e.target.value }))} style={{ ...inp("bankName"), background: "var(--hf-surface)" }}><option value="">Select...</option>{SA_BANKS.map(b => <option key={b}>{b}</option>)}</select></div>
           <div><label style={lbl}>Account Number</label><input value={form.bankAccountNumber} onChange={e => setForm(f => ({ ...f, bankAccountNumber: e.target.value }))} placeholder="1234567890" style={inp("bankAccountNumber")} /></div>
           <div><label style={lbl}>Branch Code</label><input value={form.bankBranchCode} onChange={e => setForm(f => ({ ...f, bankBranchCode: e.target.value }))} placeholder="250655" style={inp("bankBranchCode")} /></div>
         </div>
@@ -317,36 +317,36 @@ export default function EmployeesTab() {
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
           {["ALL","ACTIVE","ON_LEAVE","TERMINATED"].map(s => (
             <button key={s} onClick={() => setFilter(s)}
-              style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterStatus === s ? 600 : 400, background: filterStatus === s ? "#1B3A6B" : "#F1F5F9", color: filterStatus === s ? "#fff" : "#64748B" }}>
+              style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterStatus === s ? 600 : 400, background: filterStatus === s ? "var(--hf-primary)" : "var(--hf-surface-sunken)", color: filterStatus === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
               {s === "ALL" ? "All" : STATUS_CFG[s]?.label ?? s}
             </button>
           ))}
           <div style={{ position: "relative" as const }}>
-            <Search size={14} style={{ position: "absolute" as const, left: 10, top: "50%", transform: "translateY(-50%)", color: "#94A3B8" }} />
+            <Search size={14} style={{ position: "absolute" as const, left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--hf-text-faint)" }} />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, number..."
-              style={{ paddingLeft: 32, padding: "8px 12px 8px 32px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none", width: 220 }} />
+              style={{ paddingLeft: 32, padding: "8px 12px 8px 32px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", width: 220 }} />
           </div>
         </div>
         <button onClick={() => { setShowCreate(true); setForm(EMPTY_FORM); setFieldErrors({}); setError(""); setIdState({ valid: null, msg: "" }) }}
-          style={{ display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Add Employee
         </button>
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading employees...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading employees...</div>
       ) : (employees as Employee[]).length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Users size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No employees found</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No employees found</div>
         </div>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr style={{ background: "#F8FAFC" }}>
+              <tr style={{ background: "var(--hf-surface-muted)" }}>
                 {["Employee","Job Title","Department","Type","Gross Salary","Status",""].map(h => (
-                  <th key={h} style={{ padding: "10px 16px", textAlign: "left" as const, fontSize: 11, fontWeight: 700, color: "#64748B", letterSpacing: "0.05em", borderBottom: "1px solid #E2E8F0" }}>{h}</th>
+                  <th key={h} style={{ padding: "10px 16px", textAlign: "left" as const, fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", letterSpacing: "0.05em", borderBottom: "1px solid var(--hf-border)" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -354,29 +354,29 @@ export default function EmployeesTab() {
               {(employees as Employee[]).map((emp, i) => {
                 const cfg = STATUS_CFG[emp.status] ?? STATUS_CFG.ACTIVE
                 return (
-                  <tr key={emp.id} style={{ background: i % 2 === 0 ? "#fff" : "#FAFAFA", cursor: "pointer" }} onClick={() => setSelected(emp)}>
-                    <td style={{ padding: "12px 16px", borderBottom: "1px solid #F1F5F9" }}>
+                  <tr key={emp.id} style={{ background: i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)", cursor: "pointer" }} onClick={() => setSelected(emp)}>
+                    <td style={{ padding: "12px 16px", borderBottom: "1px solid var(--hf-border-subtle)" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1B3A6B", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{emp.firstName[0]}{emp.lastName[0]}</span>
+                        <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--hf-primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text-on-solid)" }}>{emp.firstName[0]}{emp.lastName[0]}</span>
                         </div>
                         <div>
-                          <div style={{ fontWeight: 600, fontSize: 14, color: "#0F172A" }}>{emp.fullName}</div>
-                          <div style={{ fontSize: 11, color: "#94A3B8" }}>{emp.employeeNumber}</div>
+                          <div style={{ fontWeight: 600, fontSize: 14, color: "var(--hf-text)" }}>{emp.fullName}</div>
+                          <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{emp.employeeNumber}</div>
                         </div>
                       </div>
                     </td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, color: "#475569", borderBottom: "1px solid #F1F5F9" }}>{emp.jobTitle || "—"}</td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, color: "#475569", borderBottom: "1px solid #F1F5F9" }}>{emp.department || "—"}</td>
-                    <td style={{ padding: "12px 16px", fontSize: 12, color: "#64748B", borderBottom: "1px solid #F1F5F9" }}>{emp.employmentType}</td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "#0F172A", borderBottom: "1px solid #F1F5F9" }}>{fmtR(emp.grossSalary)}</td>
-                    <td style={{ padding: "12px 16px", borderBottom: "1px solid #F1F5F9" }}>
+                    <td style={{ padding: "12px 16px", fontSize: 13, color: "var(--hf-text-tertiary)", borderBottom: "1px solid var(--hf-border-subtle)" }}>{emp.jobTitle || "—"}</td>
+                    <td style={{ padding: "12px 16px", fontSize: 13, color: "var(--hf-text-tertiary)", borderBottom: "1px solid var(--hf-border-subtle)" }}>{emp.department || "—"}</td>
+                    <td style={{ padding: "12px 16px", fontSize: 12, color: "var(--hf-text-muted)", borderBottom: "1px solid var(--hf-border-subtle)" }}>{emp.employmentType}</td>
+                    <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "var(--hf-text)", borderBottom: "1px solid var(--hf-border-subtle)" }}>{fmtR(emp.grossSalary)}</td>
+                    <td style={{ padding: "12px 16px", borderBottom: "1px solid var(--hf-border-subtle)" }}>
                       <span style={{ background: cfg.bg, color: cfg.color, padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{cfg.label}</span>
                     </td>
-                    <td style={{ padding: "12px 16px", borderBottom: "1px solid #F1F5F9" }}>
+                    <td style={{ padding: "12px 16px", borderBottom: "1px solid var(--hf-border-subtle)" }}>
                       <div style={{ display: "flex", gap: 5 }}>
-                        <button onClick={e => { e.stopPropagation(); openEdit(emp) }} style={{ background: "#EFF6FF", border: "none", borderRadius: 6, padding: "5px 7px", cursor: "pointer", color: "#1D4ED8" }}><Edit2 size={12} /></button>
-                        {emp.status === "ACTIVE" && <button onClick={e => { e.stopPropagation(); setTerminating(emp); setEndDate(""); setError("") }} style={{ background: "#FEF2F2", border: "none", borderRadius: 6, padding: "5px 7px", cursor: "pointer", color: "#DC2626" }}><UserX size={12} /></button>}
+                        <button onClick={e => { e.stopPropagation(); openEdit(emp) }} style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "5px 7px", cursor: "pointer", color: "var(--hf-info-text)" }}><Edit2 size={12} /></button>
+                        {emp.status === "ACTIVE" && <button onClick={e => { e.stopPropagation(); setTerminating(emp); setEndDate(""); setError("") }} style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "5px 7px", cursor: "pointer", color: "var(--hf-danger-text)" }}><UserX size={12} /></button>}
                       </div>
                     </td>
                   </tr>
@@ -390,18 +390,18 @@ export default function EmployeesTab() {
       {/* Detail modal */}
       {selected && !editing && !terminating && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 560, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 560, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#1B3A6B", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>{selected.firstName[0]}{selected.lastName[0]}</span>
+                <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--hf-primary)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontSize: 20, fontWeight: 700, color: "var(--hf-text-on-solid)" }}>{selected.firstName[0]}{selected.lastName[0]}</span>
                 </div>
                 <div>
-                  <h3 style={{ margin: "0 0 3px", fontSize: 18, fontWeight: 700, color: "#0F172A" }}>{selected.fullName}</h3>
-                  <div style={{ fontSize: 12, color: "#64748B" }}>{selected.employeeNumber} · {selected.jobTitle || "No title"} · {selected.department || ""}</div>
+                  <h3 style={{ margin: "0 0 3px", fontSize: 18, fontWeight: 700, color: "var(--hf-text)" }}>{selected.fullName}</h3>
+                  <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{selected.employeeNumber} · {selected.jobTitle || "No title"} · {selected.department || ""}</div>
                 </div>
               </div>
-              <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+              <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
               {[
@@ -418,21 +418,21 @@ export default function EmployeesTab() {
                 { l: "Pension",         v: fmtR(selected.pensionContribution) },
                 { l: "Emergency",       v: selected.emergencyContactName ? `${selected.emergencyContactName} · ${selected.emergencyContactPhone}` : "—" },
               ].map(item => (
-                <div key={item.l} style={{ padding: "9px 12px", background: "#F8FAFC", borderRadius: 7 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 2 }}>{item.l}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{item.v}</div>
+                <div key={item.l} style={{ padding: "9px 12px", background: "var(--hf-surface-muted)", borderRadius: 7 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 2 }}>{item.l}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{item.v}</div>
                 </div>
               ))}
             </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button onClick={() => openEdit(selected)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}><Edit2 size={13} /> Edit</button>
+              <button onClick={() => openEdit(selected)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1px solid var(--hf-info-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}><Edit2 size={13} /> Edit</button>
               {selected.status === "ACTIVE" && (
                 <button onClick={() => { setTerminating(selected); setEndDate(""); setError(""); setSelected(null) }}
-                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                   <AlertTriangle size={13} /> Terminate
                 </button>
               )}
-              <button onClick={() => setSelected(null)} style={{ padding: "8px 16px", border: "1px solid #E2E8F0", borderRadius: 8, background: "#fff", fontSize: 13, cursor: "pointer", color: "#374151" }}>Close</button>
+              <button onClick={() => setSelected(null)} style={{ padding: "8px 16px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Close</button>
             </div>
           </div>
         </div>
@@ -461,12 +461,12 @@ export default function EmployeesTab() {
       {/* Terminate modal */}
       {terminating && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1001, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-              <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#FEF2F2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><UserX size={20} color="#DC2626" /></div>
-              <div><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>Terminate Employee</h3><div style={{ fontSize: 13, color: "#64748B" }}>{terminating.fullName} · {terminating.employeeNumber}</div></div>
+              <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--hf-danger-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><UserX size={20} color="#DC2626" /></div>
+              <div><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Terminate Employee</h3><div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>{terminating.fullName} · {terminating.employeeNumber}</div></div>
             </div>
-            <div style={{ marginBottom: 16, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#B91C1C" }}>
+            <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text-strong)" }}>
               This sets the employee to Terminated. Leave balances are preserved for final pay calculation.
             </div>
             <div style={{ marginBottom: 14 }}>
@@ -475,9 +475,9 @@ export default function EmployeesTab() {
             </div>
             {error && <ErrBanner msg={error} />}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button onClick={() => { setTerminating(null); setError("") }} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
+              <button onClick={() => { setTerminating(null); setError("") }} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button onClick={() => terminateEmployee.mutate({ id: terminating.id, date: endDate })} disabled={!endDate || terminateEmployee.isPending}
-                style={{ padding: "9px 22px", background: !endDate ? "#94A3B8" : "#DC2626", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: !endDate ? "var(--hf-text-faint)" : "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {terminateEmployee.isPending ? "Processing..." : "Terminate"}
               </button>
             </div>
@@ -491,21 +491,21 @@ export default function EmployeesTab() {
 function Overlay({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 680, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 680, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>
     </div>
   )
 }
 function MHead({ title, onClose }: { title: string; onClose: () => void }) {
-  return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button></div>
+  return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button></div>
 }
 function MFoot({ onCancel, onSubmit, loading, label }: { onCancel: () => void; onSubmit: () => void; loading: boolean; label: string }) {
-  return <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24 }}><button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button><button onClick={onSubmit} disabled={loading} style={{ padding: "9px 22px", background: loading ? "#94A3B8" : "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{loading ? "Saving..." : label}</button></div>
+  return <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24 }}><button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button><button onClick={onSubmit} disabled={loading} style={{ padding: "9px 22px", background: loading ? "var(--hf-text-faint)" : "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{loading ? "Saving..." : label}</button></div>
 }
 function Sect({ title, children }: { title: string; children: React.ReactNode }) {
-  return <div><div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.07em", textTransform: "uppercase" as const, marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #F1F5F9" }}>{title}</div>{children}</div>
+  return <div><div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", letterSpacing: "0.07em", textTransform: "uppercase" as const, marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid var(--hf-border-subtle)" }}>{title}</div>{children}</div>
 }
 function ErrBanner({ msg }: { msg: string }) {
-  return <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{msg}</div>
+  return <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{msg}</div>
 }
 const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
 const inp  = (k: string): React.CSSProperties => ({ width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, outline: "none", background: "#fff" })

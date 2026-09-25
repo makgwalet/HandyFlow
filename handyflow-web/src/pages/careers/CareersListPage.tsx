@@ -88,7 +88,7 @@ export function CareersListPage() {
             style={{
               width: '100%', boxSizing: 'border-box', padding: '12px 16px', fontSize: 15,
               border: `1px solid ${line}`, borderRadius: 10, marginBottom: 28,
-              background: '#fff', color: ink, fontFamily: 'inherit',
+              background: 'var(--hf-surface)', color: ink, fontFamily: 'inherit',
             }}
           />
         )}
@@ -115,7 +115,7 @@ export function CareersListPage() {
             <Link key={job.id} to={`/careers/${tenantSlug}/${job.slug}`}
               style={{ textDecoration: 'none', color: 'inherit' }}>
               <div style={{
-                background: '#fff', border: `1px solid ${line}`, borderRadius: 12,
+                background: 'var(--hf-surface)', border: `1px solid ${line}`, borderRadius: 12,
                 padding: '22px 24px', display: 'flex', justifyContent: 'space-between',
                 alignItems: 'center', gap: 16, transition: 'border-color 0.15s',
               }}>

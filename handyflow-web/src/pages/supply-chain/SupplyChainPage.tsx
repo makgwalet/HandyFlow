@@ -26,21 +26,21 @@ export function SupplyChainPage() {
       {/* Page header */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: "#FEF3C7",
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--hf-warning-soft-strong)",
             display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Truck size={18} color={ACCENT} />
           </div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#0F172A", margin: 0 }}>Supply Chain</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Supply Chain</h1>
         </div>
-        <p style={{ fontSize: 13, color: "#94A3B8", margin: 0, paddingLeft: 46 }}>
+        <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0, paddingLeft: 46 }}>
           Suppliers · Purchase orders · Inventory · Supplier invoices
         </p>
       </div>
 
       {/* Card */}
-      <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 14, padding: 24 }}>
+      <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: 24 }}>
         {/* Tab bar */}
-        <div style={{ display: "flex", gap: 2, borderBottom: "1px solid #E2E8F0", marginBottom: 28, overflowX: "auto" }}>
+        <div style={{ display: "flex", gap: 2, borderBottom: "1px solid var(--hf-border)", marginBottom: 28, overflowX: "auto" }}>
           {TABS.map(t => {
             const active = tab === t.id
             return (
@@ -48,7 +48,7 @@ export function SupplyChainPage() {
                 style={{ display: "flex", alignItems: "center", gap: 6,
                   padding: "10px 16px", background: "none", border: "none", whiteSpace: "nowrap",
                   borderBottom: active ? `2px solid ${ACCENT}` : "2px solid transparent",
-                  color: active ? ACCENT : "#64748B", fontWeight: active ? 600 : 400,
+                  color: active ? ACCENT : "var(--hf-text-muted)", fontWeight: active ? 600 : 400,
                   fontSize: 13, cursor: "pointer", marginBottom: -1 }}>
                 <t.icon size={14} />{t.label}
               </button>

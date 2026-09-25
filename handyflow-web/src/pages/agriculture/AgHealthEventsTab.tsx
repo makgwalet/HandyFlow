@@ -68,12 +68,12 @@ export default function AgHealthEventsTab({ targetType, targetId }: { targetType
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <p style={{ fontSize: 12.5, color: "#64748B", margin: 0 }}>Vaccinations, treatments, illness/injury and deworming — one history, one due-date sweep.</p>
+        <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: 0 }}>Vaccinations, treatments, illness/injury and deworming — one history, one due-date sweep.</p>
         {!showCreate && <button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={13} style={{ marginRight: 4, verticalAlign: -2 }} />Record event</button>}
       </div>
 
       {showCreate && (
-        <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: 14, marginBottom: 14 }}>
+        <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: 14, marginBottom: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 2fr", gap: 8, marginBottom: 8 }}>
             <div><label style={lbl}>Type</label><select value={eventType} onChange={e => setEventType(e.target.value)} style={inp}>{EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
             <div><label style={lbl}>Date</label><input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} style={inp} /></div>
@@ -97,16 +97,16 @@ export default function AgHealthEventsTab({ targetType, targetId }: { targetType
         </div>
       )}
 
-      {isLoading ? <p style={{ color: "#94A3B8", fontSize: 12.5 }}>Loading…</p> :
-        events.length === 0 ? <p style={{ color: "#94A3B8", fontSize: 12.5 }}>No health events recorded yet.</p> : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden" }}>
+      {isLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 12.5 }}>Loading…</p> :
+        events.length === 0 ? <p style={{ color: "var(--hf-text-faint)", fontSize: 12.5 }}>No health events recorded yet.</p> : (
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden" }}>
           {events.map((e, i) => (
-            <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9" }}>
+            <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <HeartPulse size={13} color={AG_ACCENT} />
                 <div>
-                  <p style={{ fontSize: 12.5, color: "#0F172A", fontWeight: 600, margin: 0 }}>{e.eventType} — {e.description}</p>
-                  <p style={{ fontSize: 11, color: "#94A3B8", margin: 0 }}>
+                  <p style={{ fontSize: 12.5, color: "var(--hf-text)", fontWeight: 600, margin: 0 }}>{e.eventType} — {e.description}</p>
+                  <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>
                     {e.eventDate}{e.veterinarian ? ` · ${e.veterinarian}` : ""}{e.cost != null ? ` · ${fmtMoney(e.cost)}` : ""}{e.nextDueDate ? ` · Next due ${e.nextDueDate}` : ""}
                   </p>
                 </div>
@@ -128,8 +128,8 @@ export default function AgHealthEventsTab({ targetType, targetId }: { targetType
   )
 }
 
-const lbl: React.CSSProperties = { fontSize: 10.5, fontWeight: 600, color: "#374151", marginBottom: 3, display: "block" }
-const inp: React.CSSProperties = { width: "100%", padding: "7px 9px", border: "1px solid #E2E8F0", borderRadius: 6, fontSize: 12, boxSizing: "border-box" }
-const btnPrimary: React.CSSProperties = { display: "inline-flex", alignItems: "center", padding: "7px 12px", borderRadius: 7, border: "none", background: AG_ACCENT, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }
-const btnGhost: React.CSSProperties = { padding: "7px 12px", borderRadius: 7, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 12, fontWeight: 600, cursor: "pointer" }
-const iconBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", cursor: "pointer" }
+const lbl: React.CSSProperties = { fontSize: 10.5, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 3, display: "block" }
+const inp: React.CSSProperties = { width: "100%", padding: "7px 9px", border: "1px solid var(--hf-border)", borderRadius: 6, fontSize: 12, boxSizing: "border-box" }
+const btnPrimary: React.CSSProperties = { display: "inline-flex", alignItems: "center", padding: "7px 12px", borderRadius: 7, border: "none", background: AG_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 12, fontWeight: 700, cursor: "pointer" }
+const btnGhost: React.CSSProperties = { padding: "7px 12px", borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }
+const iconBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: 6, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", cursor: "pointer" }

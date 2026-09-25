@@ -55,21 +55,21 @@ interface Summary {
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const STAGE: Record<string, { color: string; bg: string; border: string; dot: string; label: string }> = {
-  APPLIED:    { color: '#64748B', bg: '#F8FAFC', border: '#E2E8F0', dot: '#CBD5E1', label: 'Applied'    },
-  SCREENING:  { color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', dot: '#F59E0B', label: 'Screening'  },
-  INTERVIEW:  { color: '#1D4ED8', bg: '#EFF6FF', border: '#BFDBFE', dot: '#60A5FA', label: 'Interview'  },
-  ASSESSMENT: { color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', dot: '#A78BFA', label: 'Assessment' },
-  OFFER:      { color: '#0D9488', bg: '#F0FDF9', border: '#99F6E4', dot: '#2DD4BF', label: 'Offer'      },
-  HIRED:      { color: '#166534', bg: '#DCFCE7', border: '#86EFAC', dot: '#22C55E', label: 'Hired'      },
-  REJECTED:   { color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', dot: '#EF4444', label: 'Rejected'   },
-  WITHDRAWN:  { color: '#94A3B8', bg: '#F8FAFC', border: '#E2E8F0', dot: '#CBD5E1', label: 'Withdrawn'  },
+  APPLIED:    { color: 'var(--hf-text-muted)', bg: 'var(--hf-surface-muted)', border: 'var(--hf-border)', dot: '#CBD5E1', label: 'Applied'    },
+  SCREENING:  { color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)', border: 'var(--hf-warning-border)', dot: 'var(--hf-warning)', label: 'Screening'  },
+  INTERVIEW:  { color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)', border: 'var(--hf-info-border)', dot: '#60A5FA', label: 'Interview'  },
+  ASSESSMENT: { color: 'var(--hf-violet-text)', bg: 'var(--hf-violet-soft)', border: 'var(--hf-violet-border)', dot: '#A78BFA', label: 'Assessment' },
+  OFFER:      { color: 'var(--hf-accent-text)', bg: 'var(--hf-accent-soft)', border: 'var(--hf-accent-border)', dot: '#2DD4BF', label: 'Offer'      },
+  HIRED:      { color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)', border: 'var(--hf-success-border)', dot: 'var(--hf-success)', label: 'Hired'      },
+  REJECTED:   { color: 'var(--hf-danger-text)', bg: 'var(--hf-danger-soft)', border: 'var(--hf-danger-border)', dot: 'var(--hf-danger)', label: 'Rejected'   },
+  WITHDRAWN:  { color: 'var(--hf-text-faint)', bg: 'var(--hf-surface-muted)', border: 'var(--hf-border)', dot: '#CBD5E1', label: 'Withdrawn'  },
 }
 const JOB_STATUS: Record<string, { color: string; bg: string; border: string; label: string }> = {
-  DRAFT:  { color: '#64748B', bg: '#F8FAFC', border: '#E2E8F0', label: 'Draft'  },
-  OPEN:   { color: '#166534', bg: '#DCFCE7', border: '#86EFAC', label: 'Open'   },
-  PAUSED: { color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', label: 'Paused' },
-  CLOSED: { color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', label: 'Closed' },
-  FILLED: { color: '#0D9488', bg: '#F0FDF9', border: '#99F6E4', label: 'Filled' },
+  DRAFT:  { color: 'var(--hf-text-muted)', bg: 'var(--hf-surface-muted)', border: 'var(--hf-border)', label: 'Draft'  },
+  OPEN:   { color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)', border: 'var(--hf-success-border)', label: 'Open'   },
+  PAUSED: { color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)', border: 'var(--hf-warning-border)', label: 'Paused' },
+  CLOSED: { color: 'var(--hf-danger-text)', bg: 'var(--hf-danger-soft)', border: 'var(--hf-danger-border)', label: 'Closed' },
+  FILLED: { color: 'var(--hf-accent-text)', bg: 'var(--hf-accent-soft)', border: 'var(--hf-accent-border)', label: 'Filled' },
 }
 const INTERVIEW_TYPE_ICON: Record<string, any> = {
   PHONE: Phone, VIDEO: Video, IN_PERSON: Users, TECHNICAL: Monitor, PANEL: Mic,
@@ -77,10 +77,10 @@ const INTERVIEW_TYPE_ICON: Record<string, any> = {
 const PIPELINE_STAGES = ['APPLIED','SCREENING','INTERVIEW','ASSESSMENT','OFFER','HIRED']
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-const inp: React.CSSProperties = { width: '100%', padding: '9px 12px', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' as const, background: '#fff', outline: 'none' }
-const lbl: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }
-const btnP: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, background: '#1B3A6B', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }
-const btnS: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', border: '1.5px solid #E2E8F0', borderRadius: 8, background: '#fff', fontSize: 13, cursor: 'pointer', color: '#374151', fontWeight: 500 }
+const inp: React.CSSProperties = { width: '100%', padding: '9px 12px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' as const, background: 'var(--hf-surface)', outline: 'none' }
+const lbl: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }
+const btnP: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }
+const btnS: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', border: '1.5px solid var(--hf-border)', borderRadius: 8, background: 'var(--hf-surface)', fontSize: 13, cursor: 'pointer', color: 'var(--hf-text-secondary)', fontWeight: 500 }
 
 const fmtDate = (d: any) => d ? new Date(d + (String(d).includes('T') ? '' : 'T00:00:00')).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 const fmtDT   = (d: any) => d ? new Date(d).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'
@@ -95,7 +95,7 @@ function StarRating({ value, onChange }: { value: number | null; onChange: (n: n
       {[1,2,3,4,5].map(i => (
         <button key={i} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(0)}
           onClick={() => onChange(i)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: i <= (hover || value || 0) ? '#F59E0B' : '#E2E8F0', padding: '0 1px', lineHeight: 1 }}>
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: i <= (hover || value || 0) ? 'var(--hf-warning-text)' : 'var(--hf-text-disabled)', padding: '0 1px', lineHeight: 1 }}>
           ★
         </button>
       ))}
@@ -107,21 +107,21 @@ function StarRating({ value, onChange }: { value: number | null; onChange: (n: n
 function ConfirmModal({ title, message, danger = false, confirmLabel, loading, onConfirm, onCancel, children }: any) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, backdropFilter: 'blur(2px)' }}>
-      <div style={{ background: '#fff', borderRadius: 14, padding: 28, width: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 14, padding: 28, width: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
         <div style={{ display: 'flex', gap: 14, marginBottom: 20 }}>
-          <div style={{ width: 40, height: 40, borderRadius: '50%', background: danger ? '#FEF2F2' : '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ width: 40, height: 40, borderRadius: '50%', background: danger ? 'var(--hf-danger-soft)' : 'var(--hf-success-soft-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             {danger ? <AlertTriangle size={18} color="#DC2626" /> : <CheckCircle size={18} color="#166534" />}
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>{title}</div>
-            <div style={{ fontSize: 13, color: '#64748B', lineHeight: 1.6 }}>{message}</div>
+            <div style={{ fontSize: 13, color: 'var(--hf-text-muted)', lineHeight: 1.6 }}>{message}</div>
           </div>
         </div>
         {children}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
           <button onClick={onCancel} style={btnS}>Cancel</button>
           <button onClick={onConfirm} disabled={loading}
-            style={{ ...btnP, background: danger ? '#DC2626' : '#1B3A6B', opacity: loading ? 0.6 : 1 }}>
+            style={{ ...btnP, background: danger ? 'var(--hf-danger)' : 'var(--hf-primary)', opacity: loading ? 0.6 : 1 }}>
             {confirmLabel}
           </button>
         </div>
@@ -161,36 +161,36 @@ function CompareModal({ applicationIds, onClose }: { applicationIds: string[]; o
     }
   }
 
-  const rowStyle = { padding: '10px 16px', borderBottom: '1px solid #F1F5F9', fontSize: 13, verticalAlign: 'top' as const }
-  const labelStyle = { padding: '10px 16px', borderBottom: '1px solid #F1F5F9', fontSize: 11, fontWeight: 700, color: '#64748B', letterSpacing: '0.03em', textTransform: 'uppercase' as const, whiteSpace: 'nowrap' as const, background: '#F8FAFC', width: 140 }
+  const rowStyle = { padding: '10px 16px', borderBottom: '1px solid var(--hf-border-subtle)', fontSize: 13, verticalAlign: 'top' as const }
+  const labelStyle = { padding: '10px 16px', borderBottom: '1px solid var(--hf-border-subtle)', fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', letterSpacing: '0.03em', textTransform: 'uppercase' as const, whiteSpace: 'nowrap' as const, background: 'var(--hf-surface-muted)', width: 140 }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, backdropFilter: 'blur(2px)', padding: 20 }}>
-      <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 980, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' as const, boxShadow: '0 25px 80px rgba(0,0,0,0.3)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid #E2E8F0' }}>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 14, width: '100%', maxWidth: 980, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' as const, boxShadow: '0 25px 80px rgba(0,0,0,0.3)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid var(--hf-border)' }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Compare candidates</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={20} /></button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={20} /></button>
         </div>
 
         <div style={{ overflow: 'auto', flex: 1 }}>
           {loading ? (
-            <div style={{ padding: 40, textAlign: 'center' as const, color: '#94A3B8', fontSize: 13 }}>Loading candidates...</div>
+            <div style={{ padding: 40, textAlign: 'center' as const, color: 'var(--hf-text-faint)', fontSize: 13 }}>Loading candidates...</div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
               <thead>
                 <tr>
-                  <th style={{ ...labelStyle, background: '#fff' }}></th>
+                  <th style={{ ...labelStyle, background: 'var(--hf-surface)' }}></th>
                   {candidates.map(c => {
                     const sc = STAGE[c.stage] ?? STAGE.APPLIED
                     return (
-                      <th key={c.id} style={{ padding: '14px 16px', borderBottom: '1px solid #E2E8F0', textAlign: 'left' as const, minWidth: 200 }}>
+                      <th key={c.id} style={{ padding: '14px 16px', borderBottom: '1px solid var(--hf-border)', textAlign: 'left' as const, minWidth: 200 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                           <div style={{ width: 30, height: 30, borderRadius: '50%', background: sc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             <span style={{ fontSize: 11, fontWeight: 700, color: sc.color }}>{(c.applicantName ?? 'A').charAt(0).toUpperCase()}</span>
                           </div>
-                          <div style={{ fontWeight: 800, fontSize: 14, color: '#0F172A' }}>{c.applicantName}</div>
+                          <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--hf-text)' }}>{c.applicantName}</div>
                         </div>
-                        <div style={{ fontSize: 12, color: '#64748B', fontWeight: 400 }}>{c.jobTitle}</div>
+                        <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', fontWeight: 400 }}>{c.jobTitle}</div>
                       </th>
                     )
                   })}
@@ -213,8 +213,8 @@ function CompareModal({ applicationIds, onClose }: { applicationIds: string[]; o
                 <tr>
                   <td style={labelStyle}>Score</td>
                   {candidates.map(c => (
-                    <td key={c.id} style={{ ...rowStyle, color: '#F59E0B', fontWeight: 700 }}>
-                      {c.score ? '★'.repeat(c.score) + '☆'.repeat(5 - c.score) : <span style={{ color: '#CBD5E1' }}>Not scored</span>}
+                    <td key={c.id} style={{ ...rowStyle, color: 'var(--hf-warning-text)', fontWeight: 700 }}>
+                      {c.score ? '★'.repeat(c.score) + '☆'.repeat(5 - c.score) : <span style={{ color: 'var(--hf-text-disabled)' }}>Not scored</span>}
                     </td>
                   ))}
                 </tr>
@@ -238,14 +238,14 @@ function CompareModal({ applicationIds, onClose }: { applicationIds: string[]; o
                     const failed = interviews.filter(iv => iv.outcome === 'FAILED').length
                     return (
                       <td key={c.id} style={rowStyle}>
-                        {interviews.length === 0 ? <span style={{ color: '#CBD5E1' }}>None yet</span> : (
+                        {interviews.length === 0 ? <span style={{ color: 'var(--hf-text-disabled)' }}>None yet</span> : (
                           <>
                             {interviews.length} total
                             {(passed > 0 || failed > 0) && (
-                              <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
-                                {passed > 0 && <span style={{ color: '#166534' }}>{passed} passed</span>}
+                              <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 2 }}>
+                                {passed > 0 && <span style={{ color: 'var(--hf-success-text-strong)' }}>{passed} passed</span>}
                                 {passed > 0 && failed > 0 && ' · '}
-                                {failed > 0 && <span style={{ color: '#DC2626' }}>{failed} failed</span>}
+                                {failed > 0 && <span style={{ color: 'var(--hf-danger-text)' }}>{failed} failed</span>}
                               </div>
                             )}
                           </>
@@ -257,8 +257,8 @@ function CompareModal({ applicationIds, onClose }: { applicationIds: string[]; o
                 <tr>
                   <td style={labelStyle}>Notes</td>
                   {candidates.map(c => (
-                    <td key={c.id} style={{ ...rowStyle, color: '#374151', maxWidth: 220 }}>
-                      {c.notes || <span style={{ color: '#CBD5E1' }}>—</span>}
+                    <td key={c.id} style={{ ...rowStyle, color: 'var(--hf-text-secondary)', maxWidth: 220 }}>
+                      {c.notes || <span style={{ color: 'var(--hf-text-disabled)' }}>—</span>}
                     </td>
                   ))}
                 </tr>
@@ -268,10 +268,10 @@ function CompareModal({ applicationIds, onClose }: { applicationIds: string[]; o
                     <td key={c.id} style={{ ...rowStyle, borderBottom: 'none' }}>
                       {c.hasCv ? (
                         <button onClick={() => viewCv(c.id)}
-                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: '#F5F3FF', color: '#7C3AED', border: '1px solid #DDD6FE', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: 'var(--hf-violet-soft)', color: 'var(--hf-violet-text)', border: '1px solid var(--hf-violet-border)', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                           <FileText size={11} /> View CV
                         </button>
-                      ) : <span style={{ color: '#CBD5E1' }}>—</span>}
+                      ) : <span style={{ color: 'var(--hf-text-disabled)' }}>—</span>}
                     </td>
                   ))}
                 </tr>
@@ -281,7 +281,7 @@ function CompareModal({ applicationIds, onClose }: { applicationIds: string[]; o
         </div>
 
         {cvError && (
-          <div style={{ margin: '0 24px 16px', padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 12, color: '#DC2626' }}>
+          <div style={{ margin: '0 24px 16px', padding: '10px 14px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 12, color: 'var(--hf-danger-text)' }}>
             {cvError}
           </div>
         )}
@@ -509,32 +509,32 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'stretch', justifyContent: 'flex-end', zIndex: 1000 }}>
-      <div style={{ background: '#fff', width: 600, height: '100%', overflowY: 'auto', boxShadow: '-8px 0 40px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: 'var(--hf-surface)', width: 600, height: '100%', overflowY: 'auto', boxShadow: '-8px 0 40px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column' }}>
 
         {/* Header */}
-        <div style={{ padding: '20px 24px 0', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
+        <div style={{ padding: '20px 24px 0', borderBottom: '1px solid var(--hf-border-subtle)', flexShrink: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0F172A', marginBottom: 5 }}>{app?.applicantName}</h2>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--hf-text)', marginBottom: 5 }}>{app?.applicantName}</h2>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
                   <span style={{ width: 5, height: 5, borderRadius: '50%', background: sc.dot }} />{sc.label}
                 </span>
-                <span style={{ fontSize: 12, color: '#64748B' }}>{app?.jobTitle}</span>
+                <span style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>{app?.jobTitle}</span>
                 {app?.hrEmployeeId && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#DCFCE7', color: '#166534', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
                     <UserCheck size={10} /> Onboarded to HR
                   </span>
                 )}
               </div>
             </div>
-            <button onClick={onClose} style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748B', flexShrink: 0 }}>
+            <button onClick={onClose} style={{ background: 'var(--hf-surface-sunken)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--hf-text-muted)', flexShrink: 0 }}>
               <X size={14} />
             </button>
           </div>
 
           {/* Contact strip */}
-          <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#64748B', marginBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 12, flexWrap: 'wrap' }}>
             {app?.applicantEmail && <span>{app.applicantEmail}</span>}
             {app?.applicantPhone && <span>{app.applicantPhone}</span>}
             <span>Applied {fmtDate(app?.appliedAt)}</span>
@@ -554,45 +554,45 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
             })}
             {!isTerminal && (
               <button onClick={() => setShowReject(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', border: '1px solid var(--hf-danger-border)', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                 <X size={10} /> Reject
               </button>
             )}
             {!isTerminal && (
               <button onClick={() => setShowInterview(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', border: '1px solid var(--hf-info-border)', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                 <Calendar size={10} /> Schedule interview
               </button>
             )}
             {app?.stage === 'HIRED' && !app?.hrEmployeeId && (
               <button onClick={() => setShowConvert(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#DCFCE7', color: '#166534', border: '1px solid #86EFAC', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', border: '1px solid var(--hf-success-border)', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                 <UserPlus size={10} /> Convert to employee
               </button>
             )}
             {app?.hasCv && (
               <button onClick={() => viewCv.mutate()} disabled={viewCv.isPending}
-                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#F5F3FF', color: '#7C3AED', border: '1px solid #DDD6FE', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: 'var(--hf-violet-soft)', color: 'var(--hf-violet-text)', border: '1px solid var(--hf-violet-border)', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                 <FileText size={10} /> {viewCv.isPending ? 'Loading...' : 'View CV'}
               </button>
             )}
             <button onClick={() => downloadScorecard.mutate()} disabled={downloadScorecard.isPending}
-              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#F8FAFC', color: '#334155', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: 'var(--hf-surface-muted)', color: 'var(--hf-text-secondary)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
               <FileText size={10} /> {downloadScorecard.isPending ? 'Preparing...' : 'Scorecard PDF'}
             </button>
             {app?.offeredSalary != null && (
               <>
                 <button onClick={() => downloadOfferLetter.mutate()} disabled={downloadOfferLetter.isPending}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#F8FAFC', color: '#334155', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: 'var(--hf-surface-muted)', color: 'var(--hf-text-secondary)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                   <FileText size={10} /> {downloadOfferLetter.isPending ? 'Preparing...' : 'Offer letter PDF'}
                 </button>
                 {app?.offerLetterSentAt ? (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#DCFCE7', color: '#166534', border: '1px solid #86EFAC', borderRadius: 7, fontSize: 11, fontWeight: 700 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', border: '1px solid var(--hf-success-border)', borderRadius: 7, fontSize: 11, fontWeight: 700 }}>
                     <CheckCircle size={10} /> Sent {fmtDate(app.offerLetterSentAt)}
                   </span>
                 ) : (
                   <button onClick={() => sendOfferLetter.mutate()} disabled={sendOfferLetter.isPending}
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: '#DCFCE7', color: '#166534', border: '1px solid #86EFAC', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', border: '1px solid var(--hf-success-border)', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                     <Calendar size={10} /> {sendOfferLetter.isPending ? 'Sending...' : 'Send offer letter'}
                   </button>
                 )}
@@ -604,7 +604,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
           <div style={{ display: 'flex' }}>
             {(['overview','interviews','history'] as const).map(t => (
               <button key={t} onClick={() => setTab(t)}
-                style={{ padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t ? '#1B3A6B' : '#9CA3AF', borderBottom: `2px solid ${tab === t ? '#1B3A6B' : 'transparent'}`, marginBottom: -1, textTransform: 'capitalize' }}>
+                style={{ padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t ? 'var(--hf-primary-text)' : 'var(--hf-text-faint)', borderBottom: `2px solid ${tab === t ? '#1B3A6B' : 'transparent'}`, marginBottom: -1, textTransform: 'capitalize' }}>
                 {t === 'interviews' ? `Interviews (${app?.interviews?.length ?? 0})` : t === 'history' ? `History (${app?.history?.length ?? 0})` : 'Overview'}
               </button>
             ))}
@@ -613,12 +613,12 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
 
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 28px' }}>
-          {error && <div style={{ marginBottom: 12, padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>{error}</div>}
+          {error && <div style={{ marginBottom: 12, padding: '10px 14px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>}
 
           {tab === 'overview' && (
             <div>
               {/* Score */}
-              <div style={{ marginBottom: 18, padding: '14px 16px', background: '#F8FAFC', borderRadius: 10, border: '1px solid #E2E8F0' }}>
+              <div style={{ marginBottom: 18, padding: '14px 16px', background: 'var(--hf-surface-muted)', borderRadius: 10, border: '1px solid var(--hf-border)' }}>
                 <label style={{ ...lbl, marginBottom: 10 }}>Candidate rating</label>
                 <StarRating value={scoreVal} onChange={v => setScoreVal(v)} />
                 {scoreVal && (
@@ -644,39 +644,39 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                 ['Stage changed', fmtDT(app?.stageChangedAt)],
                 ['Hired',     app?.hiredAt ? fmtDT(app.hiredAt) : '—'],
               ].map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #F1F5F9', fontSize: 13 }}>
-                  <span style={{ color: '#94A3B8', fontWeight: 600 }}>{k}</span>
-                  <span style={{ color: '#374151', fontWeight: 500 }}>{v as string}</span>
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--hf-border-subtle)', fontSize: 13 }}>
+                  <span style={{ color: 'var(--hf-text-faint)', fontWeight: 600 }}>{k}</span>
+                  <span style={{ color: 'var(--hf-text-secondary)', fontWeight: 500 }}>{v as string}</span>
                 </div>
               ))}
 
               {app?.rejectionReason && (
-                <div style={{ marginTop: 14, padding: '12px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 9 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#DC2626', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Rejection reason</div>
-                  <div style={{ fontSize: 13, color: '#374151' }}>{app.rejectionReason}</div>
+                <div style={{ marginTop: 14, padding: '12px 14px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 9 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--hf-danger-text)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Rejection reason</div>
+                  <div style={{ fontSize: 13, color: 'var(--hf-text-secondary)' }}>{app.rejectionReason}</div>
                 </div>
               )}
 
               {/* Referral */}
-              <div style={{ marginTop: 14, padding: '12px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 9 }}>
+              <div style={{ marginTop: 14, padding: '12px 14px', background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 9 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Referral</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--hf-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Referral</div>
                     {app?.referredByUserId ? (
                       <>
-                        <div style={{ fontSize: 13, color: '#0F172A', fontWeight: 600 }}>{app.referredByUserName}</div>
+                        <div style={{ fontSize: 13, color: 'var(--hf-text)', fontWeight: 600 }}>{app.referredByUserName}</div>
                         {app.referrerName && app.referrerName !== app.referredByUserName && (
-                          <div style={{ fontSize: 11, color: '#94A3B8' }}>Candidate said: {app.referrerName}</div>
+                          <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>Candidate said: {app.referrerName}</div>
                         )}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                           {app.referralBonusAmount != null && (
-                            <span style={{ fontSize: 12, color: '#374151', fontWeight: 600 }}>R {Number(app.referralBonusAmount).toLocaleString()}</span>
+                            <span style={{ fontSize: 12, color: 'var(--hf-text-secondary)', fontWeight: 600 }}>R {Number(app.referralBonusAmount).toLocaleString()}</span>
                           )}
                           {app.referralBonusStatus && app.referralBonusStatus !== 'NOT_SET' && (
                             <span style={{
                               fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
-                              background: app.referralBonusStatus === 'PAID' ? '#DCFCE7' : app.referralBonusStatus === 'APPROVED' ? '#EFF6FF' : '#FEF3C7',
-                              color: app.referralBonusStatus === 'PAID' ? '#166534' : app.referralBonusStatus === 'APPROVED' ? '#1D4ED8' : '#92400E',
+                              background: app.referralBonusStatus === 'PAID' ? 'var(--hf-success-soft-strong)' : app.referralBonusStatus === 'APPROVED' ? 'var(--hf-info-soft)' : 'var(--hf-warning-soft-strong)',
+                              color: app.referralBonusStatus === 'PAID' ? 'var(--hf-success-text-strong)' : app.referralBonusStatus === 'APPROVED' ? 'var(--hf-info-text)' : 'var(--hf-warning-text-deep)',
                             }}>
                               {app.referralBonusStatus}{app.referralBonusStatus === 'PAID' && app.referralBonusPaidAt ? ` · ${fmtDate(app.referralBonusPaidAt)}` : ''}
                             </span>
@@ -684,9 +684,9 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                         </div>
                       </>
                     ) : app?.referrerName ? (
-                      <div style={{ fontSize: 13, color: '#0F172A' }}>Candidate said: <strong>{app.referrerName}</strong> <span style={{ color: '#94A3B8', fontWeight: 400 }}>(unverified)</span></div>
+                      <div style={{ fontSize: 13, color: 'var(--hf-text)' }}>Candidate said: <strong>{app.referrerName}</strong> <span style={{ color: 'var(--hf-text-faint)', fontWeight: 400 }}>(unverified)</span></div>
                     ) : (
-                      <div style={{ fontSize: 12, color: '#94A3B8' }}>No referral on this application</div>
+                      <div style={{ fontSize: 12, color: 'var(--hf-text-faint)' }}>No referral on this application</div>
                     )}
                   </div>
                   <button onClick={() => {
@@ -694,7 +694,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                     setRefBonusAmount(app?.referralBonusAmount != null ? String(app.referralBonusAmount) : '')
                     setRefBonusStatus(app?.referralBonusStatus ?? '')
                     setShowReferral(true)
-                  }} style={{ background: 'none', border: '1px solid #E2E8F0', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, color: '#374151', cursor: 'pointer', whiteSpace: 'nowrap' as const }}>
+                  }} style={{ background: 'none', border: '1px solid var(--hf-border)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' as const }}>
                     {app?.referredByUserId ? 'Edit' : 'Link referral'}
                   </button>
                 </div>
@@ -708,30 +708,30 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                 <Calendar size={13} /> Schedule interview
               </button>
               {(app?.interviews ?? []).length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#94A3B8', border: '1.5px dashed #E2E8F0', borderRadius: 12 }}>
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--hf-text-faint)', border: '1.5px dashed var(--hf-border)', borderRadius: 12 }}>
                   <Calendar size={28} style={{ marginBottom: 10, opacity: 0.4 }} />
-                  <div style={{ fontWeight: 600, color: '#475569' }}>No interviews scheduled</div>
+                  <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No interviews scheduled</div>
                 </div>
               ) : (app?.interviews ?? []).map((iv: Interview) => {
                 const Icon = INTERVIEW_TYPE_ICON[iv.interviewType] ?? Video
                 const outcomeColor = iv.outcome === 'PASSED' ? '#166534' : iv.outcome === 'FAILED' ? '#DC2626' : '#D97706'
                 return (
-                  <div key={iv.id} style={{ border: '1px solid #E2E8F0', borderRadius: 10, padding: '14px 16px', marginBottom: 10 }}>
+                  <div key={iv.id} style={{ border: '1px solid var(--hf-border)', borderRadius: 10, padding: '14px 16px', marginBottom: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 30, height: 30, borderRadius: 7, background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: 30, height: 30, borderRadius: 7, background: 'var(--hf-info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <Icon size={14} color="#1D4ED8" />
                         </div>
                         <div>
-                          <div style={{ fontWeight: 700, fontSize: 13, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)', display: 'flex', alignItems: 'center', gap: 6 }}>
                             {iv.interviewType.replace('_',' ')}
                             {iv.roundName && (
-                              <span style={{ fontSize: 10, fontWeight: 700, color: '#7C3AED', background: '#F5F3FF', padding: '2px 7px', borderRadius: 10 }}>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--hf-violet-text)', background: 'var(--hf-violet-soft)', padding: '2px 7px', borderRadius: 10 }}>
                                 {iv.roundSequence != null ? `${iv.roundSequence}. ` : ''}{iv.roundName}
                               </span>
                             )}
                           </div>
-                          <div style={{ fontSize: 11, color: '#94A3B8' }}>
+                          <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>
                             {iv.scheduledAt ? fmtDT(iv.scheduledAt) : 'Not scheduled'}
                             {iv.interviewerName && ` · ${iv.interviewerName}`}
                             {iv.panelists && iv.panelists.length > 0 &&
@@ -743,16 +743,16 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                         <span style={{ fontSize: 11, fontWeight: 700, color: outcomeColor }}>{iv.outcome}</span>
                       )}
                     </div>
-                    {iv.score && <div style={{ fontSize: 13, color: '#F59E0B' }}>{'★'.repeat(iv.score)}{'☆'.repeat(5 - iv.score)}</div>}
+                    {iv.score && <div style={{ fontSize: 13, color: 'var(--hf-warning-text)' }}>{'★'.repeat(iv.score)}{'☆'.repeat(5 - iv.score)}</div>}
                     {iv.location && (
-                      <div style={{ fontSize: 12, color: '#1D4ED8', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <div style={{ fontSize: 12, color: 'var(--hf-info-text)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
                         <MapPin size={11} />
                         {iv.location.startsWith('http') ? (
-                          <a href={iv.location} target="_blank" rel="noreferrer" style={{ color: '#1D4ED8' }}>{iv.location}</a>
+                          <a href={iv.location} target="_blank" rel="noreferrer" style={{ color: 'var(--hf-info-text)' }}>{iv.location}</a>
                         ) : iv.location}
                       </div>
                     )}
-                    {iv.notes && <div style={{ fontSize: 12, color: '#64748B', marginTop: 6 }}>{iv.notes}</div>}
+                    {iv.notes && <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 6 }}>{iv.notes}</div>}
                   </div>
                 )
               })}
@@ -762,24 +762,24 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
           {tab === 'history' && (
             <div>
               {(app?.history ?? []).length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#94A3B8' }}>No stage history</div>
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--hf-text-faint)' }}>No stage history</div>
               ) : (app?.history ?? []).map((h: StageHistory, i: number) => {
                 const toStage = STAGE[h.toStage] ?? STAGE.APPLIED
                 return (
                   <div key={i} style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                       <div style={{ width: 10, height: 10, borderRadius: '50%', background: toStage.dot, marginTop: 4, flexShrink: 0 }} />
-                      {i < (app?.history?.length ?? 0) - 1 && <div style={{ width: 1, flex: 1, background: '#E2E8F0', marginTop: 4 }} />}
+                      {i < (app?.history?.length ?? 0) - 1 && <div style={{ width: 1, flex: 1, background: 'var(--hf-surface-strong)', marginTop: 4 }} />}
                     </div>
                     <div style={{ flex: 1, paddingBottom: 12 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                        <span style={{ fontWeight: 700, fontSize: 13, color: '#0F172A' }}>
+                        <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)' }}>
                           {h.fromStage ? `${STAGE[h.fromStage]?.label ?? h.fromStage} → ` : ''}{toStage.label}
                         </span>
-                        <span style={{ fontSize: 11, color: '#94A3B8' }}>{fmtDT(h.createdAt)}</span>
+                        <span style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{fmtDT(h.createdAt)}</span>
                       </div>
-                      {h.changedByName && <div style={{ fontSize: 12, color: '#64748B' }}>by {h.changedByName}</div>}
-                      {h.notes && <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 3 }}>{h.notes}</div>}
+                      {h.changedByName && <div style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>by {h.changedByName}</div>}
+                      {h.notes && <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', marginTop: 3 }}>{h.notes}</div>}
                     </div>
                   </div>
                 )
@@ -792,15 +792,15 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
       {/* Move Stage Modal */}
       {showMoveModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, backdropFilter: 'blur(2px)' }}>
-          <div style={{ background: '#fff', borderRadius: 14, padding: 28, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
+          <div style={{ background: 'var(--hf-surface)', borderRadius: 14, padding: 28, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Move to {STAGE[targetStage]?.label}</h3>
-              <button onClick={() => setShowMoveModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={18} /></button>
+              <button onClick={() => setShowMoveModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={18} /></button>
             </div>
             <div>
               {targetStage === 'OFFER' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14, padding: 12, background: '#F8FAFC', borderRadius: 8, border: '1px solid #E2E8F0' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#166534', textTransform: 'uppercase' as const }}>Offer terms</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14, padding: 12, background: 'var(--hf-surface-muted)', borderRadius: 8, border: '1px solid var(--hf-border)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-success-text-strong)', textTransform: 'uppercase' as const }}>Offer terms</div>
                   <div>
                     <label style={lbl}>Gross salary (monthly) *</label>
                     <input type="number" min="0" step="0.01" value={offerSalary} onChange={e => setOfferSalary(e.target.value)}
@@ -808,7 +808,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                   </div>
                   <div>
                     <label style={lbl}>Pay frequency</label>
-                    <select value={offerFrequency} onChange={e => setOfferFrequency(e.target.value)} style={{ ...inp, background: '#fff' }}>
+                    <select value={offerFrequency} onChange={e => setOfferFrequency(e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
                       {['MONTHLY', 'WEEKLY', 'BIWEEKLY', 'ANNUALLY'].map(f => <option key={f} value={f}>{f}</option>)}
                     </select>
                   </div>
@@ -821,7 +821,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                     <textarea value={offerBenefits} onChange={e => setOfferBenefits(e.target.value)} rows={2}
                       placeholder="Medical aid, 13th cheque, etc." style={{ ...inp, resize: 'none' as const, fontFamily: 'inherit' }} />
                   </div>
-                  <div style={{ fontSize: 11, color: '#94A3B8' }}>
+                  <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>
                     These terms are required before an offer letter can be generated or sent.
                   </div>
                 </div>
@@ -831,7 +831,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                 placeholder="Add context about this stage move..."
                 style={{ ...inp, resize: 'none' as const, fontFamily: 'inherit', marginBottom: 12 }} />
               {targetStage === 'HIRED' && (
-                <div style={{ padding: '10px 12px', background: '#DCFCE7', border: '1px solid #86EFAC', borderRadius: 8, fontSize: 12, color: '#166534', marginBottom: 12 }}>
+                <div style={{ padding: '10px 12px', background: 'var(--hf-success-soft-strong)', border: '1px solid var(--hf-success-border)', borderRadius: 8, fontSize: 12, color: 'var(--hf-success-text-strong)', marginBottom: 12 }}>
                   Once marked Hired, you can convert this applicant to an HR employee record.
                 </div>
               )}
@@ -839,7 +839,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button onClick={() => setShowMoveModal(false)} style={btnS}>Cancel</button>
               <button onClick={() => moveStage.mutate({ stage: targetStage, notes: stageNotes })} disabled={moveStage.isPending}
-                style={{ ...btnP, background: STAGE[targetStage]?.color ?? '#1B3A6B' }}>
+                style={{ ...btnP, background: STAGE[targetStage]?.color ?? 'var(--hf-primary)' }}>
                 {moveStage.isPending ? 'Moving...' : `Move to ${STAGE[targetStage]?.label}`}
               </button>
             </div>
@@ -850,14 +850,14 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
       {/* Reject Modal */}
       {showReject && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, backdropFilter: 'blur(2px)' }}>
-          <div style={{ background: '#fff', borderRadius: 14, padding: 28, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
+          <div style={{ background: 'var(--hf-surface)', borderRadius: 14, padding: 28, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
             <div style={{ display: 'flex', gap: 14, marginBottom: 20 }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--hf-danger-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <X size={18} color="#DC2626" />
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Reject candidate</div>
-                <div style={{ fontSize: 13, color: '#64748B' }}>A polite rejection email will be sent to the applicant.</div>
+                <div style={{ fontSize: 13, color: 'var(--hf-text-muted)' }}>A polite rejection email will be sent to the applicant.</div>
               </div>
             </div>
             <div>
@@ -865,12 +865,12 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
               <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} rows={3} autoFocus
                 placeholder="After careful consideration, we have decided to move forward with other candidates whose experience more closely matches the role requirements."
                 style={{ ...inp, resize: 'none' as const, fontFamily: 'inherit' }} />
-              <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 5 }}>This reason will be included in the rejection email.</div>
+              <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 5 }}>This reason will be included in the rejection email.</div>
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
               <button onClick={() => setShowReject(false)} style={btnS}>Cancel</button>
               <button onClick={() => moveStage.mutate({ stage: 'REJECTED', notes: null, reason: rejectReason })} disabled={moveStage.isPending}
-                style={{ ...btnP, background: '#DC2626' }}>
+                style={{ ...btnP, background: 'var(--hf-danger)' }}>
                 {moveStage.isPending ? 'Sending...' : 'Reject and notify'}
               </button>
             </div>
@@ -881,15 +881,15 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
       {/* Schedule Interview Modal */}
       {showInterview && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, backdropFilter: 'blur(2px)' }}>
-          <div style={{ background: '#fff', borderRadius: 14, padding: 28, width: 460, maxHeight: '88vh', overflowY: 'auto' as const, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
+          <div style={{ background: 'var(--hf-surface)', borderRadius: 14, padding: 28, width: 460, maxHeight: '88vh', overflowY: 'auto' as const, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Schedule Interview</h3>
-              <button onClick={() => setShowInterview(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={18} /></button>
+              <button onClick={() => setShowInterview(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={18} /></button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={lbl}>Interview type</label>
-                <select value={ivType} onChange={e => setIvType(e.target.value)} style={{ ...inp, background: '#fff' }}>
+                <select value={ivType} onChange={e => setIvType(e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
                   {['PHONE','VIDEO','IN_PERSON','TECHNICAL','PANEL'].map(t => <option key={t} value={t}>{t.replace('_',' ')}</option>)}
                 </select>
               </div>
@@ -900,7 +900,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
               {(jobRounds ?? []).length > 0 && (
                 <div>
                   <label style={lbl}>Round (optional)</label>
-                  <select value={ivRoundId} onChange={e => setIvRoundId(e.target.value)} style={{ ...inp, background: '#fff' }}>
+                  <select value={ivRoundId} onChange={e => setIvRoundId(e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
                     <option value="">No specific round</option>
                     {jobRounds!.map(r => (
                       <option key={r.id} value={r.id}>{r.sequence}. {r.name}</option>
@@ -913,15 +913,15 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                 <div style={{ display: 'flex', gap: 7, marginBottom: 8 }}>
                   <button type="button" onClick={() => { setIvMode('team'); setIvInterviewer(''); }}
                     style={{ flex: 1, padding: '6px 10px', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                      background: ivMode === 'team' ? '#EFF6FF' : '#F8FAFC',
-                      color: ivMode === 'team' ? '#1D4ED8' : '#64748B',
+                      background: ivMode === 'team' ? 'var(--hf-info-soft)' : 'var(--hf-surface-muted)',
+                      color: ivMode === 'team' ? 'var(--hf-info-text)' : 'var(--hf-text-muted)',
                       border: `1px solid ${ivMode === 'team' ? '#BFDBFE' : '#E2E8F0'}` }}>
                     From team
                   </button>
                   <button type="button" onClick={() => { setIvMode('external'); setIvInterviewerId(''); }}
                     style={{ flex: 1, padding: '6px 10px', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                      background: ivMode === 'external' ? '#EFF6FF' : '#F8FAFC',
-                      color: ivMode === 'external' ? '#1D4ED8' : '#64748B',
+                      background: ivMode === 'external' ? 'var(--hf-info-soft)' : 'var(--hf-surface-muted)',
+                      color: ivMode === 'external' ? 'var(--hf-info-text)' : 'var(--hf-text-muted)',
                       border: `1px solid ${ivMode === 'external' ? '#BFDBFE' : '#E2E8F0'}` }}>
                     External / other
                   </button>
@@ -934,20 +934,20 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                       const u = activeUsers.find(u => u.id === id)
                       setIvInterviewer(u ? `${u.firstName} ${u.lastName}` : '')
                       setIvPanelistIds(prev => prev.filter(pid => pid !== id))
-                    }} style={{ ...inp, background: '#fff' }}>
+                    }} style={{ ...inp, background: 'var(--hf-surface)' }}>
                       <option value="">Select a team member...</option>
                       {activeUsers.map(u => (
                         <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
                       ))}
                     </select>
-                    <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 5 }}>
+                    <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 5 }}>
                       They'll get an email and in-app notification once this is scheduled.
                     </div>
                   </>
                 ) : (
                   <>
                     <input value={ivInterviewer} onChange={e => setIvInterviewer(e.target.value)} placeholder="Thabo Modise" style={inp} />
-                    <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 5 }}>
+                    <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 5 }}>
                       Not a platform user — no notification will be sent, this is just a label.
                     </div>
                   </>
@@ -956,7 +956,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
               {activeUsers.length > 0 && (
                 <div>
                   <label style={lbl}>Additional panelists (optional)</label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6, maxHeight: 120, overflowY: 'auto' as const, border: '1px solid #E2E8F0', borderRadius: 8, padding: 8 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6, maxHeight: 120, overflowY: 'auto' as const, border: '1px solid var(--hf-border)', borderRadius: 8, padding: 8 }}>
                     {activeUsers.filter(u => u.id !== ivInterviewerId).map(u => {
                       const selected = ivPanelistIds.includes(u.id)
                       return (
@@ -964,8 +964,8 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                           onClick={() => setIvPanelistIds(prev => selected ? prev.filter(id => id !== u.id) : [...prev, u.id])}
                           style={{
                             padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                            background: selected ? '#EFF6FF' : '#F8FAFC',
-                            color: selected ? '#1D4ED8' : '#64748B',
+                            background: selected ? 'var(--hf-info-soft)' : 'var(--hf-surface-muted)',
+                            color: selected ? 'var(--hf-info-text)' : 'var(--hf-text-muted)',
                             border: `1px solid ${selected ? '#BFDBFE' : '#E2E8F0'}`,
                           }}>
                           {u.firstName} {u.lastName}
@@ -973,7 +973,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                       )
                     })}
                   </div>
-                  <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 5 }}>
+                  <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 5 }}>
                     Each panelist gets their own email and in-app notification, same as the primary interviewer.
                   </div>
                 </div>
@@ -997,20 +997,20 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
       {/* Link Referral Modal */}
       {showReferral && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, backdropFilter: 'blur(2px)' }}>
-          <div style={{ background: '#fff', borderRadius: 14, padding: 28, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
+          <div style={{ background: 'var(--hf-surface)', borderRadius: 14, padding: 28, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Link referral</h3>
-              <button onClick={() => setShowReferral(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={18} /></button>
+              <button onClick={() => setShowReferral(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={18} /></button>
             </div>
             {app?.referrerName && (
-              <div style={{ fontSize: 12, color: '#64748B', marginBottom: 14, padding: '8px 10px', background: '#F8FAFC', borderRadius: 7 }}>
+              <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 14, padding: '8px 10px', background: 'var(--hf-surface-muted)', borderRadius: 7 }}>
                 Candidate said they were referred by: <strong>{app.referrerName}</strong>
               </div>
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={lbl}>Referred by (team member)</label>
-                <select value={refUserId} onChange={e => setRefUserId(e.target.value)} style={{ ...inp, background: '#fff' }}>
+                <select value={refUserId} onChange={e => setRefUserId(e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
                   <option value="">Not linked</option>
                   {activeUsers.map(u => (
                     <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
@@ -1023,11 +1023,11 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
               </div>
               <div>
                 <label style={lbl}>Bonus status</label>
-                <select value={refBonusStatus} onChange={e => setRefBonusStatus(e.target.value)} style={{ ...inp, background: '#fff' }}>
+                <select value={refBonusStatus} onChange={e => setRefBonusStatus(e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
                   <option value="">Leave unchanged</option>
                   {['NOT_SET', 'PENDING', 'APPROVED', 'PAID'].map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 5 }}>
+                <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 5 }}>
                   Set automatically to PENDING once the candidate is hired, if linked. Approve and mark paid manually.
                 </div>
               </div>
@@ -1056,20 +1056,20 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
               <div style={{ display: 'flex', gap: 7 }}>
                 <button type="button" onClick={() => setCreateHrRecord(true)}
                   style={{ flex: 1, padding: '7px 10px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                    background: createHrRecord ? '#DCFCE7' : '#F8FAFC',
-                    color: createHrRecord ? '#166534' : '#64748B',
+                    background: createHrRecord ? 'var(--hf-success-soft-strong)' : 'var(--hf-surface-muted)',
+                    color: createHrRecord ? 'var(--hf-success-text-strong)' : 'var(--hf-text-muted)',
                     border: `1px solid ${createHrRecord ? '#86EFAC' : '#E2E8F0'}` }}>
                   Internal hire
                 </button>
                 <button type="button" onClick={() => setCreateHrRecord(false)}
                   style={{ flex: 1, padding: '7px 10px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                    background: !createHrRecord ? '#EFF6FF' : '#F8FAFC',
-                    color: !createHrRecord ? '#1D4ED8' : '#64748B',
+                    background: !createHrRecord ? 'var(--hf-info-soft)' : 'var(--hf-surface-muted)',
+                    color: !createHrRecord ? 'var(--hf-info-text)' : 'var(--hf-text-muted)',
                     border: `1px solid ${!createHrRecord ? '#BFDBFE' : '#E2E8F0'}` }}>
                   External placement
                 </button>
               </div>
-              <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 5 }}>
+              <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 5 }}>
                 {createHrRecord
                   ? 'Creates an employee record in HR — this tenant is the employer.'
                   : "Candidate joins a client company, not this tenant — no HR record is created."}
@@ -1086,7 +1086,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
               </div>
             )}
           </div>
-          {error && <div style={{ padding: '8px 12px', background: '#FEF2F2', borderRadius: 8, fontSize: 13, color: '#DC2626', marginBottom: 10 }}>{error}</div>}
+          {error && <div style={{ padding: '8px 12px', background: 'var(--hf-danger-soft)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)', marginBottom: 10 }}>{error}</div>}
         </ConfirmModal>
       )}
     </div>
@@ -1126,21 +1126,21 @@ function InterviewRoundsSection({ jobId }: { jobId: string }) {
   })
 
   return (
-    <div style={{ gridColumn: '1/-1', borderTop: '1px solid #E2E8F0', paddingTop: 16, marginTop: 4 }}>
+    <div style={{ gridColumn: '1/-1', borderTop: '1px solid var(--hf-border)', paddingTop: 16, marginTop: 4 }}>
       <label style={lbl}>Interview process (optional)</label>
-      <p style={{ fontSize: 12, color: '#94A3B8', margin: '0 0 10px' }}>
+      <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: '0 0 10px' }}>
         Define the rounds candidates for this role go through — e.g. Phone Screen, Technical, Final. Shown when scheduling an interview.
       </p>
       {(rounds ?? []).length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 6, marginBottom: 10 }}>
           {rounds!.map(r => (
-            <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 7 }}>
-              <span style={{ fontSize: 13, color: '#0F172A' }}>
+            <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 7 }}>
+              <span style={{ fontSize: 13, color: 'var(--hf-text)' }}>
                 <strong>{r.sequence}.</strong> {r.name}
-                {r.description && <span style={{ color: '#94A3B8', fontWeight: 400 }}> — {r.description}</span>}
+                {r.description && <span style={{ color: 'var(--hf-text-faint)', fontWeight: 400 }}> — {r.description}</span>}
               </span>
               <button onClick={() => deleteRound.mutate(r.id)} disabled={deleteRound.isPending}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}>
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}>
                 <X size={14} />
               </button>
             </div>
@@ -1157,7 +1157,7 @@ function InterviewRoundsSection({ jobId }: { jobId: string }) {
           {addRound.isPending ? 'Adding...' : 'Add round'}
         </button>
       </div>
-      {error && <div style={{ marginTop: 8, fontSize: 12, color: '#DC2626' }}>{error}</div>}
+      {error && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--hf-danger-text)' }}>{error}</div>}
     </div>
   )
 }
@@ -1202,13 +1202,13 @@ function JobModal({ job, onClose, onSaved }: { job?: Job; onClose: () => void; o
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20, backdropFilter: 'blur(2px)' }}>
-      <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: 680, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 25px 80px rgba(0,0,0,0.25)' }}>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 28, width: 680, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 25px 80px rgba(0,0,0,0.25)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 22 }}>
           <div>
             <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>{job ? 'Edit Job' : 'Post a Job'}</h3>
-            <p style={{ margin: '3px 0 0', fontSize: 13, color: '#64748B' }}>New jobs start as Draft — publish when ready to receive applications</p>
+            <p style={{ margin: '3px 0 0', fontSize: 13, color: 'var(--hf-text-muted)' }}>New jobs start as Draft — publish when ready to receive applications</p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex' }}><X size={20} /></button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={20} /></button>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -1226,13 +1226,13 @@ function JobModal({ job, onClose, onSaved }: { job?: Job; onClose: () => void; o
           </div>
           <div>
             <label style={lbl}>Job type</label>
-            <select value={form.jobType} onChange={e => f('jobType', e.target.value)} style={{ ...inp, background: '#fff' }}>
+            <select value={form.jobType} onChange={e => f('jobType', e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
               {['FULL_TIME','PART_TIME','CONTRACT','INTERNSHIP','FREELANCE'].map(t => <option key={t} value={t}>{t.replace('_',' ')}</option>)}
             </select>
           </div>
           <div>
             <label style={lbl}>Experience level</label>
-            <select value={form.experienceLevel} onChange={e => f('experienceLevel', e.target.value)} style={{ ...inp, background: '#fff' }}>
+            <select value={form.experienceLevel} onChange={e => f('experienceLevel', e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
               {['JUNIOR','MID','SENIOR','LEAD','EXECUTIVE'].map(t => <option key={t}>{t}</option>)}
             </select>
           </div>
@@ -1246,7 +1246,7 @@ function JobModal({ job, onClose, onSaved }: { job?: Job; onClose: () => void; o
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <input type="checkbox" id="showSalary" checked={form.showSalary} onChange={e => f('showSalary', e.target.checked)} style={{ width: 16, height: 16 }} />
-            <label htmlFor="showSalary" style={{ fontSize: 13, color: '#374151', cursor: 'pointer' }}>Show salary range on careers page</label>
+            <label htmlFor="showSalary" style={{ fontSize: 13, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>Show salary range on careers page</label>
           </div>
           <div>
             <label style={lbl}>Application closes</label>
@@ -1270,7 +1270,7 @@ function JobModal({ job, onClose, onSaved }: { job?: Job; onClose: () => void; o
           {job && <InterviewRoundsSection jobId={job.id} />}
         </div>
 
-        {error && <div style={{ marginTop: 12, padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>{error}</div>}
+        {error && <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>}
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 22 }}>
           <button onClick={onClose} style={btnS}>Cancel</button>
@@ -1378,12 +1378,12 @@ export function RecruiterPage() {
   }
 
   const kpis = [
-    { label: 'Open positions',  value: summary?.openJobs ?? 0,        color: '#166534', bg: '#DCFCE7', icon: <Briefcase size={16} /> },
-    { label: 'New applications',value: summary?.newApplications ?? 0,  color: '#D97706', bg: '#FFFBEB', icon: <Users size={16} /> },
-    { label: 'In interview',    value: summary?.inInterview ?? 0,      color: '#1D4ED8', bg: '#EFF6FF', icon: <Calendar size={16} /> },
-    { label: 'Offers made',     value: summary?.offersMade ?? 0,       color: '#0D9488', bg: '#F0FDF9', icon: <Send size={16} /> },
-    { label: 'Hired this month',value: summary?.hiredThisMonth ?? 0,   color: '#166534', bg: '#DCFCE7', icon: <UserCheck size={16} /> },
-    { label: 'Draft jobs',      value: summary?.draftJobs ?? 0,        color: '#64748B', bg: '#F8FAFC', icon: <FileText size={16} /> },
+    { label: 'Open positions',  value: summary?.openJobs ?? 0,        color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)', icon: <Briefcase size={16} /> },
+    { label: 'New applications',value: summary?.newApplications ?? 0,  color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)', icon: <Users size={16} /> },
+    { label: 'In interview',    value: summary?.inInterview ?? 0,      color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)', icon: <Calendar size={16} /> },
+    { label: 'Offers made',     value: summary?.offersMade ?? 0,       color: 'var(--hf-accent-text)', bg: 'var(--hf-accent-soft)', icon: <Send size={16} /> },
+    { label: 'Hired this month',value: summary?.hiredThisMonth ?? 0,   color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)', icon: <UserCheck size={16} /> },
+    { label: 'Draft jobs',      value: summary?.draftJobs ?? 0,        color: 'var(--hf-text-muted)', bg: 'var(--hf-surface-muted)', icon: <FileText size={16} /> },
   ]
 
   return (
@@ -1392,12 +1392,12 @@ export function RecruiterPage() {
       <div style={{ marginBottom: 22, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: '#0D9488', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--hf-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Briefcase size={18} color="#fff" />
             </div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', margin: 0 }}>Recruiter</h1>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>Recruiter</h1>
           </div>
-          <p style={{ fontSize: 13, color: '#94A3B8', margin: 0, paddingLeft: 46 }}>
+          <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0, paddingLeft: 46 }}>
             Job postings · Applicant pipeline · Interviews · HR onboarding
           </p>
         </div>
@@ -1407,20 +1407,20 @@ export function RecruiterPage() {
       {/* KPI strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 22 }}>
         {kpis.map(k => (
-          <div key={k.label} style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div key={k.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 32, height: 32, borderRadius: 8, background: k.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: k.color, flexShrink: 0 }}>{k.icon}</div>
             <div>
               <div style={{ fontSize: 20, fontWeight: 800, color: k.color }}>{k.value}</div>
-              <div style={{ fontSize: 10, color: '#9CA3AF' }}>{k.label}</div>
+              <div style={{ fontSize: 10, color: 'var(--hf-text-faint)' }}>{k.label}</div>
             </div>
           </div>
         ))}
       </div>
 
       {/* Main card */}
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 14 }}>
+      <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14 }}>
         {/* Tab bar + toolbar */}
-        <div style={{ borderBottom: '1px solid #E2E8F0', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ borderBottom: '1px solid var(--hf-border)', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex' }}>
             {([
               { key: 'jobs',         label: 'Job Postings',  icon: <Briefcase size={13} /> },
@@ -1428,7 +1428,7 @@ export function RecruiterPage() {
               { key: 'applications', label: 'Applications',  icon: <Users size={13} /> },
             ] as const).map(t => (
               <button key={t.key} onClick={() => setTab(t.key)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '14px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t.key ? '#1B3A6B' : '#9CA3AF', borderBottom: `2px solid ${tab === t.key ? '#1B3A6B' : 'transparent'}`, marginBottom: -1 }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '14px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t.key ? 'var(--hf-primary-text)' : 'var(--hf-text-faint)', borderBottom: `2px solid ${tab === t.key ? '#1B3A6B' : 'transparent'}`, marginBottom: -1 }}>
                 {t.icon}{t.label}
               </button>
             ))}
@@ -1444,13 +1444,13 @@ export function RecruiterPage() {
           {/* Toolbar */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 18 }}>
             <div style={{ position: 'relative' as const }}>
-              <Search size={13} style={{ position: 'absolute' as const, left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+              <Search size={13} style={{ position: 'absolute' as const, left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--hf-text-faint)' }} />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tab === 'jobs' ? 'Search jobs...' : 'Search applicants...'}
-                style={{ paddingLeft: 28, padding: '7px 10px 7px 28px', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: 13, outline: 'none', width: 200 }} />
+                style={{ paddingLeft: 28, padding: '7px 10px 7px 28px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', width: 200 }} />
             </div>
             {tab === 'jobs' && (
               <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-                style={{ padding: '7px 10px', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: 13, outline: 'none', background: '#fff' }}>
+                style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
                 <option value="">All statuses</option>
                 {Object.entries(JOB_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
@@ -1458,12 +1458,12 @@ export function RecruiterPage() {
             {(tab === 'applications') && (
               <>
                 <select value={stageFilter} onChange={e => setStageFilter(e.target.value)}
-                  style={{ padding: '7px 10px', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: 13, outline: 'none', background: '#fff' }}>
+                  style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
                   <option value="">All stages</option>
                   {Object.entries(STAGE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
                 <select value={jobFilter} onChange={e => setJobFilter(e.target.value)}
-                  style={{ padding: '7px 10px', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: 13, outline: 'none', background: '#fff' }}>
+                  style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
                   <option value="">All jobs</option>
                   {jobs.map(j => <option key={j.id} value={j.id}>{j.title}</option>)}
                 </select>
@@ -1471,11 +1471,11 @@ export function RecruiterPage() {
             )}
             {(search || statusFilter || stageFilter || jobFilter) && (
               <button onClick={() => { setSearch(''); setStatusFilter(''); setStageFilter(''); setJobFilter('') }}
-                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 12, background: '#F8FAFC', color: '#64748B', cursor: 'pointer' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, background: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)', cursor: 'pointer' }}>
                 <X size={11} /> Clear
               </button>
             )}
-            <div style={{ marginLeft: 'auto', fontSize: 12, color: '#94A3B8' }}>
+            <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--hf-text-faint)' }}>
               {tab === 'jobs' ? `${filteredJobs.length} jobs` : `${filteredApps.length} applicants`}
             </div>
           </div>
@@ -1485,40 +1485,40 @@ export function RecruiterPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {filteredJobs.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-                  <Briefcase size={36} style={{ marginBottom: 12, color: '#CBD5E1' }} />
-                  <div style={{ fontWeight: 700, color: '#475569', fontSize: 15, marginBottom: 6 }}>No job postings yet</div>
-                  <div style={{ fontSize: 13, color: '#94A3B8', marginBottom: 18 }}>Create your first job posting to start receiving applications.</div>
+                  <Briefcase size={36} style={{ marginBottom: 12, color: 'var(--hf-text-disabled)' }} />
+                  <div style={{ fontWeight: 700, color: 'var(--hf-text-tertiary)', fontSize: 15, marginBottom: 6 }}>No job postings yet</div>
+                  <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', marginBottom: 18 }}>Create your first job posting to start receiving applications.</div>
                   <button onClick={() => setShowCreate(true)} style={btnP}><Plus size={14} /> Post first job</button>
                 </div>
               ) : filteredJobs.map(job => {
                 const cfg = JOB_STATUS[job.status] ?? JOB_STATUS.DRAFT
                 const closing = job.closesAt && new Date(job.closesAt) < new Date() && job.status === 'OPEN'
                 return (
-                  <div key={job.id} style={{ border: `1px solid ${closing ? '#FECACA' : '#E2E8F0'}`, borderRadius: 12, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: '#fff' }}
+                  <div key={job.id} style={{ border: `1px solid ${closing ? '#FECACA' : '#E2E8F0'}`, borderRadius: 12, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: 'var(--hf-surface)' }}
                     onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'}
                     onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                        <span style={{ fontWeight: 800, fontSize: 15, color: '#0F172A' }}>{job.title}</span>
+                        <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--hf-text)' }}>{job.title}</span>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
                           <span style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color }} />{cfg.label}
                         </span>
-                        {closing && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#FEF2F2', color: '#DC2626', padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}><AlertTriangle size={9} /> Closing date passed</span>}
+                        {closing && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}><AlertTriangle size={9} /> Closing date passed</span>}
                       </div>
-                      <div style={{ display: 'flex', gap: 14, fontSize: 12, color: '#64748B', flexWrap: 'wrap', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--hf-text-muted)', flexWrap: 'wrap', marginBottom: 8 }}>
                         {job.department && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Building2 size={11} />{job.department}</span>}
                         {job.location && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={11} />{job.location}</span>}
                         <span>{job.jobType.replace('_',' ')} · {job.experienceLevel}</span>
-                        {job.showSalary && job.salaryMin && <span style={{ color: '#0D9488', fontWeight: 600 }}>{fmtR(job.salaryMin)}{job.salaryMax ? ` – ${fmtR(job.salaryMax)}` : '+'}</span>}
+                        {job.showSalary && job.salaryMin && <span style={{ color: 'var(--hf-accent-text)', fontWeight: 600 }}>{fmtR(job.salaryMin)}{job.salaryMax ? ` – ${fmtR(job.salaryMax)}` : '+'}</span>}
                         {job.closesAt && <span>Closes {fmtDate(job.closesAt)}</span>}
                       </div>
                       <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
-                        <span style={{ color: job.applicationCount > 0 ? '#0D9488' : '#94A3B8', fontWeight: job.applicationCount > 0 ? 700 : 400 }}>
+                        <span style={{ color: job.applicationCount > 0 ? 'var(--hf-accent-text)' : 'var(--hf-text-faint)', fontWeight: job.applicationCount > 0 ? 700 : 400 }}>
                           {job.applicationCount} application{job.applicationCount !== 1 ? 's' : ''}
                         </span>
                         {job.slug && (
                           <a href={`/careers/zeta-earthmoving/${job.slug}`} target="_blank" rel="noreferrer"
-                            style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#1B3A6B', fontWeight: 600, textDecoration: 'none' }}>
+                            style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--hf-primary-text)', fontWeight: 600, textDecoration: 'none' }}>
                             <ExternalLink size={10} /> View posting
                           </a>
                         )}
@@ -1527,26 +1527,26 @@ export function RecruiterPage() {
                     <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       {job.status === 'DRAFT' && (
                         <button onClick={() => setShowPublish(job)}
-                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', background: '#DCFCE7', color: '#166534', border: '1px solid #86EFAC', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', border: '1px solid var(--hf-success-border)', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                           <ExternalLink size={11} /> Publish
                         </button>
                       )}
                       {job.status === 'OPEN' && (
                         <>
                           <button onClick={() => doJobAction.mutate({ id: job.id, action: 'PAUSE' })}
-                            style={{ padding: '6px 12px', background: '#FFFBEB', color: '#D97706', border: '1px solid #FDE68A', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>Pause</button>
+                            style={{ padding: '6px 12px', background: 'var(--hf-warning-soft)', color: 'var(--hf-warning-text)', border: '1px solid var(--hf-warning-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>Pause</button>
                           <button onClick={() => doJobAction.mutate({ id: job.id, action: 'FILL' })}
-                            style={{ padding: '6px 12px', background: '#F0FDF9', color: '#0D9488', border: '1px solid #99F6E4', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>Mark filled</button>
+                            style={{ padding: '6px 12px', background: 'var(--hf-accent-soft)', color: 'var(--hf-accent-text)', border: '1px solid var(--hf-accent-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>Mark filled</button>
                         </>
                       )}
                       {job.status === 'PAUSED' && (
                         <button onClick={() => doJobAction.mutate({ id: job.id, action: 'PUBLISH' })}
-                          style={{ padding: '6px 12px', background: '#DCFCE7', color: '#166534', border: '1px solid #86EFAC', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>Resume</button>
+                          style={{ padding: '6px 12px', background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', border: '1px solid var(--hf-success-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>Resume</button>
                       )}
-                      <button onClick={() => setEditJob(job)} style={{ padding: '6px 10px', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 7, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <button onClick={() => setEditJob(job)} style={{ padding: '6px 10px', background: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', border: '1px solid var(--hf-info-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                         <Edit3 size={11} /> Edit
                       </button>
-                      <button onClick={() => setShowDeleteJob(job)} style={{ padding: '6px 10px', background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', borderRadius: 7, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                      <button onClick={() => setShowDeleteJob(job)} style={{ padding: '6px 10px', background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', border: '1px solid var(--hf-danger-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                         <Trash2 size={11} />
                       </button>
                     </div>
@@ -1566,25 +1566,25 @@ export function RecruiterPage() {
                   <div key={stage} style={{ minWidth: 230, maxWidth: 230, flexShrink: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
                       <div style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.dot }} />
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>{cfg.label}</span>
-                      <span style={{ background: '#F1F5F9', color: '#64748B', borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>{col.length}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-secondary)' }}>{cfg.label}</span>
+                      <span style={{ background: 'var(--hf-surface-sunken)', color: 'var(--hf-text-muted)', borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>{col.length}</span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {col.map(a => (
                         <div key={a.id} onClick={() => setSelectedApp(a)}
-                          style={{ border: '1px solid #E5E7EB', borderLeft: `3px solid ${cfg.dot}`, borderRadius: 9, padding: '11px 13px', cursor: 'pointer', background: '#fff', transition: 'box-shadow 0.15s' }}
+                          style={{ border: '1px solid var(--hf-border)', borderLeft: `3px solid ${cfg.dot}`, borderRadius: 9, padding: '11px 13px', cursor: 'pointer', background: 'var(--hf-surface)', transition: 'box-shadow 0.15s' }}
                           onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'}
                           onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
-                          <div style={{ fontWeight: 700, fontSize: 13, color: '#111827', marginBottom: 3 }}>{a.applicantName}</div>
-                          <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 6 }}>{a.jobTitle}</div>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)', marginBottom: 3 }}>{a.applicantName}</div>
+                          <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginBottom: 6 }}>{a.jobTitle}</div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                            <span style={{ color: '#64748B' }}>{fmtDate(a.appliedAt)}</span>
-                            {a.score && <span style={{ color: '#F59E0B' }}>{'★'.repeat(a.score)}</span>}
+                            <span style={{ color: 'var(--hf-text-muted)' }}>{fmtDate(a.appliedAt)}</span>
+                            {a.score && <span style={{ color: 'var(--hf-warning-text)' }}>{'★'.repeat(a.score)}</span>}
                           </div>
                         </div>
                       ))}
                       {col.length === 0 && (
-                        <div style={{ padding: '16px', textAlign: 'center', fontSize: 12, color: '#D1D5DB', border: '1.5px dashed #E5E7EB', borderRadius: 9 }}>Empty</div>
+                        <div style={{ padding: '16px', textAlign: 'center', fontSize: 12, color: 'var(--hf-text-disabled)', border: '1.5px dashed var(--hf-border)', borderRadius: 9 }}>Empty</div>
                       )}
                     </div>
                   </div>
@@ -1597,16 +1597,16 @@ export function RecruiterPage() {
           {tab === 'applications' && (
             filteredApps.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-                <Users size={36} style={{ marginBottom: 12, color: '#CBD5E1' }} />
-                <div style={{ fontWeight: 700, color: '#475569', fontSize: 15 }}>No applications found</div>
+                <Users size={36} style={{ marginBottom: 12, color: 'var(--hf-text-disabled)' }} />
+                <div style={{ fontWeight: 700, color: 'var(--hf-text-tertiary)', fontSize: 15 }}>No applications found</div>
               </div>
             ) : (
-              <div style={{ border: '1px solid #E2E8F0', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ border: '1px solid var(--hf-border)', borderRadius: 12, overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 13 }}>
                   <thead>
-                    <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+                    <tr style={{ background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border)' }}>
                       {['', 'Applicant', 'Job', 'Stage', 'Score', 'Source', 'Applied', 'CV', ''].map(h => (
-                        <th key={h} style={{ padding: '10px 16px', textAlign: 'left' as const, fontSize: 11, fontWeight: 700, color: '#64748B', letterSpacing: '0.05em' }}>{h}</th>
+                        <th key={h} style={{ padding: '10px 16px', textAlign: 'left' as const, fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', letterSpacing: '0.05em' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1616,9 +1616,9 @@ export function RecruiterPage() {
                       const checked = compareIds.includes(a.id)
                       return (
                         <tr key={a.id} onClick={() => setSelectedApp(a)}
-                          style={{ background: i % 2 === 0 ? '#fff' : '#FAFAFA', cursor: 'pointer', transition: 'background 0.1s' }}
-                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#F0F9FF'}
-                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? '#fff' : '#FAFAFA'}>
+                          style={{ background: i % 2 === 0 ? 'var(--hf-surface)' : 'var(--hf-surface-muted)', cursor: 'pointer', transition: 'background 0.1s' }}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--hf-sky-soft)'}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? 'var(--hf-surface)' : 'var(--hf-surface-muted)'}>
                           <td style={{ padding: '12px 8px 12px 16px' }} onClick={e => e.stopPropagation()}>
                             <input type="checkbox" checked={checked}
                               onChange={() => setCompareIds(prev => checked ? prev.filter(id => id !== a.id) : [...prev, a.id])}
@@ -1630,24 +1630,24 @@ export function RecruiterPage() {
                                 <span style={{ fontSize: 10, fontWeight: 700, color: sc.color }}>{(a.applicantName ?? 'A').charAt(0).toUpperCase()}</span>
                               </div>
                               <div>
-                                <div style={{ fontWeight: 700, color: '#0F172A' }}>{a.applicantName}</div>
-                                <div style={{ fontSize: 11, color: '#94A3B8' }}>{a.applicantEmail}</div>
+                                <div style={{ fontWeight: 700, color: 'var(--hf-text)' }}>{a.applicantName}</div>
+                                <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{a.applicantEmail}</div>
                               </div>
                             </div>
                           </td>
-                          <td style={{ padding: '12px 16px', color: '#374151' }}>{a.jobTitle}</td>
+                          <td style={{ padding: '12px 16px', color: 'var(--hf-text-secondary)' }}>{a.jobTitle}</td>
                           <td style={{ padding: '12px 16px' }}>
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
                               <span style={{ width: 4, height: 4, borderRadius: '50%', background: sc.dot }} />{sc.label}
                             </span>
                           </td>
-                          <td style={{ padding: '12px 16px', color: '#F59E0B', fontWeight: 700 }}>
-                            {a.score ? '★'.repeat(a.score) : <span style={{ color: '#CBD5E1' }}>—</span>}
+                          <td style={{ padding: '12px 16px', color: 'var(--hf-warning-text)', fontWeight: 700 }}>
+                            {a.score ? '★'.repeat(a.score) : <span style={{ color: 'var(--hf-text-disabled)' }}>—</span>}
                           </td>
-                          <td style={{ padding: '12px 16px', fontSize: 12, color: '#64748B' }}>{a.source?.replace('_',' ') ?? '—'}</td>
-                          <td style={{ padding: '12px 16px', fontSize: 12, color: '#94A3B8' }}>{fmtDate(a.appliedAt)}</td>
+                          <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--hf-text-muted)' }}>{a.source?.replace('_',' ') ?? '—'}</td>
+                          <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--hf-text-faint)' }}>{fmtDate(a.appliedAt)}</td>
                           <td style={{ padding: '12px 16px' }}>
-                            {a.hasCv ? <CheckCircle size={13} color="#0D9488" /> : <span style={{ color: '#CBD5E1', fontSize: 11 }}>—</span>}
+                            {a.hasCv ? <CheckCircle size={13} color="#0D9488" /> : <span style={{ color: 'var(--hf-text-disabled)', fontSize: 11 }}>—</span>}
                           </td>
                           <td style={{ padding: '12px 16px' }}><ChevronRight size={14} color="#94A3B8" /></td>
                         </tr>
@@ -1662,13 +1662,13 @@ export function RecruiterPage() {
       </div>
 
       {compareIds.length > 0 && (
-        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#0F172A', color: '#fff', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 10px 40px rgba(0,0,0,0.3)', zIndex: 900 }}>
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--hf-inverse-surface)', color: 'var(--hf-text-on-solid)', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 10px 40px rgba(0,0,0,0.3)', zIndex: 900 }}>
           <span style={{ fontSize: 13, fontWeight: 600 }}>{compareIds.length} candidate{compareIds.length === 1 ? '' : 's'} selected</span>
           <button onClick={() => setShowCompare(true)} disabled={compareIds.length < 2}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: compareIds.length < 2 ? '#334155' : '#fff', color: compareIds.length < 2 ? '#94A3B8' : '#0F172A', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: compareIds.length < 2 ? 'default' : 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: compareIds.length < 2 ? '#334155' : 'var(--hf-surface)', color: compareIds.length < 2 ? 'var(--hf-text-faint)' : 'var(--hf-text)', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: compareIds.length < 2 ? 'default' : 'pointer' }}>
             <Users size={13} /> Compare
           </button>
-          <button onClick={() => setCompareIds([])} style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', display: 'flex' }}>
+          <button onClick={() => setCompareIds([])} style={{ background: 'none', border: 'none', color: 'var(--hf-text-faint)', cursor: 'pointer', display: 'flex' }}>
             <X size={16} />
           </button>
         </div>

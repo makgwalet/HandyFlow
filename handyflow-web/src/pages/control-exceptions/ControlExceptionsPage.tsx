@@ -46,14 +46,14 @@ export function ControlExceptionsPage() {
       {loading ? (
         <div style={{ padding: 32, textAlign: "center" as const, color: FAINT, fontSize: 13 }}>Loading…</div>
       ) : exceptions.length === 0 ? (
-        <div style={{ padding: 40, textAlign: "center" as const, color: FAINT, fontSize: 14, background: "#fff",
+        <div style={{ padding: 40, textAlign: "center" as const, color: FAINT, fontSize: 14, background: "var(--hf-surface)",
           border: `1px solid ${BORDER}`, borderRadius: 8 }}>
           Nothing needs attention right now.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {exceptions.map(e => (
-            <div key={e.id} style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "14px 16px" }}>
+            <div key={e.id} style={{ background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "14px 16px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -82,8 +82,8 @@ export function ControlExceptionsPage() {
 
 function SeverityBadge({ severity }: { severity: string }) {
   const tones: Record<string, { c: string; bg: string }> = {
-    WARNING: { c: "#D97706", bg: "#FFFBEB" },
-    CRITICAL: { c: "#DC2626", bg: "#FEF2F2" },
+    WARNING: { c: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+    CRITICAL: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
   }
   const t = tones[severity] ?? tones.WARNING
   return <span style={{ background: t.bg, color: t.c, padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>{severity}</span>
@@ -107,7 +107,7 @@ function ResolveModal({ exception, onClose, onResolved }: { exception: ControlEx
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
       onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
+      <div style={{ background: "var(--hf-surface)", borderRadius: 12, padding: 24, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
         onClick={e => e.stopPropagation()}>
         <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 800, color: INK }}>Resolve</h3>
         <p style={{ fontSize: 13, color: MUTED, marginBottom: 14 }}>{exception.description}</p>
@@ -117,7 +117,7 @@ function ResolveModal({ exception, onClose, onResolved }: { exception: ControlEx
         <textarea value={notes} onChange={e => setNotes(e.target.value)}
           style={{ width: "100%", padding: "8px 10px", border: `1.5px solid ${BORDER}`, borderRadius: 6, fontSize: 13,
             minHeight: 60, resize: "vertical" as const, fontFamily: "inherit", boxSizing: "border-box" as const, marginBottom: 12 }} />
-        {error && <div style={{ padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, fontSize: 12.5, color: "#DC2626", marginBottom: 12 }}>{error}</div>}
+        {error && <div style={{ padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 12.5, color: "var(--hf-danger-text)", marginBottom: 12 }}>{error}</div>}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button onClick={onClose} style={btnSecondary}>Cancel</button>
           <button onClick={submit} disabled={saving} style={btnPrimary}>{saving ? "Saving…" : "Mark Resolved"}</button>
@@ -127,5 +127,5 @@ function ResolveModal({ exception, onClose, onResolved }: { exception: ControlEx
   )
 }
 
-const btnPrimary: React.CSSProperties = { padding: "7px 14px", background: NAVY, color: "#fff", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
-const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "#fff", color: NAVY, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }
+const btnPrimary: React.CSSProperties = { padding: "7px 14px", background: NAVY, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
+const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "var(--hf-surface)", color: NAVY, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }

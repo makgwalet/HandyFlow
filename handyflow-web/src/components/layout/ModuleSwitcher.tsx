@@ -60,27 +60,27 @@ export function ModuleSwitcher({ modules, pinnedKeys, onTogglePin, currentPath }
       {open && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 8px)', left: 0, width: 360,
-          background: 'white', border: '1px solid #E2E8F0', borderRadius: 14,
+          background: 'white', border: '1px solid var(--hf-border)', borderRadius: 14,
           boxShadow: '0 12px 40px rgba(0,0,0,0.18)', zIndex: 300, overflow: 'hidden',
         }}>
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid #F1F5F9' }}>
+          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--hf-border-subtle)' }}>
             <div style={{ position: 'relative' }}>
               <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
               <input ref={searchRef} value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search modules..."
-                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px 8px 32px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, outline: 'none' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px 8px 32px', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none' }} />
             </div>
           </div>
 
           {pinnedKeys.length === 0 && !search && (
-            <div style={{ padding: '10px 16px', fontSize: 11.5, color: '#94A3B8', background: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
+            <div style={{ padding: '10px 16px', fontSize: 11.5, color: 'var(--hf-text-faint)', background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border-subtle)' }}>
               Click the pin on any module to keep it in your topbar.
             </div>
           )}
 
           <div style={{ maxHeight: 360, overflowY: 'auto', padding: 10 }}>
             {filtered.length === 0 ? (
-              <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: '#94A3B8' }}>No modules match "{search}"</div>
+              <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--hf-text-faint)' }}>No modules match "{search}"</div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                 {filtered.map(m => {
@@ -90,17 +90,17 @@ export function ModuleSwitcher({ modules, pinnedKeys, onTogglePin, currentPath }
                     <div key={m.key} onClick={() => { navigate(m.route); setOpen(false); setSearch('') }}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8, padding: '9px 8px', borderRadius: 9,
-                        cursor: 'pointer', background: isActive ? '#EFF6FF' : 'transparent', position: 'relative',
+                        cursor: 'pointer', background: isActive ? 'var(--hf-info-soft)' : 'transparent', position: 'relative',
                       }}
-                      onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = '#F8FAFC' }}
+                      onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--hf-surface-muted)' }}
                       onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 7, background: isActive ? '#1B3A6B' : '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 7, background: isActive ? 'var(--hf-primary)' : 'var(--hf-surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <m.icon size={14} color={isActive ? 'white' : '#64748B'} />
                       </div>
-                      <span style={{ fontSize: 12.5, fontWeight: 500, color: '#0F172A', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.label}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--hf-text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.label}</span>
                       <button onClick={e => { e.stopPropagation(); onTogglePin(m.key) }}
                         title={isPinned ? 'Unpin' : 'Pin to topbar'}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 3, color: isPinned ? '#0D9488' : '#CBD5E1', flexShrink: 0 }}>
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 3, color: isPinned ? 'var(--hf-accent-text)' : 'var(--hf-text-disabled)', flexShrink: 0 }}>
                         {isPinned ? <Pin size={13} fill="currentColor" /> : <Pin size={13} />}
                       </button>
                     </div>

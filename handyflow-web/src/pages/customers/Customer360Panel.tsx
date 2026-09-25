@@ -37,7 +37,7 @@ export function Customer360Panel({ customerId }: { customerId: string }) {
   if (isLoading) return (
     <div style={wrap}>
       <div style={sectionLabel}>Customer 360</div>
-      <div style={{ color: '#94A3B8', fontSize: 13 }}>Loading…</div>
+      <div style={{ color: 'var(--hf-text-faint)', fontSize: 13 }}>Loading…</div>
     </div>
   )
 
@@ -96,20 +96,20 @@ function Stat({ icon, label, value, sub, color, highlight = false }: {
   return (
     <div style={{
       padding: '12px 14px',
-      background:   highlight ? '#FEF2F2' : '#F8FAFC',
+      background:   highlight ? 'var(--hf-danger-soft)' : 'var(--hf-surface-muted)',
       border:       `1px solid ${highlight ? '#FECACA' : '#F1F5F9'}`,
       borderRadius: 10,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, color }}>
         {icon}
-        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#94A3B8' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: 'var(--hf-text-faint)' }}>
           {label}
         </span>
       </div>
-      <div style={{ fontSize: 17, fontWeight: 700, color: highlight ? '#DC2626' : '#0F172A' }}>
+      <div style={{ fontSize: 17, fontWeight: 700, color: highlight ? 'var(--hf-danger-text)' : 'var(--hf-text)' }}>
         {value}
       </div>
-      {sub && <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 3 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 3 }}>{sub}</div>}
     </div>
   )
 }
@@ -117,11 +117,11 @@ function Stat({ icon, label, value, sub, color, highlight = false }: {
 const wrap: React.CSSProperties = {
   marginTop: 16,
   paddingTop: 16,
-  borderTop: '1px solid #F1F5F9',
+  borderTop: '1px solid var(--hf-border-subtle)',
 }
 
 const sectionLabel: React.CSSProperties = {
-  fontSize: 11, fontWeight: 700, color: '#94A3B8',
+  fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)',
   textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10,
 }
 

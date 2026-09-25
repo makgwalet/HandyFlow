@@ -202,32 +202,32 @@ export function NotificationDrawer({ open, onClose }: { open: boolean; onClose: 
           @keyframes notifSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         `}</style>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 20px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 20px', borderBottom: '1px solid var(--hf-border-subtle)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0F172A' }}>Notifications</h3>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--hf-text)' }}>Notifications</h3>
             {unreadCount > 0 && (
-              <span style={{ background: '#1B3A6B', color: 'white', fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 10 }}>{unreadCount}</span>
+              <span style={{ background: 'var(--hf-primary)', color: 'white', fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 10 }}>{unreadCount}</span>
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {unreadCount > 0 && (
               <button onClick={() => markAllRead.mutate()} title="Mark all as read"
-                style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', fontSize: 12, padding: '4px 6px' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-muted)', fontSize: 12, padding: '4px 6px' }}>
                 <CheckCheck size={13} /> Mark all read
               </button>
             )}
-            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex', padding: 4 }}><X size={18} /></button>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex', padding: 4 }}><X size={18} /></button>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 6, padding: '10px 20px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 6, padding: '10px 20px', borderBottom: '1px solid var(--hf-border-subtle)', flexShrink: 0 }}>
           {[{ label: 'All', val: false }, { label: 'Unread', val: true }].map(f => (
             <button key={f.label} onClick={() => resetPaging(f.val)}
               style={{
                 padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                border: unreadOnly === f.val ? '1px solid #1B3A6B' : '1px solid #E2E8F0',
-                background: unreadOnly === f.val ? '#EFF6FF' : 'white',
-                color: unreadOnly === f.val ? '#1B3A6B' : '#64748B',
+                border: unreadOnly === f.val ? '1px solid var(--hf-primary)' : '1px solid var(--hf-border)',
+                background: unreadOnly === f.val ? 'var(--hf-info-soft)' : 'white',
+                color: unreadOnly === f.val ? 'var(--hf-primary-text)' : 'var(--hf-text-muted)',
               }}>
               {f.label}
             </button>
@@ -236,13 +236,13 @@ export function NotificationDrawer({ open, onClose }: { open: boolean; onClose: 
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {isLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>Loading...</div>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--hf-text-faint)', fontSize: 13 }}>Loading...</div>
           ) : isError ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>Couldn't load notifications. Please try again.</div>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--hf-text-faint)', fontSize: 13 }}>Couldn't load notifications. Please try again.</div>
           ) : notifications.length === 0 ? (
             <div style={{ padding: '60px 20px', textAlign: 'center' }}>
               <Bell size={32} color="#CBD5E1" style={{ marginBottom: 10 }} />
-              <div style={{ fontSize: 13, color: '#94A3B8' }}>{unreadOnly ? "No unread notifications" : "You're all caught up"}</div>
+              <div style={{ fontSize: 13, color: 'var(--hf-text-faint)' }}>{unreadOnly ? "No unread notifications" : "You're all caught up"}</div>
             </div>
           ) : (
             <>
@@ -250,22 +250,22 @@ export function NotificationDrawer({ open, onClose }: { open: boolean; onClose: 
                 <div key={n.id} onClick={() => handleClick(n)}
                   style={{
                     display: 'flex', gap: 10, padding: '14px 20px', cursor: 'pointer',
-                    borderBottom: '1px solid #F8FAFC', background: n.read ? 'white' : '#F0F9FF',
+                    borderBottom: '1px solid var(--hf-border-subtle)', background: n.read ? 'white' : 'var(--hf-sky-soft)',
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.background = n.read ? '#FAFBFC' : '#E0F2FE' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = n.read ? 'white' : '#F0F9FF' }}>
-                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: n.read ? 'transparent' : '#0D9488', flexShrink: 0, marginTop: 6 }} />
+                  onMouseEnter={e => { e.currentTarget.style.background = n.read ? '#FAFBFC' : 'var(--hf-sky-soft-strong)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = n.read ? 'white' : 'var(--hf-sky-soft)' }}>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: n.read ? 'transparent' : 'var(--hf-accent)', flexShrink: 0, marginTop: 6 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: n.read ? 500 : 700, color: '#0F172A', marginBottom: 2 }}>{n.title}</div>
-                    <div style={{ fontSize: 12.5, color: '#64748B', lineHeight: 1.4 }}>{n.message}</div>
-                    <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 4 }}>{timeAgo(n.createdAt)}</div>
+                    <div style={{ fontSize: 13, fontWeight: n.read ? 500 : 700, color: 'var(--hf-text)', marginBottom: 2 }}>{n.title}</div>
+                    <div style={{ fontSize: 12.5, color: 'var(--hf-text-muted)', lineHeight: 1.4 }}>{n.message}</div>
+                    <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 4 }}>{timeAgo(n.createdAt)}</div>
                   </div>
                 </div>
               ))}
               {hasMore && (
                 <div style={{ padding: '14px 20px', textAlign: 'center' }}>
                   <button onClick={loadMore} disabled={isFetching}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #E2E8F0', borderRadius: 8, background: 'white', color: '#1B3A6B', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid var(--hf-border)', borderRadius: 8, background: 'white', color: 'var(--hf-primary-text)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
                     {isFetching ? <><Loader2 size={13} style={{ animation: 'notifSpin 0.8s linear infinite' }} /> Loading...</> : 'Load more'}
                   </button>
                 </div>

@@ -22,25 +22,25 @@ interface Invoice {
 }
 
 const ACCENT = "#D97706"
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 9, fontSize: 14, boxSizing: "border-box", outline: "none", background: "#fff" }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 9, fontSize: 14, boxSizing: "border-box", outline: "none", background: "var(--hf-surface)" }
 const fmtR = (n: number) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtD = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
 const isOverdue = (inv: Invoice) => !["PAID","CANCELLED"].includes(inv.status) && new Date(inv.dueDate) < new Date()
 
 const STATUS_BADGE: Record<string, { bg: string; color: string }> = {
-  RECEIVED:    { bg: "#F1F5F9", color: "#475569" },
-  UNDER_REVIEW:{ bg: "#FEF3C7", color: "#92400E" },
-  APPROVED:    { bg: "#DBEAFE", color: "#1D4ED8" },
-  DISPUTED:    { bg: "#FEE2E2", color: "#DC2626" },
-  PAID:        { bg: "#DCFCE7", color: "#166534" },
-  CANCELLED:   { bg: "#F1F5F9", color: "#9CA3AF" },
+  RECEIVED:    { bg: "var(--hf-surface-sunken)", color: "var(--hf-text-tertiary)" },
+  UNDER_REVIEW:{ bg: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text-deep)" },
+  APPROVED:    { bg: "var(--hf-info-soft-strong)", color: "var(--hf-info-text)" },
+  DISPUTED:    { bg: "var(--hf-danger-soft-strong)", color: "var(--hf-danger-text)" },
+  PAID:        { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)" },
+  CANCELLED:   { bg: "var(--hf-surface-sunken)", color: "var(--hf-text-faint)" },
 }
 const MATCH_BADGE: Record<string, { bg: string; color: string; label: string }> = {
-  PENDING:      { bg: "#F1F5F9", color: "#94A3B8",  label: "Pending" },
-  MATCHED:      { bg: "#DCFCE7", color: "#166534",  label: "✓ Matched" },
-  PARTIAL_MATCH:{ bg: "#FEF3C7", color: "#92400E",  label: "Partial" },
-  DISPUTE:      { bg: "#FEE2E2", color: "#DC2626",  label: "⚠ Dispute" },
-  OVERRIDDEN:   { bg: "#EDE9FE", color: "#7C3AED",  label: "Overridden" },
+  PENDING:      { bg: "var(--hf-surface-sunken)", color: "var(--hf-text-faint)",  label: "Pending" },
+  MATCHED:      { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)",  label: "✓ Matched" },
+  PARTIAL_MATCH:{ bg: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text-deep)",  label: "Partial" },
+  DISPUTE:      { bg: "var(--hf-danger-soft-strong)", color: "var(--hf-danger-text)",  label: "⚠ Dispute" },
+  OVERRIDDEN:   { bg: "var(--hf-violet-soft-strong)", color: "var(--hf-violet-text)",  label: "Overridden" },
 }
 
 const STATUS_FILTERS = ["", "RECEIVED", "UNDER_REVIEW", "APPROVED", "DISPUTED", "PAID"]
@@ -117,7 +117,7 @@ export function InvoicesTab() {
     setErr(`${joinWithAnd(missing.map(f => f.label))} ${missing.length === 1 ? "is" : "are"} required`)
     return false
   }
-  const fieldStyle = (key: string) => invalidFields.has(key) ? { ...inp, border: "1.5px solid #DC2626" } : inp
+  const fieldStyle = (key: string) => invalidFields.has(key) ? { ...inp, border: "1.5px solid var(--hf-danger)" } : inp
 
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
     queryKey: ["scm-invoices", statusFilter],
@@ -283,9 +283,9 @@ export function InvoicesTab() {
       {/* Summary pills */}
       {(overdue > 0 || disputes > 0) && (
         <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-          {overdue > 0 && <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "#DC2626" }}><AlertTriangle size={12} /> {overdue} overdue</div>}
-          {disputes > 0 && <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "#92400E" }}><AlertTriangle size={12} /> {disputes} dispute{disputes !== 1 ? "s" : ""}</div>}
-          {pending > 0 && <div style={{ padding: "6px 12px", background: "#F1F5F9", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "#475569" }}>{pending} pending review</div>}
+          {overdue > 0 && <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "var(--hf-danger-text)" }}><AlertTriangle size={12} /> {overdue} overdue</div>}
+          {disputes > 0 && <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "var(--hf-warning-text-deep)" }}><AlertTriangle size={12} /> {disputes} dispute{disputes !== 1 ? "s" : ""}</div>}
+          {pending > 0 && <div style={{ padding: "6px 12px", background: "var(--hf-surface-sunken)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "var(--hf-text-tertiary)" }}>{pending} pending review</div>}
         </div>
       )}
 
@@ -294,27 +294,27 @@ export function InvoicesTab() {
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {STATUS_FILTERS.map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
-              style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: statusFilter === s ? 700 : 400, border: statusFilter === s ? `1.5px solid ${ACCENT}` : "1px solid #E2E8F0", background: statusFilter === s ? "#FEF3C7" : "#fff", color: statusFilter === s ? ACCENT : "#64748B" }}>
+              style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: statusFilter === s ? 700 : 400, border: statusFilter === s ? `1.5px solid ${ACCENT}` : "1px solid var(--hf-border)", background: statusFilter === s ? "var(--hf-warning-soft-strong)" : "var(--hf-surface)", color: statusFilter === s ? ACCENT : "var(--hf-text-muted)" }}>
               {s || "All"}
             </button>
           ))}
         </div>
         <button onClick={() => { setShowCreate(true); setErr(""); setInvalidFields(new Set()) }}
-          style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: ACCENT, color: "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", background: ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={14} /> Record Invoice
         </button>
       </div>
 
       {/* Invoice table */}
       {isLoading
-        ? <div style={{ padding: 40, textAlign: "center", color: "#94A3B8" }}>Loading…</div>
+        ? <div style={{ padding: 40, textAlign: "center", color: "var(--hf-text-faint)" }}>Loading…</div>
         : invoices.length === 0
-          ? <div style={{ textAlign: "center", padding: "50px 0", color: "#94A3B8" }}><FileText size={36} style={{ opacity: .3, marginBottom: 10 }} /><div style={{ fontWeight: 600, color: "#475569" }}>No invoices found</div></div>
-          : <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+          ? <div style={{ textAlign: "center", padding: "50px 0", color: "var(--hf-text-faint)" }}><FileText size={36} style={{ opacity: .3, marginBottom: 10 }} /><div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No invoices found</div></div>
+          : <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr style={{ background: "#F8FAFC" }}>
+                <thead><tr style={{ background: "var(--hf-surface-muted)" }}>
                   {["Invoice #", "Supplier Ref", "Invoice Date", "Due Date", "Amount", "Status", "Match", ""].map(h => (
-                    <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                    <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
@@ -324,18 +324,18 @@ export function InvoicesTab() {
                     const odd = isOverdue(inv)
                     return (
                       <tr key={inv.id} onClick={() => { setSelected(inv); setErr(""); setAttachError("") }}
-                        style={{ borderTop: "1px solid #F1F5F9", background: odd ? "#FEF2F2" : i % 2 === 0 ? "#fff" : "#FAFAFA", cursor: "pointer" }}
+                        style={{ borderTop: "1px solid var(--hf-border-subtle)", background: odd ? "var(--hf-danger-soft)" : i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)", cursor: "pointer" }}
                         onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#F0F7FF"}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = odd ? "#FEF2F2" : i % 2 === 0 ? "#fff" : "#FAFAFA"}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = odd ? "var(--hf-danger-soft)" : i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)"}
                       >
                         <td style={{ padding: "11px 14px", fontSize: 12, fontWeight: 700, color: ACCENT }}>{inv.invoiceNumber}</td>
-                        <td style={{ padding: "11px 14px", fontSize: 12, color: "#64748B" }}>{inv.supplierInvoiceRef ?? "—"}</td>
-                        <td style={{ padding: "11px 14px", fontSize: 12, color: "#64748B" }}>{fmtD(inv.invoiceDate)}</td>
-                        <td style={{ padding: "11px 14px", fontSize: 12, color: odd ? "#DC2626" : "#64748B", fontWeight: odd ? 700 : 400 }}>{fmtD(inv.dueDate)}{odd && " ⚠"}</td>
+                        <td style={{ padding: "11px 14px", fontSize: 12, color: "var(--hf-text-muted)" }}>{inv.supplierInvoiceRef ?? "—"}</td>
+                        <td style={{ padding: "11px 14px", fontSize: 12, color: "var(--hf-text-muted)" }}>{fmtD(inv.invoiceDate)}</td>
+                        <td style={{ padding: "11px 14px", fontSize: 12, color: odd ? "var(--hf-danger-text)" : "var(--hf-text-muted)", fontWeight: odd ? 700 : 400 }}>{fmtD(inv.dueDate)}{odd && " ⚠"}</td>
                         <td style={{ padding: "11px 14px", fontSize: 13, fontWeight: 700 }}>{fmtR(inv.totalAmount)}</td>
                         <td style={{ padding: "11px 14px" }}><span style={{ background: sb.bg, color: sb.color, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20 }}>{inv.status}</span></td>
                         <td style={{ padding: "11px 14px" }}><span style={{ background: mb.bg, color: mb.color, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20 }}>{mb.label}</span></td>
-                        <td style={{ padding: "11px 14px", fontSize: 12, color: "#1D4ED8", fontWeight: 600 }}>View →</td>
+                        <td style={{ padding: "11px 14px", fontSize: 12, color: "var(--hf-info-text)", fontWeight: 600 }}>View →</td>
                       </tr>
                     )
                   })}
@@ -352,7 +352,7 @@ export function InvoicesTab() {
 
             {/* Match status banner */}
             {selected.matchStatus !== "PENDING" && (
-              <div style={{ marginBottom: 14, padding: "10px 14px", background: MATCH_BADGE[selected.matchStatus]?.bg ?? "#F1F5F9", borderRadius: 9, fontSize: 13, fontWeight: 600, color: MATCH_BADGE[selected.matchStatus]?.color ?? "#475569" }}>
+              <div style={{ marginBottom: 14, padding: "10px 14px", background: MATCH_BADGE[selected.matchStatus]?.bg ?? "var(--hf-surface-sunken)", borderRadius: 9, fontSize: 13, fontWeight: 600, color: MATCH_BADGE[selected.matchStatus]?.color ?? "var(--hf-text-tertiary)" }}>
                 3-Way Match: {MATCH_BADGE[selected.matchStatus]?.label}
                 {selected.matchNotes && <div style={{ fontSize: 12, fontWeight: 400, marginTop: 3, opacity: .8 }}>{selected.matchNotes}</div>}
               </div>
@@ -368,40 +368,40 @@ export function InvoicesTab() {
                 ["PO Linked",       selected.purchaseOrderId ? "Yes" : "No"],
                 ["GR Linked",       selected.goodsReceiptId ? "Yes" : "No"],
               ].map(([k, v]) => (
-                <div key={k}><div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>{k}</div><div style={{ fontSize: 13, fontWeight: 600 }}>{v}</div></div>
+                <div key={k}><div style={{ fontSize: 10, color: "var(--hf-text-faint)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>{k}</div><div style={{ fontSize: 13, fontWeight: 600 }}>{v}</div></div>
               ))}
             </div>
 
             {/* Amounts */}
-            <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
+            <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
               {[["Subtotal", fmtR(selected.subtotal)], ["VAT", fmtR(selected.vatAmount)]].map(([k, v]) => (
-                <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#64748B", marginBottom: 8 }}><span>{k}</span><span>{v}</span></div>
+                <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--hf-text-muted)", marginBottom: 8 }}><span>{k}</span><span>{v}</span></div>
               ))}
-              <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 800, color: "#0F172A" }}>
+              <div style={{ borderTop: "1px solid var(--hf-border)", paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 800, color: "var(--hf-text)" }}>
                 <span>Total</span><span style={{ color: ACCENT }}>{fmtR(selected.totalAmount)}</span>
               </div>
             </div>
 
             {/* Payment info */}
             {selected.status === "PAID" && (
-              <div style={{ marginBottom: 16, padding: "10px 14px", background: "#DCFCE7", border: "1px solid #86EFAC", borderRadius: 9 }}>
+              <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--hf-success-soft-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 9 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#166534" }}>✓ Paid {fmtD(selected.paidAt)}</div>
-                    {selected.paymentReference && <div style={{ fontSize: 12, color: "#166534" }}>Ref: {selected.paymentReference}</div>}
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-success-text-strong)" }}>✓ Paid {fmtD(selected.paidAt)}</div>
+                    {selected.paymentReference && <div style={{ fontSize: 12, color: "var(--hf-success-text-strong)" }}>Ref: {selected.paymentReference}</div>}
                   </div>
                   {/* NEW: gap-analysis item — remittance advice PDF,
                       only downloadable once actually paid, matching the
                       backend's own guard. */}
                   <button onClick={() => downloadRemittanceAdvice(selected.id)} disabled={downloadingRemittance}
-                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#fff", border: "1px solid #86EFAC", borderRadius: 7, fontSize: 12, fontWeight: 600, color: "#166534", cursor: "pointer" }}>
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-surface)", border: "1px solid var(--hf-success-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, color: "var(--hf-success-text-strong)", cursor: "pointer" }}>
                     <Download size={12} /> {downloadingRemittance ? "Downloading…" : "Remittance Advice"}
                   </button>
                 </div>
               </div>
             )}
-            {selected.approvedByName && <div style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>Approved by {selected.approvedByName} on {fmtD(selected.approvedAt)}</div>}
-            {selected.notes && <div style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>Notes: {selected.notes}</div>}
+            {selected.approvedByName && <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 12 }}>Approved by {selected.approvedByName} on {fmtD(selected.approvedAt)}</div>}
+            {selected.notes && <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 12 }}>Notes: {selected.notes}</div>}
 
             {/* NEW: gap-analysis item — supplier invoice attachments.
                 Base64-in-DB, following Creative's own proven pattern
@@ -409,10 +409,10 @@ export function InvoicesTab() {
                 ScSupplierInvoiceAttachment.java's class Javadoc. */}
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                   Attachments{attachments.length > 0 ? ` (${attachments.length})` : ""}
                 </div>
-                <label style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, cursor: uploadingAttachment ? "default" : "pointer", color: "#374151", opacity: uploadingAttachment ? .6 : 1 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12, cursor: uploadingAttachment ? "default" : "pointer", color: "var(--hf-text-secondary)", opacity: uploadingAttachment ? .6 : 1 }}>
                   <Paperclip size={12} />
                   {uploadingAttachment ? "Uploading…" : "Add File"}
                   <input type="file" style={{ display: "none" }} disabled={uploadingAttachment}
@@ -421,18 +421,18 @@ export function InvoicesTab() {
               </div>
               {attachError && <ErrBox msg={attachError} />}
               {attachments.length === 0
-                ? <div style={{ fontSize: 12, color: "#94A3B8" }}>No attachments yet.</div>
+                ? <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>No attachments yet.</div>
                 : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {attachments.map(a => (
-                      <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 10px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 7 }}>
+                      <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 10px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 7 }}>
                         <button onClick={() => downloadAttachment(a)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: ACCENT, fontWeight: 600, textAlign: "left", padding: 0 }}>
                           {a.fileName}
                         </button>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                          <span style={{ fontSize: 11, color: "#94A3B8" }}>{(a.fileSizeBytes / 1024).toFixed(0)} KB</span>
+                          <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{(a.fileSizeBytes / 1024).toFixed(0)} KB</span>
                           <button onClick={() => deleteAttachMut.mutate(a.id)} disabled={deleteAttachMut.isPending}
-                            style={{ background: "none", border: "none", cursor: "pointer", color: "#DC2626", display: "flex" }}>
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-danger-text)", display: "flex" }}>
                             <Trash2 size={13} />
                           </button>
                         </div>
@@ -450,16 +450,16 @@ export function InvoicesTab() {
                 status), so this stays as its own thing rather than being
                 forced into it. */}
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
-              <button onClick={() => { setSelected(null); setErr(""); setAttachError("") }} style={{ padding: "9px 16px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 13, cursor: "pointer", color: "#64748B" }}>Close</button>
+              <button onClick={() => { setSelected(null); setErr(""); setAttachError("") }} style={{ padding: "9px 16px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-muted)" }}>Close</button>
               {(selected.status === "RECEIVED" || selected.status === "UNDER_REVIEW") && (
                 <button onClick={() => approveMut.mutate(selected.id)} disabled={approveMut.isPending}
-                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 16px", background: "#DCFCE7", color: "#166534", border: "1px solid #86EFAC", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 16px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                   <CheckCircle size={13} /> {approveMut.isPending ? "Approving…" : "Approve"}
                 </button>
               )}
               {selected.status === "APPROVED" && (
                 <button onClick={() => setShowMarkPaid(true)}
-                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 16px", background: "#DBEAFE", color: "#1D4ED8", border: "1px solid #93C5FD", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 16px", background: "var(--hf-info-soft-strong)", color: "var(--hf-info-text)", border: "1px solid var(--hf-info-border)", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                   <CreditCard size={13} /> Mark as Paid
                 </button>
               )}
@@ -468,11 +468,11 @@ export function InvoicesTab() {
               {selected.status === "DISPUTED" && (
                 <>
                   <button onClick={() => { setReasonAction("override"); setReasonText(""); setErr("") }}
-                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 16px", background: "#EDE9FE", color: "#7C3AED", border: "1px solid #C4B5FD", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 16px", background: "var(--hf-violet-soft-strong)", color: "var(--hf-violet-text)", border: "1px solid var(--hf-violet-border)", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                     <CheckCircle size={13} /> Override &amp; Approve
                   </button>
                   <button onClick={() => { setReasonAction("cancel"); setReasonText(""); setErr("") }}
-                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 16px", background: "#FEE2E2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 16px", background: "var(--hf-danger-soft-strong)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                     <AlertTriangle size={13} /> Cancel Invoice
                   </button>
                 </>
@@ -481,14 +481,14 @@ export function InvoicesTab() {
 
             {/* Mark paid sub-panel */}
             {showMarkPaid && (
-              <div style={{ marginTop: 14, padding: "14px 16px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10 }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Payment Reference *</label>
+              <div style={{ marginTop: 14, padding: "14px 16px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 6 }}>Payment Reference *</label>
                 <input value={paymentRef} onChange={e => setPaymentRef(e.target.value)} placeholder="e.g. EFT-20260703-001 or cheque number" style={inp} autoFocus />
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
-                  <button onClick={() => { setShowMarkPaid(false); setPaymentRef("") }} style={{ padding: "7px 14px", border: "1px solid #E2E8F0", borderRadius: 8, background: "#fff", fontSize: 12, cursor: "pointer" }}>Cancel</button>
+                  <button onClick={() => { setShowMarkPaid(false); setPaymentRef("") }} style={{ padding: "7px 14px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", fontSize: 12, cursor: "pointer" }}>Cancel</button>
                   <button onClick={() => { if (!paymentRef.trim()) return; paidMut.mutate({ id: selected.id, ref: paymentRef.trim() }) }}
                     disabled={!paymentRef.trim() || paidMut.isPending}
-                    style={{ padding: "7px 14px", background: ACCENT, color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: !paymentRef.trim() ? .5 : 1 }}>
+                    style={{ padding: "7px 14px", background: ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: !paymentRef.trim() ? .5 : 1 }}>
                     {paidMut.isPending ? "Saving…" : "Confirm Payment"}
                   </button>
                 </div>
@@ -499,22 +499,22 @@ export function InvoicesTab() {
                 both dispute-resolution actions — same visual pattern as
                 the mark-paid panel above. */}
             {reasonAction && (
-              <div style={{ marginTop: 14, padding: "14px 16px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10 }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>
+              <div style={{ marginTop: 14, padding: "14px 16px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 6 }}>
                   {reasonAction === "override" ? "Reason for overriding this dispute *" : "Reason for cancelling this invoice *"}
                 </label>
                 <input value={reasonText} onChange={e => setReasonText(e.target.value)}
                   placeholder={reasonAction === "override" ? "e.g. Variance confirmed acceptable with supplier" : "e.g. Duplicate invoice — requesting corrected copy"}
                   style={inp} autoFocus />
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
-                  <button onClick={() => { setReasonAction(null); setReasonText("") }} style={{ padding: "7px 14px", border: "1px solid #E2E8F0", borderRadius: 8, background: "#fff", fontSize: 12, cursor: "pointer" }}>Cancel</button>
+                  <button onClick={() => { setReasonAction(null); setReasonText("") }} style={{ padding: "7px 14px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", fontSize: 12, cursor: "pointer" }}>Cancel</button>
                   <button onClick={() => {
                       if (!reasonText.trim()) return
                       if (reasonAction === "override") overrideMut.mutate({ id: selected.id, reason: reasonText.trim() })
                       else cancelInvoiceMut.mutate({ id: selected.id, reason: reasonText.trim() })
                     }}
                     disabled={!reasonText.trim() || overrideMut.isPending || cancelInvoiceMut.isPending}
-                    style={{ padding: "7px 14px", background: reasonAction === "override" ? "#7C3AED" : "#DC2626", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: !reasonText.trim() ? .5 : 1 }}>
+                    style={{ padding: "7px 14px", background: reasonAction === "override" ? "var(--hf-violet)" : "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: !reasonText.trim() ? .5 : 1 }}>
                     {(overrideMut.isPending || cancelInvoiceMut.isPending) ? "Saving…" : reasonAction === "override" ? "Confirm Override" : "Confirm Cancellation"}
                   </button>
                 </div>
@@ -526,7 +526,7 @@ export function InvoicesTab() {
       {/* Create Invoice Modal */}
       {showCreate && (
         <Modal title="Record Supplier Invoice" onClose={() => { setShowCreate(false); setErr(""); setInvalidFields(new Set()) }}>
-            <div style={{ marginBottom: 14, padding: "10px 12px", background: "#FFFBEB", border: "1px solid #FCD34D", borderRadius: 8, fontSize: 12, color: "#92400E" }}>
+            <div style={{ marginBottom: 14, padding: "10px 12px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 8, fontSize: 12, color: "var(--hf-warning-text-deep)" }}>
               Linking a PO and GR enables 3-way matching — HandyFlow will automatically compare amounts and flag discrepancies.
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -558,7 +558,7 @@ export function InvoicesTab() {
                     ))}
                   </select>
                   {poGoodsReceipts.length === 0 && (
-                    <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>No goods receipts recorded against this PO yet.</div>
+                    <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>No goods receipts recorded against this PO yet.</div>
                   )}
                 </Field>
               )}

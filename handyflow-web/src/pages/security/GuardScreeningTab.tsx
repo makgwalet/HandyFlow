@@ -88,8 +88,8 @@ export default function GuardScreeningTab() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0F172A" }}>Guard Screening</h2>
-          <div style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>Vetting history — polygraph, criminal record, references, and more</div>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "var(--hf-text)" }}>Guard Screening</h2>
+          <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginTop: 2 }}>Vetting history — polygraph, criminal record, references, and more</div>
         </div>
         <div style={{ minWidth: 220 }}>
           <select value={guardId} onChange={e => setGuardId(e.target.value)} style={inp}>
@@ -100,30 +100,30 @@ export default function GuardScreeningTab() {
       </div>
 
       {!guardId ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>
           <ShieldCheck size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
           <div>Select a guard to view or manage their screening history.</div>
         </div>
       ) : (
         <div>
           {gateWarning && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, color: "#B45309", fontSize: 13, marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 8, color: "var(--hf-warning-text-strong)", fontSize: 13, marginBottom: 16 }}>
               <AlertTriangle size={15} /> {gateWarning}
             </div>
           )}
-          {error && <div style={{ padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#DC2626", fontSize: 13, marginBottom: 14 }}>{error}</div>}
+          {error && <div style={{ padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, color: "var(--hf-danger-text)", fontSize: 13, marginBottom: 14 }}>{error}</div>}
 
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
             <button onClick={() => { setNewForm({ screeningType: "CRIMINAL_RECORD_CHECK", reason: "ONBOARDING" }); setShowNew(true); setError("") }}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               <Plus size={14} /> New Screening
             </button>
           </div>
 
           {isLoading ? (
-            <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>Loading…</div>
+            <div style={{ textAlign: "center", padding: 30, color: "var(--hf-text-faint)" }}>Loading…</div>
           ) : history.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12 }}>
+            <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }}>
               No screening records for this guard yet.
             </div>
           ) : (
@@ -132,29 +132,29 @@ export default function GuardScreeningTab() {
                 const rc = RESULT_CFG[r.result] ?? RESULT_CFG.PENDING
                 const Icon = rc.icon
                 return (
-                  <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
+                  <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <div style={{ width: 36, height: 36, borderRadius: 9, background: rc.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                         <Icon size={16} color={rc.color} />
                       </div>
                       <div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{r.screeningType.replace(/_/g, " ")}</span>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: "#1B3A6B", background: "#EFF6FF", padding: "2px 8px", borderRadius: 4 }}>{r.reason.replace(/_/g, " ")}</span>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{r.screeningType.replace(/_/g, " ")}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-primary-text)", background: "var(--hf-info-soft)", padding: "2px 8px", borderRadius: 4 }}>{r.reason.replace(/_/g, " ")}</span>
                         </div>
-                        <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                        <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>
                           Created {fmtDate(r.createdAt)}
                           {r.conductedAt && <> · Conducted {fmtDate(r.conductedAt)}{r.conductedBy && ` by ${r.conductedBy}`}</>}
                           {r.nextDueAt && <> · Next due {fmtDate(r.nextDueAt)}</>}
                         </div>
-                        {r.notes && <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>{r.notes}</div>}
+                        {r.notes && <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 2 }}>{r.notes}</div>}
                       </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: rc.bg, color: rc.color }}>{rc.label}</span>
                       {r.result === "PENDING" && (
                         <button onClick={() => { setResultForm({ result: "PASS", conductedBy: "", conductedAt: new Date().toISOString().slice(0, 10), nextDueAt: "", reportRef: "", notes: "" }); setResultFor(r) }}
-                          style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid #1B3A6B", background: "#EFF6FF", color: "#1B3A6B", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid var(--hf-primary)", background: "var(--hf-info-soft)", color: "var(--hf-primary-text)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                           Record Result
                         </button>
                       )}
@@ -170,8 +170,8 @@ export default function GuardScreeningTab() {
       {/* New screening modal */}
       {showNew && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: 26, width: 420 }}>
-            <h3 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>New Screening</h3>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 26, width: 420 }}>
+            <h3 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>New Screening</h3>
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Type</label>
               <select value={newForm.screeningType} onChange={e => setNewForm(f => ({ ...f, screeningType: e.target.value }))} style={inp}>
@@ -207,8 +207,8 @@ export default function GuardScreeningTab() {
       {/* Record result modal */}
       {resultFor && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: 26, width: 440 }}>
-            <h3 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Record Result — {resultFor.screeningType.replace(/_/g, " ")}</h3>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 26, width: 440 }}>
+            <h3 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Record Result — {resultFor.screeningType.replace(/_/g, " ")}</h3>
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Result</label>
               <select value={resultForm.result} onChange={e => setResultForm(f => ({ ...f, result: e.target.value }))} style={inp}>

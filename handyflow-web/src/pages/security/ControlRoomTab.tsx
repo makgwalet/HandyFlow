@@ -39,18 +39,18 @@ interface Dispatch {
 // ── Config ─────────────────────────────────────────────────────────────────────
 
 const SEV_CONFIG = {
-  LOW:      { color: "#0369A1", bg: "#E0F2FE", dot: "#0EA5E9" },
-  MEDIUM:   { color: "#92400E", bg: "#FEF3C7", dot: "#F59E0B" },
-  HIGH:     { color: "#C2410C", bg: "#FFF7ED", dot: "#F97316" },
-  CRITICAL: { color: "#991B1B", bg: "#FEF2F2", dot: "#DC2626" },
+  LOW:      { color: "var(--hf-sky-text-strong)", bg: "var(--hf-sky-soft-strong)", dot: "#0EA5E9" },
+  MEDIUM:   { color: "var(--hf-warning-text-deep)", bg: "var(--hf-warning-soft-strong)", dot: "var(--hf-warning)" },
+  HIGH:     { color: "var(--hf-orange-text-strong)", bg: "var(--hf-orange-soft)", dot: "#F97316" },
+  CRITICAL: { color: "var(--hf-danger-text-strong)", bg: "var(--hf-danger-soft)", dot: "var(--hf-danger)" },
 }
 
 const STATUS_CONFIG = {
-  NEW:        { label: "New",         color: "#1D4ED8", bg: "#EFF6FF" },
-  TRIAGED:    { label: "Triaged",     color: "#92400E", bg: "#FEF3C7" },
-  DISPATCHED: { label: "Dispatched",  color: "#166534", bg: "#DCFCE7" },
-  RESOLVED:   { label: "Resolved",    color: "#64748B", bg: "#F1F5F9" },
-  FALSE_ALARM:{ label: "False Alarm", color: "#94A3B8", bg: "#F8FAFC" },
+  NEW:        { label: "New",         color: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+  TRIAGED:    { label: "Triaged",     color: "var(--hf-warning-text-deep)", bg: "var(--hf-warning-soft-strong)" },
+  DISPATCHED: { label: "Dispatched",  color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+  RESOLVED:   { label: "Resolved",    color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
+  FALSE_ALARM:{ label: "False Alarm", color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)" },
 }
 
 const fmtTime = (iso: string) =>
@@ -172,37 +172,37 @@ export default function ControlRoomTab() {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Control Room</h2>
-          <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748B" }}>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Control Room</h2>
+          <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--hf-text-muted)" }}>
             {openEvents.length} open event{openEvents.length !== 1 ? "s" : ""} · {openDispatches.length} active dispatch{openDispatches.length !== 1 ? "es" : ""}
           </p>
         </div>
-        <button onClick={() => refetch()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", border: "1px solid #E2E8F0", borderRadius: 8, background: "#fff", color: "#64748B", fontSize: 12, cursor: "pointer" }}>
+        <button onClick={() => refetch()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12, cursor: "pointer" }}>
           <RefreshCw size={13} /> Refresh
         </button>
       </div>
 
       {/* Active dispatches strip */}
       {openDispatches.length > 0 && (
-        <div style={{ background: "#FEF3C7", border: "1px solid #FDE68A", borderRadius: 10, padding: "12px 16px", marginBottom: 20 }}>
-          <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#92400E", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+        <div style={{ background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border)", borderRadius: 10, padding: "12px 16px", marginBottom: 20 }}>
+          <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "var(--hf-warning-text-deep)", letterSpacing: "0.06em", textTransform: "uppercase" }}>
             Active Dispatches
           </p>
           {openDispatches.map(d => (
-            <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #FDE68A" }}>
-              <div style={{ fontSize: 12, color: "#78350F" }}>
+            <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid var(--hf-warning-border)" }}>
+              <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>
                 <strong>{d.dispatchedUnitType.replace("_", " ")}</strong>
                 {d.dispatchedGuardName && ` — ${d.dispatchedGuardName}`}
                 {" · "}<Clock size={10} style={{ verticalAlign: "middle" }} /> {fmtTime(d.dispatchedAt)}
-                {d.arrivedAt && <span style={{ color: "#166534" }}> · On scene {fmtTime(d.arrivedAt)}</span>}
+                {d.arrivedAt && <span style={{ color: "var(--hf-success-text-strong)" }}> · On scene {fmtTime(d.arrivedAt)}</span>}
               </div>
               <div style={{ display: "flex", gap: 6 }}>
                 {!d.arrivedAt && (
-                  <button onClick={() => arrive.mutate(d.id)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid #D97706", background: "#FFFBEB", color: "#92400E", cursor: "pointer" }}>
+                  <button onClick={() => arrive.mutate(d.id)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--hf-warning)", background: "var(--hf-warning-soft)", color: "var(--hf-warning-text-deep)", cursor: "pointer" }}>
                     On Scene
                   </button>
                 )}
-                <button onClick={() => setShowResolve(d.id)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid #16A34A", background: "#F0FDF4", color: "#166534", cursor: "pointer" }}>
+                <button onClick={() => setShowResolve(d.id)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--hf-success)", background: "var(--hf-success-soft)", color: "var(--hf-success-text-strong)", cursor: "pointer" }}>
                   Resolve
                 </button>
               </div>
@@ -216,9 +216,9 @@ export default function ControlRoomTab() {
         {/* Event list */}
         <div>
           {isLoading ? (
-            <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading events…</p>
+            <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading events…</p>
           ) : events.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 0", color: "#CBD5E1" }}>
+            <div style={{ textAlign: "center", padding: "40px 0", color: "var(--hf-text-disabled)" }}>
               <Siren size={32} strokeWidth={1.5} style={{ margin: "0 auto 8px", display: "block" }} />
               <p style={{ margin: 0, fontWeight: 500 }}>No alarm events yet</p>
             </div>
@@ -231,7 +231,7 @@ export default function ControlRoomTab() {
                   style={{
                     display: "flex", alignItems: "center", gap: 12,
                     padding: "12px 16px", border: `1px solid ${selected?.id === e.id ? "#0D9488" : "#E2E8F0"}`,
-                    borderRadius: 10, background: selected?.id === e.id ? "#F0FDFA" : "#fff",
+                    borderRadius: 10, background: selected?.id === e.id ? "var(--hf-accent-soft)" : "var(--hf-surface)",
                     cursor: "pointer", textAlign: "left", width: "100%",
                     transition: "border-color 0.15s, background 0.15s",
                   }}
@@ -239,12 +239,12 @@ export default function ControlRoomTab() {
                   <SevDot sev={e.severity} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: "#0F172A" }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--hf-text)" }}>
                         {e.source.replace(/_/g, " ")}
                       </span>
                       <StatusBadge status={e.status} />
                     </div>
-                    <p style={{ margin: 0, fontSize: 11, color: "#64748B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <p style={{ margin: 0, fontSize: 11, color: "var(--hf-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {e.description ?? "No description"} · {fmtDate(e.createdAt)} {fmtTime(e.createdAt)}
                     </p>
                   </div>
@@ -256,22 +256,22 @@ export default function ControlRoomTab() {
         </div>
 
         {/* Detail panel */}
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, padding: 20, alignSelf: "start", background: "#FAFAFA" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, padding: 20, alignSelf: "start", background: "var(--hf-surface-muted)" }}>
           {!selected ? (
-            <div style={{ textAlign: "center", padding: "40px 0", color: "#CBD5E1" }}>
+            <div style={{ textAlign: "center", padding: "40px 0", color: "var(--hf-text-disabled)" }}>
               <AlertTriangle size={28} strokeWidth={1.5} style={{ display: "block", margin: "0 auto 8px" }} />
               <p style={{ margin: 0, fontSize: 12 }}>Select an event to action</p>
             </div>
           ) : (
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)" }}>
                   {selected.source.replace(/_/g, " ")}
                 </span>
                 <StatusBadge status={selected.status} />
               </div>
 
-              <div style={{ fontSize: 11, color: "#64748B", marginBottom: 14, display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginBottom: 14, display: "flex", flexDirection: "column", gap: 4 }}>
                 <span><strong>Severity:</strong> {selected.severity}</span>
                 <span><Clock size={10} style={{ verticalAlign: "middle" }} /> {fmtDate(selected.createdAt)} {fmtTime(selected.createdAt)}</span>
                 {selected.description && <span>{selected.description}</span>}
@@ -295,7 +295,7 @@ export default function ControlRoomTab() {
               )}
               {showDispatch && (
                 <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-                  {apiError && <p style={{ margin: 0, fontSize: 11, color: "#DC2626" }}>{apiError}</p>}
+                  {apiError && <p style={{ margin: 0, fontSize: 11, color: "var(--hf-danger-text)" }}>{apiError}</p>}
                   <select value={dispatchForm.unitType} onChange={e => setDispatchForm(f => ({ ...f, unitType: e.target.value }))}
                     style={inputStyle}>
                     <option value="ARMED_RESPONSE">Armed Response</option>
@@ -356,13 +356,13 @@ export default function ControlRoomTab() {
 const btnStyle = (color: string) => ({
   display: "flex", alignItems: "center", gap: 6, justifyContent: "center" as const,
   width: "100%", padding: "9px 14px", borderRadius: 8,
-  border: `1px solid ${color}`, background: color, color: "#fff",
+  border: `1px solid ${color}`, background: color, color: "var(--hf-text-on-solid)",
   fontSize: 12, fontWeight: 600, cursor: "pointer",
 } as const)
 
 const inputStyle = {
-  width: "100%", padding: "8px 10px", border: "1px solid #E2E8F0",
-  borderRadius: 8, fontSize: 12, background: "#fff", boxSizing: "border-box" as const,
+  width: "100%", padding: "8px 10px", border: "1px solid var(--hf-border)",
+  borderRadius: 8, fontSize: 12, background: "var(--hf-surface)", boxSizing: "border-box" as const,
 } as const
 
 const modalOverlay = {
@@ -371,6 +371,6 @@ const modalOverlay = {
 } as const
 
 const modalBox = {
-  background: "#fff", borderRadius: 14, padding: 24, width: 420,
+  background: "var(--hf-surface)", borderRadius: 14, padding: 24, width: 420,
   boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
 } as const

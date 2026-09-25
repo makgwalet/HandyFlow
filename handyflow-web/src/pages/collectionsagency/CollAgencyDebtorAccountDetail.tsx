@@ -34,8 +34,8 @@ interface CollectorResponse { id: string; fullName: string; active: boolean }
 
 const CONTACT_METHODS = ["PHONE", "EMAIL", "SMS", "WHATSAPP", "LETTER", "IN_PERSON"]
 const OUTCOMES = ["NO_ANSWER", "LEFT_MESSAGE", "PROMISE_TO_PAY", "DISPUTED", "REFUSED_TO_PAY", "WRONG_NUMBER", "PAID_IN_FULL", "OTHER"]
-const inputStyle: React.CSSProperties = { width: "100%", padding: "8px 11px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
-const labelStyle: React.CSSProperties = { fontSize: 11.5, fontWeight: 600, color: "#374151", marginBottom: 4, display: "block" }
+const inputStyle: React.CSSProperties = { width: "100%", padding: "8px 11px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
+const labelStyle: React.CSSProperties = { fontSize: 11.5, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4, display: "block" }
 
 function ContactLogForm({ accountId, onDone }: { accountId: string; onDone: () => void }) {
   const qc = useQueryClient()
@@ -58,7 +58,7 @@ function ContactLogForm({ accountId, onDone }: { accountId: string; onDone: () =
   })
 
   return (
-    <div style={{ background: "#FAFBFF", border: "1px solid #E2E8F0", borderRadius: 12, padding: 18, marginBottom: 16 }}>
+    <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 18, marginBottom: 16 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
         <div>
           <label style={labelStyle}>Contact date</label>
@@ -96,29 +96,29 @@ function ContactLogForm({ accountId, onDone }: { accountId: string; onDone: () =
         <textarea style={{ ...inputStyle, minHeight: 50, resize: "vertical" }} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
       </div>
 
-      <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 10, padding: 12, marginBottom: 14 }}>
+      <div style={{ background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 10, padding: 12, marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
           <ShieldAlert size={14} color="#92400E" />
-          <p style={{ fontSize: 12, fontWeight: 700, color: "#92400E", margin: 0 }}>Mandatory NCA disclosures — all three required to record this contact</p>
+          <p style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-warning-text-deep)", margin: 0 }}>Mandatory NCA disclosures — all three required to record this contact</p>
         </div>
         {[
           ["disclosedThirdPartyCollector", "Disclosed that this agency is a third-party collector"],
           ["disclosedOriginalCreditor", "Disclosed the name of the original creditor"],
           ["disclosedDebtorRights", "Disclosed the debtor's rights"],
         ].map(([key, label]) => (
-          <label key={key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "#78350F", marginBottom: 4, cursor: "pointer" }}>
+          <label key={key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--hf-warning-text-deep)", marginBottom: 4, cursor: "pointer" }}>
             <input type="checkbox" checked={(form as any)[key]} onChange={e => setForm({ ...form, [key]: e.target.checked })} />
             {label}
           </label>
         ))}
       </div>
 
-      {save.isError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 10 }}>{(save.error as any)?.response?.data?.message ?? "Could not record this contact"}</p>}
+      {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 10 }}>{(save.error as any)?.response?.data?.message ?? "Could not record this contact"}</p>}
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-        <button onClick={onDone} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#fff", fontSize: 12.5, cursor: "pointer" }}>Cancel</button>
+        <button onClick={onDone} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", fontSize: 12.5, cursor: "pointer" }}>Cancel</button>
         <button onClick={() => save.mutate()} disabled={!valid || save.isPending}
-          style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: valid ? CA_ACCENT : "#CBD5E1", color: "#fff", fontSize: 12.5, fontWeight: 600, cursor: valid ? "pointer" : "not-allowed" }}>
+          style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: valid ? CA_ACCENT : "#CBD5E1", color: "var(--hf-text-on-solid)", fontSize: 12.5, fontWeight: 600, cursor: valid ? "pointer" : "not-allowed" }}>
           {save.isPending ? "Recording…" : "Record contact"}
         </button>
       </div>
@@ -139,7 +139,7 @@ function PaymentPlanForm({ accountId, onDone }: { accountId: string; onDone: () 
   const valid = form.totalAgreedAmount && form.installmentAmount && form.numberOfInstallments
 
   return (
-    <div style={{ background: "#FAFBFF", border: "1px solid #E2E8F0", borderRadius: 12, padding: 18, marginBottom: 16 }}>
+    <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 18, marginBottom: 16 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
         <div><label style={labelStyle}>Total agreed amount</label><input type="number" step="0.01" style={inputStyle} value={form.totalAgreedAmount} onChange={e => setForm({ ...form, totalAgreedAmount: e.target.value })} /></div>
         <div><label style={labelStyle}>Installment amount</label><input type="number" step="0.01" style={inputStyle} value={form.installmentAmount} onChange={e => setForm({ ...form, installmentAmount: e.target.value })} /></div>
@@ -153,11 +153,11 @@ function PaymentPlanForm({ accountId, onDone }: { accountId: string; onDone: () 
         <div><label style={labelStyle}>Start date</label><input type="date" style={inputStyle} value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} /></div>
       </div>
       <div style={{ marginBottom: 12 }}><label style={labelStyle}>Notes</label><textarea style={{ ...inputStyle, minHeight: 44 }} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
-      {save.isError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 10 }}>{(save.error as any)?.response?.data?.message ?? "Could not propose this plan"}</p>}
+      {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 10 }}>{(save.error as any)?.response?.data?.message ?? "Could not propose this plan"}</p>}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-        <button onClick={onDone} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#fff", fontSize: 12.5, cursor: "pointer" }}>Cancel</button>
+        <button onClick={onDone} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", fontSize: 12.5, cursor: "pointer" }}>Cancel</button>
         <button onClick={() => save.mutate()} disabled={!valid || save.isPending}
-          style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: valid ? CA_ACCENT : "#CBD5E1", color: "#fff", fontSize: 12.5, fontWeight: 600, cursor: valid ? "pointer" : "not-allowed" }}>
+          style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: valid ? CA_ACCENT : "#CBD5E1", color: "var(--hf-text-on-solid)", fontSize: 12.5, fontWeight: 600, cursor: valid ? "pointer" : "not-allowed" }}>
           {save.isPending ? "Proposing…" : "Propose plan"}
         </button>
       </div>
@@ -217,49 +217,49 @@ export default function CollAgencyDebtorAccountDetail({ accountId, clientId, onB
     window.URL.revokeObjectURL(url)
   }
 
-  if (!account) return <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+  if (!account) return <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p>
 
-  const colors = STATUS_COLORS[account.status] ?? { bg: "#F1F5F9", fg: "#64748B" }
+  const colors = STATUS_COLORS[account.status] ?? { bg: "var(--hf-surface-sunken)", fg: "var(--hf-text-muted)" }
   const isTerminal = ["RECOVERED", "RETURNED_TO_CLIENT", "WRITTEN_OFF", "CLOSED"].includes(account.status)
 
   return (
     <div>
-      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "#64748B", fontSize: 13, marginBottom: 16, padding: 0 }}>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-muted)", fontSize: 13, marginBottom: 16, padding: 0 }}>
         <ArrowLeft size={15} /> Back to debtor accounts
       </button>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0F172A", margin: 0 }}>{account.debtorName}</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>{account.debtorName}</h2>
             <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: colors.bg, color: colors.fg }}>{account.status.replace(/_/g, " ")}</span>
           </div>
-          <p style={{ fontSize: 12, color: "#94A3B8", margin: 0 }}>
+          <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: 0 }}>
             {account.accountReference ? `${account.accountReference} · ` : ""}Original creditor: {account.originalCreditorName}
             {account.debtorEmail ? ` · ${account.debtorEmail}` : ""}{account.debtorPhone ? ` · ${account.debtorPhone}` : ""}
           </p>
         </div>
         <button onClick={downloadDemandLetter}
-          style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 600, color: "#374151", cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 600, color: "var(--hf-text-secondary)", cursor: "pointer" }}>
           <Download size={14} /> Demand letter PDF
         </button>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
-        <div style={{ background: "#F8FAFC", borderRadius: 10, padding: 14 }}>
-          <p style={{ fontSize: 11, color: "#94A3B8", margin: "0 0 4px" }}>Current balance / Original</p>
-          <p style={{ fontSize: 16, fontWeight: 800, color: "#0F172A", margin: 0 }}>{fmtMoney(account.currentBalance)} <span style={{ fontWeight: 400, fontSize: 12, color: "#94A3B8" }}>/ {fmtMoney(account.originalDebtAmount)}</span></p>
+        <div style={{ background: "var(--hf-surface-muted)", borderRadius: 10, padding: 14 }}>
+          <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: "0 0 4px" }}>Current balance / Original</p>
+          <p style={{ fontSize: 16, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>{fmtMoney(account.currentBalance)} <span style={{ fontWeight: 400, fontSize: 12, color: "var(--hf-text-faint)" }}>/ {fmtMoney(account.originalDebtAmount)}</span></p>
         </div>
-        <div style={{ background: "#F8FAFC", borderRadius: 10, padding: 14 }}>
-          <p style={{ fontSize: 11, color: "#94A3B8", margin: "0 0 6px" }}>Assigned collector</p>
+        <div style={{ background: "var(--hf-surface-muted)", borderRadius: 10, padding: 14 }}>
+          <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: "0 0 6px" }}>Assigned collector</p>
           <select disabled={isTerminal} value={account.assignedCollectorId ?? ""} onChange={e => assignCollector.mutate(e.target.value)}
             style={{ ...inputStyle, padding: "5px 8px", fontSize: 12.5 }}>
             <option value="">Unassigned</option>
             {collectors.filter(c => c.active).map(c => <option key={c.id} value={c.id}>{c.fullName}</option>)}
           </select>
         </div>
-        <div style={{ background: "#F8FAFC", borderRadius: 10, padding: 14 }}>
-          <p style={{ fontSize: 11, color: "#94A3B8", margin: "0 0 6px" }}>Advance status</p>
+        <div style={{ background: "var(--hf-surface-muted)", borderRadius: 10, padding: 14 }}>
+          <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: "0 0 6px" }}>Advance status</p>
           <select disabled={isTerminal} value="" onChange={e => { if (e.target.value) advanceStatus.mutate(e.target.value) }} style={{ ...inputStyle, padding: "5px 8px", fontSize: 12.5 }}>
             <option value="">{isTerminal ? "Closed — no further changes" : "Choose a new status…"}</option>
             {STATUSES.filter(s => s !== account.status).map(s => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
@@ -268,58 +268,58 @@ export default function CollAgencyDebtorAccountDetail({ accountId, clientId, onB
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        <p style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", margin: 0 }}>Contact trail ({contacts.length})</p>
+        <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Contact trail ({contacts.length})</p>
         {!isTerminal && !showContactForm && (
-          <button onClick={() => setShowContactForm(true)} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px solid #E2E8F0", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: CA_ACCENT, cursor: "pointer" }}>
+          <button onClick={() => setShowContactForm(true)} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: CA_ACCENT, cursor: "pointer" }}>
             <Plus size={13} /> Record contact
           </button>
         )}
       </div>
       {showContactForm && <ContactLogForm accountId={accountId} onDone={() => setShowContactForm(false)} />}
       {contacts.length === 0 ? (
-        <p style={{ fontSize: 12.5, color: "#94A3B8", marginBottom: 24 }}>No contact recorded yet.</p>
+        <p style={{ fontSize: 12.5, color: "var(--hf-text-faint)", marginBottom: 24 }}>No contact recorded yet.</p>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
           {contacts.map((c, i) => (
-            <div key={c.id} style={{ padding: "11px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9" }}>
+            <div key={c.id} style={{ padding: "11px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <p style={{ fontSize: 12.5, fontWeight: 600, color: "#0F172A", margin: 0 }}>{c.contactMethod.replace(/_/g, " ")} — {c.outcome.replace(/_/g, " ")}</p>
-                <p style={{ fontSize: 11.5, color: "#94A3B8", margin: 0 }}>{c.contactDate}{c.recordedByUserName ? ` · ${c.recordedByUserName}` : ""}</p>
+                <p style={{ fontSize: 12.5, fontWeight: 600, color: "var(--hf-text)", margin: 0 }}>{c.contactMethod.replace(/_/g, " ")} — {c.outcome.replace(/_/g, " ")}</p>
+                <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>{c.contactDate}{c.recordedByUserName ? ` · ${c.recordedByUserName}` : ""}</p>
               </div>
-              {c.notes && <p style={{ fontSize: 12, color: "#64748B", margin: "4px 0 0" }}>{c.notes}</p>}
-              {c.promisedPaymentDate && <p style={{ fontSize: 11.5, color: "#92400E", margin: "4px 0 0" }}>Promised {fmtMoney(c.promisedPaymentAmount ?? 0)} by {c.promisedPaymentDate}</p>}
+              {c.notes && <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "4px 0 0" }}>{c.notes}</p>}
+              {c.promisedPaymentDate && <p style={{ fontSize: 11.5, color: "var(--hf-warning-text-deep)", margin: "4px 0 0" }}>Promised {fmtMoney(c.promisedPaymentAmount ?? 0)} by {c.promisedPaymentDate}</p>}
             </div>
           ))}
         </div>
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        <p style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", margin: 0 }}>Payment plans ({plans.length})</p>
+        <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Payment plans ({plans.length})</p>
         {!isTerminal && !showPlanForm && !plans.some(p => p.status === "ACTIVE") && (
-          <button onClick={() => setShowPlanForm(true)} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px solid #E2E8F0", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: CA_ACCENT, cursor: "pointer" }}>
+          <button onClick={() => setShowPlanForm(true)} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: CA_ACCENT, cursor: "pointer" }}>
             <Plus size={13} /> Propose plan
           </button>
         )}
       </div>
       {showPlanForm && <PaymentPlanForm accountId={accountId} onDone={() => setShowPlanForm(false)} />}
       {plans.length === 0 ? (
-        <p style={{ fontSize: 12.5, color: "#94A3B8" }}>No payment plan proposed yet.</p>
+        <p style={{ fontSize: 12.5, color: "var(--hf-text-faint)" }}>No payment plan proposed yet.</p>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {plans.map((p, i) => (
-            <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9" }}>
+            <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div>
-                <p style={{ fontSize: 12.5, fontWeight: 600, color: "#0F172A", margin: "0 0 2px" }}>
+                <p style={{ fontSize: 12.5, fontWeight: 600, color: "var(--hf-text)", margin: "0 0 2px" }}>
                   {fmtMoney(p.installmentAmount)} {p.frequency.toLowerCase()} — {p.installmentsPaid}/{p.numberOfInstallments} paid
-                  <span style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: p.status === "ACTIVE" ? "#FEF3C7" : p.status === "COMPLETED" ? "#DCFCE7" : "#F1F5F9", color: p.status === "ACTIVE" ? "#92400E" : p.status === "COMPLETED" ? "#166534" : "#64748B" }}>{p.status}</span>
+                  <span style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: p.status === "ACTIVE" ? "var(--hf-warning-soft-strong)" : p.status === "COMPLETED" ? "var(--hf-success-soft-strong)" : "var(--hf-surface-sunken)", color: p.status === "ACTIVE" ? "var(--hf-warning-text-deep)" : p.status === "COMPLETED" ? "var(--hf-success-text-strong)" : "var(--hf-text-muted)" }}>{p.status}</span>
                 </p>
-                <p style={{ fontSize: 11.5, color: "#94A3B8", margin: 0 }}>Total {fmtMoney(p.totalAgreedAmount)}{p.nextDueDate ? ` · Next due ${p.nextDueDate}` : ""}</p>
+                <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>Total {fmtMoney(p.totalAgreedAmount)}{p.nextDueDate ? ` · Next due ${p.nextDueDate}` : ""}</p>
               </div>
               {p.status === "ACTIVE" && (
                 <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => markPaid.mutate(p.id)} style={{ fontSize: 11.5, fontWeight: 600, color: "#059669", background: "none", border: "1px solid #D1FAE5", borderRadius: 6, padding: "5px 10px", cursor: "pointer" }}>Mark installment paid</button>
-                  <button onClick={() => defaultPlan.mutate(p.id)} style={{ fontSize: 11.5, fontWeight: 600, color: "#DC2626", background: "none", border: "1px solid #FECACA", borderRadius: 6, padding: "5px 10px", cursor: "pointer" }}>Default</button>
-                  <button onClick={() => cancelPlan.mutate(p.id)} style={{ fontSize: 11.5, fontWeight: 600, color: "#64748B", background: "none", border: "1px solid #E2E8F0", borderRadius: 6, padding: "5px 10px", cursor: "pointer" }}>Cancel</button>
+                  <button onClick={() => markPaid.mutate(p.id)} style={{ fontSize: 11.5, fontWeight: 600, color: "var(--hf-success-text)", background: "none", border: "1px solid var(--hf-success-border-subtle)", borderRadius: 6, padding: "5px 10px", cursor: "pointer" }}>Mark installment paid</button>
+                  <button onClick={() => defaultPlan.mutate(p.id)} style={{ fontSize: 11.5, fontWeight: 600, color: "var(--hf-danger-text)", background: "none", border: "1px solid var(--hf-danger-border)", borderRadius: 6, padding: "5px 10px", cursor: "pointer" }}>Default</button>
+                  <button onClick={() => cancelPlan.mutate(p.id)} style={{ fontSize: 11.5, fontWeight: 600, color: "var(--hf-text-muted)", background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: "5px 10px", cursor: "pointer" }}>Cancel</button>
                 </div>
               )}
             </div>

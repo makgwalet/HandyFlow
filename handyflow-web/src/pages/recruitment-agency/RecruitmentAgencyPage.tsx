@@ -112,7 +112,7 @@ export function RecruitmentAgencyPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 60px)", fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${BORDER}`, background: "#fff", padding: "0 16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${BORDER}`, background: "var(--hf-surface)", padding: "0 16px" }}>
         <div style={{ display: "flex", gap: 4 }}>
           {([["clients", "Clients & Requisitions"], ["candidates", "Candidate Pool"]] as [Section, string][]).map(([id, label]) => (
             <button key={id} onClick={() => setSection(id)} style={{
@@ -168,7 +168,7 @@ function ClientsSection() {
 
   return (
     <div style={{ display: "flex", height: "100%" }}>
-      <div style={{ width: 280, borderRight: `1px solid ${BORDER}`, background: "#fff", display: "flex", flexDirection: "column" }}>
+      <div style={{ width: 280, borderRight: `1px solid ${BORDER}`, background: "var(--hf-surface)", display: "flex", flexDirection: "column" }}>
         <div style={{ padding: 14, borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 style={{ fontSize: 14, fontWeight: 800, color: INK, margin: 0 }}>Clients</h2>
           <button onClick={() => setShowNewClient(true)} style={btnPrimary}>+ New</button>
@@ -183,7 +183,7 @@ function ClientsSection() {
             visibleClients.map(c => (
               <button key={c.id} onClick={() => { setSelected(c); setTab("requisitions"); setSelectedRequisition(null) }}
                 style={{ display: "block", width: "100%", textAlign: "left" as const, padding: "10px 14px",
-                  background: selected?.id === c.id ? "#EFF6FF" : "none", border: "none", borderBottom: `1px solid ${BORDER}`, cursor: "pointer",
+                  background: selected?.id === c.id ? "var(--hf-info-soft)" : "none", border: "none", borderBottom: `1px solid ${BORDER}`, cursor: "pointer",
                   opacity: c.status === "INACTIVE" ? 0.55 : 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: INK }}>{c.tradingName}</div>
                 <div style={{ fontSize: 11, color: FAINT, marginTop: 2 }}>
@@ -208,8 +208,8 @@ function ClientsSection() {
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => setShowEditClient(true)} style={btnSecondary}>Edit</button>
                 <button onClick={toggleArchive} disabled={archiving}
-                  style={{ ...btnSecondary, color: selected.status === "INACTIVE" ? "#166534" : "#DC2626",
-                    borderColor: selected.status === "INACTIVE" ? "#166534" : "#DC2626" }}>
+                  style={{ ...btnSecondary, color: selected.status === "INACTIVE" ? "var(--hf-success-text-strong)" : "var(--hf-danger-text)",
+                    borderColor: selected.status === "INACTIVE" ? "var(--hf-success-solid-strong)" : "var(--hf-danger)" }}>
                   {archiving ? "…" : selected.status === "INACTIVE" ? "Reactivate" : "Deactivate"}
                 </button>
               </div>
@@ -327,7 +327,7 @@ function RequisitionsTab({ client, onSelectRequisition }: { client: AgencyClient
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {requisitions.map(r => (
             <div key={r.id} onClick={() => onSelectRequisition(r)}
-              style={{ textAlign: "left" as const, padding: "12px 16px", background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, cursor: "pointer" }}>
+              style={{ textAlign: "left" as const, padding: "12px 16px", background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, cursor: "pointer" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <span style={{ fontWeight: 700, fontSize: 13.5, color: INK }}>{r.title}</span>
@@ -340,14 +340,14 @@ function RequisitionsTab({ client, onSelectRequisition }: { client: AgencyClient
                     style={{ ...btnSecondary, padding: "3px 8px", fontSize: 11 }}>Edit</button>
                   {r.status === "OPEN" && (
                     <button onClick={e => handleCancel(e, r.id)} disabled={cancellingId === r.id}
-                      style={{ ...btnSecondary, padding: "3px 8px", fontSize: 11, color: "#DC2626", borderColor: "#DC2626" }}>
+                      style={{ ...btnSecondary, padding: "3px 8px", fontSize: 11, color: "var(--hf-danger-text)", borderColor: "var(--hf-danger)" }}>
                       {cancellingId === r.id ? "…" : "Cancel"}
                     </button>
                   )}
                   {/* NEW: reopen — see handleReopen comment above for why this matters */}
                   {r.status !== "OPEN" && (
                     <button onClick={e => handleReopen(e, r.id)} disabled={reopeningId === r.id}
-                      style={{ ...btnSecondary, padding: "3px 8px", fontSize: 11, color: "#166534", borderColor: "#166534" }}>
+                      style={{ ...btnSecondary, padding: "3px 8px", fontSize: 11, color: "var(--hf-success-text-strong)", borderColor: "var(--hf-success-solid-strong)" }}>
                       {reopeningId === r.id ? "…" : "Reopen"}
                     </button>
                   )}
@@ -478,7 +478,7 @@ function PlacementsView({ requisition, onBack }: { requisition: Requisition; onB
       {loading ? <Empty text="Loading…" /> : placements.length === 0 ? <Empty text="No candidates submitted yet." /> : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {placements.map(p => (
-            <div key={p.id} style={{ padding: "12px 16px", background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
+            <div key={p.id} style={{ padding: "12px 16px", background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontWeight: 700, fontSize: 13.5, color: INK }}>{p.candidateName}</span>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -581,7 +581,7 @@ function GenerateInvoiceButton({ placement }: { placement: Placement }) {
     } finally { setGenerating(false) }
   }
 
-  if (done) return <div style={{ marginTop: 8, fontSize: 12, color: "#166534", fontWeight: 600 }}>✓ Invoice generated — see the Invoices tab</div>
+  if (done) return <div style={{ marginTop: 8, fontSize: 12, color: "var(--hf-success-text-strong)", fontWeight: 600 }}>✓ Invoice generated — see the Invoices tab</div>
   return <button onClick={generate} disabled={generating} style={{ ...btnSecondary, marginTop: 8 }}>{generating ? "Generating…" : "Generate Invoice"}</button>
 }
 
@@ -794,7 +794,7 @@ function PortalAccessTab({ client }: { client: AgencyClient }) {
               <td style={cellStyle}>
                 {g.status !== "REVOKED" && (
                   <button onClick={() => handleRevoke(g.id)} disabled={revokingId === g.id}
-                    style={{ ...btnSecondary, color: "#DC2626", borderColor: "#DC2626" }}>
+                    style={{ ...btnSecondary, color: "var(--hf-danger-text)", borderColor: "var(--hf-danger)" }}>
                     {revokingId === g.id ? "…" : "Revoke"}
                   </button>
                 )}
@@ -890,7 +890,7 @@ function CandidatePoolSection() {
       {loading ? <Empty text="Loading…" /> : candidates.length === 0 ? <Empty text="No candidates in the pool yet." /> : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
           {candidates.map(c => (
-            <div key={c.id} style={{ padding: 14, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
+            <div key={c.id} style={{ padding: 14, background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
               <div style={{ fontWeight: 700, fontSize: 13.5, color: INK }}>{c.fullName}</div>
               <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{c.currentTitle ?? "No title"} {c.currentEmployer && `at ${c.currentEmployer}`}</div>
               {c.skills && <div style={{ fontSize: 11.5, color: FAINT, marginTop: 6 }}>{c.skills}</div>}
@@ -898,7 +898,7 @@ function CandidatePoolSection() {
                 <StatusBadge status={c.status} />
                 {c.hasCv ? (
                   <button onClick={() => handleDownloadCv(c.id, c.fullName)} disabled={downloadingId === c.id}
-                    style={{ fontSize: 11, color: "#166534", background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0 }}>
+                    style={{ fontSize: 11, color: "var(--hf-success-text-strong)", background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0 }}>
                     {downloadingId === c.id ? "Downloading…" : "✓ View CV"}
                   </button>
                 ) : (
@@ -957,19 +957,19 @@ function NewCandidateModal({ onClose, onCreated }: { onClose: () => void; onCrea
 
 function StatusBadge({ status }: { status: string }) {
   const tones: Record<string, { c: string; bg: string }> = {
-    ACTIVE: { c: "#166534", bg: "#DCFCE7" }, OPEN: { c: "#1D4ED8", bg: "#EFF6FF" },
-    FILLED: { c: "#166534", bg: "#DCFCE7" }, CANCELLED: { c: "#64748B", bg: "#F1F5F9" },
-    ON_HOLD: { c: "#D97706", bg: "#FFFBEB" }, SUBMITTED: { c: "#1D4ED8", bg: "#EFF6FF" },
-    CLIENT_REVIEW: { c: "#1D4ED8", bg: "#EFF6FF" }, CLIENT_INTERVIEW: { c: "#7C3AED", bg: "#F3E8FF" },
-    OFFERED: { c: "#D97706", bg: "#FFFBEB" }, PLACED: { c: "#166534", bg: "#DCFCE7" },
-    GUARANTEE_PERIOD: { c: "#D97706", bg: "#FFFBEB" }, COMPLETED: { c: "#166534", bg: "#DCFCE7" },
-    REJECTED_BY_CLIENT: { c: "#DC2626", bg: "#FEF2F2" }, WITHDRAWN: { c: "#64748B", bg: "#F1F5F9" },
-    CANDIDATE_DECLINED: { c: "#64748B", bg: "#F1F5F9" }, FAILED_GUARANTEE: { c: "#DC2626", bg: "#FEF2F2" },
-    PLACED_STATUS: { c: "#166534", bg: "#DCFCE7" }, DO_NOT_CONTACT: { c: "#DC2626", bg: "#FEF2F2" },
-    DRAFT: { c: "#64748B", bg: "#F1F5F9" }, SENT: { c: "#1D4ED8", bg: "#EFF6FF" },
-    PARTIAL: { c: "#1D4ED8", bg: "#EFF6FF" }, PAID: { c: "#166534", bg: "#DCFCE7" },
-    OVERDUE: { c: "#DC2626", bg: "#FEF2F2" }, PENDING: { c: "#D97706", bg: "#FFFBEB" },
-    REVOKED: { c: "#DC2626", bg: "#FEF2F2" }, INACTIVE: { c: "#64748B", bg: "#F1F5F9" },
+    ACTIVE: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" }, OPEN: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+    FILLED: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" }, CANCELLED: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
+    ON_HOLD: { c: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" }, SUBMITTED: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+    CLIENT_REVIEW: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" }, CLIENT_INTERVIEW: { c: "var(--hf-violet-text)", bg: "var(--hf-violet-soft-strong)" },
+    OFFERED: { c: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" }, PLACED: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+    GUARANTEE_PERIOD: { c: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" }, COMPLETED: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+    REJECTED_BY_CLIENT: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" }, WITHDRAWN: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
+    CANDIDATE_DECLINED: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" }, FAILED_GUARANTEE: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
+    PLACED_STATUS: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" }, DO_NOT_CONTACT: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
+    DRAFT: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" }, SENT: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+    PARTIAL: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" }, PAID: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+    OVERDUE: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" }, PENDING: { c: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+    REVOKED: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" }, INACTIVE: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
   }
   const t = tones[status] ?? tones.INACTIVE
   return <span style={{ background: t.bg, color: t.c, padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" as const }}>{status.replace(/_/g, " ")}</span>
@@ -977,7 +977,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function Table({ headers, children }: { headers: string[]; children: React.ReactNode }) {
   return (
-    <table style={{ width: "100%", borderCollapse: "collapse" as const, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
+    <table style={{ width: "100%", borderCollapse: "collapse" as const, background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
       <thead><tr style={{ background: CANVAS }}>{headers.map(h => <th key={h} style={{ textAlign: "left" as const, padding: "8px 12px", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase" as const, letterSpacing: "0.03em" }}>{h}</th>)}</tr></thead>
       <tbody>{children}</tbody>
     </table>
@@ -989,7 +989,7 @@ function Empty({ text }: { text: string }) { return <div style={{ padding: 32, t
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 440, maxHeight: "80vh", overflowY: "auto" as const, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 12, padding: 24, width: 440, maxHeight: "80vh", overflowY: "auto" as const, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }} onClick={e => e.stopPropagation()}>
         <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 800, color: INK }}>{title}</h3>
         {children}
       </div>
@@ -1002,7 +1002,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function ErrorBox({ text }: { text: string }) {
-  return <div style={{ padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, fontSize: 12.5, color: "#DC2626", marginBottom: 12 }}>{text}</div>
+  return <div style={{ padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 12.5, color: "var(--hf-danger-text)", marginBottom: 12 }}>{text}</div>
 }
 
 function ModalActions({ onClose, onSubmit, saving, submitLabel }: { onClose: () => void; onSubmit: () => void; saving: boolean; submitLabel: string }) {
@@ -1010,7 +1010,7 @@ function ModalActions({ onClose, onSubmit, saving, submitLabel }: { onClose: () 
 }
 
 const inputStyle: React.CSSProperties = { width: "100%", padding: "8px 10px", border: `1.5px solid ${BORDER}`, borderRadius: 6, fontSize: 13, boxSizing: "border-box" }
-const btnPrimary: React.CSSProperties = { padding: "7px 14px", background: NAVY, color: "#fff", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
-const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "#fff", color: NAVY, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }
+const btnPrimary: React.CSSProperties = { padding: "7px 14px", background: NAVY, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
+const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "var(--hf-surface)", color: NAVY, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }
 const rowStyle: React.CSSProperties = { borderTop: `1px solid ${BORDER}` }
 const cellStyle: React.CSSProperties = { padding: "8px 12px", fontSize: 12.5, color: INK }

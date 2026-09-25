@@ -99,19 +99,19 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
   return (
     <div>
       {lowStock.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, padding: "12px 16px", marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 12, padding: "12px 16px", marginBottom: 14 }}>
           <TriangleAlert size={16} color="#D97706" />
-          <p style={{ fontSize: 12.5, color: "#92400E", margin: 0 }}>{lowStock.length} item{lowStock.length === 1 ? "" : "s"} below reorder level: {lowStock.map(i => i.itemName).join(", ")}</p>
+          <p style={{ fontSize: 12.5, color: "var(--hf-warning-text-deep)", margin: 0 }}>{lowStock.length} item{lowStock.length === 1 ? "" : "s"} below reorder level: {lowStock.map(i => i.itemName).join(", ")}</p>
         </div>
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <p style={{ fontSize: 13, color: "#64748B", margin: 0 }}>{items.length} stock item{items.length === 1 ? "" : "s"}.</p>
+        <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: 0 }}>{items.length} stock item{items.length === 1 ? "" : "s"}.</p>
         {!showCreate && <button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={14} style={{ marginRight: 5, verticalAlign: -2 }} />Add item</button>}
       </div>
 
       {showCreate && (
-        <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
             <div><label style={lbl}>Item name</label><input value={itemName} onChange={e => setItemName(e.target.value)} style={inp} /></div>
             <div><label style={lbl}>Category</label><select value={category} onChange={e => setCategory(e.target.value)} style={inp}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
@@ -130,17 +130,17 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
         </div>
       )}
 
-      {isLoading ? <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p> :
-        items.length === 0 ? <p style={{ color: "#94A3B8", fontSize: 13 }}>No stock items yet.</p> : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+      {isLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p> :
+        items.length === 0 ? <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No stock items yet.</p> : (
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {items.map((it, i) => (
             <div key={it.id}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <Package size={15} color={it.belowReorderLevel ? "#D97706" : AG_ACCENT} />
                   <div>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", margin: 0 }}>{it.itemName}</p>
-                    <p style={{ fontSize: 11, color: "#94A3B8", margin: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{it.itemName}</p>
+                    <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>
                       {it.category} · {it.currentQuantity} {it.unitOfMeasure}{it.reorderLevel != null ? ` (reorder at ${it.reorderLevel})` : ""}
                       {it.unitCost != null ? ` · ${fmtMoney(it.unitCost)}/${it.unitOfMeasure}` : ""}{it.supplier ? ` · ${it.supplier}` : ""}
                     </p>
@@ -157,7 +157,7 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
                   ) : (
                     <button onClick={() => reactivateMut.mutate(it.id)} title="Reactivate" style={iconBtn}><RotateCcw size={13} /></button>
                   )}
-                  <button onClick={() => { if (confirm(`Delete "${it.itemName}"?`)) deleteMut.mutate(it.id) }} title="Delete" style={{ ...iconBtn, color: "#DC2626" }}><Trash2 size={13} /></button>
+                  <button onClick={() => { if (confirm(`Delete "${it.itemName}"?`)) deleteMut.mutate(it.id) }} title="Delete" style={{ ...iconBtn, color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
                 </div>
               </div>
 
@@ -202,7 +202,7 @@ function EditItemForm({ item, saving, onCancel, onSave }: {
   const [supplier, setSupplier] = useState(item.supplier ?? "")
   const [notes, setNotes] = useState(item.notes ?? "")
   return (
-    <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: 16 }}>
+    <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16 }}>
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
         <div><label style={lbl}>Item name</label><input value={itemName} onChange={e => setItemName(e.target.value)} style={inp} /></div>
         <div><label style={lbl}>Reorder level</label><input type="number" min={0} value={reorderLevel} onChange={e => setReorderLevel(e.target.value)} style={inp} /></div>
@@ -219,8 +219,8 @@ function EditItemForm({ item, saving, onCancel, onSave }: {
   )
 }
 
-const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#374151", marginBottom: 4, display: "block" }
-const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12.5, boxSizing: "border-box" }
-const btnPrimary: React.CSSProperties = { display: "inline-flex", alignItems: "center", padding: "8px 14px", borderRadius: 8, border: "none", background: AG_ACCENT, color: "#fff", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
-const btnGhost: React.CSSProperties = { padding: "8px 14px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }
-const iconBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 7, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", cursor: "pointer" }
+const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4, display: "block" }
+const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12.5, boxSizing: "border-box" }
+const btnPrimary: React.CSSProperties = { display: "inline-flex", alignItems: "center", padding: "8px 14px", borderRadius: 8, border: "none", background: AG_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
+const btnGhost: React.CSSProperties = { padding: "8px 14px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }
+const iconBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", cursor: "pointer" }

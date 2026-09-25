@@ -24,12 +24,12 @@ interface BillingInvoiceResponse {
 interface InvoicePage { content: BillingInvoiceResponse[] }
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
-  DRAFT: { bg: "#F1F5F9", fg: "#64748B" }, SENT: { bg: "#DBEAFE", fg: "#1D4ED8" },
-  PARTIAL: { bg: "#FEF3C7", fg: "#92400E" }, PAID: { bg: "#DCFCE7", fg: "#166534" },
+  DRAFT: { bg: "var(--hf-surface-sunken)", fg: "var(--hf-text-muted)" }, SENT: { bg: "var(--hf-info-soft-strong)", fg: "var(--hf-info-text)" },
+  PARTIAL: { bg: "var(--hf-warning-soft-strong)", fg: "var(--hf-warning-text-deep)" }, PAID: { bg: "var(--hf-success-soft-strong)", fg: "var(--hf-success-text-strong)" },
 }
 const fmtMoney = (n: number) => new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(n ?? 0)
-const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
-const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5, display: "block" }
+const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
+const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5, display: "block" }
 
 function GenerateModal({ clientId, onClose }: { clientId: string; onClose: () => void }) {
   const qc = useQueryClient()
@@ -42,18 +42,18 @@ function GenerateModal({ clientId, onClose }: { clientId: string; onClose: () =>
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 400 }}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 400 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", margin: 0 }}>Generate billing invoice</p>
+          <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Generate billing invoice</p>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
         </div>
-        <p style={{ fontSize: 12, color: "#94A3B8", marginBottom: 14 }}>
+        <p style={{ fontSize: 12, color: "var(--hf-text-faint)", marginBottom: 14 }}>
           Bills storage + handling fees from the end of the last invoiced period (or client onboarding, if this is the first invoice) through the date below — and posts revenue to the GL immediately. This can't be undone from here.
         </p>
         <div><label style={labelStyle}>Bill through *</label><input type="date" style={inputStyle} value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} /></div>
-        {generate.isError && <p style={{ color: "#DC2626", fontSize: 12, marginTop: 12 }}>{(generate.error as any)?.response?.data?.message ?? "Could not generate this invoice"}</p>}
+        {generate.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(generate.error as any)?.response?.data?.message ?? "Could not generate this invoice"}</p>}
         <button onClick={() => generate.mutate()} disabled={!periodEnd || generate.isPending}
-          style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 8, border: "none", background: WHSE_ACCENT, color: "#fff", fontSize: 13.5, fontWeight: 700, cursor: "pointer", opacity: (!periodEnd || generate.isPending) ? 0.6 : 1 }}>
+          style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 8, border: "none", background: WHSE_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13.5, fontWeight: 700, cursor: "pointer", opacity: (!periodEnd || generate.isPending) ? 0.6 : 1 }}>
           {generate.isPending ? "Generating…" : "Generate & issue invoice"}
         </button>
       </div>
@@ -72,16 +72,16 @@ function PaymentModal({ invoice, onClose }: { invoice: BillingInvoiceResponse; o
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 380 }}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 380 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", margin: 0 }}>Record payment</p>
+          <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Record payment</p>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
         </div>
-        <p style={{ fontSize: 12.5, color: "#64748B", marginBottom: 14 }}>{invoice.invoiceNumber} — {fmtMoney(invoice.balance)} outstanding</p>
+        <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", marginBottom: 14 }}>{invoice.invoiceNumber} — {fmtMoney(invoice.balance)} outstanding</p>
         <div><label style={labelStyle}>Amount *</label><input type="number" step="0.01" style={inputStyle} value={amount} onChange={e => setAmount(e.target.value)} /></div>
-        {record.isError && <p style={{ color: "#DC2626", fontSize: 12, marginTop: 12 }}>{(record.error as any)?.response?.data?.message ?? "Could not record this payment"}</p>}
+        {record.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(record.error as any)?.response?.data?.message ?? "Could not record this payment"}</p>}
         <button onClick={() => record.mutate()} disabled={!amount || record.isPending}
-          style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 8, border: "none", background: WHSE_ACCENT, color: "#fff", fontSize: 13.5, fontWeight: 700, cursor: "pointer", opacity: (!amount || record.isPending) ? 0.6 : 1 }}>
+          style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 8, border: "none", background: WHSE_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13.5, fontWeight: 700, cursor: "pointer", opacity: (!amount || record.isPending) ? 0.6 : 1 }}>
           {record.isPending ? "Recording…" : "Record payment"}
         </button>
       </div>
@@ -114,44 +114,44 @@ export default function WhseBillingInvoicesTab({ clientId }: { clientId: string 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <p style={{ fontSize: 13, color: "#94A3B8", margin: 0 }}>{invoices.length} invoice{invoices.length === 1 ? "" : "s"}</p>
+        <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0 }}>{invoices.length} invoice{invoices.length === 1 ? "" : "s"}</p>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={downloadStatement} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid #E2E8F0", color: "#64748B", borderRadius: 8, padding: "9px 14px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+          <button onClick={downloadStatement} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--hf-border)", color: "var(--hf-text-muted)", borderRadius: 8, padding: "9px 14px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
             <Download size={14} /> Inventory statement
           </button>
           {/* ADMIN-only server-side — not hidden client-side, see this tab's own header note */}
           <button onClick={() => setShowGenerate(true)}
-            style={{ display: "flex", alignItems: "center", gap: 6, background: WHSE_ACCENT, color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            style={{ display: "flex", alignItems: "center", gap: 6, background: WHSE_ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
             <FileText size={15} /> Generate invoice
           </button>
         </div>
       </div>
 
       {isLoading ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p>
       ) : invoices.length === 0 ? (
-        <p style={{ color: "#94A3B8", fontSize: 13 }}>No invoices generated yet.</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No invoices generated yet.</p>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {invoices.map((inv, i) => {
-            const colors = STATUS_COLORS[inv.status] ?? { bg: "#F1F5F9", fg: "#64748B" }
+            const colors = STATUS_COLORS[inv.status] ?? { bg: "var(--hf-surface-sunken)", fg: "var(--hf-text-muted)" }
             return (
-              <div key={inv.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid #F1F5F9" }}>
+              <div key={inv.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", margin: 0 }}>{inv.invoiceNumber}</p>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{inv.invoiceNumber}</p>
                     <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: colors.bg, color: colors.fg }}>{inv.status}</span>
                   </div>
-                  <p style={{ fontSize: 11.5, color: "#94A3B8", margin: 0 }}>{inv.periodStart} → {inv.periodEnd} · Due {inv.dueDate}</p>
+                  <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>{inv.periodStart} → {inv.periodEnd} · Due {inv.dueDate}</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ textAlign: "right" }}>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", margin: 0 }}>{fmtMoney(inv.total)}</p>
-                    {inv.balance > 0 && <p style={{ fontSize: 11, color: "#D97706", margin: 0 }}>{fmtMoney(inv.balance)} outstanding</p>}
+                    <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{fmtMoney(inv.total)}</p>
+                    {inv.balance > 0 && <p style={{ fontSize: 11, color: "var(--hf-warning-text)", margin: 0 }}>{fmtMoney(inv.balance)} outstanding</p>}
                   </div>
                   {inv.balance > 0 && (
                     <button onClick={() => setPaying(inv)} title="Record payment"
-                      style={{ background: "none", border: "1px solid #E2E8F0", borderRadius: 7, padding: 6, cursor: "pointer" }}>
+                      style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
                       <CreditCard size={14} color={WHSE_ACCENT} />
                     </button>
                   )}

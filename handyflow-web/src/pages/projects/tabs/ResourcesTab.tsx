@@ -59,30 +59,30 @@ export function ResourcesTab({projectId}:{projectId:string}) {
     <div>
       {/* Conflict warnings banner — shown after a successful assignment with warnings */}
       {warnings.length > 0 && (
-        <div style={{marginBottom:14,padding:'12px 16px',background:'#FFFBEB',border:'1px solid #FCD34D',borderRadius:10,display:'flex',alignItems:'flex-start',gap:10}}>
+        <div style={{marginBottom:14,padding:'12px 16px',background:'var(--hf-warning-soft)',border:'1px solid var(--hf-warning-border-strong)',borderRadius:10,display:'flex',alignItems:'flex-start',gap:10}}>
           <AlertTriangle size={16} color="#D97706" style={{flexShrink:0,marginTop:1}}/>
           <div style={{flex:1}}>
-            <div style={{fontSize:13,fontWeight:700,color:'#92400E',marginBottom:4}}>Scheduling conflicts detected</div>
+            <div style={{fontSize:13,fontWeight:700,color:'var(--hf-warning-text-deep)',marginBottom:4}}>Scheduling conflicts detected</div>
             {warnings.map((w,i)=>(
-              <div key={i} style={{fontSize:12,color:'#92400E'}}>{w}</div>
+              <div key={i} style={{fontSize:12,color:'var(--hf-warning-text-deep)'}}>{w}</div>
             ))}
           </div>
-          <button onClick={()=>setWarnings([])} style={{background:'none',border:'none',cursor:'pointer',color:'#D97706',padding:0,flexShrink:0}}>
+          <button onClick={()=>setWarnings([])} style={{background:'none',border:'none',cursor:'pointer',color:'var(--hf-warning-text)',padding:0,flexShrink:0}}>
             <X size={14}/>
           </button>
         </div>
       )}
 
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-        <div style={{fontSize:13,color:'#64748B'}}>
+        <div style={{fontSize:13,color:'var(--hf-text-muted)'}}>
           {resources.length} resource{resources.length!==1?'s':''} · {totalActual.toFixed(1)} hrs logged / {totalPlanned.toFixed(0)} planned
         </div>
-        <button onClick={()=>{setShowAdd(true);setErr('')}} style={{display:'flex',alignItems:'center',gap:5,padding:'8px 14px',background:'#1B3A6B',color:'#fff',border:'none',borderRadius:9,fontSize:13,fontWeight:600,cursor:'pointer'}}>
+        <button onClick={()=>{setShowAdd(true);setErr('')}} style={{display:'flex',alignItems:'center',gap:5,padding:'8px 14px',background:'var(--hf-primary)',color:'var(--hf-text-on-solid)',border:'none',borderRadius:9,fontSize:13,fontWeight:600,cursor:'pointer'}}>
           <Plus size={14}/> Assign Resource
         </button>
       </div>
 
-      {isLoading?<div style={{padding:40,textAlign:'center',color:'#94A3B8'}}>Loading…</div>
+      {isLoading?<div style={{padding:40,textAlign:'center',color:'var(--hf-text-faint)'}}>Loading…</div>
         :resources.length===0?<Empty text="No resources assigned"/>
         :Object.entries(grouped).map(([type,items])=>{
           const tc=TYPE_COLOR[type]??{bg:'#F1F5F9',color:'#475569'}
@@ -94,34 +94,34 @@ export function ResourcesTab({projectId}:{projectId:string}) {
                   <Icon size={13} color={tc.color}/>
                 </div>
                 <span style={{fontSize:12,fontWeight:700,color:tc.color,textTransform:'uppercase' as const,letterSpacing:'0.05em'}}>{type}</span>
-                <span style={{fontSize:11,color:'#94A3B8'}}>({items.length})</span>
+                <span style={{fontSize:11,color:'var(--hf-text-faint)'}}>({items.length})</span>
               </div>
-              <div style={{border:'1px solid #E2E8F0',borderRadius:10,overflow:'hidden'}}>
+              <div style={{border:'1px solid var(--hf-border)',borderRadius:10,overflow:'hidden'}}>
                 <table style={{width:'100%',borderCollapse:'collapse'}}>
-                  <thead><tr style={{background:'#F8FAFC'}}>
+                  <thead><tr style={{background:'var(--hf-surface-muted)'}}>
                     {['Name','Role','Allocation','Dates','Rate','Planned h','Actual h',''].map(h=>(
-                      <th key={h} style={{padding:'9px 12px',textAlign:'left' as const,fontSize:10,fontWeight:700,color:'#94A3B8',textTransform:'uppercase' as const,letterSpacing:'0.04em'}}>{h}</th>
+                      <th key={h} style={{padding:'9px 12px',textAlign:'left' as const,fontSize:10,fontWeight:700,color:'var(--hf-text-faint)',textTransform:'uppercase' as const,letterSpacing:'0.04em'}}>{h}</th>
                     ))}
                   </tr></thead>
                   <tbody>
                     {items.map((r,i)=>(
-                      <tr key={r.id} style={{borderTop:'1px solid #F1F5F9',background:i%2===0?'#fff':'#FAFAFA'}}>
-                        <td style={{padding:'10px 12px',fontSize:13,fontWeight:600,color:'#0F172A'}}>{r.resourceName}</td>
-                        <td style={{padding:'10px 12px',fontSize:12,color:'#64748B'}}>{r.role??'—'}</td>
+                      <tr key={r.id} style={{borderTop:'1px solid var(--hf-border-subtle)',background:i%2===0?'var(--hf-surface)':'var(--hf-surface-muted)'}}>
+                        <td style={{padding:'10px 12px',fontSize:13,fontWeight:600,color:'var(--hf-text)'}}>{r.resourceName}</td>
+                        <td style={{padding:'10px 12px',fontSize:12,color:'var(--hf-text-muted)'}}>{r.role??'—'}</td>
                         <td style={{padding:'10px 12px'}}>
                           <div style={{display:'flex',alignItems:'center',gap:6}}>
-                            <div style={{width:50,height:5,background:'#F1F5F9',borderRadius:3}}>
-                              <div style={{height:'100%',width:`${Math.min(r.allocationPct,100)}%`,background:r.allocationPct>100?'#EF4444':'#3B82F6',borderRadius:3}}/>
+                            <div style={{width:50,height:5,background:'var(--hf-surface-sunken)',borderRadius:3}}>
+                              <div style={{height:'100%',width:`${Math.min(r.allocationPct,100)}%`,background:r.allocationPct>100?'var(--hf-danger)':'var(--hf-info)',borderRadius:3}}/>
                             </div>
-                            <span style={{fontSize:11,color:'#64748B'}}>{r.allocationPct}%</span>
+                            <span style={{fontSize:11,color:'var(--hf-text-muted)'}}>{r.allocationPct}%</span>
                           </div>
                         </td>
-                        <td style={{padding:'10px 12px',fontSize:11,color:'#64748B',whiteSpace:'nowrap' as const}}>{fmtDate(r.startDate)} – {fmtDate(r.endDate)}</td>
-                        <td style={{padding:'10px 12px',fontSize:12,color:'#64748B'}}>{r.hourlyRate?`${fmtR(r.hourlyRate)}/hr`:r.dailyRate?`${fmtR(r.dailyRate)}/day`:'—'}</td>
-                        <td style={{padding:'10px 12px',fontSize:12,color:'#64748B'}}>{r.plannedHours?.toFixed(1)??'—'}</td>
-                        <td style={{padding:'10px 12px',fontSize:12,fontWeight:600,color:r.actualHours>(r.plannedHours??Infinity)?'#DC2626':'#0F172A'}}>{r.actualHours.toFixed(1)}</td>
+                        <td style={{padding:'10px 12px',fontSize:11,color:'var(--hf-text-muted)',whiteSpace:'nowrap' as const}}>{fmtDate(r.startDate)} – {fmtDate(r.endDate)}</td>
+                        <td style={{padding:'10px 12px',fontSize:12,color:'var(--hf-text-muted)'}}>{r.hourlyRate?`${fmtR(r.hourlyRate)}/hr`:r.dailyRate?`${fmtR(r.dailyRate)}/day`:'—'}</td>
+                        <td style={{padding:'10px 12px',fontSize:12,color:'var(--hf-text-muted)'}}>{r.plannedHours?.toFixed(1)??'—'}</td>
+                        <td style={{padding:'10px 12px',fontSize:12,fontWeight:600,color:r.actualHours>(r.plannedHours??Infinity)?'var(--hf-danger-text)':'var(--hf-text)'}}>{r.actualHours.toFixed(1)}</td>
                         <td style={{padding:'10px 12px'}}>
-                          <button onClick={()=>removeMut.mutate(r.id)} style={{fontSize:11,color:'#DC2626',background:'none',border:'none',cursor:'pointer'}}>Remove</button>
+                          <button onClick={()=>removeMut.mutate(r.id)} style={{fontSize:11,color:'var(--hf-danger-text)',background:'none',border:'none',cursor:'pointer'}}>Remove</button>
                         </td>
                       </tr>
                     ))}
@@ -160,8 +160,8 @@ export function ResourcesTab({projectId}:{projectId:string}) {
   )
 }
 
-function Empty({text}:{text:string}){return<div style={{textAlign:'center',padding:'50px 20px',color:'#94A3B8'}}><Users size={36} style={{marginBottom:10,opacity:.3}}/><div style={{fontWeight:600,color:'#475569'}}>{text}</div></div>}
-function Fld({label,children}:{label:string;children:React.ReactNode}){return<div><label style={{display:'block',fontSize:12,fontWeight:600,color:'#374151',marginBottom:5}}>{label}</label>{children}</div>}
-function Err({msg}:{msg:string}){return<div style={{marginTop:10,padding:'8px 12px',background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:8,color:'#DC2626',fontSize:13}}>{msg}</div>}
-function Modal({title,children,onClose}:{title:string;children:React.ReactNode;onClose:()=>void}){return<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}><div style={{background:'#fff',borderRadius:14,padding:28,width:560,maxHeight:'90vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}><h3 style={{margin:0,fontSize:16,fontWeight:700}}>{title}</h3><button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'#94A3B8',fontSize:20}}>×</button></div>{children}</div></div>}
-function MF({onCancel,onConfirm,label,loading}:{onCancel:()=>void;onConfirm:()=>void;label:string;loading?:boolean}){return<div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:20}}><button onClick={onCancel} style={{padding:'9px 16px',border:'1px solid #E2E8F0',borderRadius:9,background:'#fff',fontSize:13,cursor:'pointer'}}>Cancel</button><button onClick={onConfirm} disabled={loading} style={{padding:'9px 16px',background:'#1B3A6B',color:'#fff',border:'none',borderRadius:9,fontSize:13,fontWeight:600,cursor:'pointer',opacity:loading?.6:1}}>{label}</button></div>}
+function Empty({text}:{text:string}){return<div style={{textAlign:'center',padding:'50px 20px',color:'var(--hf-text-faint)'}}><Users size={36} style={{marginBottom:10,opacity:.3}}/><div style={{fontWeight:600,color:'var(--hf-text-tertiary)'}}>{text}</div></div>}
+function Fld({label,children}:{label:string;children:React.ReactNode}){return<div><label style={{display:'block',fontSize:12,fontWeight:600,color:'var(--hf-text-secondary)',marginBottom:5}}>{label}</label>{children}</div>}
+function Err({msg}:{msg:string}){return<div style={{marginTop:10,padding:'8px 12px',background:'var(--hf-danger-soft)',border:'1px solid var(--hf-danger-border)',borderRadius:8,color:'var(--hf-danger-text)',fontSize:13}}>{msg}</div>}
+function Modal({title,children,onClose}:{title:string;children:React.ReactNode;onClose:()=>void}){return<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}><div style={{background:'var(--hf-surface)',borderRadius:14,padding:28,width:560,maxHeight:'90vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}><h3 style={{margin:0,fontSize:16,fontWeight:700}}>{title}</h3><button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'var(--hf-text-faint)',fontSize:20}}>×</button></div>{children}</div></div>}
+function MF({onCancel,onConfirm,label,loading}:{onCancel:()=>void;onConfirm:()=>void;label:string;loading?:boolean}){return<div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:20}}><button onClick={onCancel} style={{padding:'9px 16px',border:'1px solid var(--hf-border)',borderRadius:9,background:'var(--hf-surface)',fontSize:13,cursor:'pointer'}}>Cancel</button><button onClick={onConfirm} disabled={loading} style={{padding:'9px 16px',background:'var(--hf-primary)',color:'var(--hf-text-on-solid)',border:'none',borderRadius:9,fontSize:13,fontWeight:600,cursor:'pointer',opacity:loading?.6:1}}>{label}</button></div>}

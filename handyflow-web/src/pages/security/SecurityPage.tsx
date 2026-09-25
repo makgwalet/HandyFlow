@@ -87,25 +87,25 @@ export function SecurityPage() {
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: "#1B3A6B", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--hf-primary)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Shield size={18} color="#fff" />
           </div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#0F172A", margin: 0 }}>Security Operations</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Security Operations</h1>
         </div>
-        <p style={{ fontSize: 13, color: "#94A3B8", margin: 0, paddingLeft: 46 }}>
+        <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0, paddingLeft: 46 }}>
           Guard management · Checkpoint patrols · Control room · Close protection
         </p>
       </div>
 
-      <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 14, overflow: "hidden" }}>
+      <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, overflow: "hidden" }}>
         {/* Module switcher */}
-        <div style={{ display: "flex", borderBottom: "1px solid #E2E8F0", background: "#F8FAFC" }}>
+        <div style={{ display: "flex", borderBottom: "1px solid var(--hf-border)", background: "var(--hf-surface-muted)" }}>
           {MODULES.map(m => (
             <button key={m.id} onClick={() => switchMod(m.id)} style={{
-              padding: "11px 22px", background: mod === m.id ? "#fff" : "none", border: "none",
+              padding: "11px 22px", background: mod === m.id ? "var(--hf-surface)" : "none", border: "none",
               borderBottom: `2px solid ${mod === m.id ? m.accent : "transparent"}`,
-              borderRight: "1px solid #E2E8F0",
-              color: mod === m.id ? m.accent : "#64748B",
+              borderRight: "1px solid var(--hf-border)",
+              color: mod === m.id ? m.accent : "var(--hf-text-muted)",
               fontWeight: mod === m.id ? 700 : 400, fontSize: 11, cursor: "pointer",
               letterSpacing: "0.06em", textTransform: "uppercase" as const, marginBottom: -1,
             }}>
@@ -115,7 +115,7 @@ export function SecurityPage() {
         </div>
 
         {/* Tab bar */}
-        <div style={{ display: "flex", gap: 2, borderBottom: "1px solid #E2E8F0", padding: "0 24px", overflowX: "auto" as const, background: "#fff" }}>
+        <div style={{ display: "flex", gap: 2, borderBottom: "1px solid var(--hf-border)", padding: "0 24px", overflowX: "auto" as const, background: "var(--hf-surface)" }}>
           {tabs.map((t: any) => {
             const Icon = t.icon
             const active = tab === t.id
@@ -124,13 +124,13 @@ export function SecurityPage() {
                 display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" as const,
                 padding: "10px 14px", background: "none", border: "none",
                 borderBottom: `2px solid ${active ? accent : "transparent"}`,
-                color: active ? accent : "#64748B", fontWeight: active ? 600 : 400,
+                color: active ? accent : "var(--hf-text-muted)", fontWeight: active ? 600 : 400,
                 fontSize: 12, cursor: "pointer", marginBottom: -1,
               }}>
                 <Icon size={13} />
                 {t.label}
                 {t.badge && (
-                  <span style={{ fontSize: 9, fontWeight: 700, background: "#DC2626", color: "#fff", padding: "1px 5px", borderRadius: 4 }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", padding: "1px 5px", borderRadius: 4 }}>
                     {t.badge}
                   </span>
                 )}
@@ -160,9 +160,9 @@ export function SecurityPage() {
           {tab === "reports"       && <ReportsTab />}
           {tab === "cp-overview"   && <CloseProtectionTab />}
           {tab === "admin-overview" && (
-            <div style={{ textAlign: "center", padding: "60px 0", color: "#94A3B8" }}>
+            <div style={{ textAlign: "center", padding: "60px 0", color: "var(--hf-text-faint)" }}>
               <Users size={32} strokeWidth={1.5} style={{ margin: "0 auto 12px", display: "block" }} />
-              <p style={{ margin: 0, fontWeight: 500, color: "#374151" }}>Select a section from the tabs above</p>
+              <p style={{ margin: 0, fontWeight: 500, color: "var(--hf-text-secondary)" }}>Select a section from the tabs above</p>
               <p style={{ margin: "4px 0 0", fontSize: 13 }}>Payroll · Branches · Public API & Webhooks</p>
             </div>
           )}

@@ -49,7 +49,7 @@ function BarChartCss({ data }: { data: MonthlySummary[] }) {
                 height: `${(m.expenses / max) * 100}%`, minHeight: m.expenses > 0 ? 2 : 0,
                 transition: "height 0.4s ease" }} />
           </div>
-          <div style={{ fontSize: 10, color: "#64748B", textAlign: "center" }}>{m.monthLabel}</div>
+          <div style={{ fontSize: 10, color: "var(--hf-text-muted)", textAlign: "center" }}>{m.monthLabel}</div>
         </div>
       ))}
     </div>
@@ -144,7 +144,7 @@ export default function DashboardTab() {
   }, [])
 
   if (loading) return (
-    <div style={{ padding: 60, textAlign: "center", color: "#94A3B8" }}>Loading dashboard...</div>
+    <div style={{ padding: 60, textAlign: "center", color: "var(--hf-text-faint)" }}>Loading dashboard...</div>
   )
 
   const totalRevenue  = monthly.reduce((s, m) => s + m.revenue, 0)
@@ -162,13 +162,13 @@ export default function DashboardTab() {
           { label: "Net Profit",            value: fmtR(netProfit),          sub: `${margin}% margin`,         color: netProfit >= 0 ? GREEN : RED, icon: <DollarSign size={18} /> },
           { label: "Outstanding AR",        value: fmtR(aging?.total ?? 0),  sub: `${aging?.lines?.length ?? 0} invoices`, color: AMBER, icon: <AlertTriangle size={18} /> },
         ].map(k => (
-          <div key={k.label} style={{ background: "white", border: "1px solid #E2E8F0", borderRadius: 12, padding: 18 }}>
+          <div key={k.label} style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 18 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em" }}>{k.label}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{k.label}</div>
               <div style={{ color: k.color, opacity: 0.6 }}>{k.icon}</div>
             </div>
             <div style={{ fontSize: 20, fontWeight: 800, color: k.color, marginBottom: 3 }}>{k.value}</div>
-            <div style={{ fontSize: 11, color: "#94A3B8" }}>{k.sub}</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{k.sub}</div>
           </div>
         ))}
       </div>
@@ -177,12 +177,12 @@ export default function DashboardTab() {
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 24 }}>
 
         {/* Bar chart */}
-        <div style={{ background: "white", border: "1px solid #E2E8F0", borderRadius: 12, padding: 20 }}>
+        <div style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Revenue vs Expenses — Last 6 Months</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Revenue vs Expenses — Last 6 Months</div>
             <div style={{ display: "flex", gap: 14 }}>
               {[{ label: "Revenue", color: TEAL }, { label: "Expenses", color: RED }].map(l => (
-                <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#64748B" }}>
+                <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--hf-text-muted)" }}>
                   <div style={{ width: 10, height: 10, borderRadius: 2, background: l.color }} />
                   {l.label}
                 </div>
@@ -193,11 +193,11 @@ export default function DashboardTab() {
         </div>
 
         {/* Line chart */}
-        <div style={{ background: "white", border: "1px solid #E2E8F0", borderRadius: 12, padding: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A", marginBottom: 16 }}>Net Profit Trend</div>
+        <div style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 20 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)", marginBottom: 16 }}>Net Profit Trend</div>
           <LineChartSvg data={monthly} />
           {monthly.length > 0 && (
-            <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", fontSize: 11, color: "#64748B" }}>
+            <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--hf-text-muted)" }}>
               <span>Last: {fmtR(monthly[monthly.length - 1]?.netProfit ?? 0)}</span>
               <span style={{ color: netProfit >= 0 ? GREEN : RED, fontWeight: 700 }}>
                 {netProfit >= 0 ? "↑" : "↓"} {margin}% margin
@@ -211,8 +211,8 @@ export default function DashboardTab() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
 
         {/* Donut + legend */}
-        <div style={{ background: "white", border: "1px solid #E2E8F0", borderRadius: 12, padding: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A", marginBottom: 16 }}>
+        <div style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 20 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)", marginBottom: 16 }}>
             Revenue vs Expenses Split (6 months)
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
@@ -225,13 +225,13 @@ export default function DashboardTab() {
                 <div key={e.name} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                   <div style={{ width: 12, height: 12, borderRadius: 3, background: e.color, flexShrink: 0 }} />
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "#0F172A" }}>{e.name}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--hf-text)" }}>{e.name}</div>
                     <div style={{ fontSize: 13, fontWeight: 800, color: e.color }}>{fmtR(e.value)}</div>
                   </div>
                 </div>
               ))}
-              <div style={{ marginTop: 4, paddingTop: 10, borderTop: "1px solid #F1F5F9" }}>
-                <div style={{ fontSize: 11, color: "#64748B" }}>Profit Margin</div>
+              <div style={{ marginTop: 4, paddingTop: 10, borderTop: "1px solid var(--hf-border-subtle)" }}>
+                <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>Profit Margin</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: netProfit >= 0 ? GREEN : RED }}>{margin}%</div>
               </div>
             </div>
@@ -239,9 +239,9 @@ export default function DashboardTab() {
         </div>
 
         {/* PDF Downloads */}
-        <div style={{ background: "white", border: "1px solid #E2E8F0", borderRadius: 12, padding: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A", marginBottom: 4 }}>Download Reports</div>
-          <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 16 }}>Year to date: {yearStart} to {today}</div>
+        <div style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 20 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)", marginBottom: 4 }}>Download Reports</div>
+          <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginBottom: 16 }}>Year to date: {yearStart} to {today}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {[
               { label: "Profit & Loss",  url: `/api/v1/accounting/reports/profit-and-loss/pdf?from=${yearStart}&to=${today}`,  file: `PL-${yearStart}-to-${today}.pdf`,          color: TEAL   },
@@ -260,11 +260,11 @@ export default function DashboardTab() {
               <button key={r.label}
                 onClick={() => downloadPdf(r.url, r.file)}
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "10px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0",
+                  padding: "10px 14px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)",
                   borderRadius: 8, cursor: "pointer" }}
-                onMouseEnter={e => { const b = e.currentTarget; b.style.background = "#F1F5F9"; b.style.borderColor = r.color }}
-                onMouseLeave={e => { const b = e.currentTarget; b.style.background = "#F8FAFC"; b.style.borderColor = "#E2E8F0" }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{r.label}</span>
+                onMouseEnter={e => { const b = e.currentTarget; b.style.background = "var(--hf-surface-sunken)"; b.style.borderColor = r.color }}
+                onMouseLeave={e => { const b = e.currentTarget; b.style.background = "var(--hf-surface-muted)"; b.style.borderColor = "var(--hf-border)" }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{r.label}</span>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, color: r.color }}>
                   <span style={{ fontSize: 11, fontWeight: 700 }}>PDF</span>
                   <Download size={13} />

@@ -105,14 +105,14 @@ function GuardAvatar({ guard, size = 36 }: { guard: Guard; size?: number }) {
   return hasPhoto ? (
     <img src={guard.photoUrl!} alt={guard.fullName}
       style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover",
-               border: "2px solid #BFDBFE", flexShrink: 0, opacity: unavail ? 0.6 : 1 }} />
+               border: "2px solid var(--hf-info-border)", flexShrink: 0, opacity: unavail ? 0.6 : 1 }} />
   ) : (
     <div style={{ width: size, height: size, borderRadius: "50%",
-                  background: unavail ? "#F1F5F9" : "#EFF6FF",
+                  background: unavail ? "var(--hf-surface-sunken)" : "var(--hf-info-soft)",
                   border: `2px solid ${unavail ? "#E2E8F0" : "#BFDBFE"}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontWeight: 700, fontSize: size * 0.33,
-                  color: unavail ? "#94A3B8" : "#1D4ED8", flexShrink: 0 }}>
+                  color: unavail ? "var(--hf-text-faint)" : "var(--hf-info-text)", flexShrink: 0 }}>
       {guard.firstName?.[0]}{guard.lastName?.[0]}
     </div>
   )
@@ -122,7 +122,7 @@ function GuardAvatar({ guard, size = 36 }: { guard: Guard; size?: number }) {
 
 function ErrBanner({ msg }: { msg: string }) {
   return (
-    <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}>
+    <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}>
       <AlertCircle size={14} />{msg}
     </div>
   )
@@ -130,7 +130,7 @@ function ErrBanner({ msg }: { msg: string }) {
 
 function FieldError({ fieldErrors, name }: { fieldErrors: Record<string, string>; name: string }) {
   return fieldErrors[name] ? (
-    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#DC2626", marginTop: 4 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
       <AlertCircle size={12} />{fieldErrors[name]}
     </div>
   ) : null
@@ -201,13 +201,13 @@ function GuardFormFields({
           <FieldError fieldErrors={fieldErrors} name="idNumber" />
           {form.idNumber.length === 13 && (
             idFeedback.valid ? (
-              <div style={{ marginTop: 6, padding: "8px 10px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 7, fontSize: 12, color: "#166534", display: "flex", gap: 14 }}>
+              <div style={{ marginTop: 6, padding: "8px 10px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", borderRadius: 7, fontSize: 12, color: "var(--hf-success-text-strong)", display: "flex", gap: 14 }}>
                 <span>✓ Valid</span>
                 {idFeedback.dob && <span>DOB: {idFeedback.dob}</span>}
                 {idFeedback.gender && <span>{idFeedback.gender}</span>}
               </div>
             ) : (
-              <div style={{ marginTop: 6, padding: "8px 10px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 7, fontSize: 12, color: "#DC2626" }}>
+              <div style={{ marginTop: 6, padding: "8px 10px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 12, color: "var(--hf-danger-text)" }}>
                 ✗ {idFeedback.error}
               </div>
             )
@@ -220,18 +220,18 @@ function GuardFormFields({
         </div>
         <div>
           <label style={lbl}>PSiRA Grade</label>
-          <select value={form.grade} onChange={e => setForm(f => ({ ...f, grade: e.target.value }))} style={{ ...inpSt("grade"), background: "#fff" }}>
+          <select value={form.grade} onChange={e => setForm(f => ({ ...f, grade: e.target.value }))} style={{ ...inpSt("grade"), background: "var(--hf-surface)" }}>
             {["A","B","C","D","E"].map(g => <option key={g} value={g}>Grade {g}</option>)}
           </select>
         </div>
         <div>
-          <label style={lbl}>PSiRA Expiry Date <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+          <label style={lbl}>PSiRA Expiry Date <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
           <input type="date" value={form.psiraExpiryDate}
             onChange={e => setForm(f => ({ ...f, psiraExpiryDate: e.target.value }))}
             style={inpSt("psiraExpiryDate")} />
           {form.psiraExpiryDate && (() => { const s = psiraExpiryStatus(form.psiraExpiryDate); return s ? (
             <div style={{ marginTop: 6, fontSize: 12, color: s.color, fontWeight: 600 }}>{s.label}</div>
-          ) : <div style={{ marginTop: 6, fontSize: 12, color: "#166534" }}>✓ Valid</div> })()}
+          ) : <div style={{ marginTop: 6, fontSize: 12, color: "var(--hf-success-text-strong)" }}>✓ Valid</div> })()}
         </div>
         <div style={{ gridColumn: "1 / -1" }}>
           <label style={lbl}>Notes</label>
@@ -240,16 +240,16 @@ function GuardFormFields({
       </div>
 
       {/* Photo */}
-      <div style={{ marginTop: 16, padding: 16, background: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 12 }}>Guard Photo
-          <span style={{ fontSize: 11, fontWeight: 400, color: "#94A3B8", marginLeft: 8 }}>(dev mode — stored as PENDING_UPLOAD until S3 is configured)</span>
+      <div style={{ marginTop: 16, padding: 16, background: "var(--hf-surface-muted)", borderRadius: 10, border: "1px solid var(--hf-border)" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 12 }}>Guard Photo
+          <span style={{ fontSize: 11, fontWeight: 400, color: "var(--hf-text-faint)", marginLeft: 8 }}>(dev mode — stored as PENDING_UPLOAD until S3 is configured)</span>
         </div>
         {capturedPhoto && capturedPhoto !== "PENDING_UPLOAD" ? (
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <img src={capturedPhoto} alt="Guard" style={{ width: 80, height: 80, borderRadius: 10, objectFit: "cover", border: "2px solid #0D9488" }} />
+            <img src={capturedPhoto} alt="Guard" style={{ width: 80, height: 80, borderRadius: 10, objectFit: "cover", border: "2px solid var(--hf-accent)" }} />
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#166534", marginBottom: 6 }}>✓ Photo captured</div>
-              <button onClick={() => setCapturedPhoto(null)} style={{ fontSize: 12, color: "#DC2626", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Remove</button>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-success-text-strong)", marginBottom: 6 }}>✓ Photo captured</div>
+              <button onClick={() => setCapturedPhoto(null)} style={{ fontSize: 12, color: "var(--hf-danger-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Remove</button>
             </div>
           </div>
         ) : photoMode === "camera" ? (
@@ -257,16 +257,16 @@ function GuardFormFields({
             <video ref={videoRef} style={{ width: "100%", borderRadius: 8, maxHeight: 200, objectFit: "cover" }} />
             <canvas ref={canvasRef} style={{ display: "none" }} />
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button onClick={capturePhoto} style={{ flex: 1, padding: "8px", background: "#0D9488", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Capture</button>
-              <button onClick={stopCamera} style={{ padding: "8px 14px", background: "#F1F5F9", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", color: "#64748B" }}>Cancel</button>
+              <button onClick={capturePhoto} style={{ flex: 1, padding: "8px", background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Capture</button>
+              <button onClick={stopCamera} style={{ padding: "8px 14px", background: "var(--hf-surface-sunken)", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", color: "var(--hf-text-muted)" }}>Cancel</button>
             </div>
           </div>
         ) : (
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={startCamera} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", background: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
+            <button onClick={startCamera} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1px solid var(--hf-info-border)", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
               📷 Use Camera
             </button>
-            <label style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", background: "#F0FDF4", color: "#166534", border: "1px solid #86EFAC", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
+            <label style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", background: "var(--hf-success-soft)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
               <Upload size={14} /> Upload Photo
               <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: "none" }} />
             </label>
@@ -287,14 +287,14 @@ function GuardFormFields({
           category already covers this need today (a scanned paper form,
           uploaded like any other guard document) — this stub no longer
           pretends to be a substitute for it. */}
-      <div style={{ marginTop: 12, padding: 16, background: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
+      <div style={{ marginTop: 12, padding: 16, background: "var(--hf-surface-muted)", borderRadius: 10, border: "1px solid var(--hf-border)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 2 }}>Fingerprint</div>
-            <div style={{ fontSize: 11, color: "#94A3B8" }}>Not available in the web console — requires scanner hardware. Use the "Fingerprint Form" document upload instead.</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 2 }}>Fingerprint</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>Not available in the web console — requires scanner hardware. Use the "Fingerprint Form" document upload instead.</div>
           </div>
           <button disabled
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "#F1F5F9", color: "#94A3B8", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "not-allowed", fontWeight: 600 }}>
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "var(--hf-surface-sunken)", color: "var(--hf-text-faint)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, cursor: "not-allowed", fontWeight: 600 }}>
             <Fingerprint size={13} />
             Not Available
           </button>
@@ -482,12 +482,12 @@ export default function GuardsTab() {
       {/* Toolbar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div style={{ position: "relative" }}>
-          <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94A3B8" }} />
+          <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--hf-text-faint)" }} />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or PSiRA..."
-            style={{ paddingLeft: 36, paddingRight: 14, paddingTop: 9, paddingBottom: 9, border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, width: 260, outline: "none" }} />
+            style={{ paddingLeft: 36, paddingRight: 14, paddingTop: 9, paddingBottom: 9, border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 14, width: 260, outline: "none" }} />
         </div>
         <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError(""); setCapturedPhoto(null) }}
-          style={{ display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Add Guard
         </button>
       </div>
@@ -500,9 +500,9 @@ export default function GuardsTab() {
           { label: "On Leave",  value: guards.filter(g => g.status === "ON_LEAVE").length,                color: "#1D4ED8" },
           { label: "Suspended", value: guards.filter(g => g.status === "SUSPENDED").length,               color: "#DC2626" },
         ].map(s => (
-          <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 20px" }}>
+          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 20px" }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>{s.label}</div>
+            <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -515,15 +515,15 @@ export default function GuardsTab() {
         })
         if (expiring.length === 0) return null
         return (
-          <div style={{ marginBottom: 16, padding: "12px 16px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
             <AlertTriangle size={16} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", marginBottom: 4 }}>PSiRA Compliance Alert</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-warning-text-deep)", marginBottom: 4 }}>PSiRA Compliance Alert</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                 {expiring.map(g => {
                   const s = psiraExpiryStatus(g.psiraExpiryDate)!
                   return (
-                    <div key={g.id} style={{ fontSize: 12, color: "#78350F" }}>
+                    <div key={g.id} style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>
                       {g.fullName} — <span style={{ color: s.color, fontWeight: 600 }}>{s.label}</span>
                       {g.psiraExpiryDate && ` (${fmtDate(g.psiraExpiryDate)})`}
                     </div>
@@ -542,8 +542,8 @@ export default function GuardsTab() {
           return (
             <button key={s} onClick={() => setStatusFilter(s)}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: statusFilter === s ? 600 : 400,
-                background: statusFilter === s ? (cfg?.color ?? "#1B3A6B") : "#F1F5F9",
-                color: statusFilter === s ? "#fff" : "#64748B" }}>
+                background: statusFilter === s ? (cfg?.color ?? "var(--hf-primary)") : "var(--hf-surface-sunken)",
+                color: statusFilter === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
               {s === "ALL" ? "All guards" : cfg?.label}
             </button>
           )
@@ -552,19 +552,19 @@ export default function GuardsTab() {
 
       {/* Guard table */}
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading guards...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading guards...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Shield size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No guards found</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No guards found</div>
         </div>
       ) : (
-        <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
-              <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
+              <tr style={{ background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border)" }}>
                 {["Guard", "PSiRA No.", "Phone", "Grade", "Status", "Actions"].map(h => (
-                  <th key={h} style={{ padding: "11px 16px", textAlign: "left", fontWeight: 600, fontSize: 12, color: "#64748B", letterSpacing: "0.05em" }}>{h}</th>
+                  <th key={h} style={{ padding: "11px 16px", textAlign: "left", fontWeight: 600, fontSize: 12, color: "var(--hf-text-muted)", letterSpacing: "0.05em" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -574,20 +574,20 @@ export default function GuardsTab() {
                 const unavail   = gStatus !== "ACTIVE"
                 const expiryBadge = psiraExpiryStatus(g.psiraExpiryDate)
                 return (
-                  <tr key={g.id} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #F1F5F9" : "none", background: unavail ? "#FAFAFA" : "#fff" }}>
+                  <tr key={g.id} style={{ borderBottom: i < filtered.length - 1 ? "1px solid var(--hf-border-subtle)" : "none", background: unavail ? "var(--hf-surface-muted)" : "var(--hf-surface)" }}>
                     <td style={{ padding: "13px 16px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <GuardAvatar guard={g} size={36} />
                         <div>
-                          <div style={{ fontWeight: 600, color: unavail ? "#94A3B8" : "#0F172A" }}>{g.fullName}</div>
-                          <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                          <div style={{ fontWeight: 600, color: unavail ? "var(--hf-text-faint)" : "var(--hf-text)" }}>{g.fullName}</div>
+                          <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>
                             ID: {g.idNumber || "—"}
-                            {g.employeeCode && <span style={{ marginLeft: 8, fontFamily: "monospace", color: "#7C3AED", fontWeight: 600 }}>{g.employeeCode}</span>}
+                            {g.employeeCode && <span style={{ marginLeft: 8, fontFamily: "monospace", color: "var(--hf-violet-text)", fontWeight: 600 }}>{g.employeeCode}</span>}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td style={{ padding: "13px 16px", color: "#475569" }}>
+                    <td style={{ padding: "13px 16px", color: "var(--hf-text-tertiary)" }}>
                       <div>
                         <div style={{ display: "flex", alignItems: "center", gap: 5 }}><BadgeCheck size={13} color="#0D9488" />{g.psiraNumber || "—"}</div>
                         {expiryBadge && (
@@ -597,19 +597,19 @@ export default function GuardsTab() {
                         )}
                       </div>
                     </td>
-                    <td style={{ padding: "13px 16px", color: "#475569" }}>
+                    <td style={{ padding: "13px 16px", color: "var(--hf-text-tertiary)" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 5 }}><Phone size={13} color="#94A3B8" />{g.phone || "—"}</div>
                     </td>
                     <td style={{ padding: "13px 16px" }}>
-                      <span style={{ background: `${GRADE_COLORS[g.grade] || "#64748B"}18`, color: GRADE_COLORS[g.grade] || "#64748B", padding: "3px 10px", borderRadius: 20, fontWeight: 700, fontSize: 12 }}>Grade {g.grade}</span>
+                      <span style={{ background: `${GRADE_COLORS[g.grade] || "#64748B"}18`, color: GRADE_COLORS[g.grade] || "var(--hf-text-muted)", padding: "3px 10px", borderRadius: 20, fontWeight: 700, fontSize: 12 }}>Grade {g.grade}</span>
                     </td>
                     <td style={{ padding: "13px 16px" }}><StatusBadge status={gStatus} /></td>
                     <td style={{ padding: "13px 16px" }}>
                       <div style={{ display: "flex", gap: 6 }}>
-                        <button onClick={() => setViewing(g)} title="View" style={{ background: "#EFF6FF", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#1D4ED8" }}><Eye size={13} /></button>
-                        <button onClick={() => openEdit(g)} title="Edit" style={{ background: "#F0FDF4", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#166534" }}><Edit2 size={13} /></button>
-                        <button onClick={() => { setChangingStatus(g); setNewStatus(gStatus); setStatusNote(""); setApiError("") }} title="Change status" style={{ background: "#FEF3C7", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#D97706" }}><AlertTriangle size={13} /></button>
-                        <button onClick={() => setDeleting(g)} title="Remove" style={{ background: "#FEF2F2", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#DC2626" }}><Trash2 size={13} /></button>
+                        <button onClick={() => setViewing(g)} title="View" style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-info-text)" }}><Eye size={13} /></button>
+                        <button onClick={() => openEdit(g)} title="Edit" style={{ background: "var(--hf-success-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-success-text-strong)" }}><Edit2 size={13} /></button>
+                        <button onClick={() => { setChangingStatus(g); setNewStatus(gStatus); setStatusNote(""); setApiError("") }} title="Change status" style={{ background: "var(--hf-warning-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-warning-text)" }}><AlertTriangle size={13} /></button>
+                        <button onClick={() => setDeleting(g)} title="Remove" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
                       </div>
                     </td>
                   </tr>
@@ -647,9 +647,9 @@ export default function GuardsTab() {
           />
           {/* FIX (P0 backlog item 1.3) — see the enrollGuard mutation's own
               comment for the full context on why this exists. */}
-          <div style={{ marginTop: 12, padding: 16, background: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 2 }}>Mobile App Access</div>
-            <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 10 }}>
+          <div style={{ marginTop: 12, padding: 16, background: "var(--hf-surface-muted)", borderRadius: 10, border: "1px solid var(--hf-border)" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 2 }}>Mobile App Access</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginBottom: 10 }}>
               Set or reset this guard's PIN to enable Shield app login. Communicate the PIN verbally or via SMS — never email.
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -658,45 +658,45 @@ export default function GuardsTab() {
                 onChange={e => setEnrollPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
                 placeholder="6-digit PIN"
                 inputMode="numeric"
-                style={{ flex: 1, padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, outline: "none", letterSpacing: 2 }}
+                style={{ flex: 1, padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, outline: "none", letterSpacing: 2 }}
               />
               <button
                 onClick={() => enrollGuard.mutate({ id: editing.id, pin: enrollPin })}
                 disabled={enrollPin.length !== 6 || enrollGuard.isPending}
-                style={{ padding: "9px 16px", background: enrollPin.length === 6 ? "#0D9488" : "#F1F5F9", color: enrollPin.length === 6 ? "#fff" : "#94A3B8", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: enrollPin.length === 6 ? "pointer" : "not-allowed" }}>
+                style={{ padding: "9px 16px", background: enrollPin.length === 6 ? "var(--hf-accent)" : "var(--hf-surface-sunken)", color: enrollPin.length === 6 ? "var(--hf-text-on-solid)" : "var(--hf-text-faint)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: enrollPin.length === 6 ? "pointer" : "not-allowed" }}>
                 {enrollGuard.isPending ? "Enrolling…" : enrollGuard.isSuccess && enrollPin === "" ? "Enrolled ✓" : "Set PIN"}
               </button>
             </div>
           </div>
 
           {canViewCpTier && (
-            <div style={{ marginTop: 12, padding: 16, background: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
+            <div style={{ marginTop: 12, padding: 16, background: "var(--hf-surface-muted)", borderRadius: 10, border: "1px solid var(--hf-border)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                 <ShieldCheck size={14} color="#7C3AED" />
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>Close Protection Clearance</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text-secondary)" }}>Close Protection Clearance</div>
               </div>
-              <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 10 }}>
-                Current tier: <strong style={{ color: "#374151" }}>{editing.cpVettingTier ?? "Not set"}</strong> — enforced automatically on every CP detail assignment attempt.
+              <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginBottom: 10 }}>
+                Current tier: <strong style={{ color: "var(--hf-text-secondary)" }}>{editing.cpVettingTier ?? "Not set"}</strong> — enforced automatically on every CP detail assignment attempt.
               </div>
               <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                 <select value={cpTierForm.tier} onChange={e => setCpTierForm(f => ({ ...f, tier: e.target.value }))}
-                  style={{ flex: 1, padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none", background: "#fff" }}>
+                  style={{ flex: 1, padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", background: "var(--hf-surface)" }}>
                   <option value="STANDARD">Standard</option>
                   <option value="ENHANCED">Enhanced</option>
                   <option value="HIGH">High</option>
                   <option value="CRITICAL">Critical</option>
                 </select>
                 <input type="date" value={cpTierForm.clearedAt} onChange={e => setCpTierForm(f => ({ ...f, clearedAt: e.target.value }))}
-                  style={{ padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none" }} />
+                  style={{ padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none" }} />
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <input type="date" value={cpTierForm.expiresAt} onChange={e => setCpTierForm(f => ({ ...f, expiresAt: e.target.value }))}
                   placeholder="Expires (optional)"
-                  style={{ flex: 1, padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none" }} />
+                  style={{ flex: 1, padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none" }} />
                 <button
                   onClick={() => setCpVettingTier.mutate({ id: editing.id, body: { tier: cpTierForm.tier, clearedAt: cpTierForm.clearedAt, expiresAt: cpTierForm.expiresAt || null } })}
                   disabled={setCpVettingTier.isPending}
-                  style={{ padding: "9px 16px", background: "#7C3AED", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" as const }}>
+                  style={{ padding: "9px 16px", background: "var(--hf-violet)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" as const }}>
                   {setCpVettingTier.isPending ? "Saving…" : "Set Tier"}
                 </button>
               </div>
@@ -708,21 +708,21 @@ export default function GuardsTab() {
               Visible to any user who can already edit a guard (SECURITY_MANAGE)
               — unlike the CP tier section above, this doesn't need the
               special VIP_DETAIL_ACCESS gate. */}
-          <div style={{ marginTop: 12, padding: 16, background: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 10 }}>Banking Details (for payroll)</div>
+          <div style={{ marginTop: 12, padding: 16, background: "var(--hf-surface-muted)", borderRadius: 10, border: "1px solid var(--hf-border)" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 10 }}>Banking Details (for payroll)</div>
             <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
               <input value={bankForm.bankName} onChange={e => setBankForm(f => ({ ...f, bankName: e.target.value }))}
-                placeholder="Bank name" style={{ flex: 1, padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none" }} />
+                placeholder="Bank name" style={{ flex: 1, padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none" }} />
               <input value={bankForm.bankBranchCode} onChange={e => setBankForm(f => ({ ...f, bankBranchCode: e.target.value }))}
-                placeholder="Branch code" style={{ width: 120, padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none" }} />
+                placeholder="Branch code" style={{ width: 120, padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none" }} />
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <input value={bankForm.bankAccountNumber} onChange={e => setBankForm(f => ({ ...f, bankAccountNumber: e.target.value }))}
-                placeholder="Account number" style={{ flex: 1, padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none" }} />
+                placeholder="Account number" style={{ flex: 1, padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none" }} />
               <button
                 onClick={() => updateBankDetails.mutate({ id: editing.id, body: bankForm })}
                 disabled={updateBankDetails.isPending}
-                style={{ padding: "9px 16px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" as const }}>
+                style={{ padding: "9px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" as const }}>
                 {updateBankDetails.isPending ? "Saving…" : "Save Bank Details"}
               </button>
             </div>
@@ -738,11 +738,11 @@ export default function GuardsTab() {
           <div style={{ textAlign: "center", marginBottom: 22 }}>
             <div style={{ position: "relative", display: "inline-block" }}>
               <GuardAvatar guard={viewing} size={110} />
-              <div style={{ position: "absolute", bottom: 4, right: 4, width: 28, height: 28, borderRadius: "50%", background: STATUS_MAP[viewing.status ?? "ACTIVE"]?.color ?? "#166534", border: "2px solid #fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ position: "absolute", bottom: 4, right: 4, width: 28, height: 28, borderRadius: "50%", background: STATUS_MAP[viewing.status ?? "ACTIVE"]?.color ?? "var(--hf-success-solid-strong)", border: "2px solid var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {(() => { const S = GUARD_STATUSES.find(s => s.value === (viewing.status ?? "ACTIVE")); const Icon = S?.icon ?? CheckCircle; return <Icon size={12} color="#fff" /> })()}
               </div>
             </div>
-            <h3 style={{ margin: "12px 0 6px", fontSize: 20, fontWeight: 700, color: "#0F172A" }}>{viewing.fullName}</h3>
+            <h3 style={{ margin: "12px 0 6px", fontSize: 20, fontWeight: 700, color: "var(--hf-text)" }}>{viewing.fullName}</h3>
             <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
               <span style={{ background: `${GRADE_COLORS[viewing.grade]}18`, color: GRADE_COLORS[viewing.grade], padding: "3px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>Grade {viewing.grade}</span>
               <StatusBadge status={viewing.status} />
@@ -757,9 +757,9 @@ export default function GuardsTab() {
               { label: "Phone",        value: viewing.phone || "—" },
               { label: "Active",       value: viewing.active ? "Yes" : "No" },
             ].map(f => (
-              <div key={f.label} style={{ padding: "10px 14px", background: "#F8FAFC", borderRadius: 8 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 4 }}>{f.label}</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#0F172A" }}>{f.value}</div>
+              <div key={f.label} style={{ padding: "10px 14px", background: "var(--hf-surface-muted)", borderRadius: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 4 }}>{f.label}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--hf-text)" }}>{f.value}</div>
               </div>
             ))}
           </div>
@@ -777,32 +777,32 @@ export default function GuardsTab() {
 
           {/* SA ID decoded */}
           {viewing.idNumber && (() => { const r = validateSaId(viewing.idNumber!); return r.valid && r.dob ? (
-            <div style={{ marginTop: 10, padding: "10px 14px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 8, fontSize: 13, color: "#166534", display: "flex", gap: 16 }}>
+            <div style={{ marginTop: 10, padding: "10px 14px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-success-text-strong)", display: "flex", gap: 16 }}>
               <span>DOB: {r.dob}</span><span>{r.gender}</span>
             </div>
           ) : null })()}
 
           {/* Status history */}
           {viewing.statusNote && (
-            <div style={{ marginTop: 10, padding: "10px 14px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, fontSize: 13 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 4 }}>
+            <div style={{ marginTop: 10, padding: "10px 14px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 8, fontSize: 13 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 4 }}>
                 Status note {viewing.statusChangedAt && `· ${fmtDate(viewing.statusChangedAt)}`}
               </div>
-              <div style={{ color: "#78350F" }}>{viewing.statusNote}</div>
+              <div style={{ color: "var(--hf-warning-text-deep)" }}>{viewing.statusNote}</div>
             </div>
           )}
 
           {viewing.notes && (
-            <div style={{ marginTop: 10, padding: "10px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, color: "#374151" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>Notes</div>
+            <div style={{ marginTop: 10, padding: "10px 14px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-text-secondary)" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>Notes</div>
               {viewing.notes}
             </div>
           )}
 
           <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
-            <button onClick={() => { setViewing(null); openEdit(viewing) }} style={{ flex: 1, padding: "10px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Edit Guard</button>
-            <button onClick={() => { setViewing(null); setChangingStatus(viewing); setNewStatus(viewing.status ?? "ACTIVE"); setStatusNote(""); setApiError("") }} style={{ flex: 1, padding: "10px", background: "#FEF3C7", color: "#D97706", border: "1px solid #FDE68A", borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Change Status</button>
-            <button onClick={() => setViewing(null)} style={{ padding: "10px 16px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Close</button>
+            <button onClick={() => { setViewing(null); openEdit(viewing) }} style={{ flex: 1, padding: "10px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Edit Guard</button>
+            <button onClick={() => { setViewing(null); setChangingStatus(viewing); setNewStatus(viewing.status ?? "ACTIVE"); setStatusNote(""); setApiError("") }} style={{ flex: 1, padding: "10px", background: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text)", border: "1px solid var(--hf-warning-border)", borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Change Status</button>
+            <button onClick={() => setViewing(null)} style={{ padding: "10px 16px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Close</button>
           </div>
         </Modal>
       )}
@@ -810,10 +810,10 @@ export default function GuardsTab() {
       {/* ── Change Status Modal ───────────────────────────────────────────── */}
       {changingStatus && (
         <Modal title="Update Guard Status" onClose={() => { setChangingStatus(null); setApiError("") }} width={460}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, padding: "12px 14px", background: "#F8FAFC", borderRadius: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, padding: "12px 14px", background: "var(--hf-surface-muted)", borderRadius: 10 }}>
             <GuardAvatar guard={changingStatus} size={44} />
             <div>
-              <div style={{ fontWeight: 700, color: "#0F172A", marginBottom: 3 }}>{changingStatus.fullName}</div>
+              <div style={{ fontWeight: 700, color: "var(--hf-text)", marginBottom: 3 }}>{changingStatus.fullName}</div>
               <StatusBadge status={changingStatus.status} />
             </div>
           </div>
@@ -824,13 +824,13 @@ export default function GuardsTab() {
               const Icon = s.icon; const sel = newStatus === s.value
               return (
                 <button key={s.value} onClick={() => setNewStatus(s.value)}
-                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", border: `2px solid ${sel ? s.color : "#E2E8F0"}`, borderRadius: 9, cursor: "pointer", background: sel ? s.bg : "#fff", textAlign: "left" as const, width: "100%" }}>
+                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", border: `2px solid ${sel ? s.color : "#E2E8F0"}`, borderRadius: 9, cursor: "pointer", background: sel ? s.bg : "var(--hf-surface)", textAlign: "left" as const, width: "100%" }}>
                   <div style={{ width: 32, height: 32, borderRadius: "50%", background: `${s.color}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     <Icon size={15} color={s.color} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: sel ? s.color : "#0F172A" }}>{s.label}</div>
-                    <div style={{ fontSize: 12, color: "#94A3B8" }}>{s.description}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: sel ? s.color : "var(--hf-text)" }}>{s.label}</div>
+                    <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>{s.description}</div>
                   </div>
                   {sel && <CheckCircle size={16} color={s.color} />}
                 </button>
@@ -850,12 +850,12 @@ export default function GuardsTab() {
                   newStatus === "UNDER_INVESTIGATION" ? "e.g. Incident report #IR-2026-042 filed" :
                   "e.g. Resignation accepted effective 31 May 2026"
                 }
-                style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, resize: "vertical" as const, outline: "none" }} />
+                style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, resize: "vertical" as const, outline: "none" }} />
             </div>
           )}
 
           {newStatus && newStatus !== "ACTIVE" && (
-            <div style={{ marginBottom: 16, padding: "10px 14px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 8, fontSize: 12, color: "#92400E", display: "flex", gap: 8 }}>
+            <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 8, fontSize: 12, color: "var(--hf-warning-text-deep)", display: "flex", gap: 8 }}>
               <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
               Guards with this status will not appear as available when scheduling new shifts.
             </div>
@@ -864,13 +864,13 @@ export default function GuardsTab() {
           {apiError && <ErrBanner msg={apiError} />}
 
           <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-            <button onClick={() => { setChangingStatus(null); setApiError("") }} style={{ flex: 1, padding: "10px", border: "1.5px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#374151" }}>Cancel</button>
+            <button onClick={() => { setChangingStatus(null); setApiError("") }} style={{ flex: 1, padding: "10px", border: "1.5px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
             <button
               onClick={() => updateStatus.mutate({ id: changingStatus.id, status: newStatus, note: statusNote })}
               disabled={!newStatus || updateStatus.isPending || ((newStatus === "SUSPENDED" || newStatus === "TERMINATED") && !statusNote.trim())}
               style={{ flex: 1, padding: "10px", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer",
-                background: newStatus && !((newStatus === "SUSPENDED" || newStatus === "TERMINATED") && !statusNote.trim()) ? "#1B3A6B" : "#E2E8F0",
-                color: "#fff" }}>
+                background: newStatus && !((newStatus === "SUSPENDED" || newStatus === "TERMINATED") && !statusNote.trim()) ? "var(--hf-primary)" : "var(--hf-surface-strong)",
+                color: "var(--hf-text-on-solid)" }}>
               {updateStatus.isPending ? "Updating..." : "Update Status"}
             </button>
           </div>
@@ -881,21 +881,21 @@ export default function GuardsTab() {
       {deleting && (
         <Modal title="" onClose={() => { setDeleting(null); setApiError("") }} width={400}>
           <div style={{ textAlign: "center" }}>
-            <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#FEF2F2", border: "2px solid #FECACA", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+            <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--hf-danger-soft)", border: "2px solid var(--hf-danger-border)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
               <Trash2 size={22} color="#DC2626" />
             </div>
             <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700 }}>Remove Guard?</h3>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 40, padding: "6px 14px", marginBottom: 14 }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 40, padding: "6px 14px", marginBottom: 14 }}>
               <Shield size={13} color="#DC2626" /><span style={{ fontSize: 13, fontWeight: 600 }}>{deleting.fullName}</span>
             </div>
-            <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 20px", lineHeight: 1.6 }}>
+            <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: "0 0 20px", lineHeight: 1.6 }}>
               Deactivates the guard record. Shift history and incident records are preserved.
             </p>
             {apiError && <ErrBanner msg={apiError} />}
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => { setDeleting(null); setApiError("") }} style={{ flex: 1, padding: "10px", border: "1.5px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#374151" }}>Keep Guard</button>
+              <button onClick={() => { setDeleting(null); setApiError("") }} style={{ flex: 1, padding: "10px", border: "1.5px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Keep Guard</button>
               <button onClick={() => deleteGuard.mutate(deleting.id)} disabled={deleteGuard.isPending}
-                style={{ flex: 1, padding: "10px", border: "none", borderRadius: 9, background: "#DC2626", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ flex: 1, padding: "10px", border: "none", borderRadius: 9, background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {deleteGuard.isPending ? "Removing..." : "Yes, Remove"}
               </button>
             </div>
@@ -911,11 +911,11 @@ export default function GuardsTab() {
 function Modal({ title, onClose, children, width = 540 }: { title: string; onClose: () => void; children: React.ReactNode; width?: number }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
         {title && (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{title}</h3>
-            <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{title}</h3>
+            <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
           </div>
         )}
         {children}
@@ -927,8 +927,8 @@ function Modal({ title, onClose, children, width = 540 }: { title: string; onClo
 function Footer({ onCancel, onSubmit, loading, label }: { onCancel: () => void; onSubmit: () => void; loading: boolean; label: string }) {
   return (
     <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-      <button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
-      <button onClick={onSubmit} disabled={loading} style={{ padding: "9px 22px", background: loading ? "#94A3B8" : "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}>
+      <button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
+      <button onClick={onSubmit} disabled={loading} style={{ padding: "9px 22px", background: loading ? "var(--hf-text-faint)" : "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}>
         {loading ? "Saving..." : label}
       </button>
     </div>

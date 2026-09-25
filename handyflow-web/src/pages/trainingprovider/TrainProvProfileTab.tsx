@@ -17,8 +17,8 @@ interface ProfileResponse {
   address: string | null; phone: string | null; email: string | null; logoUrl: string | null
 }
 
-const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
-const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5, display: "block" }
+const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
+const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5, display: "block" }
 
 export default function TrainProvProfileTab() {
   const qc = useQueryClient()
@@ -48,11 +48,11 @@ export default function TrainProvProfileTab() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["trainprov-profile"] }),
   })
 
-  if (isLoading) return <p style={{ color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+  if (isLoading) return <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p>
 
   return (
     <div style={{ maxWidth: 560 }}>
-      <p style={{ fontSize: 12, color: "#94A3B8", marginBottom: 20 }}>
+      <p style={{ fontSize: 12, color: "var(--hf-text-faint)", marginBottom: 20 }}>
         Your training academy's own accreditation profile. The accreditation expiry date is watched by a daily notification sweep — keep it current.
       </p>
       <div style={{ display: "grid", gap: 14 }}>
@@ -70,11 +70,11 @@ export default function TrainProvProfileTab() {
         <div><label style={labelStyle}>Address</label><textarea style={{ ...inputStyle, minHeight: 70, resize: "vertical" }} value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} /></div>
       </div>
 
-      {save.isError && <p style={{ color: "#DC2626", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not save the profile"}</p>}
-      {save.isSuccess && <p style={{ color: "#059669", fontSize: 12, marginTop: 12 }}>Profile saved.</p>}
+      {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not save the profile"}</p>}
+      {save.isSuccess && <p style={{ color: "var(--hf-success-text)", fontSize: 12, marginTop: 12 }}>Profile saved.</p>}
 
       <button onClick={() => save.mutate()} disabled={!form.tradingName || save.isPending}
-        style={{ marginTop: 20, padding: "10px 20px", borderRadius: 8, border: "none", background: TRAINPROV_ACCENT, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+        style={{ marginTop: 20, padding: "10px 20px", borderRadius: 8, border: "none", background: TRAINPROV_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
         {save.isPending ? "Saving…" : "Save profile"}
       </button>
     </div>

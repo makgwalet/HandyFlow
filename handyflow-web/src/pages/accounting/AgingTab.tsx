@@ -11,11 +11,11 @@ const fmtR  = (n: number) => `R ${(n ?? 0).toLocaleString("en-ZA", { minimumFrac
 const fmtDt = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
 
 const BUCKET_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  "CURRENT": { bg: "#F0FDF4", color: "#166534", label: "Current" },
-  "1-30":    { bg: "#FEF3C7", color: "#92400E", label: "1–30 days" },
-  "31-60":   { bg: "#FED7AA", color: "#C2410C", label: "31–60 days" },
-  "61-90":   { bg: "#FECACA", color: "#B91C1C", label: "61–90 days" },
-  "90+":     { bg: "#FEE2E2", color: "#7F1D1D", label: "90+ days" },
+  "CURRENT": { bg: "var(--hf-success-soft)", color: "var(--hf-success-text-strong)", label: "Current" },
+  "1-30":    { bg: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text-deep)", label: "1–30 days" },
+  "31-60":   { bg: "var(--hf-orange-soft)", color: "var(--hf-orange-text-strong)", label: "31–60 days" },
+  "61-90":   { bg: "var(--hf-danger-soft-strong)", color: "var(--hf-danger-text-strong)", label: "61–90 days" },
+  "90+":     { bg: "var(--hf-danger-soft-strong)", color: "var(--hf-danger-text-strong)", label: "90+ days" },
 }
 
 export default function AgingTab() {
@@ -35,20 +35,20 @@ export default function AgingTab() {
     { key: "90+",     value: report?.over90     },
   ]
 
-  if (isLoading) return <div style={{ padding: 60, textAlign: "center", color: "#94A3B8" }}>Loading AR aging report...</div>
-  if (isError)   return <div style={{ padding: 60, textAlign: "center", color: "#DC2626" }}>Failed to load aging report</div>
+  if (isLoading) return <div style={{ padding: 60, textAlign: "center", color: "var(--hf-text-faint)" }}>Loading AR aging report...</div>
+  if (isError)   return <div style={{ padding: 60, textAlign: "center", color: "var(--hf-danger-text)" }}>Failed to load aging report</div>
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#0F172A", margin: 0 }}>AR Aging Report</h2>
-          <p style={{ fontSize: 12, color: "#94A3B8", margin: "3px 0 0" }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>AR Aging Report</h2>
+          <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "3px 0 0" }}>
             Outstanding invoices bucketed by days overdue · as at {report ? fmtDt(report.asAt) : "today"}
           </p>
         </div>
         <button onClick={() => refetch()}
-          style={{ padding: "8px 16px", background: "#F1F5F9", color: "#374151", border: "none",
+          style={{ padding: "8px 16px", background: "var(--hf-surface-sunken)", color: "var(--hf-text-secondary)", border: "none",
             borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           Refresh
         </button>
@@ -72,7 +72,7 @@ export default function AgingTab() {
       </div>
 
       {/* Total */}
-      <div style={{ background: "#0F172A", borderRadius: 10, padding: "14px 20px", marginBottom: 20,
+      <div style={{ background: "var(--hf-inverse-surface)", borderRadius: 10, padding: "14px 20px", marginBottom: 20,
         display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>Total Outstanding AR</span>
         <span style={{ fontSize: 22, fontWeight: 800, color: report && report.total > 0 ? "#F87171" : "#4ADE80" }}>
@@ -82,20 +82,20 @@ export default function AgingTab() {
 
       {/* Lines table */}
       {!report || report.lines.length === 0 ? (
-        <div style={{ padding: 60, textAlign: "center", background: "white", border: "1px solid #E2E8F0",
-          borderRadius: 12, color: "#94A3B8" }}>
+        <div style={{ padding: 60, textAlign: "center", background: "white", border: "1px solid var(--hf-border)",
+          borderRadius: 12, color: "var(--hf-text-faint)" }}>
           <Users size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
-          <div style={{ fontWeight: 600, color: "#475569", marginBottom: 4 }}>All clear — no outstanding invoices</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)", marginBottom: 4 }}>All clear — no outstanding invoices</div>
           <div style={{ fontSize: 13 }}>All invoices are either paid, cancelled, or not yet issued.</div>
         </div>
       ) : (
-        <div style={{ background: "white", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #F1F5F9" }}>
+              <tr style={{ background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border-subtle)" }}>
                 {["Invoice", "Customer", "Due Date", "Days Overdue", "Balance", "Age Bucket"].map(h => (
                   <th key={h} style={{ textAlign: "left", padding: "10px 16px", fontSize: 11,
-                    fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                    fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -103,31 +103,31 @@ export default function AgingTab() {
               {report.lines.map((line, i) => {
                 const s = BUCKET_STYLE[line.bucket] ?? BUCKET_STYLE["CURRENT"]
                 return (
-                  <tr key={line.invoiceId} style={{ borderBottom: i < report.lines.length - 1 ? "1px solid #F8FAFC" : "none" }}
-                    onMouseEnter={e => (e.currentTarget.style.background = "#F8FAFC")}
+                  <tr key={line.invoiceId} style={{ borderBottom: i < report.lines.length - 1 ? "1px solid var(--hf-border-subtle)" : "none" }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "var(--hf-surface-muted)")}
                     onMouseLeave={e => (e.currentTarget.style.background = "white")}>
                     <td style={{ padding: "12px 16px" }}>
-                      <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 700, color: "#1B3A6B" }}>
+                      <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 700, color: "var(--hf-primary-text)" }}>
                         {line.invoiceNumber}
                       </span>
                     </td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "#374151" }}>
+                    <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)" }}>
                       {line.customerName ?? "Walk-in client"}
                     </td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, color: line.daysOverdue > 0 ? "#DC2626" : "#64748B" }}>
+                    <td style={{ padding: "12px 16px", fontSize: 13, color: line.daysOverdue > 0 ? "var(--hf-danger-text)" : "var(--hf-text-muted)" }}>
                       {fmtDt(line.dueDate)}
                     </td>
                     <td style={{ padding: "12px 16px" }}>
                       {line.daysOverdue > 0 ? (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                           <AlertCircle size={12} color="#DC2626" />
-                          <span style={{ fontSize: 13, fontWeight: 700, color: "#DC2626" }}>{line.daysOverdue} days</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-danger-text)" }}>{line.daysOverdue} days</span>
                         </span>
                       ) : (
-                        <span style={{ fontSize: 13, color: "#166534", fontWeight: 600 }}>Current</span>
+                        <span style={{ fontSize: 13, color: "var(--hf-success-text-strong)", fontWeight: 600 }}>Current</span>
                       )}
                     </td>
-                    <td style={{ padding: "12px 16px", fontSize: 14, fontWeight: 700, color: "#0F172A" }}>
+                    <td style={{ padding: "12px 16px", fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>
                       {fmtR(line.balance)}
                     </td>
                     <td style={{ padding: "12px 16px" }}>

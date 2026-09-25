@@ -32,8 +32,8 @@ export default function RecallsTab() {
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:24}}>
         {[
           {label:"Due for follow-up", value:recalls.length, color:NAVY, bg:LIGHT},
-          {label:"Due today",         value:dueToday.length, color:TEAL, bg:"#F0FDFA"},
-          {label:"Overdue",           value:overdue.length,  color:RED,  bg:"#FEF2F2"},
+          {label:"Due today",         value:dueToday.length, color:TEAL, bg:"var(--hf-accent-soft)"},
+          {label:"Overdue",           value:overdue.length,  color:RED,  bg:"var(--hf-danger-soft)"},
         ].map(k => (
           <div key={k.label} style={{background:k.bg,border:`1px solid ${BORDER}`,borderRadius:12,padding:"14px 18px"}}>
             <div style={{fontSize:11,fontWeight:700,color:k.color,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>{k.label}</div>
@@ -47,22 +47,22 @@ export default function RecallsTab() {
       ) : recalls.length === 0 ? (
         <div style={{textAlign:"center",padding:"60px 20px",color:GRAY,border:`1px dashed ${BORDER}`,borderRadius:12}}>
           <CalendarClock size={36} style={{marginBottom:12,opacity:0.4}}/>
-          <div style={{fontWeight:600,color:"#475569",fontSize:15}}>No patients due for follow-up</div>
+          <div style={{fontWeight:600,color:"var(--hf-text-tertiary)",fontSize:15}}>No patients due for follow-up</div>
           <div style={{fontSize:13,marginTop:4}}>Patients appear here once their consultation's follow-up window is reached.</div>
         </div>
       ) : (
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {recalls.map(r => (
-            <div key={r.consultationId} style={{border:`1px solid ${BORDER}`,borderLeft:`4px solid ${r.overdueDays>0?RED:AMBER}`,borderRadius:10,padding:"14px 18px",background:"#fff",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
+            <div key={r.consultationId} style={{border:`1px solid ${BORDER}`,borderLeft:`4px solid ${r.overdueDays>0?RED:AMBER}`,borderRadius:10,padding:"14px 18px",background:"var(--hf-surface)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
               <div>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                  <span style={{fontWeight:700,fontSize:14,color:"#0F172A"}}>{r.patientName}</span>
+                  <span style={{fontWeight:700,fontSize:14,color:"var(--hf-text)"}}>{r.patientName}</span>
                   {r.overdueDays > 0 ? (
-                    <span style={{display:"flex",alignItems:"center",gap:3,background:"#FEF2F2",color:RED,padding:"1px 8px",borderRadius:20,fontSize:11,fontWeight:700}}>
+                    <span style={{display:"flex",alignItems:"center",gap:3,background:"var(--hf-danger-soft)",color:RED,padding:"1px 8px",borderRadius:20,fontSize:11,fontWeight:700}}>
                       <AlertTriangle size={10}/> {r.overdueDays}d overdue
                     </span>
                   ) : (
-                    <span style={{background:"#FFFBEB",color:AMBER,padding:"1px 8px",borderRadius:20,fontSize:11,fontWeight:700}}>Due today</span>
+                    <span style={{background:"var(--hf-warning-soft)",color:AMBER,padding:"1px 8px",borderRadius:20,fontSize:11,fontWeight:700}}>Due today</span>
                   )}
                 </div>
                 <div style={{fontSize:12,color:GRAY,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>

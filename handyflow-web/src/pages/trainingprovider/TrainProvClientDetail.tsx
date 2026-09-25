@@ -24,12 +24,12 @@ export default function TrainProvClientDetail({ clientId, clientName, onBack }: 
 
   return (
     <div>
-      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "#64748B", fontSize: 13, marginBottom: 14, padding: 0 }}>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-muted)", fontSize: 13, marginBottom: 14, padding: 0 }}>
         <ArrowLeft size={15} /> All clients
       </button>
-      <h2 style={{ fontSize: 17, fontWeight: 800, color: "#0F172A", margin: "0 0 16px" }}>{clientName}</h2>
+      <h2 style={{ fontSize: 17, fontWeight: 800, color: "var(--hf-text)", margin: "0 0 16px" }}>{clientName}</h2>
 
-      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #E2E8F0", marginBottom: 20, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--hf-border)", marginBottom: 20, flexWrap: "wrap" }}>
         {SUB_TABS.map(t => {
           const Icon = t.icon
           const active = sub === t.key
@@ -38,7 +38,7 @@ export default function TrainProvClientDetail({ clientId, clientName, onBack }: 
               style={{
                 display: "flex", alignItems: "center", gap: 6, padding: "9px 13px", border: "none",
                 background: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600,
-                color: active ? TRAINPROV_ACCENT : "#64748B",
+                color: active ? TRAINPROV_ACCENT : "var(--hf-text-muted)",
                 borderBottom: active ? `2px solid ${TRAINPROV_ACCENT}` : "2px solid transparent",
                 marginBottom: -1, whiteSpace: "nowrap",
               }}>

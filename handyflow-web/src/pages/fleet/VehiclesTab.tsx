@@ -128,7 +128,7 @@ export default function VehiclesTab() {
     borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "#FFF5F5" : "#fff", outline: "none",
   })
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
-    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#DC2626", marginTop: 4 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
       <AlertCircle size={12} />{fieldErrors[k]}
     </div>
   ) : null
@@ -145,9 +145,9 @@ export default function VehiclesTab() {
     <div>
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {stats.map(s => (
-          <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
+          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{s.label}</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -157,24 +157,24 @@ export default function VehiclesTab() {
           {["ALL", ...STATUSES].map(s => (
             <button key={s} onClick={() => setFilterStatus(s)}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterStatus === s ? 600 : 400,
-                background: filterStatus === s ? (s === "ALL" ? "#1B3A6B" : STATUS_CFG[s]?.color ?? "#1B3A6B") : "#F1F5F9",
-                color: filterStatus === s ? "#fff" : "#64748B" }}>
+                background: filterStatus === s ? (s === "ALL" ? "var(--hf-primary)" : STATUS_CFG[s]?.color ?? "var(--hf-primary)") : "var(--hf-surface-sunken)",
+                color: filterStatus === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
               {s === "ALL" ? "All" : STATUS_CFG[s]?.label ?? s}
             </button>
           ))}
         </div>
         <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> Register Vehicle
         </button>
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading fleet...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading fleet...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Car size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No vehicles found</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No vehicles found</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -187,19 +187,19 @@ export default function VehiclesTab() {
 
             return (
               <div key={v.id} style={{ border: `1px solid ${v.status === "BREAKDOWN" ? "#FECACA" : "#E2E8F0"}`, borderRadius: 12, overflow: "hidden" }}>
-                <div style={{ padding: "16px 20px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+                <div style={{ padding: "16px 20px", background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
-                    <div style={{ width: 48, height: 48, borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>
+                    <div style={{ width: 48, height: 48, borderRadius: 12, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>
                       {ICONS[v.vehicleType] ?? "🚘"}
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
-                        <span style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{v.registration}</span>
-                        <span style={{ fontSize: 14, color: "#64748B" }}>{v.make} {v.model}{v.year ? ` (${v.year})` : ""}</span>
-                        {v.dueForService && <span style={{ fontSize: 10, fontWeight: 700, background: "#FEF3C7", color: "#D97706", padding: "1px 7px", borderRadius: 20, border: "1px solid #FDE68A", flexShrink: 0 }}>SVC DUE</span>}
-                        {hasExpiry && <span style={{ fontSize: 10, fontWeight: 700, background: "#FEF2F2", color: "#DC2626", padding: "1px 7px", borderRadius: 20, flexShrink: 0 }}>EXPIRING</span>}
+                        <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{v.registration}</span>
+                        <span style={{ fontSize: 14, color: "var(--hf-text-muted)" }}>{v.make} {v.model}{v.year ? ` (${v.year})` : ""}</span>
+                        {v.dueForService && <span style={{ fontSize: 10, fontWeight: 700, background: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text)", padding: "1px 7px", borderRadius: 20, border: "1px solid var(--hf-warning-border)", flexShrink: 0 }}>SVC DUE</span>}
+                        {hasExpiry && <span style={{ fontSize: 10, fontWeight: 700, background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", padding: "1px 7px", borderRadius: 20, flexShrink: 0 }}>EXPIRING</span>}
                       </div>
-                      <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                      <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>
                         {v.vehicleType}{v.colour ? ` · ${v.colour}` : ""}{v.fuelType ? ` · ${v.fuelType}` : ""}
                         {v.assignedDriverName ? ` · 👤 ${v.assignedDriverName}` : ""}
                       </div>
@@ -207,31 +207,31 @@ export default function VehiclesTab() {
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                     <div style={{ textAlign: "right" as const }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{fmtOdo(v.currentOdometer ?? 0)}</div>
-                      <div style={{ fontSize: 11, color: "#94A3B8" }}>{fmtR(v.dailyRate)}/day</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{fmtOdo(v.currentOdometer ?? 0)}</div>
+                      <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{fmtR(v.dailyRate)}/day</div>
                     </div>
                     <StatusBadge status={v.status} />
                     <div style={{ display: "flex", gap: 5 }}>
-                      <button onClick={() => setViewing(v)} title="View" style={{ background: "#EFF6FF", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#1D4ED8" }}><Eye size={13} /></button>
-                      <button onClick={() => openAssign(v)} title="Assign driver" style={{ background: "#F5F3FF", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#7C3AED" }}><UserCog size={13} /></button>
-                      <button onClick={() => { setShowStatus(v); setNewStatus(v.status); setStatusNote(""); setApiError("") }} title="Change status" style={{ background: "#FEF3C7", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#D97706" }}><Edit2 size={13} /></button>
+                      <button onClick={() => setViewing(v)} title="View" style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-info-text)" }}><Eye size={13} /></button>
+                      <button onClick={() => openAssign(v)} title="Assign driver" style={{ background: "var(--hf-violet-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-violet-text)" }}><UserCog size={13} /></button>
+                      <button onClick={() => { setShowStatus(v); setNewStatus(v.status); setStatusNote(""); setApiError("") }} title="Change status" style={{ background: "var(--hf-warning-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-warning-text)" }}><Edit2 size={13} /></button>
                     </div>
-                    <button onClick={() => setExpanded(isOpen ? null : v.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
+                    <button onClick={() => setExpanded(isOpen ? null : v.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}>
                       {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </button>
                   </div>
                 </div>
-                <div style={{ padding: "0 20px 12px", background: "#fff" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#94A3B8", marginBottom: 3 }}>
+                <div style={{ padding: "0 20px 12px", background: "var(--hf-surface)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--hf-text-faint)", marginBottom: 3 }}>
                     <span>Service interval</span>
                     <span>{kmUsed.toLocaleString()} / {(v.serviceIntervalKm || 10000).toLocaleString()} km</span>
                   </div>
-                  <div style={{ height: 5, background: "#F1F5F9", borderRadius: 99, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${svcPct}%`, borderRadius: 99, background: svcPct >= 100 ? "#DC2626" : svcPct >= 80 ? "#D97706" : "#0D9488", transition: "width 0.4s" }} />
+                  <div style={{ height: 5, background: "var(--hf-surface-sunken)", borderRadius: 99, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${svcPct}%`, borderRadius: 99, background: svcPct >= 100 ? "var(--hf-danger)" : svcPct >= 80 ? "var(--hf-warning)" : "var(--hf-accent)", transition: "width 0.4s" }} />
                   </div>
                 </div>
                 {isOpen && (
-                  <div style={{ borderTop: "1px solid #F1F5F9", padding: "16px 20px", background: "#F8FAFC" }}>
+                  <div style={{ borderTop: "1px solid var(--hf-border-subtle)", padding: "16px 20px", background: "var(--hf-surface-muted)" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 14 }}>
                       {[
                         { l: "Fuel Type",     v: v.fuelType || "—" },
@@ -242,26 +242,26 @@ export default function VehiclesTab() {
                         { l: "Svc Interval",  v: fmtOdo(v.serviceIntervalKm || 10000) },
                       ].map(item => (
                         <div key={item.l}>
-                          <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: "#0F172A" }}>{item.v}</div>
+                          <div style={{ fontSize: 10, color: "var(--hf-text-faint)", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--hf-text)" }}>{item.v}</div>
                         </div>
                       ))}
                     </div>
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      {v.licenceDiscExpiry && <div style={{ padding: "8px 12px", background: daysUntil(v.licenceDiscExpiry) <= 30 ? "#FEF3C7" : "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
-                        <div style={{ fontSize: 10, color: "#94A3B8", marginBottom: 2 }}>LICENCE DISC</div>
-                        <div style={{ fontWeight: 600, color: daysUntil(v.licenceDiscExpiry) <= 30 ? "#D97706" : "#0F172A" }}>{fmtDate(v.licenceDiscExpiry)}</div>
+                      {v.licenceDiscExpiry && <div style={{ padding: "8px 12px", background: daysUntil(v.licenceDiscExpiry) <= 30 ? "var(--hf-warning-soft-strong)" : "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
+                        <div style={{ fontSize: 10, color: "var(--hf-text-faint)", marginBottom: 2 }}>LICENCE DISC</div>
+                        <div style={{ fontWeight: 600, color: daysUntil(v.licenceDiscExpiry) <= 30 ? "var(--hf-warning-text)" : "var(--hf-text)" }}>{fmtDate(v.licenceDiscExpiry)}</div>
                       </div>}
-                      {v.roadworthyExpiry && <div style={{ padding: "8px 12px", background: daysUntil(v.roadworthyExpiry) <= 30 ? "#FEF3C7" : "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
-                        <div style={{ fontSize: 10, color: "#94A3B8", marginBottom: 2 }}>ROADWORTHY</div>
-                        <div style={{ fontWeight: 600, color: daysUntil(v.roadworthyExpiry) <= 30 ? "#D97706" : "#0F172A" }}>{fmtDate(v.roadworthyExpiry)}</div>
+                      {v.roadworthyExpiry && <div style={{ padding: "8px 12px", background: daysUntil(v.roadworthyExpiry) <= 30 ? "var(--hf-warning-soft-strong)" : "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
+                        <div style={{ fontSize: 10, color: "var(--hf-text-faint)", marginBottom: 2 }}>ROADWORTHY</div>
+                        <div style={{ fontWeight: 600, color: daysUntil(v.roadworthyExpiry) <= 30 ? "var(--hf-warning-text)" : "var(--hf-text)" }}>{fmtDate(v.roadworthyExpiry)}</div>
                       </div>}
-                      {v.insuranceExpiry && <div style={{ padding: "8px 12px", background: daysUntil(v.insuranceExpiry) <= 30 ? "#FEF3C7" : "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12 }}>
-                        <div style={{ fontSize: 10, color: "#94A3B8", marginBottom: 2 }}>INSURANCE</div>
-                        <div style={{ fontWeight: 600, color: daysUntil(v.insuranceExpiry) <= 30 ? "#D97706" : "#0F172A" }}>{fmtDate(v.insuranceExpiry)}</div>
+                      {v.insuranceExpiry && <div style={{ padding: "8px 12px", background: daysUntil(v.insuranceExpiry) <= 30 ? "var(--hf-warning-soft-strong)" : "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
+                        <div style={{ fontSize: 10, color: "var(--hf-text-faint)", marginBottom: 2 }}>INSURANCE</div>
+                        <div style={{ fontWeight: 600, color: daysUntil(v.insuranceExpiry) <= 30 ? "var(--hf-warning-text)" : "var(--hf-text)" }}>{fmtDate(v.insuranceExpiry)}</div>
                       </div>}
                     </div>
-                    {v.notes && <div style={{ marginTop: 10, padding: "8px 12px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, fontSize: 13, color: "#78350F" }}>{v.notes}</div>}
+                    {v.notes && <div style={{ marginTop: 10, padding: "8px 12px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-warning-text-deep)" }}>{v.notes}</div>}
                   </div>
                 )}
               </div>
@@ -299,7 +299,7 @@ export default function VehiclesTab() {
               </div>
               <div>
                 <label style={lbl}>Type</label>
-                <select value={form.vehicleType} onChange={e => setForm(f => ({ ...f, vehicleType: e.target.value }))} style={{ ...inp("vehicleType"), background: "#fff" }}>
+                <select value={form.vehicleType} onChange={e => setForm(f => ({ ...f, vehicleType: e.target.value }))} style={{ ...inp("vehicleType"), background: "var(--hf-surface)" }}>
                   {VEHICLE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
@@ -309,7 +309,7 @@ export default function VehiclesTab() {
               </div>
               <div>
                 <label style={lbl}>Fuel Type</label>
-                <select value={form.fuelType} onChange={e => setForm(f => ({ ...f, fuelType: e.target.value }))} style={{ ...inp("fuelType"), background: "#fff" }}>
+                <select value={form.fuelType} onChange={e => setForm(f => ({ ...f, fuelType: e.target.value }))} style={{ ...inp("fuelType"), background: "var(--hf-surface)" }}>
                   {FUEL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
@@ -335,7 +335,7 @@ export default function VehiclesTab() {
                 <input type="date" value={form.insuranceExpiry} onChange={e => setForm(f => ({ ...f, insuranceExpiry: e.target.value }))} style={inp("insuranceExpiry")} />
               </div>
             </div>
-            <div style={{ marginTop: 10, padding: "8px 12px", background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 7, fontSize: 12, color: "#0369A1" }}>
+            <div style={{ marginTop: 10, padding: "8px 12px", background: "var(--hf-sky-soft)", border: "1px solid var(--hf-sky-border)", borderRadius: 7, fontSize: 12, color: "var(--hf-sky-text-strong)" }}>
               You will be alerted 60, 30, and 7 days before any document expires.
             </div>
           </Sect>
@@ -345,12 +345,12 @@ export default function VehiclesTab() {
               <div>
                 <label style={lbl}>Odometer interval (km)</label>
                 <input type="number" value={form.serviceIntervalKm} onChange={e => setForm(f => ({ ...f, serviceIntervalKm: e.target.value }))} placeholder="10000" style={inp("serviceIntervalKm")} />
-                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 3 }}>Alert when km since last service exceeds this</div>
+                <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 3 }}>Alert when km since last service exceeds this</div>
               </div>
               <div>
                 <label style={lbl}>Time interval (days)</label>
                 <input type="number" value={form.serviceIntervalDays} onChange={e => setForm(f => ({ ...f, serviceIntervalDays: e.target.value }))} placeholder="180" style={inp("serviceIntervalDays")} />
-                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 3 }}>Also alert after this many days regardless of km</div>
+                <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 3 }}>Also alert after this many days regardless of km</div>
               </div>
             </div>
           </Sect>
@@ -360,7 +360,7 @@ export default function VehiclesTab() {
               <div>
                 <label style={lbl}>Assigned Driver (free text)</label>
                 <input value={form.assignedDriverName} onChange={e => setForm(f => ({ ...f, assignedDriverName: e.target.value }))} placeholder="James Dlamini" style={inp("assignedDriverName")} />
-                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 3 }}>For a linked driver with compliance tracking, use "Assign driver" after registering — see Drivers tab</div>
+                <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 3 }}>For a linked driver with compliance tracking, use "Assign driver" after registering — see Drivers tab</div>
               </div>
               <div>
                 <label style={lbl}>Daily Rate (R)</label>
@@ -392,11 +392,11 @@ export default function VehiclesTab() {
               const cfg = STATUS_CFG[s]; const Icon = cfg.icon; const sel = newStatus === s
               return (
                 <button key={s} onClick={() => setNewStatus(s)}
-                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `2px solid ${sel ? cfg.color : "#E2E8F0"}`, borderRadius: 10, cursor: "pointer", background: sel ? cfg.bg : "#fff", textAlign: "left" as const, width: "100%" }}>
+                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `2px solid ${sel ? cfg.color : "#E2E8F0"}`, borderRadius: 10, cursor: "pointer", background: sel ? cfg.bg : "var(--hf-surface)", textAlign: "left" as const, width: "100%" }}>
                   <div style={{ width: 32, height: 32, borderRadius: "50%", background: `${cfg.color}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={15} color={cfg.color} /></div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, color: sel ? cfg.color : "#0F172A" }}>{cfg.label}</div>
-                    <div style={{ fontSize: 11, color: "#94A3B8" }}>{STATUS_DESC[s]}</div>
+                    <div style={{ fontWeight: 600, color: sel ? cfg.color : "var(--hf-text)" }}>{cfg.label}</div>
+                    <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{STATUS_DESC[s]}</div>
                   </div>
                   {sel && <CheckCircle size={16} color={cfg.color} />}
                 </button>
@@ -404,7 +404,7 @@ export default function VehiclesTab() {
             })}
           </div>
           <div style={{ marginBottom: 14 }}>
-            <label style={lbl}>Note <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
+            <label style={lbl}>Note <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(optional)</span></label>
             <input value={statusNote} onChange={e => setStatusNote(e.target.value)} placeholder={newStatus === "BREAKDOWN" ? "Describe the issue..." : ""} style={{ ...inp("_"), width: "100%" }} />
           </div>
           {apiError && <ErrBanner msg={apiError} />}
@@ -419,16 +419,16 @@ export default function VehiclesTab() {
           <div style={{ marginBottom: 16 }}>
             <label style={lbl}>Driver</label>
             {activeDrivers.length === 0 ? (
-              <div style={{ padding: "10px 12px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 8, fontSize: 13, color: "#92400E" }}>
+              <div style={{ padding: "10px 12px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 8, fontSize: 13, color: "var(--hf-warning-text-deep)" }}>
                 No active drivers registered yet — add one from the Drivers tab first.
               </div>
             ) : (
-              <select value={selectedDriverId} onChange={e => setSelectedDriverId(e.target.value)} style={{ ...inp("_"), width: "100%", background: "#fff" }}>
+              <select value={selectedDriverId} onChange={e => setSelectedDriverId(e.target.value)} style={{ ...inp("_"), width: "100%", background: "var(--hf-surface)" }}>
                 <option value="">Unassigned</option>
                 {activeDrivers.map(d => <option key={d.id} value={d.id}>{d.firstName} {d.lastName}</option>)}
               </select>
             )}
-            <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 6 }}>
+            <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 6 }}>
               This links the vehicle to a driver record with licence/PrDP compliance tracking. Select "Unassigned" to remove the current assignment.
             </div>
           </div>
@@ -444,20 +444,20 @@ export default function VehiclesTab() {
 
       {viewing && (
         <Overlay onClose={() => setViewing(null)}>
-          <div style={{ background: "linear-gradient(135deg, #1B3A6B 0%, #0F2A52 100%)", margin: "-28px -28px 24px", padding: "24px 28px", borderRadius: "16px 16px 0 0" }}>
+          <div style={{ background: "linear-gradient(135deg, var(--hf-primary) 0%, var(--hf-primary-hover) 100%)", margin: "-28px -28px 24px", padding: "24px 28px", borderRadius: "16px 16px 0 0" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                 <div style={{ fontSize: 36 }}>{ICONS[viewing.vehicleType] ?? "🚘"}</div>
                 <div>
-                  <h3 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 800, color: "#fff" }}>{viewing.registration}</h3>
+                  <h3 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 800, color: "var(--hf-text-on-solid)" }}>{viewing.registration}</h3>
                   <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>{viewing.make} {viewing.model}{viewing.year ? ` · ${viewing.year}` : ""}{viewing.colour ? ` · ${viewing.colour}` : ""}</div>
                 </div>
               </div>
-              <button onClick={() => setViewing(null)} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, cursor: "pointer", color: "#fff", padding: 6, display: "flex" }}><X size={18} /></button>
+              <button onClick={() => setViewing(null)} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, cursor: "pointer", color: "var(--hf-text-on-solid)", padding: 6, display: "flex" }}><X size={18} /></button>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
               <StatusBadge status={viewing.status} />
-              {viewing.dueForService && <span style={{ background: "#FEF3C7", color: "#D97706", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: "1px solid #FDE68A" }}>Service Due</span>}
+              {viewing.dueForService && <span style={{ background: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text)", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: "1px solid var(--hf-warning-border)" }}>Service Due</span>}
             </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
@@ -467,25 +467,25 @@ export default function VehiclesTab() {
               { l: "Daily Rate",   v: fmtR(viewing.dailyRate) },
               { l: "Driver",       v: viewing.assignedDriverName || "Unassigned" },
             ].map(item => (
-              <div key={item.l} style={{ padding: "10px 14px", background: "#F8FAFC", borderRadius: 8 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#0F172A" }}>{item.v}</div>
+              <div key={item.l} style={{ padding: "10px 14px", background: "var(--hf-surface-muted)", borderRadius: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--hf-text)" }}>{item.v}</div>
               </div>
             ))}
           </div>
           <div style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748B", marginBottom: 6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 6 }}>
               <span>Service progress</span>
               <span>{((viewing.currentOdometer ?? 0) - (viewing.lastServiceKm ?? 0)).toLocaleString()} / {(viewing.serviceIntervalKm || 10000).toLocaleString()} km</span>
             </div>
-            <div style={{ height: 8, background: "#F1F5F9", borderRadius: 99, overflow: "hidden" }}>
-              {(() => { const pct = Math.min(100, ((viewing.currentOdometer ?? 0) - (viewing.lastServiceKm ?? 0)) / (viewing.serviceIntervalKm || 10000) * 100); return <div style={{ height: "100%", width: `${pct}%`, background: pct >= 100 ? "#DC2626" : pct >= 80 ? "#D97706" : "#0D9488", borderRadius: 99 }} /> })()}
+            <div style={{ height: 8, background: "var(--hf-surface-sunken)", borderRadius: 99, overflow: "hidden" }}>
+              {(() => { const pct = Math.min(100, ((viewing.currentOdometer ?? 0) - (viewing.lastServiceKm ?? 0)) / (viewing.serviceIntervalKm || 10000) * 100); return <div style={{ height: "100%", width: `${pct}%`, background: pct >= 100 ? "var(--hf-danger)" : pct >= 80 ? "var(--hf-warning)" : "var(--hf-accent)", borderRadius: 99 }} /> })()}
             </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => { setViewing(null); openAssign(viewing) }} style={{ flex: 1, padding: "10px", background: "#F5F3FF", color: "#7C3AED", border: "1px solid #DDD6FE", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Assign Driver</button>
-            <button onClick={() => { setViewing(null); setShowStatus(viewing); setNewStatus(viewing.status); setStatusNote("") }} style={{ flex: 1, padding: "10px", background: "#FFFBEB", color: "#D97706", border: "1px solid #FDE68A", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Change Status</button>
-            <button onClick={() => setViewing(null)} style={{ padding: "10px 16px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 13, cursor: "pointer", color: "#374151" }}>Close</button>
+            <button onClick={() => { setViewing(null); openAssign(viewing) }} style={{ flex: 1, padding: "10px", background: "var(--hf-violet-soft)", color: "var(--hf-violet-text)", border: "1px solid var(--hf-violet-border)", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Assign Driver</button>
+            <button onClick={() => { setViewing(null); setShowStatus(viewing); setNewStatus(viewing.status); setStatusNote("") }} style={{ flex: 1, padding: "10px", background: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", border: "1px solid var(--hf-warning-border)", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Change Status</button>
+            <button onClick={() => setViewing(null)} style={{ padding: "10px 16px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Close</button>
           </div>
         </Overlay>
       )}
@@ -496,21 +496,21 @@ export default function VehiclesTab() {
 function Overlay({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 620, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>
+      <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 620, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>
     </div>
   )
 }
 function MHead({ title, onClose }: { title: string; onClose: () => void }) {
-  return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button></div>
+  return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button></div>
 }
 function MFoot({ onCancel, onSubmit, loading, label, disabled = false }: { onCancel: () => void; onSubmit: () => void; loading: boolean; label: string; disabled?: boolean }) {
-  return <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}><button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button><button onClick={onSubmit} disabled={loading || disabled} style={{ padding: "9px 22px", background: loading || disabled ? "#94A3B8" : "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || disabled ? "not-allowed" : "pointer" }}>{loading ? "Saving..." : label}</button></div>
+  return <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}><button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button><button onClick={onSubmit} disabled={loading || disabled} style={{ padding: "9px 22px", background: loading || disabled ? "var(--hf-text-faint)" : "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || disabled ? "not-allowed" : "pointer" }}>{loading ? "Saving..." : label}</button></div>
 }
 function Sect({ title, children }: { title: string; children: React.ReactNode }) {
-  return <div style={{ marginBottom: 20 }}><div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.07em", textTransform: "uppercase" as const, marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #F1F5F9" }}>{title}</div>{children}</div>
+  return <div style={{ marginBottom: 20 }}><div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", letterSpacing: "0.07em", textTransform: "uppercase" as const, marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid var(--hf-border-subtle)" }}>{title}</div>{children}</div>
 }
 function ErrBanner({ msg }: { msg: string }) {
-  return <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{msg}</div>
+  return <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{msg}</div>
 }
 const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
 const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }

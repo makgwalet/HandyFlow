@@ -84,33 +84,33 @@ export default function EventsListTab({ onSelectEvent }: Props) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <div style={{ position: "relative" as const }}>
-            <Search size={13} style={{ position: "absolute" as const, left: 9, top: "50%", transform: "translateY(-50%)", color: "#94A3B8" }} />
+            <Search size={13} style={{ position: "absolute" as const, left: 9, top: "50%", transform: "translateY(-50%)", color: "var(--hf-text-faint)" }} />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search events..."
-              style={{ paddingLeft: 28, padding: "7px 10px 7px 28px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none", width: 220 }} />
+              style={{ paddingLeft: 28, padding: "7px 10px 7px 28px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", width: 220 }} />
           </div>
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-            style={{ padding: "7px 10px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none", background: "#fff" }}>
+            style={{ padding: "7px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", background: "var(--hf-surface)" }}>
             <option value="ALL">All statuses</option>
             {Object.entries(STATUS_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
           <select value={filterType} onChange={e => setFilterType(e.target.value)}
-            style={{ padding: "7px 10px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, outline: "none", background: "#fff" }}>
+            style={{ padding: "7px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", background: "var(--hf-surface)" }}>
             <option value="ALL">All types</option>
             {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
         <button onClick={() => { setShowCreate(true); setError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 7, background: "#0284C7", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-sky)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> New Event
         </button>
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading events...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading events...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <Calendar size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No events yet</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No events yet</div>
           <div style={{ fontSize: 13, marginTop: 4 }}>Create your first event to start managing registrations.</div>
         </div>
       ) : (
@@ -123,24 +123,24 @@ export default function EventsListTab({ onSelectEvent }: Props) {
               <div key={e.id} style={{
                 border: `1px solid ${isLive ? "#FECACA" : "#E2E8F0"}`,
                 borderLeft: `3px solid ${isLive ? "#EF4444" : tc}`,
-                borderRadius: 10, padding: "16px 20px", background: isLive ? "#FFFAFA" : "#fff",
+                borderRadius: 10, padding: "16px 20px", background: isLive ? "#FFFAFA" : "var(--hf-surface)",
                 display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap",
               }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
                     {isLive && <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <Radio size={12} color="#EF4444" /><span style={{ fontSize: 11, color: "#DC2626", fontWeight: 700 }}>LIVE</span>
+                      <Radio size={12} color="#EF4444" /><span style={{ fontSize: 11, color: "var(--hf-danger-text)", fontWeight: 700 }}>LIVE</span>
                     </span>}
-                    <span style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{e.title}</span>
-                    <span style={{ fontFamily: "monospace", fontSize: 11, color: "#94A3B8" }}>{e.eventNumber}</span>
+                    <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{e.title}</span>
+                    <span style={{ fontFamily: "monospace", fontSize: 11, color: "var(--hf-text-faint)" }}>{e.eventNumber}</span>
                     <span style={{ background: `${tc}18`, color: tc, padding: "1px 7px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{e.eventType}</span>
                     <span style={{ background: sc.bg, color: sc.color, padding: "1px 7px", borderRadius: 20, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
                       <span style={{ width: 6, height: 6, borderRadius: "50%", background: sc.dot, display: "inline-block" }} />{sc.label}
                     </span>
-                    {e.isFree && <span style={{ background: "#F0FDF4", color: "#166534", padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>Free</span>}
-                    {e.isPrivate && <span style={{ background: "#FDF4FF", color: "#9333EA", padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>Private</span>}
+                    {e.isFree && <span style={{ background: "var(--hf-success-soft)", color: "var(--hf-success-text-strong)", padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>Free</span>}
+                    {e.isPrivate && <span style={{ background: "var(--hf-violet-soft)", color: "var(--hf-violet-text)", padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>Private</span>}
                   </div>
-                  <div style={{ display: "flex", gap: 16, fontSize: 12, color: "#64748B", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--hf-text-muted)", flexWrap: "wrap" }}>
                     <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Calendar size={11} />{fmtDT(e.startDatetime)}</span>
                     {e.venueName && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><MapPin size={11} />{e.venueName}</span>}
                     {e.venueCapacity && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Users size={11} />Cap: {e.venueCapacity}</span>}
@@ -152,30 +152,30 @@ export default function EventsListTab({ onSelectEvent }: Props) {
                 <div style={{ display: "flex", gap: 7, flexShrink: 0, flexWrap: "wrap" }}>
                   {e.status === "DRAFT" && (
                     <button onClick={() => transition.mutate({ id: e.id, action: "publish" })}
-                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#DCFCE7", color: "#166534", border: "1px solid #86EFAC", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                       <Megaphone size={12} /> Publish
                     </button>
                   )}
                   {e.status === "PUBLISHED" && (
                     <button onClick={() => transition.mutate({ id: e.id, action: "go-live" })}
-                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                       <Radio size={12} /> Go Live
                     </button>
                   )}
                   {e.status === "LIVE" && (
                     <button onClick={() => transition.mutate({ id: e.id, action: "complete" })}
-                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#E0F2FE", color: "#0284C7", border: "1px solid #BAE6FD", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-sky-soft-strong)", color: "var(--hf-sky-text)", border: "1px solid var(--hf-sky-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                       <CheckCircle size={12} /> Complete
                     </button>
                   )}
                   {["DRAFT","PUBLISHED","SOLD_OUT"].includes(e.status) && (
                     <button onClick={() => setCancelConfirm({ id: e.id, title: e.title })}
-                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#F8FAFC", color: "#94A3B8", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-surface-muted)", color: "var(--hf-text-faint)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12, cursor: "pointer" }}>
                       <XCircle size={12} /> Cancel
                     </button>
                   )}
                   <button onClick={() => onSelectEvent(e.id, e.title)}
-                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#0284C7", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-sky)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                     <Eye size={12} /> Guests <ChevronRight size={12} />
                   </button>
                 </div>
@@ -188,13 +188,13 @@ export default function EventsListTab({ onSelectEvent }: Props) {
       {/* Create event modal */}
       {showCreate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 700, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 700, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>Create Event</h3>
-                <p style={{ margin: "3px 0 0", fontSize: 13, color: "#64748B" }}>Fill in the details — you can edit everything before publishing</p>
+                <p style={{ margin: "3px 0 0", fontSize: 13, color: "var(--hf-text-muted)" }}>Fill in the details — you can edit everything before publishing</p>
               </div>
-              <button onClick={() => setShowCreate(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={20} /></button>
+              <button onClick={() => setShowCreate(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}><X size={20} /></button>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -204,7 +204,7 @@ export default function EventsListTab({ onSelectEvent }: Props) {
               </div>
               <div>
                 <label style={lbl}>Event type *</label>
-                <select value={form.eventType} onChange={e => f("eventType", e.target.value)} style={{ ...inp, background: "#fff" }}>
+                <select value={form.eventType} onChange={e => f("eventType", e.target.value)} style={{ ...inp, background: "var(--hf-surface)" }}>
                   {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
@@ -253,14 +253,14 @@ export default function EventsListTab({ onSelectEvent }: Props) {
             </div>
 
             {/* Ticket tiers notice */}
-            <div style={{ marginTop: 16, padding: "12px 14px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, fontSize: 12, color: "#1D4ED8" }}>
+            <div style={{ marginTop: 16, padding: "12px 14px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 8, fontSize: 12, color: "var(--hf-info-text)" }}>
               Ticket tiers (Early Bird, VIP, General) can be added after creating the event — from the Guests tab.
             </div>
 
-            {error && <div style={{ marginTop: 12, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{error}</div>}
+            {error && <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 22 }}>
-              <button onClick={() => setShowCreate(false)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => setShowCreate(false)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer" }}>Cancel</button>
               <button
                 disabled={!form.title || !form.startDatetime || !form.endDatetime || createEvent.isPending}
                 onClick={() => createEvent.mutate({
@@ -272,7 +272,7 @@ export default function EventsListTab({ onSelectEvent }: Props) {
                   venueName: form.venueName || null,
                   venueAddress: form.venueAddress || null,
                 })}
-                style={{ padding: "9px 22px", background: !form.title ? "#94A3B8" : "#0284C7", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: !form.title ? "var(--hf-text-faint)" : "var(--hf-sky)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {createEvent.isPending ? "Creating..." : "Create Event"}
               </button>
             </div>
@@ -283,15 +283,15 @@ export default function EventsListTab({ onSelectEvent }: Props) {
       {/* Custom cancel-event confirmation modal */}
       {cancelConfirm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 28, width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 22 }}>
-              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#FEF2F2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
+              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "var(--hf-danger-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
                 <AlertTriangle size={20} color="#DC2626" />
               </div>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 16, color: "#0F172A", marginBottom: 6 }}>Cancel event?</div>
-                <div style={{ fontSize: 13, color: "#64748B", lineHeight: 1.6 }}>
-                  <strong style={{ color: "#0F172A" }}>{cancelConfirm.title}</strong> will be marked as cancelled.
+                <div style={{ fontWeight: 700, fontSize: 16, color: "var(--hf-text)", marginBottom: 6 }}>Cancel event?</div>
+                <div style={{ fontSize: 13, color: "var(--hf-text-muted)", lineHeight: 1.6 }}>
+                  <strong style={{ color: "var(--hf-text)" }}>{cancelConfirm.title}</strong> will be marked as cancelled.
                   All registered guests will lose their spots. This action cannot be undone.
                 </div>
               </div>
@@ -299,12 +299,12 @@ export default function EventsListTab({ onSelectEvent }: Props) {
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button
                 onClick={() => setCancelConfirm(null)}
-                style={{ padding: "9px 20px", border: "1px solid #E2E8F0", borderRadius: 8, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151", fontWeight: 500 }}>
+                style={{ padding: "9px 20px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)", fontWeight: 500 }}>
                 Keep event
               </button>
               <button
                 onClick={() => { transition.mutate({ id: cancelConfirm.id, action: "cancel" }); setCancelConfirm(null) }}
-                style={{ padding: "9px 20px", background: "#DC2626", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 20px", background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 Cancel event
               </button>
             </div>

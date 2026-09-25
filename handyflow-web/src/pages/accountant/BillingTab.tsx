@@ -7,16 +7,16 @@ import { FileText, Plus, X, Send, AlertTriangle, DollarSign, Download } from "lu
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return Array.isArray(p) ? p : p?.content ?? [] }
 const fmtR   = (n: any) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
 const fmtD   = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
 
 const STATUS_CFG: Record<string, { color: string; bg: string; label: string }> = {
-  DRAFT:       { color: "#64748B", bg: "#F1F5F9", label: "Draft"     },
-  SENT:        { color: "#1D4ED8", bg: "#EFF6FF", label: "Sent"      },
-  PARTIAL:     { color: "#D97706", bg: "#FFFBEB", label: "Partial"   },
-  PAID:        { color: "#166534", bg: "#DCFCE7", label: "Paid"      },
-  OVERDUE:     { color: "#DC2626", bg: "#FEF2F2", label: "Overdue"   },
-  WRITTEN_OFF: { color: "#94A3B8", bg: "#F8FAFC", label: "Written off"},
+  DRAFT:       { color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)", label: "Draft"     },
+  SENT:        { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", label: "Sent"      },
+  PARTIAL:     { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", label: "Partial"   },
+  PAID:        { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", label: "Paid"      },
+  OVERDUE:     { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", label: "Overdue"   },
+  WRITTEN_OFF: { color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)", label: "Written off"},
 }
 
 export default function BillingTab({ initialClientId }: { initialClientId?: string | null } = {}) {
@@ -159,16 +159,16 @@ export default function BillingTab({ initialClientId }: { initialClientId?: stri
     <div>
       {/* Tabs */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-        <div style={{ display: "flex", gap: 2, background: "#F1F5F9", borderRadius: 9, padding: 3 }}>
+        <div style={{ display: "flex", gap: 2, background: "var(--hf-surface-sunken)", borderRadius: 9, padding: 3 }}>
           {(historyClientId ? (["client-history", "outstanding", "generate"] as const) : (["outstanding", "generate"] as const)).map(t => (
             <button key={t} onClick={() => setTab(t)}
-              style={{ padding: "6px 16px", borderRadius: 7, border: "none", fontSize: 13, fontWeight: tab === t ? 700 : 400, background: tab === t ? "#fff" : "transparent", color: tab === t ? "#0F172A" : "#64748B", cursor: "pointer", boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none" }}>
+              style={{ padding: "6px 16px", borderRadius: 7, border: "none", fontSize: 13, fontWeight: tab === t ? 700 : 400, background: tab === t ? "var(--hf-surface)" : "transparent", color: tab === t ? "var(--hf-text)" : "var(--hf-text-muted)", cursor: "pointer", boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none" }}>
               {t === "outstanding" ? "Debtors" : t === "generate" ? "Generate fee note" : "Client History"}
             </button>
           ))}
         </div>
         <button onClick={() => { setShowGen(true); setError("") }}
-          style={{ display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           <Plus size={15} /> New Fee Note
         </button>
       </div>
@@ -176,37 +176,37 @@ export default function BillingTab({ initialClientId }: { initialClientId?: stri
       {tab === "client-history" && historyClientId && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <div style={{ fontSize: 13, color: "#64748B" }}>Full fee note history — every status, not just outstanding</div>
+            <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>Full fee note history — every status, not just outstanding</div>
             <button onClick={() => { setHistoryClientId(null); setTab("outstanding") }}
-              style={{ fontSize: 12, color: "#64748B", background: "none", border: "1px solid #E2E8F0", borderRadius: 7, padding: "5px 12px", cursor: "pointer" }}>
+              style={{ fontSize: 12, color: "var(--hf-text-muted)", background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "5px 12px", cursor: "pointer" }}>
               Clear client filter
             </button>
           </div>
           {historyLoading ? (
-            <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading...</div>
+            <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading...</div>
           ) : !clientHistory?.content?.length ? (
-            <div style={{ textAlign: "center", padding: "50px 20px", color: "#94A3B8" }}>
+            <div style={{ textAlign: "center", padding: "50px 20px", color: "var(--hf-text-faint)" }}>
               <FileText size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
-              <div style={{ fontWeight: 600, color: "#475569" }}>No fee notes for this client yet</div>
+              <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No fee notes for this client yet</div>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               {clientHistory.content.map((inv: any) => {
                 const sc = STATUS_CFG[inv.status] ?? STATUS_CFG.SENT
                 return (
-                  <div key={inv.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", border: "1px solid #E2E8F0", borderRadius: 10, background: "#fff", gap: 10, flexWrap: "wrap" }}>
+                  <div key={inv.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", border: "1px solid var(--hf-border)", borderRadius: 10, background: "var(--hf-surface)", gap: 10, flexWrap: "wrap" }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                        <span style={{ fontFamily: "monospace", fontSize: 12, color: "#64748B" }}>{inv.invoiceNumber}</span>
+                        <span style={{ fontFamily: "monospace", fontSize: 12, color: "var(--hf-text-muted)" }}>{inv.invoiceNumber}</span>
                         <span style={{ background: sc.bg, color: sc.color, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{sc.label}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: "#94A3B8" }}>Due: {fmtD(inv.dueDate)} · Issued: {fmtD(inv.invoiceDate)}</div>
+                      <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Due: {fmtD(inv.dueDate)} · Issued: {fmtD(inv.invoiceDate)}</div>
                     </div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>{fmtR(inv.totalAmount)}</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)" }}>{fmtR(inv.totalAmount)}</div>
                   </div>
                 )
               })}
-              <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 4 }}>{clientHistory.totalElements} total fee note{clientHistory.totalElements !== 1 ? "s" : ""}</div>
+              <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 4 }}>{clientHistory.totalElements} total fee note{clientHistory.totalElements !== 1 ? "s" : ""}</div>
             </div>
           )}
         </div>
@@ -217,11 +217,11 @@ export default function BillingTab({ initialClientId }: { initialClientId?: stri
           {/* Aging summary */}
           <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
             {[
-              { l: "Current",   k: "current", color: "#166534", bg: "#DCFCE7" },
-              { l: "1-30 days", k: "1-30",    color: "#D97706", bg: "#FFFBEB" },
-              { l: "30-60 days",k: "30-60",   color: "#EA580C", bg: "#FFF7ED" },
-              { l: "60-90 days",k: "60-90",   color: "#DC2626", bg: "#FEF2F2" },
-              { l: "90+ days",  k: "90+",     color: "#7C2D12", bg: "#FFF1F2" },
+              { l: "Current",   k: "current", color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+              { l: "1-30 days", k: "1-30",    color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+              { l: "30-60 days",k: "30-60",   color: "var(--hf-orange-text)", bg: "var(--hf-orange-soft)" },
+              { l: "60-90 days",k: "60-90",   color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
+              { l: "90+ days",  k: "90+",     color: "var(--hf-orange-text-strong)", bg: "var(--hf-danger-soft)" },
             ].map(b => (
               <div key={b.k} style={{ background: b.bg, borderRadius: 9, padding: "10px 14px", minWidth: 110 }}>
                 <div style={{ fontSize: 14, fontWeight: 800, color: b.color }}>{fmtR(aging[b.k] ?? 0)}</div>
@@ -231,11 +231,11 @@ export default function BillingTab({ initialClientId }: { initialClientId?: stri
           </div>
 
           {isLoading ? (
-            <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading...</div>
+            <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading...</div>
           ) : (outstanding as any[]).length === 0 ? (
-            <div style={{ textAlign: "center", padding: "50px 20px", color: "#94A3B8" }}>
+            <div style={{ textAlign: "center", padding: "50px 20px", color: "var(--hf-text-faint)" }}>
               <FileText size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
-              <div style={{ fontWeight: 600, color: "#475569" }}>No outstanding invoices</div>
+              <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No outstanding invoices</div>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
@@ -244,19 +244,19 @@ export default function BillingTab({ initialClientId }: { initialClientId?: stri
                 const canPay = inv.status === "SENT" || inv.status === "PARTIAL" || inv.status === "OVERDUE"
                 return (
                   <div key={inv.id}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", border: `1px solid ${inv.daysOverdue > 0 ? "#FECACA" : "#E2E8F0"}`, borderLeft: `3px solid ${inv.daysOverdue > 0 ? "#DC2626" : "#1D4ED8"}`, borderRadius: 10, background: "#fff", gap: 10, flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", border: `1px solid ${inv.daysOverdue > 0 ? "#FECACA" : "#E2E8F0"}`, borderLeft: `3px solid ${inv.daysOverdue > 0 ? "#DC2626" : "#1D4ED8"}`, borderRadius: 10, background: "var(--hf-surface)", gap: 10, flexWrap: "wrap" }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                          <span style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{inv.clientName}</span>
-                          <span style={{ fontFamily: "monospace", fontSize: 12, color: "#64748B" }}>{inv.invoiceNumber}</span>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{inv.clientName}</span>
+                          <span style={{ fontFamily: "monospace", fontSize: 12, color: "var(--hf-text-muted)" }}>{inv.invoiceNumber}</span>
                           <span style={{ background: sc.bg, color: sc.color, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{sc.label}</span>
                           {inv.daysOverdue > 0 && (
-                            <span style={{ background: "#FEF2F2", color: "#DC2626", padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", gap: 3 }}>
+                            <span style={{ background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", gap: 3 }}>
                               <AlertTriangle size={9} />{inv.daysOverdue}d overdue
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                        <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>
                           Due: {fmtD(inv.dueDate)} · Issued: {fmtD(inv.invoiceDate)}
                           {/* NEW: closes the audit's #1 must-fix gap — a
                               way to actually see and record payments,
@@ -266,7 +266,7 @@ export default function BillingTab({ initialClientId }: { initialClientId?: stri
                             <>
                               {" · "}
                               <button onClick={() => setExpandedPayments(expandedPayments === inv.id ? null : inv.id)}
-                                style={{ fontSize: 12, color: "#1B3A6B", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}>
+                                style={{ fontSize: 12, color: "var(--hf-primary-text)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}>
                                 {expandedPayments === inv.id ? "Hide payments" : "View payments"}
                               </button>
                             </>
@@ -275,9 +275,9 @@ export default function BillingTab({ initialClientId }: { initialClientId?: stri
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
                         <div style={{ textAlign: "right" as const }}>
-                          <div style={{ fontWeight: 800, fontSize: 15, color: "#0F172A" }}>{fmtR(inv.total)}</div>
+                          <div style={{ fontWeight: 800, fontSize: 15, color: "var(--hf-text)" }}>{fmtR(inv.total)}</div>
                           {inv.balance < inv.total && (
-                            <div style={{ fontSize: 11, color: "#0D9488" }}>Balance: {fmtR(inv.balance)}</div>
+                            <div style={{ fontSize: 11, color: "var(--hf-accent-text)" }}>Balance: {fmtR(inv.balance)}</div>
                           )}
                         </div>
                         {/* NEW: closes the "quick win" gap from the audit
@@ -286,19 +286,19 @@ export default function BillingTab({ initialClientId }: { initialClientId?: stri
                             Payment — this is a reference/download
                             action, not a state change. */}
                         <button onClick={() => downloadPdf(inv)} disabled={downloadingPdf === inv.id}
-                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#F8FAFC", color: "#374151", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-surface-muted)", color: "var(--hf-text-secondary)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                           <Download size={12} />{downloadingPdf === inv.id ? "Downloading..." : "PDF"}
                         </button>
                         {inv.status === "DRAFT" && (
                           <button onClick={() => { setSending(inv.id); sendNote.mutate(inv.id) }}
                             disabled={sending === inv.id}
-                            style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                            style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                             <Send size={12} />{sending === inv.id ? "Sending..." : "Send"}
                           </button>
                         )}
                         {canPay && (
                           <button onClick={() => { setPayingId(inv.id); setPayForm({ ...PAY_INIT(), amount: String(inv.balance ?? inv.total) }); setPayError("") }}
-                            style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#DCFCE7", color: "#166534", border: "1px solid #86EFAC", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                            style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                             <DollarSign size={12} /> Record Payment
                           </button>
                         )}
@@ -307,19 +307,19 @@ export default function BillingTab({ initialClientId }: { initialClientId?: stri
 
                     {/* Payment history — expanded inline below the row */}
                     {expandedPayments === inv.id && (
-                      <div style={{ margin: "4px 4px 0 18px", padding: "10px 14px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8 }}>
+                      <div style={{ margin: "4px 4px 0 18px", padding: "10px 14px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8 }}>
                         {paymentHistory.length === 0 ? (
-                          <div style={{ fontSize: 12, color: "#94A3B8" }}>No payments recorded yet.</div>
+                          <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>No payments recorded yet.</div>
                         ) : (
                           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                             {paymentHistory.map((p: any) => (
                               <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                                <span style={{ color: "#64748B" }}>
+                                <span style={{ color: "var(--hf-text-muted)" }}>
                                   {fmtD(p.paymentDate)} · {p.paymentMethod.replace("_", " ")}
                                   {p.reference ? ` · Ref: ${p.reference}` : ""}
                                   {p.recordedByName ? ` · by ${p.recordedByName}` : ""}
                                 </span>
-                                <span style={{ fontWeight: 700, color: "#166534" }}>{fmtR(p.amount)}</span>
+                                <span style={{ fontWeight: 700, color: "var(--hf-success-text-strong)" }}>{fmtR(p.amount)}</span>
                               </div>
                             ))}
                           </div>
@@ -337,16 +337,16 @@ export default function BillingTab({ initialClientId }: { initialClientId?: stri
       {/* Generate fee note modal */}
       {showGen && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 640, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 640, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>Generate Fee Note</h3>
-              <button onClick={() => setShowGen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={20} /></button>
+              <button onClick={() => setShowGen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}><X size={20} /></button>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div style={{ gridColumn: "1/-1" }}>
                 <label style={lbl}>Client *</label>
-                <select value={form.clientId} onChange={e => f("clientId", e.target.value)} style={{ ...inp, background: "#fff" }}>
+                <select value={form.clientId} onChange={e => f("clientId", e.target.value)} style={{ ...inp, background: "var(--hf-surface)" }}>
                   <option value="">Select client...</option>
                   {(clients as any[]).map((c: any) => <option key={c.id} value={c.id}>{c.tradingName}</option>)}
                 </select>
@@ -365,23 +365,23 @@ export default function BillingTab({ initialClientId }: { initialClientId?: stri
             {form.clientId && (unbilled as any[]).length > 0 && (
               <div style={{ marginTop: 16 }}>
                 <label style={{ ...lbl, marginBottom: 8 }}>Select unbilled time entries</label>
-                <div style={{ border: "1px solid #E2E8F0", borderRadius: 8, overflow: "hidden" }}>
+                <div style={{ border: "1px solid var(--hf-border)", borderRadius: 8, overflow: "hidden" }}>
                   {(unbilled as any[]).map((e: any, i: number) => (
-                    <label key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", cursor: "pointer", background: i % 2 === 0 ? "#fff" : "#F8FAFC", gap: 8 }}>
+                    <label key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", cursor: "pointer", background: i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)", gap: 8 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
                         <input type="checkbox" checked={form.timeEntryIds.includes(e.id)}
                           onChange={ev => f("timeEntryIds", ev.target.checked ? [...form.timeEntryIds, e.id] : form.timeEntryIds.filter((x: string) => x !== e.id))} />
                         <div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{e.activityType} · {e.hours}h</div>
-                          <div style={{ fontSize: 11, color: "#94A3B8" }}>{e.entryDate}{e.description ? ` — ${e.description}` : ""}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{e.activityType} · {e.hours}h</div>
+                          <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{e.entryDate}{e.description ? ` — ${e.description}` : ""}</div>
                         </div>
                       </div>
-                      <span style={{ fontWeight: 700, fontSize: 13, color: "#0D9488", flexShrink: 0 }}>{fmtR(e.lineTotal)}</span>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-accent-text)", flexShrink: 0 }}>{fmtR(e.lineTotal)}</span>
                     </label>
                   ))}
                 </div>
                 <button onClick={() => f("timeEntryIds", (unbilled as any[]).map((e: any) => e.id))}
-                  style={{ marginTop: 6, fontSize: 12, color: "#1B3A6B", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+                  style={{ marginTop: 6, fontSize: 12, color: "var(--hf-primary-text)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
                   Select all
                 </button>
               </div>
@@ -394,7 +394,7 @@ export default function BillingTab({ initialClientId }: { initialClientId?: stri
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 26 }}>
                 <input type="checkbox" id="vat" checked={form.includeVat} onChange={e => f("includeVat", e.target.checked)} style={{ width: 16, height: 16 }} />
-                <label htmlFor="vat" style={{ fontSize: 13, color: "#374151", cursor: "pointer" }}>Include 15% VAT</label>
+                <label htmlFor="vat" style={{ fontSize: 13, color: "var(--hf-text-secondary)", cursor: "pointer" }}>Include 15% VAT</label>
               </div>
               <div style={{ gridColumn: "1/-1" }}>
                 <label style={lbl}>Notes</label>
@@ -404,27 +404,27 @@ export default function BillingTab({ initialClientId }: { initialClientId?: stri
 
             {/* Totals preview */}
             {subtotal > 0 && (
-              <div style={{ marginTop: 16, padding: "14px 16px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#64748B", marginBottom: 5 }}>
+              <div style={{ marginTop: 16, padding: "14px 16px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--hf-text-muted)", marginBottom: 5 }}>
                   <span>Subtotal</span><span>{fmtR(subtotal)}</span>
                 </div>
                 {form.includeVat && (
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#64748B", marginBottom: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--hf-text-muted)", marginBottom: 8 }}>
                     <span>VAT (15%)</span><span>{fmtR(vat)}</span>
                   </div>
                 )}
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 800, color: "#0F172A", borderTop: "1px solid #E2E8F0", paddingTop: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 800, color: "var(--hf-text)", borderTop: "1px solid var(--hf-border)", paddingTop: 8 }}>
                   <span>Total</span><span>{fmtR(total)}</span>
                 </div>
               </div>
             )}
 
-            {error && <div style={{ marginTop: 12, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{error}</div>}
+            {error && <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-              <button onClick={() => setShowGen(false)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => setShowGen(false)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer" }}>Cancel</button>
               <button disabled={!form.clientId || generateNote.isPending}
                 onClick={() => generateNote.mutate({ clientId: form.clientId, invoiceDate: form.invoiceDate, dueDate: form.dueDate, timeEntryIds: form.timeEntryIds, fixedFee: form.fixedFee ? parseFloat(form.fixedFee) : null, includeVat: form.includeVat, notes: form.notes || null })}
-                style={{ padding: "9px 22px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {generateNote.isPending ? "Generating..." : "Generate Fee Note"}
               </button>
             </div>
@@ -436,10 +436,10 @@ export default function BillingTab({ initialClientId }: { initialClientId?: stri
           accountant module audit ("billing has no money-in loop"). */}
       {payingId && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>Record Payment</h3>
-              <button onClick={() => setPayingId(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={20} /></button>
+              <button onClick={() => setPayingId(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}><X size={20} /></button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
@@ -454,7 +454,7 @@ export default function BillingTab({ initialClientId }: { initialClientId?: stri
               </div>
               <div>
                 <label style={lbl}>Payment method *</label>
-                <select value={payForm.paymentMethod} onChange={e => setPayForm(p => ({ ...p, paymentMethod: e.target.value }))} style={{ ...inp, background: "#fff" }}>
+                <select value={payForm.paymentMethod} onChange={e => setPayForm(p => ({ ...p, paymentMethod: e.target.value }))} style={{ ...inp, background: "var(--hf-surface)" }}>
                   <option value="EFT">EFT</option>
                   <option value="CASH">Cash</option>
                   <option value="CARD">Card</option>
@@ -471,15 +471,15 @@ export default function BillingTab({ initialClientId }: { initialClientId?: stri
                 <textarea value={payForm.notes} onChange={e => setPayForm(p => ({ ...p, notes: e.target.value }))} rows={2} style={{ ...inp, resize: "vertical" as const }} />
               </div>
             </div>
-            {payError && <div style={{ marginTop: 12, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{payError}</div>}
+            {payError && <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{payError}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-              <button onClick={() => setPayingId(null)} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => setPayingId(null)} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer" }}>Cancel</button>
               <button disabled={!payForm.amount || parseFloat(payForm.amount) <= 0 || !payForm.paymentDate || recordPayment.isPending}
                 onClick={() => recordPayment.mutate({
                   id: payingId,
                   body: { amount: parseFloat(payForm.amount), paymentDate: payForm.paymentDate, paymentMethod: payForm.paymentMethod, reference: payForm.reference || null, notes: payForm.notes || null }
                 })}
-                style={{ padding: "9px 22px", background: "#166534", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: "var(--hf-success-solid-strong)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {recordPayment.isPending ? "Recording..." : "Record Payment"}
               </button>
             </div>

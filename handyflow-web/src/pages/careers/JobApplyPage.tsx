@@ -46,7 +46,7 @@ const fontImport = `@import url('https://fonts.googleapis.com/css2?family=Fraunc
 
 const inputStyle: CSSProperties = {
   width: '100%', boxSizing: 'border-box', padding: '11px 14px', fontSize: 15,
-  border: `1px solid ${line}`, borderRadius: 9, background: '#fff', color: ink,
+  border: `1px solid ${line}`, borderRadius: 9, background: 'var(--hf-surface)', color: ink,
   fontFamily: 'inherit',
 }
 const labelStyle: CSSProperties = {
@@ -281,7 +281,7 @@ export function JobApplyPage() {
                 <input ref={fileInputRef} type="file" accept="application/pdf" style={{ display: 'none' }}
                   onChange={e => onPickFile(e.target.files?.[0] ?? null)} />
                 {cvFile ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `1px solid ${line}`, borderRadius: 9, padding: '11px 14px', background: '#fff' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `1px solid ${line}`, borderRadius: 9, padding: '11px 14px', background: 'var(--hf-surface)' }}>
                     <span style={{ fontSize: 14, color: ink }}>{cvFile.name}</span>
                     <button type="button" onClick={() => onPickFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: muted, display: 'flex' }}>
                       <X size={16} />
@@ -291,7 +291,7 @@ export function JobApplyPage() {
                   <button type="button" onClick={() => fileInputRef.current?.click()}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 8, width: '100%', boxSizing: 'border-box',
-                      padding: '13px 14px', border: `1px dashed ${line}`, borderRadius: 9, background: '#fff',
+                      padding: '13px 14px', border: `1px dashed ${line}`, borderRadius: 9, background: 'var(--hf-surface)',
                       color: muted, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
                     }}>
                     <Upload size={15} /> Upload your CV (optional, PDF only)
@@ -308,7 +308,7 @@ export function JobApplyPage() {
 
               <button onClick={submit} disabled={apply.isPending}
                 style={{
-                  width: '100%', padding: '14px 0', background: accent, color: '#fff', border: 'none',
+                  width: '100%', padding: '14px 0', background: accent, color: 'var(--hf-text-on-solid)', border: 'none',
                   borderRadius: 9, fontSize: 15, fontWeight: 600, cursor: apply.isPending ? 'default' : 'pointer',
                   opacity: apply.isPending ? 0.7 : 1, fontFamily: 'inherit',
                 }}>
