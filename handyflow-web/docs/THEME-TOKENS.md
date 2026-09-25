@@ -4,9 +4,22 @@ All colours come from `src/styles/tokens.css`. Components reference them as
 `var(--hf-*)` in inline styles, or through Tailwind names (`bg-surface`,
 `text-ink-muted`, `border-line`, `bg-primary`, …) defined in `tailwind.config.js`.
 
-The active theme is `<html data-theme="light|dark">`. `index.html` sets it
-before first paint from `localStorage['hf-theme']` (`light` | `dark` | `system`).
-For testing, append `?theme=dark` (or `light` / `system`) to any URL.
+The active theme is `<html data-theme="light|dark">`, plus `data-sidebar`
+(`full`|`mini`) and `data-container` (`boxed`|`full`) for the app shell.
+
+Appearance comes from the server (`GET /api/v1/identity/ui-preferences`) via
+`src/theme/ThemeProvider.tsx`. Components read it with `useTheme()`, and
+change the current user's settings with `updateMine({ theme: 'DARK' })`
+(pass `null` to go back to the organisation default). `index.html` repaints
+from a localStorage cache before React mounts, so there is no flash; the
+cache is written by ThemeProvider and is never the source of truth. The
+`?theme=dark` URL parameter only affects that first paint and is overridden
+as soon as the saved preferences load.
+
+Brand colours are curated (`src/styles/brand.ts`). Only the four
+`--hf-primary*` tokens change per brand. After editing a palette, run
+`node scripts/check-brand-contrast.mjs`; it fails if any pairing drops
+below WCAG AA (4.5:1).
 
 ## Rules for new code
 
@@ -18,8 +31,8 @@ For testing, append `?theme=dark` (or `light` / `system`) to any URL.
 4. Don't pass tokens to SVG presentation attributes (`<Icon color=…>`, `fill=`,
    `stroke=`). Put the colour in `style={{ color }}` and let the icon use
    `currentColor`.
-5. Recharts and Leaflet need literal colours. Chart palettes will get a
-   `useThemeColors()` hook in Phase 1 that reads computed token values.
+5. Recharts and Leaflet need literal colours. Use `useThemeColors()` from
+   `src/theme/ThemeContext.ts`: `const color = useThemeColors(); color('primary')`.
 
 ## Token families
 

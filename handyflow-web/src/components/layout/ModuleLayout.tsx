@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTheme } from '../../theme/ThemeContext'
 import { Outlet, useNavigate, useLocation, NavLink } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -78,28 +79,30 @@ export function ModuleLayout() {
   const unreadCount = unreadData?.unreadCount ?? 0
   const profileRef = useRef<HTMLDivElement>(null)
 
-  // FIX: "navbar cluttered with so many modules" — previously every
-  // subscribed module rendered as an inline pill with no cap, becoming an
-  // unusable horizontal-scroll strip once past ~8 modules (confirmed via
-  // screenshot showing 20+ crammed in). Pinning is client-side only for
-  // now (localStorage) — there's no confirmed backend endpoint for
-  // per-user layout preferences, so this won't follow the user across
-  // devices until one exists. Worth adding a real
-  // GET/PUT /api/v1/users/me/preferences endpoint if that matters; this
-  // is the honest interim.
-  const [pinnedKeys, setPinnedKeys] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem(PINNED_MODULES_KEY)
-      return raw ? JSON.parse(raw) : []
-    } catch { return [] }
-  })
+  // Pinned modules are stored server-side in the user's UI preferences
+  // (GET/PUT /api/v1/identity/ui-preferences), so they follow the user
+  // across devices. The old browser-only list is migrated once, below.
+  const { prefs, isLoaded, isSupportSession, user: uiUser, updateMine } = useTheme()
+  const pinnedKeys = prefs.pinnedModules
 
   useEffect(() => {
-    try { localStorage.setItem(PINNED_MODULES_KEY, JSON.stringify(pinnedKeys)) } catch { /* storage unavailable — pinning just won't persist */ }
-  }, [pinnedKeys])
+    if (!isLoaded || isSupportSession) return
+    let legacy: unknown
+    try {
+      const raw = localStorage.getItem(PINNED_MODULES_KEY)
+      legacy = raw ? JSON.parse(raw) : []
+    } catch { return }
+    if (!Array.isArray(legacy) || legacy.length === 0) return
+    // Only migrate when the server has nothing yet; never overwrite server state.
+    if ((uiUser?.pinnedModules.length ?? 0) === 0) {
+      updateMine({ pinnedModules: legacy.filter((k): k is string => typeof k === 'string').slice(0, 12) })
+    }
+    try { localStorage.removeItem(PINNED_MODULES_KEY) } catch { /* ignore */ }
+  }, [isLoaded, isSupportSession, uiUser, updateMine])
 
   const togglePin = (key: string) => {
-    setPinnedKeys(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
+    const next = pinnedKeys.includes(key) ? pinnedKeys.filter(k => k !== key) : [...pinnedKeys, key]
+    updateMine({ pinnedModules: next.slice(0, 12) })
   }
 
   const { data: tenantModules = [] } = useQuery<TenantModule[]>({

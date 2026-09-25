@@ -24,12 +24,22 @@ Findings recorded:
 - `npm run build` fails on `main` before any change (287 TS errors, mostly unused imports). Worth a separate cleanup commit.
 - `components/layout/Sidebar.tsx`, `TopBar.tsx`, `AppLayout.tsx` are not imported anywhere (legacy). Candidates for removal once the new shell lands.
 
-## Phase 1 — app shell (next)
+## Phase 1 — app shell (in progress, branch `phase1` on top of `feat/theme-token-phase0`)
 
-- Preferences API: `tenant_ui_preferences`, `user_ui_preferences`, `GET/PUT /api/v1/.../ui-preferences`, with tenant-isolation tests.
-- `ThemeProvider` + `useThemeColors()` (computed token values for recharts/leaflet).
-- New shell: sidebar (full/mini, context switching), top bar, compact `PageHeader`, customizer drawer.
-- Sweep of the ~680 icon/JSX colour attributes as components get touched.
+Done:
+- Backend: V302 `tenant_ui_preferences` + `user_ui_preferences` (typed, CHECK-constrained columns; jsonb pinned modules; optimistic locking).
+  `GET /api/v1/identity/ui-preferences`, `PUT .../me` (any authenticated user), `PUT .../tenant` (SETTINGS_MANAGE).
+  Precedence: user override ?? tenant default; locked brand always wins. User rows read by (userId, tenantId). Support sessions are read-only.
+  13 unit tests; verified they catch a broken brand-lock rule (mutation check).
+- Frontend: `ThemeProvider` / `useTheme()` / `useThemeColors()`; optimistic, debounced, serialised saves; follows the OS in SYSTEM mode; pre-paint cache.
+- Six curated brand colours with light/dark palettes; `scripts/check-brand-contrast.mjs` verifies all 36 pairings pass AA.
+- Module pinning moved from localStorage to the server, with one-time migration of existing pins.
+
+Verification limits: the sandbox cannot reach Maven Central, so backend tests were run with a local JUnit/Mockito setup against stubbed Spring/JPA APIs. Run `./mvnw test -Dtest=UiPreferencesServiceTest` and start the app once so Flyway applies V302 against the real schema.
+
+Next:
+- New shell: context-switching sidebar (full/mini), top bar, compact `PageHeader`, customizer drawer, organisation appearance settings.
+- `useThemeColors()` adoption in recharts/leaflet pages as they are touched.
 
 ## Phase 2 — pilot module: Security (not started)
 
