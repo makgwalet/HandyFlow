@@ -23,16 +23,16 @@ interface ScreeningRecord {
 }
 
 const RESULT_CFG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
-  PENDING:      { label: "Pending",      color: "#B45309", bg: "#FFFBEB", icon: Clock3 },
-  PASS:         { label: "Pass",         color: "#166534", bg: "#DCFCE7", icon: CheckCircle2 },
-  FAIL:         { label: "Fail",         color: "#DC2626", bg: "#FEF2F2", icon: XCircle },
-  INCONCLUSIVE: { label: "Inconclusive", color: "#64748B", bg: "#F1F5F9", icon: HelpCircle },
+  PENDING:      { label: "Pending",      color: "var(--hf-warning-text-strong)", bg: "var(--hf-warning-soft)", icon: Clock3 },
+  PASS:         { label: "Pass",         color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", icon: CheckCircle2 },
+  FAIL:         { label: "Fail",         color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", icon: XCircle },
+  INCONCLUSIVE: { label: "Inconclusive", color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)", icon: HelpCircle },
 }
 
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "#fff", outline: "none" }
-const cancelBtn: React.CSSProperties = { padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }
-const submitBtn: React.CSSProperties = { padding: "9px 18px", border: "none", borderRadius: 9, background: "#1B3A6B", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "var(--hf-surface)", outline: "none" }
+const cancelBtn: React.CSSProperties = { padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }
+const submitBtn: React.CSSProperties = { padding: "9px 18px", border: "none", borderRadius: 9, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", fontSize: 14, fontWeight: 600, cursor: "pointer" }
 const fmtDate = (s: string | null) => s ? new Date(s).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
 
 export default function GuardScreeningTab() {
@@ -135,7 +135,7 @@ export default function GuardScreeningTab() {
                   <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <div style={{ width: 36, height: 36, borderRadius: 9, background: rc.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <Icon size={16} color={rc.color} />
+                        <Icon size={16} style={{ color: rc.color }} />
                       </div>
                       <div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

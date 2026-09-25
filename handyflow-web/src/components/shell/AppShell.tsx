@@ -68,7 +68,7 @@ export function AppShell() {
 
   return (
     <div className="hf-shell">
-      <Sidebar modules={modules} pinnedKeys={prefs.pinnedModules} mini={mini}
+      <Sidebar modules={modules} pinnedKeys={prefs.pinnedModules} pathname={location.pathname} mini={mini}
         mobileOpen={mobileNavOpen} onNavigate={closeMobileNav}
         onToggleMini={() => updateMine({ sidebar: mini ? 'FULL' : 'MINI' })} />
       {mobileNavOpen && <div className="hf-backdrop" onClick={closeMobileNav} aria-hidden="true" />}

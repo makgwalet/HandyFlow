@@ -19,9 +19,9 @@ interface CameraRecord {
 interface Site { id: string; name: string }
 
 const STATUS_CONFIG = {
-  ACTIVE:          { label: "Active",          color: "#166534", bg: "#DCFCE7", Icon: Wifi },
-  OFFLINE:         { label: "Offline",         color: "#991B1B", bg: "#FEF2F2", Icon: WifiOff },
-  DECOMMISSIONED:  { label: "Decommissioned",  color: "#94A3B8", bg: "#F1F5F9", Icon: WifiOff },
+  ACTIVE:          { label: "Active",          color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", Icon: Wifi },
+  OFFLINE:         { label: "Offline",         color: "var(--hf-danger-text-strong)", bg: "var(--hf-danger-soft)", Icon: WifiOff },
+  DECOMMISSIONED:  { label: "Decommissioned",  color: "var(--hf-text-faint)", bg: "var(--hf-surface-sunken)", Icon: WifiOff },
 }
 
 const fmtDate = (d: string | null) => d ? new Date(d).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" }) : "Never"
@@ -120,7 +120,7 @@ export default function CctvTab() {
             const Icon = sc.Icon
             return (
               <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", border: "1px solid var(--hf-border)", borderRadius: 10, background: "var(--hf-surface)" }}>
-                <Icon size={18} color={sc.color} />
+                <Icon size={18} style={{ color: sc.color }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 2 }}>
                     <span style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>{c.name}</span>
@@ -196,9 +196,9 @@ export default function CctvTab() {
   )
 }
 
-const labelStyle = { display: "block", fontSize: 11, fontWeight: 600, color: "#374151", marginBottom: 4 } as const
-const inputStyle = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, background: "#fff", boxSizing: "border-box" as const } as const
-const primaryBtn = { padding: "9px 18px", borderRadius: 8, border: "none", background: "#0D9488", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" } as const
-const secondaryBtn = { padding: "9px 18px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#fff", color: "#374151", fontSize: 13, cursor: "pointer" } as const
+const labelStyle = { display: "block", fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 } as const
+const inputStyle = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", boxSizing: "border-box" as const } as const
+const primaryBtn = { padding: "9px 18px", borderRadius: 8, border: "none", background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 600, cursor: "pointer" } as const
+const secondaryBtn = { padding: "9px 18px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-secondary)", fontSize: 13, cursor: "pointer" } as const
 const modalOverlay = { position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 } as const
-const modalBox = { background: "#fff", borderRadius: 14, padding: 24, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" } as const
+const modalBox = { background: "var(--hf-surface)", borderRadius: 14, padding: 24, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" } as const

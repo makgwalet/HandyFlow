@@ -89,7 +89,7 @@ function CheckpointQrThumbnail({ siteId, checkpointId }: { siteId: string; check
   }
 
   if (isLoading) return <div style={boxStyle}><div style={{ width: 44, height: 44, background: "var(--hf-surface-strong)", borderRadius: 4 }} /></div>
-  if (isError || !imgUrl) return <div style={boxStyle}><QrCode size={24} color="#CBD5E1" /></div>
+  if (isError || !imgUrl) return <div style={boxStyle}><QrCode size={24} style={{ color: 'var(--hf-text-disabled)' }} /></div>
 
   return <img src={imgUrl} alt="Checkpoint QR code" style={{ ...boxStyle, objectFit: "contain", padding: 6 }} />
 }
@@ -317,7 +317,7 @@ export default function SitesTab() {
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading sites...</div>
       ) : sites.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
-          <MapPin size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
+          <MapPin size={36} style={{ color: 'var(--hf-text-disabled)', marginBottom: 12 }} />
           <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No sites registered</div>
           <div style={{ fontSize: 13, marginTop: 4 }}>Add your first client site to get started.</div>
         </div>
@@ -334,7 +334,7 @@ export default function SitesTab() {
                 <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", gap: 14, cursor: "pointer" }}
                   onClick={() => setExpanded(isExpanded ? null : site.id)}>
                   <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--hf-info-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <MapPin size={18} color="#1B3A6B" />
+                    <MapPin size={18} style={{ color: 'var(--hf-primary-text)' }} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 3 }}>
@@ -388,7 +388,7 @@ export default function SitesTab() {
                       style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)", display: "flex" }}>
                       <Trash2 size={13} />
                     </button>
-                    {isExpanded ? <ChevronDown size={16} color="#94A3B8" /> : <ChevronRight size={16} color="#94A3B8" />}
+                    {isExpanded ? <ChevronDown size={16} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronRight size={16} style={{ color: 'var(--hf-text-faint)' }} />}
                   </div>
                 </div>
 
@@ -584,7 +584,7 @@ export default function SitesTab() {
       {showTerminate && (
         <Modal title="Terminate Contract" onClose={() => { setShowTerminate(null); setApiError("") }} width={440}>
           <div style={{ padding: "12px 14px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 9, marginBottom: 16, display: "flex", gap: 10 }}>
-            <AlertTriangle size={16} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
+            <AlertTriangle size={16} style={{ color: 'var(--hf-warning-text)', flexShrink: 0, marginTop: 1 }} />
             <div>
               <div style={{ fontWeight: 600, fontSize: 13, color: "var(--hf-warning-text-deep)" }}>Terminate contract for {showTerminate.name}?</div>
               <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)", marginTop: 2 }}>This deactivates the site and removes it from active shifts. Historical records are preserved.</div>
@@ -671,7 +671,7 @@ export default function SitesTab() {
         <Modal title="" onClose={() => { setShowDelete(null); setApiError("") }} width={400}>
           <div style={{ textAlign: "center" }}>
             <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--hf-danger-soft)", border: "2px solid var(--hf-danger-border)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-              <Trash2 size={22} color="#DC2626" />
+              <Trash2 size={22} style={{ color: 'var(--hf-danger-text)' }} />
             </div>
             <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Delete Site?</h3>
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--hf-text)", marginBottom: 8 }}>{showDelete.name}</div>
@@ -695,12 +695,12 @@ export default function SitesTab() {
         <Modal title="" onClose={() => setRegenerateConfirm(null)} width={420}>
           <div style={{ textAlign: "center" }}>
             <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--hf-danger-soft)", border: "2px solid var(--hf-danger-border)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-              <RefreshCw size={22} color="#DC2626" />
+              <RefreshCw size={22} style={{ color: 'var(--hf-danger-text)' }} />
             </div>
             <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Regenerate QR Code?</h3>
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--hf-text)", marginBottom: 12 }}>{regenerateConfirm.checkpoint.name}</div>
             <div style={{ padding: "12px 14px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 9, marginBottom: 20, display: "flex", gap: 10, textAlign: "left" as const }}>
-              <AlertTriangle size={16} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
+              <AlertTriangle size={16} style={{ color: 'var(--hf-warning-text)', flexShrink: 0, marginTop: 1 }} />
               <div style={{ fontSize: 12.5, color: "var(--hf-warning-text-deep)", lineHeight: 1.6 }}>
                 The physical sticker currently mounted at this checkpoint will stop working immediately.
                 A fresh QR PDF will open automatically for reprinting.
@@ -775,5 +775,5 @@ function FErr({ msg }: { msg?: string }) {
 const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
 const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
 const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "var(--hf-surface)", outline: "none" }
-const inpSt = (err?: string): React.CSSProperties => ({ ...inp, border: `1.5px solid ${err ? "#DC2626" : "#E2E8F0"}`, background: err ? "var(--hf-danger-soft)" : "var(--hf-surface)" })
+const inpSt = (err?: string): React.CSSProperties => ({ ...inp, border: `1.5px solid ${err ? "var(--hf-danger)" : "var(--hf-border)"}`, background: err ? "var(--hf-danger-soft)" : "var(--hf-surface)" })
 const cancelBtn: React.CSSProperties = { padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }

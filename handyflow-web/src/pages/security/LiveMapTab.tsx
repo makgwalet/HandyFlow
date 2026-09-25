@@ -16,11 +16,11 @@ import "leaflet/dist/leaflet.css"
 import { Radio, MapPin, QrCode, Bluetooth, Navigation, Clock } from "lucide-react"
 
 const SCAN_TYPE_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  QR:       { label: "QR Code",    color: "#1D4ED8", icon: QrCode },
-  NFC:      { label: "NFC Tag",    color: "#7C3AED", icon: Radio },
-  BLE:      { label: "BLE Beacon", color: "#0D9488", icon: Bluetooth },
-  GPS_PING: { label: "GPS Ping",   color: "#166534", icon: Navigation },
-  MANUAL:   { label: "Manual",     color: "#D97706", icon: Clock },
+  QR:       { label: "QR Code",    color: "var(--hf-info-text)", icon: QrCode },
+  NFC:      { label: "NFC Tag",    color: "var(--hf-violet-text)", icon: Radio },
+  BLE:      { label: "BLE Beacon", color: "var(--hf-accent-text)", icon: Bluetooth },
+  GPS_PING: { label: "GPS Ping",   color: "var(--hf-success-text-strong)", icon: Navigation },
+  MANUAL:   { label: "Manual",     color: "var(--hf-warning-text)", icon: Clock },
 }
 
 interface ScanLog {
@@ -38,13 +38,18 @@ interface CurrentLocation {
 // avoids the well-known Leaflet/Vite asset-path bundling issue
 // entirely, and matches the shield-in-a-circle look the original
 // placeholder already used.
+// divIcon HTML is inserted into this document, so CSS variables resolve and
+// the marker follows theme and brand. (Leaflet vector layers such as circles
+// or polylines would need literal colours via useThemeColors() instead.)
 function guardIcon(stale: boolean, selected: boolean) {
-  const bg = stale ? "#94A3B8" : "#1B3A6B"
-  const ring = selected ? "0 0 0 4px rgba(13,148,136,0.35)" : "0 4px 12px rgba(27,58,107,0.4)"
+  const bg = stale ? "var(--hf-text-faint)" : "var(--hf-primary)"
+  const ring = selected
+    ? "0 0 0 4px color-mix(in srgb, var(--hf-accent) 35%, transparent)"
+    : "0 4px 12px color-mix(in srgb, var(--hf-primary) 40%, transparent)"
   return L.divIcon({
     className: "",
-    html: `<div style="width:36px;height:36px;border-radius:50%;background:${bg};border:3px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:${ring}">
-             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+    html: `<div style="width:36px;height:36px;border-radius:50%;background:${bg};border:3px solid var(--hf-text-on-solid);color:var(--hf-text-on-solid);display:flex;align-items:center;justify-content:center;box-shadow:${ring}">
+             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
            </div>`,
     iconSize: [36, 36],
     iconAnchor: [18, 18],
@@ -159,8 +164,8 @@ export default function LiveMapTab() {
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
           {Object.entries(SCAN_TYPE_CONFIG).map(([key, cfg]) => (
             <div key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--hf-text-tertiary)" }}>
-              <div style={{ width: 22, height: 22, borderRadius: 6, background: `${cfg.color}18`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <cfg.icon size={12} color={cfg.color} />
+              <div style={{ width: 22, height: 22, borderRadius: 6, background: `color-mix(in srgb, ${cfg.color} 9%, transparent)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <cfg.icon size={12} style={{ color: cfg.color }} />
               </div>
               {cfg.label}
             </div>
@@ -175,14 +180,14 @@ export default function LiveMapTab() {
         <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden", minHeight: 500 }}>
           {!siteId ? (
             <div style={{ minHeight: 500, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 10, background: "var(--hf-surface-muted)", color: "var(--hf-text-faint)" }}>
-              <MapPin size={36} color="#CBD5E1" />
+              <MapPin size={36} style={{ color: 'var(--hf-text-disabled)' }} />
               <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>Select a site above</div>
             </div>
           ) : locationsLoading ? (
             <div style={{ minHeight: 500, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--hf-text-faint)" }}>Loading positions…</div>
           ) : locations.length === 0 ? (
             <div style={{ minHeight: 500, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 10, background: "var(--hf-surface-muted)", color: "var(--hf-text-faint)" }}>
-              <MapPin size={36} color="#CBD5E1" />
+              <MapPin size={36} style={{ color: 'var(--hf-text-disabled)' }} />
               <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No guard positions yet at this site</div>
               <div style={{ fontSize: 13 }}>Positions appear once a guard's app records a GPS ping during an open shift</div>
             </div>
@@ -224,13 +229,13 @@ export default function LiveMapTab() {
               return (
                 <div key={shift.id}
                   onClick={() => setSelectedGuard(selectedGuard === shift.guardId ? null : shift.guardId)}
-                  style={{ padding: "14px 16px", border: `2px solid ${selectedGuard === shift.guardId ? "#0D9488" : "#E2E8F0"}`, borderRadius: 10, background: selectedGuard === shift.guardId ? "var(--hf-success-soft)" : "var(--hf-surface)", cursor: "pointer" }}>
+                  style={{ padding: "14px 16px", border: `2px solid ${selectedGuard === shift.guardId ? "var(--hf-accent)" : "var(--hf-border)"}`, borderRadius: 10, background: selectedGuard === shift.guardId ? "var(--hf-success-soft)" : "var(--hf-surface)", cursor: "pointer" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                     <div style={{ position: "relative", flexShrink: 0 }}>
                       <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--hf-info-soft)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "var(--hf-info-text)", fontSize: 13 }}>
                         {guard ? `${guard.firstName?.[0]}${guard.lastName?.[0]}` : "?"}
                       </div>
-                      <div style={{ position: "absolute", bottom: 0, right: 0, width: 10, height: 10, borderRadius: "50%", background: loc && !loc.stale ? "var(--hf-success)" : "#CBD5E1", border: "2px solid var(--hf-surface)" }} />
+                      <div style={{ position: "absolute", bottom: 0, right: 0, width: 10, height: 10, borderRadius: "50%", background: loc && !loc.stale ? "var(--hf-success)" : "var(--hf-text-disabled)", border: "2px solid var(--hf-surface)" }} />
                     </div>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 13, color: "var(--hf-text)" }}>{guard?.fullName ?? `Guard ${i + 1}`}</div>
@@ -252,7 +257,7 @@ export default function LiveMapTab() {
                         Last: <strong style={{ color: "var(--hf-text)" }}>{lastScan.checkpointName}</strong>
                         {" · "}{fmtTime(lastScan.scannedAt)}
                         {lastScan.scanType && lastScan.scanType !== "QR" && (
-                          <span style={{ marginLeft: 6, background: `${SCAN_TYPE_CONFIG[lastScan.scanType]?.color ?? "#64748B"}18`, color: SCAN_TYPE_CONFIG[lastScan.scanType]?.color ?? "var(--hf-text-muted)", padding: "1px 5px", borderRadius: 10, fontSize: 10, fontWeight: 600 }}>
+                          <span style={{ marginLeft: 6, background: `color-mix(in srgb, ${SCAN_TYPE_CONFIG[lastScan.scanType]?.color ?? "var(--hf-text-muted)"} 9%, transparent)`, color: SCAN_TYPE_CONFIG[lastScan.scanType]?.color ?? "var(--hf-text-muted)", padding: "1px 5px", borderRadius: 10, fontSize: 10, fontWeight: 600 }}>
                             {SCAN_TYPE_CONFIG[lastScan.scanType]?.label ?? lastScan.scanType}
                           </span>
                         )}

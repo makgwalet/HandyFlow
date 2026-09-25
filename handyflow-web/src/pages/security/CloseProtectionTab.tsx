@@ -553,7 +553,7 @@ export default function CloseProtectionTab() {
                 const active = selectedDetail?.id === d.id
                 return (
                   <button key={d.id} onClick={() => setSelectedDetail(d)}
-                    style={{ padding: "12px 14px", border: `1px solid ${active ? "#7C3AED" : "#E2E8F0"}`, borderRadius: 10, background: active ? "var(--hf-violet-soft)" : "var(--hf-surface)", cursor: "pointer", textAlign: "left" as const, width: "100%" }}>
+                    style={{ padding: "12px 14px", border: `1px solid ${active ? "var(--hf-violet)" : "var(--hf-border)"}`, borderRadius: 10, background: active ? "var(--hf-violet-soft)" : "var(--hf-surface)", cursor: "pointer", textAlign: "left" as const, width: "100%" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: active ? "var(--hf-violet-text)" : "var(--hf-text)" }}>
                         {d.principalCodename}
@@ -607,7 +607,7 @@ export default function CloseProtectionTab() {
               <div style={{ display: "flex", borderBottom: "1px solid var(--hf-border)" }}>
                 {(["details", "itinerary", "evidence", "armoury"] as View[]).map(v => (
                   <button key={v} onClick={() => setView(v)}
-                    style={{ padding: "10px 16px", border: "none", borderBottom: `2px solid ${view === v ? "#7C3AED" : "transparent"}`, background: "none", color: view === v ? "var(--hf-violet-text)" : "var(--hf-text-muted)", fontSize: 12, fontWeight: view === v ? 600 : 400, cursor: "pointer", marginBottom: -1, textTransform: "capitalize" as const }}>
+                    style={{ padding: "10px 16px", border: "none", borderBottom: `2px solid ${view === v ? "var(--hf-violet)" : "transparent"}`, background: "none", color: view === v ? "var(--hf-violet-text)" : "var(--hf-text-muted)", fontSize: 12, fontWeight: view === v ? 600 : 400, cursor: "pointer", marginBottom: -1, textTransform: "capitalize" as const }}>
                     {v === "details" ? "Team" : v === "itinerary" ? "Itinerary" : v === "evidence" ? "Evidence" : "Armoury"}
                   </button>
                 ))}
@@ -633,7 +633,7 @@ export default function CloseProtectionTab() {
                           <div key={a.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 14px", border: "1px solid var(--hf-border)", borderRadius: 8, opacity: a.active ? 1 : 0.5 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                               <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--hf-violet-soft-strong)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                <Shield size={14} color="#7C3AED" />
+                                <Shield size={14} style={{ color: 'var(--hf-violet-text)' }} />
                               </div>
                               <div>
                                 <p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: "var(--hf-text)" }}>{a.guardName}</p>
@@ -722,7 +722,7 @@ export default function CloseProtectionTab() {
                                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                                   {stopSurveysQuery.data.map(sv => (
                                     <div key={sv.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, padding: "6px 10px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 6 }}>
-                                      {sv.allClear ? <CheckCircle2 size={13} color="#166534" /> : <Ban size={13} color="#DC2626" />}
+                                      {sv.allClear ? <CheckCircle2 size={13} style={{ color: 'var(--hf-success-text-strong)' }} /> : <Ban size={13} style={{ color: 'var(--hf-danger-text)' }} />}
                                       <span style={{ fontWeight: 600, color: sv.allClear ? "var(--hf-success-text-strong)" : "var(--hf-danger-text)" }}>{sv.allClear ? "All Clear" : "Not Clear"}</span>
                                       <span style={{ color: "var(--hf-text-faint)" }}>by {sv.surveyedByGuardName} · {fmtTime(sv.surveyedAt)}</span>
                                       {sv.hazardsNoted && <span style={{ color: "var(--hf-orange-text-strong)", marginLeft: "auto" }}>{sv.hazardsNoted}</span>}
@@ -769,7 +769,7 @@ export default function CloseProtectionTab() {
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         {detailArmoury.map(log => (
                           <div key={log.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
-                            <Crosshair size={13} color={log.action === "ISSUE" ? "#7C3AED" : "#64748B"} />
+                            <Crosshair size={13} style={{ color: log.action === "ISSUE" ? "var(--hf-violet-text)" : "var(--hf-text-muted)" }} />
                             <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{log.action}</span>
                             <span style={{ color: "var(--hf-text-faint)" }}>{firearmLabel(log.armouryId)} → {guardName(log.guardId)}</span>
                             <span style={{ color: "var(--hf-text-disabled)" }}>witnessed by {guardName(log.witnessedByGuardId)}</span>
@@ -825,7 +825,7 @@ export default function CloseProtectionTab() {
                   <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <div style={{ width: 36, height: 36, borderRadius: 9, background: "var(--hf-violet-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <Car size={16} color="#7C3AED" />
+                        <Car size={16} style={{ color: 'var(--hf-violet-text)' }} />
                       </div>
                       <div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1394,7 +1394,7 @@ function PrincipalsView({
               const active = selectedPrincipal?.id === p.id
               return (
                 <button key={p.id} onClick={() => { setSelectedPrincipal(p); setPrincipalView("overview") }}
-                  style={{ padding: "12px 14px", border: `1px solid ${active ? "#7C3AED" : "#E2E8F0"}`, borderRadius: 10, background: active ? "var(--hf-violet-soft)" : "var(--hf-surface)", cursor: "pointer", textAlign: "left" as const, width: "100%", opacity: p.active ? 1 : 0.6 }}>
+                  style={{ padding: "12px 14px", border: `1px solid ${active ? "var(--hf-violet)" : "var(--hf-border)"}`, borderRadius: 10, background: active ? "var(--hf-violet-soft)" : "var(--hf-surface)", cursor: "pointer", textAlign: "left" as const, width: "100%", opacity: p.active ? 1 : 0.6 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: active ? "var(--hf-violet-text)" : "var(--hf-text)" }}>{p.aliasCodename}</span>
                     <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, color: tc.color, background: tc.bg }}>{p.threatLevel}</span>
@@ -1440,7 +1440,7 @@ function PrincipalsView({
             <div style={{ display: "flex", borderBottom: "1px solid var(--hf-border)" }}>
               {(["overview", "audit", "evidence", "vetting"] as const).map(v => (
                 <button key={v} onClick={() => setPrincipalView(v)}
-                  style={{ padding: "10px 16px", border: "none", borderBottom: `2px solid ${principalView === v ? "#7C3AED" : "transparent"}`, background: "none", color: principalView === v ? "var(--hf-violet-text)" : "var(--hf-text-muted)", fontSize: 12, fontWeight: principalView === v ? 600 : 400, cursor: "pointer", marginBottom: -1, textTransform: "capitalize" as const }}>
+                  style={{ padding: "10px 16px", border: "none", borderBottom: `2px solid ${principalView === v ? "var(--hf-violet)" : "transparent"}`, background: "none", color: principalView === v ? "var(--hf-violet-text)" : "var(--hf-text-muted)", fontSize: 12, fontWeight: principalView === v ? 600 : 400, cursor: "pointer", marginBottom: -1, textTransform: "capitalize" as const }}>
                   {v}
                 </button>
               ))}
@@ -1469,7 +1469,7 @@ function PrincipalsView({
                     <div style={{ display: "flex", gap: 4 }}>
                       {(["all", "views"] as const).map(m => (
                         <button key={m} onClick={() => setAuditMode(m)}
-                          style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${auditMode === m ? "#7C3AED" : "#E2E8F0"}`, background: auditMode === m ? "var(--hf-violet-soft)" : "var(--hf-surface)", color: auditMode === m ? "var(--hf-violet-text)" : "var(--hf-text-muted)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                          style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${auditMode === m ? "var(--hf-violet)" : "var(--hf-border)"}`, background: auditMode === m ? "var(--hf-violet-soft)" : "var(--hf-surface)", color: auditMode === m ? "var(--hf-violet-text)" : "var(--hf-text-muted)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                           {m === "all" ? "All Events" : "Who Viewed"}
                         </button>
                       ))}
@@ -1483,7 +1483,7 @@ function PrincipalsView({
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {auditData.content.map(e => (
                         <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
-                          {e.action === "VIEWED" ? <Eye size={13} color="#7C3AED" /> : <History size={13} color="#64748B" />}
+                          {e.action === "VIEWED" ? <Eye size={13} style={{ color: 'var(--hf-violet-text)' }} /> : <History size={13} style={{ color: 'var(--hf-text-muted)' }} />}
                           <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{e.action}</span>
                           <span style={{ color: "var(--hf-text-faint)" }}>by {e.actorId ? e.actorId.slice(0, 8) : "system"}</span>
                           <span style={{ color: "var(--hf-text-disabled)", marginLeft: "auto" }}>{new Date(e.occurredAt).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
@@ -1522,8 +1522,8 @@ function PrincipalsView({
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {vettingHistoryQuery.data.map((v: any) => {
-                        const resultColor = v.result === "CLEAR" ? "#166534" : v.result === "HIT" ? "#DC2626" : v.result === "INCONCLUSIVE" ? "#B45309" : "#64748B"
-                        const resultBg = v.result === "CLEAR" ? "#DCFCE7" : v.result === "HIT" ? "#FEF2F2" : v.result === "INCONCLUSIVE" ? "#FFFBEB" : "#F1F5F9"
+                        const resultColor = v.result === "CLEAR" ? "var(--hf-success-text-strong)" : v.result === "HIT" ? "var(--hf-danger-text)" : v.result === "INCONCLUSIVE" ? "var(--hf-warning-text-strong)" : "var(--hf-text-muted)"
+                        const resultBg = v.result === "CLEAR" ? "var(--hf-success-soft-strong)" : v.result === "HIT" ? "var(--hf-danger-soft)" : v.result === "INCONCLUSIVE" ? "var(--hf-warning-soft)" : "var(--hf-surface-sunken)"
                         return (
                           <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
                             <div>

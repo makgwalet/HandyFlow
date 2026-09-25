@@ -57,8 +57,25 @@ Known gaps / next:
 - `DashboardPage` has its own module registry (descriptions, tile colours); merge with `navigation/modules.ts` during the landing-page work.
 - `useThemeColors()` adoption in recharts/leaflet pages as they are touched.
 
-## Phase 2 — pilot module: Security (not started)
+## Phase 2 — pilot module: Security ✅
 
-- Group the 23 sections; nested routes; finish token migration of the 9 unsafe files.
+- Sections are routes: `/security/:section` (21 sections). Deep links, refresh and back button work. Bare `/security` and unknown ids redirect to the dashboard; old tab ids `cp-overview`/`admin-overview` are aliased.
+- Sidebar context mode (`navigation/moduleSections.ts`): inside Security the global list is replaced by six groups (Overview, Operations, Workforce, Sites & assets, Services, Insights & integration). "All modules" flips back without leaving the page.
+- The three-level in-page tab strip and large page header are replaced by the compact `PageHeader` with breadcrumbs. Section content keeps its surface panel, so nothing inside the sections moved.
+- The empty "Admin > Overview" placeholder was dropped; Payroll moved to Workforce and Branches to Sites & assets.
+- Colour migration: 212 -> 0 hex literals in `pages/security`. New `scripts/theme-codemod/jsx-colors.mjs` converts alpha suffixes (`${c}18` -> `color-mix(...)`) and lucide icon `color=` props (merging into existing `style` objects); `codemod.mjs` now follows ternaries inside template literals. Remaining helpers, component props and colour maps mapped by hand by role.
+- Leaflet: the live map only uses `divIcon` (HTML in the page DOM), so tokens work there; no literal colours needed.
+
+Verification: type-check identical to Phase 1 baseline; lint for touched folders slightly improved (4 fewer `any`); build passes; script check that all 21 sidebar sections have content. Not yet checked in a browser.
+
+### Recipe for each module (Phase 3)
+
+1. `node scripts/theme-codemod/jsx-colors.mjs --write src/pages/<module>`
+2. `node scripts/theme-codemod/codemod.mjs --write src/pages/<module>`, then `git checkout -- scripts/theme-codemod/report.json`
+3. `grep -rnE "#[0-9a-fA-F]{6}" src/pages/<module>` and map the rest by role (how each value is consumed).
+4. If the module has in-page tabs: register sections in `navigation/moduleSections.ts`, route `/<module>/:section?`, swap the header for `PageHeader`.
+5. Type-check against baseline, lint, build, click through in light and dark.
+
+App-wide dry run of step 1: 67 alpha sites and 566 icon props across 224 files.
 
 ## Phase 3 — module rollout (not started)

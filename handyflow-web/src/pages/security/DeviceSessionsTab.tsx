@@ -86,7 +86,7 @@ export default function DeviceSessionsTab() {
             {open.map(s => (
               <div key={s.sessionId} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", border: "1px solid var(--hf-info-border)", borderRadius: 10, background: "var(--hf-info-soft)" }}>
                 <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--hf-info)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <Tablet size={16} color="#fff" />
+                  <Tablet size={16} style={{ color: 'var(--hf-text-on-solid)' }} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)", marginBottom: 2 }}>
@@ -117,7 +117,7 @@ export default function DeviceSessionsTab() {
           <div style={{ display: "grid", gap: 6 }}>
             {closed.map(s => (
               <div key={s.sessionId} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", border: "1px solid var(--hf-border-subtle)", borderRadius: 8, background: "var(--hf-surface-muted)" }}>
-                <Clock size={14} color="#CBD5E1" />
+                <Clock size={14} style={{ color: 'var(--hf-text-disabled)' }} />
                 <div style={{ flex: 1, fontSize: 12, color: "var(--hf-text-secondary)" }}>
                   <strong>{s.guardName}</strong> · {fmtDate(s.startedAt)} {fmtTime(s.startedAt)} → {s.endedAt ? fmtTime(s.endedAt) : "?"} ({fmtDur(s.durationMinutes)})
                   {s.forcedCloseReason && (

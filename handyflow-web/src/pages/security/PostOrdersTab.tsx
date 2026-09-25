@@ -354,7 +354,7 @@ function PostsPanel({ siteId, qc }: { siteId: string; qc: ReturnType<typeof useQ
               <div onClick={() => setSelectedPost(selectedPost === p.id ? null : p.id)}
                 style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", cursor: "pointer" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {selectedPost === p.id ? <ChevronUp size={14} color="#94A3B8" /> : <ChevronDown size={14} color="#94A3B8" />}
+                  {selectedPost === p.id ? <ChevronUp size={14} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={14} style={{ color: 'var(--hf-text-faint)' }} />}
                   <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{p.name}</span>
                 </div>
                 {p.description && <span style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>{p.description}</span>}

@@ -165,7 +165,7 @@ export default function IncidentsTab() {
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading incidents...</div>
       ) : incidents.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
-          <AlertTriangle size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
+          <AlertTriangle size={36} style={{ color: 'var(--hf-text-disabled)', marginBottom: 12 }} />
           <div style={{ fontWeight: 600, color: "var(--hf-success-text-strong)" }}>No incidents — all clear</div>
         </div>
       ) : (
@@ -233,7 +233,7 @@ export default function IncidentsTab() {
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 22 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--hf-danger-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <AlertTriangle size={18} color="#DC2626" />
+                  <AlertTriangle size={18} style={{ color: 'var(--hf-danger-text)' }} />
                 </div>
                 <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Report Incident</h3>
               </div>
@@ -250,7 +250,7 @@ export default function IncidentsTab() {
                     const cfg = SEV_CONFIG[s]
                     return (
                       <button key={s} onClick={() => setForm(f => ({ ...f, severity: s }))}
-                        style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: `2px solid ${form.severity === s ? cfg.color : "#E2E8F0"}`, background: form.severity === s ? cfg.bg : "var(--hf-surface)", color: form.severity === s ? cfg.color : "var(--hf-text-muted)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                        style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: `2px solid ${form.severity === s ? cfg.color : "var(--hf-border)"}`, background: form.severity === s ? cfg.bg : "var(--hf-surface)", color: form.severity === s ? cfg.color : "var(--hf-text-muted)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                         {s}
                       </button>
                     )

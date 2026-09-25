@@ -41,7 +41,7 @@ const TYPE_CFG = {
 }
 
 const inp = { width:"100%", padding:"8px 12px", borderRadius:8, border:"1px solid var(--hf-border)", fontSize:13, outline:"none", boxSizing:"border-box" as const }
-const btn = (bg: string, color="white") => ({ padding:"8px 16px", borderRadius:8, border:"none", background:bg, color, fontSize:13, cursor:"pointer", fontWeight:600 })
+const btn = (bg: string, color="var(--hf-text-on-solid)") => ({ padding:"8px 16px", borderRadius:8, border:"none", background:bg, color, fontSize:13, cursor:"pointer", fontWeight:600 })
 const sbtn = { padding:"8px 16px", borderRadius:8, border:"1px solid var(--hf-border)", background:"var(--hf-surface)", fontSize:13, cursor:"pointer", color:"var(--hf-text-secondary)" }
 
 export default function PayrollTab() {
@@ -112,7 +112,7 @@ export default function PayrollTab() {
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{background:"var(--hf-primary)",borderRadius:10,padding:8}}><DollarSign size={18} color="#fff"/></div>
+          <div style={{background:"var(--hf-primary)",borderRadius:10,padding:8}}><DollarSign size={18} style={{ color: 'var(--hf-text-on-solid)' }}/></div>
           <div>
             <h2 style={{margin:0,fontSize:18,fontWeight:700,color:"var(--hf-text)"}}>Payroll Export</h2>
             <p style={{margin:0,fontSize:12,color:"var(--hf-text-faint)"}}>Periods · Approvals · CSV for Sage / VIP Payroll</p>
@@ -120,7 +120,7 @@ export default function PayrollTab() {
         </div>
         <div style={{display:"flex",gap:8}}>
           <button style={sbtn} onClick={()=>{setView("grades");setErr("")}}>Grade Rates</button>
-          <button style={{...btn("#1B3A6B"),display:"flex",alignItems:"center",gap:6}} onClick={()=>{setView("create");setErr("")}}>
+          <button style={{...btn("var(--hf-primary)"),display:"flex",alignItems:"center",gap:6}} onClick={()=>{setView("create");setErr("")}}>
             <Plus size={14}/> New Period
           </button>
         </div>
@@ -156,7 +156,7 @@ export default function PayrollTab() {
           </div>
           <div style={{display:"flex",gap:8}}>
             <button style={sbtn} onClick={()=>setView("periods")}>Cancel</button>
-            <button style={{...btn("#1B3A6B"),opacity:(!form.name||!form.periodStart||!form.periodEnd)?0.5:1}}
+            <button style={{...btn("var(--hf-primary)"),opacity:(!form.name||!form.periodStart||!form.periodEnd)?0.5:1}}
               disabled={!form.name||!form.periodStart||!form.periodEnd}
               onClick={()=>createMut.mutate(form)}>Create Period</button>
           </div>
@@ -173,7 +173,7 @@ export default function PayrollTab() {
             </div>
             <div style={{display:"flex",gap:8}}>
               <button style={sbtn} onClick={()=>setView("periods")}>← Back</button>
-              <button style={btn("#1B3A6B")} onClick={()=>setView("add-grade")}>Set Rate</button>
+              <button style={btn("var(--hf-primary)")} onClick={()=>setView("add-grade")}>Set Rate</button>
             </div>
           </div>
           {view === "add-grade" && (
@@ -199,7 +199,7 @@ export default function PayrollTab() {
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button style={sbtn} onClick={()=>setView("grades")}>Cancel</button>
-                <button style={{...btn("#166534"),opacity:!gForm.hourlyRateCents?0.5:1}} disabled={!gForm.hourlyRateCents}
+                <button style={{...btn("var(--hf-success-solid-strong)"),opacity:!gForm.hourlyRateCents?0.5:1}} disabled={!gForm.hourlyRateCents}
                   onClick={()=>gradeMut.mutate({...gForm,hourlyRateCents:Number(gForm.hourlyRateCents),standardHoursPerDay:Number(gForm.standardHoursPerDay)})}>
                   Save Rate
                 </button>
@@ -235,12 +235,12 @@ export default function PayrollTab() {
               <p style={{margin:0,fontSize:12,color:"var(--hf-text-muted)"}}>{fmtDate(selected.periodStart)} – {fmtDate(selected.periodEnd)} · {lines.length} line items · {fmtZar(selected.totalAmountCents)} total</p>
             </div>
             {(selected.status==="APPROVED"||selected.status==="EXPORTED") && (
-              <button style={{...btn("#166534"),display:"flex",alignItems:"center",gap:6}} onClick={()=>downloadCsv(selected)}>
+              <button style={{...btn("var(--hf-success-solid-strong)"),display:"flex",alignItems:"center",gap:6}} onClick={()=>downloadCsv(selected)}>
                 <Download size={14}/> Export CSV
               </button>
             )}
             {selected.status==="EXPORTED" && (
-              <button style={btn("#1D4ED8")} onClick={()=>paidMut.mutate(selected.id)}>Mark Paid</button>
+              <button style={btn("var(--hf-info)")} onClick={()=>paidMut.mutate(selected.id)}>Mark Paid</button>
             )}
           </div>
           {lines.length===0

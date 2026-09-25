@@ -26,7 +26,7 @@ const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA"
 const fmtDateTime = (d: string | null) => d ? new Date(d).toLocaleString("en-ZA", {day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "—"
 
 const inp = { width:"100%", padding:"8px 12px", borderRadius:8, border:"1px solid var(--hf-border)", fontSize:13, outline:"none", boxSizing:"border-box" as const }
-const btn = (bg: string, color="white") => ({ padding:"8px 16px", borderRadius:8, border:"none", background:bg, color, fontSize:13, cursor:"pointer", fontWeight:600 as const })
+const btn = (bg: string, color="var(--hf-text-on-solid)") => ({ padding:"8px 16px", borderRadius:8, border:"none", background:bg, color, fontSize:13, cursor:"pointer", fontWeight:600 as const })
 const sbtn = { padding:"8px 16px", borderRadius:8, border:"1px solid var(--hf-border)", background:"var(--hf-surface)", fontSize:13, cursor:"pointer", color:"var(--hf-text-secondary)" as const }
 
 export default function PublicApiTab() {
@@ -111,7 +111,7 @@ export default function PublicApiTab() {
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{background:"var(--hf-violet)",borderRadius:10,padding:8}}><Key size={18} color="#fff"/></div>
+          <div style={{background:"var(--hf-violet)",borderRadius:10,padding:8}}><Key size={18} style={{ color: 'var(--hf-text-on-solid)' }}/></div>
           <div>
             <h2 style={{margin:0,fontSize:18,fontWeight:700,color:"var(--hf-text)"}}>Public API & Webhooks</h2>
             <p style={{margin:0,fontSize:12,color:"var(--hf-text-faint)"}}>Machine-to-machine access keys · Event webhooks for client BI tools</p>
@@ -126,7 +126,7 @@ export default function PublicApiTab() {
             onClick={()=>{setSection("webhooks");setView("list");setErr("")}}>
             <Webhook size={12} style={{marginRight:5}}/> Webhooks
           </button>
-          <button style={{...btn(section==="keys"?"#1D4ED8":"#7C3AED"),display:"flex",alignItems:"center",gap:6}}
+          <button style={{...btn(section==="keys"?"var(--hf-info)":"var(--hf-violet)"),display:"flex",alignItems:"center",gap:6}}
             onClick={()=>{setView("create");setErr("");setNewKey(null)}}>
             <Plus size={14}/> New {section==="keys"?"Key":"Webhook"}
           </button>
@@ -191,7 +191,7 @@ export default function PublicApiTab() {
           </div>
           <div style={{display:"flex",gap:8}}>
             <button style={sbtn} onClick={()=>setView("list")}>Cancel</button>
-            <button style={{...btn("#1D4ED8"),opacity:!keyForm.name?0.5:1}} disabled={!keyForm.name}
+            <button style={{...btn("var(--hf-info)"),opacity:!keyForm.name?0.5:1}} disabled={!keyForm.name}
               onClick={()=>createKeyMut.mutate({...keyForm,scopePrefixesJson:keyForm.scopePrefixesJson||null,expiresAt:keyForm.expiresAt?new Date(keyForm.expiresAt).toISOString():null})}>
               Create Key
             </button>
@@ -222,7 +222,7 @@ export default function PublicApiTab() {
                   const sel = whForm.selectedEvents.includes(evt)
                   return (
                     <button key={evt}
-                      style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${sel?"#7C3AED":"#E2E8F0"}`,background:sel?"var(--hf-violet-soft)":"var(--hf-surface-muted)",fontSize:12,cursor:"pointer",color:sel?"var(--hf-violet-text)":"var(--hf-text-muted)",fontWeight:sel?700:400,transition:"all 0.1s"}}
+                      style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${sel?"var(--hf-violet)":"var(--hf-border)"}`,background:sel?"var(--hf-violet-soft)":"var(--hf-surface-muted)",fontSize:12,cursor:"pointer",color:sel?"var(--hf-violet-text)":"var(--hf-text-muted)",fontWeight:sel?700:400,transition:"all 0.1s"}}
                       onClick={()=>toggleEvent(evt)}>
                       {evt.replace(/_/g," ")}
                     </button>
@@ -233,7 +233,7 @@ export default function PublicApiTab() {
           </div>
           <div style={{display:"flex",gap:8}}>
             <button style={sbtn} onClick={()=>setView("list")}>Cancel</button>
-            <button style={{...btn("#7C3AED"),opacity:(!whForm.name||!whForm.endpointUrl||!whForm.selectedEvents.length)?0.5:1}}
+            <button style={{...btn("var(--hf-violet)"),opacity:(!whForm.name||!whForm.endpointUrl||!whForm.selectedEvents.length)?0.5:1}}
               disabled={!whForm.name||!whForm.endpointUrl||!whForm.selectedEvents.length}
               onClick={()=>createWhMut.mutate({name:whForm.name,endpointUrl:whForm.endpointUrl,eventTypesJson:JSON.stringify(whForm.selectedEvents)})}>
               Create Webhook
@@ -307,7 +307,7 @@ export default function PublicApiTab() {
                   <div key={s.id} style={{background:"var(--hf-surface)",border:"1px solid var(--hf-border)",borderRadius:12,overflow:"hidden"}}>
                     <div style={{padding:"14px 18px",display:"flex",alignItems:"center",gap:12,cursor:"pointer"}} onClick={()=>setExpandedSub(expanded?null:s.id)}>
                       <div style={{width:36,height:36,borderRadius:8,background:s.suspended?"var(--hf-danger-soft)":s.active?"var(--hf-violet-soft)":"var(--hf-surface-sunken)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        <Webhook size={16} color={s.suspended?"#991B1B":s.active?"#7C3AED":"#6B7280"}/>
+                        <Webhook size={16} style={{ color: s.suspended?"var(--hf-danger-text-strong)":s.active?"var(--hf-violet-text)":"var(--hf-text-muted)" }}/>
                       </div>
                       <div style={{flex:1}}>
                         <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -322,7 +322,7 @@ export default function PublicApiTab() {
                         <div>{s.failureCount} failures</div>
                         <div>Last success: {fmtDateTime(s.lastSuccessAt)}</div>
                       </div>
-                      {expanded ? <ChevronUp size={16} color="#94A3B8"/> : <ChevronDown size={16} color="#94A3B8"/>}
+                      {expanded ? <ChevronUp size={16} style={{ color: 'var(--hf-text-faint)' }}/> : <ChevronDown size={16} style={{ color: 'var(--hf-text-faint)' }}/>}
                     </div>
                     {expanded && (
                       <div style={{borderTop:"1px solid var(--hf-border-subtle)",padding:"14px 18px",background:"var(--hf-surface-muted)"}}>

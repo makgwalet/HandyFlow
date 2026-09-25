@@ -279,7 +279,7 @@ export default function App() {
             <Route path="/quotes/:id"  element={<QuoteDetailPage />} />
             <Route path="/catalogue"   element={<CataloguePage />} />
             <Route path="/billing"     element={<BillingPage />} />
-            <Route path="/security"    element={<SecurityPage />} />
+            <Route path="/security/:section?" element={<SecurityPage />} />
             <Route path="/fuel"        element={<FuelPage />} />
             <Route path="/internal-audit" element={<InternalAuditPage />} />
             <Route path="/earthmoving" element={<EarthMovingPage />} />

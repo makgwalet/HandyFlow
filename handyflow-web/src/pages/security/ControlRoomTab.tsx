@@ -39,9 +39,9 @@ interface Dispatch {
 // ── Config ─────────────────────────────────────────────────────────────────────
 
 const SEV_CONFIG = {
-  LOW:      { color: "var(--hf-sky-text-strong)", bg: "var(--hf-sky-soft-strong)", dot: "#0EA5E9" },
+  LOW:      { color: "var(--hf-sky-text-strong)", bg: "var(--hf-sky-soft-strong)", dot: "var(--hf-sky)" },
   MEDIUM:   { color: "var(--hf-warning-text-deep)", bg: "var(--hf-warning-soft-strong)", dot: "var(--hf-warning)" },
-  HIGH:     { color: "var(--hf-orange-text-strong)", bg: "var(--hf-orange-soft)", dot: "#F97316" },
+  HIGH:     { color: "var(--hf-orange-text-strong)", bg: "var(--hf-orange-soft)", dot: "var(--hf-orange)" },
   CRITICAL: { color: "var(--hf-danger-text-strong)", bg: "var(--hf-danger-soft)", dot: "var(--hf-danger)" },
 }
 
@@ -230,7 +230,7 @@ export default function ControlRoomTab() {
                   onClick={() => setSelected(e)}
                   style={{
                     display: "flex", alignItems: "center", gap: 12,
-                    padding: "12px 16px", border: `1px solid ${selected?.id === e.id ? "#0D9488" : "#E2E8F0"}`,
+                    padding: "12px 16px", border: `1px solid ${selected?.id === e.id ? "var(--hf-accent)" : "var(--hf-border)"}`,
                     borderRadius: 10, background: selected?.id === e.id ? "var(--hf-accent-soft)" : "var(--hf-surface)",
                     cursor: "pointer", textAlign: "left", width: "100%",
                     transition: "border-color 0.15s, background 0.15s",
@@ -248,7 +248,7 @@ export default function ControlRoomTab() {
                       {e.description ?? "No description"} · {fmtDate(e.createdAt)} {fmtTime(e.createdAt)}
                     </p>
                   </div>
-                  <ChevronRight size={14} color="#CBD5E1" />
+                  <ChevronRight size={14} style={{ color: 'var(--hf-text-disabled)' }} />
                 </button>
               ))}
             </div>
@@ -280,16 +280,16 @@ export default function ControlRoomTab() {
               {/* Actions */}
               {selected.status === "NEW" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <button onClick={() => triage.mutate(selected.id)} style={btnStyle("#0D9488")}>
+                  <button onClick={() => triage.mutate(selected.id)} style={btnStyle("var(--hf-accent)")}>
                     <CheckCircle size={13} /> Triage Event
                   </button>
-                  <button onClick={() => markFalse.mutate(selected.id)} style={btnStyle("#94A3B8")}>
+                  <button onClick={() => markFalse.mutate(selected.id)} style={btnStyle("var(--hf-text-faint)")}>
                     <XCircle size={13} /> Mark False Alarm
                   </button>
                 </div>
               )}
               {(selected.status === "TRIAGED" || selected.status === "NEW") && !showDispatch && (
-                <button onClick={() => setShowDispatch(true)} style={{ ...btnStyle("#1D4ED8"), marginTop: 8 }}>
+                <button onClick={() => setShowDispatch(true)} style={{ ...btnStyle("var(--hf-info)"), marginTop: 8 }}>
                   <Send size={13} /> Dispatch Response
                 </button>
               )}
@@ -310,10 +310,10 @@ export default function ControlRoomTab() {
                   </select>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => dispatch.mutate({ eventId: selected.id, body: { dispatchedUnitType: dispatchForm.unitType, dispatchedGuardId: dispatchForm.guardId || null } })}
-                      style={btnStyle("#1D4ED8")}>
+                      style={btnStyle("var(--hf-info)")}>
                       <Send size={12} /> Send
                     </button>
-                    <button onClick={() => setShowDispatch(false)} style={btnStyle("#94A3B8")}>
+                    <button onClick={() => setShowDispatch(false)} style={btnStyle("var(--hf-text-faint)")}>
                       Cancel
                     </button>
                   </div>
@@ -340,9 +340,9 @@ export default function ControlRoomTab() {
               placeholder="Resolution notes…"
               style={{ ...inputStyle, height: 80, resize: "vertical" as const, marginBottom: 12 }} />
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button onClick={() => setShowResolve(null)} style={btnStyle("#94A3B8")}>Cancel</button>
+              <button onClick={() => setShowResolve(null)} style={btnStyle("var(--hf-text-faint)")}>Cancel</button>
               <button onClick={() => resolve.mutate({ id: showResolve, body: resolveForm })}
-                style={btnStyle("#0D9488")}>
+                style={btnStyle("var(--hf-accent)")}>
                 <CheckCircle size={13} /> Confirm
               </button>
             </div>

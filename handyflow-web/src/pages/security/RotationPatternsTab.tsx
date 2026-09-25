@@ -311,12 +311,12 @@ export default function RotationPatternsTab() {
               <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)", marginBottom: 12 }}>{genResult.patternName} — {genResult.fromDate} to {genResult.toDate}</div>
               <div style={{ display: "flex", gap: 20, marginBottom: genResult.warnings.length ? 14 : 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <CheckCircle2 size={15} color="#166534" />
+                  <CheckCircle2 size={15} style={{ color: 'var(--hf-success-text-strong)' }} />
                   <span style={{ fontSize: 13 }}><strong>{genResult.shiftsCreated}</strong> shifts created</span>
                 </div>
                 {genResult.shiftsSkipped > 0 && (
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <AlertTriangle size={15} color="#B45309" />
+                    <AlertTriangle size={15} style={{ color: 'var(--hf-warning-text-strong)' }} />
                     <span style={{ fontSize: 13 }}><strong>{genResult.shiftsSkipped}</strong> skipped</span>
                   </div>
                 )}

@@ -26,11 +26,11 @@ interface Site  { id: string; name: string }
 // ── Config ─────────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG = {
-  SCHEDULED: { color: "#1D4ED8", bg: "#EFF6FF", label: "Scheduled",  icon: Calendar },
-  ACTIVE:    { color: "#166534", bg: "#DCFCE7", label: "Active",     icon: PlayCircle },
-  COMPLETED: { color: "#0D9488", bg: "#F0FDF4", label: "Completed",  icon: CheckCircle },
-  MISSED:    { color: "#DC2626", bg: "#FEF2F2", label: "Missed",     icon: AlertCircle },
-  CANCELLED: { color: "#94A3B8", bg: "#F8FAFC", label: "Cancelled",  icon: X },
+  SCHEDULED: { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", label: "Scheduled",  icon: Calendar },
+  ACTIVE:    { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", label: "Active",     icon: PlayCircle },
+  COMPLETED: { color: "var(--hf-accent-text)", bg: "var(--hf-success-soft)", label: "Completed",  icon: CheckCircle },
+  MISSED:    { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", label: "Missed",     icon: AlertCircle },
+  CANCELLED: { color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)", label: "Cancelled",  icon: X },
 }
 
 const EMPTY_FORM = { siteId: "", guardId: "", startAt: "", endAt: "", notes: "" }
@@ -205,19 +205,19 @@ export default function ShiftsTab() {
     sites.find(s => s.id === id)?.name ?? id.slice(0, 8) + "…"
 
   const stats = [
-    { label: "Scheduled", value: shifts.filter(s => s.status === "SCHEDULED").length, color: "#1D4ED8" },
-    { label: "Active Now", value: shifts.filter(s => s.status === "ACTIVE").length,   color: "#166534" },
-    { label: "Completed",  value: shifts.filter(s => s.status === "COMPLETED").length, color: "#0D9488" },
-    { label: "Missed",     value: shifts.filter(s => s.status === "MISSED").length,    color: "#DC2626" },
+    { label: "Scheduled", value: shifts.filter(s => s.status === "SCHEDULED").length, color: "var(--hf-info-text)" },
+    { label: "Active Now", value: shifts.filter(s => s.status === "ACTIVE").length,   color: "var(--hf-success-text-strong)" },
+    { label: "Completed",  value: shifts.filter(s => s.status === "COMPLETED").length, color: "var(--hf-accent-text)" },
+    { label: "Missed",     value: shifts.filter(s => s.status === "MISSED").length,    color: "var(--hf-danger-text)" },
   ]
 
   // ── Style helpers ─────────────────────────────────────────────────────────────
 
   const inpSt = (key: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
-    border: `1.5px solid ${fieldErrors[key] ? "#DC2626" : "#E2E8F0"}`,
+    border: `1.5px solid ${fieldErrors[key] ? "var(--hf-danger)" : "var(--hf-border)"}`,
     borderRadius: 8, fontSize: 14,
-    background: fieldErrors[key] ? "#FFF5F5" : "#fff", outline: "none",
+    background: fieldErrors[key] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
 
   const FieldErr = ({ name }: { name: string }) =>
@@ -297,7 +297,7 @@ export default function ShiftsTab() {
                 {/* Left */}
                 <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                   <div style={{ width: 44, height: 44, borderRadius: 10, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Icon size={20} color={cfg.color} />
+                    <Icon size={20} style={{ color: cfg.color }} />
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
@@ -372,14 +372,14 @@ export default function ShiftsTab() {
 
       {/* ── Schedule Shift Modal ───────────────────────────────────────────── */}
       {showAdd && (
-        <Modal onClose={closeAdd} title="Schedule Shift" icon={<Clock size={18} color="#1D4ED8" />} iconBg="#EFF6FF">
+        <Modal onClose={closeAdd} title="Schedule Shift" icon={<Clock size={18} style={{ color: 'var(--hf-info-text)' }} />} iconBg="var(--hf-info-soft)">
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
             {/* Guard */}
             <div>
               <label style={lbl}>Guard *</label>
               {guards.length === 0 ? (
-                <Notice color="#92400E" bg="#FEF3C7" border="#FCD34D">No guards found. Add guards first in the Guards tab.</Notice>
+                <Notice color="var(--hf-warning-text-deep)" bg="var(--hf-warning-soft-strong)" border="var(--hf-warning-border-strong)">No guards found. Add guards first in the Guards tab.</Notice>
               ) : (
                 <select value={form.guardId}
                   onChange={e => { setForm(f => ({ ...f, guardId: e.target.value })); setFieldErrors(f => omit(f, "guardId")) }}
@@ -395,7 +395,7 @@ export default function ShiftsTab() {
             <div>
               <label style={lbl}>Site *</label>
               {sites.length === 0 ? (
-                <Notice color="#92400E" bg="#FEF3C7" border="#FCD34D">No sites registered. Add sites first in the Sites tab.</Notice>
+                <Notice color="var(--hf-warning-text-deep)" bg="var(--hf-warning-soft-strong)" border="var(--hf-warning-border-strong)">No sites registered. Add sites first in the Sites tab.</Notice>
               ) : (
                 <select value={form.siteId}
                   onChange={e => { setForm(f => ({ ...f, siteId: e.target.value })); setFieldErrors(f => omit(f, "siteId")) }}
@@ -427,7 +427,7 @@ export default function ShiftsTab() {
 
             {/* Duration preview */}
             {form.startAt && form.endAt && new Date(form.endAt) > new Date(form.startAt) && (
-              <Notice color="#166534" bg="#F0FDF4" border="#86EFAC">
+              <Notice color="var(--hf-success-text-strong)" bg="var(--hf-success-soft)" border="var(--hf-success-border)">
                 <CheckCircle size={13} style={{ flexShrink: 0 }} />
                 Duration: {Math.round((new Date(form.endAt).getTime() - new Date(form.startAt).getTime()) / 3600000 * 10) / 10} hours
               </Notice>
@@ -441,7 +441,7 @@ export default function ShiftsTab() {
             </div>
           </div>
 
-          <Notice color="#92400E" bg="#FEF3C7" border="#FCD34D" style={{ marginTop: 16 }}>
+          <Notice color="var(--hf-warning-text-deep)" bg="var(--hf-warning-soft-strong)" border="var(--hf-warning-border-strong)" style={{ marginTop: 16 }}>
             <AlertTriangle size={14} style={{ flexShrink: 0 }} />
             Overlapping shifts for the same guard are automatically rejected.
           </Notice>
@@ -506,7 +506,7 @@ export default function ShiftsTab() {
       {interrupting && (
         <Modal onClose={() => { setInterrupting(null); setInterruptReason(""); setApiError("") }}
           title={interrupting.label}
-          icon={<AlertTriangle size={18} color="#B45309" />} iconBg="#FFFBEB">
+          icon={<AlertTriangle size={18} style={{ color: 'var(--hf-warning-text-strong)' }} />} iconBg="var(--hf-warning-soft)">
           <div style={{ marginBottom: 16, padding: "12px 14px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8 }}>
             <div style={{ fontSize: 13, color: "var(--hf-text)" }}>
               {guardName(interrupting.shift.guardId)} → {siteName(interrupting.shift.siteId)}
@@ -588,13 +588,13 @@ const omit = (obj: Record<string, string>, key: string) => {
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const lbl: React.CSSProperties = {
-  display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5,
+  display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5,
 }
 const cancelBtn: React.CSSProperties = {
-  padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9,
-  background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151",
+  padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9,
+  background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)",
 }
 const submitBtn: React.CSSProperties = {
-  padding: "9px 22px", background: "#1B3A6B", color: "#fff",
+  padding: "9px 22px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)",
   border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer",
 }

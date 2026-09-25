@@ -35,7 +35,7 @@ interface MonthlySummaryReport {
 type ReportType = "site-coverage" | "guard-attendance" | "monthly-summary"
 
 const SEV_COLORS: Record<string, string> = {
-  LOW: "#0EA5E9", MEDIUM: "#F59E0B", HIGH: "#F97316", CRITICAL: "#DC2626",
+  LOW: "var(--hf-sky)", MEDIUM: "var(--hf-warning)", HIGH: "var(--hf-orange)", CRITICAL: "var(--hf-danger)",
 }
 
 function StatBox({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
@@ -241,7 +241,7 @@ export default function ReportsTab() {
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
                 {Object.entries(r.incidentsBySeverity).map(([sev, count]) => (
                   <div key={sev} style={{ padding: "8px 14px", borderRadius: 8, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", display: "flex", gap: 8, alignItems: "center" }}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: SEV_COLORS[sev] ?? "#64748B", display: "inline-block" }} />
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: SEV_COLORS[sev] ?? "var(--hf-text-muted)", display: "inline-block" }} />
                     <span style={{ fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)" }}>{count} {sev}</span>
                   </div>
                 ))}
@@ -269,7 +269,7 @@ export default function ReportsTab() {
                 <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "var(--hf-text-secondary)", marginBottom: 10 }}>By Site</p>
                 {r.siteBreakdown.map((s, i) => (
                   <div key={i} style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 0", borderBottom: "1px solid var(--hf-border-subtle)" }}>
-                    <Building2 size={14} color="#94A3B8" />
+                    <Building2 size={14} style={{ color: 'var(--hf-text-faint)' }} />
                     <div style={{ flex: 1, fontSize: 12, color: "var(--hf-text-secondary)" }}>
                       <strong>{s.siteName}</strong> · {s.completedShifts}/{s.totalShifts} shifts · {s.hoursWorked}h
                     </div>

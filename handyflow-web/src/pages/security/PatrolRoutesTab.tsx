@@ -55,11 +55,11 @@ interface Guard { id: string; fullName: string }
 // ── Config ─────────────────────────────────────────────────────────────────────
 
 const ROUND_STATUS_CFG: Record<string, { label: string; color: string; bg: string; border: string; icon: any }> = {
-  EXPECTED:    { label: "Expected",    color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0", icon: Clock3 },
-  IN_PROGRESS: { label: "In Progress", color: "#B45309", bg: "#FFFBEB", border: "#FDE68A", icon: Radio },
-  COMPLETE:    { label: "Complete",    color: "#166534", bg: "#DCFCE7", border: "#86EFAC", icon: CheckCircle2 },
-  PARTIAL:     { label: "Partial",     color: "#C2410C", bg: "#FFEDD5", border: "#FDBA74", icon: AlertTriangle },
-  MISSED:      { label: "Missed",      color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", icon: AlertTriangle },
+  EXPECTED:    { label: "Expected",    color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)", icon: Clock3 },
+  IN_PROGRESS: { label: "In Progress", color: "var(--hf-warning-text-strong)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)", icon: Radio },
+  COMPLETE:    { label: "Complete",    color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", border: "var(--hf-success-border)", icon: CheckCircle2 },
+  PARTIAL:     { label: "Partial",     color: "var(--hf-orange-text-strong)", bg: "var(--hf-orange-soft)", border: "var(--hf-orange-border)", icon: AlertTriangle },
+  MISSED:      { label: "Missed",      color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)", icon: AlertTriangle },
 }
 
 const SUB_TABS = [
@@ -67,10 +67,10 @@ const SUB_TABS = [
   { id: "monitoring", label: "Live Monitoring", icon: Radio },
 ] as const
 
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "#fff", outline: "none" }
-const cancelBtn: React.CSSProperties = { padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }
-const submitBtn: React.CSSProperties = { padding: "9px 18px", border: "none", borderRadius: 9, background: "#1B3A6B", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "var(--hf-surface)", outline: "none" }
+const cancelBtn: React.CSSProperties = { padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }
+const submitBtn: React.CSSProperties = { padding: "9px 18px", border: "none", borderRadius: 9, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", fontSize: 14, fontWeight: 600, cursor: "pointer" }
 
 function fmtTime(s: string | null) { return s ? new Date(s).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" }) : "—" }
 
@@ -274,10 +274,10 @@ export default function PatrolRoutesTab() {
                     const cfg = ROUND_STATUS_CFG[r.status] ?? ROUND_STATUS_CFG.EXPECTED
                     const Icon = cfg.icon
                     return (
-                      <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--hf-surface)", border: `1px solid ${r.offSchedule ? "#FECACA" : "#E2E8F0"}`, borderRadius: 10, padding: "12px 16px" }}>
+                      <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--hf-surface)", border: `1px solid ${r.offSchedule ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 10, padding: "12px 16px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                           <div style={{ width: 36, height: 36, borderRadius: 9, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                            <Icon size={16} color={cfg.color} />
+                            <Icon size={16} style={{ color: cfg.color }} />
                           </div>
                           <div>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

@@ -80,6 +80,8 @@ function findOwner(lit) {
     const p = n.parent
     if (ts.isConditionalExpression(p) && p.condition !== n) { n = p; continue }
     if (ts.isParenthesizedExpression(p) || ts.isAsExpression(p)) { n = p; continue }
+    // `1px solid ${active ? '#7C3AED' : '#E2E8F0'}`: the template's owner decides the role.
+    if (ts.isTemplateSpan(p) && p.expression === n) { n = p.parent; continue }
     if (ts.isBinaryExpression(p) && [ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken].includes(p.operatorToken.kind)) { n = p; continue }
     if (ts.isPropertyAssignment(p) && p.initializer === n) return { kind: 'prop', name: propName(p), node: p }
     if (ts.isBinaryExpression(p) && p.operatorToken.kind === ts.SyntaxKind.EqualsToken && p.right === n &&

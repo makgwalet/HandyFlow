@@ -60,17 +60,17 @@ interface Evidence {
 // ── Config ─────────────────────────────────────────────────────────────────────
 
 const ENTRY_TYPE_CFG: Record<string, { label: string; icon: any; color: string; bg: string }> = {
-  VISITOR:       { label: "Visitor",       icon: User,     color: "#1D4ED8", bg: "#EFF6FF" },
-  CONTRACTOR:    { label: "Contractor",    icon: Building2, color: "#7C3AED", bg: "#F5F3FF" },
-  DELIVERY:      { label: "Delivery",      icon: Truck,    color: "#D97706", bg: "#FFFBEB" },
-  STAFF_VEHICLE: { label: "Staff Vehicle", icon: Truck,    color: "#166534", bg: "#DCFCE7" },
-  OTHER:         { label: "Other",         icon: User,     color: "#64748B", bg: "#F8FAFC" },
+  VISITOR:       { label: "Visitor",       icon: User,     color: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+  CONTRACTOR:    { label: "Contractor",    icon: Building2, color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)" },
+  DELIVERY:      { label: "Delivery",      icon: Truck,    color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+  STAFF_VEHICLE: { label: "Staff Vehicle", icon: Truck,    color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+  OTHER:         { label: "Other",         icon: User,     color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)" },
 }
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  ON_SITE:    { label: "On Site",   color: "#166534", bg: "#DCFCE7", border: "#86EFAC" },
-  DEPARTED:   { label: "Departed",  color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0" },
-  OVERSTAYED: { label: "Overstayed", color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" },
+  ON_SITE:    { label: "On Site",   color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", border: "var(--hf-success-border)" },
+  DEPARTED:   { label: "Departed",  color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)" },
+  OVERSTAYED: { label: "Overstayed", color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)" },
 }
 
 const SUB_TABS = [
@@ -80,10 +80,10 @@ const SUB_TABS = [
   { id: "report",        label: "Site Access Report", icon: FileBarChart },
 ] as const
 
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "#fff", outline: "none" }
-const cancelBtn: React.CSSProperties = { padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }
-const submitBtn: React.CSSProperties = { padding: "9px 18px", border: "none", borderRadius: 9, background: "#1B3A6B", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "var(--hf-surface)", outline: "none" }
+const cancelBtn: React.CSSProperties = { padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }
+const submitBtn: React.CSSProperties = { padding: "9px 18px", border: "none", borderRadius: 9, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", fontSize: 14, fontWeight: 600, cursor: "pointer" }
 
 function thisMonth() {
   const now = new Date()
@@ -345,10 +345,10 @@ export default function GateAccessTab() {
               ) : report ? (
                 <>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 20 }}>
-                    <StatCard label="Total Entries" value={report.totalEntries} color="#1B3A6B" />
-                    <StatCard label="Currently On Site" value={report.currentlyOnSite} color="#166534" />
-                    <StatCard label="Departed" value={report.departed} color="#64748B" />
-                    <StatCard label="Overstayed" value={report.overstayed} color="#DC2626" />
+                    <StatCard label="Total Entries" value={report.totalEntries} color="var(--hf-primary-text)" />
+                    <StatCard label="Currently On Site" value={report.currentlyOnSite} color="var(--hf-success-text-strong)" />
+                    <StatCard label="Departed" value={report.departed} color="var(--hf-text-muted)" />
+                    <StatCard label="Overstayed" value={report.overstayed} color="var(--hf-danger-text)" />
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {report.entries.map((e, i) => {
@@ -451,10 +451,10 @@ function GateEntryRow({ entry, onEvidence }: { entry: GateEntry; onEvidence: () 
   const sc = STATUS_CFG[entry.status] ?? STATUS_CFG.DEPARTED
   const Icon = cfg.icon
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--hf-surface)", border: `1px solid ${entry.status === "OVERSTAYED" ? "#FECACA" : "#E2E8F0"}`, borderRadius: 10, padding: "12px 16px" }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--hf-surface)", border: `1px solid ${entry.status === "OVERSTAYED" ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 10, padding: "12px 16px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ width: 36, height: 36, borderRadius: 9, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <Icon size={16} color={cfg.color} />
+          <Icon size={16} style={{ color: cfg.color }} />
         </div>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

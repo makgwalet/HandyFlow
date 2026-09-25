@@ -12,7 +12,7 @@ import { Shield, MapPin, Clock, AlertTriangle, ArrowRight, Radio } from "lucide-
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-ZA",  { day: "numeric", month: "short" })
 
-export default function SecurityDashboard({ onNavigate }: { onNavigate: (tab: any) => void }) {
+export default function SecurityDashboard({ onNavigate }: { onNavigate: (section: string) => void }) {
 
   // WHY targeted queries instead of size=100 everything?
   // The original fetched all guards, all shifts, all sites, all incidents on
@@ -95,15 +95,15 @@ export default function SecurityDashboard({ onNavigate }: { onNavigate: (tab: an
     guards.find((g: any) => g.id === guardId)?.fullName ?? guardId.slice(0, 8) + "…"
 
   const kpis = [
-    { label: "Guards on duty",  value: activeShifts.length, sub: `${activeGuards} active / ${totalGuards} total`, color: "#166534", bg: "#F0FDF4", icon: Shield,        tab: "shifts" },
-    { label: "Active sites",    value: siteStats ?? 0,       color: "#1B3A6B", bg: "#EFF6FF", icon: MapPin,        tab: "sites" },
+    { label: "Guards on duty",  value: activeShifts.length, sub: `${activeGuards} active / ${totalGuards} total`, color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft)", icon: Shield,        tab: "shifts" },
+    { label: "Active sites",    value: siteStats ?? 0,       color: "var(--hf-primary-text)", bg: "var(--hf-info-soft)", icon: MapPin,        tab: "sites" },
     { label: "Open incidents",  value: openIncidentCount ?? openIncidents.length,
-      color: (openIncidentCount ?? openIncidents.length) > 0 ? "#DC2626" : "#166534",
-      bg: (openIncidentCount ?? openIncidents.length) > 0 ? "#FEF2F2" : "#F0FDF4",
+      color: (openIncidentCount ?? openIncidents.length) > 0 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)",
+      bg: (openIncidentCount ?? openIncidents.length) > 0 ? "var(--hf-danger-soft)" : "var(--hf-success-soft)",
       icon: AlertTriangle, tab: "incidents" },
     { label: "Critical alerts", value: criticalIncidentCount ?? 0,
-      color: (criticalIncidentCount ?? 0) > 0 ? "#DC2626" : "#166534",
-      bg: (criticalIncidentCount ?? 0) > 0 ? "#FEF2F2" : "#F0FDF4",
+      color: (criticalIncidentCount ?? 0) > 0 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)",
+      bg: (criticalIncidentCount ?? 0) > 0 ? "var(--hf-danger-soft)" : "var(--hf-success-soft)",
       icon: Radio, tab: "incidents" },
   ]
 
@@ -121,7 +121,7 @@ export default function SecurityDashboard({ onNavigate }: { onNavigate: (tab: an
             onMouseLeave={e => (e.currentTarget.style.boxShadow = "none")}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: k.color, textTransform: "uppercase" as const }}>{k.label}</div>
-              <k.icon size={16} color={k.color} />
+              <k.icon size={16} style={{ color: k.color }} />
             </div>
             <div style={{ fontSize: 28, fontWeight: 800, color: k.color }}>{k.value}</div>
             {"sub" in k && k.sub && <div style={{ fontSize: 11, color: k.color, opacity: 0.7, marginTop: 2 }}>{k.sub}</div>}
@@ -142,7 +142,7 @@ export default function SecurityDashboard({ onNavigate }: { onNavigate: (tab: an
 
           {activeShifts.length === 0 ? (
             <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed var(--hf-border)", borderRadius: 12, color: "var(--hf-text-faint)" }}>
-              <Shield size={32} color="#CBD5E1" style={{ marginBottom: 10 }} />
+              <Shield size={32} style={{ color: 'var(--hf-text-disabled)', marginBottom: 10 }} />
               <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No active shifts</div>
             </div>
           ) : (
@@ -171,15 +171,15 @@ export default function SecurityDashboard({ onNavigate }: { onNavigate: (tab: an
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {openIncidents.slice(0, 3).map((inc: any) => {
-                  const sevColor = ({ CRITICAL: "#DC2626", HIGH: "#EA580C", MEDIUM: "#D97706", LOW: "#64748B" } as any)[inc.severity] ?? "#64748B"
+                  const sevColor = ({ CRITICAL: "var(--hf-danger-text)", HIGH: "var(--hf-orange-text)", MEDIUM: "var(--hf-warning-text)", LOW: "var(--hf-text-muted)" } as Record<string, string>)[inc.severity] ?? "var(--hf-text-muted)"
                   return (
-                    <div key={inc.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `1px solid ${sevColor}30`, borderLeft: `3px solid ${sevColor}`, borderRadius: 10, background: "var(--hf-surface)" }}>
-                      <AlertTriangle size={16} color={sevColor} />
+                    <div key={inc.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `1px solid color-mix(in srgb, ${sevColor} 19%, transparent)`, borderLeft: `3px solid ${sevColor}`, borderRadius: 10, background: "var(--hf-surface)" }}>
+                      <AlertTriangle size={16} style={{ color: sevColor }} />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: 13, color: "var(--hf-text)" }}>{inc.title}</div>
                         <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{fmtDate(inc.reportedAt)}{inc.siteName && ` · ${inc.siteName}`}</div>
                       </div>
-                      <span style={{ fontSize: 10, fontWeight: 700, background: `${sevColor}18`, color: sevColor, padding: "2px 8px", borderRadius: 20 }}>{inc.severity}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, background: `color-mix(in srgb, ${sevColor} 9%, transparent)`, color: sevColor, padding: "2px 8px", borderRadius: 20 }}>{inc.severity}</span>
                     </div>
                   )
                 })}
@@ -210,10 +210,10 @@ export default function SecurityDashboard({ onNavigate }: { onNavigate: (tab: an
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 10 }}>Quick actions</div>
             {[
-              { label: "Schedule a shift", tab: "shifts",    color: "#1B3A6B" },
-              { label: "Report incident",  tab: "incidents", color: "#DC2626" },
-              { label: "Add guard",        tab: "guards",    color: "#0D9488" },
-              { label: "View live map",    tab: "live",      color: "#7C3AED" },
+              { label: "Schedule a shift", tab: "shifts",    color: "var(--hf-primary-text)" },
+              { label: "Report incident",  tab: "incidents", color: "var(--hf-danger-text)" },
+              { label: "Add guard",        tab: "guards",    color: "var(--hf-accent-text)" },
+              { label: "View live map",    tab: "live",      color: "var(--hf-violet-text)" },
             ].map(a => (
               <button key={a.label} onClick={() => onNavigate(a.tab)}
                 style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left" as const, display: "flex", alignItems: "center", justifyContent: "space-between" }}>

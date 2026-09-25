@@ -11,7 +11,7 @@ interface Branch {
 }
 
 const inp = { width:"100%", padding:"8px 12px", borderRadius:8, border:"1px solid var(--hf-border)", fontSize:13, outline:"none", boxSizing:"border-box" as const }
-const btn = (bg: string, color="white") => ({ padding:"8px 16px", borderRadius:8, border:"none", background:bg, color, fontSize:13, cursor:"pointer", fontWeight:600 as const })
+const btn = (bg: string, color="var(--hf-text-on-solid)") => ({ padding:"8px 16px", borderRadius:8, border:"none", background:bg, color, fontSize:13, cursor:"pointer", fontWeight:600 as const })
 const sbtn = { padding:"8px 16px", borderRadius:8, border:"1px solid var(--hf-border)", background:"var(--hf-surface)", fontSize:13, cursor:"pointer", color:"var(--hf-text-secondary)" as const }
 
 const ZA_REGIONS = ["Gauteng","Western Cape","KwaZulu-Natal","Eastern Cape","Limpopo","Mpumalanga","North West","Free State","Northern Cape"]
@@ -59,22 +59,22 @@ export default function BranchesTab() {
   )
 
   const REGION_COLORS: Record<string,string> = {
-    "Gauteng":"#1D4ED8","Western Cape":"#166534","KwaZulu-Natal":"#7C3AED",
-    "Eastern Cape":"#92400E","Limpopo":"#065F46","Mpumalanga":"#B45309",
-    "North West":"#0F172A","Free State":"#374151","Northern Cape":"#6B7280",
+    "Gauteng":"var(--hf-info-text)","Western Cape":"var(--hf-success-text-strong)","KwaZulu-Natal":"var(--hf-violet-text)",
+    "Eastern Cape":"var(--hf-warning-text-deep)","Limpopo":"var(--hf-success-text-strong)","Mpumalanga":"var(--hf-warning-text-strong)",
+    "North West":"var(--hf-text)","Free State":"var(--hf-text-secondary)","Northern Cape":"var(--hf-text-muted)",
   }
 
   return (
     <div style={{fontFamily:"'Inter',system-ui,sans-serif"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{background:"var(--hf-info)",borderRadius:10,padding:8}}><GitBranch size={18} color="#fff"/></div>
+          <div style={{background:"var(--hf-info)",borderRadius:10,padding:8}}><GitBranch size={18} style={{ color: 'var(--hf-text-on-solid)' }}/></div>
           <div>
             <h2 style={{margin:0,fontSize:18,fontWeight:700,color:"var(--hf-text)"}}>Branches</h2>
             <p style={{margin:0,fontSize:12,color:"var(--hf-text-faint)"}}>Regional / operational subdivisions — assign sites and guards per branch</p>
           </div>
         </div>
-        <button style={{...btn("#2563EB"),display:"flex",alignItems:"center",gap:6}} onClick={openCreate}>
+        <button style={{...btn("var(--hf-info)"),display:"flex",alignItems:"center",gap:6}} onClick={openCreate}>
           <Plus size={14}/> New Branch
         </button>
       </div>
@@ -108,7 +108,7 @@ export default function BranchesTab() {
           </div>
           <div style={{display:"flex",gap:8}}>
             <button style={sbtn} onClick={()=>setView("list")}>Cancel</button>
-            <button style={{...btn("#2563EB"),opacity:!form.name?0.5:1}} disabled={!form.name} onClick={submit}>
+            <button style={{...btn("var(--hf-info)"),opacity:!form.name?0.5:1}} disabled={!form.name} onClick={submit}>
               {view==="edit"?"Save Changes":"Create Branch"}
             </button>
           </div>
@@ -134,7 +134,7 @@ export default function BranchesTab() {
                     <td style={{padding:"11px 14px"}}>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
                         <div style={{width:32,height:32,borderRadius:8,background:"var(--hf-info-soft)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                          <GitBranch size={14} color="#2563EB"/>
+                          <GitBranch size={14} style={{ color: 'var(--hf-info-text)' }}/>
                         </div>
                         <span style={{fontWeight:600,color:"var(--hf-text)"}}>{b.name}</span>
                       </div>

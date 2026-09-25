@@ -206,7 +206,7 @@ export default function ArmouryTab() {
 
       {expiring.length > 0 && (
         <div style={{ background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, display: "flex", gap: 8, alignItems: "center" }}>
-          <AlertTriangle size={14} color="#D97706" />
+          <AlertTriangle size={14} style={{ color: 'var(--hf-warning-text)' }} />
           <span style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>
             <strong>{expiring.length}</strong> firearm{expiring.length !== 1 ? "s" : ""} with license expiring within 30 days
           </span>

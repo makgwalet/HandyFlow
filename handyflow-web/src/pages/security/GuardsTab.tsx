@@ -49,15 +49,15 @@ interface GuardFormState {
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const GRADE_COLORS: Record<string, string> = {
-  A: "#7C3AED", B: "#1D4ED8", C: "#0D9488", D: "#D97706", E: "#DC2626",
+  A: "var(--hf-violet-text)", B: "var(--hf-info-text)", C: "var(--hf-accent-text)", D: "var(--hf-warning-text)", E: "var(--hf-danger-text)",
 }
 
 const GUARD_STATUSES = [
-  { value: "ACTIVE",              label: "Active",               color: "#166534", bg: "#DCFCE7", icon: CheckCircle,   description: "Available for shift assignment" },
-  { value: "ON_LEAVE",            label: "On Leave",             color: "#1D4ED8", bg: "#EFF6FF", icon: Clock,         description: "On approved leave — unavailable" },
-  { value: "SUSPENDED",           label: "Suspended",            color: "#DC2626", bg: "#FEF2F2", icon: Ban,           description: "Suspended — cannot be assigned" },
-  { value: "UNDER_INVESTIGATION", label: "Under Investigation",  color: "#D97706", bg: "#FEF3C7", icon: HelpCircle,    description: "Under investigation — restricted" },
-  { value: "TERMINATED",          label: "Terminated",           color: "#64748B", bg: "#F1F5F9", icon: AlertTriangle, description: "Employment terminated" },
+  { value: "ACTIVE",              label: "Active",               color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", icon: CheckCircle,   description: "Available for shift assignment" },
+  { value: "ON_LEAVE",            label: "On Leave",             color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", icon: Clock,         description: "On approved leave — unavailable" },
+  { value: "SUSPENDED",           label: "Suspended",            color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", icon: Ban,           description: "Suspended — cannot be assigned" },
+  { value: "UNDER_INVESTIGATION", label: "Under Investigation",  color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft-strong)", icon: HelpCircle,    description: "Under investigation — restricted" },
+  { value: "TERMINATED",          label: "Terminated",           color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)", icon: AlertTriangle, description: "Employment terminated" },
 ]
 
 const STATUS_MAP = Object.fromEntries(GUARD_STATUSES.map(s => [s.value, s]))
@@ -92,8 +92,8 @@ function psiraExpiryStatus(dateStr: string | null): { label: string; color: stri
   const expiry = new Date(dateStr)
   const now    = new Date()
   const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / 86400000)
-  if (daysLeft < 0)  return { label: "PSiRA Expired",              color: "#DC2626", bg: "#FEF2F2" }
-  if (daysLeft <= 30) return { label: `PSiRA expires in ${daysLeft}d`, color: "#D97706", bg: "#FEF3C7" }
+  if (daysLeft < 0)  return { label: "PSiRA Expired",              color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" }
+  if (daysLeft <= 30) return { label: `PSiRA expires in ${daysLeft}d`, color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft-strong)" }
   return null // valid — no badge needed, clutter-free when compliant
 }
 
@@ -109,7 +109,7 @@ function GuardAvatar({ guard, size = 36 }: { guard: Guard; size?: number }) {
   ) : (
     <div style={{ width: size, height: size, borderRadius: "50%",
                   background: unavail ? "var(--hf-surface-sunken)" : "var(--hf-info-soft)",
-                  border: `2px solid ${unavail ? "#E2E8F0" : "#BFDBFE"}`,
+                  border: `2px solid ${unavail ? "var(--hf-border)" : "var(--hf-info-border)"}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontWeight: 700, fontSize: size * 0.33,
                   color: unavail ? "var(--hf-text-faint)" : "var(--hf-info-text)", flexShrink: 0 }}>
@@ -138,9 +138,9 @@ function FieldError({ fieldErrors, name }: { fieldErrors: Record<string, string>
 
 function inputStyle(fieldErrors: Record<string, string>, key: string): React.CSSProperties {
   return {
-    width: "100%", padding: "9px 12px", border: `1.5px solid ${fieldErrors[key] ? "#DC2626" : "#E2E8F0"}`,
+    width: "100%", padding: "9px 12px", border: `1.5px solid ${fieldErrors[key] ? "var(--hf-danger)" : "var(--hf-border)"}`,
     borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const,
-    background: fieldErrors[key] ? "#FFF5F5" : "#fff", outline: "none",
+    background: fieldErrors[key] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   }
 }
 
@@ -495,10 +495,10 @@ export default function GuardsTab() {
       {/* Stats */}
       <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
         {[
-          { label: "Total",     value: guards.length,                                                     color: "#1B3A6B" },
-          { label: "Active",    value: guards.filter(g => (g.status ?? "ACTIVE") === "ACTIVE").length,    color: "#166534" },
-          { label: "On Leave",  value: guards.filter(g => g.status === "ON_LEAVE").length,                color: "#1D4ED8" },
-          { label: "Suspended", value: guards.filter(g => g.status === "SUSPENDED").length,               color: "#DC2626" },
+          { label: "Total",     value: guards.length,                                                     color: "var(--hf-primary-text)" },
+          { label: "Active",    value: guards.filter(g => (g.status ?? "ACTIVE") === "ACTIVE").length,    color: "var(--hf-success-text-strong)" },
+          { label: "On Leave",  value: guards.filter(g => g.status === "ON_LEAVE").length,                color: "var(--hf-info-text)" },
+          { label: "Suspended", value: guards.filter(g => g.status === "SUSPENDED").length,               color: "var(--hf-danger-text)" },
         ].map(s => (
           <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 20px" }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
@@ -516,7 +516,7 @@ export default function GuardsTab() {
         if (expiring.length === 0) return null
         return (
           <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
-            <AlertTriangle size={16} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
+            <AlertTriangle size={16} style={{ color: 'var(--hf-warning-text)', flexShrink: 0, marginTop: 1 }} />
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-warning-text-deep)", marginBottom: 4 }}>PSiRA Compliance Alert</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -589,7 +589,7 @@ export default function GuardsTab() {
                     </td>
                     <td style={{ padding: "13px 16px", color: "var(--hf-text-tertiary)" }}>
                       <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}><BadgeCheck size={13} color="#0D9488" />{g.psiraNumber || "—"}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}><BadgeCheck size={13} style={{ color: 'var(--hf-accent-text)' }} />{g.psiraNumber || "—"}</div>
                         {expiryBadge && (
                           <span style={{ fontSize: 10, fontWeight: 600, background: expiryBadge.bg, color: expiryBadge.color, padding: "1px 6px", borderRadius: 10, marginTop: 3, display: "inline-block" }}>
                             {expiryBadge.label}
@@ -598,10 +598,10 @@ export default function GuardsTab() {
                       </div>
                     </td>
                     <td style={{ padding: "13px 16px", color: "var(--hf-text-tertiary)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}><Phone size={13} color="#94A3B8" />{g.phone || "—"}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}><Phone size={13} style={{ color: 'var(--hf-text-faint)' }} />{g.phone || "—"}</div>
                     </td>
                     <td style={{ padding: "13px 16px" }}>
-                      <span style={{ background: `${GRADE_COLORS[g.grade] || "#64748B"}18`, color: GRADE_COLORS[g.grade] || "var(--hf-text-muted)", padding: "3px 10px", borderRadius: 20, fontWeight: 700, fontSize: 12 }}>Grade {g.grade}</span>
+                      <span style={{ background: `color-mix(in srgb, ${GRADE_COLORS[g.grade] || "var(--hf-text-muted)"} 9%, transparent)`, color: GRADE_COLORS[g.grade] || "var(--hf-text-muted)", padding: "3px 10px", borderRadius: 20, fontWeight: 700, fontSize: 12 }}>Grade {g.grade}</span>
                     </td>
                     <td style={{ padding: "13px 16px" }}><StatusBadge status={gStatus} /></td>
                     <td style={{ padding: "13px 16px" }}>
@@ -672,7 +672,7 @@ export default function GuardsTab() {
           {canViewCpTier && (
             <div style={{ marginTop: 12, padding: 16, background: "var(--hf-surface-muted)", borderRadius: 10, border: "1px solid var(--hf-border)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                <ShieldCheck size={14} color="#7C3AED" />
+                <ShieldCheck size={14} style={{ color: 'var(--hf-violet-text)' }} />
                 <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text-secondary)" }}>Close Protection Clearance</div>
               </div>
               <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginBottom: 10 }}>
@@ -739,12 +739,12 @@ export default function GuardsTab() {
             <div style={{ position: "relative", display: "inline-block" }}>
               <GuardAvatar guard={viewing} size={110} />
               <div style={{ position: "absolute", bottom: 4, right: 4, width: 28, height: 28, borderRadius: "50%", background: STATUS_MAP[viewing.status ?? "ACTIVE"]?.color ?? "var(--hf-success-solid-strong)", border: "2px solid var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {(() => { const S = GUARD_STATUSES.find(s => s.value === (viewing.status ?? "ACTIVE")); const Icon = S?.icon ?? CheckCircle; return <Icon size={12} color="#fff" /> })()}
+                {(() => { const S = GUARD_STATUSES.find(s => s.value === (viewing.status ?? "ACTIVE")); const Icon = S?.icon ?? CheckCircle; return <Icon size={12} style={{ color: "var(--hf-text-on-solid)" }} /> })()}
               </div>
             </div>
             <h3 style={{ margin: "12px 0 6px", fontSize: 20, fontWeight: 700, color: "var(--hf-text)" }}>{viewing.fullName}</h3>
             <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ background: `${GRADE_COLORS[viewing.grade]}18`, color: GRADE_COLORS[viewing.grade], padding: "3px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>Grade {viewing.grade}</span>
+              <span style={{ background: `color-mix(in srgb, ${GRADE_COLORS[viewing.grade]} 9%, transparent)`, color: GRADE_COLORS[viewing.grade], padding: "3px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>Grade {viewing.grade}</span>
               <StatusBadge status={viewing.status} />
             </div>
           </div>
@@ -769,7 +769,7 @@ export default function GuardsTab() {
             const badge = psiraExpiryStatus(viewing.psiraExpiryDate)
             if (!badge) return null
             return (
-              <div style={{ marginTop: 10, padding: "10px 14px", background: badge.bg, border: `1px solid ${badge.color}40`, borderRadius: 8, fontSize: 13, color: badge.color, fontWeight: 600, display: "flex", gap: 8, alignItems: "center" }}>
+              <div style={{ marginTop: 10, padding: "10px 14px", background: badge.bg, border: `1px solid color-mix(in srgb, ${badge.color} 25%, transparent)`, borderRadius: 8, fontSize: 13, color: badge.color, fontWeight: 600, display: "flex", gap: 8, alignItems: "center" }}>
                 <Calendar size={14} />{badge.label} {viewing.psiraExpiryDate && `(${fmtDate(viewing.psiraExpiryDate)})`}
               </div>
             )
@@ -824,15 +824,15 @@ export default function GuardsTab() {
               const Icon = s.icon; const sel = newStatus === s.value
               return (
                 <button key={s.value} onClick={() => setNewStatus(s.value)}
-                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", border: `2px solid ${sel ? s.color : "#E2E8F0"}`, borderRadius: 9, cursor: "pointer", background: sel ? s.bg : "var(--hf-surface)", textAlign: "left" as const, width: "100%" }}>
-                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: `${s.color}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Icon size={15} color={s.color} />
+                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", border: `2px solid ${sel ? s.color : "var(--hf-border)"}`, borderRadius: 9, cursor: "pointer", background: sel ? s.bg : "var(--hf-surface)", textAlign: "left" as const, width: "100%" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: `color-mix(in srgb, ${s.color} 9%, transparent)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Icon size={15} style={{ color: s.color }} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: sel ? s.color : "var(--hf-text)" }}>{s.label}</div>
                     <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>{s.description}</div>
                   </div>
-                  {sel && <CheckCircle size={16} color={s.color} />}
+                  {sel && <CheckCircle size={16} style={{ color: s.color }} />}
                 </button>
               )
             })}
@@ -882,11 +882,11 @@ export default function GuardsTab() {
         <Modal title="" onClose={() => { setDeleting(null); setApiError("") }} width={400}>
           <div style={{ textAlign: "center" }}>
             <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--hf-danger-soft)", border: "2px solid var(--hf-danger-border)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-              <Trash2 size={22} color="#DC2626" />
+              <Trash2 size={22} style={{ color: 'var(--hf-danger-text)' }} />
             </div>
             <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700 }}>Remove Guard?</h3>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 40, padding: "6px 14px", marginBottom: 14 }}>
-              <Shield size={13} color="#DC2626" /><span style={{ fontSize: 13, fontWeight: 600 }}>{deleting.fullName}</span>
+              <Shield size={13} style={{ color: 'var(--hf-danger-text)' }} /><span style={{ fontSize: 13, fontWeight: 600 }}>{deleting.fullName}</span>
             </div>
             <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: "0 0 20px", lineHeight: 1.6 }}>
               Deactivates the guard record. Shift history and incident records are preserved.
@@ -936,4 +936,4 @@ function Footer({ onCancel, onSubmit, loading, label }: { onCancel: () => void; 
 }
 
 const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }

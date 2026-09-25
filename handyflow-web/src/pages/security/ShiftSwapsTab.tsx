@@ -105,8 +105,8 @@ export default function ShiftSwapsTab() {
                       {s.proposedAcceptedAt && <> · Accepted {fmtDateTime(s.proposedAcceptedAt)}</>}
                     </div>
                     {s.validationNotes && (
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 8, padding: "6px 10px", background: s.validationPassed === false ? "var(--hf-danger-soft)" : "var(--hf-warning-soft)", border: `1px solid ${s.validationPassed === false ? "#FECACA" : "#FDE68A"}`, borderRadius: 7 }}>
-                        <AlertCircle size={13} color={s.validationPassed === false ? "#DC2626" : "#B45309"} style={{ marginTop: 1, flexShrink: 0 }} />
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 8, padding: "6px 10px", background: s.validationPassed === false ? "var(--hf-danger-soft)" : "var(--hf-warning-soft)", border: `1px solid ${s.validationPassed === false ? "var(--hf-danger-border)" : "var(--hf-warning-border)"}`, borderRadius: 7 }}>
+                        <AlertCircle size={13} style={{ color: s.validationPassed === false ? "var(--hf-danger-text)" : "var(--hf-warning-text-strong)", marginTop: 1, flexShrink: 0 }} />
                         <span style={{ fontSize: 11, color: s.validationPassed === false ? "var(--hf-danger-text)" : "var(--hf-warning-text-strong)" }}>{s.validationNotes}</span>
                       </div>
                     )}
