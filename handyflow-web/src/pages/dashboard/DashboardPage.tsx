@@ -15,6 +15,7 @@ import {
   Handshake,
   Warehouse,
   ClipboardCheck,
+  ShieldCheck,
 } from 'lucide-react'
 import { apiClient } from '../../api/client'
 import { useAuthStore } from '../../store/auth.store'
@@ -67,6 +68,7 @@ const MODULE_REGISTRY: Record<string, AppTile> = {
   legalcompliance: { key: 'legalcompliance', name: 'Legal & Compliance', description: 'Obligations, litigation & POPIA', icon: Scale, bg: '#E0E7FF', iconColor: '#4338CA', route: '/legalcompliance' },
   compliancetender: { key: 'compliancetender', name: 'Business Compliance & Tender', description: 'CIPC, SARS, PSIRA registrations & tender workspace', icon: ClipboardCheck, bg: '#E0F2FE', iconColor: '#0369A1', route: '/compliancetender' },
   complianceservices: { key: 'complianceservices', name: 'Compliance Services', description: 'Manage compliance and tender work for your client companies', icon: Building2, bg: '#ECFDF5', iconColor: '#065F46', route: '/complianceservices' },
+  'internal-audit': { key: 'internal-audit', name: 'Internal Audit', description: 'Risk-based audit planning, annual plan and engagement management', icon: ShieldCheck, bg: '#F4F4F5', iconColor: '#3F3F46', route: '/internal-audit' },
   debtcollection: { key: 'debtcollection',  name: 'Debt Collection', description: 'Cases, contact trail & payment plans', icon: Landmark, bg: '#FFEDD5', iconColor: '#9A3412', route: '/debtcollection',
 
 },
