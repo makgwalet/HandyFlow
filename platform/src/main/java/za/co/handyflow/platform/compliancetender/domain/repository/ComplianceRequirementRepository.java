@@ -12,19 +12,19 @@ import java.util.UUID;
 
 public interface ComplianceRequirementRepository extends JpaRepository<ComplianceRequirement, UUID> {
 
-    @Query("SELECT r FROM ComplianceRequirement r WHERE r.tenantId = :#{#tenantId.value} AND r.id = :id")
+    @Query("SELECT r FROM ComplianceRequirement r WHERE r.tenantId.value = :#{#tenantId.value} AND r.id = :id")
     Optional<ComplianceRequirement> findByIdForTenant(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT r FROM ComplianceRequirement r WHERE r.tenantId = :#{#tenantId.value} ORDER BY r.code")
+    @Query("SELECT r FROM ComplianceRequirement r WHERE r.tenantId.value = :#{#tenantId.value} ORDER BY r.code")
     List<ComplianceRequirement> findAllForTenant(@Param("tenantId") TenantId tenantId);
 
     /** The current (highest-version) row for a given code — used when applying today's rules. */
-    @Query("SELECT r FROM ComplianceRequirement r WHERE r.tenantId = :#{#tenantId.value} AND r.code = :code " +
+    @Query("SELECT r FROM ComplianceRequirement r WHERE r.tenantId.value = :#{#tenantId.value} AND r.code = :code " +
            "ORDER BY r.requirementVersion DESC LIMIT 1")
     Optional<ComplianceRequirement> findLatestByCode(@Param("tenantId") TenantId tenantId, @Param("code") String code);
 
     /** Every version ever recorded for one code, most recent first — the audit trail behind ComplianceRequirement's own versioning design. */
-    @Query("SELECT r FROM ComplianceRequirement r WHERE r.tenantId = :#{#tenantId.value} AND r.code = :code " +
+    @Query("SELECT r FROM ComplianceRequirement r WHERE r.tenantId.value = :#{#tenantId.value} AND r.code = :code " +
            "ORDER BY r.requirementVersion DESC")
     List<ComplianceRequirement> findAllVersionsByCode(@Param("tenantId") TenantId tenantId, @Param("code") String code);
 }

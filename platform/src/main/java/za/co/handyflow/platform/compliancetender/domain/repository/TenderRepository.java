@@ -13,10 +13,10 @@ import java.util.UUID;
 
 public interface TenderRepository extends JpaRepository<Tender, UUID> {
 
-    @Query("SELECT t FROM Tender t WHERE t.tenantId = :#{#tenantId.value} AND t.id = :id")
+    @Query("SELECT t FROM Tender t WHERE t.tenantId.value = :#{#tenantId.value} AND t.id = :id")
     Optional<Tender> findByIdForTenant(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT t FROM Tender t WHERE t.tenantId = :#{#tenantId.value} " +
+    @Query("SELECT t FROM Tender t WHERE t.tenantId.value = :#{#tenantId.value} " +
            "AND (:status IS NULL OR t.status = :status) ORDER BY t.closingDate ASC NULLS LAST")
     Page<Tender> findAll(@Param("tenantId") TenantId tenantId, @Param("status") String status, Pageable pageable);
 }

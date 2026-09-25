@@ -11,6 +11,6 @@ import java.util.UUID;
 
 public interface FmProfileRepository extends JpaRepository<FmProfile, UUID> {
 
-    @Query("SELECT p FROM FmProfile p WHERE p.tenantId = :#{#tenantId.value}")
+    @Query("SELECT p FROM FmProfile p WHERE p.tenantId.value = :#{#tenantId.value}")
     Optional<FmProfile> findByTenant(@Param("tenantId") TenantId tenantId);
 }

@@ -18,12 +18,12 @@ import java.util.UUID;
  */
 public interface BkAccountRepository extends JpaRepository<BkAccount, UUID> {
 
-    @Query("SELECT a FROM BkAccount a WHERE a.tenantId = :#{#tenantId.value} AND a.id = :id")
+    @Query("SELECT a FROM BkAccount a WHERE a.tenantId.value = :#{#tenantId.value} AND a.id = :id")
     Optional<BkAccount> findActiveById(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT a FROM BkAccount a WHERE a.tenantId = :#{#tenantId.value} AND a.clientId = :clientId AND a.accountCode = :code")
+    @Query("SELECT a FROM BkAccount a WHERE a.tenantId.value = :#{#tenantId.value} AND a.clientId = :clientId AND a.accountCode = :code")
     Optional<BkAccount> findByClientAndCode(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId, @Param("code") String code);
 
-    @Query("SELECT a FROM BkAccount a WHERE a.tenantId = :#{#tenantId.value} AND a.clientId = :clientId ORDER BY a.accountCode ASC")
+    @Query("SELECT a FROM BkAccount a WHERE a.tenantId.value = :#{#tenantId.value} AND a.clientId = :clientId ORDER BY a.accountCode ASC")
     List<BkAccount> findAllForClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId);
 }

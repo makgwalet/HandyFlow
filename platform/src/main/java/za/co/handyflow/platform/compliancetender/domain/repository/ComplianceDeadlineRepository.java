@@ -13,10 +13,10 @@ import java.util.UUID;
 
 public interface ComplianceDeadlineRepository extends JpaRepository<ComplianceDeadline, UUID> {
 
-    @Query("SELECT d FROM ComplianceDeadline d WHERE d.tenantId = :#{#tenantId.value} AND d.id = :id")
+    @Query("SELECT d FROM ComplianceDeadline d WHERE d.tenantId.value = :#{#tenantId.value} AND d.id = :id")
     Optional<ComplianceDeadline> findByIdForTenant(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT d FROM ComplianceDeadline d WHERE d.tenantId = :#{#tenantId.value} " +
+    @Query("SELECT d FROM ComplianceDeadline d WHERE d.tenantId.value = :#{#tenantId.value} " +
            "AND d.status = 'PENDING' ORDER BY d.dueDate ASC")
     List<ComplianceDeadline> findPendingForTenant(@Param("tenantId") TenantId tenantId);
 

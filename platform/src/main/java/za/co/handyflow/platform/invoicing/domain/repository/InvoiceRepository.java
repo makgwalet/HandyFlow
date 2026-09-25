@@ -33,7 +33,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
     Optional<Invoice> findActiveByIdWithLineItems(TenantId tenantId, UUID id);
 
     // JPQL with SpEL — TenantId works here via :#{#tenantId.value} unwrapping
-    @Query("SELECT COUNT(i) FROM Invoice i WHERE i.tenantId = :#{#tenantId.value} AND i.deletedAt IS NULL")
+    @Query("SELECT COUNT(i) FROM Invoice i WHERE i.tenantId.value = :#{#tenantId.value} AND i.deletedAt IS NULL")
     long countAllByTenantId(TenantId tenantId);
 
     /**

@@ -15,13 +15,13 @@ import java.util.UUID;
 /** {@link BkInvoice} has no {@code deletedAt} — a financial record, never deleted. Direct mirror of {@code FmInvoiceRepository}. */
 public interface BkInvoiceRepository extends JpaRepository<BkInvoice, UUID> {
 
-    @Query("SELECT i FROM BkInvoice i WHERE i.tenantId = :#{#tenantId.value} AND i.id = :id")
+    @Query("SELECT i FROM BkInvoice i WHERE i.tenantId.value = :#{#tenantId.value} AND i.id = :id")
     Optional<BkInvoice> findActiveById(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT i FROM BkInvoice i WHERE i.tenantId = :#{#tenantId.value} AND i.clientId = :clientId ORDER BY i.issueDate DESC")
+    @Query("SELECT i FROM BkInvoice i WHERE i.tenantId.value = :#{#tenantId.value} AND i.clientId = :clientId ORDER BY i.issueDate DESC")
     Page<BkInvoice> findAllActiveForClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId, Pageable pageable);
 
-    @Query("SELECT i FROM BkInvoice i WHERE i.tenantId = :#{#tenantId.value} AND i.clientId = :clientId ORDER BY i.issueDate DESC")
+    @Query("SELECT i FROM BkInvoice i WHERE i.tenantId.value = :#{#tenantId.value} AND i.clientId = :clientId ORDER BY i.issueDate DESC")
     List<BkInvoice> findAllForClientList(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId);
 
     /** Cross-tenant sweep — overdue (past dueDate, not yet PAID) invoices for the daily scheduler. */

@@ -13,9 +13,9 @@ import java.util.UUID;
 
 public interface FmVendorRepository extends JpaRepository<FmVendor, UUID> {
 
-    @Query("SELECT v FROM FmVendor v WHERE v.tenantId = :#{#tenantId.value} AND v.id = :id AND v.deletedAt IS NULL")
+    @Query("SELECT v FROM FmVendor v WHERE v.tenantId.value = :#{#tenantId.value} AND v.id = :id AND v.deletedAt IS NULL")
     Optional<FmVendor> findActiveById(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT v FROM FmVendor v WHERE v.tenantId = :#{#tenantId.value} AND v.deletedAt IS NULL")
+    @Query("SELECT v FROM FmVendor v WHERE v.tenantId.value = :#{#tenantId.value} AND v.deletedAt IS NULL")
     Page<FmVendor> findAllActive(@Param("tenantId") TenantId tenantId, Pageable pageable);
 }

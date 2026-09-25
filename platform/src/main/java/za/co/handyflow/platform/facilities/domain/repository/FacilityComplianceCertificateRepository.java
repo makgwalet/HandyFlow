@@ -15,10 +15,10 @@ import java.util.UUID;
 
 public interface FacilityComplianceCertificateRepository extends JpaRepository<FacilityComplianceCertificate, UUID> {
 
-    @Query("SELECT c FROM FacilityComplianceCertificate c WHERE c.tenantId = :#{#tenantId.value} AND c.id = :id")
+    @Query("SELECT c FROM FacilityComplianceCertificate c WHERE c.tenantId.value = :#{#tenantId.value} AND c.id = :id")
     Optional<FacilityComplianceCertificate> findByIdForTenant(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT c FROM FacilityComplianceCertificate c WHERE c.tenantId = :#{#tenantId.value} " +
+    @Query("SELECT c FROM FacilityComplianceCertificate c WHERE c.tenantId.value = :#{#tenantId.value} " +
            "AND (:siteId IS NULL OR c.siteId = :siteId) ORDER BY c.expiryDate ASC")
     Page<FacilityComplianceCertificate> findAll(@Param("tenantId") TenantId tenantId, @Param("siteId") UUID siteId, Pageable pageable);
 

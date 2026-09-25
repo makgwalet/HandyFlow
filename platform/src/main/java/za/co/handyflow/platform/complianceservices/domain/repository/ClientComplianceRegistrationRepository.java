@@ -13,10 +13,10 @@ import java.util.UUID;
 
 public interface ClientComplianceRegistrationRepository extends JpaRepository<ClientComplianceRegistration, UUID> {
 
-    @Query("SELECT r FROM ClientComplianceRegistration r WHERE r.tenantId = :#{#tenantId.value} AND r.id = :id")
+    @Query("SELECT r FROM ClientComplianceRegistration r WHERE r.tenantId.value = :#{#tenantId.value} AND r.id = :id")
     Optional<ClientComplianceRegistration> findByIdForTenant(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT r FROM ClientComplianceRegistration r WHERE r.tenantId = :#{#tenantId.value} " +
+    @Query("SELECT r FROM ClientComplianceRegistration r WHERE r.tenantId.value = :#{#tenantId.value} " +
            "AND r.clientId = :clientId ORDER BY r.authority, r.registrationType")
     List<ClientComplianceRegistration> findByClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId);
 

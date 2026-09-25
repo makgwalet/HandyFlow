@@ -11,6 +11,6 @@ import java.util.UUID;
 
 public interface BkProfileRepository extends JpaRepository<BkProfile, UUID> {
 
-    @Query("SELECT p FROM BkProfile p WHERE p.tenantId = :#{#tenantId.value}")
+    @Query("SELECT p FROM BkProfile p WHERE p.tenantId.value = :#{#tenantId.value}")
     Optional<BkProfile> findByTenant(@Param("tenantId") TenantId tenantId);
 }

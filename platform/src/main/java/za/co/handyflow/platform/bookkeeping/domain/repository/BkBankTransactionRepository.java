@@ -22,26 +22,26 @@ import java.util.UUID;
  */
 public interface BkBankTransactionRepository extends JpaRepository<BkBankTransaction, UUID> {
 
-    @Query("SELECT t FROM BkBankTransaction t WHERE t.tenantId = :#{#tenantId.value} AND t.clientId = :clientId " +
+    @Query("SELECT t FROM BkBankTransaction t WHERE t.tenantId.value = :#{#tenantId.value} AND t.clientId = :clientId " +
            "AND t.bankAccountId = :bankAccountId ORDER BY t.transactionDate DESC")
     Page<BkBankTransaction> findByBankAccount(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,
                                                @Param("bankAccountId") UUID bankAccountId, Pageable pageable);
 
-    @Query("SELECT t FROM BkBankTransaction t WHERE t.tenantId = :#{#tenantId.value} AND t.clientId = :clientId " +
+    @Query("SELECT t FROM BkBankTransaction t WHERE t.tenantId.value = :#{#tenantId.value} AND t.clientId = :clientId " +
            "AND t.bankAccountId = :bankAccountId AND t.reconciled = false ORDER BY t.transactionDate")
     List<BkBankTransaction> findUnreconciled(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,
                                               @Param("bankAccountId") UUID bankAccountId);
 
-    @Query("SELECT COUNT(t) > 0 FROM BkBankTransaction t WHERE t.tenantId = :#{#tenantId.value} AND t.clientId = :clientId " +
+    @Query("SELECT COUNT(t) > 0 FROM BkBankTransaction t WHERE t.tenantId.value = :#{#tenantId.value} AND t.clientId = :clientId " +
            "AND t.bankAccountId = :bankAccountId AND t.transactionDate = :transactionDate AND t.amount = :amount AND t.description = :description")
     boolean existsDuplicate(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,
                              @Param("bankAccountId") UUID bankAccountId, @Param("transactionDate") LocalDate transactionDate,
                              @Param("amount") BigDecimal amount, @Param("description") String description);
 
-    @Query("SELECT t.journalLineId FROM BkBankTransaction t WHERE t.tenantId = :#{#tenantId.value} AND t.clientId = :clientId AND t.journalLineId IS NOT NULL")
+    @Query("SELECT t.journalLineId FROM BkBankTransaction t WHERE t.tenantId.value = :#{#tenantId.value} AND t.clientId = :clientId AND t.journalLineId IS NOT NULL")
     List<UUID> findLinkedJournalLineIds(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId);
 
-    @Query("SELECT t FROM BkBankTransaction t WHERE t.tenantId = :#{#tenantId.value} AND t.clientId = :clientId ORDER BY t.transactionDate DESC")
+    @Query("SELECT t FROM BkBankTransaction t WHERE t.tenantId.value = :#{#tenantId.value} AND t.clientId = :clientId ORDER BY t.transactionDate DESC")
     Page<BkBankTransaction> findAllForClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId, Pageable pageable);
 
     /**

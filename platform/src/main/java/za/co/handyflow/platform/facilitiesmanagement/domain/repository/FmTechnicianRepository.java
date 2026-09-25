@@ -13,9 +13,9 @@ import java.util.UUID;
 
 public interface FmTechnicianRepository extends JpaRepository<FmTechnician, UUID> {
 
-    @Query("SELECT t FROM FmTechnician t WHERE t.tenantId = :#{#tenantId.value} AND t.id = :id AND t.deletedAt IS NULL")
+    @Query("SELECT t FROM FmTechnician t WHERE t.tenantId.value = :#{#tenantId.value} AND t.id = :id AND t.deletedAt IS NULL")
     Optional<FmTechnician> findActiveById(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT t FROM FmTechnician t WHERE t.tenantId = :#{#tenantId.value} AND t.deletedAt IS NULL")
+    @Query("SELECT t FROM FmTechnician t WHERE t.tenantId.value = :#{#tenantId.value} AND t.deletedAt IS NULL")
     Page<FmTechnician> findAllActive(@Param("tenantId") TenantId tenantId, Pageable pageable);
 }

@@ -13,9 +13,9 @@ import java.util.UUID;
 
 public interface FacilitySiteRepository extends JpaRepository<FacilitySite, UUID> {
 
-    @Query("SELECT s FROM FacilitySite s WHERE s.tenantId = :#{#tenantId.value} AND s.id = :id AND s.deletedAt IS NULL")
+    @Query("SELECT s FROM FacilitySite s WHERE s.tenantId.value = :#{#tenantId.value} AND s.id = :id AND s.deletedAt IS NULL")
     Optional<FacilitySite> findActiveById(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT s FROM FacilitySite s WHERE s.tenantId = :#{#tenantId.value} AND s.deletedAt IS NULL")
+    @Query("SELECT s FROM FacilitySite s WHERE s.tenantId.value = :#{#tenantId.value} AND s.deletedAt IS NULL")
     Page<FacilitySite> findAllActive(@Param("tenantId") TenantId tenantId, Pageable pageable);
 }

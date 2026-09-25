@@ -15,13 +15,13 @@ import java.util.UUID;
 
 public interface BkJournalEntryRepository extends JpaRepository<BkJournalEntry, UUID> {
 
-    @Query("SELECT e FROM BkJournalEntry e WHERE e.tenantId = :#{#tenantId.value} AND e.id = :id AND e.deletedAt IS NULL")
+    @Query("SELECT e FROM BkJournalEntry e WHERE e.tenantId.value = :#{#tenantId.value} AND e.id = :id AND e.deletedAt IS NULL")
     Optional<BkJournalEntry> findActiveById(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT e FROM BkJournalEntry e WHERE e.tenantId = :#{#tenantId.value} AND e.clientId = :clientId AND e.deletedAt IS NULL ORDER BY e.entryDate DESC")
+    @Query("SELECT e FROM BkJournalEntry e WHERE e.tenantId.value = :#{#tenantId.value} AND e.clientId = :clientId AND e.deletedAt IS NULL ORDER BY e.entryDate DESC")
     Page<BkJournalEntry> findAllForClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId, Pageable pageable);
 
-    @Query("SELECT e FROM BkJournalEntry e WHERE e.tenantId = :#{#tenantId.value} AND e.periodId = :periodId AND e.deletedAt IS NULL ORDER BY e.entryDate DESC")
+    @Query("SELECT e FROM BkJournalEntry e WHERE e.tenantId.value = :#{#tenantId.value} AND e.periodId = :periodId AND e.deletedAt IS NULL ORDER BY e.entryDate DESC")
     List<BkJournalEntry> findAllForPeriod(@Param("tenantId") TenantId tenantId, @Param("periodId") UUID periodId);
 
     /**
@@ -32,7 +32,7 @@ public interface BkJournalEntryRepository extends JpaRepository<BkJournalEntry, 
      * own to filter on directly. Mirrors {@code AccountingService}'s own
      * {@code journalRepo.findPostedInRange} in shape.
      */
-    @Query("SELECT e FROM BkJournalEntry e WHERE e.tenantId = :#{#tenantId.value} AND e.clientId = :clientId " +
+    @Query("SELECT e FROM BkJournalEntry e WHERE e.tenantId.value = :#{#tenantId.value} AND e.clientId = :clientId " +
            "AND e.status = 'POSTED' AND e.deletedAt IS NULL AND e.entryDate BETWEEN :from AND :to ORDER BY e.entryDate DESC")
     List<BkJournalEntry> findPostedInRangeForClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,
                                                      @Param("from") LocalDate from, @Param("to") LocalDate to);

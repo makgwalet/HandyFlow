@@ -15,13 +15,13 @@ import java.util.UUID;
 
 public interface FacilityPpmScheduleRepository extends JpaRepository<FacilityPpmSchedule, UUID> {
 
-    @Query("SELECT s FROM FacilityPpmSchedule s WHERE s.tenantId = :#{#tenantId.value} AND s.id = :id AND s.deletedAt IS NULL")
+    @Query("SELECT s FROM FacilityPpmSchedule s WHERE s.tenantId.value = :#{#tenantId.value} AND s.id = :id AND s.deletedAt IS NULL")
     Optional<FacilityPpmSchedule> findActiveById(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT s FROM FacilityPpmSchedule s WHERE s.tenantId = :#{#tenantId.value} AND s.deletedAt IS NULL")
+    @Query("SELECT s FROM FacilityPpmSchedule s WHERE s.tenantId.value = :#{#tenantId.value} AND s.deletedAt IS NULL")
     Page<FacilityPpmSchedule> findAllActive(@Param("tenantId") TenantId tenantId, Pageable pageable);
 
-    @Query("SELECT s FROM FacilityPpmSchedule s WHERE s.tenantId = :#{#tenantId.value} AND s.assetId = :assetId AND s.deletedAt IS NULL")
+    @Query("SELECT s FROM FacilityPpmSchedule s WHERE s.tenantId.value = :#{#tenantId.value} AND s.assetId = :assetId AND s.deletedAt IS NULL")
     List<FacilityPpmSchedule> findByAsset(@Param("tenantId") TenantId tenantId, @Param("assetId") UUID assetId);
 
     /** Cross-tenant sweep for the notification/work-order-generation scheduler: every active schedule due on or before today. */

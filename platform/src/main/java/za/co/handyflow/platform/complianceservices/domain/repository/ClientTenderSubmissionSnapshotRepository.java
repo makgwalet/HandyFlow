@@ -12,13 +12,13 @@ import java.util.UUID;
 
 public interface ClientTenderSubmissionSnapshotRepository extends JpaRepository<ClientTenderSubmissionSnapshot, UUID> {
 
-    @Query("SELECT s FROM ClientTenderSubmissionSnapshot s WHERE s.tenantId = :#{#tenantId.value} " +
+    @Query("SELECT s FROM ClientTenderSubmissionSnapshot s WHERE s.tenantId.value = :#{#tenantId.value} " +
            "AND s.clientTenderId = :clientTenderId ORDER BY s.snapshotNumber DESC")
     List<ClientTenderSubmissionSnapshot> findByTender(@Param("tenantId") TenantId tenantId, @Param("clientTenderId") UUID clientTenderId);
 
-    @Query("SELECT COUNT(s) FROM ClientTenderSubmissionSnapshot s WHERE s.tenantId = :#{#tenantId.value} AND s.clientTenderId = :clientTenderId")
+    @Query("SELECT COUNT(s) FROM ClientTenderSubmissionSnapshot s WHERE s.tenantId.value = :#{#tenantId.value} AND s.clientTenderId = :clientTenderId")
     long countByTender(@Param("tenantId") TenantId tenantId, @Param("clientTenderId") UUID clientTenderId);
 
-    @Query("SELECT s FROM ClientTenderSubmissionSnapshot s WHERE s.tenantId = :#{#tenantId.value} AND s.id = :id")
+    @Query("SELECT s FROM ClientTenderSubmissionSnapshot s WHERE s.tenantId.value = :#{#tenantId.value} AND s.id = :id")
     Optional<ClientTenderSubmissionSnapshot> findByIdForTenant(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 }

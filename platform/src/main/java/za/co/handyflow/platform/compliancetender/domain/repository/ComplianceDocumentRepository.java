@@ -13,15 +13,15 @@ import java.util.UUID;
 
 public interface ComplianceDocumentRepository extends JpaRepository<ComplianceDocument, UUID> {
 
-    @Query("SELECT d FROM ComplianceDocument d WHERE d.tenantId = :#{#tenantId.value} AND d.id = :id")
+    @Query("SELECT d FROM ComplianceDocument d WHERE d.tenantId.value = :#{#tenantId.value} AND d.id = :id")
     Optional<ComplianceDocument> findByIdForTenant(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT d FROM ComplianceDocument d WHERE d.tenantId = :#{#tenantId.value} " +
+    @Query("SELECT d FROM ComplianceDocument d WHERE d.tenantId.value = :#{#tenantId.value} " +
            "AND d.registrationId = :registrationId ORDER BY d.documentType")
     List<ComplianceDocument> findByRegistration(@Param("tenantId") TenantId tenantId,
                                                 @Param("registrationId") UUID registrationId);
 
-    @Query("SELECT d FROM ComplianceDocument d WHERE d.tenantId = :#{#tenantId.value} ORDER BY d.expiryDate ASC NULLS LAST")
+    @Query("SELECT d FROM ComplianceDocument d WHERE d.tenantId.value = :#{#tenantId.value} ORDER BY d.expiryDate ASC NULLS LAST")
     List<ComplianceDocument> findAllForTenant(@Param("tenantId") TenantId tenantId);
 
     /** Cross-tenant sweep, same pattern as ComplianceRegistrationRepository's own. */

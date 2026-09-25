@@ -12,10 +12,10 @@ import java.util.UUID;
 
 public interface TenderRequirementRepository extends JpaRepository<TenderRequirement, UUID> {
 
-    @Query("SELECT r FROM TenderRequirement r WHERE r.tenantId = :#{#tenantId.value} AND r.id = :id")
+    @Query("SELECT r FROM TenderRequirement r WHERE r.tenantId.value = :#{#tenantId.value} AND r.id = :id")
     Optional<TenderRequirement> findByIdForTenant(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT r FROM TenderRequirement r WHERE r.tenantId = :#{#tenantId.value} " +
+    @Query("SELECT r FROM TenderRequirement r WHERE r.tenantId.value = :#{#tenantId.value} " +
            "AND r.tenderId = :tenderId ORDER BY r.source, r.description")
     List<TenderRequirement> findByTender(@Param("tenantId") TenantId tenantId, @Param("tenderId") UUID tenderId);
 }

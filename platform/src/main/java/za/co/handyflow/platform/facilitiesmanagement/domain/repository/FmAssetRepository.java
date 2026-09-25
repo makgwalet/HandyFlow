@@ -13,12 +13,12 @@ import java.util.UUID;
 
 public interface FmAssetRepository extends JpaRepository<FmAsset, UUID> {
 
-    @Query("SELECT a FROM FmAsset a WHERE a.tenantId = :#{#tenantId.value} AND a.id = :id AND a.deletedAt IS NULL")
+    @Query("SELECT a FROM FmAsset a WHERE a.tenantId.value = :#{#tenantId.value} AND a.id = :id AND a.deletedAt IS NULL")
     Optional<FmAsset> findActiveById(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT a FROM FmAsset a WHERE a.tenantId = :#{#tenantId.value} AND a.deletedAt IS NULL")
+    @Query("SELECT a FROM FmAsset a WHERE a.tenantId.value = :#{#tenantId.value} AND a.deletedAt IS NULL")
     Page<FmAsset> findAllActive(@Param("tenantId") TenantId tenantId, Pageable pageable);
 
-    @Query("SELECT a FROM FmAsset a WHERE a.tenantId = :#{#tenantId.value} AND a.siteId = :siteId AND a.deletedAt IS NULL")
+    @Query("SELECT a FROM FmAsset a WHERE a.tenantId.value = :#{#tenantId.value} AND a.siteId = :siteId AND a.deletedAt IS NULL")
     Page<FmAsset> findBySite(@Param("tenantId") TenantId tenantId, @Param("siteId") UUID siteId, Pageable pageable);
 }

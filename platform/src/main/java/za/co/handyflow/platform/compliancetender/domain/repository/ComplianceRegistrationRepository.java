@@ -15,15 +15,15 @@ import java.util.UUID;
 
 public interface ComplianceRegistrationRepository extends JpaRepository<ComplianceRegistration, UUID> {
 
-    @Query("SELECT r FROM ComplianceRegistration r WHERE r.tenantId = :#{#tenantId.value} AND r.id = :id")
+    @Query("SELECT r FROM ComplianceRegistration r WHERE r.tenantId.value = :#{#tenantId.value} AND r.id = :id")
     Optional<ComplianceRegistration> findByIdForTenant(@Param("tenantId") TenantId tenantId, @Param("id") UUID id);
 
-    @Query("SELECT r FROM ComplianceRegistration r WHERE r.tenantId = :#{#tenantId.value} " +
+    @Query("SELECT r FROM ComplianceRegistration r WHERE r.tenantId.value = :#{#tenantId.value} " +
            "AND (:authority IS NULL OR r.authority = :authority) ORDER BY r.authority, r.registrationType")
     Page<ComplianceRegistration> findAll(@Param("tenantId") TenantId tenantId,
                                          @Param("authority") String authority, Pageable pageable);
 
-    @Query("SELECT r FROM ComplianceRegistration r WHERE r.tenantId = :#{#tenantId.value} ORDER BY r.authority, r.registrationType")
+    @Query("SELECT r FROM ComplianceRegistration r WHERE r.tenantId.value = :#{#tenantId.value} ORDER BY r.authority, r.registrationType")
     List<ComplianceRegistration> findAllForTenant(@Param("tenantId") TenantId tenantId);
 
     /** Cross-tenant sweep: every ACTIVE registration with an expiry date to check (expiring-soon and just-expired alerts). */

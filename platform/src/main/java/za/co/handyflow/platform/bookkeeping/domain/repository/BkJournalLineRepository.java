@@ -23,7 +23,7 @@ import java.util.UUID;
 public interface BkJournalLineRepository extends JpaRepository<BkJournalLine, UUID> {
 
     @Query("SELECT l FROM BkJournalLine l WHERE l.id = :id " +
-           "AND l.journalEntry.tenantId = :#{#tenantId.value} AND l.journalEntry.clientId = :clientId " +
+           "AND l.journalEntry.tenantId.value = :#{#tenantId.value} AND l.journalEntry.clientId = :clientId " +
            "AND l.journalEntry.deletedAt IS NULL")
     Optional<BkJournalLine> findByIdForClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,
                                                @Param("id") UUID id);
