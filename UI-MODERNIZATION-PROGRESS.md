@@ -91,6 +91,12 @@ Correction to the original analysis: its per-module "tab counts" were file count
 - Colours: 28 -> 0 hex. `AG_ACCENT` split into `AG_ACCENT` (fills) and `AG_ACCENT_TEXT` (text); 43 uses classified by property (19 text, 24 fill).
 - No double-unwrap sites. Also fixed hard-coded colours on the dashboard's Internal Audit tile.
 
+### Fuel ✅
+- Routed sections `/fuel/:section` in four groups (Overview; Stock: Tanks, Stock In, Dispatches; Logistics: Deliveries, Suppliers; Insights: Cost & Margin).
+- New: sections can declare a `permission`. Cost & Margin requires `FUEL_MARGIN_READ`; the sidebar hides it and the page redirects away from it without the permission (same filter in both, via `visibleGroups` / `findSection(..., permissions)`). Mirrors, does not replace, the server check.
+- Colours: 58 -> 0 hex. Fuel-type colours use the `-text` tokens (identical light values, lighter in dark mode, which also works for bars, dots and chart lines).
+- The hand-drawn price chart's SVG `fill`/`stroke` attributes moved into `style` so tokens resolve; point rings use the surface colour so they still read as a gap in dark mode.
+
 
 ## Bug found during Phase 2 review: double-unwrapped API responses
 

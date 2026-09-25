@@ -327,7 +327,7 @@ export default function DispatchesTab() {
               </div>
 
               {selectedTank && form.litresDispensed && (
-                <div style={{ padding: "10px 14px", background: Number(form.litresDispensed) > Number(selectedTank.currentLitres) ? "var(--hf-danger-soft)" : "var(--hf-success-soft)", border: `1px solid ${Number(form.litresDispensed) > Number(selectedTank.currentLitres) ? "#FECACA" : "#BBF7D0"}`, borderRadius: 8, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8, color: Number(form.litresDispensed) > Number(selectedTank.currentLitres) ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)" }}>
+                <div style={{ padding: "10px 14px", background: Number(form.litresDispensed) > Number(selectedTank.currentLitres) ? "var(--hf-danger-soft)" : "var(--hf-success-soft)", border: `1px solid ${Number(form.litresDispensed) > Number(selectedTank.currentLitres) ? "var(--hf-danger-border)" : "var(--hf-success-border-subtle)"}`, borderRadius: 8, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8, color: Number(form.litresDispensed) > Number(selectedTank.currentLitres) ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)" }}>
                   {Number(form.litresDispensed) > Number(selectedTank.currentLitres)
                     ? <><AlertTriangle size={14} /> Insufficient stock — available: {Number(selectedTank.currentLitres).toLocaleString()} L</>
                     : <>After dispatch: {(Number(selectedTank.currentLitres) - Number(form.litresDispensed)).toLocaleString()} L remaining</>}

@@ -4,7 +4,8 @@ import { NavLink, Link } from 'react-router-dom'
 import { ArrowLeft, Building2, LayoutGrid, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import type { ModuleNavItem } from '../../navigation/modules'
 import { WORKSPACE_NAV } from '../../navigation/modules'
-import { sectionsForPath, type ModuleSections } from '../../navigation/moduleSections'
+import { sectionsForPath, visibleGroups, type ModuleSections } from '../../navigation/moduleSections'
+import { useAuthStore } from '../../store/auth.store'
 
 interface SidebarProps {
   modules: ModuleNavItem[]
@@ -98,9 +99,12 @@ export function Sidebar({ modules, pinnedKeys, pathname, mini, mobileOpen, onNav
   )
 }
 
+const NO_PERMISSIONS: string[] = []
+
 function ContextNav({ config, onNavigate, onShowAll }: {
   config: ModuleSections; onNavigate: () => void; onShowAll: () => void
 }) {
+  const permissions = useAuthStore(s => s.user?.permissions ?? NO_PERMISSIONS)
   const Icon = config.icon
   return (
     <>
@@ -112,7 +116,7 @@ function ContextNav({ config, onNavigate, onShowAll }: {
         <span className="hf-nav-context-icon"><Icon size={16} aria-hidden="true" /></span>
         <span className="hf-nav-label">{config.title}</span>
       </div>
-      {config.groups.map(group => (
+      {visibleGroups(config, permissions).map(group => (
         <NavSection key={group.label} label={group.label} onNavigate={onNavigate}
           items={group.sections.map(sec => ({
             key: sec.id, icon: sec.icon, label: sec.label, badge: sec.badge,

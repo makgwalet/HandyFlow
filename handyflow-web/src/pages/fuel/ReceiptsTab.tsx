@@ -12,7 +12,7 @@ const fmtR    = (n: any) => n != null ? `R ${Number(n).toLocaleString("en-ZA", {
 // Same fuel-type color convention as FuelDashboard.tsx, reused here so a
 // DIESEL line reads as the same color everywhere in this module.
 const FUEL_COLORS: Record<string, string> = {
-  DIESEL: "#1D4ED8", PETROL: "#DC2626", PARAFFIN: "#D97706", GAS: "#7C3AED", OTHER: "#64748B",
+  DIESEL: "var(--hf-info-text)", PETROL: "var(--hf-danger-text)", PARAFFIN: "var(--hf-warning-text)", GAS: "var(--hf-violet-text)", OTHER: "var(--hf-text-muted)",
 }
 
 export default function ReceiptsTab() {
@@ -184,23 +184,23 @@ function PriceTrendChart({ receipts, tankFuelType }: { receipts: any[]; tankFuel
         {/* Gridlines + y-axis labels */}
         {gridValues.map((v, i) => (
           <g key={i}>
-            <line x1={pad.left} x2={W - pad.right} y1={yFor(v)} y2={yFor(v)} stroke="#F1F5F9" strokeWidth={1} />
-            <text x={pad.left - 8} y={yFor(v) + 4} textAnchor="end" fontSize={10} fill="#94A3B8">R{v.toFixed(2)}</text>
+            <line x1={pad.left} x2={W - pad.right} y1={yFor(v)} y2={yFor(v)} strokeWidth={1} style={{ stroke: "var(--hf-border-subtle)" }} />
+            <text x={pad.left - 8} y={yFor(v) + 4} textAnchor="end" fontSize={10} style={{ fill: "var(--hf-text-faint)" }}>R{v.toFixed(2)}</text>
           </g>
         ))}
         {/* X-axis start/end date labels */}
-        <text x={pad.left} y={H - 8} fontSize={10} fill="#94A3B8">{new Date(minDate).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}</text>
-        <text x={W - pad.right} y={H - 8} fontSize={10} fill="#94A3B8" textAnchor="end">{new Date(maxDate).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}</text>
+        <text x={pad.left} y={H - 8} fontSize={10} style={{ fill: "var(--hf-text-faint)" }}>{new Date(minDate).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}</text>
+        <text x={W - pad.right} y={H - 8} fontSize={10} style={{ fill: "var(--hf-text-faint)" }} textAnchor="end">{new Date(maxDate).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}</text>
 
         {/* Series lines + points */}
         {Object.entries(seriesByType).map(([fuelType, series]) => {
-          const color = FUEL_COLORS[fuelType] ?? "#64748B"
+          const color = FUEL_COLORS[fuelType] ?? "var(--hf-text-muted)"
           const path = series.map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(p.date)} ${yFor(p.price)}`).join(" ")
           return (
             <g key={fuelType}>
-              {series.length > 1 && <path d={path} fill="none" stroke={color} strokeWidth={2} />}
+              {series.length > 1 && <path d={path} fill="none" strokeWidth={2} style={{ stroke: color }} />}
               {series.map((p, i) => (
-                <circle key={i} cx={xFor(p.date)} cy={yFor(p.price)} r={3.5} fill={color} stroke="#fff" strokeWidth={1.5} />
+                <circle key={i} cx={xFor(p.date)} cy={yFor(p.price)} r={3.5} strokeWidth={1.5} style={{ fill: color, stroke: "var(--hf-surface)" }} />
               ))}
             </g>
           )
@@ -215,7 +215,7 @@ function PriceTrendChart({ receipts, tankFuelType }: { receipts: any[]; tankFuel
           const change = series.length > 1 ? latest.price - first.price : 0
           return (
             <div key={fuelType} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 10, height: 10, borderRadius: "50%", background: FUEL_COLORS[fuelType] ?? "#64748B" }} />
+              <div style={{ width: 10, height: 10, borderRadius: "50%", background: FUEL_COLORS[fuelType] ?? "var(--hf-text-muted)" }} />
               <div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text)" }}>{fuelType}</div>
                 <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>

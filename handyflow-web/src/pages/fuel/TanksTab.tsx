@@ -18,11 +18,11 @@ interface DipReading {
 }
 
 const FUEL_COLORS: Record<string, { color: string; bg: string }> = {
-  DIESEL:   { color: "#1D4ED8", bg: "#EFF6FF" },
-  PETROL:   { color: "#DC2626", bg: "#FEF2F2" },
-  PARAFFIN: { color: "#D97706", bg: "#FFFBEB" },
-  GAS:      { color: "#7C3AED", bg: "#F5F3FF" },
-  OTHER:    { color: "#64748B", bg: "#F8FAFC" },
+  DIESEL:   { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+  PETROL:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
+  PARAFFIN: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+  GAS:      { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)" },
+  OTHER:    { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)" },
 }
 
 const unwrapList = (r: any): any[] => {
@@ -159,19 +159,19 @@ export default function TanksTab() {
   const totalStock    = (tanks as Tank[]).reduce((s, t) => s + t.currentLitres, 0)
   const lowCount      = (tanks as Tank[]).filter(t => t.low).length
 
-  const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }
-  const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
-  const sel: React.CSSProperties = { ...inp, background: "#fff" }
+  const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }
+  const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
+  const sel: React.CSSProperties = { ...inp, background: "var(--hf-surface)" }
 
   return (
     <div>
       {/* Stats */}
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {[
-          { label: "Tanks",          value: tanks.length,                            color: "#1B3A6B" },
-          { label: "Total capacity", value: `${totalCapacity.toLocaleString()} L`,  color: "#0D9488" },
-          { label: "Total stock",    value: `${totalStock.toLocaleString()} L`,      color: "#1D4ED8" },
-          { label: "Low tanks",      value: lowCount,                                color: lowCount > 0 ? "#DC2626" : "#94A3B8" },
+          { label: "Tanks",          value: tanks.length,                            color: "var(--hf-primary-text)" },
+          { label: "Total capacity", value: `${totalCapacity.toLocaleString()} L`,  color: "var(--hf-accent-text)" },
+          { label: "Total stock",    value: `${totalStock.toLocaleString()} L`,      color: "var(--hf-info-text)" },
+          { label: "Low tanks",      value: lowCount,                                color: lowCount > 0 ? "var(--hf-danger-text)" : "var(--hf-text-faint)" },
         ].map(s => (
           <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
@@ -183,7 +183,7 @@ export default function TanksTab() {
       {/* Low stock alert */}
       {lowCount > 0 && (
         <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
-          <AlertTriangle size={17} color="#DC2626" style={{ flexShrink: 0 }} />
+          <AlertTriangle size={17} style={{ color: 'var(--hf-danger-text)', flexShrink: 0 }} />
           <div>
             <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-danger-text)" }}>Low Stock</div>
             <div style={{ fontSize: 12, color: "var(--hf-danger-text-strong)" }}>{(tanks as Tank[]).filter(t => t.low).map(t => `${t.name} (${Number(t.currentLitres).toLocaleString()} L)`).join(", ")} — receive stock soon</div>
@@ -216,12 +216,12 @@ export default function TanksTab() {
             const negDip   = dips.find(d => d.hasNegativeVariance)
 
             return (
-              <div key={tank.id} style={{ border: `1px solid ${tank.low ? "#FECACA" : "#E2E8F0"}`, borderRadius: 12, overflow: "hidden" }}>
+              <div key={tank.id} style={{ border: `1px solid ${tank.low ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 12, overflow: "hidden" }}>
                 <div style={{ padding: "18px 20px", background: "var(--hf-surface)" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <div style={{ width: 42, height: 42, borderRadius: 10, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <Droplets size={20} color={cfg.color} />
+                        <Droplets size={20} style={{ color: cfg.color }} />
                       </div>
                       <div>
                         <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{tank.name}</div>
@@ -273,7 +273,7 @@ export default function TanksTab() {
                     </div>
                     <div style={{ height: 10, background: "var(--hf-surface-sunken)", borderRadius: 99, overflow: "hidden" }}>
                       <div style={{ height: "100%", borderRadius: 99, width: `${pct}%`,
-                        background: tank.low ? "linear-gradient(90deg,#DC2626,#F87171)" : `linear-gradient(90deg,${cfg.color},${cfg.color}88)`,
+                        background: tank.low ? "linear-gradient(90deg, var(--hf-danger), color-mix(in srgb, var(--hf-danger) 60%, white))" : `linear-gradient(90deg,${cfg.color},color-mix(in srgb, ${cfg.color} 53%, transparent))`,
                         transition: "width 0.5s ease" }} />
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>
@@ -314,7 +314,7 @@ export default function TanksTab() {
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         {dips.map(d => (
-                          <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "8px 12px", background: d.hasNegativeVariance ? "var(--hf-danger-soft)" : "var(--hf-surface)", border: `1px solid ${d.hasNegativeVariance ? "#FECACA" : "#E2E8F0"}`, borderRadius: 8, fontSize: 13 }}>
+                          <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "8px 12px", background: d.hasNegativeVariance ? "var(--hf-danger-soft)" : "var(--hf-surface)", border: `1px solid ${d.hasNegativeVariance ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 8, fontSize: 13 }}>
                             <div style={{ flex: 1 }}>
                               <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{Number(d.actualLitres).toLocaleString()} L actual</span>
                               <span style={{ color: "var(--hf-text-faint)", marginLeft: 8 }}>vs {Number(d.calculatedLitres).toLocaleString()} L system</span>

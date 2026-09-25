@@ -113,7 +113,7 @@ export default function SuppliersTab() {
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--hf-info-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Users size={18} color="#1D4ED8" />
+                    <Users size={18} style={{ color: 'var(--hf-info-text)' }} />
                   </div>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{s.name}</div>
@@ -142,12 +142,12 @@ export default function SuppliersTab() {
                 )}
                 {s.contactPhone && (
                   <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--hf-text-tertiary)" }}>
-                    <Phone size={12} color="#94A3B8" />{s.contactPhone}
+                    <Phone size={12} style={{ color: 'var(--hf-text-faint)' }} />{s.contactPhone}
                   </div>
                 )}
                 {s.contactEmail && (
                   <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--hf-text-tertiary)" }}>
-                    <Mail size={12} color="#94A3B8" />{s.contactEmail}
+                    <Mail size={12} style={{ color: 'var(--hf-text-faint)' }} />{s.contactEmail}
                   </div>
                 )}
               </div>

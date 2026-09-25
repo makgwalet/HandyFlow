@@ -13,6 +13,7 @@ import {
   AlertTriangle, Camera, ClipboardList, Clock, Crosshair, DoorOpen, FileBarChart,
   GitBranch, Key, LayoutDashboard, Lock, MapPin, Radio, RefreshCw, Repeat, Route,
   Shield, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
+  Droplets, ArrowDownToLine, Fuel, Truck, Users, TrendingUp,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -21,6 +22,12 @@ export interface ModuleSection {
   icon: ElementType
   /** Short live/status marker shown next to the label, e.g. "LIVE". */
   badge?: string
+  /**
+   * Permission required to see this section. Hidden from the sidebar and
+   * redirected away from in the page when missing. This mirrors the server's
+   * own check to avoid showing a section that would 403; it does not replace it.
+   */
+  permission?: string
 }
 
 export interface ModuleSectionGroup {
@@ -117,17 +124,59 @@ export const AGRICULTURE_SECTIONS: ModuleSections = {
   ],
 }
 
-const REGISTRY: ModuleSections[] = [SECURITY_SECTIONS, AGRICULTURE_SECTIONS]
+export const FUEL_SECTIONS: ModuleSections = {
+  moduleKey: 'fuel',
+  basePath: '/fuel',
+  title: 'Fuel & Logistics',
+  icon: Droplets,
+  defaultSection: 'dashboard',
+  groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+    {
+      label: 'Stock',
+      sections: [
+        { id: 'tanks', label: 'Tanks', icon: Droplets },
+        { id: 'receipts', label: 'Stock In', icon: ArrowDownToLine },
+        { id: 'dispatches', label: 'Dispatches', icon: Fuel },
+      ],
+    },
+    {
+      label: 'Logistics',
+      sections: [
+        { id: 'deliveries', label: 'Deliveries', icon: Truck },
+        { id: 'suppliers', label: 'Suppliers', icon: Users },
+      ],
+    },
+    {
+      label: 'Insights',
+      sections: [{ id: 'margin', label: 'Cost & Margin', icon: TrendingUp, permission: 'FUEL_MARGIN_READ' }],
+    },
+  ],
+}
+
+const REGISTRY: ModuleSections[] = [SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS]
+
+/** Groups with sections the user may not see removed (and empty groups dropped). */
+export function visibleGroups(config: ModuleSections, permissions: readonly string[]): ModuleSectionGroup[] {
+  return config.groups
+    .map(g => ({ ...g, sections: g.sections.filter(s => !s.permission || permissions.includes(s.permission)) }))
+    .filter(g => g.sections.length > 0)
+}
 
 /** Section config for the module whose base path contains `pathname`. */
 export function sectionsForPath(pathname: string): ModuleSections | undefined {
   return REGISTRY.find(m => pathname === m.basePath || pathname.startsWith(m.basePath + '/'))
 }
 
-export function findSection(config: ModuleSections, id: string | undefined):
+/**
+ * Section by id. When `permissions` is given, sections the user may not see
+ * are treated as not found, so pages redirect away from them.
+ */
+export function findSection(config: ModuleSections, id: string | undefined, permissions?: readonly string[]):
   { section: ModuleSection; group: ModuleSectionGroup } | undefined {
   if (!id) return undefined
-  for (const group of config.groups) {
+  const groups = permissions ? visibleGroups(config, permissions) : config.groups
+  for (const group of groups) {
     const section = group.sections.find(s => s.id === id)
     if (section) return { section, group }
   }

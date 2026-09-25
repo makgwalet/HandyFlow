@@ -79,10 +79,10 @@ export default function MarginTab() {
           )}
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
-            <StatCard label="Revenue" value={fmtR(report.totalRevenue)} icon={TrendingUp} color="#166534" bg="#DCFCE7" />
-            <StatCard label="Cost" value={fmtR(report.totalCostOfRevenueGenerating)} icon={Fuel} color="#B45309" bg="#FFFBEB" />
-            <StatCard label="Margin" value={fmtR(report.totalMargin)} sub={fmtPct(report.marginPercent)} icon={report.totalMargin >= 0 ? TrendingUp : TrendingDown} color={report.totalMargin >= 0 ? "#1B3A6B" : "#DC2626"} bg={report.totalMargin >= 0 ? "#EFF6FF" : "#FEF2F2"} />
-            <StatCard label="Internal Fleet Cost" value={fmtR(report.totalInternalCost)} sub={`${report.totalInternalLitres.toLocaleString()} L`} icon={Truck} color="#64748B" bg="#F1F5F9" />
+            <StatCard label="Revenue" value={fmtR(report.totalRevenue)} icon={TrendingUp} color="var(--hf-success-text-strong)" bg="var(--hf-success-soft-strong)" />
+            <StatCard label="Cost" value={fmtR(report.totalCostOfRevenueGenerating)} icon={Fuel} color="var(--hf-warning-text-strong)" bg="var(--hf-warning-soft)" />
+            <StatCard label="Margin" value={fmtR(report.totalMargin)} sub={fmtPct(report.marginPercent)} icon={report.totalMargin >= 0 ? TrendingUp : TrendingDown} color={report.totalMargin >= 0 ? "var(--hf-primary-text)" : "var(--hf-danger-text)"} bg={report.totalMargin >= 0 ? "var(--hf-info-soft)" : "var(--hf-danger-soft)"} />
+            <StatCard label="Internal Fleet Cost" value={fmtR(report.totalInternalCost)} sub={`${report.totalInternalLitres.toLocaleString()} L`} icon={Truck} color="var(--hf-text-muted)" bg="var(--hf-surface-sunken)" />
           </div>
 
           <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase" as const, letterSpacing: 0.4, marginBottom: 10 }}>
@@ -95,7 +95,7 @@ export default function MarginTab() {
               {report.lines.map(l => (
                 <div key={l.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    {l.sourceType === "DELIVERY" ? <Truck size={14} color="#1B3A6B" /> : <Fuel size={14} color="#0D9488" />}
+                    {l.sourceType === "DELIVERY" ? <Truck size={14} style={{ color: 'var(--hf-primary-text)' }} /> : <Fuel size={14} style={{ color: 'var(--hf-accent-text)' }} />}
                     <div>
                       <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{l.recipientLabel || "—"}</span>
                       <span style={{ color: "var(--hf-text-faint)", marginLeft: 8 }}>{l.litres.toLocaleString()} L · {fmtDate(l.occurredAt)}</span>
@@ -123,7 +123,7 @@ function StatCard({ label, value, sub, icon: Icon, color, bg }: { label: string;
     <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "16px 18px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <div style={{ width: 28, height: 28, borderRadius: 8, background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Icon size={14} color={color} />
+          <Icon size={14} style={{ color }} />
         </div>
         <span style={{ fontSize: 12, color: "var(--hf-text-faint)", fontWeight: 600 }}>{label}</span>
       </div>

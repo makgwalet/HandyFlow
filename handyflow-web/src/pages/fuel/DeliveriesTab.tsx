@@ -28,10 +28,10 @@ interface Delivery {
 interface Tank { id: string; name: string; currentLitres: number }
 
 const STATUS_CONFIG = {
-  SCHEDULED:  { color: "#1D4ED8", bg: "#EFF6FF", label: "Scheduled"  },
-  IN_TRANSIT: { color: "#D97706", bg: "#FFFBEB", label: "In Transit" },
-  DELIVERED:  { color: "#166534", bg: "#DCFCE7", label: "Delivered"  },
-  CANCELLED:  { color: "#94A3B8", bg: "#F8FAFC", label: "Cancelled"  },
+  SCHEDULED:  { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", label: "Scheduled"  },
+  IN_TRANSIT: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", label: "In Transit" },
+  DELIVERED:  { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", label: "Delivered"  },
+  CANCELLED:  { color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)", label: "Cancelled"  },
 }
 
 export default function DeliveriesTab() {
@@ -164,7 +164,7 @@ export default function DeliveriesTab() {
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                   <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
                     <div style={{ width: 42, height: 42, borderRadius: 10, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <Truck size={20} color={cfg.color} />
+                      <Truck size={20} style={{ color: cfg.color }} />
                     </div>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
@@ -416,9 +416,9 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   )
 }
 
-const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer" }
-const labelStyle: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 500, color: "#374151", marginBottom: 5 }
-const selectStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, background: "#fff" }
-const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }
-const cancelBtn: React.CSSProperties = { padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 8, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }
-const submitBtn: React.CSSProperties = { padding: "9px 20px", background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" }
+const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer" }
+const labelStyle: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 500, color: "var(--hf-text-secondary)", marginBottom: 5 }
+const selectStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 14, background: "var(--hf-surface)" }
+const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }
+const cancelBtn: React.CSSProperties = { padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }
+const submitBtn: React.CSSProperties = { padding: "9px 20px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" }
