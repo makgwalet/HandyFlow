@@ -645,12 +645,56 @@ public class InternalAuditService {
     }
 
     @Transactional
-    public FindingResponse reopenFinding(TenantId tenantId, UUID findingId) {
+    public FindingResponse reopenFinding(TenantId tenantId, UUID findingId, ReopenFindingRequest req) {
         AuditFinding f = findingRepo.findByTenantAndId(tenantId.getValue(), findingId)
                 .orElseThrow(() -> new ResourceNotFoundException("AuditFinding", findingId.toString()));
-        f.reopen();
+        f.reopen(req.reason());
         findingRepo.save(f);
         return toFindingResponse(f);
+    }
+
+    // FIX: closes the confirmed "no internal-audit engine reachable by
+    // an external auditor" gap. Mirrors submitReportForApproval()'s own
+    // "find whoever holds Head of Internal Audit on THIS engagement"
+    // pattern just below — same authority source, same per-engagement
+    // (not tenant-wide) scoping.
+    @Transactional
+    public FindingResponse shareFindingExternally(TenantId tenantId, UUID findingId,
+                                                  ShareFindingRequest req, UUID actingUserId) {
+        AuditFinding f = findingRepo.findByTenantAndId(tenantId.getValue(), findingId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditFinding", findingId.toString()));
+        requireHeadOfInternalAudit(tenantId, f.getEngagementId(), actingUserId);
+        try {
+            f.share(actingUserId, req.reason());
+        } catch (IllegalStateException e) {
+            throw new HandyFlowException(e.getMessage(), HttpStatus.CONFLICT, "INVALID_STATUS");
+        }
+        findingRepo.save(f);
+        return toFindingResponse(f);
+    }
+
+    @Transactional
+    public FindingResponse withdrawExternalSharing(TenantId tenantId, UUID findingId, UUID actingUserId) {
+        AuditFinding f = findingRepo.findByTenantAndId(tenantId.getValue(), findingId)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditFinding", findingId.toString()));
+        requireHeadOfInternalAudit(tenantId, f.getEngagementId(), actingUserId);
+        try {
+            f.withdraw();
+        } catch (IllegalStateException e) {
+            throw new HandyFlowException(e.getMessage(), HttpStatus.CONFLICT, "INVALID_STATUS");
+        }
+        findingRepo.save(f);
+        return toFindingResponse(f);
+    }
+
+    private void requireHeadOfInternalAudit(TenantId tenantId, UUID engagementId, UUID actingUserId) {
+        boolean isHead = assignmentRepo.findByEngagement(tenantId.getValue(), engagementId).stream()
+                .anyMatch(a -> "HEAD_OF_INTERNAL_AUDIT".equals(a.getRole()) && a.getUserId().equals(actingUserId));
+        if (!isHead) {
+            throw new HandyFlowException(
+                    "Only the Head of Internal Audit on this engagement can share findings externally",
+                    HttpStatus.FORBIDDEN, "NOT_HEAD_OF_INTERNAL_AUDIT");
+        }
     }
 
     /**
@@ -698,6 +742,8 @@ public class InternalAuditService {
         return new FindingResponse(f.getId(), f.getEngagementId(), f.getSourceExceptionId(), f.getTitle(),
                 f.getDescription(), f.getRootCause(), f.getRecommendation(), f.getManagementResponse(),
                 f.getSeverity(), f.getOwner(), ownerName, f.getDueDate(), f.getStatus(),
-                f.getCreatedBy(), f.getCreatedAt(), f.getResolvedAt());
+                f.getCreatedBy(), f.getCreatedAt(), f.getResolvedAt(),
+                f.getClosedAt(), f.getPreviouslyClosedAt(), f.getReopenedAt(), f.getReopenReason(),
+                f.getExternalVisibility(), f.getSharedAt(), f.getSharedBy(), f.getSharingReason());
     }
 }

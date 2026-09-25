@@ -42,6 +42,20 @@ public class AuditorPortalDataController {
         return ResponseEntity.ok(ApiResponse.success(dataService.getControlExceptions(getPortalUserId(), tenantId)));
     }
 
+    // FIX: closes the confirmed "no internal-audit engine reachable by
+    // an external auditor" gap. Only findings Internal Audit has
+    // explicitly, individually decided to share — see AuditFinding's
+    // own class comment on share()/withdraw() for the full governance
+    // model this endpoint depends on.
+    @GetMapping("/tenants/{tenantId}/internal-audit-findings")
+    @Operation(summary = "List Internal Audit findings this business has explicitly shared with this auditor",
+            description = "Only CLOSED findings that Internal Audit has individually approved for external " +
+                    "visibility appear here — not every closed finding, and never a draft or in-progress one.")
+    public ResponseEntity<ApiResponse<List<za.co.handyflow.platform.auditor.dto.SharedFindingResponse>>> getSharedFindings(
+            @PathVariable UUID tenantId) {
+        return ResponseEntity.ok(ApiResponse.success(dataService.getSharedFindings(getPortalUserId(), tenantId)));
+    }
+
     private UUID getPortalUserId() {
         return UUID.fromString(SecurityContextHolder.getContext().getAuthentication().getPrincipal().toString());
     }

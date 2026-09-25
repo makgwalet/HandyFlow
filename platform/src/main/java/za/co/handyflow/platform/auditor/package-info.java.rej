@@ -1,0 +1,17 @@
+diff a/platform/src/main/java/za/co/handyflow/platform/auditor/package-info.java b/platform/src/main/java/za/co/handyflow/platform/auditor/package-info.java	(rejected hunks)
+@@ -2,6 +2,14 @@
+  * Auditor — Stage 3 of the Financial Control & Assurance adoption
+  * plan. Gives an external auditor their own read-only portal login to
+  * review a tenant's Evidence and Control Exceptions directly.
++ *
++ * FIX: added "internalaudit" to allowedDependencies — closes the
++ * confirmed "no internal-audit engine reachable by an external
++ * auditor" gap. This module reads AuditFinding/AuditFindingRepository
++ * directly (read-only, via findSharedForTenant()'s own SHARED-only
++ * filter) rather than through a facade — matches this whole module's
++ * own established pattern of depending directly on evidence/controls
++ * rather than through an intermediary layer.
+  */
+-@org.springframework.modulith.ApplicationModule(allowedDependencies = {"shared", "evidence", "controls"})
++@org.springframework.modulith.ApplicationModule(allowedDependencies = {"shared", "evidence", "controls", "internalaudit"})
+ package za.co.handyflow.platform.auditor;
