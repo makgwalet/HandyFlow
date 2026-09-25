@@ -12,66 +12,49 @@
 // directly, structurally closest to earthmoving/fleet. Confirmed against
 // za.co.handyflow.platform.agriculture's 7 Increment-1 controllers.
 import { useState } from "react"
-import { LayoutDashboard, Tractor, PawPrint } from "lucide-react"
-import { AG_ACCENT } from "./constants"
+import { Navigate, useLocation, useParams } from "react-router-dom"
 import AgDashboard from "./AgDashboard"
 import AgFarmsTab, { type FarmResponse } from "./AgFarmsTab"
 import AgFarmDetail from "./AgFarmDetail"
 import AgSpeciesTab from "./AgSpeciesTab"
+import { PageHeader } from "../../components/ui/PageHeader"
+import { AGRICULTURE_SECTIONS, findSection } from "../../navigation/moduleSections"
 
-type Tab = "dashboard" | "farms" | "species"
-const TABS: { key: Tab; label: string; icon: typeof LayoutDashboard }[] = [
-  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { key: "farms", label: "Farms", icon: Tractor },
-  { key: "species", label: "Species", icon: PawPrint },
-]
-
+/**
+ * Sections are routes (/agriculture/:section) with navigation in the
+ * sidebar. The farm drill-down is still in-page state: it is tied to the
+ * current history entry, so any navigation (including clicking "Farms"
+ * again) returns to the list.
+ */
 export default function AgriculturePage() {
-  const [tab, setTab] = useState<Tab>("dashboard")
-  const [selectedFarm, setSelectedFarm] = useState<FarmResponse | null>(null)
+  const { section: rawSection } = useParams<{ section?: string }>()
+  const location = useLocation()
+  const [openFarm, setOpenFarm] = useState<{ farm: FarmResponse; locationKey: string } | null>(null)
+
+  const base = AGRICULTURE_SECTIONS.basePath
+  const found = findSection(AGRICULTURE_SECTIONS, rawSection)
+  if (!found) return <Navigate replace to={`${base}/${AGRICULTURE_SECTIONS.defaultSection}`} />
+  const { section } = found
+
+  const selectedFarm = openFarm && openFarm.locationKey === location.key ? openFarm.farm : null
+  const crumbs = [
+    { label: AGRICULTURE_SECTIONS.title, to: `${base}/${AGRICULTURE_SECTIONS.defaultSection}` },
+    { label: section.label, to: selectedFarm ? `${base}/${section.id}` : undefined },
+    ...(selectedFarm ? [{ label: selectedFarm.name }] : []),
+  ]
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--hf-surface-muted)", fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 24px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 11, background: AG_ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Tractor size={20} color="#fff" />
-          </div>
-          <div>
-            <h1 style={{ fontSize: 19, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Agriculture</h1>
-            <p style={{ fontSize: 12.5, color: "var(--hf-text-faint)", margin: 0 }}>Farms · Species catalogue · Livestock — animals &amp; groups · Inventory</p>
-          </div>
-        </div>
-
-        {selectedFarm ? (
-          <AgFarmDetail farm={selectedFarm} onBack={() => setSelectedFarm(null)} />
-        ) : (
-          <>
-            <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--hf-border)", marginBottom: 24, overflowX: "auto" }}>
-              {TABS.map(t => {
-                const Icon = t.icon
-                const active = tab === t.key
-                return (
-                  <button key={t.key} onClick={() => setTab(t.key)}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 7, padding: "10px 16px", border: "none",
-                      background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap",
-                      color: active ? AG_ACCENT : "var(--hf-text-muted)",
-                      borderBottom: active ? `2px solid ${AG_ACCENT}` : "2px solid transparent",
-                      marginBottom: -1,
-                    }}>
-                    <Icon size={15} /> {t.label}
-                  </button>
-                )
-              })}
-            </div>
-
-            {tab === "dashboard" && <AgDashboard />}
-            {tab === "farms" && <AgFarmsTab onSelectFarm={setSelectedFarm} />}
-            {tab === "species" && <AgSpeciesTab />}
-          </>
-        )}
-      </div>
+    <div>
+      <PageHeader title={selectedFarm ? selectedFarm.name : section.label} icon={section.icon} breadcrumbs={crumbs} />
+      {selectedFarm ? (
+        <AgFarmDetail farm={selectedFarm} onBack={() => setOpenFarm(null)} />
+      ) : (
+        <>
+          {section.id === "dashboard" && <AgDashboard />}
+          {section.id === "farms" && <AgFarmsTab onSelectFarm={farm => setOpenFarm({ farm, locationKey: location.key })} />}
+          {section.id === "species" && <AgSpeciesTab />}
+        </>
+      )}
     </div>
   )
 }

@@ -79,7 +79,18 @@ Verification: type-check identical to Phase 1 baseline; lint for touched folders
 
 App-wide dry run of step 1: 67 alpha sites and 566 icon props across 224 files.
 
-## Phase 3 — module rollout (not started)
+## Phase 3 — module rollout (in progress)
+
+Correction to the original analysis: its per-module "tab counts" were file counts. Agriculture has 3 top-level sections, not 20; the other files are drill-down views. Check each module's real navigation before planning.
+
+### Agriculture ✅
+- Was unreachable: missing from the sidebar registry and the dashboard tiles (billing key `agriculture`, icon Wheat). Now in both.
+- Routed sections `/agriculture/:section` (Dashboard, Farms, Species) with sidebar context mode; `PageHeader` with breadcrumbs, including the open farm's name.
+- Removed the page's own full-height/1200px wrapper, which doubled the shell's padding.
+- Farm drill-down stays in-page state, tied to the current history entry so any navigation returns to the list. Deep-linking a farm (`/agriculture/farms/:id`) is a possible follow-up.
+- Colours: 28 -> 0 hex. `AG_ACCENT` split into `AG_ACCENT` (fills) and `AG_ACCENT_TEXT` (text); 43 uses classified by property (19 text, 24 fill).
+- No double-unwrap sites. Also fixed hard-coded colours on the dashboard's Internal Audit tile.
+
 
 ## Bug found during Phase 2 review: double-unwrapped API responses
 

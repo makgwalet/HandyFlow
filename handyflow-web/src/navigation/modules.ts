@@ -11,7 +11,7 @@ import {
   Shield, Fuel, HardHat, Car, Settings, Calculator, CalendarCheck,
   HeartPulse, PartyPopper, FilePen, Wallet, Briefcase,
   Palette, Headphones, CheckSquare, Megaphone, UserCheck, ShoppingCart,
-  Truck, Receipt, UserCog, ShieldCheck,
+  Truck, Receipt, UserCog, ShieldCheck, Wheat,
 } from 'lucide-react'
 import type { ElementType } from 'react'
 import { apiClient } from '../api/client'
@@ -49,6 +49,7 @@ export const MODULE_REGISTRY: Record<string, Omit<ModuleNavItem, 'key'>> = {
   ap:           { icon: Receipt,       label: 'Payables',     route: '/ap'           },
   accountant:   { icon: UserCog,       label: 'Accountant',   route: '/accountant'   },
   'internal-audit': { icon: ShieldCheck, label: 'Internal Audit', route: '/internal-audit' },
+  agriculture:  { icon: Wheat,         label: 'Agriculture',  route: '/agriculture'  },
 }
 
 /** Always reachable regardless of subscription. */

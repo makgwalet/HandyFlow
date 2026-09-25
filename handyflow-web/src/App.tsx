@@ -322,7 +322,7 @@ export default function App() {
             <Route path="/warehousing" element={<WarehousingPage />} />
             <Route path="/training" element={<TrainingPage />} />
             <Route path="/training-provider" element={<TrainProvPage />} />
-            <Route path="/agriculture" element={<AgriculturePage />} />
+            <Route path="/agriculture/:section?" element={<AgriculturePage />} />
             {/* NEW: shared "needs attention" board — see import comment above. */}
             <Route path="/control-exceptions"     element={<ControlExceptionsPage />} />
 

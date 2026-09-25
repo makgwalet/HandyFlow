@@ -15,7 +15,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Tractor, Plus, Pencil, Ban, RotateCcw, Trash2, UserCog, ChevronRight } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, statusBadge } from "./constants"
+import { AG_ACCENT, AG_ACCENT_TEXT, statusBadge } from "./constants"
 
 export interface FarmResponse {
   id: string
@@ -136,7 +136,7 @@ export default function AgFarmsTab({ onSelectFarm }: { onSelectFarm: (farm: Farm
             <div key={f.id}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
                 <div onClick={() => onSelectFarm(f)} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: 1 }}>
-                  <Tractor size={17} color={AG_ACCENT} />
+                  <Tractor size={17} style={{ color: AG_ACCENT_TEXT }} />
                   <div>
                     <p style={{ fontSize: 13.5, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{f.name}</p>
                     <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>

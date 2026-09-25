@@ -18,7 +18,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Package, Plus, Pencil, ArrowDownToLine, ArrowUpFromLine, Scale, Ban, RotateCcw, Trash2, TriangleAlert } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, fmtMoney, statusBadge } from "./constants"
+import { AG_ACCENT, AG_ACCENT_TEXT, fmtMoney, statusBadge } from "./constants"
 
 export interface InventoryItemResponse {
   id: string
@@ -100,7 +100,7 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
     <div>
       {lowStock.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 12, padding: "12px 16px", marginBottom: 14 }}>
-          <TriangleAlert size={16} color="#D97706" />
+          <TriangleAlert size={16} style={{ color: 'var(--hf-warning-text)' }} />
           <p style={{ fontSize: 12.5, color: "var(--hf-warning-text-deep)", margin: 0 }}>{lowStock.length} item{lowStock.length === 1 ? "" : "s"} below reorder level: {lowStock.map(i => i.itemName).join(", ")}</p>
         </div>
       )}
@@ -137,7 +137,7 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
             <div key={it.id}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <Package size={15} color={it.belowReorderLevel ? "#D97706" : AG_ACCENT} />
+                  <Package size={15} style={{ color: it.belowReorderLevel ? "var(--hf-warning-text)" : AG_ACCENT_TEXT }} />
                   <div>
                     <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{it.itemName}</p>
                     <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>

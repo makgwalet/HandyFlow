@@ -12,7 +12,7 @@ import type { ElementType } from 'react'
 import {
   AlertTriangle, Camera, ClipboardList, Clock, Crosshair, DoorOpen, FileBarChart,
   GitBranch, Key, LayoutDashboard, Lock, MapPin, Radio, RefreshCw, Repeat, Route,
-  Shield, ShieldCheck, Siren, Tablet, DollarSign,
+  Shield, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -99,7 +99,25 @@ export const SECURITY_SECTIONS: ModuleSections = {
   ],
 }
 
-const REGISTRY: ModuleSections[] = [SECURITY_SECTIONS]
+export const AGRICULTURE_SECTIONS: ModuleSections = {
+  moduleKey: 'agriculture',
+  basePath: '/agriculture',
+  title: 'Agriculture',
+  icon: Wheat,
+  defaultSection: 'dashboard',
+  groups: [
+    {
+      label: 'Farm operations',
+      sections: [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'farms', label: 'Farms', icon: Tractor },
+        { id: 'species', label: 'Species', icon: PawPrint },
+      ],
+    },
+  ],
+}
+
+const REGISTRY: ModuleSections[] = [SECURITY_SECTIONS, AGRICULTURE_SECTIONS]
 
 /** Section config for the module whose base path contains `pathname`. */
 export function sectionsForPath(pathname: string): ModuleSections | undefined {

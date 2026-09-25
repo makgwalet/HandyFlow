@@ -10,7 +10,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Upload, Download, Trash2, FileImage } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, fmtDateTime, type AgTargetType } from "./constants"
+import { AG_ACCENT, AG_ACCENT_TEXT, fmtDateTime, type AgTargetType } from "./constants"
 
 interface EvidenceResponse {
   id: string; fileName: string; evidenceType: string; contentType: string
@@ -78,7 +78,7 @@ export default function AgEvidenceTab({ targetType, targetId }: { targetType: Ag
           {evidence.map((e, i) => (
             <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <FileImage size={13} color={AG_ACCENT} />
+                <FileImage size={13} style={{ color: AG_ACCENT_TEXT }} />
                 <div>
                   <p style={{ fontSize: 12.5, color: "var(--hf-text)", fontWeight: 600, margin: 0 }}>{e.fileName}</p>
                   <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>{e.evidenceType} · {fmtDateTime(e.uploadedAt)}{e.uploadedByName ? ` · ${e.uploadedByName}` : ""}</p>

@@ -16,7 +16,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { PawPrint, Plus, Pencil, Ban, RotateCcw, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, statusBadge } from "./constants"
+import { AG_ACCENT, AG_ACCENT_TEXT, statusBadge } from "./constants"
 
 export interface SpeciesResponse {
   id: string
@@ -152,7 +152,7 @@ export default function AgSpeciesTab() {
             <div key={s.id}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <PawPrint size={16} color={AG_ACCENT} />
+                  <PawPrint size={16} style={{ color: AG_ACCENT_TEXT }} />
                   <div>
                     <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{s.name}</p>
                     <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>{s.category} · {s.defaultUnitOfMeasure} · Tracking: {s.trackingMode}{s.gestationDays ? ` · Gestation ${s.gestationDays}d` : ""}</p>

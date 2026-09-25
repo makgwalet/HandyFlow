@@ -7,7 +7,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { MapPin, Plus, Pencil, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, statusBadge } from "./constants"
+import { AG_ACCENT, AG_ACCENT_TEXT, statusBadge } from "./constants"
 
 export interface ProductionAreaResponse {
   id: string
@@ -113,7 +113,7 @@ export default function AgProductionAreasTab({ farmId }: { farmId: string }) {
             <div key={a.id}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <MapPin size={15} color={AG_ACCENT} />
+                  <MapPin size={15} style={{ color: AG_ACCENT_TEXT }} />
                   <div>
                     <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{a.name}</p>
                     <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>{a.areaType}{a.sizeHectares ? ` · ${a.sizeHectares} ha` : ""}{a.capacity ? ` · Capacity ${a.capacity}` : ""}{a.soilType ? ` · ${a.soilType}` : ""}</p>

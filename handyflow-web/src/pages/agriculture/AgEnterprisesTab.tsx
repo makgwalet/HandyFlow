@@ -11,7 +11,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Building2, Plus } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, statusBadge } from "./constants"
+import { AG_ACCENT, AG_ACCENT_TEXT, statusBadge } from "./constants"
 
 export interface EnterpriseResponse {
   id: string
@@ -83,7 +83,7 @@ export default function AgEnterprisesTab({ farmId }: { farmId: string }) {
           {enterprises.map((e, i) => (
             <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <Building2 size={15} color={AG_ACCENT} />
+                <Building2 size={15} style={{ color: AG_ACCENT_TEXT }} />
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{e.name}</p>
                   <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>{e.enterpriseType}{e.speciesFocus ? ` · ${e.speciesFocus}` : ""}{e.startDate ? ` · since ${e.startDate}` : ""}</p>

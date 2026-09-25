@@ -17,7 +17,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Users, Pencil, Lock, Unlock, MinusCircle, PlusCircle } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, statusBadge } from "./constants"
+import { AG_ACCENT, AG_ACCENT_TEXT, statusBadge } from "./constants"
 import type { GroupResponse } from "./AgGroupsTab"
 import AgWeightHistoryTab from "./AgWeightHistoryTab"
 import AgHealthEventsTab from "./AgHealthEventsTab"
@@ -69,7 +69,7 @@ export default function AgGroupDetail({ group, onBack }: { group: GroupResponse;
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, marginTop: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 40, height: 40, borderRadius: 10, background: AG_ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Users size={19} color="#fff" />
+            <Users size={19} style={{ color: 'var(--hf-text-on-solid)' }} />
           </div>
           <div>
             <h2 style={{ fontSize: 17, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>{g.batchNumber}</h2>
@@ -119,7 +119,7 @@ export default function AgGroupDetail({ group, onBack }: { group: GroupResponse;
           return (
             <button key={t.key} onClick={() => setSub(t.key)}
               style={{ padding: "9px 14px", border: "none", background: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap",
-                color: active ? AG_ACCENT : "var(--hf-text-muted)", borderBottom: active ? `2px solid ${AG_ACCENT}` : "2px solid transparent", marginBottom: -1 }}>
+                color: active ? AG_ACCENT_TEXT : "var(--hf-text-muted)", borderBottom: active ? `2px solid ${AG_ACCENT}` : "2px solid transparent", marginBottom: -1 }}>
               {t.label}
             </button>
           )

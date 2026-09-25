@@ -17,7 +17,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, Baby, Check, X as XIcon, Ban } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, statusBadge, type AgTargetType, targetBasePath } from "./constants"
+import { AG_ACCENT, AG_ACCENT_TEXT, statusBadge, type AgTargetType, targetBasePath } from "./constants"
 
 interface BreedingRecordResponse {
   id: string; animalId: string | null; groupId: string | null
@@ -105,7 +105,7 @@ export default function AgBreedingRecordsTab({ targetType, targetId }: { targetT
             <div key={r.id}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Baby size={13} color={AG_ACCENT} />
+                  <Baby size={13} style={{ color: AG_ACCENT_TEXT }} />
                   <div>
                     <p style={{ fontSize: 12.5, color: "var(--hf-text)", fontWeight: 600, margin: 0 }}>{r.breedingType.replace(/_/g, " ")}{r.sireDescription ? ` · ${r.sireDescription}` : ""}</p>
                     <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>

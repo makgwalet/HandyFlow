@@ -11,7 +11,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, ArrowRightLeft } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, type AgTargetType, targetBasePath } from "./constants"
+import { AG_ACCENT, AG_ACCENT_TEXT, type AgTargetType, targetBasePath } from "./constants"
 
 interface MovementRecordResponse {
   id: string; animalId: string | null; groupId: string | null
@@ -84,7 +84,7 @@ export default function AgMovementRecordsTab({ targetType, targetId }: { targetT
           {records.map((r, i) => (
             <div key={r.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <ArrowRightLeft size={13} color={AG_ACCENT} />
+                <ArrowRightLeft size={13} style={{ color: AG_ACCENT_TEXT }} />
                 <div>
                   <p style={{ fontSize: 12.5, color: "var(--hf-text)", fontWeight: 600, margin: 0 }}>{r.movementType.replace(/_/g, " ")}{r.countMoved ? ` — ${r.countMoved} moved` : ""}</p>
                   <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>{r.movementDate}{r.reason ? ` · ${r.reason}` : ""}</p>

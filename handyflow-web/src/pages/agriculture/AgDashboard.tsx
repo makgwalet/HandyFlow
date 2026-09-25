@@ -12,7 +12,7 @@ import type React from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Tractor, PawPrint } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT } from "./constants"
+import { AG_ACCENT_TEXT } from "./constants"
 
 interface Page<T> { content: T[]; totalElements: number }
 
@@ -37,14 +37,14 @@ export default function AgDashboard() {
           <p style={label}>Active farms</p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <p style={value}>{farms?.totalElements ?? "—"}</p>
-            <Tractor size={22} color={AG_ACCENT} />
+            <Tractor size={22} style={{ color: AG_ACCENT_TEXT }} />
           </div>
         </div>
         <div style={card}>
           <p style={label}>Species catalogued</p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <p style={value}>{species?.totalElements ?? "—"}</p>
-            <PawPrint size={22} color={AG_ACCENT} />
+            <PawPrint size={22} style={{ color: AG_ACCENT_TEXT }} />
           </div>
         </div>
       </div>

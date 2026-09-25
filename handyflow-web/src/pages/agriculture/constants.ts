@@ -20,7 +20,11 @@
 // animalId/groupId is populated.
 import type React from "react"
 
-export const AG_ACCENT = "#166534" // green-800 — a farm-operations tone, distinct from every prior module's own accent
+// Module accent (green-800 in light mode). Two tokens because fills and text
+// diverge in dark mode: fills stay dark enough for white labels, text gets
+// lighter to stay readable on dark surfaces.
+export const AG_ACCENT = "var(--hf-success-solid-strong)"      // backgrounds, borders
+export const AG_ACCENT_TEXT = "var(--hf-success-text-strong)"  // text and icons
 
 export const fmtDate = (d: string | null | undefined) => (d ? d : "—")
 
@@ -42,27 +46,27 @@ export const badgeStyle = (bg: string, fg: string): React.CSSProperties => ({
 })
 
 export const STATUS_COLORS: Record<string, [string, string]> = {
-  ACTIVE: ["#DCFCE7", "#166534"],
-  INACTIVE: ["#F1F5F9", "#64748B"],
-  CLOSED: ["#F1F5F9", "#64748B"],
-  SOLD: ["#EFF6FF", "#1D4ED8"],
-  DECEASED: ["#FEF2F2", "#DC2626"],
-  CULLED: ["#FEF2F2", "#DC2626"],
-  TRANSFERRED_OUT: ["#F5F3FF", "#6D28D9"],
-  COMPLETED: ["#DCFCE7", "#166534"],
-  SCHEDULED: ["#FFFBEB", "#D97706"],
-  DUE: ["#FFFBEB", "#D97706"],
-  OVERDUE: ["#FEF2F2", "#DC2626"],
-  PREGNANT_UNCONFIRMED: ["#FFFBEB", "#D97706"],
-  CONFIRMED_PREGNANT: ["#EFF6FF", "#1D4ED8"],
-  BORN: ["#DCFCE7", "#166534"],
-  ABORTED: ["#FEF2F2", "#DC2626"],
-  FAILED: ["#FEF2F2", "#DC2626"],
-  NOT_PREGNANT: ["#F1F5F9", "#64748B"],
+  ACTIVE: ["var(--hf-success-soft-strong)", "var(--hf-success-text-strong)"],
+  INACTIVE: ["var(--hf-surface-sunken)", "var(--hf-text-muted)"],
+  CLOSED: ["var(--hf-surface-sunken)", "var(--hf-text-muted)"],
+  SOLD: ["var(--hf-info-soft)", "var(--hf-info-text)"],
+  DECEASED: ["var(--hf-danger-soft)", "var(--hf-danger-text)"],
+  CULLED: ["var(--hf-danger-soft)", "var(--hf-danger-text)"],
+  TRANSFERRED_OUT: ["var(--hf-violet-soft)", "var(--hf-violet-text)"],
+  COMPLETED: ["var(--hf-success-soft-strong)", "var(--hf-success-text-strong)"],
+  SCHEDULED: ["var(--hf-warning-soft)", "var(--hf-warning-text)"],
+  DUE: ["var(--hf-warning-soft)", "var(--hf-warning-text)"],
+  OVERDUE: ["var(--hf-danger-soft)", "var(--hf-danger-text)"],
+  PREGNANT_UNCONFIRMED: ["var(--hf-warning-soft)", "var(--hf-warning-text)"],
+  CONFIRMED_PREGNANT: ["var(--hf-info-soft)", "var(--hf-info-text)"],
+  BORN: ["var(--hf-success-soft-strong)", "var(--hf-success-text-strong)"],
+  ABORTED: ["var(--hf-danger-soft)", "var(--hf-danger-text)"],
+  FAILED: ["var(--hf-danger-soft)", "var(--hf-danger-text)"],
+  NOT_PREGNANT: ["var(--hf-surface-sunken)", "var(--hf-text-muted)"],
 }
 
 export function statusBadge(status: string | null | undefined) {
-  const [bg, fg] = STATUS_COLORS[status ?? ""] ?? ["#F1F5F9", "#64748B"]
+  const [bg, fg] = STATUS_COLORS[status ?? ""] ?? ["var(--hf-surface-sunken)", "var(--hf-text-muted)"]
   return badgeStyle(bg, fg)
 }
 

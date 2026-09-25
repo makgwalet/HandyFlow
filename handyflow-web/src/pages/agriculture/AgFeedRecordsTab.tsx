@@ -12,7 +12,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, Wheat } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, fmtMoney, type AgTargetType, targetBasePath } from "./constants"
+import { AG_ACCENT, AG_ACCENT_TEXT, fmtMoney, type AgTargetType, targetBasePath } from "./constants"
 
 interface FeedRecordResponse {
   id: string; animalId: string | null; groupId: string | null
@@ -82,7 +82,7 @@ export default function AgFeedRecordsTab({ targetType, targetId }: { targetType:
           {records.map((r, i) => (
             <div key={r.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Wheat size={13} color={AG_ACCENT} />
+                <Wheat size={13} style={{ color: AG_ACCENT_TEXT }} />
                 <div>
                   <p style={{ fontSize: 12.5, color: "var(--hf-text)", fontWeight: 600, margin: 0 }}>{r.feedType} — {r.quantityKg} kg</p>
                   <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>{r.feedDate}{r.totalCost != null ? ` · ${fmtMoney(r.totalCost)}` : ""}</p>

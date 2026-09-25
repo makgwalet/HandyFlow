@@ -15,7 +15,7 @@ import {
   Handshake,
   Warehouse,
   ClipboardCheck,
-  ShieldCheck,
+  ShieldCheck, Wheat
 } from 'lucide-react'
 import { apiClient } from '../../api/client'
 import { useAuthStore } from '../../store/auth.store'
@@ -68,7 +68,8 @@ const MODULE_REGISTRY: Record<string, AppTile> = {
   legalcompliance: { key: 'legalcompliance', name: 'Legal & Compliance', description: 'Obligations, litigation & POPIA', icon: Scale, bg: 'var(--hf-indigo-soft)', iconColor: 'var(--hf-indigo-text)', route: '/legalcompliance' },
   compliancetender: { key: 'compliancetender', name: 'Business Compliance & Tender', description: 'CIPC, SARS, PSIRA registrations & tender workspace', icon: ClipboardCheck, bg: 'var(--hf-sky-soft-strong)', iconColor: 'var(--hf-sky-text-strong)', route: '/compliancetender' },
   complianceservices: { key: 'complianceservices', name: 'Compliance Services', description: 'Manage compliance and tender work for your client companies', icon: Building2, bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text-strong)', route: '/complianceservices' },
-  'internal-audit': { key: 'internal-audit', name: 'Internal Audit', description: 'Risk-based audit planning, annual plan and engagement management', icon: ShieldCheck, bg: '#F4F4F5', iconColor: '#3F3F46', route: '/internal-audit' },
+  'internal-audit': { key: 'internal-audit', name: 'Internal Audit', description: 'Risk-based audit planning, annual plan and engagement management', icon: ShieldCheck, bg: 'var(--hf-surface-sunken)', iconColor: 'var(--hf-text-secondary)', route: '/internal-audit' },
+  agriculture: { key: 'agriculture', name: 'Agriculture', description: 'Farms, livestock, health, breeding & feed', icon: Wheat, bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text-strong)', route: '/agriculture' },
   debtcollection: { key: 'debtcollection',  name: 'Debt Collection', description: 'Cases, contact trail & payment plans', icon: Landmark, bg: 'var(--hf-orange-soft)', iconColor: 'var(--hf-orange-text-strong)', route: '/debtcollection',
 
 },

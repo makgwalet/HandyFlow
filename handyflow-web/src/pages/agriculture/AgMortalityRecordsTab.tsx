@@ -86,7 +86,7 @@ export default function AgMortalityRecordsTab({ targetType, targetId }: { target
           {records.map((r, i) => (
             <div key={r.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Skull size={13} color="#DC2626" />
+                <Skull size={13} style={{ color: 'var(--hf-danger-text)' }} />
                 <div>
                   <p style={{ fontSize: 12.5, color: "var(--hf-text)", fontWeight: 600, margin: 0 }}>{r.causeCategory}{r.countLost > 1 ? ` — ${r.countLost} lost` : ""}{r.causeDetail ? ` · ${r.causeDetail}` : ""}</p>
                   <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>{r.mortalityDate}{r.estimatedValueLoss ? ` · ${fmtMoney(r.estimatedValueLoss)} loss` : ""}{r.reportedByName ? ` · ${r.reportedByName}` : ""}</p>

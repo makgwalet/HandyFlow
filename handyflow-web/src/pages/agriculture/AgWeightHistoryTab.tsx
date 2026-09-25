@@ -12,7 +12,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, Scale } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, type AgTargetType, targetBasePath } from "./constants"
+import { AG_ACCENT, AG_ACCENT_TEXT, type AgTargetType, targetBasePath } from "./constants"
 
 interface WeightRecordResponse {
   id: string; animalId: string | null; groupId: string | null
@@ -80,7 +80,7 @@ export default function AgWeightHistoryTab({ targetType, targetId }: { targetTyp
           {records.map((r, i) => (
             <div key={r.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Scale size={13} color={AG_ACCENT} />
+                <Scale size={13} style={{ color: AG_ACCENT_TEXT }} />
                 <span style={{ fontSize: 12.5, color: "var(--hf-text)", fontWeight: 600 }}>{r.weightKg} kg</span>
                 {r.sampleSize ? <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>(n={r.sampleSize})</span> : null}
               </div>

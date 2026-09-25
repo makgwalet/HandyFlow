@@ -7,7 +7,7 @@
 import type React from "react"
 import { useState } from "react"
 import { ArrowLeft, Tractor } from "lucide-react"
-import { AG_ACCENT } from "./constants"
+import { AG_ACCENT, AG_ACCENT_TEXT } from "./constants"
 import type { FarmResponse } from "./AgFarmsTab"
 import AgProductionAreasTab from "./AgProductionAreasTab"
 import AgEnterprisesTab from "./AgEnterprisesTab"
@@ -37,7 +37,7 @@ export default function AgFarmDetail({ farm, onBack }: { farm: FarmResponse; onB
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10, marginBottom: 18 }}>
         <div style={{ width: 40, height: 40, borderRadius: 10, background: AG_ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Tractor size={19} color="#fff" />
+          <Tractor size={19} style={{ color: 'var(--hf-text-on-solid)' }} />
         </div>
         <div>
           <h2 style={{ fontSize: 17, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>{farm.name}</h2>
@@ -51,7 +51,7 @@ export default function AgFarmDetail({ farm, onBack }: { farm: FarmResponse; onB
           return (
             <button key={t.key} onClick={() => setTab(t.key)}
               style={{ padding: "10px 16px", border: "none", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap",
-                color: active ? AG_ACCENT : "var(--hf-text-muted)", borderBottom: active ? `2px solid ${AG_ACCENT}` : "2px solid transparent", marginBottom: -1 }}>
+                color: active ? AG_ACCENT_TEXT : "var(--hf-text-muted)", borderBottom: active ? `2px solid ${AG_ACCENT}` : "2px solid transparent", marginBottom: -1 }}>
               {t.label}
             </button>
           )
