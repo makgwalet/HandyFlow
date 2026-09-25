@@ -15,5 +15,5 @@ public record UpdateUserUiPreferencesRequest(
         String container,
         String brandColor,
         @Size(max = 12, message = "You can pin at most 12 modules")
-        List<@Pattern(regexp = "^[a-z][a-z0-9-]{0,39}$", message = "Invalid module key") String> pinnedModules
+        List<@Pattern(regexp = "^[a-z][a-z0-9_-]{0,39}$", message = "Invalid module key") String> pinnedModules
 ) {}
