@@ -51,12 +51,12 @@ export default function GuardScreeningTab() {
 
   const { data: history = [], isLoading } = useQuery<ScreeningRecord[]>({
     queryKey: ["guard-screening-history", guardId],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/guards/${guardId}/screening`)).data?.data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/guards/${guardId}/screening`)).data ?? [],
     enabled: !!guardId,
   })
   const { data: gateWarning } = useQuery<string | null>({
     queryKey: ["guard-screening-gate", guardId],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/guards/${guardId}/screening/gate`)).data?.data ?? null,
+    queryFn: async () => (await apiClient.get(`/api/v1/security/guards/${guardId}/screening/gate`)).data ?? null,
     enabled: !!guardId,
   })
 

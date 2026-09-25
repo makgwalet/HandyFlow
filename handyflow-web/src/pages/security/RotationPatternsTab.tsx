@@ -144,7 +144,7 @@ export default function RotationPatternsTab() {
   const [expandedPattern, setExpandedPattern] = useState<string | null>(null)
   const assignmentsQuery = useQuery<RotationAssignment[]>({
     queryKey: ["rotation-assignments", expandedPattern],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/rotations/${expandedPattern}/assignments`)).data?.data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/rotations/${expandedPattern}/assignments`)).data ?? [],
     enabled: !!expandedPattern,
   })
 

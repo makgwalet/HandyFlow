@@ -154,7 +154,7 @@ export default function GateAccessTab() {
 
   const { data: onSite = [], isLoading: onSiteLoading } = useQuery<GateEntry[]>({
     queryKey: ["gate-on-site", siteId],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/sites/${siteId}/on-site`)).data?.data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/sites/${siteId}/on-site`)).data ?? [],
     enabled: !!siteId && subTab === "on-site",
     refetchInterval: 30000, // matches DeviceSessionsTab's own live-ish polling convention
   })
@@ -177,7 +177,7 @@ export default function GateAccessTab() {
 
   const { data: evidence = [], isLoading: evidenceLoading } = useQuery<Evidence[]>({
     queryKey: ["gate-entry-evidence", evidenceFor?.id],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/gate-entries/${evidenceFor!.id}/attachments`)).data?.data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/gate-entries/${evidenceFor!.id}/attachments`)).data ?? [],
     enabled: !!evidenceFor,
   })
   const downloadEvidence = async (ev: Evidence) => {
@@ -191,7 +191,7 @@ export default function GateAccessTab() {
   const [reportMonth, setReportMonth] = useState(thisMonth())
   const { data: report, isLoading: reportLoading } = useQuery<SiteAccessReport>({
     queryKey: ["site-access-report", siteId, reportMonth],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/reports/site-access?siteId=${siteId}&month=${reportMonth}`)).data?.data,
+    queryFn: async () => (await apiClient.get(`/api/v1/security/reports/site-access?siteId=${siteId}&month=${reportMonth}`)).data,
     enabled: !!siteId && !!reportMonth && subTab === "report",
   })
   const downloadReportPdf = async () => {

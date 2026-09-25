@@ -93,7 +93,7 @@ export default function PatrolRoutesTab() {
 
   const { data: siteDetail } = useQuery<SiteDetail>({
     queryKey: ["site-detail", siteId],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/sites/${siteId}`)).data?.data,
+    queryFn: async () => (await apiClient.get(`/api/v1/security/sites/${siteId}`)).data,
     enabled: !!siteId,
   })
   const checkpointName = (id: string) => siteDetail?.checkpoints.find(c => c.id === id)?.name ?? id.slice(0, 8)
@@ -102,7 +102,7 @@ export default function PatrolRoutesTab() {
 
   const { data: routes = [], isLoading: routesLoading } = useQuery<PatrolRoute[]>({
     queryKey: ["patrol-routes", siteId],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/patrol-routes?siteId=${siteId}`)).data?.data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/patrol-routes?siteId=${siteId}`)).data ?? [],
     enabled: !!siteId && subTab === "routes",
   })
 
@@ -151,7 +151,7 @@ export default function PatrolRoutesTab() {
   const [shiftId, setShiftId] = useState("")
   const { data: rounds = [], isLoading: roundsLoading } = useQuery<PatrolRound[]>({
     queryKey: ["patrol-rounds", shiftId],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/patrol-routes/rounds?shiftId=${shiftId}`)).data?.data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/patrol-routes/rounds?shiftId=${shiftId}`)).data ?? [],
     enabled: !!shiftId,
     refetchInterval: 30000, // matches GateAccessTab's on-site polling convention
   })

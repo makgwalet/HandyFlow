@@ -119,19 +119,19 @@ function PostOrderPanel({ siteId, postId, qc }: { siteId: string; postId: string
   const historyKey = ["po-history", siteId, postId]
   const { data: history = [], isLoading } = useQuery<PostOrderResp[]>({
     queryKey: historyKey,
-    queryFn: async () => (await apiClient.get(`/api/v1/security/sites/${siteId}/post-orders/history${postId ? `?postId=${postId}` : ""}`)).data.data ?? (await apiClient.get(`/api/v1/security/sites/${siteId}/post-orders/history${postId ? `?postId=${postId}` : ""}`)).data,
+    queryFn: async () => (await apiClient.get(`/api/v1/security/sites/${siteId}/post-orders/history${postId ? `?postId=${postId}` : ""}`)).data ?? [],
   })
   const current = history.find(o => o.status === "ACTIVE") ?? null
   const draft = history.find(o => o.status === "DRAFT") ?? null
 
   const { data: contacts = [] } = useQuery<ContactOption[]>({
     queryKey: ["po-contacts-for-site", siteId],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/sites/${siteId}/contacts`)).data.data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/sites/${siteId}/contacts`)).data ?? [],
     enabled: showNewDraft,
   })
   const acksQuery = useQuery<AckResp[]>({
     queryKey: ["po-acks", current?.id],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/post-orders/${current!.id}/acknowledgements`)).data.data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/post-orders/${current!.id}/acknowledgements`)).data ?? [],
     enabled: showAcks && !!current,
   })
 
@@ -322,7 +322,7 @@ function PostsPanel({ siteId, qc }: { siteId: string; qc: ReturnType<typeof useQ
 
   const { data: posts = [], isLoading } = useQuery<PostOption[]>({
     queryKey: ["po-posts", siteId],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/sites/${siteId}/posts`)).data.data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/sites/${siteId}/posts`)).data ?? [],
   })
 
   const createPost = useMutation({
@@ -406,7 +406,7 @@ function ContactsPanel({ siteId, qc }: { siteId: string; qc: ReturnType<typeof u
 
   const { data: contacts = [], isLoading } = useQuery<ContactOption[]>({
     queryKey: ["po-contacts-for-site", siteId],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/sites/${siteId}/contacts`)).data.data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/sites/${siteId}/contacts`)).data ?? [],
   })
 
   const createContact = useMutation({

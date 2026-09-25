@@ -243,13 +243,13 @@ export default function CloseProtectionTab() {
 
   const principalEvidenceQuery = useQuery<Evidence[]>({
     queryKey: ["cp-principal-evidence", selectedPrincipal?.id],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/cp/principals/${selectedPrincipal!.id}/evidence`)).data?.data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/cp/principals/${selectedPrincipal!.id}/evidence`)).data ?? [],
     enabled: !!selectedPrincipal && principalView === "evidence",
   })
 
   const detailEvidenceQuery = useQuery<Evidence[]>({
     queryKey: ["cp-detail-evidence", selectedDetail?.id],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/cp/details/${selectedDetail!.id}/evidence`)).data?.data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/cp/details/${selectedDetail!.id}/evidence`)).data ?? [],
     enabled: !!selectedDetail && view === "evidence",
   })
 
@@ -403,7 +403,7 @@ export default function CloseProtectionTab() {
   // ── Armoury-for-detail ───────────────────────────────────────────────────────
   const { data: detailArmoury = [] } = useQuery<ArmouryLogEntry[]>({
     queryKey: ["cp-detail-armoury", selectedDetail?.id],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/cp/details/${selectedDetail!.id}/armoury`)).data?.data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/cp/details/${selectedDetail!.id}/armoury`)).data ?? [],
     enabled: !!selectedDetail && view === "armoury",
   })
   const { data: firearms = [] } = useQuery<Firearm[]>({
@@ -437,7 +437,7 @@ export default function CloseProtectionTab() {
   // ── Advance surveys ──────────────────────────────────────────────────────────
   const stopSurveysQuery = useQuery<AdvanceSurvey[]>({
     queryKey: ["cp-stop-surveys", expandedStopSurveys],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/cp/itinerary/${expandedStopSurveys}/surveys`)).data?.data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/cp/itinerary/${expandedStopSurveys}/surveys`)).data ?? [],
     enabled: !!expandedStopSurveys,
   })
   const conductSurvey = useMutation({
@@ -452,7 +452,7 @@ export default function CloseProtectionTab() {
   // ── Vetting (VettingController) ──────────────────────────────────────────────
   const vettingHistoryQuery = useQuery<any[]>({
     queryKey: ["cp-vetting-history", selectedPrincipal?.id],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/cp/vetting/principals/${selectedPrincipal!.id}`)).data?.data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/cp/vetting/principals/${selectedPrincipal!.id}`)).data ?? [],
     enabled: !!selectedPrincipal && principalView === "vetting",
   })
   const createVettingCheck = useMutation({
@@ -470,7 +470,7 @@ export default function CloseProtectionTab() {
   })
   const declinedRegisterQuery = useQuery<any[]>({
     queryKey: ["cp-declined-register"],
-    queryFn: async () => (await apiClient.get("/api/v1/security/cp/vetting/declined")).data?.data ?? [],
+    queryFn: async () => (await apiClient.get("/api/v1/security/cp/vetting/declined")).data ?? [],
     enabled: showDeclinedRegister,
   })
   const declinePrincipalMutation = useMutation({

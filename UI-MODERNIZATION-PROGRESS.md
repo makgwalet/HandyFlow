@@ -74,8 +74,18 @@ Verification: type-check identical to Phase 1 baseline; lint for touched folders
 2. `node scripts/theme-codemod/codemod.mjs --write src/pages/<module>`, then `git checkout -- scripts/theme-codemod/report.json`
 3. `grep -rnE "#[0-9a-fA-F]{6}" src/pages/<module>` and map the rest by role (how each value is consumed).
 4. If the module has in-page tabs: register sections in `navigation/moduleSections.ts`, route `/<module>/:section?`, swap the header for `PageHeader`.
-5. Type-check against baseline, lint, build, click through in light and dark.
+5. Check for the double-unwrap bug (below): `grep -rnE "\.data\?\.data( \?\? (\[\]|null))?\s*(,|\)|$)" src/pages/<module>`. For each hit without a `?? r.data` fallback, confirm the endpoint's return type in the controller, then read `.data` instead. Watch for paged responses (`Page<...>`), which need `.content`.
+6. Type-check against baseline, lint, build, click through in light and dark.
 
 App-wide dry run of step 1: 67 alpha sites and 566 icon props across 224 files.
 
 ## Phase 3 — module rollout (not started)
+
+## Bug found during Phase 2 review: double-unwrapped API responses
+
+`apiClient` (src/api/client.ts) already unwraps the `{ success, message, data }` envelope, so `res.data` is the payload. Code that reads `res.data.data` / `.data?.data` **without** a `?? res.data` fallback always gets `undefined`, and lists silently show as empty.
+
+- Fixed: `uiPreferencesApi` (caused the "Query data cannot be undefined" console error, so preferences never loaded from the server).
+- Fixed in Security (21 sites, each endpoint's return type confirmed in its controller): live map guard positions; post-order history (also removed a duplicate request), acknowledgements, site posts, site contacts; close-protection evidence, armoury logs, advance surveys, vetting history, declined principals; patrol routes, patrol rounds, site detail on the patrol page; guard screening history and gate status; on-site register, gate evidence, site-access report; rotation assignments.
+- Still to check (same pattern, endpoints not yet verified): bookings 8, customers 4, pos 2, property 1, fuel 1.
+- The widespread `r.data?.data ?? r.data` form is harmless (it falls back to the payload) and is left alone.

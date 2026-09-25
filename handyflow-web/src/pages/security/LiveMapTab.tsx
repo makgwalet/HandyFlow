@@ -95,7 +95,7 @@ export default function LiveMapTab() {
   // stay reasonably live without hammering the endpoint on every render.
   const { data: locations = [], isLoading: locationsLoading } = useQuery<CurrentLocation[]>({
     queryKey: ["live-locations", siteId],
-    queryFn: async () => (await apiClient.get(`/api/v1/security/sites/${siteId}/guards/locations`)).data.data ?? [],
+    queryFn: async () => (await apiClient.get(`/api/v1/security/sites/${siteId}/guards/locations`)).data ?? [],
     enabled: !!siteId,
     refetchInterval: 30000,
   })
