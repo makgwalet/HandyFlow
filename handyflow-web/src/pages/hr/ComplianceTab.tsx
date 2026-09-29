@@ -70,7 +70,7 @@ export default function ComplianceTab() {
       {/* Overdue alert */}
       {overdueCount > 0 && (
         <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
-          <AlertCircle size={16} color="#DC2626" style={{ flexShrink: 0 }} />
+          <AlertCircle size={16} style={{ color: 'var(--hf-danger-text)', flexShrink: 0 }} />
           <div>
             <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-danger-text)" }}>{overdueCount} overdue EMP201 declaration{overdueCount > 1 ? "s" : ""}</div>
             <div style={{ fontSize: 12, color: "var(--hf-danger-text-strong)" }}>Late submission attracts a 10% penalty plus interest. Submit on SARS eFiling immediately.</div>
@@ -80,7 +80,7 @@ export default function ComplianceTab() {
 
       {/* Info */}
       <div style={{ display: "flex", gap: 10, padding: "12px 16px", background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)", borderRadius: 10, marginBottom: 22 }}>
-        <FileText size={16} color="#1D4ED8" style={{ flexShrink: 0, marginTop: 1 }} />
+        <FileText size={16} style={{ color: 'var(--hf-info-text)', flexShrink: 0, marginTop: 1 }} />
         <div style={{ fontSize: 13, color: "var(--hf-info-text)" }}>
           <strong>EMP201</strong> — monthly employer declaration, due to SARS by the 7th of each following month.
           Download the PDF, then submit and pay on SARS eFiling. Contains PAYE + UIF (employer + employee) + SDL.

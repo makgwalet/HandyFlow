@@ -7,9 +7,12 @@ const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content
 const fmtR   = (n: any) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
 const fmtDate = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
 
-const DEPT_COLORS = ["#1B3A6B","#0D9488","#D97706","#7C3AED","#DC2626","#166534","#1D4ED8"]
+const DEPT_COLORS = [
+  "var(--hf-primary-text)", "var(--hf-accent-text)", "var(--hf-warning-text)", "var(--hf-violet-text)",
+  "var(--hf-danger-text)", "var(--hf-success-text-strong)", "var(--hf-info-text)",
+]
 
-export default function HrDashboard({ onNavigate }: { onNavigate: (t: any) => void }) {
+export default function HrDashboard({ onNavigate }: { onNavigate: (section: string) => void }) {
   const { data: employees = [] } = useQuery({
     queryKey: ["hr-employees"],
     queryFn: async () => unwrap(await apiClient.get("/api/v1/hr/employees?size=200")),
@@ -41,10 +44,10 @@ export default function HrDashboard({ onNavigate }: { onNavigate: (t: any) => vo
   active.forEach(e => { const t = e.employmentType ?? "UNKNOWN"; typeMap[t] = (typeMap[t] ?? 0) + 1 })
 
   const kpis = [
-    { label: "Active employees",   value: active.length,          color: "#1B3A6B", bg: "#EFF6FF",  icon: Users,        tab: "employees" },
-    { label: "Pending leave",      value: pendingLeave.length,    color: pendingLeave.length > 0 ? "#D97706" : "#166534", bg: pendingLeave.length > 0 ? "#FFFBEB" : "#DCFCE7", icon: Calendar, tab: "leave" },
-    { label: "Payroll this month", value: lastPayRun ? fmtR(lastPayRun.totalNet) : "—", color: "#0D9488", bg: "#F0FDF4", icon: DollarSign, tab: "payroll" },
-    { label: "Employees on leave", value: leaves.filter(l => l.status === "APPROVED" && new Date(l.startDate) <= new Date() && new Date(l.endDate) >= new Date()).length, color: "#7C3AED", bg: "#F5F3FF", icon: Calendar, tab: "leave" },
+    { label: "Active employees",   value: active.length,          color: "var(--hf-primary-text)", bg: "var(--hf-info-soft)",  icon: Users,        tab: "employees" },
+    { label: "Pending leave",      value: pendingLeave.length,    color: pendingLeave.length > 0 ? "var(--hf-warning-text)" : "var(--hf-success-text-strong)", bg: pendingLeave.length > 0 ? "var(--hf-warning-soft)" : "var(--hf-success-soft-strong)", icon: Calendar, tab: "leave" },
+    { label: "Payroll this month", value: lastPayRun ? fmtR(lastPayRun.totalNet) : "—", color: "var(--hf-accent-text)", bg: "var(--hf-success-soft)", icon: DollarSign, tab: "payroll" },
+    { label: "Employees on leave", value: leaves.filter(l => l.status === "APPROVED" && new Date(l.startDate) <= new Date() && new Date(l.endDate) >= new Date()).length, color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", icon: Calendar, tab: "leave" },
   ]
 
   return (
@@ -58,7 +61,7 @@ export default function HrDashboard({ onNavigate }: { onNavigate: (t: any) => vo
             onMouseLeave={e => (e.currentTarget.style.boxShadow = "none")}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: k.color, textTransform: "uppercase" as const }}>{k.label}</div>
-              <k.icon size={16} color={k.color} />
+              <k.icon size={16} style={{ color: k.color }} />
             </div>
             <div style={{ fontSize: 24, fontWeight: 800, color: k.color }}>{k.value}</div>
           </div>
@@ -68,7 +71,7 @@ export default function HrDashboard({ onNavigate }: { onNavigate: (t: any) => vo
       {/* Pending leave alert */}
       {pendingLeave.length > 0 && (
         <div style={{ marginBottom: 22, padding: "14px 18px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 12 }}>
-          <AlertTriangle size={17} color="#D97706" style={{ flexShrink: 0 }} />
+          <AlertTriangle size={17} style={{ color: 'var(--hf-warning-text)', flexShrink: 0 }} />
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-warning-text)" }}>{pendingLeave.length} Leave Request{pendingLeave.length > 1 ? "s" : ""} Awaiting Approval</div>
             <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>{pendingLeave.slice(0, 3).map((l: any) => `${l.employeeName} — ${l.leaveType}`).join(" · ")}</div>
@@ -124,9 +127,9 @@ export default function HrDashboard({ onNavigate }: { onNavigate: (t: any) => vo
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {leaves.slice(0, 5).map((l: any) => {
                   const statusCfg: Record<string, { color: string; bg: string }> = {
-                    PENDING:  { color: "#D97706", bg: "#FFFBEB" },
-                    APPROVED: { color: "#166534", bg: "#DCFCE7" },
-                    REJECTED: { color: "#DC2626", bg: "#FEF2F2" },
+                    PENDING:  { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+                    APPROVED: { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+                    REJECTED: { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
                   }
                   const cfg = statusCfg[l.status] ?? statusCfg.PENDING
                   return (
@@ -186,10 +189,12 @@ export default function HrDashboard({ onNavigate }: { onNavigate: (t: any) => vo
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 10 }}>Quick actions</div>
             {[
-              { label: "Add employee",       tab: "employees",    color: "#1B3A6B" },
-              { label: "Approve leave",      tab: "leave",        color: "#D97706" },
-              { label: "Run payroll",        tab: "payroll",      color: "#0D9488" },
-              { label: "Download EMP201",    tab: "sars",         color: "#7C3AED" },
+              { label: "Add employee",       tab: "employees",    color: "var(--hf-primary-text)" },
+              { label: "Approve leave",      tab: "leave",        color: "var(--hf-warning-text)" },
+              { label: "Run payroll",        tab: "payroll",      color: "var(--hf-accent-text)" },
+              // Was tab: "sars", which no longer exists (EMP201 lives in Compliance); the
+              // button opened an empty panel.
+              { label: "Download EMP201",    tab: "compliance",   color: "var(--hf-violet-text)" },
             ].map(a => (
               <button key={a.label} onClick={() => onNavigate(a.tab)}
                 style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left" as const, display: "flex", alignItems: "center", justifyContent: "space-between" }}>

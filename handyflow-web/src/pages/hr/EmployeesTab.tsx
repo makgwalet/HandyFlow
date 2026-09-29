@@ -29,11 +29,11 @@ const fmtR    = (n: any) => n != null ? `R ${Number(n).toLocaleString("en-ZA", {
 const fmtDate = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
 
 const STATUS_CFG: Record<string, { color: string; bg: string; label: string }> = {
-  ACTIVE:      { color: "#166534", bg: "#DCFCE7", label: "Active"      },
-  TERMINATED:  { color: "#DC2626", bg: "#FEF2F2", label: "Terminated"  },
-  ON_LEAVE:    { color: "#D97706", bg: "#FFFBEB", label: "On Leave"    },
-  PROBATION:   { color: "#7C3AED", bg: "#F5F3FF", label: "Probation"   },
-  SUSPENDED:   { color: "#1D4ED8", bg: "#EFF6FF", label: "Suspended"   },
+  ACTIVE:      { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", label: "Active"      },
+  TERMINATED:  { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", label: "Terminated"  },
+  ON_LEAVE:    { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", label: "On Leave"    },
+  PROBATION:   { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", label: "Probation"   },
+  SUSPENDED:   { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", label: "Suspended"   },
 }
 
 const EMP_TYPES   = ["PERMANENT","FIXED_TERM","PART_TIME","CASUAL","CONTRACTOR"]
@@ -193,11 +193,11 @@ export default function EmployeesTab() {
 
   const inp = (k: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
-    border: `1.5px solid ${fieldErrors[k] ? "#DC2626" : "#E2E8F0"}`,
+    border: `1.5px solid ${fieldErrors[k] ? "var(--hf-danger)" : "var(--hf-border)"}`,
     borderRadius: 8, fontSize: 14, outline: "none",
-    background: fieldErrors[k] ? "#FFF5F5" : "#fff",
+    background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)",
   })
-  const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+  const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
   const FErr = ({ k }: { k: string }) => fieldErrors[k]
     ? <div style={{ fontSize: 12, color: "var(--hf-danger-text)", marginTop: 3, display: "flex", alignItems: "center", gap: 3 }}><AlertCircle size={11} />{fieldErrors[k]}</div>
     : null
@@ -211,7 +211,7 @@ export default function EmployeesTab() {
           <div>
             <label style={lbl}>SA ID Number</label>
             <input value={form.idNumber} onChange={e => handleIdChange(e.target.value)} placeholder="13 digits"
-              style={{ ...inp("idNumber"), borderColor: idState.valid === false ? "var(--hf-danger)" : idState.valid === true ? "#22C55E" : "var(--hf-border)" }} />
+              style={{ ...inp("idNumber"), borderColor: idState.valid === false ? "var(--hf-danger)" : idState.valid === true ? "var(--hf-success)" : "var(--hf-border)" }} />
             {idState.msg && <div style={{ fontSize: 12, marginTop: 3, color: idState.valid ? "var(--hf-success-text-strong)" : "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 3 }}><AlertCircle size={11} />{idState.msg}</div>}
           </div>
           <div><label style={lbl}>Tax / SARS Number</label><input value={form.taxNumber} onChange={e => setForm(f => ({ ...f, taxNumber: e.target.value }))} placeholder="10-digit SARS number" style={inp("taxNumber")} /></div>
@@ -305,7 +305,7 @@ export default function EmployeesTab() {
       {/* Stats */}
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {Object.entries(STATUS_CFG).filter(([k]) => k !== "TERMINATED").map(([k, cfg]) => (
-          <div key={k} style={{ flex: 1, background: cfg.bg, border: `1px solid ${cfg.color}40`, borderRadius: 10, padding: "12px 16px" }}>
+          <div key={k} style={{ flex: 1, background: cfg.bg, border: `1px solid color-mix(in srgb, ${cfg.color} 25%, transparent)`, borderRadius: 10, padding: "12px 16px" }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: cfg.color }}>{(employees as Employee[]).filter(e => e.status === k).length}</div>
             <div style={{ fontSize: 11, color: cfg.color, marginTop: 2 }}>{cfg.label}</div>
           </div>
@@ -463,7 +463,7 @@ export default function EmployeesTab() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1001, backdropFilter: "blur(2px)" }}>
           <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-              <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--hf-danger-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><UserX size={20} color="#DC2626" /></div>
+              <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--hf-danger-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><UserX size={20} style={{ color: 'var(--hf-danger-text)' }} /></div>
               <div><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Terminate Employee</h3><div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>{terminating.fullName} · {terminating.employeeNumber}</div></div>
             </div>
             <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text-strong)" }}>
@@ -508,5 +508,5 @@ function ErrBanner({ msg }: { msg: string }) {
   return <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{msg}</div>
 }
 const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
-const inp  = (k: string): React.CSSProperties => ({ width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, outline: "none", background: "#fff" })
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const inp  = (k: string): React.CSSProperties => ({ width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, outline: "none", background: "var(--hf-surface)" })
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }

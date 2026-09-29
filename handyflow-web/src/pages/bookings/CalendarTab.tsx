@@ -15,12 +15,12 @@ import { apiClient } from "../../api/client"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 const STATUS_COLOR: Record<string, string> = {
-  PENDING:     "#D97706",
-  CONFIRMED:   "#1D4ED8",
-  IN_PROGRESS: "#7C3AED",
-  COMPLETED:   "#166534",
-  CANCELLED:   "#DC2626",
-  NO_SHOW:     "#64748B",
+  PENDING:     "var(--hf-warning-text)",
+  CONFIRMED:   "var(--hf-info-text)",
+  IN_PROGRESS: "var(--hf-violet-text)",
+  COMPLETED:   "var(--hf-success-text-strong)",
+  CANCELLED:   "var(--hf-danger-text)",
+  NO_SHOW:     "var(--hf-text-muted)",
 }
 
 // 07:00 to 21:00 = 14 hours
@@ -181,7 +181,7 @@ export default function CalendarTab() {
                 style={{
                   borderLeft: "1px solid var(--hf-border)",
                   position: "relative", height: totalDayHeight,
-                  background: isToday ? "rgba(13,148,136,0.02)" : "white",
+                  background: isToday ? "rgba(13,148,136,0.02)" : "var(--hf-surface)",
                 }}>
                 {/* Horizontal hour grid lines */}
                 {HOURS.map(hour => (
@@ -207,7 +207,7 @@ export default function CalendarTab() {
                 {dayBkgs.map((b: any) => {
                   const top    = timeToY(b.startTime)
                   const height = Math.max(22, durationToH(b.durationMinutes))
-                  const color  = STATUS_COLOR[b.status] ?? "#1B3A6B"
+                  const color  = STATUS_COLOR[b.status] ?? "var(--hf-primary-text)"
 
                   // Don't render if outside our time window
                   if (top < 0 || top > totalDayHeight) return null
@@ -219,8 +219,8 @@ export default function CalendarTab() {
                       style={{
                         position: "absolute", left: 2, right: 2,
                         top, height: Math.min(height, totalDayHeight - top),
-                        background: color + "18",
-                        border: `1px solid ${color}35`,
+                        background: `color-mix(in srgb, ${color} 9%, transparent)`,
+                        border: `1px solid color-mix(in srgb, ${color} 21%, transparent)`,
                         borderLeft: `3px solid ${color}`,
                         borderRadius: 4, padding: "2px 5px",
                         overflow: "hidden", cursor: "pointer", zIndex: 1,
@@ -256,7 +256,7 @@ export default function CalendarTab() {
 }
 
 const navBtn: React.CSSProperties = {
-  background: "#F8FAFC", border: "1px solid #E2E8F0",
+  background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)",
   borderRadius: 7, padding: "5px 8px", cursor: "pointer",
-  display: "flex", alignItems: "center", color: "#374151",
+  display: "flex", alignItems: "center", color: "var(--hf-text-secondary)",
 }

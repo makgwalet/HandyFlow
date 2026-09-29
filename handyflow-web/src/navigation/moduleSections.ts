@@ -15,7 +15,7 @@ import {
   Shield, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
   Droplets, ArrowDownToLine, Fuel, Truck, Users, TrendingUp, Car, Wrench,
   Calculator, BookOpen, GitBranch as JournalIcon, Landmark, BarChart2, FileText,
-  Briefcase, Calendar, FolderOpen,
+  Briefcase, Calendar, FolderOpen, AlertOctagon, CalendarCheck, Settings,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -24,6 +24,11 @@ export interface ModuleSection {
   icon: ElementType
   /** Short live/status marker shown next to the label, e.g. "LIVE". */
   badge?: string
+  /**
+   * A count fetched live for this section (see sectionBadges.ts), shown as
+   * the badge while it is above zero. Hidden while the section is open.
+   */
+  liveBadge?: 'bookings-pending'
   /**
    * Permission required to see this section. Hidden from the sidebar and
    * redirected away from in the page when missing. This mirrors the server's
@@ -242,8 +247,62 @@ export const ACCOUNTANT_SECTIONS: ModuleSections = {
   ],
 }
 
+export const HR_SECTIONS: ModuleSections = {
+  moduleKey: 'hr',
+  basePath: '/hr',
+  title: 'HR & Payroll',
+  icon: Users,
+  // HR has always opened on the employee register, not the dashboard.
+  defaultSection: 'employees',
+  groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+    {
+      label: 'People',
+      sections: [
+        { id: 'employees', label: 'Employees', icon: Users },
+        { id: 'leave', label: 'Leave', icon: Calendar },
+        { id: 'disciplinary', label: 'Disciplinary', icon: AlertOctagon },
+      ],
+    },
+    {
+      label: 'Payroll & compliance',
+      sections: [
+        { id: 'payroll', label: 'Payroll', icon: DollarSign },
+        { id: 'compliance', label: 'Compliance', icon: FileText },
+      ],
+    },
+  ],
+}
+
+export const BOOKINGS_SECTIONS: ModuleSections = {
+  moduleKey: 'bookings',
+  basePath: '/bookings',
+  title: 'Bookings',
+  icon: CalendarCheck,
+  defaultSection: 'dashboard',
+  groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+    {
+      label: 'Schedule',
+      sections: [
+        { id: 'calendar', label: 'Calendar', icon: Calendar },
+        { id: 'bookings', label: 'Bookings', icon: Clock, liveBadge: 'bookings-pending' },
+      ],
+    },
+    {
+      label: 'Setup',
+      sections: [
+        { id: 'services', label: 'Services', icon: Briefcase },
+        { id: 'staff', label: 'Staff', icon: Users },
+        { id: 'availability', label: 'Availability', icon: Settings },
+      ],
+    },
+  ],
+}
+
 const REGISTRY: ModuleSections[] = [
   SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FLEET_SECTIONS, ACCOUNTING_SECTIONS, ACCOUNTANT_SECTIONS,
+  HR_SECTIONS, BOOKINGS_SECTIONS,
 ]
 
 /** Groups with sections the user may not see removed (and empty groups dropped). */

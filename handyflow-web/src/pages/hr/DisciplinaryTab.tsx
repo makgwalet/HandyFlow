@@ -143,12 +143,12 @@ export default function DisciplinaryTab() {
                 const active = count > 0
                 return (
                   <div key={step.type} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    {i > 0 && <ChevronRight size={12} color={active ? "#94A3B8" : "#CBD5E1"} />}
+                    {i > 0 && <ChevronRight size={12} style={{ color: active ? "var(--hf-text-faint)" : "var(--hf-text-disabled)" }} />}
                     <span style={{
                       padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
                       background: active ? cfg.bg : "var(--hf-surface-sunken)",
                       color: active ? cfg.color : "var(--hf-text-faint)",
-                      border: `1px solid ${active ? cfg.border : "#E2E8F0"}`,
+                      border: `1px solid ${active ? cfg.border : "var(--hf-border)"}`,
                     }}>
                       {cfg.label}{count > 1 ? ` ×${count}` : ""}
                     </span>

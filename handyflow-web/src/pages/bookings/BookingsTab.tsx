@@ -307,12 +307,12 @@ export default function BookingsTab() {
         </div>
       ) : isError ? (
         <div style={{ textAlign: "center", padding: 60 }}>
-          <AlertCircle size={32} color="#DC2626" style={{ marginBottom: 10 }} />
+          <AlertCircle size={32} style={{ color: 'var(--hf-danger-text)', marginBottom: 10 }} />
           <div style={{ fontWeight: 600, color: "var(--hf-danger-text)" }}>Failed to load bookings</div>
         </div>
       ) : bookings.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
-          <Calendar size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
+          <Calendar size={36} style={{ color: 'var(--hf-text-disabled)', marginBottom: 12 }} />
           <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)", marginBottom: 4 }}>
             {statusFilter || dateFilter ? "No bookings match your filters" : "No bookings yet"}
           </div>
@@ -356,7 +356,7 @@ export default function BookingsTab() {
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
                     <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{fmtR(b.price)}</span>
-                    <ChevronRight size={15} color="#94A3B8" />
+                    <ChevronRight size={15} style={{ color: 'var(--hf-text-faint)' }} />
                   </div>
                 </div>
               )
@@ -445,7 +445,7 @@ export default function BookingsTab() {
                 fontSize: 11, fontWeight: 600, padding: "2px 10px", borderRadius: 20,
                 background: selected.reminderSent ? "var(--hf-success-soft)" : "var(--hf-surface-muted)",
                 color: selected.reminderSent ? "var(--hf-success-text-strong)" : "var(--hf-text-faint)",
-                border: `1px solid ${selected.reminderSent ? "#BBF7D0" : "#E2E8F0"}`,
+                border: `1px solid ${selected.reminderSent ? "var(--hf-success-border-subtle)" : "var(--hf-border)"}`,
               }}>
                 {selected.reminderSent ? "✓ Reminder sent" : "Reminder pending"}
               </span>
@@ -597,7 +597,7 @@ export default function BookingsTab() {
         <div style={{ ...overlay, zIndex: 1001 }}>
           <div style={{ ...modal, width: 420, textAlign: "center" }}>
             <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--hf-danger-soft)", border: "2px solid var(--hf-danger-border)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-              <X size={22} color="#DC2626" />
+              <X size={22} style={{ color: 'var(--hf-danger-text)' }} />
             </div>
             <h3 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "var(--hf-text)" }}>Cancel Booking?</h3>
             <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: "0 0 16px", lineHeight: 1.6 }}>

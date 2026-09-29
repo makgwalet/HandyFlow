@@ -5,6 +5,7 @@ import { ArrowLeft, Building2, LayoutGrid, PanelLeftClose, PanelLeftOpen } from 
 import type { ModuleNavItem } from '../../navigation/modules'
 import { WORKSPACE_NAV } from '../../navigation/modules'
 import { sectionsForPath, visibleGroups, type ModuleSections } from '../../navigation/moduleSections'
+import { useSectionBadges } from '../../navigation/sectionBadges'
 import { useAuthStore } from '../../store/auth.store'
 
 interface SidebarProps {
@@ -18,19 +19,27 @@ interface SidebarProps {
   onToggleMini: () => void
 }
 
-interface NavEntry { key: string; icon: ModuleNavItem['icon']; label: string; route: string; badge?: string }
+interface NavEntry {
+  key: string; icon: ModuleNavItem['icon']; label: string; route: string
+  badge?: string
+  /** Hide the badge while this item is the current page (no need to remind
+   *  people of what they are already looking at). */
+  badgeHideWhenActive?: boolean
+}
 
 function NavSection({ label, items, onNavigate }: { label: string; items: NavEntry[]; onNavigate: () => void }) {
   if (items.length === 0) return null
   return (
     <div className="hf-nav-section" role="group" aria-label={label}>
       <div className="hf-nav-section-label" aria-hidden="true">{label}</div>
-      {items.map(({ key, icon: Icon, label: text, route, badge }) => (
-        <NavLink key={key} to={route} title={text} onClick={onNavigate}
+      {items.map(({ key, icon: Icon, label: text, route, badge, badgeHideWhenActive }) => (
+        <NavLink key={key} to={route} title={badge ? `${text} (${badge})` : text} onClick={onNavigate}
           className={({ isActive }) => 'hf-nav-item' + (isActive ? ' active' : '')}>
-          <Icon size={18} aria-hidden="true" />
-          <span className="hf-nav-label">{text}</span>
-          {badge && <span className="hf-nav-badge">{badge}</span>}
+          {({ isActive }) => (<>
+            <Icon size={18} aria-hidden="true" />
+            <span className="hf-nav-label">{text}</span>
+            {badge && !(badgeHideWhenActive && isActive) && <span className="hf-nav-badge">{badge}</span>}
+          </>)}
         </NavLink>
       ))}
     </div>
@@ -105,6 +114,7 @@ function ContextNav({ config, onNavigate, onShowAll }: {
   config: ModuleSections; onNavigate: () => void; onShowAll: () => void
 }) {
   const permissions = useAuthStore(s => s.user?.permissions ?? NO_PERMISSIONS)
+  const badges = useSectionBadges(config)
   const Icon = config.icon
   return (
     <>
@@ -119,7 +129,8 @@ function ContextNav({ config, onNavigate, onShowAll }: {
       {visibleGroups(config, permissions).map(group => (
         <NavSection key={group.label} label={group.label} onNavigate={onNavigate}
           items={group.sections.map(sec => ({
-            key: sec.id, icon: sec.icon, label: sec.label, badge: sec.badge,
+            key: sec.id, icon: sec.icon, label: sec.label,
+            badge: sec.badge ?? badges[sec.id], badgeHideWhenActive: !!sec.liveBadge,
             route: `${config.basePath}/${sec.id}`,
           }))} />
       ))}

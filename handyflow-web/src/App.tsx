@@ -285,10 +285,10 @@ export default function App() {
             <Route path="/earthmoving" element={<EarthMovingPage />} />
             <Route path="/property"    element={<PropertyPage />} />
  <Route path="/fleet/:section?" element={<FleetPage />} />
-            <Route path="/bookings"    element={<BookingsPage />} />
+            <Route path="/bookings/:section?" element={<BookingsPage />} />
             <Route path="/accounting/:section?" element={<AccountingPage />} />
             <Route path="/settings"    element={<SettingsPage />} />
-            <Route path="/hr"          element={<HrPage />} />
+            <Route path="/hr/:section?" element={<HrPage />} />
             <Route path="/clinic"      element={<ClinicPage />} />
             <Route path="/events"      element={<EventsPage />} />
             <Route path="/contracts"   element={<ContractingPage />} />

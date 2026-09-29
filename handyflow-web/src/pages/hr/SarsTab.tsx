@@ -73,7 +73,7 @@ export default function SarsTab() {
           { task: "File payslips for employees",            note: "Employees entitled to payslip each pay period (BCEA s.33)" },
         ].map(item => (
           <div key={item.task} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--hf-border-subtle)" }}>
-            <CheckCircle size={14} color="#0D9488" style={{ flexShrink: 0, marginTop: 1 }} />
+            <CheckCircle size={14} style={{ color: 'var(--hf-accent-text)', flexShrink: 0, marginTop: 1 }} />
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)" }}>{item.task}</div>
               <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{item.note}</div>

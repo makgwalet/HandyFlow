@@ -158,7 +158,7 @@ export default function PayrollTab() {
                         <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>net pay</div>
                       </div>
                     )}
-                    {isOpen ? <ChevronUp size={16} color="#94A3B8" /> : <ChevronDown size={16} color="#94A3B8" />}
+                    {isOpen ? <ChevronUp size={16} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={16} style={{ color: 'var(--hf-text-faint)' }} />}
                   </div>
                 </div>
 

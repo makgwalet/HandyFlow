@@ -13,12 +13,12 @@ import {
 } from "lucide-react"
 
 const STATUS_STYLE: Record<string, { color: string; bg: string; label: string }> = {
-  PENDING:     { color: "#D97706", bg: "#FFFBEB", label: "Pending" },
-  CONFIRMED:   { color: "#1D4ED8", bg: "#EFF6FF", label: "Confirmed" },
-  IN_PROGRESS: { color: "#7C3AED", bg: "#F5F3FF", label: "In Progress" },
-  COMPLETED:   { color: "#166534", bg: "#DCFCE7", label: "Completed" },
-  CANCELLED:   { color: "#DC2626", bg: "#FEF2F2", label: "Cancelled" },
-  NO_SHOW:     { color: "#64748B", bg: "#F8FAFC", label: "No Show" },
+  PENDING:     { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", label: "Pending" },
+  CONFIRMED:   { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", label: "Confirmed" },
+  IN_PROGRESS: { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", label: "In Progress" },
+  COMPLETED:   { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", label: "Completed" },
+  CANCELLED:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", label: "Cancelled" },
+  NO_SHOW:     { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)", label: "No Show" },
 }
 
 const fmtTime = (t: string) => t?.substring(0, 5) ?? "—"
@@ -34,7 +34,7 @@ function Skeleton({ w = "100%", h = 18, mb = 0 }: { w?: string | number; h?: num
   )
 }
 
-export default function BookingsDashboard({ onNavigate }: { onNavigate: (tab: any) => void }) {
+export default function BookingsDashboard({ onNavigate }: { onNavigate: (section: string) => void }) {
 
   // WHY two separate queries instead of one large fetch?
   // "Today's schedule" needs date=today (small, fast).
@@ -98,10 +98,10 @@ export default function BookingsDashboard({ onNavigate }: { onNavigate: (tab: an
       {/* ── KPI row ─────────────────────────────────────────────────────── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
         {[
-          { label: "Today's bookings", value: todayBookings.length, color: "#1B3A6B", icon: Calendar },
-          { label: "Confirmed today",  value: todayConfirmed,       color: "#1D4ED8", icon: CheckCircle },
-          { label: "Pending today",    value: todayPending,         color: "#D97706", icon: AlertCircle },
-          { label: "Today's revenue",  value: fmtR(todayRevenue),   color: "#166534", icon: Clock, isR: true },
+          { label: "Today's bookings", value: todayBookings.length, color: "var(--hf-primary-text)", icon: Calendar },
+          { label: "Confirmed today",  value: todayConfirmed,       color: "var(--hf-info-text)", icon: CheckCircle },
+          { label: "Pending today",    value: todayPending,         color: "var(--hf-warning-text)", icon: AlertCircle },
+          { label: "Today's revenue",  value: fmtR(todayRevenue),   color: "var(--hf-success-text-strong)", icon: Clock, isR: true },
         ].map(k => (
           <div
             key={k.label}
@@ -111,7 +111,7 @@ export default function BookingsDashboard({ onNavigate }: { onNavigate: (tab: an
             onMouseLeave={e => (e.currentTarget.style.boxShadow = "none")}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: "var(--hf-text-faint)", textTransform: "uppercase" }}>{k.label}</div>
-              <k.icon size={15} color={k.color} />
+              <k.icon size={15} style={{ color: k.color }} />
             </div>
             {loadingToday
               ? <Skeleton h={28} />
@@ -147,7 +147,7 @@ export default function BookingsDashboard({ onNavigate }: { onNavigate: (tab: an
             </div>
           ) : todayBookings.length === 0 ? (
             <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--hf-text-faint)", border: "1px dashed var(--hf-border)", borderRadius: 12 }}>
-              <Calendar size={32} color="#CBD5E1" style={{ marginBottom: 10 }} />
+              <Calendar size={32} style={{ color: 'var(--hf-text-disabled)', marginBottom: 10 }} />
               <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No bookings today</div>
               <button
                 onClick={() => onNavigate("bookings")}
@@ -194,8 +194,8 @@ export default function BookingsDashboard({ onNavigate }: { onNavigate: (tab: an
               <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.6)", marginBottom: 8, textTransform: "uppercase" }}>Next up</div>
               <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{upcoming.clientName}</div>
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", marginBottom: 12 }}>{upcoming.serviceName}</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 22, fontWeight: 800, color: "#4ADE80" }}>
-                <Clock size={18} color="#4ADE80" />{fmtTime(upcoming.startTime)}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 22, fontWeight: 800, color: "var(--hf-success-on-solid)" }}>
+                <Clock size={18} style={{ color: "var(--hf-success-on-solid)" }} />{fmtTime(upcoming.startTime)}
               </div>
               {upcoming.staffName && (
                 <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 8 }}>
@@ -209,9 +209,9 @@ export default function BookingsDashboard({ onNavigate }: { onNavigate: (tab: an
           <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 18 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 14 }}>All time</div>
             {[
-              { label: "Total completed", value: completedTotal ?? "—", color: "#166534" },
-              { label: "No-show rate",    value: `${noShowRate}%`,       color: parseFloat(noShowRate) > 10 ? "#DC2626" : "#166534" },
-              { label: "Total bookings",  value: totalBookings ?? "—",   color: "#1B3A6B" },
+              { label: "Total completed", value: completedTotal ?? "—", color: "var(--hf-success-text-strong)" },
+              { label: "No-show rate",    value: `${noShowRate}%`,       color: parseFloat(noShowRate) > 10 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)" },
+              { label: "Total bookings",  value: totalBookings ?? "—",   color: "var(--hf-primary-text)" },
             ].map(s => (
               <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--hf-border-subtle)" }}>
                 <span style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>{s.label}</span>
@@ -224,9 +224,9 @@ export default function BookingsDashboard({ onNavigate }: { onNavigate: (tab: an
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 10 }}>Quick actions</div>
             {[
-              { label: "New booking",      tab: "bookings",     color: "#1B3A6B" },
-              { label: "Manage services",  tab: "services",     color: "#0D9488" },
-              { label: "Set availability", tab: "availability", color: "#7C3AED" },
+              { label: "New booking",      tab: "bookings",     color: "var(--hf-primary-text)" },
+              { label: "Manage services",  tab: "services",     color: "var(--hf-accent-text)" },
+              { label: "Set availability", tab: "availability", color: "var(--hf-violet-text)" },
             ].map(a => (
               <button
                 key={a.label}

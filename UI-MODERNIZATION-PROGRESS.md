@@ -122,6 +122,23 @@ Correction to the original analysis: its per-module "tab counts" were file count
 - Colours: 36 -> 0. Deadline-type colours map to `-text` tokens (they feed both text and `color-mix` tints). An overdue-row tint that was `#FFF8F8` is now `color-mix(danger-soft 50%, surface)`, which is the same colour in light mode.
 - No double-unwrap sites.
 
+### Bug found: colours that are DATA must stay literals (regression from Phase 0)
+The Phase 0 codemod converted the default colour of a new bookable service (`EMPTY_FORM.color`, and the edit fallback) to `var(--hf-accent-text)`. That value is saved to `booking_services.color VARCHAR(7)`, so creating a service without touching the swatches (or editing one with no colour) would fail with a value-too-long error. Fixed; the swatch palette and default are literals with a comment saying why.
+- Prevention: `scripts/theme-codemod/data-context.mjs` classifies a colour as data when it is in form/initial state, an API payload (`apiClient.post`, `mutate`), persisted (`localStorage`, `JSON.stringify`), fed to a state setter, or a data-named constant (`EMPTY_FORM`, `DEFAULT_*`). Both codemods now skip those and report them.
+- Detection: `npm run audit:data-colors` finds any `var(--hf-*)` in those positions (exit 1 if any). Run it in CI. Suppress a reviewed false positive with `// data-color-ok: <why>`.
+- Whole-app result: the only conversion in a data position was this one. The guard would also have stopped `TasksPage` (board colour form default, `tasks.color VARCHAR(20)`) from being broken when Tasks is migrated.
+- Checked the other colour-bearing backend fields: desk categories (display maps only), fleet `colour` (free-text paint colour, different property name), email branding (no frontend).
+
+### HR ✅
+- Routed sections `/hr/:section`; opens on Employees as before (`/hr` redirects to `/hr/employees`). Groups: Overview (Dashboard); People (Employees, Leave, Disciplinary); Payroll & compliance (Payroll, Compliance).
+- Fixed a dead button: the dashboard's "Download EMP201" quick action navigated to a `sars` tab that no longer exists, so it opened an empty panel. It now opens Compliance, where EMP201 lives. (`SarsTab.tsx` is an unused older duplicate of `ComplianceTab`; left in place.)
+- Colours: 36 -> 0 (department chart palette moved to `-text` tokens).
+
+### Bookings ✅
+- Routed sections `/bookings/:section`: Overview (Dashboard); Schedule (Calendar, Bookings); Setup (Services, Staff, Availability).
+- The pending-count pill that sat on the Bookings tab is now a live badge on that sidebar item (`navigation/sectionBadges.ts`, same `bookings-pending-count` query key, so the invalidation after confirming a booking still refreshes it). Fetched only while inside Bookings. In icons-only mode any badge (this one and Security's LIVE) collapses to a dot on the icon.
+- Colours: 52 -> 0, except the service colour swatches, which are data (see above).
+
 
 ## Bug found during Phase 2 review: double-unwrapped API responses
 

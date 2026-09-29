@@ -105,7 +105,7 @@ export default function LeaveTab() {
     <div>
       {pending.length > 0 && (
         <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
-          <Clock size={16} color="#D97706" style={{ flexShrink: 0 }} />
+          <Clock size={16} style={{ color: 'var(--hf-warning-text)', flexShrink: 0 }} />
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-warning-text)" }}>{pending.length} request{pending.length !== 1 ? "s" : ""} awaiting approval</div>
             <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>{pending.slice(0, 2).map((r: any) => `${r.employeeName} (${r.leaveType})`).join(" · ")}</div>
@@ -128,7 +128,7 @@ export default function LeaveTab() {
                   <span style={{ fontWeight: 600, fontSize: 13, color: "var(--hf-text)" }}>{emp.fullName}</span>
                   <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{emp.employeeNumber}</span>
                 </div>
-                {expandedEmp === emp.id ? <ChevronUp size={14} color="#94A3B8" /> : <ChevronDown size={14} color="#94A3B8" />}
+                {expandedEmp === emp.id ? <ChevronUp size={14} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={14} style={{ color: 'var(--hf-text-faint)' }} />}
               </div>
               {expandedEmp === emp.id && (
                 <div style={{ padding: "12px 14px", background: "var(--hf-surface-muted)", borderTop: "1px solid var(--hf-border)" }}>
@@ -137,7 +137,7 @@ export default function LeaveTab() {
                       const cfg = LEAVE_CFG[b.leaveType]
                       const avail = Number(b.availableDays)
                       return (
-                        <div key={b.id} style={{ background: "var(--hf-surface)", border: `1px solid ${avail <= 0 ? "#FECACA" : "#E2E8F0"}`, borderRadius: 8, padding: "10px 14px", minWidth: 110 }}>
+                        <div key={b.id} style={{ background: "var(--hf-surface)", border: `1px solid ${avail <= 0 ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 8, padding: "10px 14px", minWidth: 110 }}>
                           <div style={{ fontSize: 10, fontWeight: 700, color: cfg?.color ?? "var(--hf-text-muted)", marginBottom: 4, textTransform: "uppercase" as const }}>{cfg?.label ?? b.leaveType}</div>
                           <div style={{ fontSize: 18, fontWeight: 700, color: avail <= 0 ? "var(--hf-danger-text)" : "var(--hf-accent-text)" }}>{avail.toFixed(1)}</div>
                           <div style={{ fontSize: 10, color: "var(--hf-text-faint)" }}>{Number(b.takenDays).toFixed(1)} taken · {Number(b.entitledDays).toFixed(1)} total</div>
@@ -192,7 +192,7 @@ export default function LeaveTab() {
             const tCfg  = LEAVE_CFG[req.leaveType] ?? LEAVE_CFG.ANNUAL
             const SIcon = sCfg.icon
             return (
-              <div key={req.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", border: `1px solid ${req.status === "PENDING" ? "#FDE68A" : "#E2E8F0"}`, borderLeft: `4px solid ${sCfg.color}`, borderRadius: 10, background: "var(--hf-surface)" }}>
+              <div key={req.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", border: `1px solid ${req.status === "PENDING" ? "var(--hf-warning-border)" : "var(--hf-border)"}`, borderLeft: `4px solid ${sCfg.color}`, borderRadius: 10, background: "var(--hf-surface)" }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
                     <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{req.employeeName}</span>

@@ -125,7 +125,7 @@ export default function StaffTab() {
 
   const inpStyle = (key: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px",
-    border: `1.5px solid ${errors[key] ? "#DC2626" : "#E2E8F0"}`,
+    border: `1.5px solid ${errors[key] ? "var(--hf-danger)" : "var(--hf-border)"}`,
     borderRadius: 8, fontSize: 14, boxSizing: "border-box",
     background: errors[key] ? "var(--hf-danger-soft)" : "var(--hf-surface)",
   })
@@ -142,7 +142,7 @@ export default function StaffTab() {
 
       {staff.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
-          <Users size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
+          <Users size={36} style={{ color: 'var(--hf-text-disabled)', marginBottom: 12 }} />
           <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)", marginBottom: 4 }}>No staff members yet</div>
         </div>
       ) : (
@@ -178,8 +178,8 @@ export default function StaffTab() {
                 )}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                {s.email && <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--hf-text-muted)" }}><Mail size={12} color="#94A3B8" />{s.email}</div>}
-                {s.phone && <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--hf-text-muted)" }}><Phone size={12} color="#94A3B8" />{s.phone}</div>}
+                {s.email && <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--hf-text-muted)" }}><Mail size={12} style={{ color: 'var(--hf-text-faint)' }} />{s.email}</div>}
+                {s.phone && <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--hf-text-muted)" }}><Phone size={12} style={{ color: 'var(--hf-text-faint)' }} />{s.phone}</div>}
               </div>
             </div>
           ))}
@@ -246,8 +246,8 @@ export default function StaffTab() {
                     style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 9, cursor: "pointer",
                       border: assigned ? "2px solid var(--hf-accent)" : "1.5px solid var(--hf-border)",
                       background: assigned ? "var(--hf-success-soft)" : "var(--hf-surface-muted)", textAlign: "left" }}>
-                    <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${assigned ? "#0D9488" : "#CBD5E1"}`, background: assigned ? "var(--hf-accent)" : "white", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      {assigned && <Check size={10} color="white" />}
+                    <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${assigned ? "var(--hf-accent)" : "var(--hf-border-strong)"}`, background: assigned ? "var(--hf-accent)" : "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      {assigned && <Check size={10} style={{ color: "var(--hf-text-on-solid)" }} />}
                     </div>
                     <div style={{ width: 10, height: 10, borderRadius: "50%", background: svc.color, flexShrink: 0 }} />
                     <span style={{ fontSize: 14, fontWeight: 500, color: "var(--hf-text)" }}>{svc.name}</span>
@@ -273,7 +273,7 @@ export default function StaffTab() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, backdropFilter: "blur(2px)" }}>
           <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", textAlign: "center" }}>
             <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--hf-danger-soft)", border: "2px solid var(--hf-danger-border)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-              <Trash2 size={22} color="#DC2626" />
+              <Trash2 size={22} style={{ color: 'var(--hf-danger-text)' }} />
             </div>
             <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Deactivate Staff Member?</h3>
             <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: "0 0 6px" }}>

@@ -95,8 +95,16 @@
 [data-sidebar='mini'] .hf-sidebar-brand { justify-content: center; padding: 0; }
 [data-sidebar='mini'] .hf-sidebar-brand-name,
 [data-sidebar='mini'] .hf-nav-label,
-[data-sidebar='mini'] .hf-nav-section-label,
-[data-sidebar='mini'] .hf-nav-badge { display: none; }
+[data-sidebar='mini'] .hf-nav-section-label { display: none; }
+/* A badge (LIVE, pending count) collapses to a dot on the icon so the signal
+   is not lost when the sidebar is icons-only. */
+[data-sidebar='mini'] .hf-nav-item { position: relative; }
+[data-sidebar='mini'] .hf-nav-badge {
+  position: absolute; top: 6px; right: 14px;
+  width: 8px; height: 8px; min-width: 0; padding: 0; margin: 0;
+  border-radius: 50%; font-size: 0; line-height: 0; color: transparent;
+  border: 2px solid var(--hf-surface); box-sizing: content-box;
+}
 [data-sidebar='mini'] .hf-nav-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--hf-border-subtle); }
 [data-sidebar='mini'] .hf-nav-section:first-child { border-top: 0; padding-top: 0; }
 [data-sidebar='mini'] .hf-nav-item,
@@ -266,8 +274,11 @@
   [data-sidebar='mini'] .hf-sidebar-brand { justify-content: flex-start; padding: 0 18px; }
   [data-sidebar='mini'] .hf-sidebar-brand-name,
   [data-sidebar='mini'] .hf-nav-label,
-  [data-sidebar='mini'] .hf-nav-section-label,
-  [data-sidebar='mini'] .hf-nav-badge { display: initial; }
+  [data-sidebar='mini'] .hf-nav-section-label { display: initial; }
+  [data-sidebar='mini'] .hf-nav-badge {
+    position: static; width: auto; height: auto; min-width: 0; margin-left: auto; padding: 1px 5px;
+    border-radius: 4px; font-size: 9px; line-height: normal; color: var(--hf-text-on-solid); border: 0; box-sizing: border-box;
+  }
   [data-sidebar='mini'] .hf-nav-context-title { justify-content: flex-start; padding: 8px 10px; }
   [data-sidebar='mini'] .hf-nav-item { justify-content: flex-start; padding: 0 10px; }
   .hf-main, [data-sidebar='mini'] .hf-main { margin-left: 0; }
