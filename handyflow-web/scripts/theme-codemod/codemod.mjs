@@ -25,6 +25,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import ts from 'typescript'
+import { classifyDataPosition } from './data-context.mjs'
 import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -133,6 +134,10 @@ for (const file of scanRoots.flatMap(r => walk(r))) {
       if (owner.kind === 'comparison') return skip('used in a comparison')
       if (owner.kind === 'jsx-attr') return skip(`JSX attribute ${owner.name}= (SVG/icon prop)`)
       if (owner.kind === 'other' || !owner.name) return skip('not a property value (constant, array, argument)')
+      // Colours that are data (form defaults, API payloads, persisted values)
+      // must stay literals; see data-context.mjs.
+      const dataWhy = classifyDataPosition(node, sf)
+      if (dataWhy) return skip(`data position, kept as literal: ${dataWhy.split(' (')[0]}`)
       const role = ROLE_BY_PROP.get(owner.name)
       if (!role) return skip(`unknown property "${owner.name}"`)
       const inStyle = owner.kind === 'style-assign' || insideStyleAttr(node)

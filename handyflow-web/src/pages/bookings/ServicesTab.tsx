@@ -17,7 +17,11 @@ interface Service {
   minLeadTimeMinutes: number; maxAdvanceDays: number
 }
 
+// A service's colour is DATA: it is saved to `booking_services.color VARCHAR(7)` and
+// must always be a #RRGGBB literal, never a CSS variable (which would overflow the
+// column and break saving). Only DISPLAY of the colour may use tokens.
 const COLORS    = ["#0D9488", "#1D4ED8", "#7C3AED", "#DC2626", "#D97706", "#166534", "#DB2777", "#0891B2"]
+const DEFAULT_SERVICE_COLOR = COLORS[0]
 const DURATIONS = [15, 30, 45, 60, 90, 120, 180, 240]
 const BUFFERS   = [0, 5, 10, 15, 20, 30]
 const LEAD_MINS = [0, 30, 60, 120, 240, 480]   // 0 = no restriction, up to 8h
@@ -25,7 +29,7 @@ const ADVANCE_DAYS = [30, 60, 90, 180, 365]
 
 const EMPTY_FORM = {
   name: "", description: "", durationMinutes: "60", price: "",
-  color: "#0D9488",
+  color: DEFAULT_SERVICE_COLOR,
   bufferBeforeMinutes: "0", bufferAfterMinutes: "0",
   minLeadTimeMinutes: "0", maxAdvanceDays: "90",
 }
@@ -101,7 +105,7 @@ export default function ServicesTab() {
     setEditing(s)
     setForm({
       name: s.name, description: s.description ?? "", durationMinutes: String(s.durationMinutes),
-      price: String(s.price ?? ""), color: s.color ?? "#0D9488",
+      price: String(s.price ?? ""), color: s.color ?? DEFAULT_SERVICE_COLOR,
       bufferBeforeMinutes: String(s.bufferBeforeMinutes ?? 0),
       bufferAfterMinutes:  String(s.bufferAfterMinutes ?? 0),
       minLeadTimeMinutes:  String(s.minLeadTimeMinutes ?? 0),
@@ -118,9 +122,9 @@ export default function ServicesTab() {
 
   const inpStyle = (key: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px",
-    border: `1.5px solid ${errors[key] ? "#DC2626" : "#E2E8F0"}`,
+    border: `1.5px solid ${errors[key] ? "var(--hf-danger)" : "var(--hf-border)"}`,
     borderRadius: 8, fontSize: 14, boxSizing: "border-box",
-    background: errors[key] ? "#FFF5F5" : "#fff",
+    background: errors[key] ? "var(--hf-danger-soft)" : "var(--hf-surface)",
   })
 
   const FieldErr = ({ name }: { name: string }) =>
@@ -144,7 +148,7 @@ export default function ServicesTab() {
 
       {services.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
-          <Tag size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
+          <Tag size={36} style={{ color: 'var(--hf-text-disabled)', marginBottom: 12 }} />
           <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)", marginBottom: 4 }}>No services yet</div>
         </div>
       ) : (
@@ -173,7 +177,7 @@ export default function ServicesTab() {
                 </div>
                 <div style={{ display: "flex", gap: 14, marginBottom: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "var(--hf-text-muted)" }}>
-                    <Clock size={13} color={s.color ?? "#0D9488"} />{s.durationMinutes} min
+                    <Clock size={13} style={{ color: s.color ?? "var(--hf-accent-text)" }} />{s.durationMinutes} min
                   </div>
                   <div style={{ fontWeight: 800, fontSize: 16, color: s.color ?? "var(--hf-accent-text)" }}>{fmtR(s.price)}</div>
                 </div>
@@ -250,7 +254,7 @@ export default function ServicesTab() {
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {COLORS.map(c => (
                     <button key={c} onClick={() => setForm(f => ({ ...f, color: c }))}
-                      style={{ width: 30, height: 30, borderRadius: "50%", background: c, border: form.color === c ? "3px solid #0F172A" : "2px solid transparent", cursor: "pointer" }} />
+                      style={{ width: 30, height: 30, borderRadius: "50%", background: c, border: form.color === c ? "3px solid var(--hf-text)" : "2px solid transparent", cursor: "pointer" }} />
                   ))}
                 </div>
               </div>
@@ -362,7 +366,7 @@ export default function ServicesTab() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, backdropFilter: "blur(2px)" }}>
           <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", textAlign: "center" }}>
             <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--hf-danger-soft)", border: "2px solid var(--hf-danger-border)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-              <Trash2 size={22} color="#DC2626" />
+              <Trash2 size={22} style={{ color: 'var(--hf-danger-text)' }} />
             </div>
             <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Delete Service?</h3>
             <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: "0 0 6px" }}>
@@ -391,5 +395,5 @@ export default function ServicesTab() {
   )
 }
 
-const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }
-const lbl: React.CSSProperties        = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }
+const lbl: React.CSSProperties        = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }

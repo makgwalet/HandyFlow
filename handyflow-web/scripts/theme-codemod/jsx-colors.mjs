@@ -22,6 +22,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
+import { classifyDataPosition } from './data-context.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '../..')
@@ -92,7 +93,7 @@ for (const file of scanRoots.flatMap(r => walk(r))) {
 
   const visit = node => {
     // A. alpha suffix inside a template feeding a colour property
-    if (ts.isTemplateExpression(node) && COLOUR_PROPS.has(owningProp(node) ?? '')) {
+    if (ts.isTemplateExpression(node) && COLOUR_PROPS.has(owningProp(node) ?? '') && !classifyDataPosition(node, sf)) {
       for (const span of node.templateSpans) {
         const lit = span.literal
         const raw = text.slice(lit.getStart(sf), lit.getEnd()) // starts with "}"
