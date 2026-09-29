@@ -15,7 +15,7 @@ import {
   Handshake,
   Warehouse,
   ClipboardCheck,
-  ShieldCheck, Wheat
+  ShieldCheck, Wheat, GraduationCap
 } from 'lucide-react'
 import { apiClient } from '../../api/client'
 import { useAuthStore } from '../../store/auth.store'
@@ -69,6 +69,8 @@ const MODULE_REGISTRY: Record<string, AppTile> = {
   compliancetender: { key: 'compliancetender', name: 'Business Compliance & Tender', description: 'CIPC, SARS, PSIRA registrations & tender workspace', icon: ClipboardCheck, bg: 'var(--hf-sky-soft-strong)', iconColor: 'var(--hf-sky-text-strong)', route: '/compliancetender' },
   complianceservices: { key: 'complianceservices', name: 'Compliance Services', description: 'Manage compliance and tender work for your client companies', icon: Building2, bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text-strong)', route: '/complianceservices' },
   'internal-audit': { key: 'internal-audit', name: 'Internal Audit', description: 'Risk-based audit planning, annual plan and engagement management', icon: ShieldCheck, bg: 'var(--hf-surface-sunken)', iconColor: 'var(--hf-text-secondary)', route: '/internal-audit' },
+  trainingprovider: { key: 'trainingprovider', name: 'Training Provider', description: 'Courses, sessions & certificates', icon: GraduationCap, bg: 'var(--hf-warning-soft)', iconColor: 'var(--hf-warning-text-strong)', route: '/training-provider' },
+  training: { key: 'training', name: 'Training & L&D', description: 'Employee courses & certifications', icon: BookOpen, bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text)', route: '/training' },
   agriculture: { key: 'agriculture', name: 'Agriculture', description: 'Farms, livestock, health, breeding & feed', icon: Wheat, bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text-strong)', route: '/agriculture' },
   debtcollection: { key: 'debtcollection',  name: 'Debt Collection', description: 'Cases, contact trail & payment plans', icon: Landmark, bg: 'var(--hf-orange-soft)', iconColor: 'var(--hf-orange-text-strong)', route: '/debtcollection',
 

@@ -12,6 +12,7 @@ import {
   HeartPulse, PartyPopper, FilePen, Wallet, Briefcase,
   Palette, Headphones, CheckSquare, Megaphone, UserCheck, ShoppingCart,
   Truck, Receipt, UserCog, ShieldCheck, Wheat,
+  Handshake, Warehouse, Scale, ClipboardCheck, Landmark, GraduationCap, BookOpen,
 } from 'lucide-react'
 import type { ElementType } from 'react'
 import { apiClient } from '../api/client'
@@ -50,6 +51,18 @@ export const MODULE_REGISTRY: Record<string, Omit<ModuleNavItem, 'key'>> = {
   accountant:   { icon: UserCog,       label: 'Accountant',   route: '/accountant'   },
   'internal-audit': { icon: ShieldCheck, label: 'Internal Audit', route: '/internal-audit' },
   agriculture:  { icon: Wheat,         label: 'Agriculture',  route: '/agriculture'  },
+  // Present on the dashboard but missing here until now, so they were absent
+  // from the sidebar and the Ctrl+K switcher.
+  collectionsagency:  { icon: Handshake,      label: 'Collections Agency',           route: '/collections-agency' },
+  warehousing:        { icon: Warehouse,      label: 'Warehousing',                  route: '/warehousing'        },
+  legalcompliance:    { icon: Scale,          label: 'Legal & Compliance',           route: '/legalcompliance'    },
+  compliancetender:   { icon: ClipboardCheck, label: 'Business Compliance & Tender', route: '/compliancetender'   },
+  complianceservices: { icon: Building2,      label: 'Compliance Services',          route: '/complianceservices' },
+  debtcollection:     { icon: Landmark,       label: 'Debt Collection',              route: '/debtcollection'     },
+  projects:           { icon: HardHat,        label: 'Projects',                     route: '/projects'           },
+  // Active catalogue modules that were on neither the dashboard nor the sidebar.
+  training:           { icon: BookOpen,       label: 'Training & L&D',               route: '/training'           },
+  trainingprovider:   { icon: GraduationCap,  label: 'Training Provider',            route: '/training-provider'  },
 }
 
 /** Always reachable regardless of subscription. */
