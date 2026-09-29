@@ -17,7 +17,8 @@ interface PO {
   createdByName: string | null; approvedByName: string | null; rejectionReason: string | null
 }
 
-const ACCENT = "#D97706"
+const ACCENT = "var(--hf-warning)"            // fills and borders
+const ACCENT_TEXT = "var(--hf-warning-text)"  // text and icons (lighter in dark mode)
 const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 9, fontSize: 14, boxSizing: "border-box", outline: "none", background: "var(--hf-surface)" }
 const fmtR = (n: number) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtD = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
@@ -157,7 +158,7 @@ export function PurchaseOrdersTab() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT }}>{detail.orderNumber}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT_TEXT }}>{detail.orderNumber}</span>
               <span style={{ background: st.bg, color: st.color, fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 20 }}>{st.label}</span>
             </div>
             <div style={{ fontSize: 18, fontWeight: 800, color: "var(--hf-text)", marginBottom: 4 }}>{detail.supplierName}</div>
@@ -177,23 +178,23 @@ export function PurchaseOrdersTab() {
             {/* NEW (gap analysis): available regardless of status, unlike
                 the lifecycle-transition buttons below — this is a
                 reference/download action, not a state change. */}
-            <ActionBtn onClick={() => downloadPdf(detail)} color="#374151" bg="#F8FAFC" border="#E2E8F0" icon={Download}>
+            <ActionBtn onClick={() => downloadPdf(detail)} color="var(--hf-text-secondary)" bg="var(--hf-surface-muted)" border="var(--hf-border)" icon={Download}>
               {downloadingPdf ? "Downloading…" : "Download PDF"}
             </ActionBtn>
             {detail.status === "DRAFT" && (
               <>
-                <ActionBtn onClick={() => { setShowAddLine(true); setErr("") }} color={ACCENT} bg="#FEF3C7" border="#FCD34D" icon={Plus}>Add Line</ActionBtn>
-                <ActionBtn onClick={() => { setErr(""); actionMut.mutate({ action: "submit" }) }} color="#1D4ED8" bg="#DBEAFE" border="#93C5FD" icon={Send}>Submit for Approval</ActionBtn>
+                <ActionBtn onClick={() => { setShowAddLine(true); setErr("") }} color={ACCENT_TEXT} bg="var(--hf-warning-soft-strong)" border="var(--hf-warning-border-strong)" icon={Plus}>Add Line</ActionBtn>
+                <ActionBtn onClick={() => { setErr(""); actionMut.mutate({ action: "submit" }) }} color="var(--hf-info-text)" bg="var(--hf-info-soft-strong)" border="var(--hf-info-border)" icon={Send}>Submit for Approval</ActionBtn>
               </>
             )}
             {detail.status === "PENDING_APPROVAL" && (
               <>
-                <ActionBtn onClick={() => { setErr(""); actionMut.mutate({ action: "approve" }) }} color="#166534" bg="#DCFCE7" border="#86EFAC" icon={CheckCircle}>Approve</ActionBtn>
-                <ActionBtn onClick={() => { setShowReject(true); setErr("") }} color="#DC2626" bg="#FEE2E2" border="#FECACA" icon={XCircle}>Reject</ActionBtn>
+                <ActionBtn onClick={() => { setErr(""); actionMut.mutate({ action: "approve" }) }} color="var(--hf-success-text-strong)" bg="var(--hf-success-soft-strong)" border="var(--hf-success-border)" icon={CheckCircle}>Approve</ActionBtn>
+                <ActionBtn onClick={() => { setShowReject(true); setErr("") }} color="var(--hf-danger-text)" bg="var(--hf-danger-soft-strong)" border="var(--hf-danger-border)" icon={XCircle}>Reject</ActionBtn>
               </>
             )}
             {detail.status === "APPROVED" && (
-              <ActionBtn onClick={() => { setErr(""); actionMut.mutate({ action: "send" }) }} color="#7C3AED" bg="#EDE9FE" border="#C4B5FD" icon={Send}>Mark as Sent</ActionBtn>
+              <ActionBtn onClick={() => { setErr(""); actionMut.mutate({ action: "send" }) }} color="var(--hf-violet-text)" bg="var(--hf-violet-soft-strong)" border="var(--hf-violet-border)" icon={Send}>Mark as Sent</ActionBtn>
             )}
           </div>
         </div>
@@ -231,7 +232,7 @@ export function PurchaseOrdersTab() {
                       <td style={{ padding: "10px 12px", fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{l.itemName}</td>
                       <td style={{ padding: "10px 12px", fontSize: 12, color: "var(--hf-text-muted)" }}>{l.supplierSku ?? "—"}</td>
                       <td style={{ padding: "10px 12px", fontSize: 13 }}>{l.qtyOrdered.toFixed(2)}</td>
-                      <td style={{ padding: "10px 12px", fontSize: 13, color: l.isFullyReceived ? "var(--hf-success-text)" : l.qtyReceived > 0 ? ACCENT : "var(--hf-text-faint)" }}>{l.qtyReceived.toFixed(2)}{l.isFullyReceived && " ✓"}</td>
+                      <td style={{ padding: "10px 12px", fontSize: 13, color: l.isFullyReceived ? "var(--hf-success-text)" : l.qtyReceived > 0 ? ACCENT_TEXT : "var(--hf-text-faint)" }}>{l.qtyReceived.toFixed(2)}{l.isFullyReceived && " ✓"}</td>
                       <td style={{ padding: "10px 12px", fontSize: 13 }}>{fmtR(l.unitCost)}</td>
                       <td style={{ padding: "10px 12px", fontSize: 13 }}>{fmtR(l.lineTotal)}</td>
                       <td style={{ padding: "10px 12px", fontSize: 12, color: "var(--hf-text-muted)" }}>{l.vatRate}%</td>
@@ -254,7 +255,7 @@ export function PurchaseOrdersTab() {
               {goodsReceipts.map((gr, i) => (
                 <div key={gr.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderTop: i > 0 ? "1px solid var(--hf-border-subtle)" : "none" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT }}>{gr.receiptNumber}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT_TEXT }}>{gr.receiptNumber}</span>
                     <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{gr.receivedDate ? fmtD(gr.receivedDate) : "—"}</span>
                     <span style={{ background: gr.status === "POSTED" ? "var(--hf-success-soft-strong)" : "var(--hf-surface-sunken)", color: gr.status === "POSTED" ? "var(--hf-success-text-strong)" : "var(--hf-text-tertiary)", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20 }}>
                       {gr.status}
@@ -279,7 +280,7 @@ export function PurchaseOrdersTab() {
               </div>
             ))}
             <div style={{ borderTop: "1px solid var(--hf-border)", paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 800, color: "var(--hf-text)" }}>
-              <span>Total (incl. VAT)</span><span style={{ color: ACCENT }}>{fmtR(detail.totalAmount)}</span>
+              <span>Total (incl. VAT)</span><span style={{ color: ACCENT_TEXT }}>{fmtR(detail.totalAmount)}</span>
             </div>
           </div>
         </div>
@@ -291,7 +292,7 @@ export function PurchaseOrdersTab() {
             <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)}
               placeholder="e.g. Unit costs don't match the agreed quotation." autoFocus
               style={{ ...inp, minHeight: 80, resize: "vertical" }} />
-            <ModalFooter onCancel={() => setShowReject(false)} onConfirm={() => actionMut.mutate({ action: "reject", body: { reason: rejectReason } })} label="Return PO" accent="#DC2626" />
+            <ModalFooter onCancel={() => setShowReject(false)} onConfirm={() => actionMut.mutate({ action: "reject", body: { reason: rejectReason } })} label="Return PO" accent="var(--hf-danger)" />
           </Modal>
         )}
 
@@ -323,7 +324,7 @@ export function PurchaseOrdersTab() {
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {STATUS_FILTERS.map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
-              style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: statusFilter === s ? 700 : 400, border: statusFilter === s ? `1.5px solid ${ACCENT}` : "1px solid var(--hf-border)", background: statusFilter === s ? "var(--hf-warning-soft-strong)" : "var(--hf-surface)", color: statusFilter === s ? ACCENT : "var(--hf-text-muted)" }}>
+              style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: statusFilter === s ? 700 : 400, border: statusFilter === s ? `1.5px solid ${ACCENT}` : "1px solid var(--hf-border)", background: statusFilter === s ? "var(--hf-warning-soft-strong)" : "var(--hf-surface)", color: statusFilter === s ? ACCENT_TEXT : "var(--hf-text-muted)" }}>
               {s ? STATUS_CFG[s]?.label : "All"}
             </button>
           ))}
@@ -351,9 +352,9 @@ export function PurchaseOrdersTab() {
                     const st = STATUS_CFG[po.status] ?? STATUS_CFG.DRAFT
                     return (
                       <tr key={po.id} onClick={() => setDetail(po)} style={{ borderTop: "1px solid var(--hf-border-subtle)", background: i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)", cursor: "pointer" }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#F0F7FF"}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--hf-info-soft)"}
                         onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)"}>
-                        <td style={{ padding: "11px 14px", fontSize: 12, fontWeight: 700, color: ACCENT }}>{po.orderNumber}</td>
+                        <td style={{ padding: "11px 14px", fontSize: 12, fontWeight: 700, color: ACCENT_TEXT }}>{po.orderNumber}</td>
                         <td style={{ padding: "11px 14px", fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{po.supplierName}</td>
                         <td style={{ padding: "11px 14px", fontSize: 13, fontWeight: 600 }}>{fmtR(po.totalAmount)}</td>
                         <td style={{ padding: "11px 14px", fontSize: 12, color: "var(--hf-text-muted)" }}>{fmtD(po.orderDate)}</td>

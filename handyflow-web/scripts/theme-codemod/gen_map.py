@@ -115,8 +115,9 @@ M = {
  # sky
  "#0284C7": ("sky-text","sky",None),
  "#0891B2": ("sky-text",None,None),
- "#0369A1": ("sky-text-strong",None,None),
+ "#0369A1": ("sky-text-strong","sky-solid-strong","sky-solid-strong"),
  "#F0F9FF": (None,"sky-soft",None),
+ "#F0F7FF": (None,"info-soft",None),
  "#ECFEFF": (None,"sky-soft",None),
  "#E0F2FE": (None,"sky-soft-strong",None),
  "#BAE6FD": (None,None,"sky-border"),

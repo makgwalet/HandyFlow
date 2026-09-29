@@ -81,6 +81,9 @@ App-wide dry run of step 1: 67 alpha sites and 566 icon props across 224 files.
 
 ## Phase 3 — module rollout (in progress)
 
+**Status (be careful with earlier optimism):** ~2,600 hard-coded colours remain in `src/pages` (of ~17,700 originally), spread over roughly 30 modules, about 20 of which have their own tab strips. Largest remaining: complianceservices (339), clinic (284), projects (179), creative (149), events (141), contracting (136), invoicing (131), auth pages (114), ap (75), debtcollection (72), quotes (66), customers (58), billing (57), property (56), expenses (54), pos (53), settings (52). Re-measure with the inventory in the last section of this file rather than trusting counts written here.
+
+
 Correction to the original analysis: its per-module "tab counts" were file counts. Agriculture has 3 top-level sections, not 20; the other files are drill-down views. Check each module's real navigation before planning.
 
 ### Agriculture ✅
@@ -140,6 +143,14 @@ The Phase 0 codemod converted the default colour of a new bookable service (`EMP
 - Neither is a tabbed module: each is a single large page (1,430 and 1,707 lines) whose "tabs" live inside a task or candidate detail panel. No routed sections apply, so only colours were migrated (48 + 21 -> 0). Their custom headers carry page-specific actions and were left as is.
 - Tasks: the board colour form default and its swatch palette are DATA (`tasks.color VARCHAR(20)`) and stay `#RRGGBB` literals, with a comment. The data-colour guard skipped that conversion automatically. Stored board/column colours are only ever *displayed* with token fallbacks.
 - Small intentional look changes: progress-bar and time colours use the nearest theme green/red (`#10B981` -> success, `#EF4444` -> danger); the Recruiter Compare button's disabled fill (dark slate `#334155`) is now a light grey surface in light mode.
+
+### Supply Chain and Business Compliance & Tender ✅
+- Routed sections on `SectionedModulePage`. Supply Chain (`/supply-chain/:section`, sidebar key `supply_chain`): Overview; Purchasing (Suppliers, Purchase Orders, Supplier Invoices); Stock (Inventory). Compliance & Tender (`/compliancetender/:section`): Overview; Compliance (Registrations, Documents, Deadlines); Tenders. Tender detail pages (`/compliancetender/tenders/:id`) are unchanged; their back button (`navigate(-1)`) now returns to the Tenders section instead of the dashboard.
+- Colours: 215 + 330 -> 0.
+- recharts (Supply Chain low-stock chart): SVG colours read through `useThemeColors()`; the tooltip box now uses theme colours (it had a hard-coded white background). A file that already does this can opt out of the codemod's recharts check with the comment `theme-codemod: charts-use-useThemeColors`.
+- New token `--hf-sky-solid-strong` (sky-700 fill); `#0369A1` and `#F0F7FF` now convert. Per-file `ACCENT` constants split into fill and text tokens by property.
+- Props passed to local components (`ActionBtn`, `KpiCard`, `Metric`) were converted only after checking each component uses them inside `style` (never as SVG attributes).
+- Found, not changed: `scm_shared.tsx` is an unused near-duplicate of `scm.shared.tsx` (the one every tab imports). Only the unused copy supports `ModalFooter`'s `accent` prop, so the amber/red confirm buttons callers ask for have never rendered (existing behaviour). Decide whether to adopt the copy or delete it.
 
 ### Navigation gaps found and fixed
 - 7 modules had dashboard tiles but were missing from the sidebar/Ctrl+K registry (carried over from the old top-nav): collections agency, warehousing, legal & compliance, business compliance & tender, compliance services, debt collection, projects. Added.

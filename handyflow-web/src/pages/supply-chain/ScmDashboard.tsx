@@ -1,6 +1,7 @@
 // src/pages/supply-chain/ScmDashboard.tsx
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { useThemeColors } from "../../theme/ThemeContext"
 import {
   Users, ShoppingCart, FileText, Package, AlertTriangle,
   Clock, TrendingUp, ArrowRight, CheckCircle
@@ -24,18 +25,19 @@ interface CatalogueItem { id: string; name: string }
 
 const fmtR  = (n: number) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 const fmtD  = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
-const ACCENT = "#D97706"
+const ACCENT_TEXT = "var(--hf-warning-text)"  // text and icons (lighter in dark mode)
+// theme-codemod: charts-use-useThemeColors  (recharts colours are read via useThemeColors below)
 
 const PO_STATUS: Record<string, { bg: string; color: string; label: string }> = {
-  DRAFT:              { bg: "#F1F5F9", color: "#475569",  label: "Draft" },
-  PENDING_APPROVAL:   { bg: "#FEF3C7", color: "#92400E",  label: "Pending" },
-  APPROVED:           { bg: "#DBEAFE", color: "#1D4ED8",  label: "Approved" },
-  SENT:               { bg: "#EDE9FE", color: "#7C3AED",  label: "Sent" },
-  ACKNOWLEDGED:       { bg: "#D1FAE5", color: "#065F46",  label: "Acknowledged" },
-  PARTIALLY_RECEIVED: { bg: "#FEF9C3", color: "#713F12",  label: "Partial" },
-  FULLY_RECEIVED:     { bg: "#DCFCE7", color: "#166534",  label: "Received" },
-  INVOICED:           { bg: "#DBEAFE", color: "#1E40AF",  label: "Invoiced" },
-  CANCELLED:          { bg: "#FEE2E2", color: "#DC2626",  label: "Cancelled" },
+  DRAFT:              { bg: "var(--hf-surface-sunken)", color: "var(--hf-text-tertiary)",  label: "Draft" },
+  PENDING_APPROVAL:   { bg: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text-deep)",  label: "Pending" },
+  APPROVED:           { bg: "var(--hf-info-soft-strong)", color: "var(--hf-info-text)",  label: "Approved" },
+  SENT:               { bg: "var(--hf-violet-soft-strong)", color: "var(--hf-violet-text)",  label: "Sent" },
+  ACKNOWLEDGED:       { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)",  label: "Acknowledged" },
+  PARTIALLY_RECEIVED: { bg: "var(--hf-warning-soft)", color: "var(--hf-warning-text-deep)",  label: "Partial" },
+  FULLY_RECEIVED:     { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)",  label: "Received" },
+  INVOICED:           { bg: "var(--hf-info-soft-strong)", color: "var(--hf-info-text-strong)",  label: "Invoiced" },
+  CANCELLED:          { bg: "var(--hf-danger-soft-strong)", color: "var(--hf-danger-text)",  label: "Cancelled" },
 }
 
 function KpiCard({ label, value, icon: Icon, color, bg, onClick, urgent }:
@@ -44,7 +46,7 @@ function KpiCard({ label, value, icon: Icon, color, bg, onClick, urgent }:
     <div
       onClick={onClick}
       style={{
-        background: "var(--hf-surface)", border: `1px solid ${urgent && value > 0 ? color : "#E2E8F0"}`,
+        background: "var(--hf-surface)", border: `1px solid ${urgent && value > 0 ? color : "var(--hf-border)"}`,
         borderRadius: 12, padding: "18px 20px", cursor: onClick ? "pointer" : "default",
         transition: "box-shadow 0.15s",
         boxShadow: urgent && value > 0 ? `0 0 0 3px ${bg}` : "none",
@@ -57,14 +59,14 @@ function KpiCard({ label, value, icon: Icon, color, bg, onClick, urgent }:
           {label}
         </div>
         <div style={{ width: 34, height: 34, borderRadius: 9, background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Icon size={16} color={color} />
+          <Icon size={16} style={{ color }} />
         </div>
       </div>
       <div style={{ fontSize: 32, fontWeight: 800, color: urgent && value > 0 ? color : "var(--hf-text)" }}>
         {value}
       </div>
       {onClick && (
-        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 8, fontSize: 12, color: ACCENT, fontWeight: 600 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 8, fontSize: 12, color: ACCENT_TEXT, fontWeight: 600 }}>
           View all <ArrowRight size={12} />
         </div>
       )}
@@ -75,6 +77,8 @@ function KpiCard({ label, value, icon: Icon, color, bg, onClick, urgent }:
 type ScmTab = "dashboard" | "suppliers" | "purchase-orders" | "inventory" | "invoices"
 
 export function ScmDashboard({ onNav }: { onNav: (tab: ScmTab) => void }) {
+  // recharts draws SVG attributes, which cannot use CSS variables: read literal values.
+  const c = useThemeColors()
   const { data: summary } = useQuery<Summary>({
     queryKey: ["scm-summary"],
     queryFn: async () => { const r = await apiClient.get("/api/v1/supply-chain/summary"); return r.data?.data ?? r.data },
@@ -130,12 +134,12 @@ export function ScmDashboard({ onNav }: { onNav: (tab: ScmTab) => void }) {
     <div>
       {/* KPI grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 28 }}>
-        <KpiCard label="Active Suppliers"   value={s?.totalSuppliers ?? 0}      icon={Users}         color="#059669" bg="#DCFCE7" onClick={() => onNav("suppliers")} />
-        <KpiCard label="Open Orders"        value={s?.openPurchaseOrders ?? 0}  icon={ShoppingCart}  color="#1D4ED8" bg="#DBEAFE" onClick={() => onNav("purchase-orders")} />
-        <KpiCard label="Pending Invoices"   value={s?.pendingInvoices ?? 0}     icon={FileText}      color="#7C3AED" bg="#EDE9FE" onClick={() => onNav("invoices")} />
-        <KpiCard label="Low Stock Items"    value={s?.lowStockItems ?? 0}       icon={Package}       color="#D97706" bg="#FEF3C7" onClick={() => onNav("inventory")} urgent />
-        <KpiCard label="Overdue Invoices"   value={s?.overdueInvoices ?? 0}     icon={AlertTriangle} color="#DC2626" bg="#FEE2E2" onClick={() => onNav("invoices")} urgent />
-        <KpiCard label="Ready for Payment"  value={s?.invoicesForApproval ?? 0} icon={CheckCircle}   color="#059669" bg="#DCFCE7" onClick={() => onNav("invoices")} />
+        <KpiCard label="Active Suppliers"   value={s?.totalSuppliers ?? 0}      icon={Users}         color="var(--hf-success-text)" bg="var(--hf-success-soft-strong)" onClick={() => onNav("suppliers")} />
+        <KpiCard label="Open Orders"        value={s?.openPurchaseOrders ?? 0}  icon={ShoppingCart}  color="var(--hf-info-text)" bg="var(--hf-info-soft-strong)" onClick={() => onNav("purchase-orders")} />
+        <KpiCard label="Pending Invoices"   value={s?.pendingInvoices ?? 0}     icon={FileText}      color="var(--hf-violet-text)" bg="var(--hf-violet-soft-strong)" onClick={() => onNav("invoices")} />
+        <KpiCard label="Low Stock Items"    value={s?.lowStockItems ?? 0}       icon={Package}       color="var(--hf-warning-text)" bg="var(--hf-warning-soft-strong)" onClick={() => onNav("inventory")} urgent />
+        <KpiCard label="Overdue Invoices"   value={s?.overdueInvoices ?? 0}     icon={AlertTriangle} color="var(--hf-danger-text)" bg="var(--hf-danger-soft-strong)" onClick={() => onNav("invoices")} urgent />
+        <KpiCard label="Ready for Payment"  value={s?.invoicesForApproval ?? 0} icon={CheckCircle}   color="var(--hf-success-text)" bg="var(--hf-success-soft-strong)" onClick={() => onNav("invoices")} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 18 }}>
@@ -144,7 +148,7 @@ export function ScmDashboard({ onNav }: { onNav: (tab: ScmTab) => void }) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Recent Purchase Orders</div>
             <button onClick={() => onNav("purchase-orders")}
-              style={{ fontSize: 12, color: ACCENT, fontWeight: 600, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+              style={{ fontSize: 12, color: ACCENT_TEXT, fontWeight: 600, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
               View all <ArrowRight size={12} />
             </button>
           </div>
@@ -167,7 +171,7 @@ export function ScmDashboard({ onNav }: { onNav: (tab: ScmTab) => void }) {
                       const st = PO_STATUS[po.status] ?? PO_STATUS.DRAFT
                       return (
                         <tr key={po.id} style={{ borderTop: "1px solid var(--hf-border-subtle)", background: i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)" }}>
-                          <td style={{ padding: "10px 14px", fontSize: 12, fontWeight: 700, color: ACCENT }}>{po.orderNumber}</td>
+                          <td style={{ padding: "10px 14px", fontSize: 12, fontWeight: 700, color: ACCENT_TEXT }}>{po.orderNumber}</td>
                           <td style={{ padding: "10px 14px", fontSize: 13, color: "var(--hf-text)" }}>{po.supplierName}</td>
                           <td style={{ padding: "10px 14px", fontSize: 13, fontWeight: 600 }}>{fmtR(po.totalAmount)}</td>
                           <td style={{ padding: "10px 14px", fontSize: 12, color: "var(--hf-text-muted)" }}>{fmtD(po.requiredByDate)}</td>
@@ -190,7 +194,7 @@ export function ScmDashboard({ onNav }: { onNav: (tab: ScmTab) => void }) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Low Stock Alerts</div>
             <button onClick={() => onNav("inventory")}
-              style={{ fontSize: 12, color: ACCENT, fontWeight: 600, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+              style={{ fontSize: 12, color: ACCENT_TEXT, fontWeight: 600, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
               View all <ArrowRight size={12} />
             </button>
           </div>
@@ -207,18 +211,18 @@ export function ScmDashboard({ onNav }: { onNav: (tab: ScmTab) => void }) {
                     old list made via its "⚠" prefix. */}
                 <ResponsiveContainer width="100%" height={Math.max(180, lowStockChartData.length * 34)}>
                   <BarChart data={lowStockChartData} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#FDE68A" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 10, fill: "#92400E" }} axisLine={false} tickLine={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={c("warning-border")} horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 10, fill: c("warning-text-deep") }} axisLine={false} tickLine={false} />
                     <YAxis type="category" dataKey="name" width={110}
-                      tick={{ fontSize: 11, fill: "#78350F" }} axisLine={false} tickLine={false} />
+                      tick={{ fontSize: 11, fill: c("warning-text-deep") }} axisLine={false} tickLine={false} />
                     <Tooltip
-                      contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #FCD34D" }}
+                      contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid var(--hf-warning-border-strong)", background: "var(--hf-surface)", color: "var(--hf-text)" }}
                       formatter={(value: number, key: string) => [value.toFixed(1), key === "onHand" ? "On Hand" : "Reorder Point"]}
                     />
-                    <Bar dataKey="reorderPoint" fill="#FDE68A" radius={[0, 4, 4, 0]} barSize={8} name="Reorder Point" />
+                    <Bar dataKey="reorderPoint" fill={c("warning-border")} radius={[0, 4, 4, 0]} barSize={8} name="Reorder Point" />
                     <Bar dataKey="onHand" radius={[0, 4, 4, 0]} barSize={8} name="On Hand">
                       {lowStockChartData.map((d, i) => (
-                        <Cell key={i} fill={d.critical ? "#EF4444" : "#F59E0B"} />
+                        <Cell key={i} fill={d.critical ? c("danger") : c("warning")} />
                       ))}
                     </Bar>
                   </BarChart>

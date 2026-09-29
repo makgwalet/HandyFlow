@@ -309,9 +309,9 @@ export default function App() {
             <Route path="/recurring/variable-hours/new" element={<CreateVariableHoursContractPage />} />
             <Route path="/recurring/new"          element={<CreateRecurringSchedulePage />} />
             <Route path="/recurring"              element={<InvoicingPage />} />
-            <Route path="/supply-chain"           element={<SupplyChainPage />} />
+            <Route path="/supply-chain/:section?" element={<SupplyChainPage />} />
             <Route path="/legalcompliance/:section?" element={<LegalCompliancePage />} />
-            <Route path="/compliancetender"              element={<CompliancePage />} />
+            <Route path="/compliancetender/:section?" element={<CompliancePage />} />
             <Route path="/compliancetender/tenders/:id"  element={<TenderDetailPage />} />
             <Route path="/complianceservices"                          element={<ComplianceServicesPage />} />
             <Route path="/complianceservices/clients/:clientId"        element={<ClientDetailPage />} />

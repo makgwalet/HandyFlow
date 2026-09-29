@@ -109,6 +109,7 @@
   --hf-sky: #0284c7;
   --hf-sky-text: #0284c7;
   --hf-sky-text-strong: #0369a1;
+  --hf-sky-solid-strong: #0369a1;
   --hf-sky-soft: #f0f9ff;
   --hf-sky-soft-strong: #e0f2fe;
   --hf-sky-border: #bae6fd;
@@ -220,6 +221,7 @@
   --hf-sky: #0284c7;
   --hf-sky-text: #38bdf8;
   --hf-sky-text-strong: #7dd3fc;
+  --hf-sky-solid-strong: #0369a1;
   --hf-sky-soft: rgba(56, 189, 248, 0.1);
   --hf-sky-soft-strong: rgba(56, 189, 248, 0.18);
   --hf-sky-border: rgba(56, 189, 248, 0.32);

@@ -17,6 +17,7 @@ import {
   Calculator, BookOpen, GitBranch as JournalIcon, Landmark, BarChart2, FileText,
   Briefcase, Calendar, FolderOpen, AlertOctagon, CalendarCheck, Settings,
   Building2, GraduationCap, CalendarDays, Award, Scale, Gavel, FileSearch, MapPin as PinIcon, HardHat,
+  ShoppingCart, Package, CalendarClock, ClipboardCheck,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -376,9 +377,53 @@ export const EARTHMOVING_SECTIONS: ModuleSections = {
   ],
 }
 
+export const SUPPLY_CHAIN_SECTIONS: ModuleSections = {
+  // The sidebar registry key uses an underscore; the URL uses a hyphen.
+  moduleKey: 'supply_chain',
+  basePath: '/supply-chain',
+  title: 'Supply Chain',
+  icon: Truck,
+  defaultSection: 'dashboard',
+  groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+    {
+      label: 'Purchasing',
+      sections: [
+        { id: 'suppliers', label: 'Suppliers', icon: Users },
+        { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart },
+        { id: 'invoices', label: 'Supplier Invoices', icon: FileText },
+      ],
+    },
+    { label: 'Stock', sections: [{ id: 'inventory', label: 'Inventory', icon: Package }] },
+  ],
+}
+
+export const COMPLIANCE_TENDER_SECTIONS: ModuleSections = {
+  moduleKey: 'compliancetender',
+  // Tender detail pages live at /compliancetender/tenders/:id (a separate,
+  // more specific route); the "Tenders" section stays highlighted on them.
+  basePath: '/compliancetender',
+  title: 'Business Compliance & Tender',
+  icon: ClipboardCheck,
+  defaultSection: 'dashboard',
+  groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+    {
+      label: 'Compliance',
+      sections: [
+        { id: 'registrations', label: 'Registrations', icon: ShieldCheck },
+        { id: 'documents', label: 'Documents', icon: FileText },
+        { id: 'deadlines', label: 'Deadlines', icon: CalendarClock },
+      ],
+    },
+    { label: 'Tenders', sections: [{ id: 'tenders', label: 'Tenders', icon: Briefcase }] },
+  ],
+}
+
 const REGISTRY: ModuleSections[] = [
   SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FLEET_SECTIONS, ACCOUNTING_SECTIONS, ACCOUNTANT_SECTIONS,
   HR_SECTIONS, BOOKINGS_SECTIONS, TRAINING_PROVIDER_SECTIONS, LEGAL_COMPLIANCE_SECTIONS, EARTHMOVING_SECTIONS,
+  SUPPLY_CHAIN_SECTIONS, COMPLIANCE_TENDER_SECTIONS,
 ]
 
 /** Groups with sections the user may not see removed (and empty groups dropped). */

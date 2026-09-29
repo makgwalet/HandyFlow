@@ -13,7 +13,8 @@ interface Supplier {
   city: string | null; province: string | null; bankName: string | null
 }
 
-const ACCENT = "#D97706"
+const ACCENT = "var(--hf-warning)"            // fills and borders
+const ACCENT_TEXT = "var(--hf-warning-text)"  // text and icons (lighter in dark mode)
 const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 9, fontSize: 14, boxSizing: "border-box", outline: "none", background: "var(--hf-surface)" }
 
 const STATUS_BADGE: Record<string, { bg: string; color: string }> = {
@@ -24,7 +25,7 @@ const STATUS_BADGE: Record<string, { bg: string; color: string }> = {
 
 function BbbeeBar({ level }: { level: number | null }) {
   if (!level) return <span style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>—</span>
-  const colour = level <= 2 ? "#059669" : level <= 4 ? "#D97706" : "#DC2626"
+  const colour = level <= 2 ? "var(--hf-success-text)" : level <= 4 ? "var(--hf-warning-text)" : "var(--hf-danger-text)"
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
       <span style={{ fontSize: 13, fontWeight: 700, color: colour }}>L{level}</span>
@@ -102,13 +103,13 @@ export function SuppliersTab() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <div style={{ position: "relative" }}>
-            <Search size={13} color="#94A3B8" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+            <Search size={13} style={{ color: 'var(--hf-text-faint)', position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search suppliers…"
               style={{ ...inp, paddingLeft: 30, width: 200 }} />
           </div>
           {["", "ACTIVE", "INACTIVE", "BLACKLISTED"].map(s => (
             <button key={s} onClick={() => setStatus(s)}
-              style={{ padding: "6px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: status === s ? 700 : 400, border: status === s ? `1.5px solid ${ACCENT}` : "1px solid var(--hf-border)", background: status === s ? "var(--hf-warning-soft-strong)" : "var(--hf-surface)", color: status === s ? ACCENT : "var(--hf-text-muted)" }}>
+              style={{ padding: "6px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: status === s ? 700 : 400, border: status === s ? `1.5px solid ${ACCENT}` : "1px solid var(--hf-border)", background: status === s ? "var(--hf-warning-soft-strong)" : "var(--hf-surface)", color: status === s ? ACCENT_TEXT : "var(--hf-text-muted)" }}>
               {s || "All"}
             </button>
           ))}
@@ -135,11 +136,11 @@ export function SuppliersTab() {
                   <div key={s.id} style={{ borderTop: i > 0 ? "1px solid var(--hf-border-subtle)" : "none" }}>
                     <div onClick={() => setExpanded(isOpen ? null : s.id)}
                       style={{ display: "flex", alignItems: "center", padding: "12px 16px", cursor: "pointer", background: isOpen ? "var(--hf-warning-soft)" : i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)" }}
-                      onMouseEnter={e => { if (!isOpen) (e.currentTarget as HTMLElement).style.background = "#F0F7FF" }}
+                      onMouseEnter={e => { if (!isOpen) (e.currentTarget as HTMLElement).style.background = "var(--hf-info-soft)" }}
                       onMouseLeave={e => { if (!isOpen) (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)" }}
                     >
                       {/* Avatar */}
-                      <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--hf-warning-soft-strong)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 12, fontSize: 14, fontWeight: 800, color: ACCENT }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--hf-warning-soft-strong)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 12, fontSize: 14, fontWeight: 800, color: ACCENT_TEXT }}>
                         {s.name.charAt(0).toUpperCase()}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -168,7 +169,7 @@ export function SuppliersTab() {
                             {s.onTimeRate != null ? `${s.onTimeRate.toFixed(0)}%` : "—"}
                           </div>
                         </div>
-                        {isOpen ? <ChevronUp size={16} color="#94A3B8" /> : <ChevronDown size={16} color="#94A3B8" />}
+                        {isOpen ? <ChevronUp size={16} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={16} style={{ color: 'var(--hf-text-faint)' }} />}
                       </div>
                     </div>
 

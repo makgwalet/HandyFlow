@@ -35,9 +35,9 @@ export default function ComplianceDashboard({ onNavigate }: { onNavigate: (tab: 
   const activeTenders = tenders.filter(t => !["AWARDED", "UNSUCCESSFUL", "WITHDRAWN"].includes(t.status)).length
 
   const cards = [
-    { label: "Registrations", value: registrations.length, icon: ShieldCheck, color: "#0369A1", bg: "#E0F2FE", tab: "registrations" },
-    { label: "Pending Deadlines", value: deadlines.length, icon: CalendarClock, color: "#D97706", bg: "#FFFBEB", tab: "deadlines" },
-    { label: "Active Tenders", value: activeTenders, icon: Briefcase, color: "#166534", bg: "#DCFCE7", tab: "tenders" },
+    { label: "Registrations", value: registrations.length, icon: ShieldCheck, color: "var(--hf-sky-text-strong)", bg: "var(--hf-sky-soft-strong)", tab: "registrations" },
+    { label: "Pending Deadlines", value: deadlines.length, icon: CalendarClock, color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", tab: "deadlines" },
+    { label: "Active Tenders", value: activeTenders, icon: Briefcase, color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", tab: "tenders" },
   ]
 
   const alerts = [
@@ -53,12 +53,12 @@ export default function ComplianceDashboard({ onNavigate }: { onNavigate: (tab: 
           const Icon = c.icon
           return (
             <button key={c.label} onClick={() => onNavigate(c.tab)}
-              style={{ textAlign: "left", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 14, padding: 20, cursor: "pointer" }}>
+              style={{ textAlign: "left", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: 20, cursor: "pointer" }}>
               <div style={{ width: 38, height: 38, borderRadius: 10, background: c.bg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
-                <Icon size={18} color={c.color} />
+                <Icon size={18} style={{ color: c.color }} />
               </div>
-              <div style={{ fontSize: 26, fontWeight: 800, color: "#0F172A" }}>{c.value}</div>
-              <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>{c.label}</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: "var(--hf-text)" }}>{c.value}</div>
+              <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 2 }}>{c.label}</div>
             </button>
           )
         })}
@@ -66,14 +66,14 @@ export default function ComplianceDashboard({ onNavigate }: { onNavigate: (tab: 
 
       {alerts.length > 0 && (
         <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.05em", marginBottom: 10 }}>Attention Required</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, letterSpacing: "0.05em", marginBottom: 10 }}>Attention Required</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {alerts.map((a, i) => (
               <button key={i} onClick={() => onNavigate(a.tab)}
                 style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", width: "100%", padding: "12px 16px", borderRadius: 10, cursor: "pointer", border: "none",
-                  background: a.severity === "critical" ? "#FEF2F2" : "#FFFBEB" }}>
-                <AlertTriangle size={15} color={a.severity === "critical" ? "#DC2626" : "#D97706"} />
-                <span style={{ fontSize: 13, fontWeight: 600, color: a.severity === "critical" ? "#DC2626" : "#D97706" }}>{a.text}</span>
+                  background: a.severity === "critical" ? "var(--hf-danger-soft)" : "var(--hf-warning-soft)" }}>
+                <AlertTriangle size={15} style={{ color: a.severity === "critical" ? "var(--hf-danger-text)" : "var(--hf-warning-text)" }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: a.severity === "critical" ? "var(--hf-danger-text)" : "var(--hf-warning-text)" }}>{a.text}</span>
               </button>
             ))}
           </div>
@@ -81,7 +81,7 @@ export default function ComplianceDashboard({ onNavigate }: { onNavigate: (tab: 
       )}
 
       {alerts.length === 0 && (registrations.length > 0 || deadlines.length > 0 || tenders.length > 0) && (
-        <div style={{ padding: "24px 20px", textAlign: "center", color: "#166534", background: "#DCFCE7", borderRadius: 12, fontSize: 13, fontWeight: 600 }}>
+        <div style={{ padding: "24px 20px", textAlign: "center", color: "var(--hf-success-text-strong)", background: "var(--hf-success-soft-strong)", borderRadius: 12, fontSize: 13, fontWeight: 600 }}>
           Nothing needs attention right now.
         </div>
       )}

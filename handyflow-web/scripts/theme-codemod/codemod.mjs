@@ -120,7 +120,12 @@ for (const file of scanRoots.flatMap(r => walk(r))) {
   if (!HEX_RE.test(text)) continue
   HEX_RE.lastIndex = 0
   const rel = path.relative(root, file)
-  const unsafe = UNSAFE_PATTERNS.filter(([re]) => re.test(text)).map(([, why]) => why)
+  // A file that already draws its charts through useThemeColors() may opt out of the
+  // recharts/leaflet check by containing the marker `theme-codemod: charts-use-useThemeColors`.
+  const chartsHandled = text.includes('theme-codemod: charts-use-useThemeColors')
+  const unsafe = UNSAFE_PATTERNS
+    .filter(([re, why]) => re.test(text) && !(chartsHandled && /recharts/.test(why)))
+    .map(([, why]) => why)
   if (unsafe.length) report.unsafeFiles[rel] = unsafe
 
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)

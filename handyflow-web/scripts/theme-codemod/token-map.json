@@ -4,6 +4,8 @@
   "fg": "sky-text"
  },
  "#0369A1": {
+  "bd": "sky-solid-strong",
+  "bg": "sky-solid-strong",
   "fg": "sky-text-strong"
  },
  "#059669": {
@@ -296,6 +298,9 @@
  "#EFF6FF": {
   "bg": "info-soft",
   "fg": "info-soft"
+ },
+ "#F0F7FF": {
+  "bg": "info-soft"
  },
  "#F0F9FF": {
   "bg": "sky-soft"

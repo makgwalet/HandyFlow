@@ -32,34 +32,34 @@ export const fmtDate = (d: string | null | undefined) =>
 // ── Status colours ────────────────────────────────────────────────────────────
 
 const SC: Record<string, { bg: string; color: string }> = {
-  DRAFT:               { bg: "#F1F5F9", color: "#475569" },
-  PENDING_APPROVAL:    { bg: "#FEF3C7", color: "#92400E" },
-  APPROVED:            { bg: "#DCFCE7", color: "#166534" },
-  SENT:                { bg: "#DBEAFE", color: "#1D4ED8" },
-  ACKNOWLEDGED:        { bg: "#EDE9FE", color: "#7C3AED" },
-  PARTIALLY_RECEIVED:  { bg: "#EDE9FE", color: "#7C3AED" },
-  FULLY_RECEIVED:      { bg: "#DCFCE7", color: "#166534" },
-  INVOICED:            { bg: "#F3E8FF", color: "#7C3AED" },
-  CANCELLED:           { bg: "#FEF2F2", color: "#DC2626" },
-  RECEIVED:            { bg: "#F1F5F9", color: "#475569" },
-  UNDER_REVIEW:        { bg: "#FEF3C7", color: "#92400E" },
-  PAID:                { bg: "#DCFCE7", color: "#166534" },
-  DISPUTED:            { bg: "#FEF2F2", color: "#DC2626" },
-  ACTIVE:              { bg: "#DCFCE7", color: "#166534" },
-  INACTIVE:            { bg: "#F1F5F9", color: "#475569" },
-  BLACKLISTED:         { bg: "#FEF2F2", color: "#DC2626" },
-  MATCHED:             { bg: "#DCFCE7", color: "#166534" },
-  PO_MATCHED:          { bg: "#DBEAFE", color: "#1D4ED8" },
-  PARTIAL_MATCH:       { bg: "#FEF3C7", color: "#92400E" },
-  NO_PO:               { bg: "#FEF2F2", color: "#DC2626" },
-  POSTED:              { bg: "#DCFCE7", color: "#166534" },
-  OPENING:             { bg: "#F1F5F9", color: "#475569" },
-  PURCHASE:            { bg: "#DBEAFE", color: "#1D4ED8" },
-  ADJUSTMENT:          { bg: "#FEF3C7", color: "#92400E" },
+  DRAFT:               { bg: "var(--hf-surface-sunken)", color: "var(--hf-text-tertiary)" },
+  PENDING_APPROVAL:    { bg: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text-deep)" },
+  APPROVED:            { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)" },
+  SENT:                { bg: "var(--hf-info-soft-strong)", color: "var(--hf-info-text)" },
+  ACKNOWLEDGED:        { bg: "var(--hf-violet-soft-strong)", color: "var(--hf-violet-text)" },
+  PARTIALLY_RECEIVED:  { bg: "var(--hf-violet-soft-strong)", color: "var(--hf-violet-text)" },
+  FULLY_RECEIVED:      { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)" },
+  INVOICED:            { bg: "var(--hf-violet-soft-strong)", color: "var(--hf-violet-text)" },
+  CANCELLED:           { bg: "var(--hf-danger-soft)", color: "var(--hf-danger-text)" },
+  RECEIVED:            { bg: "var(--hf-surface-sunken)", color: "var(--hf-text-tertiary)" },
+  UNDER_REVIEW:        { bg: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text-deep)" },
+  PAID:                { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)" },
+  DISPUTED:            { bg: "var(--hf-danger-soft)", color: "var(--hf-danger-text)" },
+  ACTIVE:              { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)" },
+  INACTIVE:            { bg: "var(--hf-surface-sunken)", color: "var(--hf-text-tertiary)" },
+  BLACKLISTED:         { bg: "var(--hf-danger-soft)", color: "var(--hf-danger-text)" },
+  MATCHED:             { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)" },
+  PO_MATCHED:          { bg: "var(--hf-info-soft-strong)", color: "var(--hf-info-text)" },
+  PARTIAL_MATCH:       { bg: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text-deep)" },
+  NO_PO:               { bg: "var(--hf-danger-soft)", color: "var(--hf-danger-text)" },
+  POSTED:              { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)" },
+  OPENING:             { bg: "var(--hf-surface-sunken)", color: "var(--hf-text-tertiary)" },
+  PURCHASE:            { bg: "var(--hf-info-soft-strong)", color: "var(--hf-info-text)" },
+  ADJUSTMENT:          { bg: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text-deep)" },
 }
 
 export function Badge({ status }: { status: string }) {
-  const s = SC[status] ?? { bg: "#F1F5F9", color: "#475569" }
+  const s = SC[status] ?? { bg: "var(--hf-surface-sunken)", color: "var(--hf-text-tertiary)" }
   return (
     <span style={{ background: s.bg, color: s.color, fontSize: 11, fontWeight: 700,
       padding: "2px 9px", borderRadius: 20, whiteSpace: "nowrap" as const }}>
@@ -71,16 +71,16 @@ export function Badge({ status }: { status: string }) {
 // ── Shared styles ─────────────────────────────────────────────────────────────
 
 export const inp: React.CSSProperties = {
-  width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0",
+  width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)",
   borderRadius: 8, fontSize: 13, boxSizing: "border-box" as const,
-  outline: "none", background: "#fff", color: "#0F172A",
+  outline: "none", background: "var(--hf-surface)", color: "var(--hf-text)",
 }
 export const TH: React.CSSProperties = {
   padding: "10px 14px", textAlign: "left" as const, fontSize: 11,
-  fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.05em",
+  fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" as const, letterSpacing: "0.05em",
 }
 export const TD: React.CSSProperties = {
-  padding: "11px 14px", fontSize: 13, color: "#374151", verticalAlign: "middle" as const,
+  padding: "11px 14px", fontSize: 13, color: "var(--hf-text-secondary)", verticalAlign: "middle" as const,
 }
 
 // ── Reusable components ───────────────────────────────────────────────────────
@@ -137,13 +137,13 @@ export function EmptyState({ icon: Icon, title, sub }: { icon: React.ElementType
 
 export function Banner({ variant, children }: { variant: "error" | "warning" | "info"; children: React.ReactNode }) {
   const styles = {
-    error:   { bg: "#FEF2F2", border: "#FECACA", color: "#DC2626",   Icon: AlertTriangle },
-    warning: { bg: "#FEF3C7", border: "#FCD34D", color: "#92400E",   Icon: AlertCircle   },
-    info:    { bg: "#EFF6FF", border: "#BFDBFE", color: "#1D4ED8",   Icon: Info          },
+    error:   { bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)", color: "var(--hf-danger-text)",   Icon: AlertTriangle },
+    warning: { bg: "var(--hf-warning-soft-strong)", border: "var(--hf-warning-border-strong)", color: "var(--hf-warning-text-deep)",   Icon: AlertCircle   },
+    info:    { bg: "var(--hf-info-soft)", border: "var(--hf-info-border)", color: "var(--hf-info-text)",   Icon: Info          },
   }[variant]
   return (
     <div style={{ background: styles.bg, border: `1px solid ${styles.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 14, display: "flex", alignItems: "center", gap: 10 }}>
-      <styles.Icon size={16} color={styles.color} style={{ flexShrink: 0 }} />
+      <styles.Icon size={16} style={{ flexShrink: 0, color: styles.color }} />
       <span style={{ fontSize: 13, color: styles.color, fontWeight: 500 }}>{children}</span>
     </div>
   )
@@ -160,7 +160,7 @@ export function ActionChip({ label, color, bg, border, onClick }: { label: strin
 export function filterPill(active: boolean): React.CSSProperties {
   return {
     padding: "5px 12px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: active ? 700 : 400,
-    border: active ? "1.5px solid #D97706" : "1px solid #E2E8F0",
-    background: active ? "#FEF3C7" : "#fff", color: active ? "#92400E" : "#64748B",
+    border: active ? "1.5px solid var(--hf-warning)" : "1px solid var(--hf-border)",
+    background: active ? "var(--hf-warning-soft-strong)" : "var(--hf-surface)", color: active ? "var(--hf-warning-text-deep)" : "var(--hf-text-muted)",
   }
 }

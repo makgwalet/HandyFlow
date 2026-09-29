@@ -19,7 +19,8 @@ interface Movement {
 // NEW: backs the catalogue-item search picker below.
 interface CatalogueItem { id: string; name: string; description: string | null; unit: string | null; defaultPrice: number | null; categoryName: string | null }
 
-const ACCENT = "#D97706"
+const ACCENT = "var(--hf-warning)"            // fills and borders
+const ACCENT_TEXT = "var(--hf-warning-text)"  // text and icons (lighter in dark mode)
 const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 9, fontSize: 14, boxSizing: "border-box", outline: "none", background: "var(--hf-surface)" }
 const fmtR = (n: number) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtD = (d: string) => new Date(d).toLocaleDateString("en-ZA")
@@ -110,12 +111,12 @@ export function InventoryTab() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <button onClick={() => setSelectedLocation("")}
-            style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: !selectedLocation ? 700 : 400, border: !selectedLocation ? `1.5px solid ${ACCENT}` : "1px solid var(--hf-border)", background: !selectedLocation ? "var(--hf-warning-soft-strong)" : "var(--hf-surface)", color: !selectedLocation ? ACCENT : "var(--hf-text-muted)" }}>
+            style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: !selectedLocation ? 700 : 400, border: !selectedLocation ? `1.5px solid ${ACCENT}` : "1px solid var(--hf-border)", background: !selectedLocation ? "var(--hf-warning-soft-strong)" : "var(--hf-surface)", color: !selectedLocation ? ACCENT_TEXT : "var(--hf-text-muted)" }}>
             All Locations
           </button>
           {locations.map(l => (
             <button key={l.id} onClick={() => setSelectedLocation(l.id)}
-              style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: selectedLocation === l.id ? 700 : 400, border: selectedLocation === l.id ? `1.5px solid ${ACCENT}` : "1px solid var(--hf-border)", background: selectedLocation === l.id ? "var(--hf-warning-soft-strong)" : "var(--hf-surface)", color: selectedLocation === l.id ? ACCENT : "var(--hf-text-muted)" }}>
+              style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: selectedLocation === l.id ? 700 : 400, border: selectedLocation === l.id ? `1.5px solid ${ACCENT}` : "1px solid var(--hf-border)", background: selectedLocation === l.id ? "var(--hf-warning-soft-strong)" : "var(--hf-surface)", color: selectedLocation === l.id ? ACCENT_TEXT : "var(--hf-text-muted)" }}>
               {l.name}
             </button>
           ))}
@@ -172,13 +173,13 @@ export function InventoryTab() {
 
                       {/* Metrics */}
                       <div style={{ display: "flex", gap: 24, flexShrink: 0 }}>
-                        <Metric label="On Hand"    value={item.qtyOnHand.toFixed(2)}    color={isCritical ? "#DC2626" : isLow ? ACCENT : "#0F172A"} />
+                        <Metric label="On Hand"    value={item.qtyOnHand.toFixed(2)}    color={isCritical ? "var(--hf-danger-text)" : isLow ? ACCENT_TEXT : "var(--hf-text)"} />
                         <Metric label="Reserved"   value={item.qtyReserved.toFixed(2)} />
                         <Metric label="Reorder At" value={item.reorderPoint > 0 ? item.reorderPoint.toFixed(2) : "—"} />
                         <Metric label="Avg Cost"   value={fmtR(item.avgCost)} />
                         <Metric label="Stock Value" value={fmtR(item.qtyOnHand * item.avgCost)} />
                       </div>
-                      {isOpen ? <ChevronUp size={15} color="#94A3B8" /> : <ChevronDown size={15} color="#94A3B8" />}
+                      {isOpen ? <ChevronUp size={15} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={15} style={{ color: 'var(--hf-text-faint)' }} />}
                     </div>
 
                     {/* Movement history */}

@@ -21,7 +21,8 @@ interface Invoice {
   paymentReference: string | null; paidAt: string | null; notes: string | null
 }
 
-const ACCENT = "#D97706"
+const ACCENT = "var(--hf-warning)"            // fills and borders
+const ACCENT_TEXT = "var(--hf-warning-text)"  // text and icons (lighter in dark mode)
 const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 9, fontSize: 14, boxSizing: "border-box", outline: "none", background: "var(--hf-surface)" }
 const fmtR = (n: number) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtD = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
@@ -294,7 +295,7 @@ export function InvoicesTab() {
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {STATUS_FILTERS.map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
-              style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: statusFilter === s ? 700 : 400, border: statusFilter === s ? `1.5px solid ${ACCENT}` : "1px solid var(--hf-border)", background: statusFilter === s ? "var(--hf-warning-soft-strong)" : "var(--hf-surface)", color: statusFilter === s ? ACCENT : "var(--hf-text-muted)" }}>
+              style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: statusFilter === s ? 700 : 400, border: statusFilter === s ? `1.5px solid ${ACCENT}` : "1px solid var(--hf-border)", background: statusFilter === s ? "var(--hf-warning-soft-strong)" : "var(--hf-surface)", color: statusFilter === s ? ACCENT_TEXT : "var(--hf-text-muted)" }}>
               {s || "All"}
             </button>
           ))}
@@ -325,10 +326,10 @@ export function InvoicesTab() {
                     return (
                       <tr key={inv.id} onClick={() => { setSelected(inv); setErr(""); setAttachError("") }}
                         style={{ borderTop: "1px solid var(--hf-border-subtle)", background: odd ? "var(--hf-danger-soft)" : i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)", cursor: "pointer" }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#F0F7FF"}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--hf-info-soft)"}
                         onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = odd ? "var(--hf-danger-soft)" : i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)"}
                       >
-                        <td style={{ padding: "11px 14px", fontSize: 12, fontWeight: 700, color: ACCENT }}>{inv.invoiceNumber}</td>
+                        <td style={{ padding: "11px 14px", fontSize: 12, fontWeight: 700, color: ACCENT_TEXT }}>{inv.invoiceNumber}</td>
                         <td style={{ padding: "11px 14px", fontSize: 12, color: "var(--hf-text-muted)" }}>{inv.supplierInvoiceRef ?? "—"}</td>
                         <td style={{ padding: "11px 14px", fontSize: 12, color: "var(--hf-text-muted)" }}>{fmtD(inv.invoiceDate)}</td>
                         <td style={{ padding: "11px 14px", fontSize: 12, color: odd ? "var(--hf-danger-text)" : "var(--hf-text-muted)", fontWeight: odd ? 700 : 400 }}>{fmtD(inv.dueDate)}{odd && " ⚠"}</td>
@@ -347,7 +348,7 @@ export function InvoicesTab() {
       {/* Invoice detail panel */}
       {selected && (
         <Modal
-          title={<><div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 3 }}>{selected.invoiceNumber}</div>Supplier Invoice</>}
+          title={<><div style={{ fontSize: 11, fontWeight: 700, color: ACCENT_TEXT, marginBottom: 3 }}>{selected.invoiceNumber}</div>Supplier Invoice</>}
           onClose={() => { setSelected(null); setErr(""); setAttachError("") }}>
 
             {/* Match status banner */}
@@ -378,7 +379,7 @@ export function InvoicesTab() {
                 <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--hf-text-muted)", marginBottom: 8 }}><span>{k}</span><span>{v}</span></div>
               ))}
               <div style={{ borderTop: "1px solid var(--hf-border)", paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 800, color: "var(--hf-text)" }}>
-                <span>Total</span><span style={{ color: ACCENT }}>{fmtR(selected.totalAmount)}</span>
+                <span>Total</span><span style={{ color: ACCENT_TEXT }}>{fmtR(selected.totalAmount)}</span>
               </div>
             </div>
 
@@ -426,7 +427,7 @@ export function InvoicesTab() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {attachments.map(a => (
                       <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 10px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 7 }}>
-                        <button onClick={() => downloadAttachment(a)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: ACCENT, fontWeight: 600, textAlign: "left", padding: 0 }}>
+                        <button onClick={() => downloadAttachment(a)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: ACCENT_TEXT, fontWeight: 600, textAlign: "left", padding: 0 }}>
                           {a.fileName}
                         </button>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>

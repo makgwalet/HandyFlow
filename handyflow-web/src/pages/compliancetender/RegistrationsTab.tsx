@@ -24,11 +24,11 @@ const AUTHORITIES = ["CIPC", "SARS", "UIF", "PSIRA", "CSD", "CIDB", "NHBRC", "OT
 const STATUSES = ["ACTIVE", "EXPIRED", "LAPSED", "PENDING", "NOT_APPLICABLE"]
 
 const STATUS_CFG: Record<string, { color: string; bg: string; border: string; label: string }> = {
-  ACTIVE:         { color: "#166534", bg: "#DCFCE7", border: "#86EFAC", label: "Active" },
-  EXPIRED:        { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", label: "Expired" },
-  LAPSED:         { color: "#C2410C", bg: "#FFF7ED", border: "#FDBA74", label: "Lapsed" },
-  PENDING:        { color: "#D97706", bg: "#FFFBEB", border: "#FDE68A", label: "Pending" },
-  NOT_APPLICABLE: { color: "#64748B", bg: "#F1F5F9", border: "#E2E8F0", label: "N/A" },
+  ACTIVE:         { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", border: "var(--hf-success-border)", label: "Active" },
+  EXPIRED:        { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)", label: "Expired" },
+  LAPSED:         { color: "var(--hf-orange-text-strong)", bg: "var(--hf-orange-soft)", border: "var(--hf-orange-border)", label: "Lapsed" },
+  PENDING:        { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)", label: "Pending" },
+  NOT_APPLICABLE: { color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)", border: "var(--hf-border)", label: "N/A" },
 }
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
@@ -97,26 +97,26 @@ export default function RegistrationsTab() {
   const filtered = filterAuthority === "ALL" ? registrations : registrations.filter(r => r.authority === filterAuthority)
 
   const stats = [
-    { label: "Total",    value: registrations.length,                                          color: "#0369A1" },
-    { label: "Active",   value: registrations.filter(r => r.status === "ACTIVE").length,        color: "#166534" },
-    { label: "Expiring Soon", value: registrations.filter(r => r.expiringSoon).length,           color: "#D97706" },
-    { label: "Expired",  value: registrations.filter(r => r.status === "EXPIRED").length,        color: "#DC2626" },
+    { label: "Total",    value: registrations.length,                                          color: "var(--hf-sky-text-strong)" },
+    { label: "Active",   value: registrations.filter(r => r.status === "ACTIVE").length,        color: "var(--hf-success-text-strong)" },
+    { label: "Expiring Soon", value: registrations.filter(r => r.expiringSoon).length,           color: "var(--hf-warning-text)" },
+    { label: "Expired",  value: registrations.filter(r => r.status === "EXPIRED").length,        color: "var(--hf-danger-text)" },
   ]
 
   const inp = (k: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
-    border: `1.5px solid ${fieldErrors[k] ? "#DC2626" : "#E2E8F0"}`,
-    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "#FFF5F5" : "#fff", outline: "none",
+    border: `1.5px solid ${fieldErrors[k] ? "var(--hf-danger)" : "var(--hf-border)"}`,
+    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
-    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#DC2626", marginTop: 4 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
       <AlertCircle size={12} />{fieldErrors[k]}
     </div>
   ) : null
 
   const StatusBadge = ({ status, expiringSoon }: { status: string; expiringSoon: boolean }) => {
     if (status === "ACTIVE" && expiringSoon) {
-      return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#FFFBEB", color: "#D97706", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: "1px solid #FDE68A" }}><Clock size={11} /> Expiring Soon</span>
+      return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: "1px solid var(--hf-warning-border)" }}><Clock size={11} /> Expiring Soon</span>
     }
     const cfg = STATUS_CFG[status] ?? STATUS_CFG.ACTIVE
     return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: cfg.bg, color: cfg.color, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: `1px solid ${cfg.border}` }}>{cfg.label}</span>
@@ -126,9 +126,9 @@ export default function RegistrationsTab() {
     <div>
       <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
         {stats.map(s => (
-          <div key={s.label} style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px" }}>
+          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{s.label}</div>
+            <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -138,43 +138,43 @@ export default function RegistrationsTab() {
           {["ALL", ...AUTHORITIES].map(a => (
             <button key={a} onClick={() => setFilterAuthority(a)}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterAuthority === a ? 600 : 400,
-                background: filterAuthority === a ? "#0369A1" : "#F1F5F9", color: filterAuthority === a ? "#fff" : "#64748B" }}>
+                background: filterAuthority === a ? "var(--hf-sky-solid-strong)" : "var(--hf-surface-sunken)", color: filterAuthority === a ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
               {a === "ALL" ? "All" : a}
             </button>
           ))}
         </div>
         {canManage && (
           <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") }}
-            style={{ display: "flex", alignItems: "center", gap: 7, background: "#0369A1", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-sky-solid-strong)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             <Plus size={15} /> New Registration
           </button>
         )}
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading registrations...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading registrations...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <ShieldCheck size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No registrations found</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No registrations found</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {filtered.map(r => {
             const isOpen = expanded === r.id
             return (
-              <div key={r.id} style={{ border: `1px solid ${r.status === "EXPIRED" ? "#FECACA" : "#E2E8F0"}`, borderRadius: 12, overflow: "hidden" }}>
-                <div style={{ padding: "16px 20px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+              <div key={r.id} style={{ border: `1px solid ${r.status === "EXPIRED" ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ padding: "16px 20px", background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 10, background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <ShieldCheck size={18} color="#0369A1" />
+                    <div style={{ width: 44, height: 44, borderRadius: 10, background: "var(--hf-info-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <ShieldCheck size={18} style={{ color: 'var(--hf-sky-text-strong)' }} />
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
-                        <span style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{r.authority}</span>
-                        <span style={{ fontSize: 11, color: "#64748B", background: "#F1F5F9", padding: "1px 8px", borderRadius: 20 }}>{r.registrationType}</span>
+                        <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{r.authority}</span>
+                        <span style={{ fontSize: 11, color: "var(--hf-text-muted)", background: "var(--hf-surface-sunken)", padding: "1px 8px", borderRadius: 20 }}>{r.registrationType}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                      <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>
                         {r.registrationNumber ? `${r.registrationNumber} · ` : ""}Expires {fmtDate(r.expiryDate)}
                       </div>
                     </div>
@@ -183,19 +183,19 @@ export default function RegistrationsTab() {
                     <StatusBadge status={r.status} expiringSoon={r.expiringSoon} />
                     {canManage && (
                       <div style={{ display: "flex", gap: 5 }}>
-                        <button onClick={() => openEdit(r)} title="Edit" style={{ background: "#EFF6FF", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#1D4ED8" }}><Edit2 size={13} /></button>
+                        <button onClick={() => openEdit(r)} title="Edit" style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-info-text)" }}><Edit2 size={13} /></button>
                         {canAdmin && (
-                          <button onClick={() => { if (confirm(`Delete ${r.authority} ${r.registrationType}?`)) deleteRegistration.mutate(r.id) }} title="Delete" style={{ background: "#FEF2F2", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#DC2626" }}><Trash2 size={13} /></button>
+                          <button onClick={() => { if (confirm(`Delete ${r.authority} ${r.registrationType}?`)) deleteRegistration.mutate(r.id) }} title="Delete" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
                         )}
                       </div>
                     )}
-                    <button onClick={() => setExpanded(isOpen ? null : r.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
+                    <button onClick={() => setExpanded(isOpen ? null : r.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)" }}>
                       {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </button>
                   </div>
                 </div>
                 {isOpen && (
-                  <div style={{ borderTop: "1px solid #F1F5F9", padding: "16px 20px", background: "#F8FAFC" }}>
+                  <div style={{ borderTop: "1px solid var(--hf-border-subtle)", padding: "16px 20px", background: "var(--hf-surface-muted)" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 14 }}>
                       {[
                         { l: "Issued", v: fmtDate(r.issuedDate) },
@@ -203,12 +203,12 @@ export default function RegistrationsTab() {
                         { l: "Registration number", v: r.registrationNumber || "—" },
                       ].map(item => (
                         <div key={item.l}>
-                          <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{item.v}</div>
+                          <div style={{ fontSize: 10, color: "var(--hf-text-faint)", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 3 }}>{item.l}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{item.v}</div>
                         </div>
                       ))}
                     </div>
-                    {r.notes && <div style={{ fontSize: 13, color: "#374151" }}>{r.notes}</div>}
+                    {r.notes && <div style={{ fontSize: 13, color: "var(--hf-text-secondary)" }}>{r.notes}</div>}
                   </div>
                 )}
               </div>
@@ -224,26 +224,26 @@ export default function RegistrationsTab() {
             <div>
               <label style={lbl}>Authority *</label>
               {editing ? (
-                <div style={{ ...inp("_"), background: "#F1F5F9", color: "#64748B" }}>{editing.authority}</div>
+                <div style={{ ...inp("_"), background: "var(--hf-surface-sunken)", color: "var(--hf-text-muted)" }}>{editing.authority}</div>
               ) : (
-                <select value={form.authority} onChange={e => setForm(f => ({ ...f, authority: e.target.value }))} style={{ ...inp("authority"), background: "#fff" }}>
+                <select value={form.authority} onChange={e => setForm(f => ({ ...f, authority: e.target.value }))} style={{ ...inp("authority"), background: "var(--hf-surface)" }}>
                   {AUTHORITIES.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
               )}
-              {editing && <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 3 }}>Authority can't be changed after creation</div>}
+              {editing && <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 3 }}>Authority can't be changed after creation</div>}
             </div>
             <div>
               <label style={lbl}>Registration type *</label>
               <input value={form.registrationType} onChange={e => { setForm(f => ({ ...f, registrationType: e.target.value })); setFieldErrors(f => omit(f, "registrationType")) }} placeholder="e.g. Business Registration" style={inp("registrationType")} disabled={!!editing} />
               <FErr k="registrationType" />
-              {editing && <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 3 }}>Type can't be changed after creation</div>}
+              {editing && <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 3 }}>Type can't be changed after creation</div>}
             </div>
           </div>
 
           {editing && (
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Status</label>
-              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={{ ...inp("status"), background: "#fff" }}>
+              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={{ ...inp("status"), background: "var(--hf-surface)" }}>
                 {STATUSES.map(s => <option key={s} value={s}>{STATUS_CFG[s]?.label ?? s}</option>)}
               </select>
             </div>
@@ -260,7 +260,7 @@ export default function RegistrationsTab() {
               <input type="date" value={form.issuedDate} onChange={e => setForm(f => ({ ...f, issuedDate: e.target.value }))} style={inp("issuedDate")} />
             </div>
             <div>
-              <label style={lbl}>Expiry date <span style={{ fontWeight: 400, color: "#94A3B8" }}>(leave blank if it never expires)</span></label>
+              <label style={lbl}>Expiry date <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(leave blank if it never expires)</span></label>
               <input type="date" value={form.expiryDate} onChange={e => { setForm(f => ({ ...f, expiryDate: e.target.value })); setFieldErrors(f => omit(f, "expiryDate")) }} style={inp("expiryDate")} />
               <FErr k="expiryDate" />
             </div>
@@ -300,18 +300,18 @@ export default function RegistrationsTab() {
 function Overlay({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 16, padding: 28, width: 560, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>
+      <div onClick={e => e.stopPropagation()} style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 560, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>
     </div>
   )
 }
 function MHead({ title, onClose }: { title: string; onClose: () => void }) {
-  return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button></div>
+  return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button></div>
 }
 function MFoot({ onCancel, onSubmit, loading, label, disabled = false }: { onCancel: () => void; onSubmit: () => void; loading: boolean; label: string; disabled?: boolean }) {
-  return <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}><button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button><button onClick={onSubmit} disabled={loading || disabled} style={{ padding: "9px 22px", background: loading || disabled ? "#94A3B8" : "#0369A1", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || disabled ? "not-allowed" : "pointer" }}>{loading ? "Saving..." : label}</button></div>
+  return <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}><button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button><button onClick={onSubmit} disabled={loading || disabled} style={{ padding: "9px 22px", background: loading || disabled ? "var(--hf-text-faint)" : "var(--hf-sky-solid-strong)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || disabled ? "not-allowed" : "pointer" }}>{loading ? "Saving..." : label}</button></div>
 }
 function ErrBanner({ msg }: { msg: string }) {
-  return <div style={{ marginTop: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{msg}</div>
+  return <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{msg}</div>
 }
 const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
