@@ -4,7 +4,7 @@
 // WhseClientDetail.tsx / CollAgencyClientDetail.tsx.
 import { useState } from "react"
 import { ArrowLeft, Users, ClipboardList, FileText, UserPlus } from "lucide-react"
-import { TRAINPROV_ACCENT } from "./constants"
+import { TRAINPROV_ACCENT, TRAINPROV_ACCENT_TEXT } from "./constants"
 import TrainProvDelegatesTab from "./TrainProvDelegatesTab"
 import TrainProvEnrollmentsTab from "./TrainProvEnrollmentsTab"
 import TrainProvBillingTab from "./TrainProvBillingTab"
@@ -38,7 +38,7 @@ export default function TrainProvClientDetail({ clientId, clientName, onBack }: 
               style={{
                 display: "flex", alignItems: "center", gap: 6, padding: "9px 13px", border: "none",
                 background: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600,
-                color: active ? TRAINPROV_ACCENT : "var(--hf-text-muted)",
+                color: active ? TRAINPROV_ACCENT_TEXT : "var(--hf-text-muted)",
                 borderBottom: active ? `2px solid ${TRAINPROV_ACCENT}` : "2px solid transparent",
                 marginBottom: -1, whiteSpace: "nowrap",
               }}>

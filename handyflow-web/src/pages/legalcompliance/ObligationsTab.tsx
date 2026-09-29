@@ -41,10 +41,10 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 const STATUS_CFG: Record<string, { color: string; bg: string; border: string; label: string }> = {
-  COMPLIANT:     { color: "#166534", bg: "#DCFCE7", border: "#86EFAC", label: "Compliant"     },
-  DUE_SOON:      { color: "#D97706", bg: "#FFFBEB", border: "#FDE68A", label: "Due Soon"      },
-  OVERDUE:       { color: "#C2410C", bg: "#FFF7ED", border: "#FDBA74", label: "Overdue"       },
-  NON_COMPLIANT: { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", label: "Non-Compliant" },
+  COMPLIANT:     { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", border: "var(--hf-success-border)", label: "Compliant"     },
+  DUE_SOON:      { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)", label: "Due Soon"      },
+  OVERDUE:       { color: "var(--hf-orange-text-strong)", bg: "var(--hf-orange-soft)", border: "var(--hf-orange-border)", label: "Overdue"       },
+  NON_COMPLIANT: { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)", label: "Non-Compliant" },
 }
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
@@ -149,17 +149,17 @@ export default function ObligationsTab() {
   }
 
   const stats = [
-    { label: "Total",         value: obligations.length,                                              color: "#4338CA" },
-    { label: "Compliant",     value: obligations.filter(o => o.status === "COMPLIANT").length,        color: "#166534" },
-    { label: "Due Soon",      value: obligations.filter(o => o.status === "DUE_SOON").length,          color: "#D97706" },
-    { label: "Overdue",       value: obligations.filter(o => o.status === "OVERDUE").length,           color: "#C2410C" },
-    { label: "Non-Compliant", value: obligations.filter(o => o.status === "NON_COMPLIANT").length,     color: "#DC2626" },
+    { label: "Total",         value: obligations.length,                                              color: "var(--hf-indigo-text)" },
+    { label: "Compliant",     value: obligations.filter(o => o.status === "COMPLIANT").length,        color: "var(--hf-success-text-strong)" },
+    { label: "Due Soon",      value: obligations.filter(o => o.status === "DUE_SOON").length,          color: "var(--hf-warning-text)" },
+    { label: "Overdue",       value: obligations.filter(o => o.status === "OVERDUE").length,           color: "var(--hf-orange-text-strong)" },
+    { label: "Non-Compliant", value: obligations.filter(o => o.status === "NON_COMPLIANT").length,     color: "var(--hf-danger-text)" },
   ]
 
   const inp = (k: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
-    border: `1.5px solid ${fieldErrors[k] ? "#DC2626" : "#E2E8F0"}`,
-    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "#FFF5F5" : "#fff", outline: "none",
+    border: `1.5px solid ${fieldErrors[k] ? "var(--hf-danger)" : "var(--hf-border)"}`,
+    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
     <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
@@ -220,11 +220,11 @@ export default function ObligationsTab() {
             const isOpen = expanded === o.id
             const cfg = STATUS_CFG[o.status] ?? STATUS_CFG.COMPLIANT
             return (
-              <div key={o.id} style={{ border: `1px solid ${o.status === "NON_COMPLIANT" ? "#FECACA" : "#E2E8F0"}`, borderRadius: 12, overflow: "hidden" }}>
+              <div key={o.id} style={{ border: `1px solid ${o.status === "NON_COMPLIANT" ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 12, overflow: "hidden" }}>
                 <div style={{ padding: "16px 20px", background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                     <div style={{ width: 44, height: 44, borderRadius: 10, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <ClipboardList size={18} color={cfg.color} />
+                      <ClipboardList size={18} style={{ color: cfg.color }} />
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
@@ -425,4 +425,4 @@ function ErrBanner({ msg }: { msg: string }) {
   return <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{msg}</div>
 }
 const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }

@@ -34,11 +34,11 @@ const STATUSES = ["OPEN", "IN_PROGRESS", "SETTLED", "WITHDRAWN", "CLOSED"]
 const TERMINAL_STATUSES = ["SETTLED", "WITHDRAWN", "CLOSED"]
 
 const STATUS_CFG: Record<string, { color: string; bg: string; border: string; label: string }> = {
-  OPEN:         { color: "#BE123C", bg: "#FFE4E6", border: "#FECDD3", label: "Open"         },
-  IN_PROGRESS:  { color: "#1D4ED8", bg: "#EFF6FF", border: "#BFDBFE", label: "In Progress"   },
-  SETTLED:      { color: "#166534", bg: "#DCFCE7", border: "#86EFAC", label: "Settled"       },
-  WITHDRAWN:    { color: "#64748B", bg: "#F1F5F9", border: "#E2E8F0", label: "Withdrawn"     },
-  CLOSED:       { color: "#334155", bg: "#F8FAFC", border: "#E2E8F0", label: "Closed"        },
+  OPEN:         { color: "var(--hf-danger-text-strong)", bg: "var(--hf-danger-soft-strong)", border: "var(--hf-danger-border)", label: "Open"         },
+  IN_PROGRESS:  { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", border: "var(--hf-info-border)", label: "In Progress"   },
+  SETTLED:      { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", border: "var(--hf-success-border)", label: "Settled"       },
+  WITHDRAWN:    { color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)", border: "var(--hf-border)", label: "Withdrawn"     },
+  CLOSED:       { color: "var(--hf-text-secondary)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)", label: "Closed"        },
 }
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
@@ -90,7 +90,7 @@ function EvidenceSection({ matterId, canManage }: { matterId: string; canManage:
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
           {evidence.map(ev => (
             <div key={ev.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12 }}>
-              <FileText size={13} color="#64748B" />
+              <FileText size={13} style={{ color: 'var(--hf-text-muted)' }} />
               <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{ev.fileName}</span>
               <span style={{ color: "var(--hf-text-faint)" }}>{ev.evidenceType} · {fmtBytes(ev.fileSizeBytes)}</span>
               <span style={{ marginLeft: "auto", color: "var(--hf-text-faint)" }}>{ev.uploadedByName} · {fmtDate(ev.createdAt)}</span>
@@ -103,7 +103,7 @@ function EvidenceSection({ matterId, canManage }: { matterId: string; canManage:
           <input type="text" value={evidenceType} onChange={e => setEvidenceType(e.target.value)} placeholder="Type e.g. COURT_FILING" style={{ flex: 1, padding: "7px 10px", border: "1.5px solid var(--hf-border)", borderRadius: 7, fontSize: 12 }} />
           <input type="file" onChange={e => setFile(e.target.files?.[0] ?? null)} style={{ fontSize: 12, flex: 1 }} />
           <button onClick={() => attach.mutate()} disabled={!file || !evidenceType.trim() || attach.isPending}
-            style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: (!file || !evidenceType.trim()) ? "#CBD5E1" : "var(--hf-indigo)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: (!file || !evidenceType.trim()) ? "not-allowed" : "pointer" }}>
+            style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: (!file || !evidenceType.trim()) ? "var(--hf-border-strong)" : "var(--hf-indigo)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: (!file || !evidenceType.trim()) ? "not-allowed" : "pointer" }}>
             <Paperclip size={12} /> {attach.isPending ? "Uploading..." : "Attach"}
           </button>
         </div>
@@ -199,16 +199,16 @@ export default function LitigationTab() {
   }
 
   const stats = [
-    { label: "Total",       value: matters.length,                                                       color: "#4338CA" },
-    { label: "Open",        value: matters.filter(m => m.status === "OPEN").length,                      color: "#BE123C" },
-    { label: "In Progress", value: matters.filter(m => m.status === "IN_PROGRESS").length,                color: "#1D4ED8" },
-    { label: "Exposure (open)", value: fmtR(matters.filter(m => m.status === "OPEN" || m.status === "IN_PROGRESS").reduce((s, m) => s + (m.estimatedExposure ?? 0), 0)), color: "#D97706" },
+    { label: "Total",       value: matters.length,                                                       color: "var(--hf-indigo-text)" },
+    { label: "Open",        value: matters.filter(m => m.status === "OPEN").length,                      color: "var(--hf-danger-text-strong)" },
+    { label: "In Progress", value: matters.filter(m => m.status === "IN_PROGRESS").length,                color: "var(--hf-info-text)" },
+    { label: "Exposure (open)", value: fmtR(matters.filter(m => m.status === "OPEN" || m.status === "IN_PROGRESS").reduce((s, m) => s + (m.estimatedExposure ?? 0), 0)), color: "var(--hf-warning-text)" },
   ]
 
   const inp = (k: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
-    border: `1.5px solid ${fieldErrors[k] ? "#DC2626" : "#E2E8F0"}`,
-    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "#FFF5F5" : "#fff", outline: "none",
+    border: `1.5px solid ${fieldErrors[k] ? "var(--hf-danger)" : "var(--hf-border)"}`,
+    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
     <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}><AlertCircle size={12} />{fieldErrors[k]}</div>
@@ -278,7 +278,7 @@ export default function LitigationTab() {
                 <div style={{ padding: "16px 20px", background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                     <div style={{ width: 44, height: 44, borderRadius: 10, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <Gavel size={18} color={cfg.color} />
+                      <Gavel size={18} style={{ color: cfg.color }} />
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
@@ -442,7 +442,7 @@ export default function LitigationTab() {
               const cfg = STATUS_CFG[s]; const sel = newStatus === s
               return (
                 <button key={s} onClick={() => setNewStatus(s)}
-                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `2px solid ${sel ? cfg.color : "#E2E8F0"}`, borderRadius: 10, cursor: "pointer", background: sel ? cfg.bg : "var(--hf-surface)", textAlign: "left" as const, width: "100%" }}>
+                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `2px solid ${sel ? cfg.color : "var(--hf-border)"}`, borderRadius: 10, cursor: "pointer", background: sel ? cfg.bg : "var(--hf-surface)", textAlign: "left" as const, width: "100%" }}>
                   <span style={{ fontWeight: 600, color: sel ? cfg.color : "var(--hf-text)" }}>{cfg.label}</span>
                 </button>
               )
@@ -503,4 +503,4 @@ function ErrBanner({ msg }: { msg: string }) {
   return <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{msg}</div>
 }
 const omit = (obj: Record<string, string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }

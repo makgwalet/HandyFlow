@@ -14,7 +14,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { UserPlus, X, Ban, Mail } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { TRAINPROV_ACCENT } from "./constants"
+import { TRAINPROV_ACCENT, TRAINPROV_ACCENT_TEXT } from "./constants"
 
 interface PortalAccessGrantResponse {
   id: string; clientId: string; inviteEmail: string; status: "PENDING" | "ACTIVE" | "REVOKED"
@@ -40,7 +40,7 @@ function InviteModal({ clientId, onClose }: { clientId: string; onClose: () => v
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 380 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Invite to portal</p>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
         <label style={{ fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5, display: "block" }}>Contact email *</label>
         <input type="email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} placeholder="contact@client.co.za" />
@@ -89,7 +89,7 @@ export default function TrainProvPortalAccessTab({ clientId }: { clientId: strin
             return (
               <div key={g.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <Mail size={14} color={TRAINPROV_ACCENT} />
+                  <Mail size={14} style={{ color: TRAINPROV_ACCENT_TEXT }} />
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <p style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)", margin: 0 }}>{g.inviteEmail}</p>
@@ -101,7 +101,7 @@ export default function TrainProvPortalAccessTab({ clientId }: { clientId: strin
                 {g.status !== "REVOKED" && (
                   <button onClick={() => { if (confirm(`Revoke portal access for ${g.inviteEmail}?`)) revoke.mutate(g.id) }} title="Revoke"
                     style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
-                    <Ban size={13} color="#DC2626" />
+                    <Ban size={13} style={{ color: 'var(--hf-danger-text)' }} />
                   </button>
                 )}
               </div>

@@ -99,7 +99,7 @@ export const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWe
 
 export const inputStyle = (hasError = false): React.CSSProperties => ({
   width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
-  border: `1.5px solid ${hasError ? "#DC2626" : "#E2E8F0"}`,
+  border: `1.5px solid ${hasError ? "var(--hf-danger)" : "var(--hf-border)"}`,
   borderRadius: 8, fontSize: 14,
   background: hasError ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
 })

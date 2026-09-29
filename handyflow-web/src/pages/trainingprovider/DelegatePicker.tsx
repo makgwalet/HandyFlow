@@ -19,7 +19,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Search, X, User } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { TRAINPROV_ACCENT } from "./constants"
+import { TRAINPROV_ACCENT_TEXT } from "./constants"
 
 export interface DelegateOption {
   id: string
@@ -69,7 +69,7 @@ export default function DelegatePicker({ clientId, value, onChange }: { clientId
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "9px 12px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <User size={14} color={TRAINPROV_ACCENT} />
+          <User size={14} style={{ color: TRAINPROV_ACCENT_TEXT }} />
           <div>
             <p style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)", margin: 0 }}>{value.fullName}</p>
             <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>
@@ -77,7 +77,7 @@ export default function DelegatePicker({ clientId, value, onChange }: { clientId
             </p>
           </div>
         </div>
-        <button onClick={() => onChange(null)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={15} color="#94A3B8" /></button>
+        <button onClick={() => onChange(null)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={15} style={{ color: 'var(--hf-text-faint)' }} /></button>
       </div>
     )
   }
@@ -85,7 +85,7 @@ export default function DelegatePicker({ clientId, value, onChange }: { clientId
   return (
     <div ref={boxRef} style={{ position: "relative" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid var(--hf-border)", borderRadius: 8, padding: "9px 12px" }}>
-        <Search size={14} color="#94A3B8" />
+        <Search size={14} style={{ color: 'var(--hf-text-faint)' }} />
         <input
           value={query}
           onFocus={() => setOpen(true)}

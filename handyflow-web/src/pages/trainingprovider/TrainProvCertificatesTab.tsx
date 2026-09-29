@@ -21,8 +21,8 @@ interface CertificateResponse {
 }
 interface CertificatePage { content: CertificateResponse[] }
 
-const STATUS_COLORS: Record<string, string> = { VALID: "#059669", EXPIRED: "#D97706", REVOKED: "#DC2626" }
-const btnStyle: React.CSSProperties = { background: "none", border: "1px solid #E2E8F0", borderRadius: 7, padding: "6px 10px", fontSize: 11.5, fontWeight: 600, color: "#64748B", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }
+const STATUS_COLORS: Record<string, string> = { VALID: "var(--hf-success-text)", EXPIRED: "var(--hf-warning-text)", REVOKED: "var(--hf-danger-text)" }
+const btnStyle: React.CSSProperties = { background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "6px 10px", fontSize: 11.5, fontWeight: 600, color: "var(--hf-text-muted)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }
 
 export default function TrainProvCertificatesTab() {
   const qc = useQueryClient()
@@ -79,12 +79,12 @@ export default function TrainProvCertificatesTab() {
             <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--hf-warning-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Award size={15} color="#D97706" />
+                  <Award size={15} style={{ color: 'var(--hf-warning-text)' }} />
                 </div>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <p style={{ fontSize: 13.5, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{c.delegateNameSnapshot}</p>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: `${STATUS_COLORS[c.status]}18`, color: STATUS_COLORS[c.status] }}>{c.status}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: `color-mix(in srgb, ${STATUS_COLORS[c.status]} 9%, transparent)`, color: STATUS_COLORS[c.status] }}>{c.status}</span>
                   </div>
                   <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>
                     {c.clientNameSnapshot} · {c.courseTitleSnapshot}{c.unitStandardSnapshot ? ` (US ${c.unitStandardSnapshot})` : ""} · {c.certificateNumber} · Issued {c.issueDate}{c.expiryDate ? ` · Expires ${c.expiryDate}` : " · No expiry"}

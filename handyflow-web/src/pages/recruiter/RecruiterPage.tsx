@@ -55,14 +55,14 @@ interface Summary {
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const STAGE: Record<string, { color: string; bg: string; border: string; dot: string; label: string }> = {
-  APPLIED:    { color: 'var(--hf-text-muted)', bg: 'var(--hf-surface-muted)', border: 'var(--hf-border)', dot: '#CBD5E1', label: 'Applied'    },
+  APPLIED:    { color: 'var(--hf-text-muted)', bg: 'var(--hf-surface-muted)', border: 'var(--hf-border)', dot: 'var(--hf-border-strong)', label: 'Applied'    },
   SCREENING:  { color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)', border: 'var(--hf-warning-border)', dot: 'var(--hf-warning)', label: 'Screening'  },
-  INTERVIEW:  { color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)', border: 'var(--hf-info-border)', dot: '#60A5FA', label: 'Interview'  },
-  ASSESSMENT: { color: 'var(--hf-violet-text)', bg: 'var(--hf-violet-soft)', border: 'var(--hf-violet-border)', dot: '#A78BFA', label: 'Assessment' },
-  OFFER:      { color: 'var(--hf-accent-text)', bg: 'var(--hf-accent-soft)', border: 'var(--hf-accent-border)', dot: '#2DD4BF', label: 'Offer'      },
+  INTERVIEW:  { color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)', border: 'var(--hf-info-border)', dot: 'var(--hf-info-dot)', label: 'Interview'  },
+  ASSESSMENT: { color: 'var(--hf-violet-text)', bg: 'var(--hf-violet-soft)', border: 'var(--hf-violet-border)', dot: 'var(--hf-violet-dot)', label: 'Assessment' },
+  OFFER:      { color: 'var(--hf-accent-text)', bg: 'var(--hf-accent-soft)', border: 'var(--hf-accent-border)', dot: 'var(--hf-accent-dot)', label: 'Offer'      },
   HIRED:      { color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)', border: 'var(--hf-success-border)', dot: 'var(--hf-success)', label: 'Hired'      },
   REJECTED:   { color: 'var(--hf-danger-text)', bg: 'var(--hf-danger-soft)', border: 'var(--hf-danger-border)', dot: 'var(--hf-danger)', label: 'Rejected'   },
-  WITHDRAWN:  { color: 'var(--hf-text-faint)', bg: 'var(--hf-surface-muted)', border: 'var(--hf-border)', dot: '#CBD5E1', label: 'Withdrawn'  },
+  WITHDRAWN:  { color: 'var(--hf-text-faint)', bg: 'var(--hf-surface-muted)', border: 'var(--hf-border)', dot: 'var(--hf-border-strong)', label: 'Withdrawn'  },
 }
 const JOB_STATUS: Record<string, { color: string; bg: string; border: string; label: string }> = {
   DRAFT:  { color: 'var(--hf-text-muted)', bg: 'var(--hf-surface-muted)', border: 'var(--hf-border)', label: 'Draft'  },
@@ -110,7 +110,7 @@ function ConfirmModal({ title, message, danger = false, confirmLabel, loading, o
       <div style={{ background: 'var(--hf-surface)', borderRadius: 14, padding: 28, width: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
         <div style={{ display: 'flex', gap: 14, marginBottom: 20 }}>
           <div style={{ width: 40, height: 40, borderRadius: '50%', background: danger ? 'var(--hf-danger-soft)' : 'var(--hf-success-soft-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            {danger ? <AlertTriangle size={18} color="#DC2626" /> : <CheckCircle size={18} color="#166534" />}
+            {danger ? <AlertTriangle size={18} style={{ color: 'var(--hf-danger-text)' }} /> : <CheckCircle size={18} style={{ color: 'var(--hf-success-text-strong)' }} />}
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>{title}</div>
@@ -604,7 +604,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
           <div style={{ display: 'flex' }}>
             {(['overview','interviews','history'] as const).map(t => (
               <button key={t} onClick={() => setTab(t)}
-                style={{ padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t ? 'var(--hf-primary-text)' : 'var(--hf-text-faint)', borderBottom: `2px solid ${tab === t ? '#1B3A6B' : 'transparent'}`, marginBottom: -1, textTransform: 'capitalize' }}>
+                style={{ padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t ? 'var(--hf-primary-text)' : 'var(--hf-text-faint)', borderBottom: `2px solid ${tab === t ? 'var(--hf-primary)' : 'transparent'}`, marginBottom: -1, textTransform: 'capitalize' }}>
                 {t === 'interviews' ? `Interviews (${app?.interviews?.length ?? 0})` : t === 'history' ? `History (${app?.history?.length ?? 0})` : 'Overview'}
               </button>
             ))}
@@ -714,13 +714,13 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                 </div>
               ) : (app?.interviews ?? []).map((iv: Interview) => {
                 const Icon = INTERVIEW_TYPE_ICON[iv.interviewType] ?? Video
-                const outcomeColor = iv.outcome === 'PASSED' ? '#166534' : iv.outcome === 'FAILED' ? '#DC2626' : '#D97706'
+                const outcomeColor = iv.outcome === 'PASSED' ? 'var(--hf-success-text-strong)' : iv.outcome === 'FAILED' ? 'var(--hf-danger-text)' : 'var(--hf-warning-text)'
                 return (
                   <div key={iv.id} style={{ border: '1px solid var(--hf-border)', borderRadius: 10, padding: '14px 16px', marginBottom: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ width: 30, height: 30, borderRadius: 7, background: 'var(--hf-info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Icon size={14} color="#1D4ED8" />
+                          <Icon size={14} style={{ color: 'var(--hf-info-text)' }} />
                         </div>
                         <div>
                           <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -853,7 +853,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
           <div style={{ background: 'var(--hf-surface)', borderRadius: 14, padding: 28, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
             <div style={{ display: 'flex', gap: 14, marginBottom: 20 }}>
               <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--hf-danger-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <X size={18} color="#DC2626" />
+                <X size={18} style={{ color: 'var(--hf-danger-text)' }} />
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Reject candidate</div>
@@ -915,14 +915,14 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                     style={{ flex: 1, padding: '6px 10px', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer',
                       background: ivMode === 'team' ? 'var(--hf-info-soft)' : 'var(--hf-surface-muted)',
                       color: ivMode === 'team' ? 'var(--hf-info-text)' : 'var(--hf-text-muted)',
-                      border: `1px solid ${ivMode === 'team' ? '#BFDBFE' : '#E2E8F0'}` }}>
+                      border: `1px solid ${ivMode === 'team' ? 'var(--hf-info-border)' : 'var(--hf-border)'}` }}>
                     From team
                   </button>
                   <button type="button" onClick={() => { setIvMode('external'); setIvInterviewerId(''); }}
                     style={{ flex: 1, padding: '6px 10px', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer',
                       background: ivMode === 'external' ? 'var(--hf-info-soft)' : 'var(--hf-surface-muted)',
                       color: ivMode === 'external' ? 'var(--hf-info-text)' : 'var(--hf-text-muted)',
-                      border: `1px solid ${ivMode === 'external' ? '#BFDBFE' : '#E2E8F0'}` }}>
+                      border: `1px solid ${ivMode === 'external' ? 'var(--hf-info-border)' : 'var(--hf-border)'}` }}>
                     External / other
                   </button>
                 </div>
@@ -966,7 +966,7 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                             padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer',
                             background: selected ? 'var(--hf-info-soft)' : 'var(--hf-surface-muted)',
                             color: selected ? 'var(--hf-info-text)' : 'var(--hf-text-muted)',
-                            border: `1px solid ${selected ? '#BFDBFE' : '#E2E8F0'}`,
+                            border: `1px solid ${selected ? 'var(--hf-info-border)' : 'var(--hf-border)'}`,
                           }}>
                           {u.firstName} {u.lastName}
                         </button>
@@ -1058,14 +1058,14 @@ function ApplicationDetail({ app: initial, onClose, onUpdated }: {
                   style={{ flex: 1, padding: '7px 10px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer',
                     background: createHrRecord ? 'var(--hf-success-soft-strong)' : 'var(--hf-surface-muted)',
                     color: createHrRecord ? 'var(--hf-success-text-strong)' : 'var(--hf-text-muted)',
-                    border: `1px solid ${createHrRecord ? '#86EFAC' : '#E2E8F0'}` }}>
+                    border: `1px solid ${createHrRecord ? 'var(--hf-success-border)' : 'var(--hf-border)'}` }}>
                   Internal hire
                 </button>
                 <button type="button" onClick={() => setCreateHrRecord(false)}
                   style={{ flex: 1, padding: '7px 10px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer',
                     background: !createHrRecord ? 'var(--hf-info-soft)' : 'var(--hf-surface-muted)',
                     color: !createHrRecord ? 'var(--hf-info-text)' : 'var(--hf-text-muted)',
-                    border: `1px solid ${!createHrRecord ? '#BFDBFE' : '#E2E8F0'}` }}>
+                    border: `1px solid ${!createHrRecord ? 'var(--hf-info-border)' : 'var(--hf-border)'}` }}>
                   External placement
                 </button>
               </div>
@@ -1393,7 +1393,7 @@ export function RecruiterPage() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--hf-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Briefcase size={18} color="#fff" />
+              <Briefcase size={18} style={{ color: 'var(--hf-text-on-solid)' }} />
             </div>
             <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>Recruiter</h1>
           </div>
@@ -1428,7 +1428,7 @@ export function RecruiterPage() {
               { key: 'applications', label: 'Applications',  icon: <Users size={13} /> },
             ] as const).map(t => (
               <button key={t.key} onClick={() => setTab(t.key)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '14px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t.key ? 'var(--hf-primary-text)' : 'var(--hf-text-faint)', borderBottom: `2px solid ${tab === t.key ? '#1B3A6B' : 'transparent'}`, marginBottom: -1 }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '14px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t.key ? 'var(--hf-primary-text)' : 'var(--hf-text-faint)', borderBottom: `2px solid ${tab === t.key ? 'var(--hf-primary)' : 'transparent'}`, marginBottom: -1 }}>
                 {t.icon}{t.label}
               </button>
             ))}
@@ -1494,7 +1494,7 @@ export function RecruiterPage() {
                 const cfg = JOB_STATUS[job.status] ?? JOB_STATUS.DRAFT
                 const closing = job.closesAt && new Date(job.closesAt) < new Date() && job.status === 'OPEN'
                 return (
-                  <div key={job.id} style={{ border: `1px solid ${closing ? '#FECACA' : '#E2E8F0'}`, borderRadius: 12, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: 'var(--hf-surface)' }}
+                  <div key={job.id} style={{ border: `1px solid ${closing ? 'var(--hf-danger-border)' : 'var(--hf-border)'}`, borderRadius: 12, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: 'var(--hf-surface)' }}
                     onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'}
                     onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
                     <div style={{ flex: 1 }}>
@@ -1647,9 +1647,9 @@ export function RecruiterPage() {
                           <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--hf-text-muted)' }}>{a.source?.replace('_',' ') ?? '—'}</td>
                           <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--hf-text-faint)' }}>{fmtDate(a.appliedAt)}</td>
                           <td style={{ padding: '12px 16px' }}>
-                            {a.hasCv ? <CheckCircle size={13} color="#0D9488" /> : <span style={{ color: 'var(--hf-text-disabled)', fontSize: 11 }}>—</span>}
+                            {a.hasCv ? <CheckCircle size={13} style={{ color: 'var(--hf-accent-text)' }} /> : <span style={{ color: 'var(--hf-text-disabled)', fontSize: 11 }}>—</span>}
                           </td>
-                          <td style={{ padding: '12px 16px' }}><ChevronRight size={14} color="#94A3B8" /></td>
+                          <td style={{ padding: '12px 16px' }}><ChevronRight size={14} style={{ color: 'var(--hf-text-faint)' }} /></td>
                         </tr>
                       )
                     })}
@@ -1665,7 +1665,7 @@ export function RecruiterPage() {
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--hf-inverse-surface)', color: 'var(--hf-text-on-solid)', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 10px 40px rgba(0,0,0,0.3)', zIndex: 900 }}>
           <span style={{ fontSize: 13, fontWeight: 600 }}>{compareIds.length} candidate{compareIds.length === 1 ? '' : 's'} selected</span>
           <button onClick={() => setShowCompare(true)} disabled={compareIds.length < 2}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: compareIds.length < 2 ? '#334155' : 'var(--hf-surface)', color: compareIds.length < 2 ? 'var(--hf-text-faint)' : 'var(--hf-text)', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: compareIds.length < 2 ? 'default' : 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: compareIds.length < 2 ? 'var(--hf-surface-strong)' : 'var(--hf-surface)', color: compareIds.length < 2 ? 'var(--hf-text-faint)' : 'var(--hf-text)', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: compareIds.length < 2 ? 'default' : 'pointer' }}>
             <Users size={13} /> Compare
           </button>
           <button onClick={() => setCompareIds([])} style={{ background: 'none', border: 'none', color: 'var(--hf-text-faint)', cursor: 'pointer', display: 'flex' }}>

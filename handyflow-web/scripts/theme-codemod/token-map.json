@@ -76,6 +76,9 @@
   "bg": "info",
   "fg": "info-text"
  },
+ "#2DD4BF": {
+  "bg": "accent-dot"
+ },
  "#334155": {
   "fg": "text-secondary"
  },
@@ -101,7 +104,11 @@
   "fg": "violet-text-strong"
  },
  "#5EEAD4": {},
+ "#60A5FA": {
+  "bg": "info-dot"
+ },
  "#64748B": {
+  "bg": "neutral-solid",
   "fg": "text-muted"
  },
  "#6B7280": {
@@ -169,10 +176,15 @@
  "#9D174D": {
   "fg": "danger-text-strong"
  },
+ "#A78BFA": {
+  "bg": "violet-dot"
+ },
  "#B43C32": {
   "fg": "danger-text-strong"
  },
  "#B45309": {
+  "bd": "warning-solid-strong",
+  "bg": "warning-solid-strong",
   "fg": "warning-text-strong"
  },
  "#B91C1C": {
@@ -206,6 +218,7 @@
  },
  "#CBD5E1": {
   "bd": "border-strong",
+  "bg": "border-strong",
   "fg": "text-disabled"
  },
  "#CCFBF1": {

@@ -17,7 +17,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { FileText, X, Download, CreditCard, Send } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { TRAINPROV_ACCENT } from "./constants"
+import { TRAINPROV_ACCENT, TRAINPROV_ACCENT_TEXT } from "./constants"
 
 interface InvoiceResponse {
   id: string; clientId: string; invoiceNumber: string; periodStart: string; periodEnd: string
@@ -48,7 +48,7 @@ function GenerateModal({ clientId, onClose }: { clientId: string; onClose: () =>
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 400 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Generate invoice</p>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
         <p style={{ fontSize: 12, color: "var(--hf-text-faint)", marginBottom: 14 }}>
           Bills every not-yet-invoiced billable enrollment for this client through the date below, and posts revenue to the GL immediately. The invoice is created as DRAFT — use "Send" afterwards to mark it sent.
@@ -78,7 +78,7 @@ function PaymentModal({ invoice, onClose }: { invoice: InvoiceResponse; onClose:
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 380 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Record payment</p>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", marginBottom: 14 }}>{invoice.invoiceNumber} — {fmtMoney(invoice.balance)} outstanding</p>
         <div><label style={labelStyle}>Amount *</label><input type="number" step="0.01" style={inputStyle} value={amount} onChange={e => setAmount(e.target.value)} /></div>
@@ -151,16 +151,16 @@ export default function TrainProvBillingTab({ clientId }: { clientId: string }) 
                     {inv.balance > 0 && <p style={{ fontSize: 11, color: "var(--hf-warning-text)", margin: 0 }}>{fmtMoney(inv.balance)} outstanding</p>}
                   </div>
                   <button onClick={() => downloadPdf(inv)} title="Download PDF" style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
-                    <Download size={14} color="#64748B" />
+                    <Download size={14} style={{ color: 'var(--hf-text-muted)' }} />
                   </button>
                   {inv.status === "DRAFT" && (
                     <button onClick={() => send.mutate(inv.id)} title="Send to client" style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
-                      <Send size={14} color={TRAINPROV_ACCENT} />
+                      <Send size={14} style={{ color: TRAINPROV_ACCENT_TEXT }} />
                     </button>
                   )}
                   {inv.balance > 0 && inv.status !== "DRAFT" && (
                     <button onClick={() => setPaying(inv)} title="Record payment" style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
-                      <CreditCard size={14} color={TRAINPROV_ACCENT} />
+                      <CreditCard size={14} style={{ color: TRAINPROV_ACCENT_TEXT }} />
                     </button>
                   )}
                 </div>

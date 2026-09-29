@@ -10,7 +10,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, X, Archive, RotateCcw, Trash2, GraduationCap, Award } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { TRAINPROV_ACCENT } from "./constants"
+import { TRAINPROV_ACCENT, TRAINPROV_ACCENT_TEXT } from "./constants"
 
 export interface CourseResponse {
   id: string; courseCode: string; title: string; description: string | null
@@ -64,7 +64,7 @@ function CourseFormModal({ initial, onClose }: { initial?: CourseResponse; onClo
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 520, maxHeight: "85vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>{initial ? "Edit course" : "Add a course"}</p>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
         <div style={{ display: "grid", gap: 12 }}>
           <div><label style={labelStyle}>Title *</label><input style={inputStyle} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Occupational Health & Safety Level 2" /></div>
@@ -152,13 +152,13 @@ export default function TrainProvCoursesTab() {
             <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--hf-warning-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <GraduationCap size={15} color={TRAINPROV_ACCENT} />
+                  <GraduationCap size={15} style={{ color: TRAINPROV_ACCENT_TEXT }} />
                 </div>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <p style={{ fontSize: 13.5, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{c.title}</p>
                     <span style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)" }}>{c.courseCode}</span>
-                    {c.certificationOffered && <Award size={13} color="#D97706" />}
+                    {c.certificationOffered && <Award size={13} style={{ color: 'var(--hf-warning-text)' }} />}
                     {c.status === "ARCHIVED" && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "var(--hf-surface-sunken)", color: "var(--hf-text-muted)" }}>ARCHIVED</span>}
                   </div>
                   <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>
@@ -173,16 +173,16 @@ export default function TrainProvCoursesTab() {
                 </button>
                 {c.status === "ACTIVE" ? (
                   <button onClick={() => archive.mutate(c.id)} title="Archive" style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
-                    <Archive size={13} color="#94A3B8" />
+                    <Archive size={13} style={{ color: 'var(--hf-text-faint)' }} />
                   </button>
                 ) : (
                   <button onClick={() => reactivate.mutate(c.id)} title="Reactivate" style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
-                    <RotateCcw size={13} color="#059669" />
+                    <RotateCcw size={13} style={{ color: 'var(--hf-success-text)' }} />
                   </button>
                 )}
                 <button onClick={() => { if (confirm(`Delete ${c.title}? This cannot be undone.`)) remove.mutate(c.id) }} title="Delete"
                   style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
-                  <Trash2 size={13} color="#DC2626" />
+                  <Trash2 size={13} style={{ color: 'var(--hf-danger-text)' }} />
                 </button>
               </div>
             </div>

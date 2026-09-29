@@ -12,7 +12,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, X, User, Power, PowerOff, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { TRAINPROV_ACCENT } from "./constants"
+import { TRAINPROV_ACCENT, TRAINPROV_ACCENT_TEXT } from "./constants"
 
 interface DelegateResponse {
   id: string; clientId: string; delegateNumber: string; fullName: string; idNumber: string | null
@@ -45,7 +45,7 @@ function DelegateFormModal({ clientId, initial, onClose }: { clientId: string; i
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 440 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>{initial ? "Edit delegate" : "Add a delegate"}</p>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
         <div style={{ display: "grid", gap: 12 }}>
           <div><label style={labelStyle}>Full name *</label><input style={inputStyle} value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} /></div>
@@ -111,7 +111,7 @@ export default function TrainProvDelegatesTab({ clientId }: { clientId: string }
             <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--hf-warning-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <User size={14} color={TRAINPROV_ACCENT} />
+                  <User size={14} style={{ color: TRAINPROV_ACCENT_TEXT }} />
                 </div>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -129,16 +129,16 @@ export default function TrainProvDelegatesTab({ clientId }: { clientId: string }
                 </button>
                 {d.status === "ACTIVE" ? (
                   <button onClick={() => deactivate.mutate(d.id)} title="Deactivate" style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
-                    <PowerOff size={13} color="#94A3B8" />
+                    <PowerOff size={13} style={{ color: 'var(--hf-text-faint)' }} />
                   </button>
                 ) : (
                   <button onClick={() => reactivate.mutate(d.id)} title="Reactivate" style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
-                    <Power size={13} color="#059669" />
+                    <Power size={13} style={{ color: 'var(--hf-success-text)' }} />
                   </button>
                 )}
                 <button onClick={() => { if (confirm(`Delete ${d.fullName}? This cannot be undone.`)) remove.mutate(d.id) }} title="Delete"
                   style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
-                  <Trash2 size={13} color="#DC2626" />
+                  <Trash2 size={13} style={{ color: 'var(--hf-danger-text)' }} />
                 </button>
               </div>
             </div>

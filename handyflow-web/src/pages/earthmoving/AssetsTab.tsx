@@ -66,11 +66,11 @@ export default function AssetsTab() {
   })
 
   const stats = [
-    { label: "Total fleet", value: assets.length, color: "#1B3A6B" },
-    { label: "Available",   value: assets.filter(a => a.status === "AVAILABLE").length, color: "#166534" },
-    { label: "Deployed",    value: assets.filter(a => a.status === "DEPLOYED").length, color: "#1D4ED8" },
-    { label: "Service due", value: assets.filter(a => a.dueForService).length, color: "#D97706" },
-    { label: "Breakdowns",  value: assets.filter(a => a.status === "BREAKDOWN").length, color: "#DC2626" },
+    { label: "Total fleet", value: assets.length, color: "var(--hf-primary-text)" },
+    { label: "Available",   value: assets.filter(a => a.status === "AVAILABLE").length, color: "var(--hf-success-text-strong)" },
+    { label: "Deployed",    value: assets.filter(a => a.status === "DEPLOYED").length, color: "var(--hf-info-text)" },
+    { label: "Service due", value: assets.filter(a => a.dueForService).length, color: "var(--hf-warning-text)" },
+    { label: "Breakdowns",  value: assets.filter(a => a.status === "BREAKDOWN").length, color: "var(--hf-danger-text)" },
   ]
 
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
@@ -103,7 +103,7 @@ export default function AssetsTab() {
 
       {assets.filter(a => a.status === "BREAKDOWN").length > 0 && (
         <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
-          <AlertTriangle size={17} color="#DC2626" style={{ flexShrink: 0 }} />
+          <AlertTriangle size={17} style={{ color: 'var(--hf-danger-text)', flexShrink: 0 }} />
           <div>
             <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-danger-text)" }}>Active Breakdowns</div>
             <div style={{ fontSize: 12, color: "var(--hf-danger-text-strong)" }}>
@@ -115,7 +115,7 @@ export default function AssetsTab() {
 
       {assets.filter(a => a.dueForService).length > 0 && (
         <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
-          <AlertTriangle size={17} color="#D97706" style={{ flexShrink: 0 }} />
+          <AlertTriangle size={17} style={{ color: 'var(--hf-warning-text)', flexShrink: 0 }} />
           <div>
             <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-warning-text)" }}>Service Due</div>
             <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>
@@ -169,7 +169,7 @@ export default function AssetsTab() {
             const svcPct = Math.min(100, (hoursUsed / (asset.serviceIntervalHours || 250)) * 100)
 
             return (
-              <div key={asset.id} style={{ border: `1px solid ${asset.status === "BREAKDOWN" ? "#FECACA" : "#E2E8F0"}`, borderRadius: 12, overflow: "hidden" }}>
+              <div key={asset.id} style={{ border: `1px solid ${asset.status === "BREAKDOWN" ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 12, overflow: "hidden" }}>
                 <div style={{ padding: "16px 20px", background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                     <div style={{ width: 48, height: 48, borderRadius: 12, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>
@@ -427,15 +427,15 @@ export default function AssetsTab() {
               const sel = newStatus === s
               return (
                 <button key={s} onClick={() => setNewStatus(s)}
-                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `2px solid ${sel ? cfg.color : "#E2E8F0"}`, borderRadius: 10, cursor: "pointer", background: sel ? cfg.bg : "var(--hf-surface)", textAlign: "left" as const, width: "100%" }}>
-                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: `${cfg.color}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Icon size={15} color={cfg.color} />
+                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `2px solid ${sel ? cfg.color : "var(--hf-border)"}`, borderRadius: 10, cursor: "pointer", background: sel ? cfg.bg : "var(--hf-surface)", textAlign: "left" as const, width: "100%" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: `color-mix(in srgb, ${cfg.color} 9%, transparent)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Icon size={15} style={{ color: cfg.color }} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: 14, color: sel ? cfg.color : "var(--hf-text)" }}>{cfg.label}</div>
                     <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{STATUS_DESCRIPTIONS[s]}</div>
                   </div>
-                  {sel && <CheckCircle size={16} color={cfg.color} />}
+                  {sel && <CheckCircle size={16} style={{ color: cfg.color }} />}
                 </button>
               )
             })}

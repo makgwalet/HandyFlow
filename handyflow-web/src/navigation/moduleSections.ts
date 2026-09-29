@@ -16,6 +16,7 @@ import {
   Droplets, ArrowDownToLine, Fuel, Truck, Users, TrendingUp, Car, Wrench,
   Calculator, BookOpen, GitBranch as JournalIcon, Landmark, BarChart2, FileText,
   Briefcase, Calendar, FolderOpen, AlertOctagon, CalendarCheck, Settings,
+  Building2, GraduationCap, CalendarDays, Award, Scale, Gavel, FileSearch, MapPin as PinIcon, HardHat,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -300,9 +301,84 @@ export const BOOKINGS_SECTIONS: ModuleSections = {
   ],
 }
 
+export const TRAINING_PROVIDER_SECTIONS: ModuleSections = {
+  moduleKey: 'trainingprovider',
+  // Note: /training-provider/portal/* is the client portal, routed separately
+  // outside the staff shell, and is unaffected.
+  basePath: '/training-provider',
+  title: 'Training Provider',
+  icon: GraduationCap,
+  defaultSection: 'dashboard',
+  groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+    {
+      label: 'Clients & courses',
+      sections: [
+        { id: 'clients', label: 'Clients', icon: Building2 },
+        { id: 'courses', label: 'Courses', icon: GraduationCap },
+      ],
+    },
+    {
+      label: 'Delivery',
+      sections: [
+        { id: 'sessions', label: 'Sessions', icon: CalendarDays },
+        { id: 'certificates', label: 'Certificates', icon: Award },
+      ],
+    },
+    { label: 'Setup', sections: [{ id: 'profile', label: 'Academy Profile', icon: Landmark }] },
+  ],
+}
+
+export const LEGAL_COMPLIANCE_SECTIONS: ModuleSections = {
+  moduleKey: 'legalcompliance',
+  basePath: '/legalcompliance',
+  title: 'Legal & Compliance',
+  icon: Scale,
+  defaultSection: 'dashboard',
+  groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+    {
+      label: 'Compliance',
+      sections: [
+        { id: 'obligations', label: 'Obligations', icon: ClipboardList },
+        { id: 'popia', label: 'POPIA Register', icon: Lock },
+        { id: 'dsar', label: 'DSAR Requests', icon: FileSearch },
+        { id: 'calendar', label: 'Calendar', icon: CalendarDays },
+      ],
+    },
+    { label: 'Legal matters', sections: [{ id: 'litigation', label: 'Litigation', icon: Gavel }] },
+  ],
+}
+
+export const EARTHMOVING_SECTIONS: ModuleSections = {
+  moduleKey: 'earthmoving',
+  basePath: '/earthmoving',
+  title: 'Earthmoving',
+  icon: HardHat,
+  defaultSection: 'dashboard',
+  groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+    {
+      label: 'Fleet & sites',
+      sections: [
+        { id: 'assets', label: 'Fleet', icon: Truck },
+        { id: 'deployments', label: 'Deployments', icon: PinIcon },
+      ],
+    },
+    {
+      label: 'Operations',
+      sections: [
+        { id: 'maintenance', label: 'Maintenance', icon: Wrench },
+        { id: 'operators', label: 'Operator Logs', icon: Users },
+      ],
+    },
+    { label: 'Safety', sections: [{ id: 'incidents', label: 'Incidents', icon: AlertTriangle }] },
+  ],
+}
+
 const REGISTRY: ModuleSections[] = [
   SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FLEET_SECTIONS, ACCOUNTING_SECTIONS, ACCOUNTANT_SECTIONS,
-  HR_SECTIONS, BOOKINGS_SECTIONS,
+  HR_SECTIONS, BOOKINGS_SECTIONS, TRAINING_PROVIDER_SECTIONS, LEGAL_COMPLIANCE_SECTIONS, EARTHMOVING_SECTIONS,
 ]
 
 /** Groups with sections the user may not see removed (and empty groups dropped). */

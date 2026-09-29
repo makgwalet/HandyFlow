@@ -130,7 +130,7 @@ export default function PopiaTab() {
 
   const inp = (k: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
-    border: `1.5px solid ${fieldErrors[k] ? "#DC2626" : "#E2E8F0"}`,
+    border: `1.5px solid ${fieldErrors[k] ? "var(--hf-danger)" : "var(--hf-border)"}`,
     borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
@@ -183,11 +183,11 @@ export default function PopiaTab() {
           {filtered.map(a => {
             const isOpen = expanded === a.id
             return (
-              <div key={a.id} style={{ border: `1px solid ${!a.active ? "#E2E8F0" : "#E2E8F0"}`, borderRadius: 12, overflow: "hidden", opacity: a.active ? 1 : 0.65 }}>
+              <div key={a.id} style={{ border: `1px solid ${!a.active ? "var(--hf-border)" : "var(--hf-border)"}`, borderRadius: 12, overflow: "hidden", opacity: a.active ? 1 : 0.65 }}>
                 <div style={{ padding: "16px 20px", background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                     <div style={{ width: 44, height: 44, borderRadius: 10, background: "var(--hf-indigo-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <Lock size={18} color="#4338CA" />
+                      <Lock size={18} style={{ color: 'var(--hf-indigo-text)' }} />
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>

@@ -23,9 +23,9 @@ const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-ZA", { weekday
 const daysUntil = (d: string) => Math.ceil((new Date(d).getTime() - Date.now()) / 86400000)
 
 const SOURCE_CFG: Record<string, { color: string; bg: string; border: string; label: string; icon: React.ElementType }> = {
-  OBLIGATION:       { color: "#4338CA", bg: "#EEF2FF", border: "#C7D2FE", label: "Obligation", icon: ClipboardList },
-  LITIGATION:       { color: "#BE123C", bg: "#FFE4E6", border: "#FECDD3", label: "Litigation", icon: Gavel         },
-  CONTRACT_RENEWAL: { color: "#0D9488", bg: "#F0FDFA", border: "#99F6E4", label: "Contract",   icon: FileText      },
+  OBLIGATION:       { color: "var(--hf-indigo-text)", bg: "var(--hf-indigo-soft)", border: "var(--hf-indigo-border)", label: "Obligation", icon: ClipboardList },
+  LITIGATION:       { color: "var(--hf-danger-text-strong)", bg: "var(--hf-danger-soft-strong)", border: "var(--hf-danger-border)", label: "Litigation", icon: Gavel         },
+  CONTRACT_RENEWAL: { color: "var(--hf-accent-text)", bg: "var(--hf-accent-soft)", border: "var(--hf-accent-border)", label: "Contract",   icon: FileText      },
 }
 
 const DAY_OPTIONS = [7, 30, 60, 90]
@@ -71,7 +71,7 @@ export default function CalendarTab() {
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading calendar...</div>
       ) : entries.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
-          <CheckCircle size={40} style={{ marginBottom: 12, opacity: 0.4, color: "#86EFAC" }} />
+          <CheckCircle size={40} style={{ marginBottom: 12, opacity: 0.4, color: "var(--hf-success-border)" }} />
           <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>Nothing due in the next {days} days</div>
         </div>
       ) : (
@@ -94,7 +94,7 @@ export default function CalendarTab() {
                     return (
                       <div key={`${e.sourceId}-${i}`} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", border: `1px solid ${cfg.border}`, borderRadius: 10, background: cfg.bg }}>
                         <div style={{ width: 36, height: 36, borderRadius: 9, background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          <Icon size={16} color={cfg.color} />
+                          <Icon size={16} style={{ color: cfg.color }} />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>{e.title}</div>

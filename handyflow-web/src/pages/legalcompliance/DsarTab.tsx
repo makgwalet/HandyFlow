@@ -90,7 +90,7 @@ function EvidenceSection({ requestId, canManage }: { requestId: string; canManag
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
           {evidence.map(ev => (
             <div key={ev.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12 }}>
-              <FileText size={13} color="#64748B" />
+              <FileText size={13} style={{ color: 'var(--hf-text-muted)' }} />
               <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{ev.fileName}</span>
               <span style={{ color: "var(--hf-text-faint)" }}>{ev.evidenceType} · {fmtBytes(ev.fileSizeBytes)}</span>
               <span style={{ marginLeft: "auto", color: "var(--hf-text-faint)" }}>{ev.uploadedByName} · {fmtDate(ev.createdAt)}</span>
@@ -103,7 +103,7 @@ function EvidenceSection({ requestId, canManage }: { requestId: string; canManag
           <input type="text" value={evidenceType} onChange={e => setEvidenceType(e.target.value)} placeholder="Type e.g. ID_SCAN" style={{ flex: 1, padding: "7px 10px", border: "1.5px solid var(--hf-border)", borderRadius: 7, fontSize: 12 }} />
           <input type="file" onChange={e => setFile(e.target.files?.[0] ?? null)} style={{ fontSize: 12, flex: 1 }} />
           <button onClick={() => attach.mutate()} disabled={!file || !evidenceType.trim() || attach.isPending}
-            style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: (!file || !evidenceType.trim()) ? "#CBD5E1" : "var(--hf-indigo)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: (!file || !evidenceType.trim()) ? "not-allowed" : "pointer" }}>
+            style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: (!file || !evidenceType.trim()) ? "var(--hf-border-strong)" : "var(--hf-indigo)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: (!file || !evidenceType.trim()) ? "not-allowed" : "pointer" }}>
             <Paperclip size={12} /> {attach.isPending ? "Uploading..." : "Attach"}
           </button>
         </div>
@@ -189,7 +189,7 @@ export default function DsarTab() {
 
   const inp = (k: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
-    border: `1.5px solid ${fieldErrors[k] ? "#DC2626" : "#E2E8F0"}`,
+    border: `1.5px solid ${fieldErrors[k] ? "var(--hf-danger)" : "var(--hf-border)"}`,
     borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
@@ -202,7 +202,7 @@ export default function DsarTab() {
   }
 
   const actionLabel = { complete: "Mark Completed", reject: "Reject Request", withdraw: "Mark Withdrawn" }
-  const actionColor = { complete: "#166534", reject: "#DC2626", withdraw: "#64748B" }
+  const actionColor = { complete: "var(--hf-success-solid-strong)", reject: "var(--hf-danger)", withdraw: "var(--hf-neutral-solid)" }
 
   return (
     <div>
@@ -258,11 +258,11 @@ export default function DsarTab() {
             const isTerminal = !OPEN_STATUSES.has(r.status)
             const days = daysUntil(r.dueDate)
             return (
-              <div key={r.id} style={{ border: `1px solid ${r.overdue ? "#FECACA" : "#E2E8F0"}`, borderRadius: 12, overflow: "hidden" }}>
+              <div key={r.id} style={{ border: `1px solid ${r.overdue ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 12, overflow: "hidden" }}>
                 <div style={{ padding: "16px 20px", background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                     <div style={{ width: 44, height: 44, borderRadius: 10, background: r.overdue ? "var(--hf-danger-soft)" : "var(--hf-indigo-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <FileSearch size={18} color={r.overdue ? "#DC2626" : "#4338CA"} />
+                      <FileSearch size={18} style={{ color: r.overdue ? "var(--hf-danger-text)" : "var(--hf-indigo-text)" }} />
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>

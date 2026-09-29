@@ -17,7 +17,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, X, ChevronRight, CalendarDays, Users, Globe, Lock } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { TRAINPROV_ACCENT } from "./constants"
+import { TRAINPROV_ACCENT, TRAINPROV_ACCENT_TEXT } from "./constants"
 import TrainProvSessionDetail from "./TrainProvSessionDetail"
 import type { CourseResponse } from "./TrainProvCoursesTab"
 
@@ -32,9 +32,9 @@ interface CoursePage { content: CourseResponse[] }
 interface ClientOption { id: string; tradingName: string; status: string }
 interface ClientPage { content: ClientOption[] }
 
-const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
-const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5, display: "block" }
-const STATUS_COLORS: Record<string, string> = { SCHEDULED: "#0369A1", IN_PROGRESS: "#D97706", COMPLETED: "#059669", CANCELLED: "#94A3B8" }
+const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
+const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5, display: "block" }
+const STATUS_COLORS: Record<string, string> = { SCHEDULED: "var(--hf-sky-text-strong)", IN_PROGRESS: "var(--hf-warning-text)", COMPLETED: "var(--hf-success-text)", CANCELLED: "var(--hf-text-faint)" }
 
 function CreateSessionModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient()
@@ -72,7 +72,7 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 480, maxHeight: "85vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Schedule a session</p>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
         <div style={{ display: "grid", gap: 12 }}>
           <div>
@@ -86,11 +86,11 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
             <label style={labelStyle}>Session type *</label>
             <div style={{ display: "flex", gap: 10 }}>
               <button type="button" onClick={() => setForm({ ...form, sessionType: "PUBLIC", clientId: "" })}
-                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", borderRadius: 8, border: form.sessionType === "PUBLIC" ? `1.5px solid ${TRAINPROV_ACCENT}` : "1px solid var(--hf-border)", background: form.sessionType === "PUBLIC" ? "var(--hf-warning-soft)" : "var(--hf-surface)", color: form.sessionType === "PUBLIC" ? TRAINPROV_ACCENT : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", borderRadius: 8, border: form.sessionType === "PUBLIC" ? `1.5px solid ${TRAINPROV_ACCENT}` : "1px solid var(--hf-border)", background: form.sessionType === "PUBLIC" ? "var(--hf-warning-soft)" : "var(--hf-surface)", color: form.sessionType === "PUBLIC" ? TRAINPROV_ACCENT_TEXT : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                 <Globe size={14} /> Public
               </button>
               <button type="button" onClick={() => setForm({ ...form, sessionType: "CLOSED" })}
-                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", borderRadius: 8, border: form.sessionType === "CLOSED" ? `1.5px solid ${TRAINPROV_ACCENT}` : "1px solid var(--hf-border)", background: form.sessionType === "CLOSED" ? "var(--hf-warning-soft)" : "var(--hf-surface)", color: form.sessionType === "CLOSED" ? TRAINPROV_ACCENT : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", borderRadius: 8, border: form.sessionType === "CLOSED" ? `1.5px solid ${TRAINPROV_ACCENT}` : "1px solid var(--hf-border)", background: form.sessionType === "CLOSED" ? "var(--hf-warning-soft)" : "var(--hf-surface)", color: form.sessionType === "CLOSED" ? TRAINPROV_ACCENT_TEXT : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                 <Lock size={14} /> Closed
               </button>
             </div>
@@ -175,7 +175,7 @@ export default function TrainProvSessionsTab() {
               style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", textAlign: "left", padding: "13px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)", background: "none", border: "none", cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--hf-warning-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <CalendarDays size={15} color={TRAINPROV_ACCENT} />
+                  <CalendarDays size={15} style={{ color: TRAINPROV_ACCENT_TEXT }} />
                 </div>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -183,7 +183,7 @@ export default function TrainProvSessionsTab() {
                     <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: s.sessionType === "PUBLIC" ? "var(--hf-info-soft)" : "var(--hf-violet-soft)", color: s.sessionType === "PUBLIC" ? "var(--hf-info-text)" : "var(--hf-violet-text)" }}>
                       {s.sessionType === "PUBLIC" ? <Globe size={10} /> : <Lock size={10} />} {s.sessionType}
                     </span>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: `${STATUS_COLORS[s.status]}18`, color: STATUS_COLORS[s.status] }}>{s.status.replace("_", " ")}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: `color-mix(in srgb, ${STATUS_COLORS[s.status]} 9%, transparent)`, color: STATUS_COLORS[s.status] }}>{s.status.replace("_", " ")}</span>
                   </div>
                   <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>
                     {s.startDate} → {s.endDate} {s.venue ? `· ${s.venue}` : ""} {s.clientName ? `· ${s.clientName}` : ""}
@@ -194,7 +194,7 @@ export default function TrainProvSessionsTab() {
                 <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-text-muted)" }}>
                   <Users size={13} /> {s.enrolledCount}{s.capacity != null ? ` / ${s.capacity}` : ""}
                 </span>
-                <ChevronRight size={16} color="#CBD5E1" />
+                <ChevronRight size={16} style={{ color: 'var(--hf-text-disabled)' }} />
               </div>
             </button>
           ))}

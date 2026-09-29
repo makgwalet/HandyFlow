@@ -20,10 +20,10 @@ export default function EarthDashboard({ onNavigate }: { onNavigate: (tab: Tab) 
   const fleetValue = assets.reduce((sum, a) => sum + (a.dailyRate ?? 0), 0)
 
   const stats = [
-    { label: "Total fleet", value: assets.length, color: "#1B3A6B", icon: Truck, tab: "assets" as Tab },
-    { label: "Deployed", value: deployed.length, color: "#1D4ED8", icon: MapPin, tab: "deployments" as Tab },
-    { label: "Service due", value: serviceDue.length, color: "#D97706", icon: Wrench, tab: "maintenance" as Tab },
-    { label: "Breakdowns", value: breakdowns.length, color: "#DC2626", icon: AlertTriangle, tab: "incidents" as Tab },
+    { label: "Total fleet", value: assets.length, color: "var(--hf-primary-text)", icon: Truck, tab: "assets" as Tab },
+    { label: "Deployed", value: deployed.length, color: "var(--hf-info-text)", icon: MapPin, tab: "deployments" as Tab },
+    { label: "Service due", value: serviceDue.length, color: "var(--hf-warning-text)", icon: Wrench, tab: "maintenance" as Tab },
+    { label: "Breakdowns", value: breakdowns.length, color: "var(--hf-danger-text)", icon: AlertTriangle, tab: "incidents" as Tab },
   ]
 
   return (
@@ -36,10 +36,10 @@ export default function EarthDashboard({ onNavigate }: { onNavigate: (tab: Tab) 
             <button key={s.label} onClick={() => onNavigate(s.tab)}
               style={{ textAlign: "left" as const, cursor: "pointer", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div style={{ width: 34, height: 34, borderRadius: 9, background: `${s.color}18`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Icon size={16} color={s.color} />
+                <div style={{ width: 34, height: 34, borderRadius: 9, background: `color-mix(in srgb, ${s.color} 9%, transparent)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Icon size={16} style={{ color: s.color }} />
                 </div>
-                <ArrowRight size={14} color="#CBD5E1" />
+                <ArrowRight size={14} style={{ color: 'var(--hf-text-disabled)' }} />
               </div>
               <div>
                 <div style={{ fontSize: 26, fontWeight: 800, color: s.color }}>{s.value}</div>
@@ -60,24 +60,24 @@ export default function EarthDashboard({ onNavigate }: { onNavigate: (tab: Tab) 
             <button onClick={() => onNavigate("incidents")}
               style={{ width: "100%", textAlign: "left" as const, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "var(--hf-surface)", border: "none", borderBottom: serviceDue.length ? "1px solid var(--hf-border-subtle)" : "none" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <AlertTriangle size={15} color="#DC2626" />
+                <AlertTriangle size={15} style={{ color: 'var(--hf-danger-text)' }} />
                 <span style={{ fontSize: 13, color: "var(--hf-text)" }}>
                   <strong>{breakdowns.length}</strong> machine{breakdowns.length !== 1 ? "s" : ""} currently broken down — {breakdowns.map(a => a.fleetNumber ?? a.name).join(", ")}
                 </span>
               </div>
-              <ArrowRight size={14} color="#94A3B8" />
+              <ArrowRight size={14} style={{ color: 'var(--hf-text-faint)' }} />
             </button>
           )}
           {serviceDue.length > 0 && (
             <button onClick={() => onNavigate("maintenance")}
               style={{ width: "100%", textAlign: "left" as const, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "var(--hf-surface)", border: "none" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <Wrench size={15} color="#D97706" />
+                <Wrench size={15} style={{ color: 'var(--hf-warning-text)' }} />
                 <span style={{ fontSize: 13, color: "var(--hf-text)" }}>
                   <strong>{serviceDue.length}</strong> machine{serviceDue.length !== 1 ? "s" : ""} due for service — {serviceDue.map(a => a.fleetNumber ?? a.name).join(", ")}
                 </span>
               </div>
-              <ArrowRight size={14} color="#94A3B8" />
+              <ArrowRight size={14} style={{ color: 'var(--hf-text-faint)' }} />
             </button>
           )}
         </div>

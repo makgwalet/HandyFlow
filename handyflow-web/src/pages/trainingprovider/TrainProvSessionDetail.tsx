@@ -20,7 +20,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Play, CheckCircle2, XCircle, Pencil, Download, Upload, UserPlus, Award, Check, X as XIcon, Globe, Lock, ReceiptText } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { TRAINPROV_ACCENT } from "./constants"
+import { TRAINPROV_ACCENT, TRAINPROV_ACCENT_TEXT } from "./constants"
 import DelegatePicker, { type DelegateOption } from "./DelegatePicker"
 import type { CourseResponse } from "./TrainProvCoursesTab"
 import type { SessionResponse } from "./TrainProvSessionsTab"
@@ -34,13 +34,13 @@ interface EnrollmentResponse {
 interface EvidenceResponse { id: string; fileName: string; evidenceType: string; uploadedAt: string; uploadedByName: string | null }
 interface EnrollmentPage { content: EnrollmentResponse[] }
 
-const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
-const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5, display: "block" }
+const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
+const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5, display: "block" }
 const STATUS_COLORS: Record<string, string> = {
-  SCHEDULED: "#0369A1", IN_PROGRESS: "#D97706", COMPLETED: "#059669", CANCELLED: "#94A3B8",
-  ENROLLED: "#0369A1", ATTENDED: "#7C3AED", NO_SHOW: "#DC2626", FAILED: "#DC2626",
+  SCHEDULED: "var(--hf-sky-text-strong)", IN_PROGRESS: "var(--hf-warning-text)", COMPLETED: "var(--hf-success-text)", CANCELLED: "var(--hf-text-faint)",
+  ENROLLED: "var(--hf-sky-text-strong)", ATTENDED: "var(--hf-violet-text)", NO_SHOW: "var(--hf-danger-text)", FAILED: "var(--hf-danger-text)",
 }
-const btnStyle: React.CSSProperties = { background: "none", border: "1px solid #E2E8F0", borderRadius: 7, padding: "6px 10px", fontSize: 11.5, fontWeight: 600, color: "#64748B", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }
+const btnStyle: React.CSSProperties = { background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "6px 10px", fontSize: 11.5, fontWeight: 600, color: "var(--hf-text-muted)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }
 
 function EditSessionModal({ session, onClose }: { session: SessionResponse; onClose: () => void }) {
   const qc = useQueryClient()
@@ -149,7 +149,7 @@ function CompleteEnrollmentModal({ enrollment, onClose }: { enrollment: Enrollme
         <label style={labelStyle}>Score (optional)</label>
         <input type="number" step="0.01" style={inputStyle} value={score} onChange={e => setScore(e.target.value)} />
         <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-          <button onClick={() => setPassed(true)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: passed ? `1.5px solid ${TRAINPROV_ACCENT}` : "1px solid var(--hf-border)", background: passed ? "var(--hf-warning-soft)" : "var(--hf-surface)", color: passed ? TRAINPROV_ACCENT : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Passed</button>
+          <button onClick={() => setPassed(true)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: passed ? `1.5px solid ${TRAINPROV_ACCENT}` : "1px solid var(--hf-border)", background: passed ? "var(--hf-warning-soft)" : "var(--hf-surface)", color: passed ? TRAINPROV_ACCENT_TEXT : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Passed</button>
           <button onClick={() => setPassed(false)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: !passed ? "1.5px solid var(--hf-danger)" : "1px solid var(--hf-border)", background: !passed ? "var(--hf-danger-soft)" : "var(--hf-surface)", color: !passed ? "var(--hf-danger-text)" : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Failed</button>
         </div>
         {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not record outcome"}</p>}
@@ -254,7 +254,7 @@ export default function TrainProvSessionDetail({ sessionId, onBack }: { sessionI
             <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: session.sessionType === "PUBLIC" ? "var(--hf-info-soft)" : "var(--hf-violet-soft)", color: session.sessionType === "PUBLIC" ? "var(--hf-info-text)" : "var(--hf-violet-text)" }}>
               {session.sessionType === "PUBLIC" ? <Globe size={11} /> : <Lock size={11} />} {session.sessionType}
             </span>
-            <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: `${STATUS_COLORS[session.status]}18`, color: STATUS_COLORS[session.status] }}>{session.status.replace("_", " ")}</span>
+            <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: `color-mix(in srgb, ${STATUS_COLORS[session.status]} 9%, transparent)`, color: STATUS_COLORS[session.status] }}>{session.status.replace("_", " ")}</span>
           </div>
           <p style={{ fontSize: 12.5, color: "var(--hf-text-faint)", margin: "4px 0 0" }}>
             {session.startDate} → {session.endDate} {session.venue ? `· ${session.venue}` : ""} {session.trainerName ? `· ${session.trainerName}` : ""}
@@ -272,7 +272,7 @@ export default function TrainProvSessionDetail({ sessionId, onBack }: { sessionI
             </>
           )}
           {session.status === "IN_PROGRESS" && (
-            <button onClick={() => lifecycle.mutate("complete")} style={{ ...btnStyle, color: TRAINPROV_ACCENT }}><CheckCircle2 size={13} /> Mark complete</button>
+            <button onClick={() => lifecycle.mutate("complete")} style={{ ...btnStyle, color: TRAINPROV_ACCENT_TEXT }}><CheckCircle2 size={13} /> Mark complete</button>
           )}
           <button onClick={downloadRegister} style={btnStyle}><Download size={13} /> Attendance PDF</button>
         </div>
@@ -296,7 +296,7 @@ export default function TrainProvSessionDetail({ sessionId, onBack }: { sessionI
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <p style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)", margin: 0 }}>{e.delegateNameSnapshot}</p>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: `${STATUS_COLORS[e.status] ?? "#94A3B8"}18`, color: STATUS_COLORS[e.status] ?? "var(--hf-text-faint)" }}>{e.status.replace("_", " ")}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: `color-mix(in srgb, ${STATUS_COLORS[e.status] ?? "var(--hf-text-faint)"} 9%, transparent)`, color: STATUS_COLORS[e.status] ?? "var(--hf-text-faint)" }}>{e.status.replace("_", " ")}</span>
                   {e.invoiced && (
                     <span title="Already invoiced — cancel is blocked" style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, color: "var(--hf-warning-text)" }}>
                       <ReceiptText size={11} /> INVOICED
@@ -313,7 +313,7 @@ export default function TrainProvSessionDetail({ sessionId, onBack }: { sessionI
                   </>
                 )}
                 {(e.status === "ENROLLED" || e.status === "ATTENDED") && (
-                  <button onClick={() => setCompleting(e)} style={{ ...btnStyle, color: TRAINPROV_ACCENT }}>Record outcome</button>
+                  <button onClick={() => setCompleting(e)} style={{ ...btnStyle, color: TRAINPROV_ACCENT_TEXT }}>Record outcome</button>
                 )}
                 {(e.status === "ENROLLED" || e.status === "ATTENDED") && (
                   <button onClick={() => cancelEnrollment.mutate(e.id)} disabled={e.invoiced}

@@ -65,7 +65,7 @@ export default function DeploymentsTab() {
                       <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{a.name}</span>
                     </div>
                     <div style={{ fontSize: 13, color: "var(--hf-text-muted)", display: "flex", gap: 14, flexWrap: "wrap" }}>
-                      {a.currentSite && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><MapPin size={11} color="#1D4ED8" /> {a.currentSite}</span>}
+                      {a.currentSite && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><MapPin size={11} style={{ color: 'var(--hf-info-text)' }} /> {a.currentSite}</span>}
                       {a.currentClient && <span>Client: {a.currentClient}</span>}
                       <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Clock size={11} /> {(a.currentHours ?? 0).toLocaleString()} hrs</span>
                     </div>

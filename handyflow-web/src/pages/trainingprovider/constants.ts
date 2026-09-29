@@ -5,4 +5,8 @@
 // TRAINING_ACCENT all learned this the hard way: importing the accent
 // back out of the page shell creates a circular import once every tab
 // needs it too).
-export const TRAINPROV_ACCENT = "#B45309" // amber-700 — distinct from warehousing (teal #0F766E), collectionsagency (violet #5B21B6), training/4a (green #15803D)
+// Module accent (amber-700 in light mode). Two tokens because fills and text
+// diverge in dark mode: fills stay dark enough for white labels, text gets
+// lighter to stay readable on dark surfaces.
+export const TRAINPROV_ACCENT = "var(--hf-warning-solid-strong)"      // backgrounds, borders
+export const TRAINPROV_ACCENT_TEXT = "var(--hf-warning-text-strong)"  // text and icons

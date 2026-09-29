@@ -97,7 +97,7 @@ export default function IncidentsTab() {
 
       {assets.filter(a => a.status === "BREAKDOWN").length > 0 && (
         <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
-          <AlertTriangle size={18} color="#DC2626" style={{ flexShrink: 0 }} />
+          <AlertTriangle size={18} style={{ color: 'var(--hf-danger-text)', flexShrink: 0 }} />
           <div>
             <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-danger-text)" }}>Active Breakdowns</div>
             <div style={{ fontSize: 12, color: "var(--hf-danger-text-strong)" }}>
@@ -162,7 +162,7 @@ export default function IncidentsTab() {
         <Overlay onClose={() => setShowCreate(false)} width={560}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
             <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--hf-danger-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <AlertTriangle size={18} color="#DC2626" />
+              <AlertTriangle size={18} style={{ color: 'var(--hf-danger-text)' }} />
             </div>
             <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Report Incident</h3>
           </div>
@@ -175,7 +175,7 @@ export default function IncidentsTab() {
                   const cfg = SEVERITY_CFG[s]
                   return (
                     <button key={s} onClick={() => setForm(f => ({ ...f, severity: s }))}
-                      style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: `2px solid ${form.severity === s ? cfg.color : "#E2E8F0"}`, background: form.severity === s ? cfg.bg : "var(--hf-surface)", color: form.severity === s ? cfg.color : "var(--hf-text-muted)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                      style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: `2px solid ${form.severity === s ? cfg.color : "var(--hf-border)"}`, background: form.severity === s ? cfg.bg : "var(--hf-surface)", color: form.severity === s ? cfg.color : "var(--hf-text-muted)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                       {s}
                     </button>
                   )

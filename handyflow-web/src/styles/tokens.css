@@ -42,6 +42,12 @@
   --hf-text-faint: #94a3b8;
   --hf-text-disabled: #cbd5e1;
   --hf-text-on-solid: #ffffff;
+  /* Neutral grey button/badge fill that keeps white labels readable in both themes. */
+  --hf-neutral-solid: #64748b;
+  /* Mid-tone status dots: readable on light and dark surfaces, so identical in both themes. */
+  --hf-info-dot: #60a5fa;
+  --hf-violet-dot: #a78bfa;
+  --hf-accent-dot: #2dd4bf;
 
   /* Brand */
   --hf-primary: #1b3a6b;
@@ -78,6 +84,7 @@
   --hf-warning-text: #d97706;
   --hf-warning-text-strong: #b45309;
   --hf-warning-text-deep: #92400e;
+  --hf-warning-solid-strong: #b45309;
   --hf-warning-soft: #fffbeb;
   --hf-warning-soft-strong: #fef3c7;
   --hf-warning-border: #fde68a;
@@ -155,6 +162,10 @@
   --hf-text-faint: #6e7a8e;
   --hf-text-disabled: #4b5669;
   --hf-text-on-solid: #ffffff;
+  --hf-neutral-solid: #64748b;
+  --hf-info-dot: #60a5fa;
+  --hf-violet-dot: #a78bfa;
+  --hf-accent-dot: #2dd4bf;
 
   --hf-primary: #3563ae;
   --hf-primary-hover: #2b5596;
@@ -187,6 +198,7 @@
   --hf-warning-text: #fbbf24;
   --hf-warning-text-strong: #fcd34d;
   --hf-warning-text-deep: #fde68a;
+  --hf-warning-solid-strong: #b45309;
   --hf-warning-soft: rgba(251, 191, 36, 0.1);
   --hf-warning-soft-strong: rgba(251, 191, 36, 0.18);
   --hf-warning-border: rgba(251, 191, 36, 0.32);

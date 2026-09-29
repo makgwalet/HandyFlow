@@ -129,6 +129,24 @@ The Phase 0 codemod converted the default colour of a new bookable service (`EMP
 - Whole-app result: the only conversion in a data position was this one. The guard would also have stopped `TasksPage` (board colour form default, `tasks.color VARCHAR(20)`) from being broken when Tasks is migrated.
 - Checked the other colour-bearing backend fields: desk categories (display maps only), fleet `colour` (free-text paint colour, different property name), email branding (no frontend).
 
+### Training Provider, Legal & Compliance, Earthmoving ✅
+- Routed sections on `SectionedModulePage`. Training Provider: Overview; Clients & courses; Delivery (Sessions, Certificates); Setup (Academy Profile). Legal & Compliance: Overview; Compliance (Obligations, POPIA Register, DSAR Requests, Calendar); Legal matters (Litigation). Earthmoving: Overview; Fleet & sites; Operations; Safety.
+- Training Provider: removed its own full-height/1200px wrapper (double padding in the shell). Its client portal (`/training-provider/portal/*`) is routed separately outside the shell and is unaffected.
+- Colours: 42 + 60 + 25 -> 0. `TRAINPROV_ACCENT` split into fill and text tokens (45 uses classified: 21 text, 24 fill).
+- New tokens: `--hf-warning-solid-strong` (amber-700 fill), `--hf-neutral-solid` (grey button fill), `--hf-{info,violet,accent}-dot` (mid-tone status dots, same in both themes). Map additions: `#64748B` and `#CBD5E1` now convert as fills.
+- No double-unwrap sites.
+
+### Tasks and Recruiter (colours only) ✅
+- Neither is a tabbed module: each is a single large page (1,430 and 1,707 lines) whose "tabs" live inside a task or candidate detail panel. No routed sections apply, so only colours were migrated (48 + 21 -> 0). Their custom headers carry page-specific actions and were left as is.
+- Tasks: the board colour form default and its swatch palette are DATA (`tasks.color VARCHAR(20)`) and stay `#RRGGBB` literals, with a comment. The data-colour guard skipped that conversion automatically. Stored board/column colours are only ever *displayed* with token fallbacks.
+- Small intentional look changes: progress-bar and time colours use the nearest theme green/red (`#10B981` -> success, `#EF4444` -> danger); the Recruiter Compare button's disabled fill (dark slate `#334155`) is now a light grey surface in light mode.
+
+### Navigation gaps found and fixed
+- 7 modules had dashboard tiles but were missing from the sidebar/Ctrl+K registry (carried over from the old top-nav): collections agency, warehousing, legal & compliance, business compliance & tender, compliance services, debt collection, projects. Added.
+- 2 active catalogue modules (R249 `training`, R449 `trainingprovider`) were on neither the dashboard nor the sidebar, so subscribers could only reach them by typing the URL. Added to both.
+- Five staff routes still have no sidebar or dashboard entry: `/booking-agency`, `/payroll-bureau`, `/recruitment-agency` (agency-variant pages; not checked against `module_catalogue`), and `/control-exceptions`, `/recurring` (probably sub-pages of Internal Audit and Invoicing). Decide whether each should be a module entry.
+- The dashboard tiles and the sidebar registry are two separate lists that had drifted apart; merge them into one source when the landing page is redone.
+
 ### HR ✅
 - Routed sections `/hr/:section`; opens on Employees as before (`/hr` redirects to `/hr/employees`). Groups: Overview (Dashboard); People (Employees, Leave, Disciplinary); Payroll & compliance (Payroll, Compliance).
 - Fixed a dead button: the dashboard's "Download EMP201" quick action navigated to a `sars` tab that no longer exists, so it opened an empty panel. It now opens Compliance, where EMP201 lives. (`SarsTab.tsx` is an unused older duplicate of `ComplianceTab`; left in place.)

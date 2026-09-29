@@ -19,7 +19,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Check, X as XIcon, Award, ReceiptText } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { TRAINPROV_ACCENT } from "./constants"
+import { TRAINPROV_ACCENT, TRAINPROV_ACCENT_TEXT } from "./constants"
 
 interface EnrollmentResponse {
   id: string; sessionId: string; delegateId: string; clientId: string; delegateNameSnapshot: string
@@ -30,9 +30,9 @@ interface EnrollmentResponse {
 interface EnrollmentPage { content: EnrollmentResponse[] }
 
 const STATUS_COLORS: Record<string, string> = {
-  ENROLLED: "#0369A1", ATTENDED: "#7C3AED", COMPLETED: "#059669", FAILED: "#DC2626", NO_SHOW: "#DC2626", CANCELLED: "#94A3B8",
+  ENROLLED: "var(--hf-sky-text-strong)", ATTENDED: "var(--hf-violet-text)", COMPLETED: "var(--hf-success-text)", FAILED: "var(--hf-danger-text)", NO_SHOW: "var(--hf-danger-text)", CANCELLED: "var(--hf-text-faint)",
 }
-const btnStyle: React.CSSProperties = { background: "none", border: "1px solid #E2E8F0", borderRadius: 7, padding: "6px 10px", fontSize: 11.5, fontWeight: 600, color: "#64748B", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }
+const btnStyle: React.CSSProperties = { background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "6px 10px", fontSize: 11.5, fontWeight: 600, color: "var(--hf-text-muted)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }
 
 function CompleteModal({ enrollment, onClose }: { enrollment: EnrollmentResponse; onClose: () => void }) {
   const qc = useQueryClient()
@@ -50,7 +50,7 @@ function CompleteModal({ enrollment, onClose }: { enrollment: EnrollmentResponse
         <label style={{ fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5, display: "block" }}>Score (optional)</label>
         <input type="number" step="0.01" style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box" }} value={score} onChange={e => setScore(e.target.value)} />
         <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-          <button onClick={() => setPassed(true)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: passed ? `1.5px solid ${TRAINPROV_ACCENT}` : "1px solid var(--hf-border)", background: passed ? "var(--hf-warning-soft)" : "var(--hf-surface)", color: passed ? TRAINPROV_ACCENT : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Passed</button>
+          <button onClick={() => setPassed(true)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: passed ? `1.5px solid ${TRAINPROV_ACCENT}` : "1px solid var(--hf-border)", background: passed ? "var(--hf-warning-soft)" : "var(--hf-surface)", color: passed ? TRAINPROV_ACCENT_TEXT : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Passed</button>
           <button onClick={() => setPassed(false)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: !passed ? "1.5px solid var(--hf-danger)" : "1px solid var(--hf-border)", background: !passed ? "var(--hf-danger-soft)" : "var(--hf-surface)", color: !passed ? "var(--hf-danger-text)" : "var(--hf-text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Failed</button>
         </div>
         {save.isError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginTop: 12 }}>{(save.error as any)?.response?.data?.message ?? "Could not record outcome"}</p>}
@@ -128,7 +128,7 @@ export default function TrainProvEnrollmentsTab({ clientId }: { clientId: string
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <p style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)", margin: 0 }}>{e.delegateNameSnapshot}</p>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: `${STATUS_COLORS[e.status] ?? "#94A3B8"}18`, color: STATUS_COLORS[e.status] ?? "var(--hf-text-faint)" }}>{e.status.replace("_", " ")}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: `color-mix(in srgb, ${STATUS_COLORS[e.status] ?? "var(--hf-text-faint)"} 9%, transparent)`, color: STATUS_COLORS[e.status] ?? "var(--hf-text-faint)" }}>{e.status.replace("_", " ")}</span>
                   {e.invoiced && (
                     <span title="Already invoiced — cancel is blocked; issuing a credit note isn't implemented in this build" style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, color: "var(--hf-warning-text)" }}>
                       <ReceiptText size={11} /> INVOICED
@@ -146,7 +146,7 @@ export default function TrainProvEnrollmentsTab({ clientId }: { clientId: string
                   </>
                 )}
                 {(e.status === "ENROLLED" || e.status === "ATTENDED") && (
-                  <button onClick={() => setCompleting(e)} style={{ ...btnStyle, color: TRAINPROV_ACCENT }}>Record outcome</button>
+                  <button onClick={() => setCompleting(e)} style={{ ...btnStyle, color: TRAINPROV_ACCENT_TEXT }}>Record outcome</button>
                 )}
                 {(e.status === "ENROLLED" || e.status === "ATTENDED") && (
                   <button onClick={() => cancel.mutate(e.id)} disabled={e.invoiced}

@@ -18,9 +18,9 @@ const fmtR = (n: number | null | undefined) => n != null ? `R ${Number(n).toLoca
 const daysUntil = (d: string) => Math.ceil((new Date(d).getTime() - Date.now()) / 86400000)
 
 const SOURCE_CFG: Record<string, { color: string; bg: string; label: string }> = {
-  OBLIGATION:       { color: "#4338CA", bg: "#E0E7FF", label: "Obligation" },
-  LITIGATION:       { color: "#BE123C", bg: "#FFE4E6", label: "Litigation" },
-  CONTRACT_RENEWAL: { color: "#0D9488", bg: "#F0FDFA", label: "Contract"   },
+  OBLIGATION:       { color: "var(--hf-indigo-text)", bg: "var(--hf-indigo-soft)", label: "Obligation" },
+  LITIGATION:       { color: "var(--hf-danger-text-strong)", bg: "var(--hf-danger-soft-strong)", label: "Litigation" },
+  CONTRACT_RENEWAL: { color: "var(--hf-accent-text)", bg: "var(--hf-accent-soft)", label: "Contract"   },
 }
 
 const OPEN_LITIGATION_STATUSES = new Set(["OPEN", "IN_PROGRESS"])
@@ -74,24 +74,24 @@ export default function LegalComplianceDashboard({ onNavigate }: { onNavigate: (
   const kpis = [
     {
       label: "Non-compliant / overdue", value: nonCompliant.length + overdue.length,
-      color: (nonCompliant.length + overdue.length) > 0 ? "#DC2626" : "#166534",
-      bg: (nonCompliant.length + overdue.length) > 0 ? "#FEF2F2" : "#DCFCE7",
+      color: (nonCompliant.length + overdue.length) > 0 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)",
+      bg: (nonCompliant.length + overdue.length) > 0 ? "var(--hf-danger-soft)" : "var(--hf-success-soft-strong)",
       icon: ShieldAlert, tab: "obligations" as Tab,
     },
     {
       label: "Open litigation matters", value: openMatters.length,
-      color: "#BE123C", bg: "#FFE4E6", icon: Gavel, tab: "litigation" as Tab,
+      color: "var(--hf-danger-text-strong)", bg: "var(--hf-danger-soft-strong)", icon: Gavel, tab: "litigation" as Tab,
     },
     {
       label: "Cross-border transfers", value: crossBorder.length,
-      color: crossBorder.length > 0 ? "#D97706" : "#166534",
-      bg: crossBorder.length > 0 ? "#FFFBEB" : "#DCFCE7",
+      color: crossBorder.length > 0 ? "var(--hf-warning-text)" : "var(--hf-success-text-strong)",
+      bg: crossBorder.length > 0 ? "var(--hf-warning-soft)" : "var(--hf-success-soft-strong)",
       icon: Globe2, tab: "popia" as Tab,
     },
     {
       label: "DSAR overdue", value: overdueDsars.length,
-      color: overdueDsars.length > 0 ? "#DC2626" : "#166534",
-      bg: overdueDsars.length > 0 ? "#FEF2F2" : "#DCFCE7",
+      color: overdueDsars.length > 0 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)",
+      bg: overdueDsars.length > 0 ? "var(--hf-danger-soft)" : "var(--hf-success-soft-strong)",
       icon: FileSearch, tab: "dsar" as Tab,
     },
   ]
@@ -108,7 +108,7 @@ export default function LegalComplianceDashboard({ onNavigate }: { onNavigate: (
             onMouseLeave={e => (e.currentTarget.style.boxShadow = "none")}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: k.color, textTransform: "uppercase" as const }}>{k.label}</div>
-              <k.icon size={16} color={k.color} />
+              <k.icon size={16} style={{ color: k.color }} />
             </div>
             <div style={{ fontSize: 28, fontWeight: 800, color: k.color }}>{k.value}</div>
           </div>
@@ -126,7 +126,7 @@ export default function LegalComplianceDashboard({ onNavigate }: { onNavigate: (
 
           {upcoming.length === 0 ? (
             <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed var(--hf-border)", borderRadius: 12, color: "var(--hf-text-faint)" }}>
-              <CheckCircle size={32} color="#CBD5E1" style={{ marginBottom: 10 }} />
+              <CheckCircle size={32} style={{ color: 'var(--hf-text-disabled)', marginBottom: 10 }} />
               <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>Nothing due in the next 30 days</div>
             </div>
           ) : (
@@ -156,7 +156,7 @@ export default function LegalComplianceDashboard({ onNavigate }: { onNavigate: (
           {(nonCompliant.length > 0 || overdue.length > 0) && (
             <div style={{ marginTop: 24 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
-                <AlertTriangle size={15} color="#DC2626" />
+                <AlertTriangle size={15} style={{ color: 'var(--hf-danger-text)' }} />
                 <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Needs attention</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -204,10 +204,10 @@ export default function LegalComplianceDashboard({ onNavigate }: { onNavigate: (
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 10 }}>Quick actions</div>
             {[
-              { label: "New obligation",   tab: "obligations" as Tab, color: "#4338CA", icon: ClipboardList },
-              { label: "Open matter",      tab: "litigation"  as Tab, color: "#BE123C", icon: Gavel         },
-              { label: "Register activity",tab: "popia"       as Tab, color: "#0D9488", icon: Lock          },
-              { label: "Log DSAR",         tab: "dsar"        as Tab, color: "#D97706", icon: FileSearch    },
+              { label: "New obligation",   tab: "obligations" as Tab, color: "var(--hf-indigo-text)", icon: ClipboardList },
+              { label: "Open matter",      tab: "litigation"  as Tab, color: "var(--hf-danger-text-strong)", icon: Gavel         },
+              { label: "Register activity",tab: "popia"       as Tab, color: "var(--hf-accent-text)", icon: Lock          },
+              { label: "Log DSAR",         tab: "dsar"        as Tab, color: "var(--hf-warning-text)", icon: FileSearch    },
             ].map(a => (
               <button key={a.label} onClick={() => onNavigate(a.tab)}
                 style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left" as const, display: "flex", alignItems: "center", justifyContent: "space-between" }}>

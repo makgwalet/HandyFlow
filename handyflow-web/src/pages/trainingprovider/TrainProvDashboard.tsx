@@ -10,7 +10,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { GraduationCap, CalendarDays, Users, Award, Building2, TriangleAlert, Globe, Lock } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { TRAINPROV_ACCENT } from "./constants"
+import { TRAINPROV_ACCENT_TEXT } from "./constants"
 import type { SessionResponse } from "./TrainProvSessionsTab"
 
 interface Page<T> { content: T[]; totalElements: number }
@@ -53,35 +53,35 @@ export default function TrainProvDashboard() {
           <p style={label}>Active clients</p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <p style={value}>{clients?.totalElements ?? "—"}</p>
-            <Building2 size={22} color={TRAINPROV_ACCENT} />
+            <Building2 size={22} style={{ color: TRAINPROV_ACCENT_TEXT }} />
           </div>
         </div>
         <div style={card}>
           <p style={label}>Active courses</p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <p style={value}>{courses?.totalElements ?? "—"}</p>
-            <GraduationCap size={22} color={TRAINPROV_ACCENT} />
+            <GraduationCap size={22} style={{ color: TRAINPROV_ACCENT_TEXT }} />
           </div>
         </div>
         <div style={card}>
           <p style={label}>Scheduled sessions</p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <p style={value}>{scheduledSessions?.totalElements ?? "—"}</p>
-            <CalendarDays size={22} color={TRAINPROV_ACCENT} />
+            <CalendarDays size={22} style={{ color: TRAINPROV_ACCENT_TEXT }} />
           </div>
         </div>
         <div style={card}>
           <p style={label}>Live enrollments</p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <p style={value}>{liveEnrollments?.totalElements ?? "—"}</p>
-            <Users size={22} color={TRAINPROV_ACCENT} />
+            <Users size={22} style={{ color: TRAINPROV_ACCENT_TEXT }} />
           </div>
         </div>
         <div style={card}>
           <p style={label}>Certificates expiring (30d)</p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <p style={{ ...value, color: expiringSoon.length > 0 ? "var(--hf-warning-text)" : "var(--hf-text)" }}>{expiringSoon.length}</p>
-            <Award size={22} color={expiringSoon.length > 0 ? "#D97706" : TRAINPROV_ACCENT} />
+            <Award size={22} style={{ color: expiringSoon.length > 0 ? "var(--hf-warning-text)" : TRAINPROV_ACCENT_TEXT }} />
           </div>
         </div>
       </div>
@@ -89,7 +89,7 @@ export default function TrainProvDashboard() {
       {expiringSoon.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <TriangleAlert size={18} color="#D97706" />
+            <TriangleAlert size={18} style={{ color: 'var(--hf-warning-text)' }} />
             <div>
               <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-warning-text-deep)", margin: 0 }}>{expiringSoon.length} certificate{expiringSoon.length === 1 ? "" : "s"} expiring within 30 days</p>
               <p style={{ fontSize: 11.5, color: "var(--hf-warning-text-strong)", margin: 0 }}>Refresher training may be needed — see the Certificates tab.</p>

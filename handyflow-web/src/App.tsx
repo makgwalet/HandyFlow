@@ -282,7 +282,7 @@ export default function App() {
             <Route path="/security/:section?" element={<SecurityPage />} />
             <Route path="/fuel/:section?" element={<FuelPage />} />
             <Route path="/internal-audit" element={<InternalAuditPage />} />
-            <Route path="/earthmoving" element={<EarthMovingPage />} />
+            <Route path="/earthmoving/:section?" element={<EarthMovingPage />} />
             <Route path="/property"    element={<PropertyPage />} />
  <Route path="/fleet/:section?" element={<FleetPage />} />
             <Route path="/bookings/:section?" element={<BookingsPage />} />
@@ -310,7 +310,7 @@ export default function App() {
             <Route path="/recurring/new"          element={<CreateRecurringSchedulePage />} />
             <Route path="/recurring"              element={<InvoicingPage />} />
             <Route path="/supply-chain"           element={<SupplyChainPage />} />
-            <Route path="/legalcompliance"        element={<LegalCompliancePage />} />
+            <Route path="/legalcompliance/:section?" element={<LegalCompliancePage />} />
             <Route path="/compliancetender"              element={<CompliancePage />} />
             <Route path="/compliancetender/tenders/:id"  element={<TenderDetailPage />} />
             <Route path="/complianceservices"                          element={<ComplianceServicesPage />} />
@@ -321,7 +321,7 @@ export default function App() {
             <Route path="/collections-agency" element={<CollectionsAgencyPage />} />
             <Route path="/warehousing" element={<WarehousingPage />} />
             <Route path="/training" element={<TrainingPage />} />
-            <Route path="/training-provider" element={<TrainProvPage />} />
+            <Route path="/training-provider/:section?" element={<TrainProvPage />} />
             <Route path="/agriculture/:section?" element={<AgriculturePage />} />
             {/* NEW: shared "needs attention" board — see import comment above. */}
             <Route path="/control-exceptions"     element={<ControlExceptionsPage />} />

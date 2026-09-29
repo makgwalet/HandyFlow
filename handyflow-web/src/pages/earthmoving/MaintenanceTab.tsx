@@ -31,7 +31,7 @@ export default function MaintenanceTab() {
     <div>
       {serviceAlerts.length > 0 && (
         <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
-          <AlertTriangle size={18} color="#D97706" style={{ flexShrink: 0 }} />
+          <AlertTriangle size={18} style={{ color: 'var(--hf-warning-text)', flexShrink: 0 }} />
           <div>
             <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-warning-text)" }}>Service Due — {serviceAlerts.length} machine{serviceAlerts.length !== 1 ? "s" : ""}</div>
             <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>{serviceAlerts.map(a => a.fleetNumber ?? a.name).join(", ")}</div>
@@ -101,7 +101,7 @@ export default function MaintenanceTab() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div style={{ display: "flex", gap: 12 }}>
                     <div style={{ width: 40, height: 40, borderRadius: 9, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <Wrench size={18} color={cfg.color} />
+                      <Wrench size={18} style={{ color: cfg.color }} />
                     </div>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
