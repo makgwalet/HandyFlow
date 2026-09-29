@@ -115,6 +115,13 @@ Correction to the original analysis: its per-module "tab counts" were file count
 - Colours: 25 hex + 57 named -> 0. Dashboard SVG chart attributes moved to `style`.
 - No double-unwrap sites. Removed an unused import (fixes a pre-existing type error).
 
+### Accountant ✅
+- Routed sections `/accountant/:section`: Overview (Dashboard); Clients (Clients, Compliance); Work & billing (Time, Billing); Records (Journals, Workpapers).
+- `SectionedModulePage` gained `action`, `subtitle`, `banner` and `children` slots, so the page keeps its practice-settings button, firm-name subtitle, "set up your practice" warning, KPI strip and profile modal.
+- Client filter (opening Time or Billing for one client from a client's workspace) moved from in-memory state to the URL: `/accountant/time?client=<id>`. It now survives refresh and can be shared; clicking the sidebar clears it, as clicking a tab did before.
+- Colours: 36 -> 0. Deadline-type colours map to `-text` tokens (they feed both text and `color-mix` tints). An overdue-row tint that was `#FFF8F8` is now `color-mix(danger-soft 50%, surface)`, which is the same colour in light mode.
+- No double-unwrap sites.
+
 
 ## Bug found during Phase 2 review: double-unwrapped API responses
 

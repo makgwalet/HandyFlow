@@ -6,19 +6,19 @@ import { Calendar, CheckCircle, AlertTriangle, Clock, Filter, ChevronDown, Layer
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return Array.isArray(p) ? p : p?.content ?? [] }
 const fmtD   = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
 
 const TYPE_COLOR: Record<string, string> = {
-  VAT201: "#0D9488", ITR14: "#1D4ED8", ITR12: "#7C3AED", EMP201: "#D97706",
-  EMP501: "#EA580C", IRP6_P1: "#166534", IRP6_P2: "#166534", IRP6_P3: "#166534",
-  CIPC_RETURN: "#64748B", OTHER: "#94A3B8",
+  VAT201: "var(--hf-accent-text)", ITR14: "var(--hf-info-text)", ITR12: "var(--hf-violet-text)", EMP201: "var(--hf-warning-text)",
+  EMP501: "var(--hf-orange-text)", IRP6_P1: "var(--hf-success-text-strong)", IRP6_P2: "var(--hf-success-text-strong)", IRP6_P3: "var(--hf-success-text-strong)",
+  CIPC_RETURN: "var(--hf-text-muted)", OTHER: "var(--hf-text-faint)",
 }
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
-  PENDING: { label: "Pending", color: "#D97706", bg: "#FFFBEB" },
-  FILED:   { label: "Filed",   color: "#166534", bg: "#DCFCE7" },
-  OVERDUE: { label: "Overdue", color: "#DC2626", bg: "#FEF2F2" },
-  WAIVED:  { label: "Waived",  color: "#64748B", bg: "#F1F5F9" },
+  PENDING: { label: "Pending", color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+  FILED:   { label: "Filed",   color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+  OVERDUE: { label: "Overdue", color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
+  WAIVED:  { label: "Waived",  color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
 }
 
 export default function DeadlinesTab() {
@@ -88,9 +88,9 @@ export default function DeadlinesTab() {
       {/* Summary strip */}
       <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
         {[
-          { l: "Overdue",  v: overdue, color: "#DC2626", bg: "#FEF2F2" },
-          { l: "Pending",  v: pending, color: "#D97706", bg: "#FFFBEB" },
-          { l: "Filed",    v: filed,   color: "#166534", bg: "#DCFCE7" },
+          { l: "Overdue",  v: overdue, color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
+          { l: "Pending",  v: pending, color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+          { l: "Filed",    v: filed,   color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
         ].map(s => (
           <div key={s.l} onClick={() => setFilterStatus(s.l.toUpperCase())}
             style={{ background: s.bg, borderRadius: 9, padding: "10px 16px", cursor: "pointer", border: filterStatus === s.l.toUpperCase() ? `2px solid ${s.color}` : "2px solid transparent", minWidth: 100 }}>
@@ -117,7 +117,7 @@ export default function DeadlinesTab() {
         <div style={{
           marginBottom: 20, padding: "12px 16px", borderRadius: 10,
           background: bulkResult.failures?.length > 0 ? "var(--hf-warning-soft)" : "var(--hf-success-soft-strong)",
-          border: `1px solid ${bulkResult.failures?.length > 0 ? "#FDE68A" : "#86EFAC"}`,
+          border: `1px solid ${bulkResult.failures?.length > 0 ? "var(--hf-warning-border)" : "var(--hf-success-border)"}`,
         }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: bulkResult.failures?.length > 0 ? "var(--hf-warning-text-deep)" : "var(--hf-success-text-strong)", marginBottom: bulkResult.failures?.length > 0 ? 6 : 0 }}>
             Generated deadlines for {bulkResult.succeeded} of {bulkResult.totalClients} client{bulkResult.totalClients !== 1 ? "s" : ""}.
@@ -161,18 +161,18 @@ export default function DeadlinesTab() {
                 {items.sort((a: any, b: any) => new Date(a.adjustedDueDate).getTime() - new Date(b.adjustedDueDate).getTime())
                   .map((d: any) => {
                     const sc    = STATUS_CFG[d.status] ?? STATUS_CFG.PENDING
-                    const tc    = TYPE_COLOR[d.deadlineType] ?? "#64748B"
+                    const tc    = TYPE_COLOR[d.deadlineType] ?? "var(--hf-text-muted)"
                     const overdue = d.daysUntilDue < 0 && d.status !== "FILED"
                     return (
                       <div key={d.id} style={{
                         display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "11px 16px", border: `1px solid ${overdue ? "#FECACA" : "#E2E8F0"}`,
-                        borderLeft: `3px solid ${overdue ? "#DC2626" : tc}`,
-                        borderRadius: 8, background: overdue ? "#FFF8F8" : "var(--hf-surface)", gap: 10,
+                        padding: "11px 16px", border: `1px solid ${overdue ? "var(--hf-danger-border)" : "var(--hf-border)"}`,
+                        borderLeft: `3px solid ${overdue ? "var(--hf-danger)" : tc}`,
+                        borderRadius: 8, background: overdue ? "color-mix(in srgb, var(--hf-danger-soft) 50%, var(--hf-surface))" : "var(--hf-surface)", gap: 10,
                       }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3, flexWrap: "wrap" }}>
-                            <span style={{ background: `${tc}18`, color: tc, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{d.deadlineType}</span>
+                            <span style={{ background: `color-mix(in srgb, ${tc} 9%, transparent)`, color: tc, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{d.deadlineType}</span>
                             <span style={{ background: sc.bg, color: sc.color, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{sc.label}</span>
                             {d.periodMonth ? <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Period: {d.periodMonth}/{d.periodYear}</span>
                               : <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Year: {d.periodYear}</span>}

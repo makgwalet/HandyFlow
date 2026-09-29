@@ -353,7 +353,7 @@ export default function JournalsTab() {
             const isOpen = expanded === j.id
             const firstLineHasAccountCode = !!j.lines?.[0]?.accountCode
             return (
-              <div key={j.id} style={{ border: "1px solid var(--hf-border)", borderLeft: `3px solid ${j.balanced ? sc.color : "#DC2626"}`, borderRadius: 10, overflow: "hidden" }}>
+              <div key={j.id} style={{ border: "1px solid var(--hf-border)", borderLeft: `3px solid ${j.balanced ? sc.color : "var(--hf-danger)"}`, borderRadius: 10, overflow: "hidden" }}>
                 <div onClick={() => setExpanded(isOpen ? null : j.id)}
                   style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 18px", cursor: "pointer", background: isOpen ? "var(--hf-surface-muted)" : "var(--hf-surface)", gap: 10, flexWrap: "wrap" }}>
                   <div style={{ flex: 1 }}>
@@ -375,7 +375,7 @@ export default function JournalsTab() {
                       <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Dr {fmtR(j.totalDebits)}</div>
                       <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Cr {fmtR(j.totalCredits)}</div>
                     </div>
-                    {isOpen ? <ChevronUp size={16} color="#94A3B8" /> : <ChevronDown size={16} color="#94A3B8" />}
+                    {isOpen ? <ChevronUp size={16} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={16} style={{ color: 'var(--hf-text-faint)' }} />}
                   </div>
                 </div>
 
@@ -422,7 +422,7 @@ export default function JournalsTab() {
                         <button onClick={() => postMut.mutate({ id: j.id, clientId: selClient })}
                           disabled={postMut.isPending || !j.balanced}
                           title={!j.balanced ? "Debits and credits must match before this journal can be posted" : undefined}
-                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 14px", background: j.balanced ? "var(--hf-success-soft-strong)" : "var(--hf-surface-sunken)", color: j.balanced ? "var(--hf-success-text-strong)" : "var(--hf-text-faint)", border: `1px solid ${j.balanced ? "#86EFAC" : "#E2E8F0"}`, borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: j.balanced ? "pointer" : "not-allowed" }}>
+                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 14px", background: j.balanced ? "var(--hf-success-soft-strong)" : "var(--hf-surface-sunken)", color: j.balanced ? "var(--hf-success-text-strong)" : "var(--hf-text-faint)", border: `1px solid ${j.balanced ? "var(--hf-success-border)" : "var(--hf-border)"}`, borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: j.balanced ? "pointer" : "not-allowed" }}>
                           <CheckCircle size={12} />{postMut.isPending ? "Posting..." : "Approve & Post"}
                         </button>
                       )}

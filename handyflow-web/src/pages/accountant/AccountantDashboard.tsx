@@ -7,12 +7,12 @@ const fmtR = (n: any) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFr
 const fmtD = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
 
 const DEADLINE_COLOR: Record<string, string> = {
-  VAT201: "#0D9488", ITR14: "#1D4ED8", ITR12: "#7C3AED",
-  EMP201: "#D97706", EMP501: "#EA580C", IRP6_P1: "#166534",
-  IRP6_P2: "#166534", CIPC_RETURN: "#64748B", OTHER: "#94A3B8",
+  VAT201: "var(--hf-accent-text)", ITR14: "var(--hf-info-text)", ITR12: "var(--hf-violet-text)",
+  EMP201: "var(--hf-warning-text)", EMP501: "var(--hf-orange-text)", IRP6_P1: "var(--hf-success-text-strong)",
+  IRP6_P2: "var(--hf-success-text-strong)", CIPC_RETURN: "var(--hf-text-muted)", OTHER: "var(--hf-text-faint)",
 }
 
-export default function AccountantDashboard({ onNavigate }: { onNavigate: (t: any) => void }) {
+export default function AccountantDashboard({ onNavigate }: { onNavigate: (section: string) => void }) {
   const { data: dash } = useQuery<any>({
     queryKey: ["accountant-dashboard"],
     queryFn: async () => { const r = await apiClient.get("/api/v1/accountant/dashboard"); return r.data?.data ?? r.data },
@@ -28,7 +28,7 @@ export default function AccountantDashboard({ onNavigate }: { onNavigate: (t: an
       {/* Alert banner */}
       {dash.overdueFilings > 0 && (
         <div style={{ marginBottom: 20, padding: "14px 18px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
-          <AlertTriangle size={16} color="#DC2626" />
+          <AlertTriangle size={16} style={{ color: 'var(--hf-danger-text)' }} />
           <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-danger-text)" }}>{dash.overdueFilings} overdue SARS filing{dash.overdueFilings !== 1 ? "s" : ""} — immediate action required</span>
           <button onClick={() => onNavigate("deadlines")} style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", background: "none", border: "none", cursor: "pointer", fontWeight: 700 }}>
             View <ArrowRight size={13} />
@@ -42,7 +42,7 @@ export default function AccountantDashboard({ onNavigate }: { onNavigate: (t: an
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                <Calendar size={14} color="#DC2626" />
+                <Calendar size={14} style={{ color: 'var(--hf-danger-text)' }} />
                 <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>Due within 7 days</span>
               </div>
               <button onClick={() => onNavigate("deadlines")}
@@ -57,13 +57,13 @@ export default function AccountantDashboard({ onNavigate }: { onNavigate: (t: an
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {urgent.map((d: any) => {
-                  const color = DEADLINE_COLOR[d.deadlineType] ?? "#64748B"
+                  const color = DEADLINE_COLOR[d.deadlineType] ?? "var(--hf-text-muted)"
                   const overdue = d.daysUntilDue < 0
                   return (
-                    <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 16px", border: `1px solid ${overdue ? "#FECACA" : "#E2E8F0"}`, borderLeft: `3px solid ${overdue ? "#DC2626" : color}`, borderRadius: 8, background: overdue ? "var(--hf-danger-soft)" : "var(--hf-surface)" }}>
+                    <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 16px", border: `1px solid ${overdue ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderLeft: `3px solid ${overdue ? "var(--hf-danger)" : color}`, borderRadius: 8, background: overdue ? "var(--hf-danger-soft)" : "var(--hf-surface)" }}>
                       <div>
                         <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3 }}>
-                          <span style={{ background: `${color}18`, color, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{d.deadlineType}</span>
+                          <span style={{ background: `color-mix(in srgb, ${color} 9%, transparent)`, color, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{d.deadlineType}</span>
                           <span style={{ fontWeight: 600, fontSize: 13, color: "var(--hf-text)" }}>{d.clientName}</span>
                         </div>
                         <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>
@@ -87,7 +87,7 @@ export default function AccountantDashboard({ onNavigate }: { onNavigate: (t: an
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                  <FileText size={14} color="#1D4ED8" />
+                  <FileText size={14} style={{ color: 'var(--hf-info-text)' }} />
                   <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>Outstanding invoices</span>
                 </div>
                 <button onClick={() => onNavigate("billing")}
@@ -114,12 +114,12 @@ export default function AccountantDashboard({ onNavigate }: { onNavigate: (t: an
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 18 }}>
             <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)", marginBottom: 14, display: "flex", alignItems: "center", gap: 7 }}>
-              <TrendingUp size={14} color="#1B3A6B" /> Practice summary
+              <TrendingUp size={14} style={{ color: 'var(--hf-primary-text)' }} /> Practice summary
             </div>
             {[
               { l: "Total clients",          v: dash.totalClients },
-              { l: "High-risk clients",      v: dash.highRiskClients,     color: dash.highRiskClients > 0 ? "#DC2626" : "#166534" },
-              { l: "FICA incomplete",        v: dash.ficaIncompleteClients, color: dash.ficaIncompleteClients > 0 ? "#D97706" : "#166534" },
+              { l: "High-risk clients",      v: dash.highRiskClients,     color: dash.highRiskClients > 0 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)" },
+              { l: "FICA incomplete",        v: dash.ficaIncompleteClients, color: dash.ficaIncompleteClients > 0 ? "var(--hf-warning-text)" : "var(--hf-success-text-strong)" },
               { l: "Filings this month",     v: dash.deadlinesThisMonth },
               { l: "Pending (30 days)",      v: dash.pendingFilingsNext30Days },
             ].map(r => (

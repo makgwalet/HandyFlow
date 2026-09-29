@@ -19,9 +19,18 @@ const NO_PERMISSIONS: string[] = []
 interface SectionedModulePageProps {
   config: ModuleSections
   render: (sectionId: string, goTo: (sectionId: string) => void) => ReactNode
+  /** Right-aligned header actions shown on every section (e.g. settings). */
+  action?: ReactNode
+  /** Line under the section title, e.g. a firm name. */
+  subtitle?: ReactNode
+  /** Content between the header and the section panel on every section
+   *  (e.g. a setup warning or a KPI strip). */
+  banner?: ReactNode
+  /** Rendered after the panel, e.g. modals owned by the page. */
+  children?: ReactNode
 }
 
-export function SectionedModulePage({ config, render }: SectionedModulePageProps) {
+export function SectionedModulePage({ config, render, action, subtitle, banner, children }: SectionedModulePageProps) {
   const { section: rawSection } = useParams<{ section?: string }>()
   const navigate = useNavigate()
   const permissions = useAuthStore(s => s.user?.permissions ?? NO_PERMISSIONS)
@@ -36,16 +45,20 @@ export function SectionedModulePage({ config, render }: SectionedModulePageProps
     <div>
       <PageHeader
         title={section.label}
+        subtitle={subtitle}
         icon={section.icon}
         breadcrumbs={[
           { label: config.title, to: `${base}/${config.defaultSection}` },
           { label: group.label },
           { label: section.label },
         ]}
+        action={action}
       />
+      {banner}
       <div key={section.id} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, padding: 24 }}>
         {render(section.id, goTo)}
       </div>
+      {children}
     </div>
   )
 }

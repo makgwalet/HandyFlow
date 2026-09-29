@@ -189,7 +189,7 @@ export default function WorkpapersTab() {
                   <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", marginBottom: 6 }}>{year}</div>
                   {yearFolders.map((f: any) => (
                     <button key={f.id} onClick={() => setSelFolder(f)}
-                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left" as const, padding: "8px 10px", marginBottom: 4, background: selFolder?.id === f.id ? "var(--hf-indigo-soft)" : "var(--hf-surface)", border: `1px solid ${selFolder?.id === f.id ? "#1B3A6B" : "#E2E8F0"}`, borderRadius: 7, fontSize: 13, fontWeight: selFolder?.id === f.id ? 600 : 400, color: selFolder?.id === f.id ? "var(--hf-primary-text)" : "var(--hf-text-secondary)", cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left" as const, padding: "8px 10px", marginBottom: 4, background: selFolder?.id === f.id ? "var(--hf-indigo-soft)" : "var(--hf-surface)", border: `1px solid ${selFolder?.id === f.id ? "var(--hf-primary)" : "var(--hf-border)"}`, borderRadius: 7, fontSize: 13, fontWeight: selFolder?.id === f.id ? 600 : 400, color: selFolder?.id === f.id ? "var(--hf-primary-text)" : "var(--hf-text-secondary)", cursor: "pointer" }}>
                       <FolderOpen size={14} />
                       <span style={{ flex: 1 }}>{f.name}</span>
                       {f.folderType && <span style={{ fontSize: 10, color: "var(--hf-text-faint)" }}>{f.folderType}</span>}

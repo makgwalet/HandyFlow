@@ -181,7 +181,7 @@ export default function TimeTab({ initialClientId }: { initialClientId?: string 
           </select>
           {selClient !== "ALL" && (
             <button onClick={() => setShowFullHistory(v => !v)}
-              style={{ padding: "7px 14px", border: `1px solid ${showFullHistory ? "#1B3A6B" : "#E2E8F0"}`, borderRadius: 8, fontSize: 13, fontWeight: 600, background: showFullHistory ? "var(--hf-info-soft)" : "var(--hf-surface)", color: showFullHistory ? "var(--hf-primary-text)" : "var(--hf-text-muted)", cursor: "pointer" }}>
+              style={{ padding: "7px 14px", border: `1px solid ${showFullHistory ? "var(--hf-primary)" : "var(--hf-border)"}`, borderRadius: 8, fontSize: 13, fontWeight: 600, background: showFullHistory ? "var(--hf-info-soft)" : "var(--hf-surface)", color: showFullHistory ? "var(--hf-primary-text)" : "var(--hf-text-muted)", cursor: "pointer" }}>
               {showFullHistory ? "Showing Full History" : "Full History"}
             </button>
           )}

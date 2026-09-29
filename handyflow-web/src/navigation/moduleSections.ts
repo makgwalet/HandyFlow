@@ -15,6 +15,7 @@ import {
   Shield, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
   Droplets, ArrowDownToLine, Fuel, Truck, Users, TrendingUp, Car, Wrench,
   Calculator, BookOpen, GitBranch as JournalIcon, Landmark, BarChart2, FileText,
+  Briefcase, Calendar, FolderOpen,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -209,7 +210,41 @@ export const ACCOUNTING_SECTIONS: ModuleSections = {
   ],
 }
 
-const REGISTRY: ModuleSections[] = [SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FLEET_SECTIONS, ACCOUNTING_SECTIONS]
+export const ACCOUNTANT_SECTIONS: ModuleSections = {
+  moduleKey: 'accountant',
+  basePath: '/accountant',
+  title: 'Accountant',
+  icon: Briefcase,
+  defaultSection: 'dashboard',
+  groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: BarChart2 }] },
+    {
+      label: 'Clients',
+      sections: [
+        { id: 'clients', label: 'Clients', icon: Users },
+        { id: 'deadlines', label: 'Compliance', icon: Calendar },
+      ],
+    },
+    {
+      label: 'Work & billing',
+      sections: [
+        { id: 'time', label: 'Time', icon: Clock },
+        { id: 'billing', label: 'Billing', icon: FileText },
+      ],
+    },
+    {
+      label: 'Records',
+      sections: [
+        { id: 'journals', label: 'Journals', icon: BookOpen },
+        { id: 'workpapers', label: 'Workpapers', icon: FolderOpen },
+      ],
+    },
+  ],
+}
+
+const REGISTRY: ModuleSections[] = [
+  SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FLEET_SECTIONS, ACCOUNTING_SECTIONS, ACCOUNTANT_SECTIONS,
+]
 
 /** Groups with sections the user may not see removed (and empty groups dropped). */
 export function visibleGroups(config: ModuleSections, permissions: readonly string[]): ModuleSectionGroup[] {

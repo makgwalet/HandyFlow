@@ -300,7 +300,7 @@ export default function App() {
             <Route path="/marketing"              element={<MarketingPage />} />
             <Route path="/recruiter"              element={<RecruiterPage />} />
             <Route path="/pos"                    element={<PosPage />} />
-            <Route path="/accountant"             element={<AccountantPage />} />
+            <Route path="/accountant/:section?" element={<AccountantPage />} />
             <Route path="/ap"                     element={<AccountsPayablePage />} />
             <Route path="/booking-agency"       element={<BookingAgencyPage />} />
             <Route path="/payroll-bureau"         element={<PayrollBureauPage />} />

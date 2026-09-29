@@ -244,7 +244,7 @@ export default function BillingTab({ initialClientId }: { initialClientId?: stri
                 const canPay = inv.status === "SENT" || inv.status === "PARTIAL" || inv.status === "OVERDUE"
                 return (
                   <div key={inv.id}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", border: `1px solid ${inv.daysOverdue > 0 ? "#FECACA" : "#E2E8F0"}`, borderLeft: `3px solid ${inv.daysOverdue > 0 ? "#DC2626" : "#1D4ED8"}`, borderRadius: 10, background: "var(--hf-surface)", gap: 10, flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", border: `1px solid ${inv.daysOverdue > 0 ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderLeft: `3px solid ${inv.daysOverdue > 0 ? "var(--hf-danger)" : "var(--hf-info)"}`, borderRadius: 10, background: "var(--hf-surface)", gap: 10, flexWrap: "wrap" }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
                           <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{inv.clientName}</span>
