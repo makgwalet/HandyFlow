@@ -1043,7 +1043,7 @@ function ViewModal({ customer: c, onClose, onEdit, onTimeline, onAddTag, onRemov
             {popiaMenuOpen && (
               <div role="menu" style={{
                 position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
-                background: 'white', border: '1px solid var(--hf-border)', borderRadius: 10,
+                background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 10,
                 boxShadow: '0 4px 16px rgba(0,0,0,.1)', minWidth: 160, zIndex: 200, overflow: 'hidden',
               }}>
                 <button role="menuitem" onClick={() => downloadPopiaExport(c.id, c.name, 'pdf')}
@@ -1224,7 +1224,7 @@ function DeleteModal({ customer, isPending, error, onConfirm, onCancel }: {
   return (
     <Overlay onClose={onCancel}>
       <div ref={trapRef} className={`${styles.modal} ${styles.modalNarrow}`} role="alertdialog" aria-modal="true" aria-label="Delete customer">
-        <div className={styles.deleteIcon}><AlertTriangle size={24} color="#EA580C" /></div>
+        <div className={styles.deleteIcon}><AlertTriangle size={24} style={{ color: 'var(--hf-orange-text)' }} /></div>
         <h3 className={styles.deleteTitle}>Delete Customer?</h3>
         <div className={styles.deleteChip}>
           <div className={styles.avatar} style={{ width: 28, height: 28, fontSize: 11 }}>

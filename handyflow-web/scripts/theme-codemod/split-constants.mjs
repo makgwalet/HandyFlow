@@ -46,6 +46,7 @@ const CONSTS = {
   '#065F46': { fill: 'success-solid-strong', text: 'success-text-strong' }, // merged into green-800
   '#D97706': { fill: 'warning',              text: 'warning-text' },
   '#7C3AED': { fill: 'violet',               text: 'violet-text' },
+  '#9A3412': { fill: 'orange-solid-strong',  text: 'orange-text-strong' },
   '#64748B': { fill: 'neutral-solid',        text: 'text-muted' },
   '#0284C7': { fill: 'sky',                  text: 'sky-text' },
   '#1D4ED8': { fill: 'info',                 text: 'info-text' },

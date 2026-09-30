@@ -12,7 +12,7 @@ M = {
  "#475569": ("text-tertiary",None,None),
  "#64748B": ("text-muted","neutral-solid",None),
  "#6B7280": ("text-muted",None,None),
- "#94A3B8": ("text-faint","text-faint",None),
+ "#94A3B8": ("text-faint","text-faint","text-faint"),
  "#9CA3AF": ("text-faint",None,None),
  "#CBD5E1": ("text-disabled","border-strong","border-strong"),
  "#D1D5DB": ("text-disabled",None,"border-strong"),
@@ -28,6 +28,7 @@ M = {
  # brand
  "#1B3A6B": ("primary-text","primary","primary"),
  "#0F2A52": (None,"primary-hover",None),
+ "#132C52": (None,"primary-hover",None),
  "#E8EDF5": (None,None,"primary-border"),
  "#0D9488": ("accent-text","accent","accent"),
  "#0F766E": ("accent-text-strong",None,None),
@@ -47,7 +48,7 @@ M = {
  # danger
  "#DC2626": ("danger-text","danger","danger"),
  "#EF4444": ("danger-text","danger",None),
- "#B91C1C": ("danger-text-strong",None,None),
+ "#B91C1C": ("danger-text-strong","danger-hover",None),
  "#991B1B": ("danger-text-strong",None,None),
  "#7F1D1D": ("danger-text-strong",None,None),
  "#BE123C": ("danger-text-strong",None,None),
@@ -100,9 +101,9 @@ M = {
  "#FDE68A": (None,None,"warning-border"),
  "#FCD34D": ("warning-on-brand",None,"warning-border-strong"),
  # orange
- "#EA580C": ("orange-text",None,None),
+ "#EA580C": ("orange-text","orange","orange"),
  "#C2410C": ("orange-text-strong",None,None),
- "#9A3412": ("orange-text-strong",None,None),  # brown fill has no token yet
+ "#9A3412": ("orange-text-strong","orange-solid-strong","orange-solid-strong"),
  "#7C2D12": ("orange-text-strong",None,None),
  "#FFF7ED": (None,"orange-soft",None),
  "#FFEDD5": (None,"orange-soft",None),

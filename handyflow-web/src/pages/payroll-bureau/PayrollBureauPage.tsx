@@ -166,7 +166,7 @@ export function PayrollBureauPage() {
   }
 
   return (
-    <div style={{ display: "flex", height: "calc(100vh - 60px)", fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ display: "flex", height: "calc(100vh - var(--hf-topbar-h) - 64px)", fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div style={{ width: 300, borderRight: `1px solid ${BORDER}`, background: "var(--hf-surface)", display: "flex", flexDirection: "column" }}>
         <div style={{ padding: 16, borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 style={{ fontSize: 15, fontWeight: 800, color: INK, margin: 0 }}>Payroll Clients</h2>

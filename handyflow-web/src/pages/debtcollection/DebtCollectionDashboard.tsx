@@ -34,10 +34,10 @@ export default function DebtCollectionDashboard({ onNavigate }: { onNavigate: (t
   const writtenOffTotal = cs.filter(c => c.status === "WRITTEN_OFF").reduce((s, c) => s + (c.writeOffAmount ?? 0), 0)
 
   const kpis = [
-    { label: "Open cases",        value: openCases.length,            color: "#9A3412", bg: "#FFEDD5", icon: Landmark },
-    { label: "Outstanding (open)",value: fmtR(totalOutstanding),      color: "#9A3412", bg: "#FFEDD5", icon: TrendingDown },
-    { label: "Next action overdue", value: overdueAction.length,      color: overdueAction.length > 0 ? "#DC2626" : "#166534", bg: overdueAction.length > 0 ? "#FEF2F2" : "#DCFCE7", icon: AlertTriangle },
-    { label: "On payment plan",   value: onPlan.length,               color: "#1D4ED8", bg: "#EFF6FF", icon: CheckCircle },
+    { label: "Open cases",        value: openCases.length,            color: "var(--hf-orange-text-strong)", bg: "var(--hf-orange-soft)", icon: Landmark },
+    { label: "Outstanding (open)",value: fmtR(totalOutstanding),      color: "var(--hf-orange-text-strong)", bg: "var(--hf-orange-soft)", icon: TrendingDown },
+    { label: "Next action overdue", value: overdueAction.length,      color: overdueAction.length > 0 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)", bg: overdueAction.length > 0 ? "var(--hf-danger-soft)" : "var(--hf-success-soft-strong)", icon: AlertTriangle },
+    { label: "On payment plan",   value: onPlan.length,               color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", icon: CheckCircle },
   ]
 
   const followUps = [...overdueAction, ...dueSoonAction]
@@ -54,7 +54,7 @@ export default function DebtCollectionDashboard({ onNavigate }: { onNavigate: (t
             onMouseLeave={e => (e.currentTarget.style.boxShadow = "none")}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: k.color, textTransform: "uppercase" as const }}>{k.label}</div>
-              <k.icon size={16} color={k.color} />
+              <k.icon size={16} style={{ color: k.color }} />
             </div>
             <div style={{ fontSize: 24, fontWeight: 800, color: k.color }}>{k.value}</div>
           </div>
@@ -72,7 +72,7 @@ export default function DebtCollectionDashboard({ onNavigate }: { onNavigate: (t
 
           {followUps.length === 0 ? (
             <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed var(--hf-border)", borderRadius: 12, color: "var(--hf-text-faint)" }}>
-              <CheckCircle size={32} color="#CBD5E1" style={{ marginBottom: 10 }} />
+              <CheckCircle size={32} style={{ color: 'var(--hf-text-disabled)', marginBottom: 10 }} />
               <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>Nothing due in the next 7 days</div>
             </div>
           ) : (
@@ -82,7 +82,7 @@ export default function DebtCollectionDashboard({ onNavigate }: { onNavigate: (t
                 return (
                   <div key={c.id} onClick={() => onNavigate("cases")} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", border: "1px solid var(--hf-border)", borderRadius: 10, background: "var(--hf-surface)", cursor: "pointer" }}>
                     <div style={{ width: 36, height: 36, borderRadius: 9, background: "var(--hf-orange-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <CalendarClock size={16} color="#9A3412" />
+                      <CalendarClock size={16} style={{ color: 'var(--hf-orange-text-strong)' }} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>{c.caseNumber} — {c.debtorName}</div>
@@ -102,7 +102,7 @@ export default function DebtCollectionDashboard({ onNavigate }: { onNavigate: (t
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ background: "#9A3412", borderRadius: 12, padding: 20, color: "var(--hf-text-on-solid)" }}>
+          <div style={{ background: "var(--hf-orange-solid-strong)", borderRadius: 12, padding: 20, color: "var(--hf-text-on-solid)" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 14, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>At a glance</div>
             {[
               { label: "Total cases",        value: cs.length },

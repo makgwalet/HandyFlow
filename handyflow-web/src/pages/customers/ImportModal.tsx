@@ -199,9 +199,9 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
         {phase === 'done' && result && (
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
-              <ResultStat icon={<CheckCircle2 size={16} color="#16A34A" />} value={result.createdCount} label="Imported"  bg="#F0FDF4" bd="#BBF7D0" />
-              <ResultStat icon={<AlertCircle  size={16} color="#EA580C" />} value={result.skippedCount} label="Skipped"   bg="#FFF7ED" bd="#FED7AA" />
-              <ResultStat icon={<FileText     size={16} color="#94A3B8" />} value={result.totalRows}    label="Total rows" bg="#F8FAFC" bd="#E2E8F0" />
+              <ResultStat icon={<CheckCircle2 size={16} style={{ color: 'var(--hf-success-text)' }} />} value={result.createdCount} label="Imported"  bg="var(--hf-success-soft)" bd="var(--hf-success-border-subtle)" />
+              <ResultStat icon={<AlertCircle  size={16} style={{ color: 'var(--hf-orange-text)' }} />} value={result.skippedCount} label="Skipped"   bg="var(--hf-orange-soft)" bd="var(--hf-orange-border)" />
+              <ResultStat icon={<FileText     size={16} style={{ color: 'var(--hf-text-faint)' }} />} value={result.totalRows}    label="Total rows" bg="var(--hf-surface-muted)" bd="var(--hf-border)" />
             </div>
 
             {result.rowErrors.length > 0 && (

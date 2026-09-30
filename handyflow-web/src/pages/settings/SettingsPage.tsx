@@ -259,7 +259,7 @@ export function SettingsPage() {
                   {currentLogo ? (
                     <img src={currentLogo} alt="Company logo" style={{ width: "100%", height: "100%", objectFit: "contain", padding: 8 }} />
                   ) : (
-                    <><Upload size={24} color="#94A3B8" style={{ marginBottom: 6 }} /><span style={{ fontSize: 11, color: "var(--hf-text-faint)", textAlign: "center", padding: "0 8px" }}>Click to upload</span></>
+                    <><Upload size={24} style={{ color: 'var(--hf-text-faint)', marginBottom: 6 }} /><span style={{ fontSize: 11, color: "var(--hf-text-faint)", textAlign: "center", padding: "0 8px" }}>Click to upload</span></>
                   )}
                 </div>
                 <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/svg+xml" style={{ display: "none" }} onChange={handleLogoChange} />
@@ -327,7 +327,7 @@ export function SettingsPage() {
           <Section title="Invoice Payment Terms" icon={Phone}>
             <Field label="Default payment terms (printed on every invoice)" error={fieldErrors.paymentTerms}>
               <textarea value={form.paymentTerms} onChange={e => { setForm(f => ({ ...f, paymentTerms: e.target.value })); setFieldErrors(er => ({ ...er, paymentTerms: "" })) }} placeholder="Payment due within 30 days of invoice date. EFT payments only." rows={3}
-                style={{ width: "100%", padding: "9px 12px", border: `1px solid ${fieldErrors.paymentTerms ? "#FCA5A5" : "#E2E8F0"}`, borderRadius: 8, fontSize: 14, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit", color: "var(--hf-text)" }} />
+                style={{ width: "100%", padding: "9px 12px", border: `1px solid ${fieldErrors.paymentTerms ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 8, fontSize: 14, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit", color: "var(--hf-text)" }} />
             </Field>
           </Section>
 
@@ -390,7 +390,7 @@ function Section({ title, icon: Icon, children }: { title: string; icon: React.E
     <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 24 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--hf-border-subtle)" }}>
         <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--hf-success-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Icon size={16} color="#0D9488" />
+          <Icon size={16} style={{ color: 'var(--hf-accent-text)' }} />
         </div>
         <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "var(--hf-text)" }}>{title}</h2>
       </div>
@@ -412,7 +412,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 function Input({ value, onChange, placeholder, type = "text", error }: { value: string; onChange: (v: string) => void; placeholder?: string; type?: string; error?: boolean }) {
   return (
     <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-      style={{ width: "100%", padding: "9px 12px", border: `1px solid ${error ? "#FCA5A5" : "#E2E8F0"}`, borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, color: "var(--hf-text)" }} />
+      style={{ width: "100%", padding: "9px 12px", border: `1px solid ${error ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, color: "var(--hf-text)" }} />
   )
 }
 

@@ -72,6 +72,7 @@
   --hf-danger: #dc2626;
   --hf-danger-text: #dc2626;
   --hf-danger-text-strong: #991b1b;
+  --hf-danger-hover: #b91c1c;
   --hf-danger-soft: #fef2f2;
   --hf-danger-soft-strong: #fee2e2;
   --hf-danger-border: #fecaca;
@@ -101,6 +102,7 @@
   --hf-orange: #ea580c;
   --hf-orange-text: #ea580c;
   --hf-orange-text-strong: #9a3412;
+  --hf-orange-solid-strong: #9a3412;
   --hf-orange-soft: #fff7ed;
   --hf-orange-border: #fed7aa;
 
@@ -197,6 +199,7 @@
   --hf-danger: #dc2626;
   --hf-danger-text: #f87171;
   --hf-danger-text-strong: #fca5a5;
+  --hf-danger-hover: #b91c1c;
   --hf-danger-soft: rgba(248, 113, 113, 0.1);
   --hf-danger-soft-strong: rgba(248, 113, 113, 0.18);
   --hf-danger-border: rgba(248, 113, 113, 0.32);
@@ -223,6 +226,7 @@
   --hf-orange: #ea580c;
   --hf-orange-text: #fb923c;
   --hf-orange-text-strong: #fdba74;
+  --hf-orange-solid-strong: #9a3412;
   --hf-orange-soft: rgba(251, 146, 60, 0.1);
   --hf-orange-border: rgba(251, 146, 60, 0.32);
 

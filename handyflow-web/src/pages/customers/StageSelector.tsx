@@ -61,7 +61,7 @@ export function StageSelector({ customerId, customerType }: { customerId: string
               padding: '4px 11px', borderRadius: 20, fontSize: 12, fontWeight: 600,
               cursor: active ? 'default' : 'pointer', fontFamily: 'inherit',
               border: `1.5px solid ${active ? cfg.color : cfg.border}`,
-              background: active ? cfg.bg : 'white',
+              background: active ? cfg.bg : 'var(--hf-surface)',
               color: active ? cfg.color : 'var(--hf-text-faint)',
               opacity: changeStage.isPending ? 0.6 : 1,
             }}>

@@ -139,18 +139,18 @@ const unwrap = (r: any): any[] =>
   r.data?.data?.content ?? r.data?.content ?? r.data?.data ?? []
 
 const STATUS_COLORS: Record<string, [string, string]> = {
-  COMPLETED:           ['#166534', '#DCFCE7'],
-  VOIDED:              ['#DC2626', '#FEF2F2'],
-  REFUNDED:            ['#D97706', '#FFFBEB'],
-  ORDERED:             ['#1D4ED8', '#EFF6FF'],
-  PARTIALLY_RECEIVED:  ['#D97706', '#FFFBEB'],
-  RECEIVED:            ['#166534', '#DCFCE7'],
-  CANCELLED:           ['#DC2626', '#FEF2F2'],
-  DRAFT:               ['#64748B', '#F8FAFC'],
+  COMPLETED:           ['var(--hf-success-text-strong)', 'var(--hf-success-soft-strong)'],
+  VOIDED:              ['var(--hf-danger-text)', 'var(--hf-danger-soft)'],
+  REFUNDED:            ['var(--hf-warning-text)', 'var(--hf-warning-soft)'],
+  ORDERED:             ['var(--hf-info-text)', 'var(--hf-info-soft)'],
+  PARTIALLY_RECEIVED:  ['var(--hf-warning-text)', 'var(--hf-warning-soft)'],
+  RECEIVED:            ['var(--hf-success-text-strong)', 'var(--hf-success-soft-strong)'],
+  CANCELLED:           ['var(--hf-danger-text)', 'var(--hf-danger-soft)'],
+  DRAFT:               ['var(--hf-text-muted)', 'var(--hf-surface-muted)'],
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const [color, bg] = STATUS_COLORS[status] ?? ['#64748B', '#F8FAFC']
+  const [color, bg] = STATUS_COLORS[status] ?? ['var(--hf-text-muted)', 'var(--hf-surface-muted)']
   return (
     <span style={{
       background: bg, color,
@@ -166,44 +166,44 @@ function StatusBadge({ status }: { status: string }) {
 
 const inp: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
-  border: '1px solid #E2E8F0', borderRadius: 8,
-  fontSize: 13, boxSizing: 'border-box', background: '#fff', outline: 'none',
+  border: '1px solid var(--hf-border)', borderRadius: 8,
+  fontSize: 13, boxSizing: 'border-box', background: 'var(--hf-surface)', outline: 'none',
 }
 
 const lbl: React.CSSProperties = {
   display: 'block', fontSize: 11,
-  fontWeight: 600, color: '#374151', marginBottom: 3,
+  fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 3,
 }
 
 const TH: React.CSSProperties = {
   padding: '9px 14px', textAlign: 'left',
-  fontSize: 11, fontWeight: 600, color: '#64748B',
-  letterSpacing: '0.05em', borderBottom: '1px solid #E2E8F0',
-  whiteSpace: 'nowrap', background: '#F8FAFC',
+  fontSize: 11, fontWeight: 600, color: 'var(--hf-text-muted)',
+  letterSpacing: '0.05em', borderBottom: '1px solid var(--hf-border)',
+  whiteSpace: 'nowrap', background: 'var(--hf-surface-muted)',
 }
 
 const TD: React.CSSProperties = {
-  padding: '10px 14px', fontSize: 13, borderBottom: '1px solid #F1F5F9',
+  padding: '10px 14px', fontSize: 13, borderBottom: '1px solid var(--hf-border-subtle)',
 }
 
-const btnPrimary = (bg = '#1B3A6B'): React.CSSProperties => ({
+const btnPrimary = (bg = 'var(--hf-primary)'): React.CSSProperties => ({
   display: 'flex', alignItems: 'center', gap: 6,
-  background: bg, color: '#fff',
+  background: bg, color: 'var(--hf-text-on-solid)',
   border: 'none', borderRadius: 8,
   padding: '9px 15px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
 })
 
 const btnSecondary: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 6,
-  background: '#F8FAFC', color: '#374151',
-  border: '1px solid #E2E8F0', borderRadius: 8,
+  background: 'var(--hf-surface-muted)', color: 'var(--hf-text-secondary)',
+  border: '1px solid var(--hf-border)', borderRadius: 8,
   padding: '9px 15px', fontSize: 13, cursor: 'pointer',
 }
 
 const btnCancel: React.CSSProperties = {
-  padding: '9px 15px', border: '1px solid #E2E8F0',
-  borderRadius: 8, background: '#fff',
-  fontSize: 13, cursor: 'pointer', color: '#374151',
+  padding: '9px 15px', border: '1px solid var(--hf-border)',
+  borderRadius: 8, background: 'var(--hf-surface)',
+  fontSize: 13, cursor: 'pointer', color: 'var(--hf-text-secondary)',
 }
 
 const MODAL_BG: React.CSSProperties = {
@@ -214,7 +214,7 @@ const MODAL_BG: React.CSSProperties = {
 }
 
 const modalBox = (w = 480): React.CSSProperties => ({
-  background: '#fff', borderRadius: 16,
+  background: 'var(--hf-surface)', borderRadius: 16,
   padding: 28, width: w,
   maxHeight: '90vh', overflowY: 'auto',
   boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
@@ -224,7 +224,7 @@ const modalHeader = (title: string, onClose: () => void) => (
   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
     <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--hf-text)' }}>{title}</h3>
     <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-      <X size={18} color="#94A3B8" />
+      <X size={18} style={{ color: 'var(--hf-text-faint)' }} />
     </button>
   </div>
 )
@@ -292,7 +292,7 @@ function CatalogueCombo({
         onClick={() => { setOpen(!open); setQuery('') }}
         style={{
           width: '100%', padding: '9px 12px',
-          border: `1px solid ${open ? '#1B3A6B' : '#E2E8F0'}`,
+          border: `1px solid ${open ? 'var(--hf-primary)' : 'var(--hf-border)'}`,
           borderRadius: 8, fontSize: 13, boxSizing: 'border-box' as const,
           background: 'var(--hf-surface)', cursor: 'pointer',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -748,11 +748,11 @@ export function PosPage() {
   // ── Stats strip ──────────────────────────────────────────────────────────────
 
   const STATS = [
-    { label: 'Sales today',    value: fmtR(summary?.salesToday ?? 0),    color: '#0D9488', Icon: TrendingUp   },
-    { label: 'Transactions',   value: summary?.transactionsToday ?? 0,    color: '#1B3A6B', Icon: Receipt      },
-    { label: 'Stock items',    value: summary?.totalStockItems ?? 0,      color: '#475569', Icon: Package      },
-    { label: 'Low stock',      value: summary?.lowStockItems ?? 0,        color: '#DC2626', Icon: AlertTriangle },
-    { label: 'Pending orders', value: summary?.pendingOrders ?? 0,        color: '#D97706', Icon: Truck        },
+    { label: 'Sales today',    value: fmtR(summary?.salesToday ?? 0),    color: 'var(--hf-accent-text)', Icon: TrendingUp   },
+    { label: 'Transactions',   value: summary?.transactionsToday ?? 0,    color: 'var(--hf-primary-text)', Icon: Receipt      },
+    { label: 'Stock items',    value: summary?.totalStockItems ?? 0,      color: 'var(--hf-text-tertiary)', Icon: Package      },
+    { label: 'Low stock',      value: summary?.lowStockItems ?? 0,        color: 'var(--hf-danger-text)', Icon: AlertTriangle },
+    { label: 'Pending orders', value: summary?.pendingOrders ?? 0,        color: 'var(--hf-warning-text)', Icon: Truck        },
   ]
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -795,10 +795,10 @@ export function PosPage() {
           }}>
             <div style={{
               width: 32, height: 32, borderRadius: 8,
-              background: `${color}18`,
+              background: `color-mix(in srgb, ${color} 9%, transparent)`,
               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
             }}>
-              <Icon size={15} color={color} />
+              <Icon size={15} style={{ color }} />
             </div>
             <div>
               <div style={{
@@ -822,14 +822,14 @@ export function PosPage() {
             border: '1px solid var(--hf-warning-border)', borderRadius: 10, marginBottom: 16,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <AlertTriangle size={14} color="#D97706" />
+              <AlertTriangle size={14} style={{ color: 'var(--hf-warning-text)' }} />
               <span style={{ fontSize: 13, color: 'var(--hf-warning-text-deep)', fontWeight: 500 }}>
                 No cash session open — CASH sales are blocked.
               </span>
             </div>
             <button
               onClick={() => { setCashModal('open'); setErrMsg('') }}
-              style={{ ...btnPrimary('#D97706'), padding: '6px 14px', fontSize: 12 }}>
+              style={{ ...btnPrimary('var(--hf-warning)'), padding: '6px 14px', fontSize: 12 }}>
               Open Session
             </button>
           </div>
@@ -840,7 +840,7 @@ export function PosPage() {
             border: '1px solid var(--hf-success-border)', borderRadius: 10, marginBottom: 16,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <CheckCircle size={14} color="#166534" />
+              <CheckCircle size={14} style={{ color: 'var(--hf-success-text-strong)' }} />
               <span style={{ fontSize: 13, color: 'var(--hf-success-text-strong)', fontWeight: 600 }}>
                 Session {(localSession as CashSession).sessionNumber}
               </span>
@@ -1075,7 +1075,7 @@ export function PosPage() {
                   {['CASH', 'CARD', 'EFT', 'ACCOUNT'].map(m => (
                     <button key={m} onClick={() => setPayment(m)} style={{
                       padding: '7px 4px',
-                      border: `1px solid ${payment === m ? '#1B3A6B' : '#E2E8F0'}`,
+                      border: `1px solid ${payment === m ? 'var(--hf-primary)' : 'var(--hf-border)'}`,
                       borderRadius: 7, fontSize: 11,
                       fontWeight: payment === m ? 700 : 400,
                       background: payment === m ? 'var(--hf-primary)' : 'var(--hf-surface)',
@@ -1258,7 +1258,7 @@ export function PosPage() {
                             <div style={{ fontSize: 10, color: 'var(--hf-accent-text)' }}>Chg: {fmtR(t.changeGiven)}</div>
                           )}
                         </div>
-                        <ChevronDown size={14} color="#94A3B8" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }} />
+                        <ChevronDown size={14} style={{ color: 'var(--hf-text-faint)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }} />
                       </div>
 
                       {/* Expanded detail */}
@@ -1363,7 +1363,7 @@ export function PosPage() {
                       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                         <button
                           onClick={() => { setShowReceive(po); setReceiveQtys({}) }}
-                          style={{ ...btnPrimary('#0D9488'), fontSize: 12 }}>
+                          style={{ ...btnPrimary('var(--hf-accent)'), fontSize: 12 }}>
                           <Truck size={13} /> Receive Stock
                         </button>
                       </div>
@@ -1404,7 +1404,7 @@ export function PosPage() {
                   <button
                     disabled={!openFloat || openSeshMut.isPending}
                     onClick={() => openSeshMut.mutate({ openingFloat: Number(openFloat), notes: sNotes || null })}
-                    style={btnPrimary('#0D9488')}>
+                    style={btnPrimary('var(--hf-accent)')}>
                     {openSeshMut.isPending ? 'Opening…' : 'Open Session'}
                   </button>
                 </div>
@@ -1458,7 +1458,7 @@ export function PosPage() {
                       id: (localSession as CashSession).id,
                       body: { closingFloat: Number(closeFloat), notes: sNotes || null },
                     })}
-                    style={btnPrimary('#DC2626')}>
+                    style={btnPrimary('var(--hf-danger)')}>
                     {closeSeshMut.isPending ? 'Closing…' : 'Close Session'}
                   </button>
                 </div>
@@ -1566,7 +1566,7 @@ export function PosPage() {
                     })),
                   },
                 })}
-                style={btnPrimary('#0D9488')}>
+                style={btnPrimary('var(--hf-accent)')}>
                 {receiveMut.isPending ? 'Receiving…' : 'Confirm Receipt'}
               </button>
             </div>
@@ -1698,7 +1698,7 @@ export function PosPage() {
                     })),
                   },
                 })}
-                style={btnPrimary('#D97706')}>
+                style={btnPrimary('var(--hf-warning)')}>
                 {refundMut.isPending ? 'Processing…' : 'Process Refund'}
               </button>
             </div>

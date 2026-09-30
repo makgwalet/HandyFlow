@@ -39,21 +39,21 @@ const MODULE_ICONS: Record<string, React.ElementType> = {
   contracting: FilePen, expenses: Wallet,
 }
 const MODULE_COLORS: Record<string, { bg: string; color: string }> = {
-  crm:         { bg: '#DBEAFE', color: '#1D4ED8' },
-  invoicing:   { bg: '#DCFCE7', color: '#166534' },
-  catalogue:   { bg: '#F3E8FF', color: '#7C3AED' },
-  security:    { bg: '#F0FDF4', color: '#0D9488' },
-  fuel:        { bg: '#FEF3C7', color: '#D97706' },
-  earthmoving: { bg: '#FEF9C3', color: '#854D0E' },
-  property:    { bg: '#EDE9FE', color: '#7C3AED' },
-  fleet:       { bg: '#E0F2FE', color: '#0369A1' },
-  hr:          { bg: '#FCE7F3', color: '#9D174D' },
-  accounting:  { bg: '#ECFDF5', color: '#059669' },
-  bookings:    { bg: '#FFF7ED', color: '#EA580C' },
-  clinic:      { bg: '#FFF1F2', color: '#BE123C' },
-  events:      { bg: '#FFFBEB', color: '#D97706' },
-  contracting: { bg: '#F0F9FF', color: '#0284C7' },
-  expenses:    { bg: '#FDF4FF', color: '#9333EA' },
+  crm:         { bg: 'var(--hf-info-soft-strong)', color: 'var(--hf-info-text)' },
+  invoicing:   { bg: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)' },
+  catalogue:   { bg: 'var(--hf-violet-soft-strong)', color: 'var(--hf-violet-text)' },
+  security:    { bg: 'var(--hf-success-soft)', color: 'var(--hf-accent-text)' },
+  fuel:        { bg: 'var(--hf-warning-soft-strong)', color: 'var(--hf-warning-text)' },
+  earthmoving: { bg: 'var(--hf-warning-soft)', color: 'var(--hf-warning-text-deep)' },
+  property:    { bg: 'var(--hf-violet-soft-strong)', color: 'var(--hf-violet-text)' },
+  fleet:       { bg: 'var(--hf-sky-soft-strong)', color: 'var(--hf-sky-text-strong)' },
+  hr:          { bg: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text-strong)' },
+  accounting:  { bg: 'var(--hf-success-soft)', color: 'var(--hf-success-text)' },
+  bookings:    { bg: 'var(--hf-orange-soft)', color: 'var(--hf-orange-text)' },
+  clinic:      { bg: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text-strong)' },
+  events:      { bg: 'var(--hf-warning-soft)', color: 'var(--hf-warning-text)' },
+  contracting: { bg: 'var(--hf-sky-soft)', color: 'var(--hf-sky-text)' },
+  expenses:    { bg: 'var(--hf-violet-soft)', color: 'var(--hf-violet-text)' },
 }
 const CORE_KEYS = ['crm', 'invoicing', 'catalogue']
 
@@ -139,7 +139,7 @@ export function BillingPage() {
 
       {/* Subscription banner */}
       {subscription && (
-        <div style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 14, padding: '20px 24px', marginBottom: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, padding: '20px 24px', marginBottom: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: 24 }}>
             {[
               { label: 'Status', value: subscription.status },
@@ -189,14 +189,14 @@ export function BillingPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
               {CORE_KEYS.map(key => {
                 const Icon = MODULE_ICONS[key] || Package
-                const c = MODULE_COLORS[key] || { bg: '#F8FAFC', color: '#64748B' }
+                const c = MODULE_COLORS[key] || { bg: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)' }
                 const names: Record<string, string> = { crm: 'CRM', invoicing: 'Invoicing', catalogue: 'Catalogue' }
                 const descs: Record<string, string> = { crm: 'Customers & contacts', invoicing: 'Quotes & invoices', catalogue: 'Products & services' }
                 return (
-                  <div key={key} style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '16px' }}>
+                  <div key={key} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                       <div style={{ width: 34, height: 34, borderRadius: 8, background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Icon size={16} color={c.color} />
+                        <Icon size={16} style={{ color: c.color }} />
                       </div>
                       <div>
                         <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)' }}>{names[key]}</div>
@@ -221,12 +221,12 @@ export function BillingPage() {
           {loadingMine ? (
             <div style={{ textAlign: 'center', padding: 40, color: 'var(--hf-text-faint)' }}>Loading apps...</div>
           ) : tenantModules.length === 0 ? (
-            <div style={{ background: 'white', border: '2px dashed var(--hf-border)', borderRadius: 14, padding: '40px', textAlign: 'center', color: 'var(--hf-text-faint)' }}>
+            <div style={{ background: 'var(--hf-surface)', border: '2px dashed var(--hf-border)', borderRadius: 14, padding: '40px', textAlign: 'center', color: 'var(--hf-text-faint)' }}>
               <Zap size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
               <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)', marginBottom: 4 }}>No additional apps yet</div>
               <div style={{ fontSize: 13, marginBottom: 16 }}>Add industry or business apps to unlock more features.</div>
               <button onClick={() => setTab('subscription')}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 18px', background: 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 18px', background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
                 <Plus size={15} /> Browse apps
               </button>
             </div>
@@ -234,17 +234,17 @@ export function BillingPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
               {tenantModules.map(m => {
                 const Icon = MODULE_ICONS[m.moduleKey] || Package
-                const c    = MODULE_COLORS[m.moduleKey] || { bg: '#F8FAFC', color: '#64748B' }
+                const c    = MODULE_COLORS[m.moduleKey] || { bg: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)' }
                 const isTrial   = m.status === 'TRIAL'
                 const daysLeft  = isTrial && m.trialEndsAt ? trialDaysLeft(m.trialEndsAt) : null
                 const isExpiring = daysLeft != null && daysLeft <= 14
 
                 return (
-                  <div key={m.moduleKey} style={{ background: 'white', border: `1px solid ${isExpiring ? '#FCD34D' : '#E2E8F0'}`, borderRadius: 12, padding: '16px', position: 'relative' }}>
+                  <div key={m.moduleKey} style={{ background: 'var(--hf-surface)', border: `1px solid ${isExpiring ? 'var(--hf-warning-border-strong)' : 'var(--hf-border)'}`, borderRadius: 12, padding: '16px', position: 'relative' }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ width: 36, height: 36, borderRadius: 9, background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Icon size={17} color={c.color} />
+                          <Icon size={17} style={{ color: c.color }} />
                         </div>
                         <div>
                           <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)' }}>{m.moduleName}</div>
@@ -309,12 +309,12 @@ export function BillingPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
                   {mods.sort((a, b) => a.sortOrder - b.sortOrder).map(m => {
                     const Icon = MODULE_ICONS[m.key] || Package
-                    const c    = MODULE_COLORS[m.key] || { bg: '#F8FAFC', color: '#64748B' }
+                    const c    = MODULE_COLORS[m.key] || { bg: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)' }
                     return (
-                      <div key={m.key} style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '16px' }}>
+                      <div key={m.key} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
                           <div style={{ width: 36, height: 36, borderRadius: 9, background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <Icon size={17} color={c.color} />
+                            <Icon size={17} style={{ color: c.color }} />
                           </div>
                           <div>
                             <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)' }}>{m.name}</div>
@@ -328,7 +328,7 @@ export function BillingPage() {
                           </div>
                           <button
                             onClick={() => setConfirmActivate(m)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
                             <Plus size={13} /> Add
                           </button>
                         </div>
@@ -345,7 +345,7 @@ export function BillingPage() {
       {/* ── Cancel preview modal ────────────────────────────────────── */}
       {confirmCancel && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: 'white', borderRadius: 16, padding: 28, width: 460, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+          <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 28, width: 460, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>Remove {confirmCancel.moduleName}?</h3>
               <button onClick={() => setConfirmCancel(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={20} /></button>
@@ -354,7 +354,7 @@ export function BillingPage() {
             {/* Access until */}
             <div style={{ padding: '12px 16px', background: 'var(--hf-warning-soft)', border: '1px solid var(--hf-warning-border-strong)', borderRadius: 10, marginBottom: 14 }}>
               <div style={{ display: 'flex', gap: 8 }}>
-                <Clock size={15} color="#D97706" style={{ marginTop: 1, flexShrink: 0 }} />
+                <Clock size={15} style={{ color: 'var(--hf-warning-text)', marginTop: 1, flexShrink: 0 }} />
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--hf-warning-text-deep)' }}>Access continues until {fmtDate(confirmCancel.accessUntil)}</div>
                   <div style={{ fontSize: 12, color: 'var(--hf-warning-text-strong)', marginTop: 2 }}>You won't lose access immediately — billing stops at end of period.</div>
@@ -366,7 +366,7 @@ export function BillingPage() {
             {confirmCancel.affectedRecords > 0 && (
               <div style={{ padding: '12px 16px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 10, marginBottom: 14 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <AlertTriangle size={15} color="#DC2626" style={{ marginTop: 1, flexShrink: 0 }} />
+                  <AlertTriangle size={15} style={{ color: 'var(--hf-danger-text)', marginTop: 1, flexShrink: 0 }} />
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--hf-danger-text)' }}>{confirmCancel.affectedRecords} records will become inaccessible</div>
                     <div style={{ fontSize: 12, color: 'var(--hf-danger-text-strong)', marginTop: 2 }}>{confirmCancel.message}</div>
@@ -378,7 +378,7 @@ export function BillingPage() {
             {confirmCancel.affectedRecords === 0 && (
               <div style={{ padding: '12px 16px', background: 'var(--hf-success-soft)', border: '1px solid var(--hf-success-border-subtle)', borderRadius: 10, marginBottom: 14 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <Check size={15} color="#16A34A" style={{ marginTop: 1 }} />
+                  <Check size={15} style={{ color: 'var(--hf-success-text)', marginTop: 1 }} />
                   <div style={{ fontSize: 13, color: 'var(--hf-success-text-strong)' }}>No data will be affected. You can reactivate this app at any time.</div>
                 </div>
               </div>
@@ -390,13 +390,13 @@ export function BillingPage() {
 
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button onClick={() => setConfirmCancel(null)}
-                style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'white', fontSize: 14, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
+                style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'var(--hf-surface)', fontSize: 14, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
                 Keep app
               </button>
               <button
                 onClick={() => cancelModule.mutate(confirmCancel.moduleKey)}
                 disabled={cancelModule.isPending}
-                style={{ padding: '10px 20px', background: 'var(--hf-danger)', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                style={{ padding: '10px 20px', background: 'var(--hf-danger)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
                 {cancelModule.isPending ? 'Removing...' : 'Yes, remove app'}
               </button>
             </div>
@@ -409,14 +409,14 @@ export function BillingPage() {
           matching the confirm-before-remove modal above. */}
       {confirmActivate && (() => {
         const Icon = MODULE_ICONS[confirmActivate.key] || Package
-        const c    = MODULE_COLORS[confirmActivate.key] || { bg: '#F8FAFC', color: '#64748B' }
+        const c    = MODULE_COLORS[confirmActivate.key] || { bg: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)' }
         return (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-            <div style={{ background: 'white', borderRadius: 16, padding: 28, width: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 28, width: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 10, background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Icon size={19} color={c.color} />
+                    <Icon size={19} style={{ color: c.color }} />
                   </div>
                   <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>Add {confirmActivate.name}?</h3>
                 </div>
@@ -425,7 +425,7 @@ export function BillingPage() {
 
               <div style={{ padding: '12px 16px', background: 'var(--hf-success-soft)', border: '1px solid var(--hf-success-border-subtle)', borderRadius: 10, marginBottom: 16 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <Zap size={15} color="#16A34A" style={{ marginTop: 1, flexShrink: 0 }} />
+                  <Zap size={15} style={{ color: 'var(--hf-success-text)', marginTop: 1, flexShrink: 0 }} />
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--hf-success-text-strong)' }}>60 days free, then R {Number(confirmActivate.monthlyPrice).toLocaleString('en-ZA')}/mo</div>
                     <div style={{ fontSize: 12, color: 'var(--hf-success-text-strong)', marginTop: 2 }}>
@@ -441,13 +441,13 @@ export function BillingPage() {
 
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
                 <button onClick={() => setConfirmActivate(null)}
-                  style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'white', fontSize: 14, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
+                  style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'var(--hf-surface)', fontSize: 14, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
                   Cancel
                 </button>
                 <button
                   onClick={() => activate.mutate(confirmActivate.key)}
                   disabled={activate.isPending}
-                  style={{ padding: '10px 20px', background: 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                  style={{ padding: '10px 20px', background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
                   {activate.isPending ? 'Adding...' : 'Yes, add app'}
                 </button>
               </div>

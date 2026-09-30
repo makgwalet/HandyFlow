@@ -9,12 +9,12 @@
 import { useEffect, useState } from "react"
 import { auditorApi, type AuditorAccessGrant } from "../../api/auditor.api"
 
-const NAVY = "#1B3A6B"
-const BORDER = "#E2E8F0"
-const CANVAS = "#F8FAFC"
-const INK = "#0F172A"
-const MUTED = "#64748B"
-const FAINT = "#94A3B8"
+const NAVY = "var(--hf-primary)"
+const BORDER = "var(--hf-border)"
+const CANVAS = "var(--hf-surface-muted)"
+const INK = "var(--hf-text)"
+const MUTED = "var(--hf-text-muted)"
+const FAINT = "var(--hf-text-faint)"
 
 export function AuditorAccessSection() {
   const [grants, setGrants] = useState<AuditorAccessGrant[]>([])

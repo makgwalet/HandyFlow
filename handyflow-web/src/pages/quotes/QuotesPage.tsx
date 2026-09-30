@@ -54,7 +54,7 @@ const fmtDate = (d: string | null) =>
 
 const inp: React.CSSProperties = {
   width: '100%', padding: '10px 12px', border: '1.5px solid var(--hf-border)',
-  borderRadius: 9, fontSize: 14, boxSizing: 'border-box', background: 'white', outline: 'none',
+  borderRadius: 9, fontSize: 14, boxSizing: 'border-box', background: 'var(--hf-surface)', outline: 'none',
 }
 
 // ── Main Invoicing Page ───────────────────────────────────────────────────────
@@ -76,7 +76,7 @@ export function InvoicingPage() {
         </div>
         {activeTab === 'quotes' && (
           <button onClick={() => navigate('/quotes/new')}
-            style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             <Plus size={15} /> New Quote
           </button>
         )}
@@ -95,7 +95,7 @@ export function InvoicingPage() {
               display: 'flex', alignItems: 'center', gap: 7,
               padding: '8px 20px', borderRadius: 9, border: 'none',
               fontSize: 14, fontWeight: 600, cursor: 'pointer',
-              background: activeTab === tab.key ? 'white' : 'transparent',
+              background: activeTab === tab.key ? 'var(--hf-surface)' : 'transparent',
               color: activeTab === tab.key ? 'var(--hf-primary-text)' : 'var(--hf-text-muted)',
               boxShadow: activeTab === tab.key ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
               transition: 'all 0.15s',
@@ -145,25 +145,25 @@ function QuotesTab() {
           { label: 'Sent',     value: quotes.filter(q => q.status === 'SENT').length,           color: 'var(--hf-info-text)' },
           { label: 'Accepted', value: quotes.filter(q => q.status === 'ACCEPTED').length,       color: 'var(--hf-success-text-strong)' },
         ].map(s => (
-          <div key={s.label} style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '14px 18px' }}>
+          <div key={s.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '14px 18px' }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
         {isLoading ? (
           <div style={{ padding: 60, textAlign: 'center', color: 'var(--hf-text-faint)' }}>Loading quotes...</div>
         ) : isError ? (
           <div style={{ padding: 60, textAlign: 'center' }}>
-            <AlertCircle size={32} color="#DC2626" style={{ marginBottom: 10 }} />
+            <AlertCircle size={32} style={{ color: 'var(--hf-danger-text)', marginBottom: 10 }} />
             <div style={{ fontWeight: 600, color: 'var(--hf-danger-text)' }}>Failed to load quotes</div>
             <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', marginTop: 4 }}>Please refresh and try again.</div>
           </div>
         ) : quotes.length === 0 ? (
           <div style={{ padding: 60, textAlign: 'center', color: 'var(--hf-text-faint)' }}>
-            <FileText size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
+            <FileText size={36} style={{ color: 'var(--hf-text-disabled)', marginBottom: 12 }} />
             <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)', marginBottom: 4 }}>No quotes yet</div>
             <div style={{ fontSize: 13 }}>Create your first quote to get started.</div>
           </div>
@@ -182,7 +182,7 @@ function QuotesTab() {
                   onClick={() => navigate(`/quotes/${q.id}`)}
                   style={{ borderBottom: '1px solid var(--hf-border-subtle)', cursor: 'pointer' }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--hf-surface-muted)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
+                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--hf-surface)')}>
                   <td style={{ padding: '14px 16px' }}>
                     <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700, color: 'var(--hf-info-text)' }}>{q.quoteNumber}</span>
                   </td>
@@ -193,7 +193,7 @@ function QuotesTab() {
                     {q.expiresAt ? new Date(q.expiresAt).toLocaleDateString('en-ZA') : '—'}
                   </td>
                   <td style={{ padding: '14px 16px' }}>
-                    <Eye size={15} color="#94A3B8" />
+                    <Eye size={15} style={{ color: 'var(--hf-text-faint)' }} />
                   </td>
                 </tr>
               ))}
@@ -289,7 +289,7 @@ function InvoicesTab() {
           { label: 'Total revenue',   value: fmtR(totalRevenue), fmt: true,  color: 'var(--hf-accent-text)' },
           { label: 'Outstanding',     value: fmtR(totalOutstanding), fmt: true, color: overdueCount > 0 ? 'var(--hf-danger-text)' : 'var(--hf-warning-text)' },
         ].map(s => (
-          <div key={s.label} style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '16px 20px' }}>
+          <div key={s.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '16px 20px' }}>
             <div style={{ fontSize: s.fmt ? 18 : 26, fontWeight: 700, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 3 }}>{s.label}</div>
           </div>
@@ -302,7 +302,7 @@ function InvoicesTab() {
           <button key={s} onClick={() => setStatusFilter(s)}
             style={{ padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
               background: statusFilter === s ? 'var(--hf-primary)' : 'var(--hf-surface-sunken)',
-              color:      statusFilter === s ? 'white'   : 'var(--hf-text-muted)',
+              color:      statusFilter === s ? 'var(--hf-text-on-solid)'   : 'var(--hf-text-muted)',
             }}>
             {s === 'ALL' ? 'All' : (INVOICE_STATUS[s]?.label ?? s)}
             {s !== 'ALL' && ` (${invoices.filter(i => i.status === s).length})`}
@@ -311,17 +311,17 @@ function InvoicesTab() {
       </div>
 
       {/* Table */}
-      <div style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
         {isLoading ? (
           <div style={{ padding: 60, textAlign: 'center', color: 'var(--hf-text-faint)' }}>Loading invoices...</div>
         ) : isError ? (
           <div style={{ padding: 60, textAlign: 'center' }}>
-            <AlertCircle size={32} color="#DC2626" style={{ marginBottom: 10 }} />
+            <AlertCircle size={32} style={{ color: 'var(--hf-danger-text)', marginBottom: 10 }} />
             <div style={{ fontWeight: 600, color: 'var(--hf-danger-text)' }}>Failed to load invoices</div>
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ padding: 60, textAlign: 'center', color: 'var(--hf-text-faint)' }}>
-            <FileText size={36} color="#CBD5E1" style={{ marginBottom: 12, opacity: 0.5 }} />
+            <FileText size={36} style={{ color: 'var(--hf-text-disabled)', marginBottom: 12, opacity: 0.5 }} />
             <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)', marginBottom: 4 }}>No invoices</div>
             <div style={{ fontSize: 13 }}>Convert an accepted quote to generate an invoice.</div>
           </div>
@@ -342,14 +342,14 @@ function InvoicesTab() {
                   <>
                     <tr key={inv.id}
                       onClick={() => setExpanded(isExp ? null : inv.id)}
-                      style={{ borderBottom: '1px solid var(--hf-border-subtle)', cursor: 'pointer', background: isExp ? 'var(--hf-surface-muted)' : 'white' }}
+                      style={{ borderBottom: '1px solid var(--hf-border-subtle)', cursor: 'pointer', background: isExp ? 'var(--hf-surface-muted)' : 'var(--hf-surface)' }}
                       onMouseEnter={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = 'var(--hf-surface-muted)' }}
-                      onMouseLeave={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = 'white' }}>
+                      onMouseLeave={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = 'var(--hf-surface)' }}>
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <FileText size={14} color="#0D9488" />
+                          <FileText size={14} style={{ color: 'var(--hf-accent-text)' }} />
                           <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)' }}>{inv.invoiceNumber}</span>
-                          {isExp ? <ChevronUp size={13} color="#94A3B8" /> : <ChevronDown size={13} color="#94A3B8" />}
+                          {isExp ? <ChevronUp size={13} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={13} style={{ color: 'var(--hf-text-faint)' }} />}
                         </div>
                       </td>
                       <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)' }}>
@@ -446,7 +446,7 @@ function InvoicesTab() {
       {/* Mark as Paid modal */}
       {payModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(2px)' }}>
-          <div style={{ background: 'white', borderRadius: 16, padding: 28, width: 460, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+          <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 28, width: 460, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>Record Payment</h3>
@@ -482,13 +482,13 @@ function InvoicesTab() {
 
             {payError && (
               <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <AlertCircle size={15} color="#DC2626" style={{ flexShrink: 0 }} />{payError}
+                <AlertCircle size={15} style={{ color: 'var(--hf-danger-text)', flexShrink: 0 }} />{payError}
               </div>
             )}
 
             <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
               <button onClick={() => { setPayModal(null); setPayError('') }}
-                style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'white', fontSize: 14, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
+                style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'var(--hf-surface)', fontSize: 14, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
                 Cancel
               </button>
               <button
@@ -497,7 +497,7 @@ function InvoicesTab() {
                   id: payModal.id,
                   body: { amount: Number(payForm.amount), paymentMethod: payForm.paymentMethod, reference: payForm.reference || undefined, note: payForm.note || undefined },
                 })}
-                style={{ padding: '10px 22px', background: !payForm.amount ? 'var(--hf-surface-strong)' : 'var(--hf-success)', color: !payForm.amount ? 'var(--hf-text-faint)' : 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: !payForm.amount ? 'not-allowed' : 'pointer' }}>
+                style={{ padding: '10px 22px', background: !payForm.amount ? 'var(--hf-surface-strong)' : 'var(--hf-success)', color: !payForm.amount ? 'var(--hf-text-faint)' : 'var(--hf-text-on-solid)', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: !payForm.amount ? 'not-allowed' : 'pointer' }}>
                 {markPaid.isPending ? 'Saving...' : 'Confirm payment'}
               </button>
             </div>

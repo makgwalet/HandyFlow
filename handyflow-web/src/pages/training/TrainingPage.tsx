@@ -24,7 +24,7 @@ export default function TrainingPage() {
   const [tab, setTab] = useState<Tab>("dashboard")
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--hf-surface-muted)", fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 24px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
           <div style={{ width: 40, height: 40, borderRadius: 11, background: TRAINING_ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>

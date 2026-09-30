@@ -33,7 +33,7 @@ const btnP: React.CSSProperties = {
 
 function Toast({ msg, ok }: { msg: string; ok: boolean }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 16px', background: ok ? 'var(--hf-success-soft-strong)' : 'var(--hf-danger-soft)', border: `1px solid ${ok ? '#86EFAC' : '#FECACA'}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: ok ? 'var(--hf-success-text-strong)' : 'var(--hf-danger-text)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 16px', background: ok ? 'var(--hf-success-soft-strong)' : 'var(--hf-danger-soft)', border: `1px solid ${ok ? 'var(--hf-success-border)' : 'var(--hf-danger-border)'}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: ok ? 'var(--hf-success-text-strong)' : 'var(--hf-danger-text)' }}>
       {ok ? <CheckCircle size={15} /> : <AlertTriangle size={15} />}
       {msg}
     </div>
@@ -113,7 +113,7 @@ export function ProfilePage() {
   }
   const pwStrength = strength(pw.next)
   const strengthLabel = ['', 'Weak', 'Fair', 'Good', 'Strong'][pwStrength]
-  const strengthColor = ['', '#DC2626', '#D97706', '#0D9488', '#166534'][pwStrength]
+  const strengthColor = ['', 'var(--hf-danger-text)', 'var(--hf-warning-text)', 'var(--hf-accent-text)', 'var(--hf-success-text-strong)'][pwStrength]
 
   const rules = [
     { label: 'At least 8 characters',        ok: pw.next.length >= 8 },
@@ -148,7 +148,7 @@ export function ProfilePage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 720 }}>
 
         {/* ── Profile card ── */}
-        <Card title="Personal information" icon={<User size={16} color="#0D9488" />}>
+        <Card title="Personal information" icon={<User size={16} style={{ color: 'var(--hf-accent-text)' }} />}>
           {/* Avatar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, padding: '14px 18px', background: 'var(--hf-surface-muted)', borderRadius: 10, border: '1px solid var(--hf-border)' }}>
             <div style={{ width: 54, height: 54, borderRadius: '50%', background: 'var(--hf-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800, color: 'var(--hf-text-on-solid)', flexShrink: 0 }}>
@@ -201,7 +201,7 @@ export function ProfilePage() {
         </Card>
 
         {/* ── Password card ── */}
-        <Card title="Change password" icon={<Lock size={16} color="#0D9488" />}>
+        <Card title="Change password" icon={<Lock size={16} style={{ color: 'var(--hf-accent-text)' }} />}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {/* Current password */}
             <div>
@@ -262,8 +262,8 @@ export function ProfilePage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                 {rules.map(r => (
                   <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: r.ok ? 'var(--hf-success-text-strong)' : 'var(--hf-text-faint)' }}>
-                    <div style={{ width: 14, height: 14, borderRadius: '50%', background: r.ok ? 'var(--hf-success-soft-strong)' : 'var(--hf-surface-sunken)', border: `1.5px solid ${r.ok ? '#22C55E' : '#E2E8F0'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      {r.ok && <CheckCircle size={9} color="#166534" />}
+                    <div style={{ width: 14, height: 14, borderRadius: '50%', background: r.ok ? 'var(--hf-success-soft-strong)' : 'var(--hf-surface-sunken)', border: `1.5px solid ${r.ok ? 'var(--hf-success)' : 'var(--hf-border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {r.ok && <CheckCircle size={9} style={{ color: 'var(--hf-success-text-strong)' }} />}
                     </div>
                     {r.label}
                   </div>
@@ -276,7 +276,7 @@ export function ProfilePage() {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--hf-text-muted)' }}>
-              <ShieldCheck size={13} color="#0D9488" />
+              <ShieldCheck size={13} style={{ color: 'var(--hf-accent-text)' }} />
               Use a unique password not used on other sites
             </div>
             <button onClick={() => changePassword.mutate()}

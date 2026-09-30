@@ -56,20 +56,20 @@ const CONTACT_OUTCOMES = ["NO_ANSWER", "LEFT_MESSAGE", "PROMISE_TO_PAY", "DISPUT
 const PLAN_FREQUENCIES = ["WEEKLY", "FORTNIGHTLY", "MONTHLY"]
 
 const STATUS_CFG: Record<string, { color: string; bg: string; border: string; label: string }> = {
-  OPEN:                { color: "#9A3412", bg: "#FFEDD5", border: "#FED7AA", label: "Open"              },
-  DEMAND_SENT:         { color: "#B45309", bg: "#FEF3C7", border: "#FDE68A", label: "Demand Sent"       },
-  PAYMENT_PLAN_ACTIVE: { color: "#1D4ED8", bg: "#EFF6FF", border: "#BFDBFE", label: "Payment Plan"      },
-  DISPUTED:            { color: "#D97706", bg: "#FFFBEB", border: "#FDE68A", label: "Disputed"          },
-  HANDED_TO_LEGAL:     { color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE", label: "Handed to Legal"   },
-  SETTLED:             { color: "#166534", bg: "#DCFCE7", border: "#86EFAC", label: "Settled"           },
-  WRITTEN_OFF:         { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", label: "Written Off"       },
-  CLOSED:              { color: "#334155", bg: "#F8FAFC", border: "#E2E8F0", label: "Closed"            },
+  OPEN:                { color: "var(--hf-orange-text-strong)", bg: "var(--hf-orange-soft)", border: "var(--hf-orange-border)", label: "Open"              },
+  DEMAND_SENT:         { color: "var(--hf-warning-text-strong)", bg: "var(--hf-warning-soft-strong)", border: "var(--hf-warning-border)", label: "Demand Sent"       },
+  PAYMENT_PLAN_ACTIVE: { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", border: "var(--hf-info-border)", label: "Payment Plan"      },
+  DISPUTED:            { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)", label: "Disputed"          },
+  HANDED_TO_LEGAL:     { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", border: "var(--hf-violet-border)", label: "Handed to Legal"   },
+  SETTLED:             { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", border: "var(--hf-success-border)", label: "Settled"           },
+  WRITTEN_OFF:         { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)", label: "Written Off"       },
+  CLOSED:              { color: "var(--hf-text-secondary)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)", label: "Closed"            },
 }
 const PLAN_STATUS_CFG: Record<string, { color: string; bg: string; label: string }> = {
-  ACTIVE:    { color: "#1D4ED8", bg: "#EFF6FF", label: "Active"    },
-  COMPLETED: { color: "#166534", bg: "#DCFCE7", label: "Completed" },
-  DEFAULTED: { color: "#DC2626", bg: "#FEF2F2", label: "Defaulted" },
-  CANCELLED: { color: "#64748B", bg: "#F1F5F9", label: "Cancelled" },
+  ACTIVE:    { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", label: "Active"    },
+  COMPLETED: { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", label: "Completed" },
+  DEFAULTED: { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", label: "Defaulted" },
+  CANCELLED: { color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)", label: "Cancelled" },
 }
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
@@ -152,7 +152,7 @@ function CaseDetailPanel({ c, canManage, canAdmin, invalidate }: { c: Case; canM
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["dc-evidence", c.id] }); setFile(null); setEvidenceType("") },
   })
 
-  const inp: React.CSSProperties = { width: "100%", padding: "7px 10px", border: "1.5px solid #E2E8F0", borderRadius: 7, fontSize: 12, boxSizing: "border-box" as const }
+  const inp: React.CSSProperties = { width: "100%", padding: "7px 10px", border: "1.5px solid var(--hf-border)", borderRadius: 7, fontSize: 12, boxSizing: "border-box" as const }
   const activePlan = plans.find(p => p.status === "ACTIVE")
 
   return (
@@ -196,7 +196,7 @@ function CaseDetailPanel({ c, canManage, canAdmin, invalidate }: { c: Case; canM
             <textarea value={contactForm.notes} onChange={e => setContactForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Notes..." style={{ ...inp, resize: "vertical" as const, marginBottom: 8 }} />
             <button onClick={() => recordContact.mutate({ contactDate: contactForm.contactDate, contactMethod: contactForm.contactMethod, outcome: contactForm.outcome, notes: contactForm.notes || null, promisedPaymentDate: contactForm.promisedPaymentDate || null, promisedPaymentAmount: contactForm.promisedPaymentAmount ? Number(contactForm.promisedPaymentAmount) : null })}
               disabled={recordContact.isPending || (contactForm.outcome === "PROMISE_TO_PAY" && (!contactForm.promisedPaymentDate || !contactForm.promisedPaymentAmount))}
-              style={{ padding: "6px 14px", background: "#9A3412", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              style={{ padding: "6px 14px", background: "var(--hf-orange-solid-strong)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
               {recordContact.isPending ? "Saving..." : "Record"}
             </button>
           </div>
@@ -236,7 +236,7 @@ function CaseDetailPanel({ c, canManage, canAdmin, invalidate }: { c: Case; canM
             <textarea value={planForm.notes} onChange={e => setPlanForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Notes..." style={{ ...inp, resize: "vertical" as const, marginBottom: 8 }} />
             <button onClick={() => proposePlan.mutate({ totalAgreedAmount: Number(planForm.totalAgreedAmount), installmentAmount: Number(planForm.installmentAmount), frequency: planForm.frequency, startDate: planForm.startDate, numberOfInstallments: Number(planForm.numberOfInstallments), notes: planForm.notes || null })}
               disabled={proposePlan.isPending || !planForm.totalAgreedAmount || !planForm.installmentAmount || !planForm.numberOfInstallments}
-              style={{ padding: "6px 14px", background: "#9A3412", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              style={{ padding: "6px 14px", background: "var(--hf-orange-solid-strong)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
               {proposePlan.isPending ? "Saving..." : "Propose Plan"}
             </button>
             <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 6 }}>Proposing a plan also moves the case to Payment Plan status.</div>
@@ -276,7 +276,7 @@ function CaseDetailPanel({ c, canManage, canAdmin, invalidate }: { c: Case; canM
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
             {evidence.map(ev => (
               <div key={ev.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12 }}>
-                <FileText size={13} color="#64748B" />
+                <FileText size={13} style={{ color: 'var(--hf-text-muted)' }} />
                 <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{ev.fileName}</span>
                 <span style={{ color: "var(--hf-text-faint)" }}>{ev.evidenceType} · {fmtBytes(ev.fileSizeBytes)}</span>
                 <span style={{ marginLeft: "auto", color: "var(--hf-text-faint)" }}>{ev.uploadedByName} · {fmtDate(ev.createdAt)}</span>
@@ -289,7 +289,7 @@ function CaseDetailPanel({ c, canManage, canAdmin, invalidate }: { c: Case; canM
             <input type="text" value={evidenceType} onChange={e => setEvidenceType(e.target.value)} placeholder="Type e.g. AOD" style={{ flex: 1, padding: "7px 10px", border: "1.5px solid var(--hf-border)", borderRadius: 7, fontSize: 12 }} />
             <input type="file" onChange={e => setFile(e.target.files?.[0] ?? null)} style={{ fontSize: 12, flex: 1 }} />
             <button onClick={() => attachEvidence.mutate()} disabled={!file || !evidenceType.trim() || attachEvidence.isPending}
-              style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: (!file || !evidenceType.trim()) ? "#CBD5E1" : "#9A3412", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: (!file || !evidenceType.trim()) ? "not-allowed" : "pointer" }}>
+              style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: (!file || !evidenceType.trim()) ? "var(--hf-border-strong)" : "var(--hf-orange-solid-strong)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: (!file || !evidenceType.trim()) ? "not-allowed" : "pointer" }}>
               <Paperclip size={12} /> {attachEvidence.isPending ? "Uploading..." : "Attach"}
             </button>
           </div>
@@ -397,18 +397,18 @@ export default function CasesTab() {
   const toggleInvoice = (id: string) => setNewCase(f => ({ ...f, selectedInvoiceIds: f.selectedInvoiceIds.includes(id) ? f.selectedInvoiceIds.filter(x => x !== id) : [...f.selectedInvoiceIds, id] }))
 
   const stats = [
-    { label: "Total",           value: cases.length,                                                    color: "#9A3412" },
-    { label: "Open",            value: cases.filter(c => !TERMINAL.has(c.status)).length,                color: "#B45309" },
-    { label: "On plan",         value: cases.filter(c => c.status === "PAYMENT_PLAN_ACTIVE").length,     color: "#1D4ED8" },
-    { label: "Outstanding",     value: fmtR(cases.filter(c => !TERMINAL.has(c.status)).reduce((s, c) => s + (c.totalOutstanding ?? 0), 0)), color: "#DC2626" },
+    { label: "Total",           value: cases.length,                                                    color: "var(--hf-orange-text-strong)" },
+    { label: "Open",            value: cases.filter(c => !TERMINAL.has(c.status)).length,                color: "var(--hf-warning-text-strong)" },
+    { label: "On plan",         value: cases.filter(c => c.status === "PAYMENT_PLAN_ACTIVE").length,     color: "var(--hf-info-text)" },
+    { label: "Outstanding",     value: fmtR(cases.filter(c => !TERMINAL.has(c.status)).reduce((s, c) => s + (c.totalOutstanding ?? 0), 0)), color: "var(--hf-danger-text)" },
   ]
 
   const StatusBadge = ({ status }: { status: string }) => {
     const cfg = STATUS_CFG[status] ?? STATUS_CFG.OPEN
     return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: cfg.bg, color: cfg.color, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: `1px solid ${cfg.border}` }}>{cfg.label}</span>
   }
-  const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, background: "#fff", outline: "none" }
-  const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+  const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, background: "var(--hf-surface)", outline: "none" }
+  const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
 
   return (
     <div>
@@ -426,7 +426,7 @@ export default function CasesTab() {
           {["ALL", ...STATUSES].map(s => (
             <button key={s} onClick={() => setFilterStatus(s)}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterStatus === s ? 600 : 400,
-                background: filterStatus === s ? (s === "ALL" ? "#9A3412" : STATUS_CFG[s]?.color ?? "#9A3412") : "var(--hf-surface-sunken)",
+                background: filterStatus === s ? (s === "ALL" ? "var(--hf-orange-solid-strong)" : STATUS_CFG[s]?.color ?? "var(--hf-orange-solid-strong)") : "var(--hf-surface-sunken)",
                 color: filterStatus === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
               {s === "ALL" ? "All" : STATUS_CFG[s]?.label ?? s}
             </button>
@@ -438,7 +438,7 @@ export default function CasesTab() {
           </button>
           {canManage && (
             <button onClick={() => { setShowNewCase(true); setNewCase(EMPTY_NEW_CASE); setOutstandingInvoices([]); setApiError("") }}
-              style={{ display: "flex", alignItems: "center", gap: 7, background: "#9A3412", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+              style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--hf-orange-solid-strong)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
               <Plus size={15} /> Open Case
             </button>
           )}
@@ -460,11 +460,11 @@ export default function CasesTab() {
             const isTerminal = TERMINAL.has(c.status)
             const overdue = c.nextActionDate && daysUntil(c.nextActionDate) < 0 && !isTerminal
             return (
-              <div key={c.id} style={{ border: `1px solid ${overdue ? "#FECACA" : "#E2E8F0"}`, borderRadius: 12, overflow: "hidden" }}>
+              <div key={c.id} style={{ border: `1px solid ${overdue ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 12, overflow: "hidden" }}>
                 <div style={{ padding: "16px 20px", background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                     <div style={{ width: 44, height: 44, borderRadius: 10, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <Landmark size={18} color={cfg.color} />
+                      <Landmark size={18} style={{ color: cfg.color }} />
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
@@ -509,8 +509,8 @@ export default function CasesTab() {
         <Overlay onClose={() => { setShowNewCase(false); setApiError("") }}>
           <MHead title="Open Debt Collection Case" onClose={() => { setShowNewCase(false); setApiError("") }} />
           <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
-            <button onClick={() => setNewCase(f => ({ ...f, mode: "customer" }))} style={{ flex: 1, padding: "8px", borderRadius: 8, border: `2px solid ${newCase.mode === "customer" ? "#9A3412" : "#E2E8F0"}`, background: newCase.mode === "customer" ? "var(--hf-orange-soft)" : "var(--hf-surface)", color: newCase.mode === "customer" ? "var(--hf-orange-text-strong)" : "var(--hf-text-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>From CRM Customer</button>
-            <button onClick={() => setNewCase(f => ({ ...f, mode: "manual" }))} style={{ flex: 1, padding: "8px", borderRadius: 8, border: `2px solid ${newCase.mode === "manual" ? "#9A3412" : "#E2E8F0"}`, background: newCase.mode === "manual" ? "var(--hf-orange-soft)" : "var(--hf-surface)", color: newCase.mode === "manual" ? "var(--hf-orange-text-strong)" : "var(--hf-text-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Manual / Walk-in</button>
+            <button onClick={() => setNewCase(f => ({ ...f, mode: "customer" }))} style={{ flex: 1, padding: "8px", borderRadius: 8, border: `2px solid ${newCase.mode === "customer" ? "var(--hf-orange-solid-strong)" : "var(--hf-border)"}`, background: newCase.mode === "customer" ? "var(--hf-orange-soft)" : "var(--hf-surface)", color: newCase.mode === "customer" ? "var(--hf-orange-text-strong)" : "var(--hf-text-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>From CRM Customer</button>
+            <button onClick={() => setNewCase(f => ({ ...f, mode: "manual" }))} style={{ flex: 1, padding: "8px", borderRadius: 8, border: `2px solid ${newCase.mode === "manual" ? "var(--hf-orange-solid-strong)" : "var(--hf-border)"}`, background: newCase.mode === "manual" ? "var(--hf-orange-soft)" : "var(--hf-surface)", color: newCase.mode === "manual" ? "var(--hf-orange-text-strong)" : "var(--hf-text-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Manual / Walk-in</button>
           </div>
 
           {newCase.mode === "customer" ? (
@@ -622,7 +622,7 @@ export default function CasesTab() {
               const cfg = STATUS_CFG[s]; const sel = newStatus === s
               return (
                 <button key={s} onClick={() => setNewStatus(s)}
-                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `2px solid ${sel ? cfg.color : "#E2E8F0"}`, borderRadius: 10, cursor: "pointer", background: sel ? cfg.bg : "var(--hf-surface)", textAlign: "left" as const, width: "100%" }}>
+                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `2px solid ${sel ? cfg.color : "var(--hf-border)"}`, borderRadius: 10, cursor: "pointer", background: sel ? cfg.bg : "var(--hf-surface)", textAlign: "left" as const, width: "100%" }}>
                   <span style={{ fontWeight: 600, color: sel ? cfg.color : "var(--hf-text)" }}>{cfg.label}</span>
                 </button>
               )
@@ -681,7 +681,7 @@ function MHead({ title, onClose }: { title: string; onClose: () => void }) {
   return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button></div>
 }
 function MFoot({ onCancel, onSubmit, loading, label, disabled = false }: { onCancel: () => void; onSubmit: () => void; loading: boolean; label: string; disabled?: boolean }) {
-  return <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}><button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button><button onClick={onSubmit} disabled={loading || disabled} style={{ padding: "9px 22px", background: loading || disabled ? "var(--hf-text-faint)" : "#9A3412", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || disabled ? "not-allowed" : "pointer" }}>{loading ? "Saving..." : label}</button></div>
+  return <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}><button onClick={onCancel} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button><button onClick={onSubmit} disabled={loading || disabled} style={{ padding: "9px 22px", background: loading || disabled ? "var(--hf-text-faint)" : "var(--hf-orange-solid-strong)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || disabled ? "not-allowed" : "pointer" }}>{loading ? "Saving..." : label}</button></div>
 }
 function ErrBanner({ msg }: { msg: string }) {
   return <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{msg}</div>

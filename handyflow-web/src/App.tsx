@@ -316,7 +316,7 @@ export default function App() {
             <Route path="/complianceservices"                          element={<ComplianceServicesPage />} />
             <Route path="/complianceservices/clients/:clientId"        element={<ClientDetailPage />} />
             <Route path="/complianceservices/tenders/:id"              element={<ClientTenderDetailPage />} />
-            <Route path="/debtcollection" element={<DebtCollectionPage />} />
+            <Route path="/debtcollection/:section?" element={<DebtCollectionPage />} />
             <Route path="/recruitment-agency" element={<RecruitmentAgencyPage />} />
             <Route path="/collections-agency" element={<CollectionsAgencyPage />} />
             <Route path="/warehousing" element={<WarehousingPage />} />

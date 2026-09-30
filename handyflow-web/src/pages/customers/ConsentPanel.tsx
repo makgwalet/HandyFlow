@@ -136,10 +136,10 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {hasConsent
-            ? <ShieldCheck size={13} color="#16A34A" />
+            ? <ShieldCheck size={13} style={{ color: 'var(--hf-success-text)' }} />
             : isWithdrawn
-              ? <ShieldOff size={13} color="#EA580C" />
-              : <Shield size={13} color="#94A3B8" />
+              ? <ShieldOff size={13} style={{ color: 'var(--hf-orange-text)' }} />
+              : <Shield size={13} style={{ color: 'var(--hf-text-faint)' }} />
           }
           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)',
                          textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -207,7 +207,7 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
                   <button
                     onClick={() => reviewMutation.mutate()}
                     disabled={reviewMutation.isPending}
-                    style={actionBtn('#FFF7ED', '#C2410C', '#FED7AA')}>
+                    style={actionBtn('var(--hf-orange-soft)', 'var(--hf-orange-text-strong)', 'var(--hf-orange-border)')}>
                     {reviewMutation.isPending ? 'Recording…' : 'Mark retention reviewed'}
                   </button>
                 </div>
@@ -229,7 +229,7 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
                   <button
                     onClick={() => reviewMutation.mutate()}
                     disabled={reviewMutation.isPending}
-                    style={actionBtn('#F8FAFC', '#475569', '#E2E8F0')}>
+                    style={actionBtn('var(--hf-surface-muted)', 'var(--hf-text-tertiary)', 'var(--hf-border)')}>
                     {reviewMutation.isPending ? 'Recording…' : 'Mark reviewed again'}
                   </button>
                 </div>
@@ -303,11 +303,11 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
               {formError && <ErrLine msg={formError} />}
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <button onClick={submitWithdraw} disabled={withdrawMutation.isPending}
-                  style={actionBtn('#FEF2F2', '#DC2626', '#FECACA')}>
+                  style={actionBtn('var(--hf-danger-soft)', 'var(--hf-danger-text)', 'var(--hf-danger-border)')}>
                   {withdrawMutation.isPending ? 'Withdrawing…' : 'Confirm withdrawal'}
                 </button>
                 <button onClick={() => { setShowWithdraw(false); setFormError('') }}
-                  style={actionBtn('#F8FAFC', '#374151', '#E2E8F0')}>
+                  style={actionBtn('var(--hf-surface-muted)', 'var(--hf-text-secondary)', 'var(--hf-border)')}>
                   Cancel
                 </button>
               </div>
@@ -351,11 +351,11 @@ export function ConsentPanel({ customerId }: { customerId: string }) {
               {formError && <ErrLine msg={formError} />}
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <button onClick={submitRecord} disabled={recordMutation.isPending}
-                  style={actionBtn('#EFF6FF', '#1D4ED8', '#BFDBFE')}>
+                  style={actionBtn('var(--hf-info-soft)', 'var(--hf-info-text)', 'var(--hf-info-border)')}>
                   {recordMutation.isPending ? 'Recording…' : 'Record consent'}
                 </button>
                 <button onClick={() => { setShowRecord(false); setFormError('') }}
-                  style={actionBtn('#F8FAFC', '#374151', '#E2E8F0')}>
+                  style={actionBtn('var(--hf-surface-muted)', 'var(--hf-text-secondary)', 'var(--hf-border)')}>
                   Cancel
                 </button>
               </div>
@@ -399,7 +399,7 @@ function ErrLine({ msg }: { msg: string }) {
 const selectStyle: React.CSSProperties = {
   width: '100%', padding: '6px 10px', fontSize: 13,
   border: '1.5px solid var(--hf-border)', borderRadius: 6,
-  fontFamily: 'inherit', background: 'white',
+  fontFamily: 'inherit', background: 'var(--hf-surface)',
 }
 
 const inputStyle: React.CSSProperties = {

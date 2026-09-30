@@ -26,11 +26,11 @@ function Btn({ label, icon: Icon, onClick, disabled, variant = 'secondary' }: {
   disabled?: boolean; variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'outline'
 }) {
   const styles = {
-    primary:   { bg: 'var(--hf-primary)', color: 'white',  border: 'none' },
-    secondary: { bg: 'white',   color: 'var(--hf-text-secondary)', border: '1px solid var(--hf-border)' },
-    success:   { bg: 'var(--hf-success)', color: 'white',   border: 'none' },
-    danger:    { bg: 'var(--hf-danger)', color: 'white',   border: 'none' },
-    outline:   { bg: 'white',   color: 'var(--hf-primary-text)', border: '1px solid var(--hf-primary)' },
+    primary:   { bg: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)',  border: 'none' },
+    secondary: { bg: 'var(--hf-surface)',   color: 'var(--hf-text-secondary)', border: '1px solid var(--hf-border)' },
+    success:   { bg: 'var(--hf-success)', color: 'var(--hf-text-on-solid)',   border: 'none' },
+    danger:    { bg: 'var(--hf-danger)', color: 'var(--hf-text-on-solid)',   border: 'none' },
+    outline:   { bg: 'var(--hf-surface)',   color: 'var(--hf-primary-text)', border: '1px solid var(--hf-primary)' },
   }
   const s = styles[variant]
   return (
@@ -56,16 +56,16 @@ function RejectModal({
 }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(2px)' }}>
-      <div style={{ background: 'white', borderRadius: 18, padding: 32, width: 420, boxShadow: '0 24px 64px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 18, padding: 32, width: 420, boxShadow: '0 24px 64px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
 
         <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--hf-orange-soft)', border: '2px solid var(--hf-orange-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-          <AlertTriangle size={24} color="#EA580C" strokeWidth={2} />
+          <AlertTriangle size={24} style={{ color: 'var(--hf-orange-text)' }} strokeWidth={2} />
         </div>
 
         <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: 'var(--hf-text)' }}>Reject Quote?</h3>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 40, padding: '7px 16px', margin: '10px 0' }}>
-          <XCircle size={14} color="#DC2626" />
+          <XCircle size={14} style={{ color: 'var(--hf-danger-text)' }} />
           <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--hf-text)' }}>{quoteNumber}</span>
         </div>
 
@@ -76,17 +76,17 @@ function RejectModal({
 
         {error && (
           <div style={{ width: '100%', marginBottom: 16, padding: '10px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <AlertCircle size={15} color="#DC2626" style={{ flexShrink: 0 }} />{error}
+            <AlertCircle size={15} style={{ color: 'var(--hf-danger-text)', flexShrink: 0 }} />{error}
           </div>
         )}
 
         <div style={{ display: 'flex', gap: 10, width: '100%' }}>
           <button onClick={onCancel} disabled={isPending}
-            style={{ flex: 1, padding: '11px', border: '1.5px solid var(--hf-border)', borderRadius: 10, background: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
+            style={{ flex: 1, padding: '11px', border: '1.5px solid var(--hf-border)', borderRadius: 10, background: 'var(--hf-surface)', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
             Cancel
           </button>
           <button onClick={onConfirm} disabled={isPending}
-            style={{ flex: 1, padding: '11px', border: 'none', borderRadius: 10, background: isPending ? '#93A8C9' : 'var(--hf-danger)', color: 'white', fontSize: 14, fontWeight: 700, cursor: isPending ? 'not-allowed' : 'pointer' }}>
+            style={{ flex: 1, padding: '11px', border: 'none', borderRadius: 10, background: isPending ? 'color-mix(in srgb, var(--hf-danger) 45%, var(--hf-surface))' : 'var(--hf-danger)', color: 'var(--hf-text-on-solid)', fontSize: 14, fontWeight: 700, cursor: isPending ? 'not-allowed' : 'pointer' }}>
             {isPending ? 'Rejecting...' : 'Yes, Reject'}
           </button>
         </div>
@@ -186,7 +186,7 @@ export function QuoteDetailPage() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={() => navigate('/quotes')}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', border: '1px solid var(--hf-border)', borderRadius: 9, padding: '7px 12px', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 9, padding: '7px 12px', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
             <ArrowLeft size={15} /> Back
           </button>
           <div>
@@ -233,7 +233,7 @@ export function QuoteDetailPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16 }}>
 
         {/* Main card */}
-        <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+        <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
 
           {/* Bill To + Quote meta */}
           <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--hf-border-subtle)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
@@ -334,7 +334,7 @@ export function QuoteDetailPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
           {/* Timeline */}
-          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 14px' }}>Timeline</p>
             {[
               { label: 'Created',        done: true,                  date: quote.createdAt },
@@ -344,8 +344,8 @@ export function QuoteDetailPage() {
             ].map((step, i) => (
               <div key={step.label} style={{ display: 'flex', gap: 10, marginBottom: i < 3 ? 12 : 0 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: step.done ? 'var(--hf-success)' : 'var(--hf-surface-sunken)', border: `2px solid ${step.done ? '#16A34A' : '#E2E8F0'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    {step.done && <CheckCircle size={12} color="white" strokeWidth={3} />}
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: step.done ? 'var(--hf-success)' : 'var(--hf-surface-sunken)', border: `2px solid ${step.done ? 'var(--hf-success)' : 'var(--hf-border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {step.done && <CheckCircle size={12} style={{ color: "var(--hf-text-on-solid)" }} strokeWidth={3} />}
                   </div>
                   {i < 3 && <div style={{ width: 2, flex: 1, background: step.done ? 'var(--hf-success-soft-strong)' : 'var(--hf-surface-sunken)', minHeight: 16, marginTop: 3 }} />}
                 </div>
@@ -358,7 +358,7 @@ export function QuoteDetailPage() {
           </div>
 
           {/* Customer or walk-in card */}
-          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 14, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 14, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px' }}>
               {isWalkin ? 'Walk-in Client' : 'Customer'}
             </p>
@@ -383,7 +383,7 @@ export function QuoteDetailPage() {
           {status === 'SENT' && quote.expiresAt && (
             <div style={{ background: 'var(--hf-warning-soft)', border: '1px solid var(--hf-warning-border-strong)', borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ display: 'flex', gap: 8 }}>
-                <Clock size={15} color="#F59E0B" style={{ marginTop: 1 }} />
+                <Clock size={15} style={{ color: 'var(--hf-warning-text)', marginTop: 1 }} />
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-warning-text-deep)', margin: 0 }}>Expires soon</p>
                   <p style={{ fontSize: 12, color: 'var(--hf-warning-text-strong)', margin: '2px 0 0' }}>
@@ -397,7 +397,7 @@ export function QuoteDetailPage() {
           {status === 'ACCEPTED' && (
             <div style={{ background: 'var(--hf-success-soft)', border: '1px solid var(--hf-success-border-subtle)', borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ display: 'flex', gap: 8 }}>
-                <CheckCircle size={15} color="#16A34A" />
+                <CheckCircle size={15} style={{ color: 'var(--hf-success-text)' }} />
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-success-text-strong)', margin: 0 }}>Quote accepted</p>
                   <p style={{ fontSize: 12, color: 'var(--hf-success-text-strong)', margin: '2px 0 0' }}>Ready to convert to an invoice</p>
@@ -409,7 +409,7 @@ export function QuoteDetailPage() {
           {status === 'REJECTED' && (
             <div style={{ background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ display: 'flex', gap: 8 }}>
-                <XCircle size={15} color="#DC2626" />
+                <XCircle size={15} style={{ color: 'var(--hf-danger-text)' }} />
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-danger-text)', margin: 0 }}>Quote rejected</p>
                   <p style={{ fontSize: 12, color: 'var(--hf-danger-text-strong)', margin: '2px 0 0' }}>Create a new quote to proceed</p>
@@ -421,14 +421,14 @@ export function QuoteDetailPage() {
           {status === 'INVOICED' && (
             <div style={{ background: 'var(--hf-violet-soft)', border: '1px solid var(--hf-violet-border)', borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                <FileCheck size={15} color="#7C3AED" />
+                <FileCheck size={15} style={{ color: 'var(--hf-violet-text)' }} />
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-violet-text)', margin: 0 }}>Invoice created</p>
                   <p style={{ fontSize: 12, color: 'var(--hf-violet-text)', margin: '2px 0 0' }}>This quote has been invoiced</p>
                 </div>
               </div>
               <button onClick={() => navigate('/invoices')}
-                style={{ width: '100%', padding: '7px 12px', background: 'white', border: '1px solid var(--hf-violet-border)', borderRadius: 8, fontSize: 12, color: 'var(--hf-violet-text)', cursor: 'pointer', fontWeight: 600 }}>
+                style={{ width: '100%', padding: '7px 12px', background: 'var(--hf-surface)', border: '1px solid var(--hf-violet-border)', borderRadius: 8, fontSize: 12, color: 'var(--hf-violet-text)', cursor: 'pointer', fontWeight: 600 }}>
                 View invoices →
               </button>
             </div>

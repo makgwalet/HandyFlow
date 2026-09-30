@@ -114,7 +114,7 @@ export function FollowUpPanel({ customerId }: { customerId: string }) {
         marginBottom: 12,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <CalendarClock size={13} color={overdueCount > 0 ? '#DC2626' : '#94A3B8'} />
+          <CalendarClock size={13} style={{ color: overdueCount > 0 ? 'var(--hf-danger-text)' : 'var(--hf-text-faint)' }} />
           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Follow-ups
           </span>
@@ -123,7 +123,7 @@ export function FollowUpPanel({ customerId }: { customerId: string }) {
               fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 20,
               background: overdueCount > 0 ? 'var(--hf-danger-soft)' : 'var(--hf-info-soft)',
               color:      overdueCount > 0 ? 'var(--hf-danger-text)' : 'var(--hf-info-text)',
-              border:     `1px solid ${overdueCount > 0 ? '#FECACA' : '#BFDBFE'}`,
+              border:     `1px solid ${overdueCount > 0 ? 'var(--hf-danger-border)' : 'var(--hf-info-border)'}`,
             }}>
               {pending.length} pending{overdueCount > 0 ? ` · ${overdueCount} overdue` : ''}
             </span>
@@ -299,12 +299,12 @@ function FollowUpRow({ f, onStartComplete, onReopen, onDelete, rescheduledTo }: 
         <button onClick={onStartComplete} title="Record outcome"
           style={{
             flexShrink: 0, marginTop: 1, width: 18, height: 18, borderRadius: '50%',
-            border: `1.5px solid ${f.overdue ? '#DC2626' : '#CBD5E1'}`, background: 'white',
+            border: `1.5px solid ${f.overdue ? 'var(--hf-danger)' : 'var(--hf-border-strong)'}`, background: 'var(--hf-surface)',
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
           }} />
       ) : (
         <div style={{ flexShrink: 0, marginTop: 1, width: 18, height: 18, borderRadius: '50%', background: outcomeCfg?.color ?? 'var(--hf-success)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Check size={11} color="white" />
+          <Check size={11} style={{ color: "var(--hf-text-on-solid)" }} />
         </div>
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -312,7 +312,7 @@ function FollowUpRow({ f, onStartComplete, onReopen, onDelete, rescheduledTo }: 
           {f.note}
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, flexWrap: 'wrap' }}>
-          {f.overdue && !f.completed && <AlertTriangle size={10} color="#DC2626" />}
+          {f.overdue && !f.completed && <AlertTriangle size={10} style={{ color: 'var(--hf-danger-text)' }} />}
           <span style={{ color: f.overdue && !f.completed ? 'var(--hf-danger-text)' : 'var(--hf-text-faint)', fontWeight: f.overdue && !f.completed ? 600 : 400 }}>
             {f.completed ? fmtDate(f.completedAt!) : `Due ${fmtDate(f.dueDate)}`}
           </span>

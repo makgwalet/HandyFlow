@@ -197,7 +197,7 @@ export default function TeamTab() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
             <button onClick={() => { setShowInvite(true); setError('') }}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 9, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 9, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
               <Plus size={15} /> Invite user
             </button>
           </div>
@@ -205,7 +205,7 @@ export default function TeamTab() {
           {loadingUsers ? (
             <div style={{ textAlign: 'center', padding: 48, color: 'var(--hf-text-faint)' }}>Loading team...</div>
           ) : (
-            <div style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border-subtle)' }}>
@@ -220,7 +220,7 @@ export default function TeamTab() {
                     return (
                       <tr key={u.id} style={{ borderBottom: '1px solid var(--hf-border-subtle)' }}
                         onMouseEnter={e => (e.currentTarget.style.background = 'var(--hf-surface-muted)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
+                        onMouseLeave={e => (e.currentTarget.style.background = 'var(--hf-surface)')}>
                         <td style={{ padding: '14px 16px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--hf-info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--hf-info-text)', flexShrink: 0 }}>
@@ -286,7 +286,7 @@ export default function TeamTab() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
             <button onClick={() => { setShowRole(true); setSelectedPerms(new Set()); setError('') }}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 9, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 9, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
               <Plus size={15} /> Create role
             </button>
           </div>
@@ -296,12 +296,12 @@ export default function TeamTab() {
               const isExpanded = expandedRole === role.id
               const isAdmin = role.name === 'ADMIN'
               return (
-                <div key={role.id} style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 12, overflow: 'hidden' }}>
+                <div key={role.id} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, overflow: 'hidden' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', cursor: 'pointer' }}
                     onClick={() => setExpandedRole(isExpanded ? null : role.id)}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div style={{ width: 36, height: 36, borderRadius: 9, background: isAdmin ? 'var(--hf-info-soft)' : 'var(--hf-success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Shield size={16} color={isAdmin ? '#1D4ED8' : '#0D9488'} />
+                        <Shield size={16} style={{ color: isAdmin ? 'var(--hf-info-text)' : 'var(--hf-accent-text)' }} />
                       </div>
                       <div>
                         <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -324,7 +324,7 @@ export default function TeamTab() {
                           <Pencil size={12} /> Edit permissions
                         </button>
                       )}
-                      {isExpanded ? <ChevronUp size={15} color="#94A3B8" /> : <ChevronDown size={15} color="#94A3B8" />}
+                      {isExpanded ? <ChevronUp size={15} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={15} style={{ color: 'var(--hf-text-faint)' }} />}
                     </div>
                   </div>
                   {isExpanded && (
@@ -332,7 +332,7 @@ export default function TeamTab() {
                       <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', letterSpacing: '0.06em', marginBottom: 10 }}>PERMISSIONS</div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         {[...(role.permissions as unknown as string[])].sort().map(pname => (
-                          <span key={pname} style={{ background: 'white', border: '1px solid var(--hf-border)', padding: '3px 10px', borderRadius: 20, fontSize: 11, color: 'var(--hf-text-secondary)' }}>{pname}</span>
+                          <span key={pname} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', padding: '3px 10px', borderRadius: 20, fontSize: 11, color: 'var(--hf-text-secondary)' }}>{pname}</span>
                         ))}
                       </div>
                     </div>
@@ -354,7 +354,7 @@ export default function TeamTab() {
               <div style={{ fontSize: 13, marginTop: 4 }}>Invite your team members from the Team tab.</div>
             </div>
           ) : (
-            <div style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border-subtle)' }}>
@@ -421,7 +421,7 @@ export default function TeamTab() {
               <Field label="Department"><input value={inviteForm.department} onChange={e => setInviteForm(f => ({ ...f, department: e.target.value }))} placeholder="Sales" style={inp} /></Field>
             </div>
             <Field label="Role">
-              <select value={inviteForm.roleId} onChange={e => setInviteForm(f => ({ ...f, roleId: e.target.value }))} style={{ ...inp, background: 'white' }}>
+              <select value={inviteForm.roleId} onChange={e => setInviteForm(f => ({ ...f, roleId: e.target.value }))} style={{ ...inp, background: 'var(--hf-surface)' }}>
                 <option value="">Select a role...</option>
                 {roles.map(r => <option key={r.id} value={r.id}>{r.name}{r.description ? ` — ${r.description}` : ''}</option>)}
               </select>
@@ -467,7 +467,7 @@ export default function TeamTab() {
               <input value={editForm.department} onChange={e => setEditForm(f => ({ ...f, department: e.target.value }))} placeholder="Sales" style={inp} />
             </Field>
             <Field label="Change role">
-              <select value={editForm.roleId} onChange={e => setEditForm(f => ({ ...f, roleId: e.target.value }))} style={{ ...inp, background: 'white' }}>
+              <select value={editForm.roleId} onChange={e => setEditForm(f => ({ ...f, roleId: e.target.value }))} style={{ ...inp, background: 'var(--hf-surface)' }}>
                 <option value="">Keep current role ({editUser.roles.join(', ')})</option>
                 {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
@@ -602,9 +602,9 @@ function PermissionPicker({ permissions, selected, onToggle }: {
                 const checked = selected.has(p.id)
                 return (
                   <div key={p.id} onClick={() => onToggle(p.id)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', border: `1px solid ${checked ? '#0D9488' : '#E2E8F0'}`, borderRadius: 8, cursor: 'pointer', background: checked ? 'var(--hf-success-soft)' : 'white', transition: 'all 0.12s' }}>
-                    <div style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${checked ? '#0D9488' : '#D1D5DB'}`, background: checked ? 'var(--hf-accent)' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      {checked && <Check size={10} color="white" strokeWidth={3} />}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', border: `1px solid ${checked ? 'var(--hf-accent)' : 'var(--hf-border)'}`, borderRadius: 8, cursor: 'pointer', background: checked ? 'var(--hf-success-soft)' : 'var(--hf-surface)', transition: 'all 0.12s' }}>
+                    <div style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${checked ? 'var(--hf-accent)' : 'var(--hf-border-strong)'}`, background: checked ? 'var(--hf-accent)' : 'var(--hf-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {checked && <Check size={10} style={{ color: "var(--hf-text-on-solid)" }} strokeWidth={3} />}
                     </div>
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--hf-text)' }}>{p.name}</div>
@@ -625,7 +625,7 @@ function PermissionPicker({ permissions, selected, onToggle }: {
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-      <div style={{ background: 'white', borderRadius: 16, padding: 28, width: wide ? 680 : 520, maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 28, width: wide ? 680 : 520, maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
           <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>{title}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={20} /></button>
@@ -657,10 +657,10 @@ function ConfirmModal({ title, message, confirmLabel, onConfirm, onCancel, loadi
 }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
-      <div style={{ background: 'white', borderRadius: 16, padding: 26, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 26, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
         <div style={{ display: 'flex', gap: 14, marginBottom: 22 }}>
           <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--hf-danger-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <AlertTriangle size={20} color="#DC2626" />
+            <AlertTriangle size={20} style={{ color: 'var(--hf-danger-text)' }} />
           </div>
           <div>
             <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700, color: 'var(--hf-text)' }}>{title}</h3>
@@ -670,11 +670,11 @@ function ConfirmModal({ title, message, confirmLabel, onConfirm, onCancel, loadi
         {error && <ErrMsg msg={error} />}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: error ? 16 : 0 }}>
           <button onClick={onCancel} disabled={loading}
-            style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'white', fontSize: 14, cursor: loading ? 'default' : 'pointer', color: 'var(--hf-text-secondary)' }}>
+            style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'var(--hf-surface)', fontSize: 14, cursor: loading ? 'default' : 'pointer', color: 'var(--hf-text-secondary)' }}>
             Cancel
           </button>
           <button onClick={onConfirm} disabled={loading}
-            style={{ padding: '10px 22px', background: loading ? '#F3A6A6' : 'var(--hf-danger)', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer' }}>
+            style={{ padding: '10px 22px', background: loading ? 'color-mix(in srgb, var(--hf-danger) 45%, var(--hf-surface))' : 'var(--hf-danger)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer' }}>
             {loading ? 'Working...' : confirmLabel}
           </button>
         </div>
@@ -691,9 +691,9 @@ function ErrMsg({ msg }: { msg: string }) {
 function Footer({ onCancel, onSubmit, loading, disabled, label }: { onCancel: () => void; onSubmit: () => void; loading: boolean; disabled: boolean; label: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 22 }}>
-      <button onClick={onCancel} style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'white', fontSize: 14, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>Cancel</button>
+      <button onClick={onCancel} style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'var(--hf-surface)', fontSize: 14, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>Cancel</button>
       <button onClick={onSubmit} disabled={disabled || loading}
-        style={{ padding: '10px 22px', background: disabled || loading ? 'var(--hf-text-faint)' : 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: disabled || loading ? 'not-allowed' : 'pointer' }}>
+        style={{ padding: '10px 22px', background: disabled || loading ? 'var(--hf-text-faint)' : 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: disabled || loading ? 'not-allowed' : 'pointer' }}>
         {loading ? 'Saving...' : label}
       </button>
     </div>

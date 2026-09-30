@@ -25,33 +25,33 @@ interface Employee { id: string; fullName: string }
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const STATUS: Record<string, { color: string; bg: string; border: string; dot: string; label: string }> = {
-  PENDING:    { color: "#D97706", bg: "#FFFBEB", border: "#FDE68A", dot: "#F59E0B", label: "Pending" },
-  APPROVED:   { color: "#166534", bg: "#DCFCE7", border: "#86EFAC", dot: "#22C55E", label: "Approved" },
-  REJECTED:   { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", dot: "#EF4444", label: "Rejected" },
-  REIMBURSED: { color: "#1D4ED8", bg: "#EFF6FF", border: "#BFDBFE", dot: "#3B82F6", label: "Reimbursed" },
+  PENDING:    { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)", dot: "var(--hf-warning)", label: "Pending" },
+  APPROVED:   { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", border: "var(--hf-success-border)", dot: "var(--hf-success)", label: "Approved" },
+  REJECTED:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)", dot: "var(--hf-danger)", label: "Rejected" },
+  REIMBURSED: { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", border: "var(--hf-info-border)", dot: "var(--hf-info)", label: "Reimbursed" },
 }
 
 const CATEGORIES: Record<string, { label: string; icon: any; color: string }> = {
-  TRAVEL:         { label: "Travel",         icon: Car,       color: "#1D4ED8" },
-  MEALS:          { label: "Meals",          icon: Utensils,  color: "#D97706" },
-  ACCOMMODATION:  { label: "Accommodation",  icon: Briefcase, color: "#7C3AED" },
-  FUEL:           { label: "Fuel",           icon: Fuel,      color: "#DC2626" },
-  EQUIPMENT:      { label: "Equipment",      icon: Package,   color: "#0D9488" },
-  OFFICE_SUPPLIES:{ label: "Office",         icon: FileText,  color: "#64748B" },
-  MARKETING:      { label: "Marketing",      icon: TrendingUp,color: "#D97706" },
-  ENTERTAINMENT:  { label: "Entertainment",  icon: MoreHorizontal, color: "#9333EA" },
-  TELEPHONE:      { label: "Telephone",      icon: Phone,     color: "#0369A1" },
-  OTHER:          { label: "Other",          icon: Tag,       color: "#94A3B8" },
+  TRAVEL:         { label: "Travel",         icon: Car,       color: "var(--hf-info-text)" },
+  MEALS:          { label: "Meals",          icon: Utensils,  color: "var(--hf-warning-text)" },
+  ACCOMMODATION:  { label: "Accommodation",  icon: Briefcase, color: "var(--hf-violet-text)" },
+  FUEL:           { label: "Fuel",           icon: Fuel,      color: "var(--hf-danger-text)" },
+  EQUIPMENT:      { label: "Equipment",      icon: Package,   color: "var(--hf-accent-text)" },
+  OFFICE_SUPPLIES:{ label: "Office",         icon: FileText,  color: "var(--hf-text-muted)" },
+  MARKETING:      { label: "Marketing",      icon: TrendingUp,color: "var(--hf-warning-text)" },
+  ENTERTAINMENT:  { label: "Entertainment",  icon: MoreHorizontal, color: "var(--hf-violet-text)" },
+  TELEPHONE:      { label: "Telephone",      icon: Phone,     color: "var(--hf-sky-text-strong)" },
+  OTHER:          { label: "Other",          icon: Tag,       color: "var(--hf-text-faint)" },
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 const fmtR    = (n: any) => n != null ? `R\u00A0${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
 const fmtDate = (d: string | null) => d ? new Date(d + (d.includes("T") ? "" : "T00:00:00")).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
 const fmtDT   = (d: string | null) => d ? new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "#fff", outline: "none" }
-const lbl: React.CSSProperties = { display: "block", fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }
-const btnPrimary: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }
-const btnSecondary: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", border: "1.5px solid #E2E8F0", borderRadius: 8, background: "#fff", fontSize: 13, cursor: "pointer", color: "#374151", fontWeight: 500 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "var(--hf-surface)", outline: "none" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }
+const btnPrimary: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }
+const btnSecondary: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", border: "1.5px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)", fontWeight: 500 }
 
 // ── Confirm Modal ──────────────────────────────────────────────────────────
 function ConfirmModal({ title, message, confirmLabel, danger, onConfirm, onCancel }: {
@@ -63,7 +63,7 @@ function ConfirmModal({ title, message, confirmLabel, danger, onConfirm, onCance
       <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 28, width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 22 }}>
           <div style={{ width: 40, height: 40, borderRadius: "50%", background: danger ? "var(--hf-danger-soft)" : "var(--hf-success-soft-strong)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            {danger ? <AlertTriangle size={18} color="#DC2626" /> : <CheckCircle size={18} color="#166534" />}
+            {danger ? <AlertTriangle size={18} style={{ color: 'var(--hf-danger-text)' }} /> : <CheckCircle size={18} style={{ color: 'var(--hf-success-text-strong)' }} />}
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)", marginBottom: 6 }}>{title}</div>
@@ -218,7 +218,7 @@ export function ExpensesPage() {
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--hf-warning)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Receipt size={18} color="#fff" />
+              <Receipt size={18} style={{ color: 'var(--hf-text-on-solid)' }} />
             </div>
             <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Expenses</h1>
           </div>
@@ -235,11 +235,11 @@ export function ExpensesPage() {
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 22 }}>
         {[
-          { label: "Pending approval", value: fmtR(pendingTotal), sub: `${pendingCount} claim${pendingCount !== 1 ? "s" : ""}`, color: "#D97706", bg: "#FFFBEB", icon: <Clock size={16} /> },
-          { label: "Approved this month", value: fmtR(monthlyTotal ?? 0), sub: `${approvedCount} approved`, color: "#166534", bg: "#DCFCE7", icon: <CheckCircle size={16} /> },
-          { label: "Reimbursed", value: `${reimbursedCount}`, sub: "claims paid out", color: "#1D4ED8", bg: "#EFF6FF", icon: <DollarSign size={16} /> },
-          { label: "Total claims", value: `${allClaims.length}`, sub: "all time", color: "#1B3A6B", bg: "#EEF2FF", icon: <Receipt size={16} /> },
-          { label: "Top category", value: topCategory ? CATEGORIES[topCategory[0]]?.label ?? topCategory[0] : "—", sub: topCategory ? fmtR(topCategory[1]) : "No data", color: "#0D9488", bg: "#F0FDF9", icon: <BarChart2 size={16} /> },
+          { label: "Pending approval", value: fmtR(pendingTotal), sub: `${pendingCount} claim${pendingCount !== 1 ? "s" : ""}`, color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", icon: <Clock size={16} /> },
+          { label: "Approved this month", value: fmtR(monthlyTotal ?? 0), sub: `${approvedCount} approved`, color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", icon: <CheckCircle size={16} /> },
+          { label: "Reimbursed", value: `${reimbursedCount}`, sub: "claims paid out", color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", icon: <DollarSign size={16} /> },
+          { label: "Total claims", value: `${allClaims.length}`, sub: "all time", color: "var(--hf-primary-text)", bg: "var(--hf-indigo-soft)", icon: <Receipt size={16} /> },
+          { label: "Top category", value: topCategory ? CATEGORIES[topCategory[0]]?.label ?? topCategory[0] : "—", sub: topCategory ? fmtR(topCategory[1]) : "No data", color: "var(--hf-accent-text)", bg: "var(--hf-accent-soft)", icon: <BarChart2 size={16} /> },
         ].map(k => (
           <div key={k.label} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 36, height: 36, borderRadius: 9, background: k.bg, display: "flex", alignItems: "center", justifyContent: "center", color: k.color, flexShrink: 0 }}>{k.icon}</div>
@@ -263,7 +263,7 @@ export function ExpensesPage() {
               const active = statusFilter === s
               return (
                 <button key={s} onClick={() => setStatus(s)}
-                  style={{ padding: "6px 13px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: active ? 700 : 500, border: `1.5px solid ${active && cfg ? cfg.border : "#E2E8F0"}`, background: active && cfg ? cfg.bg : "var(--hf-surface)", color: active && cfg ? cfg.color : "var(--hf-text-muted)", display: "flex", alignItems: "center", gap: 5 }}>
+                  style={{ padding: "6px 13px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: active ? 700 : 500, border: `1.5px solid ${active && cfg ? cfg.border : "var(--hf-border)"}`, background: active && cfg ? cfg.bg : "var(--hf-surface)", color: active && cfg ? cfg.color : "var(--hf-text-muted)", display: "flex", alignItems: "center", gap: 5 }}>
                   {s && cfg && <span style={{ width: 6, height: 6, borderRadius: "50%", background: cfg.dot }} />}
                   {s ? cfg.label : "All claims"}
                 </button>
@@ -313,8 +313,8 @@ export function ExpensesPage() {
                 const Icon = cfg?.icon ?? Tag
                 return (
                   <div key={cat} style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                    <div style={{ width: 24, height: 24, borderRadius: 6, background: `${cfg?.color ?? "#64748B"}20`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <Icon size={12} color={cfg?.color ?? "#64748B"} />
+                    <div style={{ width: 24, height: 24, borderRadius: 6, background: `color-mix(in srgb, ${cfg?.color ?? "var(--hf-neutral-solid)"} 13%, transparent)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Icon size={12} style={{ color: cfg?.color ?? "var(--hf-text-muted)" }} />
                     </div>
                     <div>
                       <div style={{ fontSize: 10, color: "var(--hf-text-faint)" }}>{cfg?.label ?? cat}</div>
@@ -372,8 +372,8 @@ export function ExpensesPage() {
                       </td>
                       <td style={{ padding: "12px 16px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <div style={{ width: 22, height: 22, borderRadius: 5, background: `${catCfg?.color ?? "#94A3B8"}18`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <Icon size={11} color={catCfg?.color ?? "#94A3B8"} />
+                          <div style={{ width: 22, height: 22, borderRadius: 5, background: `color-mix(in srgb, ${catCfg?.color ?? "var(--hf-text-faint)"} 9%, transparent)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <Icon size={11} style={{ color: catCfg?.color ?? "var(--hf-text-faint)" }} />
                           </div>
                           <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{catCfg?.label ?? c.category}</span>
                         </div>
@@ -405,7 +405,7 @@ export function ExpensesPage() {
                               <DollarSign size={10} /> Pay
                             </button>
                           )}
-                          <ChevronRight size={14} color="#94A3B8" />
+                          <ChevronRight size={14} style={{ color: 'var(--hf-text-faint)' }} />
                         </div>
                       </td>
                     </tr>
@@ -538,7 +538,7 @@ export function ExpensesPage() {
           <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 20 }}>
               <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--hf-danger-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <XCircle size={18} color="#DC2626" />
+                <XCircle size={18} style={{ color: 'var(--hf-danger-text)' }} />
               </div>
               <div>
                 <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: "var(--hf-danger-text)" }}>Reject claim</h3>

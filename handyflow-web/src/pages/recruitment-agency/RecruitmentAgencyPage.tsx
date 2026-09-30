@@ -111,7 +111,7 @@ export function RecruitmentAgencyPage() {
   const [showProfile, setShowProfile] = useState(false)
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 60px)", fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - var(--hf-topbar-h) - 64px)", fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${BORDER}`, background: "var(--hf-surface)", padding: "0 16px" }}>
         <div style={{ display: "flex", gap: 4 }}>
           {([["clients", "Clients & Requisitions"], ["candidates", "Candidate Pool"]] as [Section, string][]).map(([id, label]) => (

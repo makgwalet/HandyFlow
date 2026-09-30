@@ -88,7 +88,7 @@ export function CommunicationPanel({ customerId }: { customerId: string }) {
         marginBottom: 12,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <MessageSquare size={13} color="#94A3B8" />
+          <MessageSquare size={13} style={{ color: 'var(--hf-text-faint)' }} />
           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Communications
           </span>
@@ -134,7 +134,7 @@ export function CommunicationPanel({ customerId }: { customerId: string }) {
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--hf-text-secondary)', display: 'block', marginBottom: 3 }}>Type</label>
                   <select value={type} onChange={e => setType(e.target.value as CommType)}
-                    style={{ width: '100%', padding: '6px 10px', fontSize: 13, border: '1.5px solid var(--hf-border)', borderRadius: 6, fontFamily: 'inherit', background: 'white' }}>
+                    style={{ width: '100%', padding: '6px 10px', fontSize: 13, border: '1.5px solid var(--hf-border)', borderRadius: 6, fontFamily: 'inherit', background: 'var(--hf-surface)' }}>
                     {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                   </select>
                 </div>
@@ -146,7 +146,7 @@ export function CommunicationPanel({ customerId }: { customerId: string }) {
                         style={{
                           flex: 1, padding: '6px 8px', fontSize: 12, borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
                           border: direction === d ? '1.5px solid var(--hf-info)' : '1.5px solid var(--hf-border)',
-                          background: direction === d ? 'var(--hf-info-soft)' : 'white',
+                          background: direction === d ? 'var(--hf-info-soft)' : 'var(--hf-surface)',
                           color: direction === d ? 'var(--hf-info-text)' : 'var(--hf-text-muted)',
                         }}>
                         {d === 'OUTBOUND' ? 'Out' : 'In'}
@@ -195,14 +195,14 @@ function CommRow({ c, onDelete }: { c: Communication; onDelete: () => void }) {
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--hf-border-subtle)' }}>
       <div style={{ flexShrink: 0, marginTop: 1, width: 22, height: 22, borderRadius: 6, background: 'var(--hf-surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Icon size={12} color="#64748B" />
+        <Icon size={12} style={{ color: 'var(--hf-text-muted)' }} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
           <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--hf-text-secondary)' }}>{label}</span>
           {c.direction === 'OUTBOUND'
-            ? <ArrowUpRight size={11} color="#94A3B8" titleAccess="Outbound" />
-            : <ArrowDownLeft size={11} color="#94A3B8" titleAccess="Inbound" />}
+            ? <ArrowUpRight size={11} style={{ color: 'var(--hf-text-faint)' }} titleAccess="Outbound" />
+            : <ArrowDownLeft size={11} style={{ color: 'var(--hf-text-faint)' }} titleAccess="Inbound" />}
           <span style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{fmtDateTime(c.occurredAt)}</span>
         </div>
         <p style={{ fontSize: 12.5, color: 'var(--hf-text)', margin: 0, lineHeight: 1.4 }}>{c.summary}</p>

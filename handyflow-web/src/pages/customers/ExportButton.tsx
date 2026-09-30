@@ -78,7 +78,7 @@ export function ExportButton() {
       {open && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 6px)', right: 0,
-          background: 'white', border: '1px solid var(--hf-border)',
+          background: 'var(--hf-surface)', border: '1px solid var(--hf-border)',
           borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,.1)',
           minWidth: 220, zIndex: 200, overflow: 'hidden',
         }} role="menu">

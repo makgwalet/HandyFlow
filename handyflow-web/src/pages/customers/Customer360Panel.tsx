@@ -57,27 +57,27 @@ export function Customer360Panel({ customerId }: { customerId: string }) {
           label="Total bookings"
           value={String(s.totalBookings)}
           sub={`${s.bookingsLast90Days} in last 90 days`}
-          color="#1D4ED8"
+          color="var(--hf-info-text)"
         />
         <Stat
           icon={<Clock size={15} />}
           label="Last booking"
           value={fmtDate(s.lastBookingAt)}
-          color={s.lastBookingAt ? '#1D4ED8' : '#94A3B8'}
+          color={s.lastBookingAt ? 'var(--hf-info-text)' : 'var(--hf-text-faint)'}
         />
         <Stat
           icon={<FileText size={15} />}
           label="Total invoiced"
           value={fmt(s.totalInvoicedAmount)}
           sub={`${s.totalInvoices} invoices`}
-          color="#16A34A"
+          color="var(--hf-success-text)"
         />
         <Stat
           icon={hasOverdue ? <AlertCircle size={15} /> : <TrendingUp size={15} />}
           label={hasOverdue ? 'Overdue invoices' : 'Outstanding'}
           value={hasOverdue ? String(s.overdueInvoices) : fmt(s.outstandingAmount)}
           sub={hasOverdue ? fmt(s.outstandingAmount) + ' outstanding' : undefined}
-          color={hasOverdue ? '#DC2626' : '#16A34A'}
+          color={hasOverdue ? 'var(--hf-danger-text)' : 'var(--hf-success-text)'}
           highlight={hasOverdue}
         />
       </div>
@@ -97,7 +97,7 @@ function Stat({ icon, label, value, sub, color, highlight = false }: {
     <div style={{
       padding: '12px 14px',
       background:   highlight ? 'var(--hf-danger-soft)' : 'var(--hf-surface-muted)',
-      border:       `1px solid ${highlight ? '#FECACA' : '#F1F5F9'}`,
+      border:       `1px solid ${highlight ? 'var(--hf-danger-border)' : 'var(--hf-border-subtle)'}`,
       borderRadius: 10,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, color }}>
