@@ -82,6 +82,11 @@ function findOwner(lit) {
   while (n.parent) {
     const p = n.parent
     if (ts.isConditionalExpression(p) && p.condition !== n) { n = p; continue }
+    // `TYPE_COLOR[x] ?? '#64748B'`: the fallback of a colour-map lookup is a text colour.
+    if (ts.isBinaryExpression(p) && [ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken].includes(p.operatorToken.kind) &&
+        p.right === n && /COLOU?RS?\s*\[/i.test(p.left.getText())) {
+      return { kind: 'colormap', name: 'color', node: p }
+    }
     if (ts.isParenthesizedExpression(p) || ts.isAsExpression(p)) { n = p; continue }
     // `1px solid ${active ? '#7C3AED' : '#E2E8F0'}`: the template's owner decides the role.
     if (ts.isTemplateSpan(p) && p.expression === n) { n = p.parent; continue }
@@ -99,6 +104,16 @@ function findOwner(lit) {
     return { kind: 'other' }
   }
   return { kind: 'other' }
+}
+
+const COLOUR_MAP_NAME = /(COLOU?RS?|PALETTE)$/i
+function inColourMap(propNode) {
+  let n = propNode.parent // ObjectLiteralExpression
+  while (n && (ts.isParenthesizedExpression(n) || ts.isAsExpression(n) || ts.isSatisfiesExpression?.(n))) n = n.parent
+  if (!n || !ts.isObjectLiteralExpression(n)) return false
+  let d = n.parent
+  while (d && (ts.isAsExpression(d) || ts.isParenthesizedExpression(d) || ts.isSatisfiesExpression?.(d))) d = d.parent
+  return !!d && ts.isVariableDeclaration(d) && ts.isIdentifier(d.name) && COLOUR_MAP_NAME.test(d.name.text)
 }
 
 function insideStyleAttr(node) {
@@ -143,7 +158,10 @@ for (const file of scanRoots.flatMap(r => walk(r))) {
       // must stay literals; see data-context.mjs.
       const dataWhy = classifyDataPosition(node, sf)
       if (dataWhy) return skip(`data position, kept as literal: ${dataWhy.split(' (')[0]}`)
-      const role = ROLE_BY_PROP.get(owner.name)
+      let role = ROLE_BY_PROP.get(owner.name)
+      // Values of a map declared as `const X_COLOR(S) = { KEY: '#hex' }` are text
+      // colours (the -text tokens also work as fills and inside color-mix tints).
+      if (!role && owner.kind === 'prop' && inColourMap(owner.node)) role = 'fg'
       if (!role) return skip(`unknown property "${owner.name}"`)
       const inStyle = owner.kind === 'style-assign' || insideStyleAttr(node)
       if (!inStyle && unsafe.length) return skip('definition object in unsafe file')

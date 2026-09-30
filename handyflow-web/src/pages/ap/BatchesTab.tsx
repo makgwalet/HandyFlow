@@ -23,20 +23,20 @@ interface Batch {
 }
 
 const STATUS: Record<string, { color: string; bg: string; border: string; dot: string; label: string }> = {
-  DRAFT:     { color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0", dot: "#CBD5E1", label: "Draft" },
-  SUBMITTED: { color: "#D97706", bg: "#FFFBEB", border: "#FDE68A", dot: "#F59E0B", label: "Submitted" },
-  PAID:      { color: "#1D4ED8", bg: "#EFF6FF", border: "#BFDBFE", dot: "#3B82F6", label: "Paid" },
-  CANCELLED: { color: "#94A3B8", bg: "#F8FAFC", border: "#E2E8F0", dot: "#CBD5E1", label: "Cancelled" },
+  DRAFT:     { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)", dot: "var(--hf-border-strong)", label: "Draft" },
+  SUBMITTED: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)", dot: "var(--hf-warning)", label: "Submitted" },
+  PAID:      { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", border: "var(--hf-info-border)", dot: "var(--hf-info)", label: "Paid" },
+  CANCELLED: { color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)", dot: "var(--hf-border-strong)", label: "Cancelled" },
 }
 
 const fmtR    = (n: any) => n != null ? `R\u00A0${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
 const fmtDate = (d: any) => d ? new Date(d + (String(d).includes("T") ? "" : "T00:00:00")).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
 const fmtDT   = (d: any) => d ? new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"
 
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "#fff", outline: "none" }
-const lbl: React.CSSProperties = { display: "block", fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }
-const btnP: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }
-const btnS: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 14px", border: "1.5px solid #E2E8F0", borderRadius: 8, background: "#fff", fontSize: 13, cursor: "pointer", color: "#374151", fontWeight: 500 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "var(--hf-surface)", outline: "none" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }
+const btnP: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }
+const btnS: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 14px", border: "1.5px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", fontSize: 13, cursor: "pointer", color: "var(--hf-text-secondary)", fontWeight: 500 }
 
 function ConfirmModal({ title, message, confirmLabel, danger = false, loading = false, onConfirm, onCancel, children }: any) {
   return (
@@ -44,7 +44,7 @@ function ConfirmModal({ title, message, confirmLabel, danger = false, loading = 
       <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 28, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
         <div style={{ display: "flex", gap: 14, marginBottom: 20 }}>
           <div style={{ width: 40, height: 40, borderRadius: "50%", background: danger ? "var(--hf-danger-soft)" : "var(--hf-success-soft-strong)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            {danger ? <AlertTriangle size={18} color="#DC2626" /> : <CheckCircle size={18} color="#166534" />}
+            {danger ? <AlertTriangle size={18} style={{ color: 'var(--hf-danger-text)' }} /> : <CheckCircle size={18} style={{ color: 'var(--hf-success-text-strong)' }} />}
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>{title}</div>
@@ -219,7 +219,7 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
                   onClick={() => handleExpand(batch)}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     <div style={{ width: 40, height: 40, borderRadius: 10, background: sc.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <CreditCard size={18} color={sc.color} />
+                      <CreditCard size={18} style={{ color: sc.color }} />
                     </div>
                     <div>
                       <div style={{ fontWeight: 800, fontSize: 14, color: "var(--hf-text)", display: "flex", alignItems: "center", gap: 8 }}>
@@ -227,7 +227,7 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
                           <span style={{ width: 4, height: 4, borderRadius: "50%", background: sc.dot }} />{sc.label}
                         </span>
-                        {batch.hasPop && <CheckCircle size={12} color="#0D9488" />}
+                        {batch.hasPop && <CheckCircle size={12} style={{ color: 'var(--hf-accent-text)' }} />}
                       </div>
                       <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 2 }}>
                         {batch.billCount} bill{batch.billCount !== 1 ? "s" : ""} · Payment {fmtDate(batch.paymentDate)}
@@ -259,7 +259,7 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
                         <Download size={10} />
                       </button>
                     </div>
-                    {expanded ? <ChevronUp size={16} color="#94A3B8" /> : <ChevronDown size={16} color="#94A3B8" />}
+                    {expanded ? <ChevronUp size={16} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={16} style={{ color: 'var(--hf-text-faint)' }} />}
                   </div>
                 </div>
 
@@ -311,7 +311,7 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
                               <td style={{ padding: "9px 16px", color: "var(--hf-text-muted)" }}>{fmtDate(bill.dueDate)}</td>
                               <td style={{ padding: "9px 16px", fontWeight: 700, color: "var(--hf-text)" }}>{fmtR(bill.totalAmount)}</td>
                               <td style={{ padding: "9px 16px" }}>
-                                {bill.hasPop ? <CheckCircle size={13} color="#0D9488" /> : <span style={{ fontSize: 10, color: "var(--hf-text-faint)" }}>—</span>}
+                                {bill.hasPop ? <CheckCircle size={13} style={{ color: 'var(--hf-accent-text)' }} /> : <span style={{ fontSize: 10, color: "var(--hf-text-faint)" }}>—</span>}
                               </td>
                             </tr>
                           ))}
@@ -376,8 +376,8 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
                     return (
                       <div key={bill.id} onClick={() => toggleBillSelection(bill.id)}
                         style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", cursor: "pointer", background: checked ? "var(--hf-info-soft)" : i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border-subtle)", transition: "background 0.1s" }}>
-                        <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${checked ? "#1B3A6B" : "#D1D5DB"}`, background: checked ? "var(--hf-primary)" : "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          {checked && <CheckCircle size={11} color="#fff" />}
+                        <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${checked ? "var(--hf-primary)" : "var(--hf-border-strong)"}`, background: checked ? "var(--hf-primary)" : "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          {checked && <CheckCircle size={11} style={{ color: 'var(--hf-text-on-solid)' }} />}
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 600, fontSize: 13, color: "var(--hf-text)" }}>{bill.supplierName}</div>
@@ -420,9 +420,9 @@ export function BatchesTab({ onRefreshSummary }: { onRefreshSummary: () => void 
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Upload remittance / POP</h3>
               <button onClick={() => setShowPopUpload(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={18} /></button>
             </div>
-            <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "28px", border: `2px dashed ${popFile ? "#0D9488" : "#E2E8F0"}`, borderRadius: 10, cursor: "pointer", background: popFile ? "var(--hf-accent-soft)" : "var(--hf-surface-muted)" }}>
+            <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "28px", border: `2px dashed ${popFile ? "var(--hf-accent)" : "var(--hf-border)"}`, borderRadius: 10, cursor: "pointer", background: popFile ? "var(--hf-accent-soft)" : "var(--hf-surface-muted)" }}>
               <input type="file" style={{ display: "none" }} onChange={handleFile} />
-              {popFile ? <><CheckCircle size={24} color="#0D9488" /><span style={{ fontSize: 13, color: "var(--hf-accent-text)", fontWeight: 600 }}>{popName}</span></> : <><Upload size={24} color="#94A3B8" /><span style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>Bank confirmation, remittance advice</span></>}
+              {popFile ? <><CheckCircle size={24} style={{ color: 'var(--hf-accent-text)' }} /><span style={{ fontSize: 13, color: "var(--hf-accent-text)", fontWeight: 600 }}>{popName}</span></> : <><Upload size={24} style={{ color: 'var(--hf-text-faint)' }} /><span style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>Bank confirmation, remittance advice</span></>}
             </label>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setShowPopUpload(false)} style={btnS}>Cancel</button>

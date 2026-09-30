@@ -34,19 +34,19 @@ const fmtDT = (d: any) =>
   d ? new Date(d).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : '—'
 
 const STATUS_CFG: Record<string, { color: string; bg: string; border: string; label: string }> = {
-  DRAFT:        { color: '#64748B', bg: '#F8FAFC', border: '#E2E8F0', label: 'Draft'         },
-  UNDER_REVIEW: { color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', label: 'Under Review'  },
-  SENT:         { color: '#1D4ED8', bg: '#EFF6FF', border: '#BFDBFE', label: 'Pending Sign'  },
-  SIGNED:       { color: '#166534', bg: '#DCFCE7', border: '#86EFAC', label: 'Signed'        },
-  TERMINATED:   { color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', label: 'Terminated'    },
-  EXPIRED:      { color: '#94A3B8', bg: '#F1F5F9', border: '#E2E8F0', label: 'Expired'       },
+  DRAFT:        { color: 'var(--hf-text-muted)', bg: 'var(--hf-surface-muted)', border: 'var(--hf-border)', label: 'Draft'         },
+  UNDER_REVIEW: { color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)', border: 'var(--hf-warning-border)', label: 'Under Review'  },
+  SENT:         { color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)', border: 'var(--hf-info-border)', label: 'Pending Sign'  },
+  SIGNED:       { color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)', border: 'var(--hf-success-border)', label: 'Signed'        },
+  TERMINATED:   { color: 'var(--hf-danger-text)', bg: 'var(--hf-danger-soft)', border: 'var(--hf-danger-border)', label: 'Terminated'    },
+  EXPIRED:      { color: 'var(--hf-text-faint)', bg: 'var(--hf-surface-sunken)', border: 'var(--hf-border)', label: 'Expired'       },
 }
 
 const SIGN_CFG: Record<string, { color: string; Icon: any }> = {
-  PENDING:  { color: '#D97706', Icon: Clock          },
-  SENT:     { color: '#1D4ED8', Icon: Send            },
-  SIGNED:   { color: '#166534', Icon: CheckCircle     },
-  DECLINED: { color: '#DC2626', Icon: AlertTriangle   },
+  PENDING:  { color: 'var(--hf-warning-text)', Icon: Clock          },
+  SENT:     { color: 'var(--hf-info-text)', Icon: Send            },
+  SIGNED:   { color: 'var(--hf-success-text-strong)', Icon: CheckCircle     },
+  DECLINED: { color: 'var(--hf-danger-text)', Icon: AlertTriangle   },
 }
 
 const CONTRACT_TYPES = [
@@ -69,29 +69,29 @@ const CONTRACT_TYPES = [
 
 const inp: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
-  border: '1.5px solid #E2E8F0', borderRadius: 8,
-  fontSize: 13, boxSizing: 'border-box', background: '#fff', outline: 'none',
+  border: '1.5px solid var(--hf-border)', borderRadius: 8,
+  fontSize: 13, boxSizing: 'border-box', background: 'var(--hf-surface)', outline: 'none',
 }
 const lbl: React.CSSProperties = {
   display: 'block', fontSize: 12,
-  fontWeight: 600, color: '#374151', marginBottom: 4,
+  fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 4,
 }
-const btnP = (bg = '#1B3A6B'): React.CSSProperties => ({
+const btnP = (bg = 'var(--hf-primary)'): React.CSSProperties => ({
   display: 'flex', alignItems: 'center', gap: 6,
-  background: bg, color: '#fff', border: 'none',
+  background: bg, color: 'var(--hf-text-on-solid)', border: 'none',
   borderRadius: 8, padding: '9px 16px',
   fontSize: 13, fontWeight: 600, cursor: 'pointer',
 })
 const btnS: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 6,
-  background: '#F8FAFC', color: '#374151',
-  border: '1px solid #E2E8F0', borderRadius: 8,
+  background: 'var(--hf-surface-muted)', color: 'var(--hf-text-secondary)',
+  border: '1px solid var(--hf-border)', borderRadius: 8,
   padding: '9px 14px', fontSize: 13, cursor: 'pointer',
 }
 const btnC: React.CSSProperties = {
-  padding: '9px 16px', border: '1px solid #E2E8F0',
-  borderRadius: 8, background: '#fff',
-  fontSize: 13, cursor: 'pointer', color: '#374151',
+  padding: '9px 16px', border: '1px solid var(--hf-border)',
+  borderRadius: 8, background: 'var(--hf-surface)',
+  fontSize: 13, cursor: 'pointer', color: 'var(--hf-text-secondary)',
 }
 const MODAL: React.CSSProperties = {
   position: 'fixed', inset: 0,
@@ -100,7 +100,7 @@ const MODAL: React.CSSProperties = {
   zIndex: 1000,
 }
 const mBox = (w = 480): React.CSSProperties => ({
-  background: '#fff', borderRadius: 16,
+  background: 'var(--hf-surface)', borderRadius: 16,
   padding: 28, width: w,
   maxHeight: '90vh', overflowY: 'auto',
   boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
@@ -155,6 +155,8 @@ function SignatureCanvas({ onCapture }: { onCapture: (data: string | null) => vo
     const ctx = canvasRef.current!.getContext('2d')!
     const r   = canvasRef.current!.getBoundingClientRect()
     ctx.lineTo(e.clientX - r.left, e.clientY - r.top)
+    // Canvas: needs a literal colour, and the drawn signature is saved as an image,
+    // so it must not follow the theme.
     ctx.strokeStyle = '#1B3A6B'; ctx.lineWidth = 2
     ctx.lineCap = 'round'; ctx.lineJoin = 'round'
     ctx.stroke()
@@ -394,9 +396,9 @@ export default function ContractsTab() {
   const unfilledVarKeys = templateVarKeys.filter(k => !(form.variables[k] ?? '').trim())
 
   const getNextActions = (status: string) => {
-    if (status === 'DRAFT')        return [{ label: 'Submit for Review', action: 'submit-for-review', color: '#1D4ED8', bg: '#EFF6FF' }]
-    if (status === 'UNDER_REVIEW') return [{ label: 'Send for Signing',  action: 'send-for-signing',  color: '#166534', bg: '#DCFCE7' }]
-    if (status === 'SIGNED')       return [{ label: 'Terminate',         action: 'terminate',          color: '#DC2626', bg: '#FEF2F2' }]
+    if (status === 'DRAFT')        return [{ label: 'Submit for Review', action: 'submit-for-review', color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)' }]
+    if (status === 'UNDER_REVIEW') return [{ label: 'Send for Signing',  action: 'send-for-signing',  color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)' }]
+    if (status === 'SIGNED')       return [{ label: 'Terminate',         action: 'terminate',          color: 'var(--hf-danger-text)', bg: 'var(--hf-danger-soft)' }]
     return []
   }
 
@@ -496,7 +498,7 @@ export default function ContractsTab() {
                         <Download size={11} /> PDF
                       </button>
                     )}
-                    <ChevronDown size={15} color="#94A3B8" style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                    <ChevronDown size={15} style={{ color: 'var(--hf-text-faint)', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
                   </div>
                 </div>
 
@@ -535,7 +537,7 @@ export default function ContractsTab() {
                       </button>
                       {showBodyId === c.id && (
                         <div style={{ border: '1px solid var(--hf-border)', borderRadius: 8, padding: '14px 16px', background: 'var(--hf-surface)', maxHeight: 320, overflowY: 'auto', fontSize: 13, lineHeight: 1.8, color: 'var(--hf-text-secondary)' }}
-                          dangerouslySetInnerHTML={{ __html: (contractDetail?.id === c.id ? contractDetail?.body : null) ?? c.body ?? '<p style="color:#94A3B8">Loading body…</p>' }}
+                          dangerouslySetInnerHTML={{ __html: (contractDetail?.id === c.id ? contractDetail?.body : null) ?? c.body ?? '<p style="color:var(--hf-text-faint)">Loading body…</p>' }}
                         />
                       )}
                     </div>
@@ -584,7 +586,7 @@ export default function ContractsTab() {
                               <div key={party.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 8 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                   <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--hf-info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                    <User size={14} color="#1D4ED8" />
+                                    <User size={14} style={{ color: 'var(--hf-info-text)' }} />
                                   </div>
                                   <div>
                                     <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--hf-text)' }}>
@@ -603,7 +605,7 @@ export default function ContractsTab() {
 
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                    <SIcon size={13} color={sCfg.color} />
+                                    <SIcon size={13} style={{ color: sCfg.color }} />
                                     <span style={{ fontSize: 12, color: sCfg.color, fontWeight: 700 }}>
                                       {party.signingStatus === 'SENT' ? 'OTP SENT' : party.signingStatus}
                                     </span>
@@ -629,7 +631,7 @@ export default function ContractsTab() {
                                   {c.status === 'SENT' && party.signingStatus === 'SENT' && (
                                     <button
                                       onClick={() => { setShowOtp({ contractId: c.id, partyId: party.id, name: party.fullName, isResend: true }); setError('') }}
-                                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: otpExpired ? 'var(--hf-danger-soft)' : 'var(--hf-warning-soft)', color: otpExpired ? 'var(--hf-danger-text)' : 'var(--hf-warning-text)', border: `1px solid ${otpExpired ? '#FECACA' : '#FDE68A'}`, borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: otpExpired ? 'var(--hf-danger-soft)' : 'var(--hf-warning-soft)', color: otpExpired ? 'var(--hf-danger-text)' : 'var(--hf-warning-text)', border: `1px solid ${otpExpired ? 'var(--hf-danger-border)' : 'var(--hf-warning-border)'}`, borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
                                       <RefreshCw size={11} />
                                       {otpExpired ? 'Resend OTP' : 'Resend OTP'}
                                     </button>
@@ -670,7 +672,7 @@ export default function ContractsTab() {
                           ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
                               {(contractDetail?.comments ?? c.comments ?? []).map((cm: any) => (
-                                <div key={cm.id} style={{ padding: '10px 14px', background: cm.isAmendmentRequest ? 'var(--hf-warning-soft)' : 'var(--hf-surface-muted)', border: `1px solid ${cm.isAmendmentRequest ? '#FDE68A' : '#E2E8F0'}`, borderRadius: 8 }}>
+                                <div key={cm.id} style={{ padding: '10px 14px', background: cm.isAmendmentRequest ? 'var(--hf-warning-soft)' : 'var(--hf-surface-muted)', border: `1px solid ${cm.isAmendmentRequest ? 'var(--hf-warning-border)' : 'var(--hf-border)'}`, borderRadius: 8 }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                       <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--hf-text)' }}>{cm.authorName ?? 'Internal'}</span>
@@ -764,7 +766,7 @@ export default function ContractsTab() {
                             contractAction.mutate({ id: c.id, action })
                           }}
                           disabled={contractAction.isPending}
-                          style={{ padding: '8px 16px', borderRadius: 7, fontSize: 13, cursor: 'pointer', border: `1px solid ${color}40`, fontWeight: 600, background: bg, color }}>
+                          style={{ padding: '8px 16px', borderRadius: 7, fontSize: 13, cursor: 'pointer', border: `1px solid color-mix(in srgb, ${color} 25%, transparent)`, fontWeight: 600, background: bg, color }}>
                           {label}
                         </button>
                       ))}
@@ -802,7 +804,7 @@ export default function ContractsTab() {
           <div style={mBox(700)}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>New Contract</h3>
-              <button onClick={() => setShowCreate(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={20} color="#94A3B8" /></button>
+              <button onClick={() => setShowCreate(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={20} style={{ color: 'var(--hf-text-faint)' }} /></button>
             </div>
 
             <Sect title="Template">
@@ -874,7 +876,7 @@ export default function ContractsTab() {
                 <div style={{
                   marginBottom: 10, padding: '9px 12px', borderRadius: 8, fontSize: 12,
                   background: unfilledVarKeys.length > 0 ? 'var(--hf-warning-soft)' : 'var(--hf-success-soft)',
-                  border: `1px solid ${unfilledVarKeys.length > 0 ? '#FDE68A' : '#BBF7D0'}`,
+                  border: `1px solid ${unfilledVarKeys.length > 0 ? 'var(--hf-warning-border)' : 'var(--hf-success-border-subtle)'}`,
                   color: unfilledVarKeys.length > 0 ? 'var(--hf-warning-text-deep)' : 'var(--hf-success-text-strong)',
                 }}>
                   {unfilledVarKeys.length > 0 ? (
@@ -938,7 +940,7 @@ export default function ContractsTab() {
           <div style={mBox(520)}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>Add Party</h3>
-              <button onClick={() => setShowParty(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={20} color="#94A3B8" /></button>
+              <button onClick={() => setShowParty(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={20} style={{ color: 'var(--hf-text-faint)' }} /></button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <div>
@@ -1029,10 +1031,10 @@ export default function ContractsTab() {
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>
                 {showOtp.isResend ? 'Resend OTP' : 'Send OTP to Signer'}
               </h3>
-              <button onClick={() => setShowOtp(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={20} color="#94A3B8" /></button>
+              <button onClick={() => setShowOtp(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={20} style={{ color: 'var(--hf-text-faint)' }} /></button>
             </div>
 
-            <div style={{ padding: '12px 14px', background: showOtp.isResend ? 'var(--hf-warning-soft)' : 'var(--hf-info-soft)', border: `1px solid ${showOtp.isResend ? '#FDE68A' : '#BFDBFE'}`, borderRadius: 8, fontSize: 13, color: showOtp.isResend ? 'var(--hf-warning-text-deep)' : 'var(--hf-info-text)', marginBottom: 16 }}>
+            <div style={{ padding: '12px 14px', background: showOtp.isResend ? 'var(--hf-warning-soft)' : 'var(--hf-info-soft)', border: `1px solid ${showOtp.isResend ? 'var(--hf-warning-border)' : 'var(--hf-info-border)'}`, borderRadius: 8, fontSize: 13, color: showOtp.isResend ? 'var(--hf-warning-text-deep)' : 'var(--hf-info-text)', marginBottom: 16 }}>
               {showOtp.isResend
                 ? <>The previous OTP for <strong>{showOtp.name}</strong> may have expired. A new 6-digit code will be generated and sent to their registered phone. The old OTP is invalidated.</>
                 : <>A 6-digit OTP will be sent via SMS to <strong>{showOtp.name}</strong>'s registered phone. The code expires in 10 minutes.</>
@@ -1065,14 +1067,14 @@ export default function ContractsTab() {
           <div style={mBox(500)}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
               <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--hf-success-soft-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <PenLine size={18} color="#166534" />
+                <PenLine size={18} style={{ color: 'var(--hf-success-text-strong)' }} />
               </div>
               <div>
                 <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>Sign Contract</h3>
                 <div style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>OTP sent — enter the 6-digit code to sign</div>
               </div>
               <button onClick={() => { setShowSign(null); setOtpCode(''); setSignatureData(null); setError('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: 'auto', display: 'flex' }}>
-                <X size={20} color="#94A3B8" />
+                <X size={20} style={{ color: 'var(--hf-text-faint)' }} />
               </button>
             </div>
 
@@ -1113,7 +1115,7 @@ export default function ContractsTab() {
               <button
                 disabled={otpCode.length < 6 || signContract.isPending}
                 onClick={() => signContract.mutate({ contractId: showSign.contractId, partyId: showSign.partyId })}
-                style={{ ...btnP(otpCode.length >= 6 ? '#166534' : '#94A3B8'), cursor: otpCode.length >= 6 ? 'pointer' : 'not-allowed' }}>
+                style={{ ...btnP(otpCode.length >= 6 ? 'var(--hf-success-solid-strong)' : 'var(--hf-text-faint)'), cursor: otpCode.length >= 6 ? 'pointer' : 'not-allowed' }}>
                 <CheckCircle size={14} />
                 {signContract.isPending ? 'Signing…' : 'Sign Contract'}
               </button>
@@ -1128,7 +1130,7 @@ export default function ContractsTab() {
           <div style={mBox(440)}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-danger-text)' }}>Terminate Contract</h3>
-              <button onClick={() => setShowTerminate(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={20} color="#94A3B8" /></button>
+              <button onClick={() => setShowTerminate(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={20} style={{ color: 'var(--hf-text-faint)' }} /></button>
             </div>
             <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text-strong)' }}>
               This permanently terminates the contract. A reason is required for the audit trail.
@@ -1145,7 +1147,7 @@ export default function ContractsTab() {
               <button
                 disabled={!terminateReason || contractAction.isPending}
                 onClick={() => contractAction.mutate({ id: showTerminate, action: 'terminate', body: { reason: terminateReason } })}
-                style={btnP('#DC2626')}>
+                style={btnP('var(--hf-danger)')}>
                 {contractAction.isPending ? 'Terminating…' : 'Terminate'}
               </button>
             </div>
@@ -1164,7 +1166,7 @@ export default function ContractsTab() {
           <div style={mBox(620)}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>Edit Contract</h3>
-              <button onClick={() => setShowEditContract(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={20} color="#94A3B8" /></button>
+              <button onClick={() => setShowEditContract(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={20} style={{ color: 'var(--hf-text-faint)' }} /></button>
             </div>
 
             {(() => {

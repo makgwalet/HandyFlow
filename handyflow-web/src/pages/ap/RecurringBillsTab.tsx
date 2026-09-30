@@ -87,7 +87,7 @@ export function RecurringBillsTab({ onRefreshSummary }: { onRefreshSummary: () =
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
           padding: "12px 16px", background: "var(--hf-success-soft)", border: "1.5px solid var(--hf-success-border)", borderRadius: 10, marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Zap size={16} color="#166534" />
+            <Zap size={16} style={{ color: 'var(--hf-success-text-strong)' }} />
             <span style={{ fontSize: 13, color: "var(--hf-success-text-strong)" }}>{notice}</span>
           </div>
           <button onClick={() => setNotice("")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-success-text-strong)", display: "flex" }}><X size={14} /></button>
@@ -141,7 +141,7 @@ export function RecurringBillsTab({ onRefreshSummary }: { onRefreshSummary: () =
                   </td>
                   <td style={{ padding: "12px 16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--hf-text-secondary)", fontWeight: 600 }}>
-                      <Calendar size={12} color="#94A3B8" />{fmtDate(t.nextDueDate)}
+                      <Calendar size={12} style={{ color: 'var(--hf-text-faint)' }} />{fmtDate(t.nextDueDate)}
                     </div>
                     {t.lastGeneratedAt && (
                       <div style={{ fontSize: 10, color: "var(--hf-text-faint)", marginTop: 2 }}>Last generated {fmtDT(t.lastGeneratedAt)}</div>
@@ -150,8 +150,8 @@ export function RecurringBillsTab({ onRefreshSummary }: { onRefreshSummary: () =
                   <td style={{ padding: "12px 16px" }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 4,
                       background: t.active ? "var(--hf-success-soft-strong)" : "var(--hf-surface-sunken)", color: t.active ? "var(--hf-success-text-strong)" : "var(--hf-text-muted)",
-                      border: `1px solid ${t.active ? "#86EFAC" : "#E2E8F0"}`, padding: "2px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
-                      <span style={{ width: 5, height: 5, borderRadius: "50%", background: t.active ? "var(--hf-success)" : "#CBD5E1" }} />
+                      border: `1px solid ${t.active ? "var(--hf-success-border)" : "var(--hf-border)"}`, padding: "2px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                      <span style={{ width: 5, height: 5, borderRadius: "50%", background: t.active ? "var(--hf-success)" : "var(--hf-border-strong)" }} />
                       {t.active ? "Active" : "Paused"}
                     </span>
                   </td>

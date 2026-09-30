@@ -283,15 +283,15 @@ export default function App() {
             <Route path="/fuel/:section?" element={<FuelPage />} />
             <Route path="/internal-audit" element={<InternalAuditPage />} />
             <Route path="/earthmoving/:section?" element={<EarthMovingPage />} />
-            <Route path="/property"    element={<PropertyPage />} />
+            <Route path="/property/:section?" element={<PropertyPage />} />
  <Route path="/fleet/:section?" element={<FleetPage />} />
             <Route path="/bookings/:section?" element={<BookingsPage />} />
             <Route path="/accounting/:section?" element={<AccountingPage />} />
             <Route path="/settings"    element={<SettingsPage />} />
             <Route path="/hr/:section?" element={<HrPage />} />
             <Route path="/clinic"      element={<ClinicPage />} />
-            <Route path="/events"      element={<EventsPage />} />
-            <Route path="/contracts"   element={<ContractingPage />} />
+            <Route path="/events/:section?" element={<EventsPage />} />
+            <Route path="/contracts/:section?" element={<ContractingPage />} />
             <Route path="/expenses"    element={<ExpensesPage />} />
             <Route path="/invite/accept"          element={<AcceptInvitePage />} />
             <Route path="/creative"               element={<CreativePage />} />
@@ -301,7 +301,7 @@ export default function App() {
             <Route path="/recruiter"              element={<RecruiterPage />} />
             <Route path="/pos"                    element={<PosPage />} />
             <Route path="/accountant/:section?" element={<AccountantPage />} />
-            <Route path="/ap"                     element={<AccountsPayablePage />} />
+            <Route path="/ap/:section?" element={<AccountsPayablePage />} />
             <Route path="/booking-agency"       element={<BookingAgencyPage />} />
             <Route path="/payroll-bureau"         element={<PayrollBureauPage />} />
             <Route path="/profile"                element={<ProfilePage />} />

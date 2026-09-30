@@ -12,7 +12,7 @@ interface Customer { id: string; name: string; email: string }
 const inp: React.CSSProperties = {
   width: '100%', padding: '10px 14px', border: '1.5px solid var(--hf-border)',
   borderRadius: 10, fontSize: 14, color: 'var(--hf-text)', outline: 'none',
-  boxSizing: 'border-box', background: 'white',
+  boxSizing: 'border-box', background: 'var(--hf-surface)',
 }
 const inpErr: React.CSSProperties = { ...inp, borderColor: 'var(--hf-danger)', background: 'var(--hf-danger-soft)' }
 
@@ -131,7 +131,7 @@ export function CreateVariableHoursContractPage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
         <button onClick={() => navigate('/recurring')}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', border: '1px solid var(--hf-border)', borderRadius: 9, padding: '7px 12px', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 9, padding: '7px 12px', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
           <ArrowLeft size={15} /> Back
         </button>
         <div>
@@ -152,7 +152,7 @@ export function CreateVariableHoursContractPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* Client card */}
-          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', margin: '0 0 18px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Client</p>
 
             <div style={{ marginBottom: 18 }}>
@@ -162,7 +162,7 @@ export function CreateVariableHoursContractPage() {
                   <button key={type} onClick={() => setClientType(type)}
                     style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px', borderRadius: 10,
                       border: clientType === type ? '2px solid var(--hf-warning)' : '1.5px solid var(--hf-border)',
-                      background: clientType === type ? 'var(--hf-warning-soft)' : 'white',
+                      background: clientType === type ? 'var(--hf-warning-soft)' : 'var(--hf-surface)',
                       color: clientType === type ? 'var(--hf-warning-text)' : 'var(--hf-text-muted)',
                       fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
                     <Icon size={15} />{label}
@@ -179,7 +179,7 @@ export function CreateVariableHoursContractPage() {
                     <option value="">Select a customer...</option>
                     {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
-                  <ChevronDown size={15} color="#94A3B8" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                  <ChevronDown size={15} style={{ color: 'var(--hf-text-faint)', position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                 </div>
               </Field>
             ) : (
@@ -215,9 +215,9 @@ export function CreateVariableHoursContractPage() {
           </div>
 
           {/* Billing terms card */}
-          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
-              <Gauge size={16} color="#D97706" />
+              <Gauge size={16} style={{ color: 'var(--hf-warning-text)' }} />
               <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Billing Terms</p>
             </div>
 
@@ -228,7 +228,7 @@ export function CreateVariableHoursContractPage() {
                     title={f.hint}
                     style={{ flex: 1, padding: '9px 10px', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer',
                       border: frequency === f.value ? '2px solid var(--hf-warning)' : '1.5px solid var(--hf-border)',
-                      background: frequency === f.value ? 'var(--hf-warning-soft)' : 'white',
+                      background: frequency === f.value ? 'var(--hf-warning-soft)' : 'var(--hf-surface)',
                       color: frequency === f.value ? 'var(--hf-warning-text)' : 'var(--hf-text-muted)' }}>
                     {f.label}
                   </button>
@@ -291,7 +291,7 @@ export function CreateVariableHoursContractPage() {
 
         {/* Right — summary & submit */}
         <div style={{ position: 'sticky', top: 80 }}>
-          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Summary</p>
 
             {[['Rate/hr', rate > 0 ? fmtR(rate) : '—'],
@@ -319,8 +319,8 @@ export function CreateVariableHoursContractPage() {
 
             <button onClick={handleSubmit} disabled={create.isPending}
               style={{ width: '100%', padding: 12, border: 'none', borderRadius: 10,
-                background: create.isPending ? '#FCD34D' : 'var(--hf-warning)',
-                color: 'white', fontSize: 14, fontWeight: 700,
+                background: create.isPending ? 'color-mix(in srgb, var(--hf-warning) 45%, var(--hf-surface))' : 'var(--hf-warning)',
+                color: 'var(--hf-text-on-solid)', fontSize: 14, fontWeight: 700,
                 cursor: create.isPending ? 'not-allowed' : 'pointer' }}>
               {create.isPending ? 'Creating...' : 'Create variable-hours contract'}
             </button>

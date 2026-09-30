@@ -18,7 +18,7 @@ interface LineItem {
 const inp: React.CSSProperties = {
   width: '100%', padding: '10px 14px', border: '1.5px solid var(--hf-border)',
   borderRadius: 10, fontSize: 14, color: 'var(--hf-text)', outline: 'none',
-  boxSizing: 'border-box', background: 'white',
+  boxSizing: 'border-box', background: 'var(--hf-surface)',
 }
 const inpErr: React.CSSProperties = { ...inp, borderColor: 'var(--hf-danger)', background: 'var(--hf-danger-soft)' }
 
@@ -34,7 +34,7 @@ function Field({ label, required, error, hint, children }: {
       {hint  && <p style={{ fontSize: 11, color: 'var(--hf-text-faint)', margin: '4px 0 0' }}>{hint}</p>}
       {error && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--hf-danger-text)', marginTop: 4 }}>
-          <AlertCircle size={12} color="#DC2626" />{error}
+          <AlertCircle size={12} style={{ color: 'var(--hf-danger-text)' }} />{error}
         </div>
       )}
     </div>
@@ -189,7 +189,7 @@ export function CreateQuotePage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
         <button onClick={() => navigate('/quotes')}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', border: '1px solid var(--hf-border)', borderRadius: 9, padding: '7px 12px', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 9, padding: '7px 12px', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
           <ArrowLeft size={15} /> Back
         </button>
         <div>
@@ -201,7 +201,7 @@ export function CreateQuotePage() {
       {/* Global error banner */}
       {createError && (
         <div style={{ marginBottom: 20, padding: '12px 16px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 10, fontSize: 13, color: 'var(--hf-danger-text)', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <AlertCircle size={16} color="#DC2626" style={{ flexShrink: 0 }} />
+          <AlertCircle size={16} style={{ color: 'var(--hf-danger-text)', flexShrink: 0 }} />
           <div><strong>Could not create quote:</strong> {createError}</div>
         </div>
       )}
@@ -212,7 +212,7 @@ export function CreateQuotePage() {
         <div>
 
           {/* Quote details card */}
-          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', margin: '0 0 18px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quote details</p>
 
             {/* Client type toggle */}
@@ -221,12 +221,12 @@ export function CreateQuotePage() {
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   onClick={() => { setClientType('existing'); setWalkinName(''); setWalkinEmail(''); setWalkinPhone('') }}
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px', borderRadius: 10, border: clientType === 'existing' ? '2px solid var(--hf-primary)' : '1.5px solid var(--hf-border)', background: clientType === 'existing' ? 'var(--hf-info-soft)' : 'white', color: clientType === 'existing' ? 'var(--hf-primary-text)' : 'var(--hf-text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px', borderRadius: 10, border: clientType === 'existing' ? '2px solid var(--hf-primary)' : '1.5px solid var(--hf-border)', background: clientType === 'existing' ? 'var(--hf-info-soft)' : 'var(--hf-surface)', color: clientType === 'existing' ? 'var(--hf-primary-text)' : 'var(--hf-text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
                   <Users size={15} /> Saved customer
                 </button>
                 <button
                   onClick={() => { setClientType('walkin'); setCustomerId('') }}
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px', borderRadius: 10, border: clientType === 'walkin' ? '2px solid var(--hf-primary)' : '1.5px solid var(--hf-border)', background: clientType === 'walkin' ? 'var(--hf-info-soft)' : 'white', color: clientType === 'walkin' ? 'var(--hf-primary-text)' : 'var(--hf-text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px', borderRadius: 10, border: clientType === 'walkin' ? '2px solid var(--hf-primary)' : '1.5px solid var(--hf-border)', background: clientType === 'walkin' ? 'var(--hf-info-soft)' : 'var(--hf-surface)', color: clientType === 'walkin' ? 'var(--hf-primary-text)' : 'var(--hf-text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
                   <UserPlus size={15} /> Walk-in client
                 </button>
               </div>
@@ -241,7 +241,7 @@ export function CreateQuotePage() {
                     <option value="">Select a customer...</option>
                     {customers.map((c: Customer) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
-                  <ChevronDown size={15} color="#94A3B8" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                  <ChevronDown size={15} style={{ color: 'var(--hf-text-faint)', position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                 </div>
               </Field>
             )}
@@ -293,13 +293,13 @@ export function CreateQuotePage() {
           </div>
 
           {/* Line Items card */}
-          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--hf-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Line items</p>
                 {fieldErrors.lineItems && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--hf-danger-text)', marginTop: 3 }}>
-                    <AlertCircle size={12} color="#DC2626" />{fieldErrors.lineItems}
+                    <AlertCircle size={12} style={{ color: 'var(--hf-danger-text)' }} />{fieldErrors.lineItems}
                   </div>
                 )}
               </div>
@@ -316,7 +316,7 @@ export function CreateQuotePage() {
                       position: 'fixed',    // fixed so it never gets clipped by overflow:hidden parents
                       zIndex: 9999,
                       width: 380,
-                      background: 'white',
+                      background: 'var(--hf-surface)',
                       border: '1.5px solid var(--hf-border)',
                       borderRadius: 14,
                       boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
@@ -334,7 +334,7 @@ export function CreateQuotePage() {
                     }}>
                       <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--hf-border-subtle)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--hf-surface-muted)', borderRadius: 8, padding: '8px 10px' }}>
-                          <Search size={13} color="#94A3B8" />
+                          <Search size={13} style={{ color: 'var(--hf-text-faint)' }} />
                           <input value={itemSearch} onChange={e => setItemSearch(e.target.value)}
                             placeholder="Type to search..." autoFocus
                             style={{ border: 'none', background: 'none', outline: 'none', fontSize: 13, width: '100%', color: 'var(--hf-text)' }} />
@@ -349,7 +349,7 @@ export function CreateQuotePage() {
                           <div key={item.id} onClick={() => addFromCatalogue(item)}
                             style={{ padding: '11px 14px', cursor: 'pointer', borderBottom: '1px solid var(--hf-border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                             onMouseEnter={e => (e.currentTarget.style.background = 'var(--hf-surface-muted)')}
-                            onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
+                            onMouseLeave={e => (e.currentTarget.style.background = 'var(--hf-surface)')}>
                             <div>
                               <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-text)', margin: 0 }}>{item.name}</p>
                               <p style={{ fontSize: 11, color: 'var(--hf-text-faint)', margin: '2px 0 0' }}>
@@ -367,7 +367,7 @@ export function CreateQuotePage() {
                 </div>
 
                 <button onClick={addBlankLine}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: 'white', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                   <Plus size={13} /> Add blank
                 </button>
               </div>
@@ -375,7 +375,7 @@ export function CreateQuotePage() {
 
             {lineItems.length === 0 ? (
               <div style={{ padding: '48px 24px', textAlign: 'center' }}>
-                <FileText size={32} color="#CBD5E1" style={{ marginBottom: 10 }} />
+                <FileText size={32} style={{ color: 'var(--hf-text-disabled)', marginBottom: 10 }} />
                 <p style={{ fontSize: 14, color: 'var(--hf-text-faint)', margin: 0 }}>Search your catalogue or add a blank line to get started</p>
               </div>
             ) : (
@@ -403,7 +403,7 @@ export function CreateQuotePage() {
                       onChange={e => updateLine(li.tempId, 'vatRate', parseFloat(e.target.value) || 0)}
                       style={{ ...inp, fontSize: 13, padding: '7px 10px' }} />
                     <button onClick={() => removeLine(li.tempId)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FDA4AF', padding: 4, borderRadius: 6, display: 'flex' }}>
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'color-mix(in srgb, var(--hf-danger-text) 50%, var(--hf-surface))', padding: 4, borderRadius: 6, display: 'flex' }}>
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -415,7 +415,7 @@ export function CreateQuotePage() {
 
         {/* Right — summary */}
         <div style={{ position: 'sticky', top: 80 }}>
-          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', margin: '0 0 18px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Summary</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
@@ -446,8 +446,8 @@ export function CreateQuotePage() {
             <button onClick={handleSubmit} disabled={createQuote.isPending}
               style={{
                 width: '100%', padding: '12px', border: 'none', borderRadius: 10,
-                background: createQuote.isPending ? '#93A8C9' : 'var(--hf-primary)',
-                color: 'white', fontSize: 14, fontWeight: 700,
+                background: createQuote.isPending ? 'color-mix(in srgb, var(--hf-primary) 45%, var(--hf-surface))' : 'var(--hf-primary)',
+                color: 'var(--hf-text-on-solid)', fontSize: 14, fontWeight: 700,
                 cursor: createQuote.isPending ? 'not-allowed' : 'pointer',
               }}>
               {createQuote.isPending ? 'Creating...' : 'Create quote'}

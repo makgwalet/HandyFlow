@@ -5,14 +5,14 @@ import { apiClient } from "../../api/client"
 import { Plus, X, CheckCircle, ChevronLeft, Truck, Phone, Mail } from "lucide-react"
 
 const fmtR = (n: any) => n != null && n > 0 ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
 
 const VENDOR_TYPES = ["CATERING","AV_TECH","SECURITY","PHOTOGRAPHY","TRANSPORT","DECOR","ENTERTAINMENT","OTHER"]
 const TYPE_COLOR: Record<string, string> = {
-  CATERING: "#D97706", AV_TECH: "#7C3AED", SECURITY: "#DC2626",
-  PHOTOGRAPHY: "#0284C7", TRANSPORT: "#16A34A", DECOR: "#BE185D",
-  ENTERTAINMENT: "#EA580C", OTHER: "#64748B",
+  CATERING: "var(--hf-warning-text)", AV_TECH: "var(--hf-violet-text)", SECURITY: "var(--hf-danger-text)",
+  PHOTOGRAPHY: "var(--hf-sky-text)", TRANSPORT: "var(--hf-success-text)", DECOR: "var(--hf-pink-text)",
+  ENTERTAINMENT: "var(--hf-orange-text)", OTHER: "var(--hf-text-muted)",
 }
 
 interface Props {
@@ -93,7 +93,7 @@ export default function VendorsTab({ eventId, eventTitle, onChangeEvent }: Props
       {Object.keys(vendorsByType).length > 0 && (
         <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
           {Object.entries(vendorsByType).map(([type, count]: any) => (
-            <div key={type} style={{ padding: "4px 12px", background: `${TYPE_COLOR[type] ?? "#64748B"}18`, border: `1px solid ${TYPE_COLOR[type] ?? "#64748B"}40`, borderRadius: 20, fontSize: 12 }}>
+            <div key={type} style={{ padding: "4px 12px", background: `color-mix(in srgb, ${TYPE_COLOR[type] ?? "var(--hf-neutral-solid)"} 9%, transparent)`, border: `1px solid color-mix(in srgb, ${TYPE_COLOR[type] ?? "var(--hf-text-muted)"} 25%, transparent)`, borderRadius: 20, fontSize: 12 }}>
               <span style={{ fontWeight: 700, color: TYPE_COLOR[type] ?? "var(--hf-text-muted)" }}>{type.replace("_"," ")}</span>
               <span style={{ color: "var(--hf-text-faint)", marginLeft: 5 }}>×{count}</span>
             </div>
@@ -119,12 +119,12 @@ export default function VendorsTab({ eventId, eventTitle, onChangeEvent }: Props
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {(vendors as any[]).map((v: any) => {
-            const tc = TYPE_COLOR[v.vendorType] ?? "#64748B"
+            const tc = TYPE_COLOR[v.vendorType] ?? "var(--hf-text-muted)"
             return (
-              <div key={v.id} style={{ border: `1px solid ${v.confirmed ? "#86EFAC" : "#E2E8F0"}`, borderLeft: `3px solid ${v.confirmed ? "#22C55E" : tc}`, borderRadius: 10, padding: "14px 20px", background: v.confirmed ? "var(--hf-success-soft)" : "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <div key={v.id} style={{ border: `1px solid ${v.confirmed ? "var(--hf-success-border)" : "var(--hf-border)"}`, borderLeft: `3px solid ${v.confirmed ? "var(--hf-success)" : tc}`, borderRadius: 10, padding: "14px 20px", background: v.confirmed ? "var(--hf-success-soft)" : "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-                    <span style={{ background: `${tc}18`, color: tc, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{v.vendorType.replace("_"," ")}</span>
+                    <span style={{ background: `color-mix(in srgb, ${tc} 9%, transparent)`, color: tc, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{v.vendorType.replace("_"," ")}</span>
                     <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{v.companyName}</span>
                     {v.confirmed && <span style={{ display: "flex", alignItems: "center", gap: 3, background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}><CheckCircle size={10} /> Confirmed</span>}
                   </div>

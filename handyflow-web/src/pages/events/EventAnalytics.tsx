@@ -80,10 +80,10 @@ export default function EventAnalytics({ eventId }: Props) {
         <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 12 }}>Portfolio overview</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
           {[
-            { label: "Total events",  value: totalEvents, color: "#0284C7", bg: "#E0F2FE", icon: Calendar },
-            { label: "Live now",      value: liveNow,     color: liveNow > 0 ? "#DC2626" : "#64748B", bg: liveNow > 0 ? "#FEF2F2" : "#F8FAFC", icon: TrendingUp },
-            { label: "Upcoming",      value: upcoming,    color: "#D97706", bg: "#FFFBEB", icon: Calendar },
-            { label: "Completed",     value: completed,   color: "#166534", bg: "#DCFCE7", icon: BarChart2 },
+            { label: "Total events",  value: totalEvents, color: "var(--hf-sky-text)", bg: "var(--hf-sky-soft-strong)", icon: Calendar },
+            { label: "Live now",      value: liveNow,     color: liveNow > 0 ? "var(--hf-danger-text)" : "var(--hf-text-muted)", bg: liveNow > 0 ? "var(--hf-danger-soft)" : "var(--hf-surface-muted)", icon: TrendingUp },
+            { label: "Upcoming",      value: upcoming,    color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", icon: Calendar },
+            { label: "Completed",     value: completed,   color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", icon: BarChart2 },
           ].map(s => {
             const Icon = s.icon
             return (
@@ -92,7 +92,7 @@ export default function EventAnalytics({ eventId }: Props) {
                   <div style={{ fontSize: 24, fontWeight: 800, color: s.color }}>{s.value}</div>
                   <div style={{ fontSize: 11, color: s.color, opacity: 0.8, marginTop: 2 }}>{s.label}</div>
                 </div>
-                <Icon size={22} color={s.color} style={{ opacity: 0.4 }} />
+                <Icon size={22} style={{ color: s.color, opacity: 0.4 }} />
               </div>
             )
           })}
@@ -115,12 +115,12 @@ export default function EventAnalytics({ eventId }: Props) {
           {/* KPIs */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 22 }}>
             {[
-              { label: "Registered",     value: registered,   color: "#0284C7", bg: "#E0F2FE" },
-              { label: "Checked in",     value: checkedIn,    color: "#166534", bg: "#DCFCE7" },
-              { label: "Attendance rate",value: `${attendanceRate}%`, color: attendanceRate >= 70 ? "#166534" : "#D97706", bg: attendanceRate >= 70 ? "#DCFCE7" : "#FFFBEB" },
-              { label: "No-shows",       value: noShows,      color: noShows > 0 ? "#DC2626" : "#64748B", bg: noShows > 0 ? "#FEF2F2" : "#F8FAFC" },
-              { label: "Cancellations",  value: cancelled,    color: "#64748B", bg: "#F8FAFC" },
-              { label: "Total revenue",  value: fmtR(totalRevenue), color: "#0D9488", bg: "#F0FDF9" },
+              { label: "Registered",     value: registered,   color: "var(--hf-sky-text)", bg: "var(--hf-sky-soft-strong)" },
+              { label: "Checked in",     value: checkedIn,    color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+              { label: "Attendance rate",value: `${attendanceRate}%`, color: attendanceRate >= 70 ? "var(--hf-success-text-strong)" : "var(--hf-warning-text)", bg: attendanceRate >= 70 ? "var(--hf-success-soft-strong)" : "var(--hf-warning-soft)" },
+              { label: "No-shows",       value: noShows,      color: noShows > 0 ? "var(--hf-danger-text)" : "var(--hf-text-muted)", bg: noShows > 0 ? "var(--hf-danger-soft)" : "var(--hf-surface-muted)" },
+              { label: "Cancellations",  value: cancelled,    color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)" },
+              { label: "Total revenue",  value: fmtR(totalRevenue), color: "var(--hf-accent-text)", bg: "var(--hf-accent-soft)" },
             ].map(k => (
               <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: "14px 18px" }}>
                 <div style={{ fontSize: 22, fontWeight: 800, color: k.color }}>{k.value}</div>
@@ -159,8 +159,8 @@ export default function EventAnalytics({ eventId }: Props) {
             <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, padding: "18px 20px" }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)", marginBottom: 14 }}>Payment breakdown</div>
               {[
-                { label: "Paid tickets",     value: paidGuests, color: "#166534", pct: registered > 0 ? Math.round(paidGuests / registered * 100) : 0 },
-                { label: "Free admission",   value: freeGuests, color: "#0284C7", pct: registered > 0 ? Math.round(freeGuests / registered * 100) : 0 },
+                { label: "Paid tickets",     value: paidGuests, color: "var(--hf-success-text-strong)", pct: registered > 0 ? Math.round(paidGuests / registered * 100) : 0 },
+                { label: "Free admission",   value: freeGuests, color: "var(--hf-sky-text)", pct: registered > 0 ? Math.round(freeGuests / registered * 100) : 0 },
               ].map(r => (
                 <div key={r.label} style={{ marginBottom: 14 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5, fontSize: 13 }}>
@@ -197,14 +197,14 @@ export default function EventAnalytics({ eventId }: Props) {
             <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, padding: "18px 20px" }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)", marginBottom: 14 }}>All events overview</div>
               {(events as any[]).slice(0, 6).map((e: any) => {
-                const cfg: Record<string, string> = { LIVE: "#DC2626", PUBLISHED: "#166534", DRAFT: "#94A3B8", COMPLETED: "#0284C7", CANCELLED: "#CBD5E1", SOLD_OUT: "#D97706" }
+                const cfg: Record<string, string> = { LIVE: "var(--hf-danger-text)", PUBLISHED: "var(--hf-success-text-strong)", DRAFT: "var(--hf-text-faint)", COMPLETED: "var(--hf-sky-text)", CANCELLED: "var(--hf-text-disabled)", SOLD_OUT: "var(--hf-warning-text)" }
                 return (
                   <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: "1px solid var(--hf-border-subtle)", fontSize: 12 }}>
                     <div>
                       <div style={{ fontWeight: 600, color: e.id === eventId ? "var(--hf-sky-text)" : "var(--hf-text)" }}>{e.title}</div>
                       <div style={{ color: "var(--hf-text-faint)" }}>{fmtDT(e.startDatetime)}</div>
                     </div>
-                    <span style={{ background: `${cfg[e.status] ?? "#94A3B8"}18`, color: cfg[e.status] ?? "var(--hf-text-faint)", padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>{e.status}</span>
+                    <span style={{ background: `color-mix(in srgb, ${cfg[e.status] ?? "var(--hf-text-faint)"} 9%, transparent)`, color: cfg[e.status] ?? "var(--hf-text-faint)", padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>{e.status}</span>
                   </div>
                 )
               })}

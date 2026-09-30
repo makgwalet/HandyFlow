@@ -35,10 +35,10 @@ const CONTRACT_TYPES = [
 ]
 
 const TYPE_COLOR: Record<string, string> = {
-  SERVICE_AGREEMENT: '#0D9488', NDA: '#7C3AED', EMPLOYMENT: '#1D4ED8',
-  JOINT_VENTURE: '#D97706', EQUIPMENT_HIRE: '#EA580C', LEASE: '#166534',
-  SUPPLY: '#0891B2', SUBCONTRACTOR: '#DC2626', SERVICE_LEVEL: '#6366F1',
-  CONSULTING: '#DB2777', RETAINER: '#854D0E', ACKNOWLEDGMENT_OF_DEBT: '#B45309', OTHER: '#64748B',
+  SERVICE_AGREEMENT: 'var(--hf-accent-text)', NDA: 'var(--hf-violet-text)', EMPLOYMENT: 'var(--hf-info-text)',
+  JOINT_VENTURE: 'var(--hf-warning-text)', EQUIPMENT_HIRE: 'var(--hf-orange-text)', LEASE: 'var(--hf-success-text-strong)',
+  SUPPLY: 'var(--hf-sky-text)', SUBCONTRACTOR: 'var(--hf-danger-text)', SERVICE_LEVEL: 'var(--hf-indigo-text)',
+  CONSULTING: 'var(--hf-pink-text)', RETAINER: 'var(--hf-warning-text-deep)', ACKNOWLEDGMENT_OF_DEBT: 'var(--hf-warning-text-strong)', OTHER: 'var(--hf-text-muted)',
 }
 
 interface Template {
@@ -55,12 +55,12 @@ interface Template {
 
 const inp: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
-  border: '1.5px solid #E2E8F0', borderRadius: 8,
-  fontSize: 14, boxSizing: 'border-box', background: '#fff', outline: 'none',
+  border: '1.5px solid var(--hf-border)', borderRadius: 8,
+  fontSize: 14, boxSizing: 'border-box', background: 'var(--hf-surface)', outline: 'none',
 }
 const lbl: React.CSSProperties = {
   display: 'block', fontSize: 12,
-  fontWeight: 600, color: '#374151', marginBottom: 4,
+  fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 4,
 }
 const MODAL: React.CSSProperties = {
   position: 'fixed', inset: 0,
@@ -95,7 +95,7 @@ function TemplateCard({ template, onCopyVar, copied }: {
   const [expanded, setExpanded] = useState(false)
   const [mode,     setMode]     = useState<'rendered' | 'source'>('rendered')
 
-  const color    = TYPE_COLOR[template.contractType] ?? '#64748B'
+  const color    = TYPE_COLOR[template.contractType] ?? 'var(--hf-text-muted)'
   const varKeys  = template.variables ? Object.keys(template.variables) : []
   const typeLabel = CONTRACT_TYPES.find(t => t.value === template.contractType)?.label ?? template.contractType.replace(/_/g, ' ')
 
@@ -109,7 +109,7 @@ function TemplateCard({ template, onCopyVar, copied }: {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)', marginBottom: 5 }}>{template.name}</div>
-            <span style={{ background: `${color}18`, color, border: `1px solid ${color}30`, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+            <span style={{ background: `color-mix(in srgb, ${color} 9%, transparent)`, color, border: `1px solid color-mix(in srgb, ${color} 19%, transparent)`, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
               {typeLabel}
             </span>
           </div>
@@ -142,7 +142,7 @@ function TemplateCard({ template, onCopyVar, copied }: {
                   border: '1px solid var(--hf-border)', cursor: 'pointer',
                   transition: 'background 0.1s',
                 }}>
-                {copied === v ? <Check size={9} color="#166534" /> : <Copy size={9} />}
+                {copied === v ? <Check size={9} style={{ color: 'var(--hf-success-text-strong)' }} /> : <Copy size={9} />}
                 {`{{${v}}}`}
               </button>
             ))}
@@ -263,7 +263,7 @@ export default function TemplatesTab() {
       {systemTemplates.length > 0 && (
         <div style={{ marginBottom: 28 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14 }}>
-            <Lock size={11} color="#94A3B8" />
+            <Lock size={11} style={{ color: 'var(--hf-text-faint)' }} />
             <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--hf-text-faint)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>
               System Templates — SA standard contracts
             </span>
@@ -305,7 +305,7 @@ export default function TemplatesTab() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>New Contract Template</h3>
               <button onClick={() => setShowCreate(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}>
-                <X size={20} color="#94A3B8" />
+                <X size={20} style={{ color: 'var(--hf-text-faint)' }} />
               </button>
             </div>
 

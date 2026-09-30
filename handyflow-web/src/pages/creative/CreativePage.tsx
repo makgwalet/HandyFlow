@@ -42,20 +42,20 @@ interface Summary { briefingCount: number; inProgressCount: number; awaitingAppr
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const STATUS: Record<string, { label: string; color: string; bg: string; border: string; dot: string }> = {
-  BRIEFING:          { label: 'Brief',             color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', dot: '#A78BFA' },
-  IN_PROGRESS:       { label: 'In Progress',       color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', dot: '#F59E0B' },
-  AWAITING_APPROVAL: { label: 'Awaiting Approval', color: '#1D4ED8', bg: '#EFF6FF', border: '#BFDBFE', dot: '#60A5FA' },
-  IN_REVISION:       { label: 'In Revision',       color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', dot: '#EF4444' },
-  APPROVED:          { label: 'Approved',           color: '#166534', bg: '#DCFCE7', border: '#86EFAC', dot: '#22C55E' },
-  DELIVERED:         { label: 'Delivered',          color: '#0D9488', bg: '#F0FDF9', border: '#99F6E4', dot: '#2DD4BF' },
-  INVOICED:          { label: 'Invoiced',           color: '#0369A1', bg: '#E0F2FE', border: '#BAE6FD', dot: '#38BDF8' },
-  CANCELLED:         { label: 'Cancelled',          color: '#94A3B8', bg: '#F8FAFC', border: '#E2E8F0', dot: '#CBD5E1' },
+  BRIEFING:          { label: 'Brief',             color: 'var(--hf-violet-text)', bg: 'var(--hf-violet-soft)', border: 'var(--hf-violet-border)', dot: 'var(--hf-violet-dot)' },
+  IN_PROGRESS:       { label: 'In Progress',       color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)', border: 'var(--hf-warning-border)', dot: 'var(--hf-warning)' },
+  AWAITING_APPROVAL: { label: 'Awaiting Approval', color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)', border: 'var(--hf-info-border)', dot: 'var(--hf-info-dot)' },
+  IN_REVISION:       { label: 'In Revision',       color: 'var(--hf-danger-text)', bg: 'var(--hf-danger-soft)', border: 'var(--hf-danger-border)', dot: 'var(--hf-danger)' },
+  APPROVED:          { label: 'Approved',           color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)', border: 'var(--hf-success-border)', dot: 'var(--hf-success)' },
+  DELIVERED:         { label: 'Delivered',          color: 'var(--hf-accent-text)', bg: 'var(--hf-accent-soft)', border: 'var(--hf-accent-border)', dot: 'var(--hf-accent-dot)' },
+  INVOICED:          { label: 'Invoiced',           color: 'var(--hf-sky-text-strong)', bg: 'var(--hf-sky-soft-strong)', border: 'var(--hf-sky-border)', dot: 'var(--hf-sky-dot)' },
+  CANCELLED:         { label: 'Cancelled',          color: 'var(--hf-text-faint)', bg: 'var(--hf-surface-muted)', border: 'var(--hf-border)', dot: 'var(--hf-border-strong)' },
 }
 const PRIORITY: Record<string, { color: string; bg: string }> = {
-  LOW:    { color: '#64748B', bg: '#F8FAFC' },
-  NORMAL: { color: '#1D4ED8', bg: '#EFF6FF' },
-  HIGH:   { color: '#D97706', bg: '#FFFBEB' },
-  URGENT: { color: '#DC2626', bg: '#FEF2F2' },
+  LOW:    { color: 'var(--hf-text-muted)', bg: 'var(--hf-surface-muted)' },
+  NORMAL: { color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)' },
+  HIGH:   { color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)' },
+  URGENT: { color: 'var(--hf-danger-text)', bg: 'var(--hf-danger-soft)' },
 }
 const JOB_TYPES = ['LOGO','SOCIAL_MEDIA','VIDEO','PHOTOGRAPHY','PRINT','WEB_DESIGN','ANIMATION','COPYWRITING','BRANDING','ILLUSTRATION','PACKAGING','PRESENTATION','OTHER']
 const TYPE_ICON: Record<string, any> = {
@@ -67,8 +67,8 @@ const TYPE_ICON: Record<string, any> = {
 const PIPELINE_STATUSES = ['BRIEFING','IN_PROGRESS','AWAITING_APPROVAL','IN_REVISION','APPROVED','DELIVERED']
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-const inp: React.CSSProperties = { width: '100%', padding: '9px 12px', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' as const, background: '#fff', outline: 'none' }
-const lbl: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }
+const inp: React.CSSProperties = { width: '100%', padding: '9px 12px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' as const, background: 'var(--hf-surface)', outline: 'none' }
+const lbl: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }
 const fmtDate  = (d: any) => d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 const fmtDT    = (d: any) => d ? new Date(d).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'
 const fmtR     = (n: any) => n ? `R ${Number(n).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}` : '—'
@@ -79,8 +79,8 @@ const formatTimecode = (seconds: number) => {
 const isOverdue = (d: string | null, status: string) =>
   d && !['APPROVED','DELIVERED','INVOICED','CANCELLED'].includes(status) && new Date(d) < new Date()
 
-const btnPrimary: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, background: '#1B3A6B', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }
-const btnSecondary: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', border: '1.5px solid #E2E8F0', borderRadius: 8, background: '#fff', fontSize: 13, cursor: 'pointer', color: '#374151', fontWeight: 500 }
+const btnPrimary: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }
+const btnSecondary: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', border: '1.5px solid var(--hf-border)', borderRadius: 8, background: 'var(--hf-surface)', fontSize: 13, cursor: 'pointer', color: 'var(--hf-text-secondary)', fontWeight: 500 }
 
 // ── Confirm Modal ──────────────────────────────────────────────────────────
 function ConfirmModal({ title, message, confirmLabel = 'Confirm', danger = false, onConfirm, onCancel }: {
@@ -92,7 +92,7 @@ function ConfirmModal({ title, message, confirmLabel = 'Confirm', danger = false
       <div style={{ background: 'var(--hf-surface)', borderRadius: 14, padding: 28, width: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 22 }}>
           <div style={{ width: 40, height: 40, borderRadius: '50%', background: danger ? 'var(--hf-danger-soft)' : 'var(--hf-info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <AlertTriangle size={18} color={danger ? '#DC2626' : '#1D4ED8'} />
+            <AlertTriangle size={18} style={{ color: danger ? 'var(--hf-danger-text)' : 'var(--hf-info-text)' }} />
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--hf-text)', marginBottom: 6 }}>{title}</div>
@@ -338,11 +338,11 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
   const TABS = ['details','proofs','brief','deliverables'] as const
 
   const ACTIONS: Record<string, { label: string; action: string; color: string; bg: string; next: string }[]> = {
-    BRIEFING:          [{ label: 'Start work', action: 'START', color: '#D97706', bg: '#FFFBEB', next: 'IN_PROGRESS' }],
-    IN_PROGRESS:       [{ label: 'Send for approval', action: 'SEND', color: '#1D4ED8', bg: '#EFF6FF', next: 'AWAITING_APPROVAL' }],
-    AWAITING_APPROVAL: [{ label: 'Mark approved', action: 'APPROVE', color: '#166534', bg: '#DCFCE7', next: 'APPROVED' }, { label: 'Request revision', action: 'REVISE', color: '#DC2626', bg: '#FEF2F2', next: 'IN_REVISION' }],
-    IN_REVISION:       [{ label: 'Resume work', action: 'START', color: '#D97706', bg: '#FFFBEB', next: 'IN_PROGRESS' }],
-    APPROVED:          [{ label: 'Mark delivered', action: 'DELIVER', color: '#0D9488', bg: '#F0FDF9', next: 'DELIVERED' }],
+    BRIEFING:          [{ label: 'Start work', action: 'START', color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)', next: 'IN_PROGRESS' }],
+    IN_PROGRESS:       [{ label: 'Send for approval', action: 'SEND', color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)', next: 'AWAITING_APPROVAL' }],
+    AWAITING_APPROVAL: [{ label: 'Mark approved', action: 'APPROVE', color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)', next: 'APPROVED' }, { label: 'Request revision', action: 'REVISE', color: 'var(--hf-danger-text)', bg: 'var(--hf-danger-soft)', next: 'IN_REVISION' }],
+    IN_REVISION:       [{ label: 'Resume work', action: 'START', color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)', next: 'IN_PROGRESS' }],
+    APPROVED:          [{ label: 'Mark delivered', action: 'DELIVER', color: 'var(--hf-accent-text)', bg: 'var(--hf-accent-soft)', next: 'DELIVERED' }],
     DELIVERED:         [],
   }
   const currentActions = ACTIONS[job.status] ?? []
@@ -388,12 +388,12 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
               const isPast   = PIPELINE_STATUSES.indexOf(job.status) > i
               return (
                 <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
-                  <div style={{ flex: 1, padding: '4px 8px', borderRadius: 6, background: isCurrent ? cfg.bg : isPast ? 'var(--hf-success-soft)' : 'var(--hf-surface-muted)', border: `1px solid ${isCurrent ? cfg.border : isPast ? '#86EFAC' : '#E2E8F0'}`, textAlign: 'center' as const }}>
+                  <div style={{ flex: 1, padding: '4px 8px', borderRadius: 6, background: isCurrent ? cfg.bg : isPast ? 'var(--hf-success-soft)' : 'var(--hf-surface-muted)', border: `1px solid ${isCurrent ? cfg.border : isPast ? 'var(--hf-success-border)' : 'var(--hf-border)'}`, textAlign: 'center' as const }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: isCurrent ? cfg.color : isPast ? 'var(--hf-success-text-strong)' : 'var(--hf-text-faint)', whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {isPast && !isCurrent ? '✓ ' : ''}{cfg.label}
                     </div>
                   </div>
-                  {i < PIPELINE_STATUSES.length - 1 && <ChevronRight size={10} color="#CBD5E1" style={{ flexShrink: 0 }} />}
+                  {i < PIPELINE_STATUSES.length - 1 && <ChevronRight size={10} style={{ color: 'var(--hf-text-disabled)', flexShrink: 0 }} />}
                 </div>
               )
             })}
@@ -428,7 +428,7 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
           <div style={{ display: 'flex', gap: 0, marginTop: 16 }}>
             {TABS.map(t => (
               <button key={t} onClick={() => setTab(t)}
-                style={{ padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t ? 'var(--hf-primary-text)' : 'var(--hf-text-faint)', borderBottom: `2px solid ${tab === t ? '#1B3A6B' : 'transparent'}`, marginBottom: -1, textTransform: 'capitalize' }}>
+                style={{ padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t ? 'var(--hf-primary-text)' : 'var(--hf-text-faint)', borderBottom: `2px solid ${tab === t ? 'var(--hf-primary)' : 'transparent'}`, marginBottom: -1, textTransform: 'capitalize' }}>
                 {t === 'proofs' ? `Proofs (${(proofs as Proof[]).length})` : t === 'deliverables' ? `Deliverables (${(deliverables as Deliverable[]).length})` : t}
               </button>
             ))}
@@ -512,10 +512,10 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {(proofs as Proof[]).map((proof) => {
-                    const ps = proof.status === 'APPROVED' ? { color: '#166534', bg: '#DCFCE7', label: 'Approved' }
-                             : proof.status === 'REJECTED'   ? { color: '#DC2626', bg: '#FEF2F2', label: 'Changes requested' }
-                             : proof.status === 'SUPERSEDED' ? { color: '#94A3B8', bg: '#F8FAFC', label: 'Superseded' }
-                             : { color: '#D97706', bg: '#FFFBEB', label: 'Pending review' }
+                    const ps = proof.status === 'APPROVED' ? { color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)', label: 'Approved' }
+                             : proof.status === 'REJECTED'   ? { color: 'var(--hf-danger-text)', bg: 'var(--hf-danger-soft)', label: 'Changes requested' }
+                             : proof.status === 'SUPERSEDED' ? { color: 'var(--hf-text-faint)', bg: 'var(--hf-surface-muted)', label: 'Superseded' }
+                             : { color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)', label: 'Pending review' }
                     return (
                       <div key={proof.id} style={{ border: '1px solid var(--hf-border)', borderRadius: 12, padding: '16px 18px', background: proof.status === 'APPROVED' ? 'var(--hf-success-soft)' : 'var(--hf-surface)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
@@ -551,7 +551,7 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                                 .map((c, i) => ({
                                   id: c.id, x: c.anchorX!, y: c.anchorY!,
                                   label: String(i + 1),
-                                  color: c.authorType === 'CLIENT' ? '#0D9488' : '#1B3A6B',
+                                  color: c.authorType === 'CLIENT' ? 'var(--hf-accent-text)' : 'var(--hf-primary-text)',
                                   onClick: () => {
                                     setHighlightedCommentId(c.id)
                                     document.getElementById(`staff-comment-${c.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -630,12 +630,12 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                               {proof.approvers.map(a => {
                                 const badge = a.status === 'APPROVED'
-                                  ? { bg: '#DCFCE7', color: '#166534', label: 'Approved' }
+                                  ? { bg: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', label: 'Approved' }
                                   : a.status === 'REJECTED'
-                                  ? { bg: '#FEF2F2', color: '#DC2626', label: 'Rejected' }
+                                  ? { bg: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', label: 'Rejected' }
                                   : a.sentAt
-                                  ? { bg: '#EFF6FF', color: '#1D4ED8', label: 'Awaiting review' }
-                                  : { bg: '#F1F5F9', color: '#94A3B8', label: 'Waiting for turn' }
+                                  ? { bg: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', label: 'Awaiting review' }
+                                  : { bg: 'var(--hf-surface-sunken)', color: 'var(--hf-text-faint)', label: 'Waiting for turn' }
                                 return (
                                   <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 10px', background: 'var(--hf-surface-muted)', borderRadius: 6 }}>
                                     <span style={{ fontSize: 12, color: 'var(--hf-text-secondary)' }}>{a.approvalOrder}. {a.approverName}</span>
@@ -742,7 +742,7 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                     <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid var(--hf-border)', borderRadius: 10, background: 'var(--hf-accent-soft)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--hf-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <FileText size={16} color="#fff" />
+                          <FileText size={16} style={{ color: 'var(--hf-text-on-solid)' }} />
                         </div>
                         <div>
                           <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)' }}>{d.fileName}</div>
@@ -752,7 +752,7 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
                           {d.notes && <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 1 }}>{d.notes}</div>}
                         </div>
                       </div>
-                      <CheckCircle size={16} color="#0D9488" />
+                      <CheckCircle size={16} style={{ color: 'var(--hf-accent-text)' }} />
                     </div>
                   ))}
                 </div>
@@ -887,9 +887,9 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={lbl}>Proof file *</label>
-                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '28px 20px', border: `2px dashed ${uploadFile ? '#0D9488' : '#E2E8F0'}`, borderRadius: 10, cursor: 'pointer', background: uploadFile ? 'var(--hf-accent-soft)' : 'var(--hf-surface-muted)', transition: 'all 0.15s' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '28px 20px', border: `2px dashed ${uploadFile ? 'var(--hf-accent)' : 'var(--hf-border)'}`, borderRadius: 10, cursor: 'pointer', background: uploadFile ? 'var(--hf-accent-soft)' : 'var(--hf-surface-muted)', transition: 'all 0.15s' }}>
                   <input type="file" style={{ display: 'none' }} onChange={e => handleFileInput(e, (b64, name, type) => { setUploadFile(b64); setUploadName(name); setUploadType(type) })} />
-                  {uploadFile ? <><CheckCircle size={24} color="#0D9488" /><span style={{ fontSize: 13, color: 'var(--hf-accent-text)', fontWeight: 600 }}>{uploadName}</span></> : <><Upload size={24} color="#94A3B8" /><span style={{ fontSize: 13, color: 'var(--hf-text-muted)' }}>Click to select file</span><span style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>Images, PDFs, videos — up to your storage plan</span></>}
+                  {uploadFile ? <><CheckCircle size={24} style={{ color: 'var(--hf-accent-text)' }} /><span style={{ fontSize: 13, color: 'var(--hf-accent-text)', fontWeight: 600 }}>{uploadName}</span></> : <><Upload size={24} style={{ color: 'var(--hf-text-faint)' }} /><span style={{ fontSize: 13, color: 'var(--hf-text-muted)' }}>Click to select file</span><span style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>Images, PDFs, videos — up to your storage plan</span></>}
                 </label>
               </div>
               <div><label style={lbl}>Version title (optional)</label><input value={uploadNotes} onChange={e => setUploadNotes(e.target.value)} placeholder="e.g. Version 2 — revised colours" style={inp} /></div>
@@ -918,9 +918,9 @@ function JobDetailModal({ job, onClose, onRefresh }: { job: Job; onClose: () => 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={lbl}>Final file *</label>
-                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '28px 20px', border: `2px dashed ${delFile ? '#0D9488' : '#E2E8F0'}`, borderRadius: 10, cursor: 'pointer', background: delFile ? 'var(--hf-accent-soft)' : 'var(--hf-surface-muted)' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '28px 20px', border: `2px dashed ${delFile ? 'var(--hf-accent)' : 'var(--hf-border)'}`, borderRadius: 10, cursor: 'pointer', background: delFile ? 'var(--hf-accent-soft)' : 'var(--hf-surface-muted)' }}>
                   <input type="file" style={{ display: 'none' }} onChange={e => handleFileInput(e, (b64, name, type) => { setDelFile(b64); setDelName(name) })} />
-                  {delFile ? <><CheckCircle size={24} color="#0D9488" /><span style={{ fontSize: 13, color: 'var(--hf-accent-text)', fontWeight: 600 }}>{delName}</span></> : <><Package size={24} color="#94A3B8" /><span style={{ fontSize: 13, color: 'var(--hf-text-muted)' }}>Click to select final file</span></>}
+                  {delFile ? <><CheckCircle size={24} style={{ color: 'var(--hf-accent-text)' }} /><span style={{ fontSize: 13, color: 'var(--hf-accent-text)', fontWeight: 600 }}>{delName}</span></> : <><Package size={24} style={{ color: 'var(--hf-text-faint)' }} /><span style={{ fontSize: 13, color: 'var(--hf-text-muted)' }}>Click to select final file</span></>}
                 </label>
               </div>
               <div><label style={lbl}>Notes (optional)</label><input value={delNotes} onChange={e => setDelNotes(e.target.value)} placeholder="e.g. Final print-ready PDF" style={inp} /></div>
@@ -1163,13 +1163,13 @@ export function CreativePage() {
   })
 
   const kpis = [
-    { label: 'Briefing',          value: summary?.briefingCount ?? 0,          color: '#7C3AED', bg: '#F5F3FF' },
-    { label: 'In Progress',        value: summary?.inProgressCount ?? 0,        color: '#D97706', bg: '#FFFBEB' },
-    { label: 'Awaiting Approval',  value: summary?.awaitingApprovalCount ?? 0,  color: '#1D4ED8', bg: '#EFF6FF' },
-    { label: 'In Revision',        value: summary?.inRevisionCount ?? 0,        color: '#DC2626', bg: '#FEF2F2' },
-    { label: 'Approved',           value: summary?.approvedCount ?? 0,          color: '#166534', bg: '#DCFCE7' },
-    { label: 'Delivered',          value: summary?.deliveredCount ?? 0,         color: '#0D9488', bg: '#F0FDF9' },
-    { label: 'Overdue',            value: summary?.overdueCount ?? 0,           color: summary?.overdueCount ? '#DC2626' : '#94A3B8', bg: summary?.overdueCount ? '#FEF2F2' : '#F8FAFC' },
+    { label: 'Briefing',          value: summary?.briefingCount ?? 0,          color: 'var(--hf-violet-text)', bg: 'var(--hf-violet-soft)' },
+    { label: 'In Progress',        value: summary?.inProgressCount ?? 0,        color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)' },
+    { label: 'Awaiting Approval',  value: summary?.awaitingApprovalCount ?? 0,  color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)' },
+    { label: 'In Revision',        value: summary?.inRevisionCount ?? 0,        color: 'var(--hf-danger-text)', bg: 'var(--hf-danger-soft)' },
+    { label: 'Approved',           value: summary?.approvedCount ?? 0,          color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)' },
+    { label: 'Delivered',          value: summary?.deliveredCount ?? 0,         color: 'var(--hf-accent-text)', bg: 'var(--hf-accent-soft)' },
+    { label: 'Overdue',            value: summary?.overdueCount ?? 0,           color: summary?.overdueCount ? 'var(--hf-danger-text)' : 'var(--hf-text-faint)', bg: summary?.overdueCount ? 'var(--hf-danger-soft)' : 'var(--hf-surface-muted)' },
   ]
 
   return (
@@ -1179,7 +1179,7 @@ export function CreativePage() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--hf-violet)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Palette size={18} color="#fff" />
+              <Palette size={18} style={{ color: 'var(--hf-text-on-solid)' }} />
             </div>
             <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>Creative Studio</h1>
           </div>
@@ -1255,15 +1255,15 @@ export function CreativePage() {
               const overdue = isOverdue(job.dueDate, job.status)
               return (
                 <div key={job.id} onClick={() => setSelectedJob(job)}
-                  style={{ border: `1px solid ${overdue ? '#FCA5A5' : '#E5E7EB'}`, borderLeft: `3px solid ${cfg.dot}`, borderRadius: 12, padding: '18px 20px', cursor: 'pointer', background: 'var(--hf-surface)', transition: 'box-shadow 0.15s' }}
+                  style={{ border: `1px solid ${overdue ? 'var(--hf-danger-border)' : 'var(--hf-border)'}`, borderLeft: `3px solid ${cfg.dot}`, borderRadius: 12, padding: '18px 20px', cursor: 'pointer', background: 'var(--hf-surface)', transition: 'box-shadow 0.15s' }}
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                     <div style={{ width: 38, height: 38, borderRadius: 9, background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Icon size={18} color={cfg.color} />
+                      <Icon size={18} style={{ color: cfg.color }} />
                     </div>
                     <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-                      {overdue && <AlertTriangle size={12} color="#DC2626" />}
+                      {overdue && <AlertTriangle size={12} style={{ color: 'var(--hf-danger-text)' }} />}
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700 }}>
                         <span style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.dot }} />{cfg.label}
                       </span>

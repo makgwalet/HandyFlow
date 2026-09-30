@@ -20,12 +20,12 @@ interface Bill {
 }
 
 const STATUS: Record<string, { color: string; bg: string; border: string; dot: string; label: string }> = {
-  DRAFT:            { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)", dot: "#CBD5E1", label: "Draft" },
-  SECOND_APPROVAL:  { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", border: "var(--hf-violet-border)", dot: "#A78BFA", label: "Awaiting 2nd approval" },
+  DRAFT:            { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)", dot: "var(--hf-border-strong)", label: "Draft" },
+  SECOND_APPROVAL:  { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", border: "var(--hf-violet-border)", dot: "var(--hf-violet-dot)", label: "Awaiting 2nd approval" },
   APPROVED:  { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", border: "var(--hf-success-border)", dot: "var(--hf-success)", label: "Approved" },
   PAID:      { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", border: "var(--hf-info-border)", dot: "var(--hf-info)", label: "Paid" },
   OVERDUE:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)", dot: "var(--hf-danger)", label: "Overdue" },
-  CANCELLED: { color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)", dot: "#CBD5E1", label: "Cancelled" },
+  CANCELLED: { color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)", dot: "var(--hf-border-strong)", label: "Cancelled" },
   // FIX (P1 backlog): this key was simply missing — a rejected bill was
   // falling through to the STATUS.DRAFT fallback and showing a "Draft"
   // badge, which is actively wrong, not just an omission.
@@ -51,7 +51,7 @@ function ConfirmModal({ title, message, confirmLabel, danger = false, loading = 
       <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 28, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
         <div style={{ display: "flex", gap: 14, marginBottom: 20 }}>
           <div style={{ width: 40, height: 40, borderRadius: "50%", background: danger ? "var(--hf-danger-soft)" : "var(--hf-success-soft-strong)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            {danger ? <AlertTriangle size={18} color="#DC2626" /> : <CheckCircle size={18} color="#166534" />}
+            {danger ? <AlertTriangle size={18} style={{ color: 'var(--hf-danger-text)' }} /> : <CheckCircle size={18} style={{ color: 'var(--hf-success-text-strong)' }} />}
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>{title}</div>
@@ -217,7 +217,7 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
           padding: "12px 16px", background: "var(--hf-warning-soft)", border: "1.5px solid var(--hf-warning-border)", borderRadius: 10,
           marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <AlertTriangle size={16} color="#D97706" />
+            <AlertTriangle size={16} style={{ color: 'var(--hf-warning-text)' }} />
             <span style={{ fontSize: 13, color: "var(--hf-warning-text-deep)" }}>{duplicateWarning}</span>
           </div>
           <button onClick={() => setDuplicateWarning("")}
@@ -234,7 +234,7 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
             const cfg = STATUS[s]; const active = statusFilter === s
             return (
               <button key={s} onClick={() => setStatus(s)}
-                style={{ padding: "6px 13px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: active ? 700 : 500, border: `1.5px solid ${active && cfg ? cfg.border : "#E2E8F0"}`, background: active && cfg ? cfg.bg : "var(--hf-surface)", color: active && cfg ? cfg.color : "var(--hf-text-muted)", display: "flex", alignItems: "center", gap: 5 }}>
+                style={{ padding: "6px 13px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: active ? 700 : 500, border: `1.5px solid ${active && cfg ? cfg.border : "var(--hf-border)"}`, background: active && cfg ? cfg.bg : "var(--hf-surface)", color: active && cfg ? cfg.color : "var(--hf-text-muted)", display: "flex", alignItems: "center", gap: 5 }}>
                 {s && cfg && <span style={{ width: 6, height: 6, borderRadius: "50%", background: cfg.dot }} />}
                 {s ? cfg.label : "All bills"}
               </button>
@@ -279,18 +279,18 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
             <tbody>
               {filtered.map((b, i) => {
                 const sc = STATUS[b.status] ?? STATUS.DRAFT
-                const urgency = b.overdue ? "#FEF2F2" : b.daysUntilDue <= 7 && !["PAID","CANCELLED"].includes(b.status) ? "#FFFBEB" : "#fff"
+                const urgency = b.overdue ? "var(--hf-danger-soft)" : b.daysUntilDue <= 7 && !["PAID","CANCELLED"].includes(b.status) ? "var(--hf-warning-soft)" : "var(--hf-surface)"
                 return (
                   <tr key={b.id} onClick={() => setSelected(b)}
-                    style={{ background: i % 2 === 0 ? urgency : urgency === "#fff" ? "var(--hf-surface-muted)" : urgency, cursor: "pointer", transition: "background 0.1s" }}
+                    style={{ background: i % 2 === 0 ? urgency : urgency === "var(--hf-surface)" ? "var(--hf-surface-muted)" : urgency, cursor: "pointer", transition: "background 0.1s" }}
                     onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--hf-sky-soft)"}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? urgency : urgency === "#fff" ? "var(--hf-surface-muted)" : urgency}>
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? urgency : urgency === "var(--hf-surface)" ? "var(--hf-surface-muted)" : urgency}>
                     <td style={{ padding: "12px 16px" }}>
                       <div style={{ fontWeight: 700, color: "var(--hf-text)" }}>{b.supplierName}</div>
                       <div style={{ fontSize: 11, color: "var(--hf-text-faint)", display: "flex", alignItems: "center", gap: 6, marginTop: 1 }}>
                         #{b.billNumber}
-                        {b.hasAttachment && <Paperclip size={10} color="#94A3B8" />}
-                        {b.hasPop && <CheckCircle size={10} color="#0D9488" />}
+                        {b.hasAttachment && <Paperclip size={10} style={{ color: 'var(--hf-text-faint)' }} />}
+                        {b.hasPop && <CheckCircle size={10} style={{ color: 'var(--hf-accent-text)' }} />}
                       </div>
                     </td>
                     <td style={{ padding: "12px 16px", fontSize: 12, color: "var(--hf-text-muted)" }}>{CAT_LABELS[b.category] ?? b.category}</td>
@@ -329,7 +329,7 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
                           </button>
                         )}
                         {b.batchId && <span style={{ fontSize: 10, color: "var(--hf-violet-text)", fontWeight: 600 }}>In batch</span>}
-                        <ChevronRight size={14} color="#94A3B8" />
+                        <ChevronRight size={14} style={{ color: 'var(--hf-text-faint)' }} />
                       </div>
                     </td>
                   </tr>
@@ -418,11 +418,11 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
 
             {/* Evidence */}
             <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-              <button onClick={() => setShowAttachUpload(true)} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", border: `1.5px solid ${selected.hasAttachment ? "#86EFAC" : "#E2E8F0"}`, borderRadius: 9, background: selected.hasAttachment ? "var(--hf-success-soft)" : "var(--hf-surface)", fontSize: 12, cursor: "pointer", color: selected.hasAttachment ? "var(--hf-success-text-strong)" : "var(--hf-text-muted)", fontWeight: 600 }}>
+              <button onClick={() => setShowAttachUpload(true)} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", border: `1.5px solid ${selected.hasAttachment ? "var(--hf-success-border)" : "var(--hf-border)"}`, borderRadius: 9, background: selected.hasAttachment ? "var(--hf-success-soft)" : "var(--hf-surface)", fontSize: 12, cursor: "pointer", color: selected.hasAttachment ? "var(--hf-success-text-strong)" : "var(--hf-text-muted)", fontWeight: 600 }}>
                 <Paperclip size={13} /> {selected.hasAttachment ? "Invoice uploaded" : "Upload invoice"}
               </button>
               {["PAID"].includes(selected.status) && (
-                <button onClick={() => setShowPopUpload(true)} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", border: `1.5px solid ${selected.hasPop ? "#86EFAC" : "#E2E8F0"}`, borderRadius: 9, background: selected.hasPop ? "var(--hf-success-soft)" : "var(--hf-surface)", fontSize: 12, cursor: "pointer", color: selected.hasPop ? "var(--hf-success-text-strong)" : "var(--hf-text-muted)", fontWeight: 600 }}>
+                <button onClick={() => setShowPopUpload(true)} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", border: `1.5px solid ${selected.hasPop ? "var(--hf-success-border)" : "var(--hf-border)"}`, borderRadius: 9, background: selected.hasPop ? "var(--hf-success-soft)" : "var(--hf-surface)", fontSize: 12, cursor: "pointer", color: selected.hasPop ? "var(--hf-success-text-strong)" : "var(--hf-text-muted)", fontWeight: 600 }}>
                   <Upload size={13} /> {selected.hasPop ? "POP uploaded" : "Upload POP"}
                 </button>
               )}
@@ -592,11 +592,11 @@ export function BillsTab({ onRefreshSummary }: { onRefreshSummary: () => void })
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{showAttachUpload ? "Upload invoice document" : "Upload proof of payment"}</h3>
               <button onClick={() => { setShowAttachUpload(false); setShowPopUpload(false) }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={18} /></button>
             </div>
-            <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "28px", border: `2px dashed ${(showAttachUpload ? attFile : popFile) ? "#0D9488" : "#E2E8F0"}`, borderRadius: 10, cursor: "pointer", background: (showAttachUpload ? attFile : popFile) ? "var(--hf-accent-soft)" : "var(--hf-surface-muted)" }}>
+            <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "28px", border: `2px dashed ${(showAttachUpload ? attFile : popFile) ? "var(--hf-accent)" : "var(--hf-border)"}`, borderRadius: 10, cursor: "pointer", background: (showAttachUpload ? attFile : popFile) ? "var(--hf-accent-soft)" : "var(--hf-surface-muted)" }}>
               <input type="file" style={{ display: "none" }} onChange={e => showAttachUpload ? handleFile(e, setAttFile, setAttName) : handleFile(e, setPopFile, setPopName)} />
               {(showAttachUpload ? attFile : popFile)
-                ? <><CheckCircle size={24} color="#0D9488" /><span style={{ fontSize: 13, color: "var(--hf-accent-text)", fontWeight: 600 }}>{showAttachUpload ? attName : popName}</span></>
-                : <><Upload size={24} color="#94A3B8" /><span style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>Click to select PDF or image</span></>}
+                ? <><CheckCircle size={24} style={{ color: 'var(--hf-accent-text)' }} /><span style={{ fontSize: 13, color: "var(--hf-accent-text)", fontWeight: 600 }}>{showAttachUpload ? attName : popName}</span></>
+                : <><Upload size={24} style={{ color: 'var(--hf-text-faint)' }} /><span style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>Click to select PDF or image</span></>}
             </label>
             {error && <div style={{ marginTop: 10, padding: "8px 12px", background: "var(--hf-danger-soft)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>

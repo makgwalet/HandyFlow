@@ -11,19 +11,19 @@ const PROPERTY_TYPES = ["RESIDENTIAL","COMMERCIAL","INDUSTRIAL","RETAIL","MIXED_
 const UNIT_TYPES     = ["STUDIO","1BED","2BED","3BED","4BED","PENTHOUSE","COMMERCIAL","RETAIL","WAREHOUSE","PARKING","OTHER"]
 
 const TYPE_COLOR: Record<string, string> = {
-  RESIDENTIAL: "#1D4ED8", COMMERCIAL: "#0D9488", INDUSTRIAL: "#D97706",
-  RETAIL: "#7C3AED", MIXED_USE: "#166534", LAND: "#92400E", OTHER: "#64748B",
+  RESIDENTIAL: "var(--hf-info-text)", COMMERCIAL: "var(--hf-accent-text)", INDUSTRIAL: "var(--hf-warning-text)",
+  RETAIL: "var(--hf-violet-text)", MIXED_USE: "var(--hf-success-text-strong)", LAND: "var(--hf-warning-text-deep)", OTHER: "var(--hf-text-muted)",
 }
 
 const STATUS_CFG: Record<string, { color: string; bg: string }> = {
-  VACANT:      { color: "#166534", bg: "#DCFCE7" },
-  OCCUPIED:    { color: "#1D4ED8", bg: "#EFF6FF" },
-  MAINTENANCE: { color: "#D97706", bg: "#FFFBEB" },
-  RESERVED:    { color: "#7C3AED", bg: "#F5F3FF" },
+  VACANT:      { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+  OCCUPIED:    { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+  MAINTENANCE: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+  RESERVED:    { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)" },
 }
 
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none", background: "#fff" }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none", background: "var(--hf-surface)" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
 
 export default function PropertiesTab() {
   const qc = useQueryClient()
@@ -111,7 +111,7 @@ export default function PropertiesTab() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {(properties as any[]).map(p => {
-            const color = TYPE_COLOR[p.propertyType] ?? "#64748B"
+            const color = TYPE_COLOR[p.propertyType] ?? "var(--hf-text-muted)"
             const isOpen = expanded === p.id
             const pct    = p.totalUnits > 0 ? Math.round((p.occupiedUnits / p.totalUnits) * 100) : 0
 
@@ -122,7 +122,7 @@ export default function PropertiesTab() {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                       <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{p.name}</span>
-                      <span style={{ background: `${color}18`, color, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{p.propertyType.replace("_"," ")}</span>
+                      <span style={{ background: `color-mix(in srgb, ${color} 9%, transparent)`, color, padding: "1px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{p.propertyType.replace("_"," ")}</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 12, color: "var(--hf-text-muted)" }}>
                       {p.address && <span><MapPin size={11} style={{ verticalAlign: "middle", marginRight: 2 }} />{p.address.suburb}, {p.address.city}</span>}
@@ -131,7 +131,7 @@ export default function PropertiesTab() {
                       {p.marketValue > 0 && <span style={{ fontWeight: 600, color: "var(--hf-primary-text)" }}>{fmtR(p.marketValue)}</span>}
                     </div>
                   </div>
-                  {isOpen ? <ChevronUp size={16} color="#94A3B8" /> : <ChevronDown size={16} color="#94A3B8" />}
+                  {isOpen ? <ChevronUp size={16} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={16} style={{ color: 'var(--hf-text-faint)' }} />}
                 </div>
 
                 {isOpen && (
@@ -161,7 +161,7 @@ export default function PropertiesTab() {
                       ) : (
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
                           {units.map((u: any) => {
-                            const sc = STATUS_CFG[u.status] ?? { color: "#64748B", bg: "#F8FAFC" }
+                            const sc = STATUS_CFG[u.status] ?? { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)" }
                             return (
                               <div key={u.id} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "12px 14px" }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>

@@ -9,21 +9,21 @@ import {
 
 const fmtDT = (d: any) => d ? new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"
 const fmtR  = (n: any) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "Free"
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
 
 const GUEST_STATUS: Record<string, { color: string; bg: string }> = {
-  REGISTERED:  { color: "#0284C7", bg: "#E0F2FE" },
-  CONFIRMED:   { color: "#166534", bg: "#DCFCE7" },
-  CHECKED_IN:  { color: "#166534", bg: "#DCFCE7" },
-  CANCELLED:   { color: "#94A3B8", bg: "#F1F5F9" },
-  NO_SHOW:     { color: "#DC2626", bg: "#FEF2F2" },
+  REGISTERED:  { color: "var(--hf-sky-text)", bg: "var(--hf-sky-soft-strong)" },
+  CONFIRMED:   { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+  CHECKED_IN:  { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+  CANCELLED:   { color: "var(--hf-text-faint)", bg: "var(--hf-surface-sunken)" },
+  NO_SHOW:     { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
 }
 const PAY_STATUS: Record<string, { color: string; bg: string }> = {
-  FREE:    { color: "#166534", bg: "#DCFCE7" },
-  PAID:    { color: "#166534", bg: "#DCFCE7" },
-  PENDING: { color: "#D97706", bg: "#FFFBEB" },
-  REFUNDED:{ color: "#64748B", bg: "#F1F5F9" },
+  FREE:    { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+  PAID:    { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+  PENDING: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+  REFUNDED:{ color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
 }
 
 interface Props {
@@ -180,10 +180,10 @@ export default function GuestsTab({ eventId, eventTitle, onChangeEvent }: Props)
       {stats && (
         <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
           {[
-            { l: "Registered",   v: stats.totalRegistered,  color: "#0284C7", bg: "#E0F2FE" },
-            { l: "Checked in",   v: stats.totalCheckedIn,   color: "#166534", bg: "#DCFCE7" },
-            { l: "Vendors",      v: stats.totalVendors,     color: "#D97706", bg: "#FFFBEB" },
-            { l: "Attendance %", v: stats.totalRegistered > 0 ? `${Math.round(stats.totalCheckedIn / stats.totalRegistered * 100)}%` : "—", color: "#7C3AED", bg: "#F5F3FF" },
+            { l: "Registered",   v: stats.totalRegistered,  color: "var(--hf-sky-text)", bg: "var(--hf-sky-soft-strong)" },
+            { l: "Checked in",   v: stats.totalCheckedIn,   color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+            { l: "Vendors",      v: stats.totalVendors,     color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+            { l: "Attendance %", v: stats.totalRegistered > 0 ? `${Math.round(stats.totalCheckedIn / stats.totalRegistered * 100)}%` : "—", color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)" },
           ].map(s => (
             <div key={s.l} style={{ background: s.bg, borderRadius: 8, padding: "8px 14px" }}>
               <div style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.v}</div>
@@ -262,8 +262,8 @@ export default function GuestsTab({ eventId, eventTitle, onChangeEvent }: Props)
             </thead>
             <tbody>
               {filtered.map((g: any, i: number) => {
-                const gs = GUEST_STATUS[g.status]  ?? { color: "#64748B", bg: "#F1F5F9" }
-                const ps = PAY_STATUS[g.paymentStatus] ?? { color: "#64748B", bg: "#F1F5F9" }
+                const gs = GUEST_STATUS[g.status]  ?? { color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" }
+                const ps = PAY_STATUS[g.paymentStatus] ?? { color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" }
                 return (
                   <tr key={g.id} style={{ borderBottom: "1px solid var(--hf-border-subtle)", background: i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)" }}>
                     <td style={{ padding: "10px 14px", fontFamily: "monospace", fontSize: 11, color: "var(--hf-text-muted)" }}>{g.ticketNumber}</td>
@@ -308,7 +308,7 @@ export default function GuestsTab({ eventId, eventTitle, onChangeEvent }: Props)
             <div style={{ padding: "22px 28px 18px", borderBottom: "1px solid var(--hf-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, display: "flex", alignItems: "center", gap: 8 }}>
-                  <QrCode size={20} color="#0284C7" /> QR Check-in
+                  <QrCode size={20} style={{ color: 'var(--hf-sky-text)' }} /> QR Check-in
                 </h3>
                 <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--hf-text-muted)" }}>
                   Scan a QR code, type a ticket number (e.g. EVT-2026-00001-0001), or click a guest row to check in
@@ -358,17 +358,17 @@ export default function GuestsTab({ eventId, eventTitle, onChangeEvent }: Props)
                 {/* Result display */}
                 {checkInResult && (() => {
                   const cfg: Record<string, { bg: string; color: string; border: string; icon: any; label: string }> = {
-                    SUCCESS:            { bg: "#DCFCE7", color: "#166534", border: "#86EFAC", icon: UserCheck,    label: "Welcome!" },
-                    ALREADY_CHECKED_IN: { bg: "#FFFBEB", color: "#D97706", border: "#FDE68A", icon: AlertTriangle, label: "Already checked in" },
-                    CANCELLED_TICKET:   { bg: "#FEF2F2", color: "#DC2626", border: "#FECACA", icon: UserX,         label: "Cancelled ticket" },
-                    NOT_FOUND:          { bg: "#FEF2F2", color: "#DC2626", border: "#FECACA", icon: UserX,         label: "Not found" },
-                    ERROR:              { bg: "#FEF2F2", color: "#DC2626", border: "#FECACA", icon: AlertTriangle, label: "Error" },
+                    SUCCESS:            { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "var(--hf-success-border)", icon: UserCheck,    label: "Welcome!" },
+                    ALREADY_CHECKED_IN: { bg: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", border: "var(--hf-warning-border)", icon: AlertTriangle, label: "Already checked in" },
+                    CANCELLED_TICKET:   { bg: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "var(--hf-danger-border)", icon: UserX,         label: "Cancelled ticket" },
+                    NOT_FOUND:          { bg: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "var(--hf-danger-border)", icon: UserX,         label: "Not found" },
+                    ERROR:              { bg: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "var(--hf-danger-border)", icon: AlertTriangle, label: "Error" },
                   }
                   const c   = cfg[checkInResult.result] ?? cfg.NOT_FOUND
                   const Icon = c.icon
                   return (
                     <div style={{ padding: "16px", background: c.bg, border: `1px solid ${c.border}`, borderRadius: 12, textAlign: "center" as const }}>
-                      <Icon size={32} color={c.color} style={{ marginBottom: 8 }} />
+                      <Icon size={32} style={{ color: c.color, marginBottom: 8 }} />
                       <div style={{ fontWeight: 800, fontSize: 16, color: c.color, marginBottom: 6 }}>{c.label}</div>
                       {checkInResult.guestName && checkInResult.guestName !== "Unknown" && (
                         <div style={{ fontWeight: 700, fontSize: 17, color: "var(--hf-text)", marginBottom: 2 }}>{checkInResult.guestName}</div>
@@ -411,7 +411,7 @@ export default function GuestsTab({ eventId, eventTitle, onChangeEvent }: Props)
                         style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between",
                           padding: "10px 14px", marginBottom: 6, borderRadius: 9,
-                          border: `1px solid ${isCheckedIn ? "#86EFAC" : "#E2E8F0"}`,
+                          border: `1px solid ${isCheckedIn ? "var(--hf-success-border)" : "var(--hf-border)"}`,
                           background: isCheckedIn ? "var(--hf-success-soft)" : "var(--hf-surface)",
                           cursor: isCheckedIn ? "default" : "pointer",
                           transition: "all 0.15s",
@@ -423,7 +423,7 @@ export default function GuestsTab({ eventId, eventTitle, onChangeEvent }: Props)
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 14, color: "var(--hf-text)", display: "flex", alignItems: "center", gap: 7 }}>
                             {g.fullName}
-                            {isCheckedIn && <UserCheck size={13} color="#166534" />}
+                            {isCheckedIn && <UserCheck size={13} style={{ color: 'var(--hf-success-text-strong)' }} />}
                           </div>
                           <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 1 }}>
                             {g.ticketNumber}
@@ -528,7 +528,7 @@ export default function GuestsTab({ eventId, eventTitle, onChangeEvent }: Props)
             {(tiers as any[]).length > 0 && (
               <div style={{ marginBottom: 20 }}>
                 {(tiers as any[]).map((t: any) => (
-                  <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", border: "1px solid var(--hf-border)", borderRadius: 9, marginBottom: 8, background: t.available === 0 ? "#FFF8F8" : "var(--hf-surface)" }}>
+                  <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", border: "1px solid var(--hf-border)", borderRadius: 9, marginBottom: 8, background: t.available === 0 ? "color-mix(in srgb, var(--hf-danger-soft) 50%, var(--hf-surface))" : "var(--hf-surface)" }}>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{t.name}</div>
                       <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>
@@ -580,7 +580,7 @@ export default function GuestsTab({ eventId, eventTitle, onChangeEvent }: Props)
           <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 28, width: 380, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
               <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--hf-danger-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <UserX size={20} color="#DC2626" />
+                <UserX size={20} style={{ color: 'var(--hf-danger-text)' }} />
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>Cancel registration?</div>

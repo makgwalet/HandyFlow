@@ -97,7 +97,7 @@ const fmtDate = (d: string | null) =>
 
 const inp: React.CSSProperties = {
   width: '100%', padding: '10px 12px', border: '1.5px solid var(--hf-border)',
-  borderRadius: 9, fontSize: 14, boxSizing: 'border-box', background: 'white', outline: 'none',
+  borderRadius: 9, fontSize: 14, boxSizing: 'border-box', background: 'var(--hf-surface)', outline: 'none',
 }
 
 // ── Root Page ─────────────────────────────────────────────────────────────────
@@ -119,25 +119,25 @@ export function InvoicingPage() {
         <div style={{ display: 'flex', gap: 8 }}>
           {activeTab === 'quotes' && (
             <button onClick={() => navigate('/quotes/new')}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
               <Plus size={15} /> New Quote
             </button>
           )}
           {activeTab === 'recurring' && (
             <>
               <button onClick={() => navigate('/recurring/variable-hours/new')}
-                style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'white', color: 'var(--hf-warning-text)', border: '1.5px solid var(--hf-warning-border)', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-surface)', color: 'var(--hf-warning-text)', border: '1.5px solid var(--hf-warning-border)', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
                 <Gauge size={15} /> Variable-Hours Contract
               </button>
               <button onClick={() => navigate('/recurring/new')}
-                style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-accent)', color: 'white', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-accent)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
                 <Plus size={15} /> New Schedule
               </button>
             </>
           )}
           {activeTab === 'invoices' && (
             <button onClick={() => navigate('/invoices/retainer/new')}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-violet)', color: 'white', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-violet)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
               <Plus size={15} /> Retainer Invoice
             </button>
           )}
@@ -156,7 +156,7 @@ export function InvoicingPage() {
               display: 'flex', alignItems: 'center', gap: 7,
               padding: '8px 20px', borderRadius: 9, border: 'none',
               fontSize: 14, fontWeight: 600, cursor: 'pointer',
-              background: activeTab === tab.key ? 'white' : 'transparent',
+              background: activeTab === tab.key ? 'var(--hf-surface)' : 'transparent',
               color:      activeTab === tab.key ? 'var(--hf-primary-text)' : 'var(--hf-text-muted)',
               boxShadow:  activeTab === tab.key ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
               transition: 'all 0.15s',
@@ -194,14 +194,14 @@ function QuotesTab() {
           { label: 'Sent',     value: quotes.filter(q => q.status === 'SENT').length,     color: 'var(--hf-info-text)' },
           { label: 'Accepted', value: quotes.filter(q => q.status === 'ACCEPTED').length, color: 'var(--hf-success-text-strong)' },
         ].map(s => (
-          <div key={s.label} style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '14px 18px' }}>
+          <div key={s.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '14px 18px' }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
         {isLoading ? <LoadingRow text="Loading quotes..." /> :
          isError   ? <ErrorRow /> :
          quotes.length === 0 ? <EmptyRow icon={FileText} text="No quotes yet" sub="Create your first quote to get started." /> : (
@@ -222,7 +222,7 @@ function QuotesTab() {
                     onClick={() => navigate(`/quotes/${q.id}`)}
                     style={{ borderBottom: '1px solid var(--hf-border-subtle)', cursor: 'pointer' }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--hf-surface-muted)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
+                    onMouseLeave={e => (e.currentTarget.style.background = 'var(--hf-surface)')}>
                     <td style={{ padding: '14px 16px' }}>
                       <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700, color: 'var(--hf-info-text)' }}>{q.quoteNumber}</span>
                     </td>
@@ -251,7 +251,7 @@ function QuotesTab() {
                     <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--hf-text-muted)' }}>
                       {q.expiresAt ? new Date(q.expiresAt).toLocaleDateString('en-ZA') : '—'}
                     </td>
-                    <td style={{ padding: '14px 16px' }}><Eye size={15} color="#94A3B8" /></td>
+                    <td style={{ padding: '14px 16px' }}><Eye size={15} style={{ color: 'var(--hf-text-faint)' }} /></td>
                   </tr>
                 )
               })}
@@ -418,7 +418,7 @@ function InvoicesTab() {
           { label: 'Revenue',        value: fmtR(totalRevenue),               fmt: true,  color: 'var(--hf-accent-text)' },
           { label: 'Outstanding',    value: fmtR(totalOutstanding),           fmt: true,  color: overdueCount > 0 ? 'var(--hf-danger-text)' : 'var(--hf-warning-text)' },
         ].map(s => (
-          <div key={s.label} style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '14px 18px' }}>
+          <div key={s.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '14px 18px' }}>
             <div style={{ fontSize: s.fmt ? 16 : 24, fontWeight: 700, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 2 }}>{s.label}</div>
           </div>
@@ -432,7 +432,7 @@ function InvoicesTab() {
             <button key={s} onClick={() => setStatusFilter(s)}
               style={{ padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
                 background: statusFilter === s ? 'var(--hf-primary)' : 'var(--hf-surface-sunken)',
-                color:      statusFilter === s ? 'white'   : 'var(--hf-text-muted)' }}>
+                color:      statusFilter === s ? 'var(--hf-text-on-solid)'   : 'var(--hf-text-muted)' }}>
               {s === 'ALL' ? 'All status' : (INVOICE_STATUS[s]?.label ?? s)}
               {s !== 'ALL' && ` (${invoices.filter(i => i.status === s).length})`}
             </button>
@@ -444,7 +444,7 @@ function InvoicesTab() {
             <button key={t} onClick={() => setTypeFilter(t)}
               style={{ padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
                 background: typeFilter === t ? 'var(--hf-violet)' : 'var(--hf-surface-sunken)',
-                color:      typeFilter === t ? 'white'   : 'var(--hf-text-muted)' }}>
+                color:      typeFilter === t ? 'var(--hf-text-on-solid)'   : 'var(--hf-text-muted)' }}>
               {t === 'ALL' ? 'All types' : t === 'RECURRING_INSTANCE' ? 'Recurring' : t === 'RETAINER' ? 'Retainer' : 'Standard'}
             </button>
           ))}
@@ -452,7 +452,7 @@ function InvoicesTab() {
       </div>
 
       {/* Table */}
-      <div style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
         {isLoading ? <LoadingRow text="Loading invoices..." /> :
          isError   ? <ErrorRow /> :
          filtered.length === 0 ? <EmptyRow icon={FileText} text="No invoices" sub="Convert an accepted quote, create a retainer, or let a recurring schedule fire." /> : (
@@ -482,15 +482,15 @@ function InvoicesTab() {
                   <>
                     <tr key={inv.id}
                       onClick={() => setExpanded(isExp ? null : inv.id)}
-                      style={{ borderBottom: '1px solid var(--hf-border-subtle)', cursor: 'pointer', background: isExp ? 'var(--hf-surface-muted)' : 'white' }}
+                      style={{ borderBottom: '1px solid var(--hf-border-subtle)', cursor: 'pointer', background: isExp ? 'var(--hf-surface-muted)' : 'var(--hf-surface)' }}
                       onMouseEnter={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = 'var(--hf-surface-muted)' }}
-                      onMouseLeave={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = 'white' }}>
+                      onMouseLeave={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = 'var(--hf-surface)' }}>
 
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <FileText size={14} color={isRetainer ? '#7C3AED' : isRecurring ? '#0D9488' : '#64748B'} />
+                          <FileText size={14} style={{ color: isRetainer ? 'var(--hf-violet-text)' : isRecurring ? 'var(--hf-accent-text)' : 'var(--hf-text-muted)' }} />
                           <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)' }}>{inv.invoiceNumber}</span>
-                          {isExp ? <ChevronUp size={13} color="#94A3B8" /> : <ChevronDown size={13} color="#94A3B8" />}
+                          {isExp ? <ChevronUp size={13} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={13} style={{ color: 'var(--hf-text-faint)' }} />}
                         </div>
                         {/* Type badges */}
                         <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
@@ -538,21 +538,21 @@ function InvoicesTab() {
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
                           {inv.status === 'DRAFT' && (
-                            <ActionBtn icon={Send} label="Issue" color="#1D4ED8" bg="#EFF6FF" border="#BFDBFE"
+                            <ActionBtn icon={Send} label="Issue" color="var(--hf-info-text)" bg="var(--hf-info-soft)" border="var(--hf-info-border)"
                               onClick={() => issueInvoice.mutate(inv.id)} disabled={issueInvoice.isPending} />
                           )}
                           {['ISSUED','PARTIALLY_PAID','OVERDUE'].includes(inv.status) && (
-                            <ActionBtn icon={CheckCircle} label="Mark paid" color="#166534" bg="#F0FDF4" border="#BBF7D0"
+                            <ActionBtn icon={CheckCircle} label="Mark paid" color="var(--hf-success-text-strong)" bg="var(--hf-success-soft)" border="var(--hf-success-border-subtle)"
                               onClick={() => { setPayModal(inv); setPayError(''); setPayForm(f => ({ ...f, amount: String(inv.total - (inv.amountPaid ?? 0)) })) }} />
                           )}
                           {isRetainer && ['ISSUED','PARTIALLY_PAID','PAID'].includes(inv.status) && (
-                            <ActionBtn icon={Timer} label="Log hrs" color="#7C3AED" bg="#F3E8FF" border="#DDD6FE"
+                            <ActionBtn icon={Timer} label="Log hrs" color="var(--hf-violet-text)" bg="var(--hf-violet-soft-strong)" border="var(--hf-violet-border)"
                               onClick={() => { setHoursModal(inv); setHoursError(''); setHoursForm({ hours: '', note: '' }) }} />
                           )}
-                          <ActionBtn icon={Download} label={downloading === inv.id ? '…' : 'PDF'} color="#64748B" bg="#F8FAFC" border="#E2E8F0"
+                          <ActionBtn icon={Download} label={downloading === inv.id ? '…' : 'PDF'} color="var(--hf-text-muted)" bg="var(--hf-surface-muted)" border="var(--hf-border)"
                             onClick={() => downloadPdf(inv)} disabled={downloading === inv.id} />
                           {inv.customerId && (
-                            <ActionBtn icon={FileText} label={downloadingStatement === inv.customerId ? '…' : 'Statement'} color="#0D9488" bg="#F0FDFA" border="#99F6E4"
+                            <ActionBtn icon={FileText} label={downloadingStatement === inv.customerId ? '…' : 'Statement'} color="var(--hf-accent-text)" bg="var(--hf-accent-soft)" border="var(--hf-accent-border)"
                               onClick={() => downloadStatement(inv.customerId!)} disabled={downloadingStatement === inv.customerId} />
                           )}
                         </div>
@@ -565,7 +565,7 @@ function InvoicesTab() {
                           <div style={{ background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border-subtle)', padding: '16px 24px' }}>
                             {/* Retainer detail panel */}
                             {isRetainer && inv.committedHours != null && (
-                              <div style={{ background: 'white', border: '1px solid var(--hf-violet-border)', borderRadius: 10, padding: '14px 18px', marginBottom: 16 }}>
+                              <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-violet-border)', borderRadius: 10, padding: '14px 18px', marginBottom: 16 }}>
                                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-violet-text)', letterSpacing: '0.06em', marginBottom: 10 }}>RETAINER HOURS</div>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
                                   {[
@@ -636,7 +636,7 @@ function InvoicesTab() {
                                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', letterSpacing: '0.06em' }}>CREDIT NOTES</div>
                                 {inv.status !== 'DRAFT' && (
                                   <button onClick={() => { setCreditNoteModal(inv); setCreditNoteError('') }}
-                                    style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', color: 'var(--hf-danger-text-strong)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                    style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--hf-surface)', color: 'var(--hf-danger-text-strong)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                                     <FileMinus size={13} /> Issue credit note
                                   </button>
                                 )}
@@ -707,7 +707,7 @@ function InvoicesTab() {
             onConfirm={() => markPaid.mutate({ id: payModal.id, body: { amountPaid: Number(payForm.amount), paymentMethod: payForm.paymentMethod, reference: payForm.reference || undefined, paidDate: undefined } })}
             confirmLabel={markPaid.isPending ? 'Saving...' : 'Confirm payment'}
             disabled={!payForm.amount || markPaid.isPending}
-            confirmColor="#16A34A" />
+            confirmColor="var(--hf-success)" />
         </Modal>
       )}
 
@@ -734,7 +734,7 @@ function InvoicesTab() {
             </div>
             {Number(hoursForm.hours) > 0 && (Number(hoursForm.hours) + (hoursModal.hoursConsumed ?? 0)) > (hoursModal.committedHours ?? Infinity) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--hf-warning-soft)', border: '1px solid var(--hf-warning-border-strong)', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: 'var(--hf-warning-text-deep)' }}>
-                <AlertTriangle size={14} color="#F59E0B" />
+                <AlertTriangle size={14} style={{ color: 'var(--hf-warning-text)' }} />
                 This will exceed the committed hours — invoice will enter <strong>overage</strong>.
               </div>
             )}
@@ -745,7 +745,7 @@ function InvoicesTab() {
             onConfirm={() => logHours.mutate({ id: hoursModal.id, body: { hours: Number(hoursForm.hours), note: hoursForm.note || undefined } })}
             confirmLabel={logHours.isPending ? 'Saving...' : 'Log hours'}
             disabled={!hoursForm.hours || logHours.isPending}
-            confirmColor="#7C3AED" />
+            confirmColor="var(--hf-violet)" />
         </Modal>
       )}
 
@@ -797,7 +797,7 @@ function InvoicesTab() {
             })}
             confirmLabel={createCreditNote.isPending ? 'Issuing...' : 'Issue credit note'}
             disabled={!creditNoteForm.reason || !creditNoteForm.amount || createCreditNote.isPending}
-            confirmColor="#B43C32" />
+            confirmColor="var(--hf-danger)" />
         </Modal>
       )}
     </div>
@@ -892,7 +892,7 @@ function RecurringTab() {
           { label: 'Paused',          value: paused,           fmt: false, color: 'var(--hf-warning-text-deep)' },
           { label: 'Monthly MRR',     value: fmtR(monthlyMRR), fmt: true,  color: 'var(--hf-accent-text)' },
         ].map(s => (
-          <div key={s.label} style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '14px 18px' }}>
+          <div key={s.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '14px 18px' }}>
             <div style={{ fontSize: s.fmt ? 18 : 24, fontWeight: 700, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 2 }}>{s.label}</div>
           </div>
@@ -908,18 +908,18 @@ function RecurringTab() {
         </div>
       </div>
 
-      <div style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
         {isLoading ? <LoadingRow text="Loading schedules..." /> :
          isError   ? <ErrorRow /> :
          schedules.length === 0 ? (
           <div style={{ padding: '60px 24px', textAlign: 'center' }}>
-            <RefreshCw size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
+            <RefreshCw size={36} style={{ color: 'var(--hf-text-disabled)', marginBottom: 12 }} />
             <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)', marginBottom: 4 }}>No recurring schedules yet</div>
             <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', marginBottom: 20 }}>
               Set up automatic monthly invoicing for mining site security, equipment rentals, or any regular service.
             </div>
             <button onClick={() => navigate('/recurring/new')}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'var(--hf-accent)', color: 'white', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'var(--hf-accent)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
               <Plus size={15} /> Create first schedule
             </button>
           </div>
@@ -942,15 +942,15 @@ function RecurringTab() {
                   <>
                     <tr key={s.id}
                       onClick={() => setExpanded(isExp ? null : s.id)}
-                      style={{ borderBottom: '1px solid var(--hf-border-subtle)', cursor: 'pointer', background: isExp ? 'var(--hf-accent-soft)' : 'white' }}
+                      style={{ borderBottom: '1px solid var(--hf-border-subtle)', cursor: 'pointer', background: isExp ? 'var(--hf-accent-soft)' : 'var(--hf-surface)' }}
                       onMouseEnter={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = 'var(--hf-surface-muted)' }}
-                      onMouseLeave={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = 'white' }}>
+                      onMouseLeave={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = 'var(--hf-surface)' }}>
 
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <RefreshCw size={14} color="#0D9488" />
+                          <RefreshCw size={14} style={{ color: 'var(--hf-accent-text)' }} />
                           <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)' }}>{s.title}</span>
-                          {isExp ? <ChevronUp size={13} color="#94A3B8" /> : <ChevronDown size={13} color="#94A3B8" />}
+                          {isExp ? <ChevronUp size={13} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={13} style={{ color: 'var(--hf-text-faint)' }} />}
                         </div>
                       </td>
                       <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)' }}>{displayName(s)}</td>
@@ -967,19 +967,19 @@ function RecurringTab() {
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
                           {s.status === 'ACTIVE' && (
-                            <ActionBtn icon={Pause} label="Pause" color="#92400E" bg="#FEF3C7" border="#FCD34D"
+                            <ActionBtn icon={Pause} label="Pause" color="var(--hf-warning-text-deep)" bg="var(--hf-warning-soft-strong)" border="var(--hf-warning-border-strong)"
                               onClick={() => pause.mutate(s.id)} disabled={pause.isPending} />
                           )}
                           {s.variableHours && s.status === 'ACTIVE' && (
-                            <ActionBtn icon={Timer} label="Log hrs" color="#D97706" bg="#FFFBEB" border="#FDE68A"
+                            <ActionBtn icon={Timer} label="Log hrs" color="var(--hf-warning-text)" bg="var(--hf-warning-soft)" border="var(--hf-warning-border)"
                               onClick={() => { setCycleHoursModal(s); setCycleHoursError(''); setCycleHoursForm({ actualHours: '', periodLabel: '', operatorNotes: '' }) }} />
                           )}
                           {s.status === 'PAUSED' && (
-                            <ActionBtn icon={Play} label="Resume" color="#166534" bg="#F0FDF4" border="#BBF7D0"
+                            <ActionBtn icon={Play} label="Resume" color="var(--hf-success-text-strong)" bg="var(--hf-success-soft)" border="var(--hf-success-border-subtle)"
                               onClick={() => resume.mutate(s.id)} disabled={resume.isPending} />
                           )}
                           {['ACTIVE','PAUSED'].includes(s.status) && (
-                            <ActionBtn icon={Trash2} label="Cancel" color="#DC2626" bg="#FEF2F2" border="#FECACA"
+                            <ActionBtn icon={Trash2} label="Cancel" color="var(--hf-danger-text)" bg="var(--hf-danger-soft)" border="var(--hf-danger-border)"
                               onClick={() => { if (confirm(`Cancel recurring schedule "${s.title}"?`)) cancel.mutate(s.id) }}
                               disabled={cancel.isPending} />
                           )}
@@ -998,7 +998,7 @@ function RecurringTab() {
                             )}
 
                             {s.variableHours ? (
-                              <div style={{ background: 'white', border: '1px solid var(--hf-warning-border)', borderRadius: 10, padding: '14px 18px' }}>
+                              <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-warning-border)', borderRadius: 10, padding: '14px 18px' }}>
                                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-warning-text)', letterSpacing: '0.06em', marginBottom: 10 }}>VARIABLE-HOURS CONTRACT</div>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
                                   {[
@@ -1032,7 +1032,7 @@ function RecurringTab() {
                                   </thead>
                                   <tbody>
                                     {s.lineItems.map((li: any, i: number) => (
-                                      <tr key={i} style={{ borderBottom: i < s.lineItems.length - 1 ? '1px solid #F0FDFA' : 'none' }}>
+                                      <tr key={i} style={{ borderBottom: i < s.lineItems.length - 1 ? '1px solid var(--hf-accent-soft)' : 'none' }}>
                                         <td style={{ padding: '8px 12px', color: 'var(--hf-text-secondary)' }}>{li.description}</td>
                                         <td style={{ padding: '8px 12px', color: 'var(--hf-text-muted)' }}>{li.quantity}</td>
                                         <td style={{ padding: '8px 12px', color: 'var(--hf-text-muted)' }}>{fmtR(li.unitPrice)}</td>
@@ -1097,7 +1097,7 @@ function RecurringTab() {
             </div>
             {Number(cycleHoursForm.actualHours) > 0 && Number(cycleHoursForm.actualHours) < (cycleHoursModal.minimumHoursPerCycle ?? 0) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--hf-warning-soft)', border: '1px solid var(--hf-warning-border-strong)', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: 'var(--hf-warning-text-deep)' }}>
-                <AlertTriangle size={14} color="#F59E0B" />
+                <AlertTriangle size={14} style={{ color: 'var(--hf-warning-text)' }} />
                 Below the {cycleHoursModal.minimumHoursPerCycle}h minimum — the invoice will bill the minimum, not the actual hours worked.
               </div>
             )}
@@ -1115,7 +1115,7 @@ function RecurringTab() {
             })}
             confirmLabel={logCycleHours.isPending ? 'Saving...' : 'Log hours & generate invoice'}
             disabled={!cycleHoursForm.actualHours || !cycleHoursForm.periodLabel || logCycleHours.isPending}
-            confirmColor="#D97706" />
+            confirmColor="var(--hf-warning)" />
         </Modal>
       )}
     </div>
@@ -1131,7 +1131,7 @@ function ActionBtn({ icon: Icon, label, color, bg, border, onClick, disabled }: 
     <button disabled={disabled} onClick={onClick}
       style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px',
         background: disabled ? 'var(--hf-surface-muted)' : bg, color: disabled ? 'var(--hf-text-disabled)' : color,
-        border: `1px solid ${disabled ? '#E2E8F0' : border}`,
+        border: `1px solid ${disabled ? 'var(--hf-border)' : border}`,
         borderRadius: 7, fontSize: 12, fontWeight: 600,
         cursor: disabled ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' as const }}>
       <Icon size={12} />{label}
@@ -1144,7 +1144,7 @@ function Modal({ title, subtitle, children, onClose }: {
 }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(2px)' }}>
-      <div style={{ background: 'white', borderRadius: 16, padding: 28, width: 460, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 28, width: 460, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
           <div>
             <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>{title}</h3>
@@ -1165,13 +1165,13 @@ function ModalFooter({ onCancel, onConfirm, confirmLabel, disabled, confirmColor
   return (
     <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
       <button onClick={onCancel}
-        style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'white', fontSize: 14, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
+        style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'var(--hf-surface)', fontSize: 14, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
         Cancel
       </button>
       <button disabled={disabled} onClick={onConfirm}
         style={{ padding: '10px 22px', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700,
           background: disabled ? 'var(--hf-surface-strong)' : confirmColor,
-          color: disabled ? 'var(--hf-text-faint)' : 'white',
+          color: disabled ? 'var(--hf-text-faint)' : 'var(--hf-text-on-solid)',
           cursor: disabled ? 'not-allowed' : 'pointer' }}>
         {confirmLabel}
       </button>
@@ -1194,7 +1194,7 @@ function LoadingRow({ text }: { text: string }) {
 function ErrorRow() {
   return (
     <div style={{ padding: 60, textAlign: 'center' }}>
-      <AlertCircle size={32} color="#DC2626" style={{ marginBottom: 10 }} />
+      <AlertCircle size={32} style={{ color: 'var(--hf-danger-text)', marginBottom: 10 }} />
       <div style={{ fontWeight: 600, color: 'var(--hf-danger-text)' }}>Failed to load data</div>
       <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', marginTop: 4 }}>Please refresh and try again.</div>
     </div>
@@ -1204,7 +1204,7 @@ function ErrorRow() {
 function EmptyRow({ icon: Icon, text, sub }: { icon: React.ElementType; text: string; sub: string }) {
   return (
     <div style={{ padding: 60, textAlign: 'center', color: 'var(--hf-text-faint)' }}>
-      <Icon size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
+      <Icon size={36} style={{ color: 'var(--hf-text-disabled)', marginBottom: 12 }} />
       <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)', marginBottom: 4 }}>{text}</div>
       <div style={{ fontSize: 13 }}>{sub}</div>
     </div>

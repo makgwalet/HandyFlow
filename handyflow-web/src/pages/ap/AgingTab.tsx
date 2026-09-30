@@ -76,21 +76,21 @@ export default function AgingTab() {
       <div style={{ background: "var(--hf-inverse-surface)", borderRadius: 10, padding: "14px 20px", marginBottom: 20,
         display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>Total Outstanding AP</span>
-        <span style={{ fontSize: 22, fontWeight: 800, color: report && report.total > 0 ? "#F87171" : "#4ADE80" }}>
+        <span style={{ fontSize: 22, fontWeight: 800, color: report && report.total > 0 ? "var(--hf-danger-on-inverse)" : "var(--hf-success-on-inverse)" }}>
           {fmtR(report?.total ?? 0)}
         </span>
       </div>
 
       {/* Lines table */}
       {!report || report.lines.length === 0 ? (
-        <div style={{ padding: 60, textAlign: "center", background: "white", border: "1px solid var(--hf-border)",
+        <div style={{ padding: 60, textAlign: "center", background: "var(--hf-surface)", border: "1px solid var(--hf-border)",
           borderRadius: 12, color: "var(--hf-text-faint)" }}>
-          <Users size={36} color="#CBD5E1" style={{ marginBottom: 12 }} />
+          <Users size={36} style={{ color: 'var(--hf-text-disabled)', marginBottom: 12 }} />
           <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)", marginBottom: 4 }}>All clear — no outstanding bills</div>
           <div style={{ fontSize: 13 }}>All bills are either paid, draft, or not yet approved.</div>
         </div>
       ) : (
-        <div style={{ background: "white", border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border-subtle)" }}>
@@ -106,7 +106,7 @@ export default function AgingTab() {
                 return (
                   <tr key={line.billId} style={{ borderBottom: i < report.lines.length - 1 ? "1px solid var(--hf-border-subtle)" : "none" }}
                     onMouseEnter={e => (e.currentTarget.style.background = "var(--hf-surface-muted)")}
-                    onMouseLeave={e => (e.currentTarget.style.background = "white")}>
+                    onMouseLeave={e => (e.currentTarget.style.background = "var(--hf-surface)")}>
                     <td style={{ padding: "12px 16px" }}>
                       <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 700, color: "var(--hf-primary-text)" }}>
                         {line.billNumber}
@@ -121,7 +121,7 @@ export default function AgingTab() {
                     <td style={{ padding: "12px 16px" }}>
                       {line.daysOverdue > 0 ? (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                          <AlertCircle size={12} color="#DC2626" />
+                          <AlertCircle size={12} style={{ color: 'var(--hf-danger-text)' }} />
                           <span style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-danger-text)" }}>{line.daysOverdue} days</span>
                         </span>
                       ) : (

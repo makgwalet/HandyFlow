@@ -11,15 +11,15 @@ const fmtD   = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "n
 const MONTH_NAMES = ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 
 const STATUS_CFG: Record<string, { color: string; bg: string; border: string; icon: React.ElementType }> = {
-  PAID:     { color: "#166534", bg: "#DCFCE7", border: "#86EFAC", icon: CheckCircle  },
-  PARTIAL:  { color: "#D97706", bg: "#FFFBEB", border: "#FDE68A", icon: Clock        },
-  PENDING:  { color: "#1D4ED8", bg: "#EFF6FF", border: "#BFDBFE", icon: Clock        },
-  OVERDUE:  { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", icon: AlertTriangle },
-  WAIVED:   { color: "#64748B", bg: "#F1F5F9", border: "#E2E8F0", icon: CheckCircle  },
+  PAID:     { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", border: "var(--hf-success-border)", icon: CheckCircle  },
+  PARTIAL:  { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)", icon: Clock        },
+  PENDING:  { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", border: "var(--hf-info-border)", icon: Clock        },
+  OVERDUE:  { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)", icon: AlertTriangle },
+  WAIVED:   { color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)", border: "var(--hf-border)", icon: CheckCircle  },
 }
 
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none", background: "#fff" }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none", background: "var(--hf-surface)" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
 
 export default function PaymentsTab({ initialLeaseId }: { initialLeaseId?: string }) {
   const qc = useQueryClient()
@@ -92,7 +92,7 @@ export default function PaymentsTab({ initialLeaseId }: { initialLeaseId?: strin
       {os.length > 0 && (
         <div style={{ marginBottom: 20, padding: "14px 18px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <AlertTriangle size={16} color="#DC2626" />
+            <AlertTriangle size={16} style={{ color: 'var(--hf-danger-text)' }} />
             <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-danger-text)" }}>{os.length} outstanding payment{os.length !== 1 ? "s" : ""}</span>
             <span style={{ fontSize: 13, color: "var(--hf-danger-text-strong)" }}>· Total arrears: <strong>{fmtR(totalArrears)}</strong></span>
           </div>
@@ -106,7 +106,7 @@ export default function PaymentsTab({ initialLeaseId }: { initialLeaseId?: strin
           <div style={{ display: "flex", flexDirection: "column" as const, gap: 6 }}>
             {(leases as any[]).map(l => (
               <button key={l.id} onClick={() => setLease(l)}
-                style={{ width: "100%", textAlign: "left" as const, padding: "10px 14px", border: `1px solid ${selectedLease?.id === l.id ? "#1B3A6B" : "#E2E8F0"}`, background: selectedLease?.id === l.id ? "var(--hf-indigo-soft)" : "var(--hf-surface)", borderRadius: 9, cursor: "pointer" }}>
+                style={{ width: "100%", textAlign: "left" as const, padding: "10px 14px", border: `1px solid ${selectedLease?.id === l.id ? "var(--hf-primary)" : "var(--hf-border)"}`, background: selectedLease?.id === l.id ? "var(--hf-indigo-soft)" : "var(--hf-surface)", borderRadius: 9, cursor: "pointer" }}>
                 <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>{l.lesseeName}</div>
                 <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{fmtR(l.monthlyRent)}/mo · Day {l.paymentDay}</div>
               </button>
@@ -175,7 +175,7 @@ export default function PaymentsTab({ initialLeaseId }: { initialLeaseId?: strin
                     return (
                       <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", border: `1px solid ${cfg.border}`, borderLeft: `3px solid ${cfg.color}`, borderRadius: 8, background: "var(--hf-surface)" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                          <Icon size={16} color={cfg.color} />
+                          <Icon size={16} style={{ color: cfg.color }} />
                           <div>
                             <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>{MONTH_NAMES[p.periodMonth]} {p.periodYear}</div>
                             <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>Due {fmtD(p.dueDate)}{p.paidDate && ` · Paid ${fmtD(p.paidDate)}`}</div>

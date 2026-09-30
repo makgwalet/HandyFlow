@@ -14,10 +14,10 @@ const daysUntil = (d: string) =>
   Math.ceil((new Date(d).getTime() - Date.now()) / 86_400_000)
 
 const TYPE_COLOR: Record<string, string> = {
-  SERVICE_AGREEMENT: '#0D9488', NDA: '#7C3AED', EMPLOYMENT: '#1D4ED8',
-  JOINT_VENTURE: '#D97706', EQUIPMENT_HIRE: '#EA580C', LEASE: '#166534',
-  SUBCONTRACTOR: '#DC2626', SERVICE_LEVEL: '#0891B2', CONSULTING: '#DB2777',
-  RETAINER: '#854D0E', SUPPLY: '#475569', ACKNOWLEDGMENT_OF_DEBT: '#B45309', OTHER: '#64748B',
+  SERVICE_AGREEMENT: 'var(--hf-accent-text)', NDA: 'var(--hf-violet-text)', EMPLOYMENT: 'var(--hf-info-text)',
+  JOINT_VENTURE: 'var(--hf-warning-text)', EQUIPMENT_HIRE: 'var(--hf-orange-text)', LEASE: 'var(--hf-success-text-strong)',
+  SUBCONTRACTOR: 'var(--hf-danger-text)', SERVICE_LEVEL: 'var(--hf-sky-text)', CONSULTING: 'var(--hf-pink-text)',
+  RETAINER: 'var(--hf-warning-text-deep)', SUPPLY: 'var(--hf-text-tertiary)', ACKNOWLEDGMENT_OF_DEBT: 'var(--hf-warning-text-strong)', OTHER: 'var(--hf-text-muted)',
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -56,12 +56,12 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any
 
   // Pipeline stages
   const STAGES = [
-    { label: 'Draft',        count: draft.length,      color: '#64748B', Icon: FileText     },
-    { label: 'Under Review', count: review.length,     color: '#D97706', Icon: Clock        },
-    { label: 'Pending Sign', count: pending.length,    color: '#1D4ED8', Icon: Clock        },
-    { label: 'Signed',       count: signed.length,     color: '#166534', Icon: CheckCircle  },
-    { label: 'Terminated',   count: terminated.length, color: '#DC2626', Icon: XCircle      },
-    { label: 'Expired',      count: expired.length,    color: '#94A3B8', Icon: AlertTriangle },
+    { label: 'Draft',        count: draft.length,      color: 'var(--hf-text-muted)', Icon: FileText     },
+    { label: 'Under Review', count: review.length,     color: 'var(--hf-warning-text)', Icon: Clock        },
+    { label: 'Pending Sign', count: pending.length,    color: 'var(--hf-info-text)', Icon: Clock        },
+    { label: 'Signed',       count: signed.length,     color: 'var(--hf-success-text-strong)', Icon: CheckCircle  },
+    { label: 'Terminated',   count: terminated.length, color: 'var(--hf-danger-text)', Icon: XCircle      },
+    { label: 'Expired',      count: expired.length,    color: 'var(--hf-text-faint)', Icon: AlertTriangle },
   ].filter(s => s.count > 0 || ['Draft', 'Pending Sign', 'Signed'].includes(s.label))
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -71,10 +71,10 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any
       {/* KPI row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
         {[
-          { label: 'Active contracts',      value: signed.length,     color: '#166534', bg: '#DCFCE7' },
-          { label: 'Awaiting signature',    value: pending.length,    color: '#1D4ED8', bg: '#EFF6FF' },
-          { label: 'Active contract value', value: fmtR(totalActiveVal), color: '#1B3A6B', bg: '#EEF2FF' },
-          { label: 'Pending value',         value: fmtR(pendingVal),  color: '#D97706', bg: '#FFFBEB' },
+          { label: 'Active contracts',      value: signed.length,     color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)' },
+          { label: 'Awaiting signature',    value: pending.length,    color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)' },
+          { label: 'Active contract value', value: fmtR(totalActiveVal), color: 'var(--hf-primary-text)', bg: 'var(--hf-indigo-soft)' },
+          { label: 'Pending value',         value: fmtR(pendingVal),  color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 12, padding: '15px 18px' }}>
             <div style={{ fontSize: typeof k.value === 'number' ? 26 : 20, fontWeight: 800, color: k.color }}>
@@ -98,8 +98,8 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any
                 const { Icon } = s
                 return (
                   <div key={s.label} style={{ display: 'flex', alignItems: 'center' }}>
-                    <div style={{ minWidth: 90, background: `${s.color}12`, border: `1px solid ${s.color}30`, borderRadius: 10, padding: '14px 10px', textAlign: 'center' }}>
-                      <Icon size={15} color={s.color} style={{ marginBottom: 6 }} />
+                    <div style={{ minWidth: 90, background: `color-mix(in srgb, ${s.color} 7%, transparent)`, border: `1px solid color-mix(in srgb, ${s.color} 19%, transparent)`, borderRadius: 10, padding: '14px 10px', textAlign: 'center' }}>
+                      <Icon size={15} style={{ color: s.color, marginBottom: 6 }} />
                       <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.count}</div>
                       <div style={{ fontSize: 10, color: s.color, opacity: 0.8, marginTop: 2, lineHeight: 1.3 }}>
                         {s.label}
@@ -118,7 +118,7 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any
           <div style={{ marginBottom: 26 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                <Calendar size={14} color="#D97706" />
+                <Calendar size={14} style={{ color: 'var(--hf-warning-text)' }} />
                 <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)' }}>Expiring within 30 days</span>
                 {expiringSoon.length > 0 && (
                   <span style={{ background: 'var(--hf-warning-soft-strong)', color: 'var(--hf-warning-text)', padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
@@ -145,8 +145,8 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any
                     <div key={c.id} style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       padding: '11px 16px',
-                      border: `1px solid ${urgent ? '#FECACA' : '#FDE68A'}`,
-                      borderLeft: `3px solid ${urgent ? '#DC2626' : '#D97706'}`,
+                      border: `1px solid ${urgent ? 'var(--hf-danger-border)' : 'var(--hf-warning-border)'}`,
+                      borderLeft: `3px solid ${urgent ? 'var(--hf-danger)' : 'var(--hf-warning)'}`,
                       borderRadius: 8,
                       background: urgent ? 'var(--hf-danger-soft)' : 'var(--hf-warning-soft)',
                     }}>
@@ -173,7 +173,7 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <Clock size={14} color="#1D4ED8" />
+                  <Clock size={14} style={{ color: 'var(--hf-info-text)' }} />
                   <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)' }}>Awaiting signature</span>
                 </div>
                 <button onClick={() => onNavigate('contracts')} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--hf-primary-text)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
@@ -212,13 +212,13 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any
           {/* Type breakdown */}
           <div style={{ background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-              <TrendingUp size={13} color="#1B3A6B" />
+              <TrendingUp size={13} style={{ color: 'var(--hf-primary-text)' }} />
               <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)' }}>By contract type</span>
             </div>
             {typeEntries.length === 0 ? (
               <div style={{ fontSize: 13, color: 'var(--hf-text-faint)' }}>No contracts yet</div>
             ) : typeEntries.map(([type, count]) => {
-              const color = TYPE_COLOR[type] ?? '#64748B'
+              const color = TYPE_COLOR[type] ?? 'var(--hf-text-muted)'
               const pct   = Math.round((count / Math.max(cs.length, 1)) * 100)
               return (
                 <div key={type} style={{ marginBottom: 10 }}>
@@ -240,8 +240,8 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any
               Quick actions
             </div>
             {[
-              { label: 'New contract',     tab: 'contracts', color: '#1B3A6B' },
-              { label: 'Browse templates', tab: 'templates', color: '#0D9488' },
+              { label: 'New contract',     tab: 'contracts', color: 'var(--hf-primary-text)' },
+              { label: 'Browse templates', tab: 'templates', color: 'var(--hf-accent-text)' },
             ].map(a => (
               <button key={a.label} onClick={() => onNavigate(a.tab)} style={{
                 width: '100%', marginBottom: 7,

@@ -15,7 +15,7 @@ interface LineItem { tempId: string; catalogueItemId?: string; description: stri
 const inp: React.CSSProperties = {
   width: '100%', padding: '10px 14px', border: '1.5px solid var(--hf-border)',
   borderRadius: 10, fontSize: 14, color: 'var(--hf-text)', outline: 'none',
-  boxSizing: 'border-box', background: 'white',
+  boxSizing: 'border-box', background: 'var(--hf-surface)',
 }
 const inpErr: React.CSSProperties = { ...inp, borderColor: 'var(--hf-danger)', background: 'var(--hf-danger-soft)' }
 
@@ -179,7 +179,7 @@ export function CreateRecurringSchedulePage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
         <button onClick={() => navigate('/recurring')}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', border: '1px solid var(--hf-border)', borderRadius: 9, padding: '7px 12px', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 9, padding: '7px 12px', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
           <ArrowLeft size={15} /> Back
         </button>
         <div>
@@ -200,7 +200,7 @@ export function CreateRecurringSchedulePage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* Schedule details */}
-          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', margin: '0 0 18px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schedule details</p>
 
             {/* Client type */}
@@ -211,7 +211,7 @@ export function CreateRecurringSchedulePage() {
                   <button key={type} onClick={() => setClientType(type)}
                     style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px', borderRadius: 10,
                       border: clientType === type ? '2px solid var(--hf-accent)' : '1.5px solid var(--hf-border)',
-                      background: clientType === type ? 'var(--hf-accent-soft)' : 'white',
+                      background: clientType === type ? 'var(--hf-accent-soft)' : 'var(--hf-surface)',
                       color: clientType === type ? 'var(--hf-accent-text)' : 'var(--hf-text-muted)',
                       fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
                     <Icon size={15} />{label}
@@ -228,7 +228,7 @@ export function CreateRecurringSchedulePage() {
                     <option value="">Select a customer...</option>
                     {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
-                  <ChevronDown size={15} color="#94A3B8" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                  <ChevronDown size={15} style={{ color: 'var(--hf-text-faint)', position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                 </div>
               </Field>
             ) : (
@@ -264,9 +264,9 @@ export function CreateRecurringSchedulePage() {
           </div>
 
           {/* Cadence card */}
-          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
-              <RefreshCw size={15} color="#0D9488" />
+              <RefreshCw size={15} style={{ color: 'var(--hf-accent-text)' }} />
               <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Billing cadence</p>
             </div>
 
@@ -278,7 +278,7 @@ export function CreateRecurringSchedulePage() {
                   <button key={f.value} onClick={() => setFrequency(f.value)}
                     style={{ padding: '10px 8px', borderRadius: 10, textAlign: 'center',
                       border: frequency === f.value ? '2px solid var(--hf-accent)' : '1.5px solid var(--hf-border)',
-                      background: frequency === f.value ? 'var(--hf-accent-soft)' : 'white',
+                      background: frequency === f.value ? 'var(--hf-accent-soft)' : 'var(--hf-surface)',
                       color: frequency === f.value ? 'var(--hf-accent-text)' : 'var(--hf-text-muted)',
                       cursor: 'pointer' }}>
                     <div style={{ fontSize: 13, fontWeight: 700 }}>{f.label}</div>
@@ -309,7 +309,7 @@ export function CreateRecurringSchedulePage() {
           </div>
 
           {/* Line items card */}
-          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--hf-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Line items (template)</p>
@@ -327,7 +327,7 @@ export function CreateRecurringSchedulePage() {
                     <Search size={13} /> Search catalogue
                   </button>
                   {showCatalog && (
-                    <div style={{ position: 'fixed', zIndex: 9999, width: 380, background: 'white', border: '1.5px solid var(--hf-border)', borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,0.15)', overflow: 'hidden' }}
+                    <div style={{ position: 'fixed', zIndex: 9999, width: 380, background: 'var(--hf-surface)', border: '1.5px solid var(--hf-border)', borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,0.15)', overflow: 'hidden' }}
                       ref={el => {
                         if (el && catalogRef.current) {
                           const btn = catalogRef.current.querySelector('button') as HTMLElement
@@ -336,7 +336,7 @@ export function CreateRecurringSchedulePage() {
                       }}>
                       <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--hf-border-subtle)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--hf-surface-muted)', borderRadius: 8, padding: '8px 10px' }}>
-                          <Search size={13} color="#94A3B8" />
+                          <Search size={13} style={{ color: 'var(--hf-text-faint)' }} />
                           <input value={itemSearch} onChange={e => setItemSearch(e.target.value)} placeholder="Type to search..." autoFocus
                             style={{ border: 'none', background: 'none', outline: 'none', fontSize: 13, width: '100%', color: 'var(--hf-text)' }} />
                         </div>
@@ -350,7 +350,7 @@ export function CreateRecurringSchedulePage() {
                           <div key={item.id} onClick={() => addFromCatalogue(item)}
                             style={{ padding: '11px 14px', cursor: 'pointer', borderBottom: '1px solid var(--hf-border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                             onMouseEnter={e => (e.currentTarget.style.background = 'var(--hf-surface-muted)')}
-                            onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
+                            onMouseLeave={e => (e.currentTarget.style.background = 'var(--hf-surface)')}>
                             <div>
                               <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-text)', margin: 0 }}>{item.name}</p>
                               <p style={{ fontSize: 11, color: 'var(--hf-text-faint)', margin: '2px 0 0' }}>{item.categoryName ?? 'Uncategorised'} · {item.unit}</p>
@@ -365,7 +365,7 @@ export function CreateRecurringSchedulePage() {
                   )}
                 </div>
                 <button onClick={addBlank}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: 'white', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                   <Plus size={13} /> Add blank
                 </button>
               </div>
@@ -373,7 +373,7 @@ export function CreateRecurringSchedulePage() {
 
             {lineItems.length === 0 ? (
               <div style={{ padding: '40px 24px', textAlign: 'center' }}>
-                <FileText size={32} color="#CBD5E1" style={{ marginBottom: 10 }} />
+                <FileText size={32} style={{ color: 'var(--hf-text-disabled)', marginBottom: 10 }} />
                 <p style={{ fontSize: 14, color: 'var(--hf-text-faint)', margin: 0 }}>Add line items — these become the template for every invoice</p>
               </div>
             ) : (
@@ -397,7 +397,7 @@ export function CreateRecurringSchedulePage() {
                     <input type="number" value={li.vatRate} onChange={e => updateLine(li.tempId, 'vatRate', parseFloat(e.target.value) || 0)}
                       style={{ ...inp, fontSize: 13, padding: '7px 10px' }} />
                     <button onClick={() => removeLine(li.tempId)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FDA4AF', padding: 4, borderRadius: 6, display: 'flex' }}>
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'color-mix(in srgb, var(--hf-danger-text) 50%, var(--hf-surface))', padding: 4, borderRadius: 6, display: 'flex' }}>
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -409,7 +409,7 @@ export function CreateRecurringSchedulePage() {
 
         {/* Right — summary */}
         <div style={{ position: 'sticky', top: 80 }}>
-          <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Per invoice</p>
 
             {[['Subtotal', fmtR(subtotal)], ['VAT', fmtR(vatTotal)]].map(([l, v]) => (
@@ -441,8 +441,8 @@ export function CreateRecurringSchedulePage() {
 
             <button onClick={handleSubmit} disabled={create.isPending}
               style={{ width: '100%', padding: 12, border: 'none', borderRadius: 10,
-                background: create.isPending ? '#5EEAD4' : 'var(--hf-accent)',
-                color: 'white', fontSize: 14, fontWeight: 700,
+                background: create.isPending ? 'color-mix(in srgb, var(--hf-accent) 45%, var(--hf-surface))' : 'var(--hf-accent)',
+                color: 'var(--hf-text-on-solid)', fontSize: 14, fontWeight: 700,
                 cursor: create.isPending ? 'not-allowed' : 'pointer' }}>
               {create.isPending ? 'Creating...' : 'Create recurring schedule'}
             </button>

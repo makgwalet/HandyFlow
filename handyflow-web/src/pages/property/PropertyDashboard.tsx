@@ -50,7 +50,7 @@ export default function PropertyDashboard({ onNavigate }: {
           {/* Occupancy bar per property */}
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)", marginBottom: 14, display: "flex", alignItems: "center", gap: 7 }}>
-              <Building2 size={14} color="#1B3A6B" /> Portfolio occupancy
+              <Building2 size={14} style={{ color: 'var(--hf-primary-text)' }} /> Portfolio occupancy
             </div>
             {ps.length === 0 ? (
               <div style={{ padding: "24px", border: "1px dashed var(--hf-border)", borderRadius: 10, color: "var(--hf-text-faint)", fontSize: 13, textAlign: "center" as const }}>
@@ -77,7 +77,7 @@ export default function PropertyDashboard({ onNavigate }: {
             <div style={{ marginBottom: 24 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                  <AlertTriangle size={14} color="#DC2626" />
+                  <AlertTriangle size={14} style={{ color: 'var(--hf-danger-text)' }} />
                   <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>Outstanding payments</span>
                 </div>
                 <button onClick={() => onNavigate("payments")}
@@ -91,7 +91,7 @@ export default function PropertyDashboard({ onNavigate }: {
                   const overdue = p.status === "OVERDUE"
                   return (
                     <div key={p.id} onClick={() => onNavigate("payments", { paymentsLeaseId: p.leaseId })}
-                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", border: `1px solid ${overdue ? "#FECACA" : "#FDE68A"}`, borderLeft: `3px solid ${overdue ? "#DC2626" : "#D97706"}`, borderRadius: 8, background: overdue ? "var(--hf-danger-soft)" : "var(--hf-warning-soft)", cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", border: `1px solid ${overdue ? "var(--hf-danger-border)" : "var(--hf-warning-border)"}`, borderLeft: `3px solid ${overdue ? "var(--hf-danger)" : "var(--hf-warning)"}`, borderRadius: 8, background: overdue ? "var(--hf-danger-soft)" : "var(--hf-warning-soft)", cursor: "pointer" }}>
                       <div>
                         <div style={{ fontWeight: 600, fontSize: 13, color: "var(--hf-text)" }}>
                           {p.periodMonth}/{p.periodYear}
@@ -113,7 +113,7 @@ export default function PropertyDashboard({ onNavigate }: {
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                  <Calendar size={14} color="#D97706" />
+                  <Calendar size={14} style={{ color: 'var(--hf-warning-text)' }} />
                   <span style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>Leases expiring soon</span>
                 </div>
                 {/* NEW: this is the exact case the original module review

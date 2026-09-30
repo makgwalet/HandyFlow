@@ -81,7 +81,7 @@ App-wide dry run of step 1: 67 alpha sites and 566 icon props across 224 files.
 
 ## Phase 3 — module rollout (in progress)
 
-**Status (be careful with earlier optimism):** ~2,600 hard-coded colours remain in `src/pages` (of ~17,700 originally), spread over roughly 30 modules, about 20 of which have their own tab strips. Largest remaining: complianceservices (339), clinic (284), projects (179), creative (149), events (141), contracting (136), invoicing (131), auth pages (114), ap (75), debtcollection (72), quotes (66), customers (58), billing (57), property (56), expenses (54), pos (53), settings (52). Re-measure with the inventory in the last section of this file rather than trusting counts written here.
+**Status (be careful with earlier optimism):** 1,714 hard-coded colours remain in `src/pages` (of ~17,700 originally). Largest: complianceservices 339, clinic 284, projects 179, auth pages 114, debtcollection 72, quotes 66, customers 58, billing 57, expenses 54, pos 53, settings 52, catalogue 41, training 38, marketing 34, collectionsagency 32, warehousing 29, internal-audit 24, accountant-portal 24. Re-measure rather than trusting counts written here.
 
 
 Correction to the original analysis: its per-module "tab counts" were file counts. Agriculture has 3 top-level sections, not 20; the other files are drill-down views. Check each module's real navigation before planning.
@@ -151,6 +151,19 @@ The Phase 0 codemod converted the default colour of a new bookable service (`EMP
 - New token `--hf-sky-solid-strong` (sky-700 fill); `#0369A1` and `#F0F7FF` now convert. Per-file `ACCENT` constants split into fill and text tokens by property.
 - Props passed to local components (`ActionBtn`, `KpiCard`, `Metric`) were converted only after checking each component uses them inside `style` (never as SVG attributes).
 - Found, not changed: `scm_shared.tsx` is an unused near-duplicate of `scm.shared.tsx` (the one every tab imports). Only the unused copy supports `ModalFooter`'s `accent` prop, so the amber/red confirm buttons callers ask for have never rendered (existing behaviour). Decide whether to adopt the copy or delete it.
+
+### Events, Contracting, AP, Property (routed) and Creative, Invoicing (colours only) ✅
+- Routed sections: Events `/events/:section` (Events; Selected event: Guests, Vendors, Analytics), Contracting `/contracts/:section` (opens on Contracts; Dashboard; Contracts, Templates), AP `/ap/:section` (Payables: Bills, EFT Batches, Recurring; Suppliers & reporting), Property `/property/:section` (Overview; Portfolio; Operations).
+- Events: the picked event is shared by Guests, Vendors and Analytics. It stays in page state (the page remains mounted across sections) and is shown under the title instead of on the old tab chips.
+- Property: the dashboard hand-off (leases pre-filtered, payments for one lease) moved from state to the URL: `/property/leases?filter=EXPIRING_SOON`, `/property/payments?lease=<id>`.
+- Contracting keeps the `unwrap`/`fmtR` exports its tabs import from `ContractingPage`. AP keeps its summary strip and passes a summary-refresh callback to its tabs. KPI strips ride in the `banner` slot.
+- Creative (single 1,345-line page whose tabs are inside a detail panel) and Invoicing (its Quotes/Invoices/Recurring "tabs" are already three separate top-level routes `/quotes`, `/invoices`, `/recurring`, so there is no single base path for sidebar sections) are colours only.
+- Colours: ~430 converted in the four routed modules plus ~440 across Creative and Invoicing; all six at zero except two canvas literals.
+- Canvas exception: signature pads (`ctx.strokeStyle = '#1B3A6B'` in Contracting's `ContractsTab` and `SigningPage`) stay literal (canvas cannot use CSS variables, and the drawn signature is saved as an image, so it must not follow the theme). Commented in place.
+- Codemod: values in a map named `*_COLOR(S)`/`*_PALETTE` and their `MAP[key] ?? '#hex'` fallbacks are now converted as text colours. New tokens `--hf-pink-text`, `--hf-sky-dot`, `--hf-on-brand-muted` (pale text on the dark brand header); map additions `#6366F1`, `#BE185D`, `#DB2777`, `#38BDF8`, `#93C5FD`.
+- Pending-state button fills (`create.isPending ? '#C4B5FD' : ...`) now tint the base colour toward the surface with `color-mix`, so they adapt to the theme.
+- SVG check: no migrated module feeds a token into an SVG attribute (only the not-yet-migrated `projects/tabs/GanttTab.tsx` does: convert its `fill={...}` to `style` when Projects is done).
+- No double-unwrap sites.
 
 ### Navigation gaps found and fixed
 - 7 modules had dashboard tiles but were missing from the sidebar/Ctrl+K registry (carried over from the old top-nav): collections agency, warehousing, legal & compliance, business compliance & tender, compliance services, debt collection, projects. Added.

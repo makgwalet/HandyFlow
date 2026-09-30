@@ -75,7 +75,7 @@ export default function InspectionsTab() {
           <div style={{ display: "flex", flexDirection: "column" as const, gap: 5 }}>
             {(units as any[]).map(u => (
               <button key={u.id} onClick={() => setUnit(u)}
-                style={{ width: "100%", textAlign: "left" as const, padding: "10px 12px", border: `1px solid ${selectedUnit?.id === u.id ? "#1B3A6B" : "#E2E8F0"}`, background: selectedUnit?.id === u.id ? "var(--hf-indigo-soft)" : "var(--hf-surface)", borderRadius: 9, cursor: "pointer" }}>
+                style={{ width: "100%", textAlign: "left" as const, padding: "10px 12px", border: `1px solid ${selectedUnit?.id === u.id ? "var(--hf-primary)" : "var(--hf-border)"}`, background: selectedUnit?.id === u.id ? "var(--hf-indigo-soft)" : "var(--hf-surface)", borderRadius: 9, cursor: "pointer" }}>
                 <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>Unit {u.unitNumber}</div>
                 <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{u.status}</div>
               </button>

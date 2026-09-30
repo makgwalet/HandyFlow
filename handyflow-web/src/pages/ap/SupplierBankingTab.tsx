@@ -84,7 +84,7 @@ export function SupplierBankingTab() {
 
       {unconfiguredNames.length > 0 && (
         <div style={{ padding: "12px 16px", background: "var(--hf-warning-soft)", border: "1.5px solid var(--hf-warning-border)", borderRadius: 10, marginBottom: 16, display: "flex", gap: 10, alignItems: "flex-start" }}>
-          <AlertTriangle size={15} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
+          <AlertTriangle size={15} style={{ color: 'var(--hf-warning-text)', flexShrink: 0, marginTop: 1 }} />
           <div style={{ fontSize: 12, color: "var(--hf-warning-text-deep)" }}>
             <strong>{unconfiguredNames.length} supplier{unconfiguredNames.length === 1 ? "" : "s"} with bills but no banking details:</strong>{" "}
             {unconfiguredNames.slice(0, 6).join(", ")}{unconfiguredNames.length > 6 ? `, +${unconfiguredNames.length - 6} more` : ""}.

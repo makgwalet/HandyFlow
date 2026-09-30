@@ -9,22 +9,22 @@ import {
 
 const fmtDT = (d: any) => d ? new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"
 const fmtD  = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
-const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string; dot: string }> = {
-  DRAFT:     { label: "Draft",     color: "#64748B", bg: "#F1F5F9", dot: "#94A3B8" },
-  PUBLISHED: { label: "Published", color: "#166534", bg: "#DCFCE7", dot: "#22C55E" },
-  SOLD_OUT:  { label: "Sold out",  color: "#D97706", bg: "#FFFBEB", dot: "#F59E0B" },
-  LIVE:      { label: "Live",      color: "#DC2626", bg: "#FEF2F2", dot: "#EF4444" },
-  COMPLETED: { label: "Completed", color: "#0284C7", bg: "#E0F2FE", dot: "#38BDF8" },
-  CANCELLED: { label: "Cancelled", color: "#94A3B8", bg: "#F8FAFC", dot: "#CBD5E1" },
+  DRAFT:     { label: "Draft",     color: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)", dot: "var(--hf-text-faint)" },
+  PUBLISHED: { label: "Published", color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", dot: "var(--hf-success)" },
+  SOLD_OUT:  { label: "Sold out",  color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", dot: "var(--hf-warning)" },
+  LIVE:      { label: "Live",      color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", dot: "var(--hf-danger)" },
+  COMPLETED: { label: "Completed", color: "var(--hf-sky-text)", bg: "var(--hf-sky-soft-strong)", dot: "var(--hf-sky-dot)" },
+  CANCELLED: { label: "Cancelled", color: "var(--hf-text-faint)", bg: "var(--hf-surface-muted)", dot: "var(--hf-border-strong)" },
 }
 const EVENT_TYPES = ["CONFERENCE","WEDDING","CHURCH","FESTIVAL","CORPORATE","COMMUNITY","FUNDRAISER","GENERAL"]
 const TYPE_COLOR:  Record<string, string> = {
-  CONFERENCE: "#1D4ED8", WEDDING: "#BE185D", CHURCH: "#7C3AED",
-  FESTIVAL: "#D97706", CORPORATE: "#0284C7", COMMUNITY: "#16A34A",
-  FUNDRAISER: "#EA580C", GENERAL: "#64748B",
+  CONFERENCE: "var(--hf-info-text)", WEDDING: "var(--hf-pink-text)", CHURCH: "var(--hf-violet-text)",
+  FESTIVAL: "var(--hf-warning-text)", CORPORATE: "var(--hf-sky-text)", COMMUNITY: "var(--hf-success-text)",
+  FUNDRAISER: "var(--hf-orange-text)", GENERAL: "var(--hf-text-muted)",
 }
 
 interface Props { onSelectEvent: (id: string, title: string) => void }
@@ -117,23 +117,23 @@ export default function EventsListTab({ onSelectEvent }: Props) {
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {filtered.map((e: any) => {
             const sc  = STATUS_CFG[e.status] ?? STATUS_CFG.DRAFT
-            const tc  = TYPE_COLOR[e.eventType] ?? "#64748B"
+            const tc  = TYPE_COLOR[e.eventType] ?? "var(--hf-text-muted)"
             const isLive = e.status === "LIVE"
             return (
               <div key={e.id} style={{
-                border: `1px solid ${isLive ? "#FECACA" : "#E2E8F0"}`,
-                borderLeft: `3px solid ${isLive ? "#EF4444" : tc}`,
-                borderRadius: 10, padding: "16px 20px", background: isLive ? "#FFFAFA" : "var(--hf-surface)",
+                border: `1px solid ${isLive ? "var(--hf-danger-border)" : "var(--hf-border)"}`,
+                borderLeft: `3px solid ${isLive ? "var(--hf-danger)" : tc}`,
+                borderRadius: 10, padding: "16px 20px", background: isLive ? "color-mix(in srgb, var(--hf-danger-soft) 40%, var(--hf-surface))" : "var(--hf-surface)",
                 display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap",
               }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
                     {isLive && <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <Radio size={12} color="#EF4444" /><span style={{ fontSize: 11, color: "var(--hf-danger-text)", fontWeight: 700 }}>LIVE</span>
+                      <Radio size={12} style={{ color: 'var(--hf-danger-text)' }} /><span style={{ fontSize: 11, color: "var(--hf-danger-text)", fontWeight: 700 }}>LIVE</span>
                     </span>}
                     <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{e.title}</span>
                     <span style={{ fontFamily: "monospace", fontSize: 11, color: "var(--hf-text-faint)" }}>{e.eventNumber}</span>
-                    <span style={{ background: `${tc}18`, color: tc, padding: "1px 7px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{e.eventType}</span>
+                    <span style={{ background: `color-mix(in srgb, ${tc} 9%, transparent)`, color: tc, padding: "1px 7px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{e.eventType}</span>
                     <span style={{ background: sc.bg, color: sc.color, padding: "1px 7px", borderRadius: 20, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
                       <span style={{ width: 6, height: 6, borderRadius: "50%", background: sc.dot, display: "inline-block" }} />{sc.label}
                     </span>
@@ -286,7 +286,7 @@ export default function EventsListTab({ onSelectEvent }: Props) {
           <div style={{ background: "var(--hf-surface)", borderRadius: 14, padding: 28, width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.22)" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 22 }}>
               <div style={{ width: 42, height: 42, borderRadius: "50%", background: "var(--hf-danger-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
-                <AlertTriangle size={20} color="#DC2626" />
+                <AlertTriangle size={20} style={{ color: 'var(--hf-danger-text)' }} />
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 16, color: "var(--hf-text)", marginBottom: 6 }}>Cancel event?</div>

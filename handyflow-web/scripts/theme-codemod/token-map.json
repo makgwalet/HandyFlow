@@ -87,6 +87,9 @@
  "#374151": {
   "fg": "text-secondary"
  },
+ "#38BDF8": {
+  "bg": "sky-dot"
+ },
  "#3B82F6": {
   "bg": "info",
   "fg": "info-text"
@@ -108,6 +111,9 @@
  "#5EEAD4": {},
  "#60A5FA": {
   "bg": "info-dot"
+ },
+ "#6366F1": {
+  "fg": "indigo-text"
  },
  "#64748B": {
   "bg": "neutral-solid",
@@ -157,7 +163,8 @@
   "fg": "violet-text"
  },
  "#93C5FD": {
-  "bd": "info-border"
+  "bd": "info-border",
+  "fg": "on-brand-muted"
  },
  "#94A3B8": {
   "bg": "text-faint",
@@ -202,6 +209,9 @@
  "#BE123C": {
   "fg": "danger-text-strong"
  },
+ "#BE185D": {
+  "fg": "pink-text"
+ },
  "#BFDBFE": {
   "bd": "info-border",
   "bg": "info-soft-strong"
@@ -239,6 +249,9 @@
   "bd": "warning",
   "bg": "warning",
   "fg": "warning-text"
+ },
+ "#DB2777": {
+  "fg": "pink-text"
  },
  "#DBEAFE": {
   "bd": "info-border",

@@ -48,6 +48,9 @@
   --hf-info-dot: #60a5fa;
   --hf-violet-dot: #a78bfa;
   --hf-accent-dot: #2dd4bf;
+  --hf-sky-dot: #38bdf8;
+  /* Pale text used on the dark brand header (signing page etc.). */
+  --hf-on-brand-muted: #93c5fd;
 
   /* Brand */
   --hf-primary: #1b3a6b;
@@ -123,6 +126,8 @@
   --hf-violet-border: #ddd6fe;
 
   /* Indigo */
+  --hf-pink-text: #be185d;
+
   --hf-indigo: #4338ca;
   --hf-indigo-text: #4338ca;
   --hf-indigo-soft: #eef2ff;
@@ -167,6 +172,8 @@
   --hf-info-dot: #60a5fa;
   --hf-violet-dot: #a78bfa;
   --hf-accent-dot: #2dd4bf;
+  --hf-sky-dot: #38bdf8;
+  --hf-on-brand-muted: #93c5fd;
 
   --hf-primary: #3563ae;
   --hf-primary-hover: #2b5596;
@@ -232,6 +239,8 @@
   --hf-violet-soft: rgba(167, 139, 250, 0.1);
   --hf-violet-soft-strong: rgba(167, 139, 250, 0.18);
   --hf-violet-border: rgba(167, 139, 250, 0.32);
+
+  --hf-pink-text: #f472b6;
 
   --hf-indigo: #4f46e5;
   --hf-indigo-text: #818cf8;

@@ -18,6 +18,7 @@ import {
   Briefcase, Calendar, FolderOpen, AlertOctagon, CalendarCheck, Settings,
   Building2, GraduationCap, CalendarDays, Award, Scale, Gavel, FileSearch, MapPin as PinIcon, HardHat,
   ShoppingCart, Package, CalendarClock, ClipboardCheck,
+  PartyPopper, FilePlus, LayoutTemplate, CreditCard,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -420,10 +421,101 @@ export const COMPLIANCE_TENDER_SECTIONS: ModuleSections = {
   ],
 }
 
+export const EVENTS_SECTIONS: ModuleSections = {
+  moduleKey: 'events',
+  basePath: '/events',
+  title: 'Events',
+  icon: PartyPopper,
+  defaultSection: 'events',
+  groups: [
+    { label: 'Events', sections: [{ id: 'events', label: 'Events', icon: Calendar }] },
+    {
+      // These three work on the event picked in the list; the page shows the
+      // current selection under its title.
+      label: 'Selected event',
+      sections: [
+        { id: 'guests', label: 'Guests', icon: Users },
+        { id: 'vendors', label: 'Vendors', icon: Truck },
+        { id: 'analytics', label: 'Analytics', icon: BarChart2 },
+      ],
+    },
+  ],
+}
+
+export const CONTRACTING_SECTIONS: ModuleSections = {
+  moduleKey: 'contracting',
+  basePath: '/contracts',
+  title: 'Contracting',
+  icon: FilePlus,
+  // Contracting has always opened on the contract list, not the dashboard.
+  defaultSection: 'contracts',
+  groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: BarChart2 }] },
+    {
+      label: 'Contracts',
+      sections: [
+        { id: 'contracts', label: 'Contracts', icon: FileText },
+        { id: 'templates', label: 'Templates', icon: LayoutTemplate },
+      ],
+    },
+  ],
+}
+
+export const AP_SECTIONS: ModuleSections = {
+  moduleKey: 'ap',
+  basePath: '/ap',
+  title: 'Accounts Payable',
+  icon: CreditCard,
+  defaultSection: 'bills',
+  groups: [
+    {
+      label: 'Payables',
+      sections: [
+        { id: 'bills', label: 'Bills', icon: FileText },
+        { id: 'batches', label: 'EFT Batches', icon: CreditCard },
+        { id: 'recurring', label: 'Recurring', icon: RefreshCw },
+      ],
+    },
+    {
+      label: 'Suppliers & reporting',
+      sections: [
+        { id: 'suppliers', label: 'Suppliers', icon: Landmark },
+        { id: 'aging', label: 'Aging', icon: Users },
+      ],
+    },
+  ],
+}
+
+export const PROPERTY_SECTIONS: ModuleSections = {
+  moduleKey: 'property',
+  basePath: '/property',
+  title: 'Property',
+  icon: Building2,
+  defaultSection: 'dashboard',
+  groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: BarChart2 }] },
+    {
+      label: 'Portfolio',
+      sections: [
+        { id: 'properties', label: 'Properties', icon: Building2 },
+        { id: 'leases', label: 'Leases', icon: FileText },
+      ],
+    },
+    {
+      label: 'Operations',
+      sections: [
+        { id: 'payments', label: 'Payments', icon: CreditCard },
+        { id: 'inspections', label: 'Inspections', icon: ClipboardList },
+      ],
+    },
+  ],
+}
+
 const REGISTRY: ModuleSections[] = [
   SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FLEET_SECTIONS, ACCOUNTING_SECTIONS, ACCOUNTANT_SECTIONS,
   HR_SECTIONS, BOOKINGS_SECTIONS, TRAINING_PROVIDER_SECTIONS, LEGAL_COMPLIANCE_SECTIONS, EARTHMOVING_SECTIONS,
   SUPPLY_CHAIN_SECTIONS, COMPLIANCE_TENDER_SECTIONS,
+  EVENTS_SECTIONS, CONTRACTING_SECTIONS, AP_SECTIONS, PROPERTY_SECTIONS,
 ]
 
 /** Groups with sections the user may not see removed (and empty groups dropped). */

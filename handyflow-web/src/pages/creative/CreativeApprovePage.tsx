@@ -117,10 +117,10 @@ export function CreativeApprovePage() {
     return (
       <Page>
         <StatusCard
-          icon={isExpired ? <Clock size={48} color="#D97706" /> : alreadyDone ? <CheckCircle size={48} color="#166534" /> : <XCircle size={48} color="#DC2626" />}
+          icon={isExpired ? <Clock size={48} style={{ color: 'var(--hf-warning-text)' }} /> : alreadyDone ? <CheckCircle size={48} style={{ color: 'var(--hf-success-text-strong)' }} /> : <XCircle size={48} style={{ color: 'var(--hf-danger-text)' }} />}
           title={isExpired ? 'Link expired' : alreadyDone ? 'Already approved' : 'Invalid link'}
-          color={isExpired ? '#D97706' : alreadyDone ? '#166534' : '#DC2626'}
-          bg={isExpired ? '#FFFBEB' : alreadyDone ? '#F0FDF4' : '#FEF2F2'}>
+          color={isExpired ? 'var(--hf-warning-text)' : alreadyDone ? 'var(--hf-success-text-strong)' : 'var(--hf-danger-text)'}
+          bg={isExpired ? 'var(--hf-warning-soft)' : alreadyDone ? 'var(--hf-success-soft)' : 'var(--hf-danger-soft)'}>
           {isExpired
             ? 'This approval link has expired. Please ask your designer to resend the proof.'
             : alreadyDone
@@ -135,7 +135,7 @@ export function CreativeApprovePage() {
   if (proof.status === 'APPROVED') {
     return (
       <Page tenantName={proof.tenantName}>
-        <StatusCard icon={<CheckCircle size={48} color="#166534" />} title="Already approved" color="#166534" bg="#F0FDF4">
+        <StatusCard icon={<CheckCircle size={48} style={{ color: 'var(--hf-success-text-strong)' }} />} title="Already approved" color="var(--hf-success-text-strong)" bg="var(--hf-success-soft)">
           This proof has already been approved. Thank you!
         </StatusCard>
       </Page>
@@ -146,7 +146,7 @@ export function CreativeApprovePage() {
   if (view === 'approved') {
     return (
       <Page tenantName={proof?.tenantName}>
-        <StatusCard icon={<CheckCircle size={48} color="#166534" />} title="Approved!" color="#166534" bg="#F0FDF4">
+        <StatusCard icon={<CheckCircle size={48} style={{ color: 'var(--hf-success-text-strong)' }} />} title="Approved!" color="var(--hf-success-text-strong)" bg="var(--hf-success-soft)">
           <div style={{ marginBottom: 12 }}>
             Thank you, <strong>{clientName}</strong>. Your approval has been recorded and your designer has been notified.
           </div>
@@ -162,7 +162,7 @@ export function CreativeApprovePage() {
   if (view === 'rejected') {
     return (
       <Page tenantName={proof?.tenantName}>
-        <StatusCard icon={<MessageSquare size={48} color="#D97706" />} title="Feedback submitted" color="#D97706" bg="#FFFBEB">
+        <StatusCard icon={<MessageSquare size={48} style={{ color: 'var(--hf-warning-text)' }} />} title="Feedback submitted" color="var(--hf-warning-text)" bg="var(--hf-warning-soft)">
           Your change request has been sent to your designer. They will review your feedback and send you a revised proof.
         </StatusCard>
       </Page>
@@ -173,7 +173,7 @@ export function CreativeApprovePage() {
   if (view === 'already_done') {
     return (
       <Page tenantName={proof?.tenantName}>
-        <StatusCard icon={<CheckCircle size={48} color="#166534" />} title="Already approved" color="#166534" bg="#F0FDF4">
+        <StatusCard icon={<CheckCircle size={48} style={{ color: 'var(--hf-success-text-strong)' }} />} title="Already approved" color="var(--hf-success-text-strong)" bg="var(--hf-success-soft)">
           This proof was already approved. No further action is needed.
         </StatusCard>
       </Page>
@@ -225,8 +225,8 @@ export function CreativeApprovePage() {
               const label = a.status === 'APPROVED' ? 'Approved'
                 : a.status === 'REJECTED' ? 'Requested changes'
                 : isMe ? 'Your review' : 'Pending';
-              const color = a.status === 'APPROVED' ? '#166534'
-                : a.status === 'REJECTED' ? '#DC2626' : '#94A3B8';
+              const color = a.status === 'APPROVED' ? 'var(--hf-success-text-strong)'
+                : a.status === 'REJECTED' ? 'var(--hf-danger-text)' : 'var(--hf-text-faint)';
               return (
                 <div key={a.approvalOrder} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
                   <span style={{ color: isMe ? 'var(--hf-info-text)' : 'var(--hf-text-secondary)', fontWeight: isMe ? 700 : 400 }}>
@@ -244,7 +244,7 @@ export function CreativeApprovePage() {
       <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden', marginBottom: 20, animation: 'fadeIn 0.35s ease' }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--hf-border-subtle)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--hf-info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {fileIsImage ? <Image size={14} color="#1D4ED8" /> : fileIsVideo ? <Video size={14} color="#1D4ED8" /> : fileIsPdf ? <FileText size={14} color="#1D4ED8" /> : <Package size={14} color="#1D4ED8" />}
+            {fileIsImage ? <Image size={14} style={{ color: 'var(--hf-info-text)' }} /> : fileIsVideo ? <Video size={14} style={{ color: 'var(--hf-info-text)' }} /> : fileIsPdf ? <FileText size={14} style={{ color: 'var(--hf-info-text)' }} /> : <Package size={14} style={{ color: 'var(--hf-info-text)' }} />}
           </div>
           <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--hf-text-secondary)' }}>Proof Preview</span>
         </div>
@@ -340,9 +340,9 @@ export function CreativeApprovePage() {
           <button onClick={() => setShowComments(p => !p)}
             style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: showComments ? '1px solid var(--hf-border-subtle)' : 'none' }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--hf-text-secondary)', display: 'flex', alignItems: 'center', gap: 7 }}>
-              <MessageSquare size={14} color="#64748B" /> Comments ({proof.comments.length})
+              <MessageSquare size={14} style={{ color: 'var(--hf-text-muted)' }} /> Comments ({proof.comments.length})
             </span>
-            {showComments ? <ChevronUp size={14} color="#94A3B8" /> : <ChevronDown size={14} color="#94A3B8" />}
+            {showComments ? <ChevronUp size={14} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={14} style={{ color: 'var(--hf-text-faint)' }} />}
           </button>
           {showComments && (
             <div style={{ padding: '14px 20px' }}>
@@ -385,7 +385,7 @@ export function CreativeApprovePage() {
       {/* Add comment */}
       <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, padding: '18px 20px', marginBottom: 20, animation: 'fadeIn 0.45s ease' }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--hf-text-secondary)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 7 }}>
-          <MessageSquare size={14} color="#64748B" /> Add a comment
+          <MessageSquare size={14} style={{ color: 'var(--hf-text-muted)' }} /> Add a comment
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -508,7 +508,7 @@ export function CreativeApprovePage() {
             <button
               disabled={!clientName.trim()}
               onClick={() => setShowReject(true)}
-              style={{ flex: 1, minWidth: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px 24px', background: !clientName.trim() ? 'var(--hf-surface-muted)' : 'var(--hf-danger-soft)', color: !clientName.trim() ? 'var(--hf-text-faint)' : 'var(--hf-danger-text)', border: `1.5px solid ${!clientName.trim() ? '#E2E8F0' : '#FECACA'}`, borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: !clientName.trim() ? 'default' : 'pointer', transition: 'all 0.15s' }}>
+              style={{ flex: 1, minWidth: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px 24px', background: !clientName.trim() ? 'var(--hf-surface-muted)' : 'var(--hf-danger-soft)', color: !clientName.trim() ? 'var(--hf-text-faint)' : 'var(--hf-danger-text)', border: `1.5px solid ${!clientName.trim() ? 'var(--hf-border)' : 'var(--hf-danger-border)'}`, borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: !clientName.trim() ? 'default' : 'pointer', transition: 'all 0.15s' }}>
               <XCircle size={16} /> Request changes
             </button>
           ) : (
@@ -545,7 +545,7 @@ function Page({ children, tenantName }: { children: React.ReactNode; tenantName?
       <div style={{ background: 'var(--hf-primary)', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 30, height: 30, borderRadius: 7, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FileText size={16} color="#fff" />
+            <FileText size={16} style={{ color: 'var(--hf-text-on-solid)' }} />
           </div>
           <span style={{ color: 'var(--hf-text-on-solid)', fontWeight: 700, fontSize: 15 }}>
             {tenantName ? `${tenantName} — Proof Review` : 'Proof Review'}

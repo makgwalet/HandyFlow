@@ -1,16 +1,14 @@
 // src/pages/ap/AccountsPayablePage.tsx
-import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import {
-  FileText, CreditCard, AlertTriangle, CheckCircle,
-  Clock, TrendingDown, BarChart2, Calendar, Users, RefreshCw, Landmark,
-} from "lucide-react"
+import { FileText, CreditCard, AlertTriangle, CheckCircle, Clock, TrendingDown, Calendar } from "lucide-react"
 import { BillsTab }   from "./BillsTab"
 import { BatchesTab } from "./BatchesTab"
 import AgingTab from "./AgingTab"
 import { RecurringBillsTab } from "./RecurringBillsTab"
 import { SupplierBankingTab } from "./SupplierBankingTab"
+import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
+import { AP_SECTIONS } from "../../navigation/moduleSections"
 
 interface Summary {
   totalOutstanding: number; overdueAmount: number
@@ -24,7 +22,7 @@ const fmtR = (n: any) =>
 
 export function AccountsPayablePage() {
   const qc = useQueryClient()
-  const [tab, setTab] = useState<"bills" | "batches" | "aging" | "recurring" | "suppliers">("bills")
+  const refreshSummary = () => qc.invalidateQueries({ queryKey: ["ap-summary"] })
 
   const { data: summary } = useQuery<Summary>({
     queryKey: ["ap-summary"],
@@ -46,71 +44,48 @@ export function AccountsPayablePage() {
     { label: "Pending batches",    value: String(summary?.pendingBatches ?? 0), color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", icon: <CreditCard size={16} /> },
   ]
 
+  // Summary strip shown above every section.
+  const banner = (
+    <>
+    {/* KPI strip */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 }}>
+            {kpis.slice(0, 4).map(k => (
+              <div key={k.label} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 9, background: k.bg, display: "flex", alignItems: "center", justifyContent: "center", color: k.color, flexShrink: 0 }}>{k.icon}</div>
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: k.color, letterSpacing: "-0.02em" }}>{k.value}</div>
+                  <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 1 }}>{k.label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 }}>
+            {kpis.slice(4).map(k => (
+              <div key={k.label} style={{ background: k.bg, border: "1px solid transparent", borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ color: k.color }}>{k.icon}</div>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: k.color }}>{k.value}</div>
+                  <div style={{ fontSize: 10, color: k.color, opacity: 0.7 }}>{k.label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+    </>
+  )
+
+  // Sections are routes (/ap/:section); /ap opens on Bills.
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 22, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--hf-primary)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <CreditCard size={18} color="#fff" />
-            </div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Accounts Payable</h1>
-          </div>
-          <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0, paddingLeft: 46 }}>
-            Supplier bills · EFT batch payments · Accounting integration
-          </p>
-        </div>
-      </div>
-
-      {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 }}>
-        {kpis.slice(0, 4).map(k => (
-          <div key={k.label} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 9, background: k.bg, display: "flex", alignItems: "center", justifyContent: "center", color: k.color, flexShrink: 0 }}>{k.icon}</div>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: k.color, letterSpacing: "-0.02em" }}>{k.value}</div>
-              <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 1 }}>{k.label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 }}>
-        {kpis.slice(4).map(k => (
-          <div key={k.label} style={{ background: k.bg, border: "1px solid transparent", borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ color: k.color }}>{k.icon}</div>
-            <div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: k.color }}>{k.value}</div>
-              <div style={{ fontSize: 10, color: k.color, opacity: 0.7 }}>{k.label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Tabs */}
-      <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14 }}>
-        <div style={{ display: "flex", borderBottom: "1px solid var(--hf-border)", padding: "0 24px" }}>
-          {([
-            { key: "bills",     label: "Bills",       icon: <FileText size={14} /> },
-            { key: "batches",   label: "EFT Batches", icon: <CreditCard size={14} /> },
-            { key: "aging",     label: "Aging",       icon: <Users size={14} /> },
-            { key: "recurring", label: "Recurring",   icon: <RefreshCw size={14} /> },
-            { key: "suppliers", label: "Suppliers",   icon: <Landmark size={14} /> },
-          ] as const).map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "14px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", border: "none", background: "none", color: tab === t.key ? "var(--hf-primary-text)" : "var(--hf-text-faint)", borderBottom: `2px solid ${tab === t.key ? "#1B3A6B" : "transparent"}`, marginBottom: -1 }}>
-              {t.icon}{t.label}
-            </button>
-          ))}
-        </div>
-        <div style={{ padding: 24 }}>
-          {tab === "bills"     && <BillsTab onRefreshSummary={() => qc.invalidateQueries({ queryKey: ["ap-summary"] })} />}
-          {tab === "batches"   && <BatchesTab onRefreshSummary={() => qc.invalidateQueries({ queryKey: ["ap-summary"] })} />}
-          {tab === "aging"     && <AgingTab />}
-          {tab === "recurring" && <RecurringBillsTab onRefreshSummary={() => qc.invalidateQueries({ queryKey: ["ap-summary"] })} />}
-          {tab === "suppliers" && <SupplierBankingTab />}
-        </div>
-      </div>
-    </div>
+    <SectionedModulePage config={AP_SECTIONS} banner={banner}
+      subtitle="Supplier bills · EFT batch payments · Accounting integration"
+      render={id => {
+        switch (id) {
+          case "bills":     return <BillsTab onRefreshSummary={refreshSummary} />
+          case "batches":   return <BatchesTab onRefreshSummary={refreshSummary} />
+          case "aging":     return <AgingTab />
+          case "recurring": return <RecurringBillsTab onRefreshSummary={refreshSummary} />
+          case "suppliers": return <SupplierBankingTab />
+          default:          return null
+        }
+      }} />
   )
 }

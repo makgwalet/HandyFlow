@@ -129,6 +129,8 @@ function SignatureCanvas({ onCapture }: { onCapture: (data: string | null) => vo
     const x    = 'touches' in e ? e.touches[0].clientX - rect.left : (e as React.MouseEvent).clientX - rect.left
     const y    = 'touches' in e ? e.touches[0].clientY - rect.top  : (e as React.MouseEvent).clientY - rect.top
     ctx.lineTo(x, y)
+    // Canvas: needs a literal colour, and the drawn signature is saved as an image,
+    // so it must not follow the theme.
     ctx.strokeStyle = '#1B3A6B'; ctx.lineWidth = 2.5
     ctx.lineCap = 'round'; ctx.lineJoin = 'round'
     ctx.stroke(); setHas(true)
@@ -304,7 +306,7 @@ export default function SigningPage() {
       <div style={{ minHeight: '100vh', background: 'var(--hf-surface-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
         <div style={{ maxWidth: 480, textAlign: 'center' }}>
           <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'var(--hf-danger-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-            <AlertTriangle size={28} color="#DC2626" />
+            <AlertTriangle size={28} style={{ color: 'var(--hf-danger-text)' }} />
           </div>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--hf-text)', marginBottom: 8 }}>Link not valid</h2>
           <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', lineHeight: 1.7 }}>{errMsg}</p>
@@ -323,7 +325,7 @@ export default function SigningPage() {
       <div style={{ minHeight: '100vh', background: 'var(--hf-surface-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
         <div style={{ maxWidth: 480, textAlign: 'center' }}>
           <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'var(--hf-warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-            <X size={28} color="#D97706" />
+            <X size={28} style={{ color: 'var(--hf-warning-text)' }} />
           </div>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--hf-text)', marginBottom: 8 }}>Declination recorded</h2>
           <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', lineHeight: 1.7 }}>
@@ -344,7 +346,7 @@ export default function SigningPage() {
         <div style={{ maxWidth: 540, width: '100%' }}>
           <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 36, textAlign: 'center', border: '1px solid var(--hf-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
             <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--hf-success-soft-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-              <CheckCircle size={32} color="#166534" />
+              <CheckCircle size={32} style={{ color: 'var(--hf-success-text-strong)' }} />
             </div>
             <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', marginBottom: 8 }}>
               {contract?.alreadySigned && !result ? 'Already signed' : 'Contract signed'}
@@ -397,11 +399,11 @@ export default function SigningPage() {
       {/* Top bar */}
       <div style={{ background: 'var(--hf-primary)', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <FileText size={20} color="#fff" />
+          <FileText size={20} style={{ color: 'var(--hf-text-on-solid)' }} />
           <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--hf-text-on-solid)' }}>HandyFlow</span>
-          <span style={{ fontSize: 12, color: '#93C5FD', marginLeft: 8 }}>Secure signing</span>
+          <span style={{ fontSize: 12, color: 'var(--hf-on-brand-muted)', marginLeft: 8 }}>Secure signing</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#93C5FD' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--hf-on-brand-muted)' }}>
           <Clock size={13} />
           <span>{timeLeft}</span>
         </div>
@@ -465,7 +467,7 @@ export default function SigningPage() {
           <div style={{ marginBottom: 12, padding: '12px 16px', background: 'var(--hf-info-soft)', border: '1px solid var(--hf-info-border)', borderRadius: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--hf-info)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <User size={16} color="#fff" />
+                <User size={16} style={{ color: 'var(--hf-text-on-solid)' }} />
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)' }}>
@@ -489,7 +491,7 @@ export default function SigningPage() {
             <div key={i} style={{ padding: '10px 16px', border: '1px solid var(--hf-border)', borderRadius: 10, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--hf-surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <User size={14} color="#64748B" />
+                  <User size={14} style={{ color: 'var(--hf-text-muted)' }} />
                 </div>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--hf-text)' }}>
@@ -504,13 +506,13 @@ export default function SigningPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {p.signingStatus === 'SIGNED' ? (
                   <>
-                    <CheckCircle size={13} color="#166534" />
+                    <CheckCircle size={13} style={{ color: 'var(--hf-success-text-strong)' }} />
                     <span style={{ fontSize: 12, color: 'var(--hf-success-text-strong)', fontWeight: 600 }}>Signed</span>
                     {p.signedAt && <span style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{fmtDT(p.signedAt)}</span>}
                   </>
                 ) : (
                   <>
-                    <Clock size={13} color="#D97706" />
+                    <Clock size={13} style={{ color: 'var(--hf-warning-text)' }} />
                     <span style={{ fontSize: 12, color: 'var(--hf-warning-text)', fontWeight: 600 }}>Pending</span>
                   </>
                 )}
@@ -523,7 +525,7 @@ export default function SigningPage() {
         <div style={{ background: 'var(--hf-surface)', borderRadius: 14, border: '1px solid var(--hf-border)', padding: '22px 24px', marginBottom: 16 }}>
           <button onClick={() => setShowComments(!showComments)} style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-secondary)', fontSize: 14, fontWeight: 600, padding: 0, width: '100%', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <MessageSquare size={15} color="#1B3A6B" />
+              <MessageSquare size={15} style={{ color: 'var(--hf-primary-text)' }} />
               Comments & Amendment Requests
               {contract.comments.length > 0 && (
                 <span style={{ background: 'var(--hf-indigo-soft)', color: 'var(--hf-primary-text)', padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
@@ -531,7 +533,7 @@ export default function SigningPage() {
                 </span>
               )}
             </div>
-            {showComments ? <ChevronUp size={14} color="#94A3B8" /> : <ChevronDown size={14} color="#94A3B8" />}
+            {showComments ? <ChevronUp size={14} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={14} style={{ color: 'var(--hf-text-faint)' }} />}
           </button>
 
           {showComments && (
@@ -540,7 +542,7 @@ export default function SigningPage() {
               {contract.comments.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
                   {contract.comments.map(cm => (
-                    <div key={cm.id} style={{ padding: '10px 14px', background: cm.isAmendmentRequest ? 'var(--hf-warning-soft)' : 'var(--hf-surface-muted)', border: `1px solid ${cm.isAmendmentRequest ? '#FDE68A' : '#E2E8F0'}`, borderRadius: 8 }}>
+                    <div key={cm.id} style={{ padding: '10px 14px', background: cm.isAmendmentRequest ? 'var(--hf-warning-soft)' : 'var(--hf-surface-muted)', border: `1px solid ${cm.isAmendmentRequest ? 'var(--hf-warning-border)' : 'var(--hf-border)'}`, borderRadius: 8 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--hf-text)' }}>{cm.authorName}</span>
