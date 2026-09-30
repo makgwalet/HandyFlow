@@ -23,12 +23,13 @@ import { PLACEMENT_STAGES, TERMINAL_STAGES } from "../../types/recruitmentAgency
 const fmtR = (n: any) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
 const fmtD = (d: any) => (d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—")
 
-const NAVY = "#1B3A6B"
-const BORDER = "#E2E8F0"
-const CANVAS = "#F8FAFC"
-const INK = "#0F172A"
-const MUTED = "#64748B"
-const FAINT = "#94A3B8"
+const NAVY = "var(--hf-primary)"
+const NAVY_TEXT = "var(--hf-primary-text)";
+const BORDER = "var(--hf-border)"
+const CANVAS = "var(--hf-surface-muted)"
+const INK = "var(--hf-text)"
+const MUTED = "var(--hf-text-muted)"
+const FAINT = "var(--hf-text-faint)"
 
 type Section = "clients" | "candidates"
 type ClientTab = "requisitions" | "invoices" | "portal"
@@ -118,7 +119,7 @@ export function RecruitmentAgencyPage() {
             <button key={id} onClick={() => setSection(id)} style={{
               padding: "12px 16px", background: "none", border: "none",
               borderBottom: section === id ? `2px solid ${NAVY}` : "2px solid transparent",
-              color: section === id ? NAVY : MUTED, fontWeight: section === id ? 700 : 500, fontSize: 13.5, cursor: "pointer", marginBottom: -1,
+              color: section === id ? NAVY_TEXT : MUTED, fontWeight: section === id ? 700 : 500, fontSize: 13.5, cursor: "pointer", marginBottom: -1,
             }}>{label}</button>
           ))}
         </div>
@@ -220,7 +221,7 @@ function ClientsSection() {
                 <button key={id} onClick={() => setTab(id)} style={{
                   padding: "7px 12px", background: "none", border: "none",
                   borderBottom: tab === id ? `2px solid ${NAVY}` : "2px solid transparent",
-                  color: tab === id ? NAVY : MUTED, fontWeight: tab === id ? 700 : 500, fontSize: 12.5, cursor: "pointer", marginBottom: -1,
+                  color: tab === id ? NAVY_TEXT : MUTED, fontWeight: tab === id ? 700 : 500, fontSize: 12.5, cursor: "pointer", marginBottom: -1,
                 }}>{label}</button>
               ))}
             </div>
@@ -902,7 +903,7 @@ function CandidatePoolSection() {
                     {downloadingId === c.id ? "Downloading…" : "✓ View CV"}
                   </button>
                 ) : (
-                  <label style={{ fontSize: 11, color: NAVY, cursor: "pointer", fontWeight: 600 }}>
+                  <label style={{ fontSize: 11, color: NAVY_TEXT, cursor: "pointer", fontWeight: 600 }}>
                     Upload CV
                     <input type="file" style={{ display: "none" }} accept=".pdf,.doc,.docx"
                       onChange={e => { const f = e.target.files?.[0]; if (f) handleUploadCv(c.id, f) }} />
@@ -1011,6 +1012,6 @@ function ModalActions({ onClose, onSubmit, saving, submitLabel }: { onClose: () 
 
 const inputStyle: React.CSSProperties = { width: "100%", padding: "8px 10px", border: `1.5px solid ${BORDER}`, borderRadius: 6, fontSize: 13, boxSizing: "border-box" }
 const btnPrimary: React.CSSProperties = { padding: "7px 14px", background: NAVY, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
-const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "var(--hf-surface)", color: NAVY, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }
+const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "var(--hf-surface)", color: NAVY_TEXT, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }
 const rowStyle: React.CSSProperties = { borderTop: `1px solid ${BORDER}` }
 const cellStyle: React.CSSProperties = { padding: "8px 12px", fontSize: 12.5, color: INK }

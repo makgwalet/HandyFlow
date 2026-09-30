@@ -178,7 +178,7 @@ export default function TenderDetailPage() {
   const inp: React.CSSProperties = { padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box" as const }
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto", padding: "24px 20px" }}>
+    <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <button onClick={() => nav(-1)} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-muted)", fontSize: 13, marginBottom: 18, padding: 0 }}>
         <ArrowLeft size={15} /> Back to Tenders
       </button>

@@ -21,6 +21,7 @@ import {
   PartyPopper, FilePlus, LayoutTemplate, CreditCard,
   Stethoscope, ListPlus,
   Megaphone, Warehouse, Handshake, UserCog,
+  Database, CalendarRange,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -631,12 +632,31 @@ export const COLLECTIONS_AGENCY_SECTIONS: ModuleSections = {
   ],
 }
 
+export const INTERNAL_AUDIT_SECTIONS: ModuleSections = {
+  moduleKey: 'internal-audit',
+  basePath: '/internal-audit',
+  title: 'Internal Audit',
+  icon: ShieldCheck,
+  defaultSection: 'universe',
+  groups: [
+    {
+      label: 'Audit programme',
+      sections: [
+        { id: 'universe', label: 'Audit Universe', icon: Database },
+        { id: 'plans', label: 'Annual Plans', icon: CalendarRange },
+        { id: 'engagements', label: 'Engagements', icon: ClipboardList },
+      ],
+    },
+  ],
+}
+
 const REGISTRY: ModuleSections[] = [
   SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FLEET_SECTIONS, ACCOUNTING_SECTIONS, ACCOUNTANT_SECTIONS,
   HR_SECTIONS, BOOKINGS_SECTIONS, TRAINING_PROVIDER_SECTIONS, LEGAL_COMPLIANCE_SECTIONS, EARTHMOVING_SECTIONS,
   SUPPLY_CHAIN_SECTIONS, COMPLIANCE_TENDER_SECTIONS,
   EVENTS_SECTIONS, CONTRACTING_SECTIONS, AP_SECTIONS, PROPERTY_SECTIONS, CLINIC_SECTIONS,
   DEBT_COLLECTION_SECTIONS, MARKETING_SECTIONS, TRAINING_SECTIONS, WAREHOUSING_SECTIONS, COLLECTIONS_AGENCY_SECTIONS,
+  INTERNAL_AUDIT_SECTIONS,
 ]
 
 /** Groups with sections the user may not see removed (and empty groups dropped). */

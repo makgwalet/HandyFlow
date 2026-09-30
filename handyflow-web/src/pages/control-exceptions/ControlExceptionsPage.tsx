@@ -18,12 +18,13 @@ import { controlExceptionsApi, type ControlException } from "../../api/controlEx
 
 const fmtDT = (d: any) => (d ? new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—")
 
-const NAVY = "#1B3A6B"
-const BORDER = "#E2E8F0"
-const CANVAS = "#F8FAFC"
-const INK = "#0F172A"
-const MUTED = "#64748B"
-const FAINT = "#94A3B8"
+const NAVY = "var(--hf-primary)"
+const NAVY_TEXT = "var(--hf-primary-text)";
+const BORDER = "var(--hf-border)"
+const CANVAS = "var(--hf-surface-muted)"
+const INK = "var(--hf-text)"
+const MUTED = "var(--hf-text-muted)"
+const FAINT = "var(--hf-text-faint)"
 
 export function ControlExceptionsPage() {
   const [exceptions, setExceptions] = useState<ControlException[]>([])
@@ -37,7 +38,7 @@ export function ControlExceptionsPage() {
   useEffect(refetch, [])
 
   return (
-    <div style={{ padding: "24px 32px", fontFamily: "'Inter', system-ui, sans-serif", maxWidth: 900 }}>
+    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", maxWidth: 900 }}>
       <h1 style={{ fontSize: 20, fontWeight: 800, color: INK, marginBottom: 4 }}>Needs Attention</h1>
       <p style={{ fontSize: 13, color: MUTED, marginBottom: 24 }}>
         Everything flagged across the business that hasn't been resolved yet.
@@ -128,4 +129,4 @@ function ResolveModal({ exception, onClose, onResolved }: { exception: ControlEx
 }
 
 const btnPrimary: React.CSSProperties = { padding: "7px 14px", background: NAVY, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
-const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "var(--hf-surface)", color: NAVY, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }
+const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "var(--hf-surface)", color: NAVY_TEXT, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }

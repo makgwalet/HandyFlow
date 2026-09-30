@@ -145,8 +145,8 @@ function AppTileCard({ app, onClick }: { app: AppTile; onClick: () => void }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? 'var(--hf-surface-muted)' : 'white',
-        border: `1.5px solid ${hovered ? '#1B3A6B' : '#E8EDF5'}`,
+        background: hovered ? 'var(--hf-surface-muted)' : 'var(--hf-surface)',
+        border: `1.5px solid ${hovered ? 'var(--hf-primary)' : 'var(--hf-primary-border)'}`,
         borderRadius: 16,
         padding: '28px 16px 20px',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
@@ -157,7 +157,7 @@ function AppTileCard({ app, onClick }: { app: AppTile; onClick: () => void }) {
         textAlign: 'center', width: '100%',
       }}
     >
-      {hovered && <ExternalLink size={12} color="#94A3B8" style={{ position: 'absolute', top: 12, right: 12 }} />}
+      {hovered && <ExternalLink size={12} style={{ color: 'var(--hf-text-faint)', position: 'absolute', top: 12, right: 12 }} />}
       <div style={{ width: 56, height: 56, borderRadius: 16, background: app.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 2px 8px ${app.bg}` }}>
         <app.icon size={26} style={{ color: app.iconColor }} />
       </div>
@@ -267,12 +267,12 @@ export function DashboardPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 34, height: 34, background: 'var(--hf-accent)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(13,148,136,0.4)' }}>
-              <Building2 size={18} color="white" strokeWidth={2.5} />
+              <Building2 size={18} style={{ color: "var(--hf-text-on-solid)" }} strokeWidth={2.5} />
             </div>
-            <span style={{ color: 'white', fontWeight: 700, fontSize: 17, letterSpacing: '-0.3px' }}>HandyFlow</span>
+            <span style={{ color: 'var(--hf-text-on-solid)', fontWeight: 700, fontSize: 17, letterSpacing: '-0.3px' }}>HandyFlow</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '7px 14px', width: 240 }}>
-            <Search size={13} color="rgba(255,255,255,0.35)" />
+            <Search size={13} style={{ color: "rgba(255,255,255,0.35)" }} />
             <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>Search anything…</span>
           </div>
         </div>
@@ -283,7 +283,7 @@ export function DashboardPage() {
             style={{ background: notifDrawerOpen ? 'rgba(255,255,255,0.12)' : 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.7)', padding: '8px 10px', borderRadius: 9, display: 'flex', alignItems: 'center', position: 'relative' }}>
             <Bell size={20} />
             {unreadCount > 0 && (
-              <span style={{ position: 'absolute', top: 4, right: 5, width: 17, height: 17, background: 'var(--hf-danger)', borderRadius: '50%', fontSize: 10, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--hf-primary)', fontWeight: 700 }}>{unreadCount > 99 ? '99+' : unreadCount}</span>
+              <span style={{ position: 'absolute', top: 4, right: 5, width: 17, height: 17, background: 'var(--hf-danger)', borderRadius: '50%', fontSize: 10, color: 'var(--hf-text-on-solid)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--hf-primary)', fontWeight: 700 }}>{unreadCount > 99 ? '99+' : unreadCount}</span>
             )}
           </button>
 
@@ -293,17 +293,17 @@ export function DashboardPage() {
           <div ref={profileRef} style={{ position: 'relative' }}>
             <button onClick={() => { setProfileOpen(o => !o); setNotifOpen(false) }}
               style={{ display: 'flex', alignItems: 'center', gap: 9, background: profileOpen ? 'rgba(255,255,255,0.12)' : 'none', border: 'none', borderRadius: 10, padding: '5px 10px 5px 6px', cursor: 'pointer' }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--hf-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 12, fontWeight: 700 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--hf-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--hf-text-on-solid)', fontSize: 12, fontWeight: 700 }}>
                 {user?.firstName?.[0]}{user?.lastName?.[0]}
               </div>
               <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: 500 }}>{user?.firstName}</span>
-              <ChevronDown size={14} color="rgba(255,255,255,0.4)" />
+              <ChevronDown size={14} style={{ color: "rgba(255,255,255,0.4)" }} />
             </button>
             {profileOpen && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: 260, background: 'white', border: '1px solid var(--hf-border)', borderRadius: 16, boxShadow: '0 12px 40px rgba(0,0,0,0.15)', zIndex: 200, overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: 260, background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 16, boxShadow: '0 12px 40px rgba(0,0,0,0.15)', zIndex: 200, overflow: 'hidden' }}>
                 <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--hf-border-subtle)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--hf-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 14, fontWeight: 700 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--hf-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--hf-text-on-solid)', fontSize: 14, fontWeight: 700 }}>
                       {user?.firstName?.[0]}{user?.lastName?.[0]}
                     </div>
                     <div>
@@ -323,14 +323,14 @@ export function DashboardPage() {
                     <button key={item.label} onClick={() => { item.action(); setProfileOpen(false) }}
                       style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--hf-text-secondary)', textAlign: 'left' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--hf-surface-muted)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-                      <item.icon size={16} color="#94A3B8" />{item.label}
+                      <item.icon size={16} style={{ color: 'var(--hf-text-faint)' }} />{item.label}
                     </button>
                   ))}
                   <div style={{ height: 1, background: 'var(--hf-surface-sunken)', margin: '4px 0' }} />
                   <button onClick={() => { logout(); navigate('/login') }}
                     style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--hf-danger-text)', textAlign: 'left' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--hf-danger-soft)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-                    <LogOut size={16} color="#DC2626" />Sign out
+                    <LogOut size={16} style={{ color: 'var(--hf-danger-text)' }} />Sign out
                   </button>
                 </div>
               </div>
@@ -354,12 +354,12 @@ export function DashboardPage() {
           </div>
           {subscription?.status === 'PILOT' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'linear-gradient(135deg, var(--hf-warning-soft), var(--hf-warning-soft-strong))', border: '1px solid var(--hf-warning-border-strong)', borderRadius: 24, padding: '8px 16px 8px 12px', boxShadow: '0 2px 8px rgba(245,158,11,0.15)' }}>
-              <div style={{ width: 28, height: 28, background: 'var(--hf-warning)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Clock size={15} color="white" strokeWidth={2.5} /></div>
+              <div style={{ width: 28, height: 28, background: 'var(--hf-warning)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Clock size={15} style={{ color: "var(--hf-text-on-solid)" }} strokeWidth={2.5} /></div>
               <div>
                 <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-warning-text-deep)', margin: 0 }}>{subscription.pilotDaysRemaining} days left in pilot</p>
                 <p style={{ fontSize: 11, color: 'var(--hf-warning-text-strong)', margin: 0 }}>Ends {new Date(subscription.pilotEndsAt!).toLocaleDateString('en-ZA')}</p>
               </div>
-              <button onClick={() => navigate('/billing')} style={{ background: 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', marginLeft: 4 }}>Upgrade</button>
+              <button onClick={() => navigate('/billing')} style={{ background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', marginLeft: 4 }}>Upgrade</button>
             </div>
           )}
         </div>
@@ -367,7 +367,7 @@ export function DashboardPage() {
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 36 }}>
           {stats.map(s => (
-            <div key={s.label} style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+            <div key={s.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
               <div>
                 <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: '0 0 6px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</p>
                 <p style={{ fontSize: 28, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 4px', letterSpacing: '-0.5px' }}>{s.value}</p>
@@ -410,12 +410,12 @@ export function DashboardPage() {
           <button onClick={() => navigate('/billing')}
             style={{
               width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: '18px 24px',
+              background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: '18px 24px',
               boxShadow: '0 1px 6px rgba(0,0,0,0.04)', cursor: 'pointer', textAlign: 'left',
             }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--hf-indigo-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <CreditCard size={18} color="#1B3A6B" />
+                <CreditCard size={18} style={{ color: 'var(--hf-primary-text)' }} />
               </div>
               <div>
                 <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--hf-text)', margin: '0 0 2px' }}>
@@ -427,7 +427,7 @@ export function DashboardPage() {
                 </p>
               </div>
             </div>
-            <ChevronRight size={18} color="#CBD5E1" />
+            <ChevronRight size={18} style={{ color: 'var(--hf-text-disabled)' }} />
           </button>
         )}
       </main>

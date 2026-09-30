@@ -118,7 +118,7 @@ export function InvoicesPage() {
           { label: 'Total revenue',   value: fmtR(totalRevenue),    fmt: true, color: 'var(--hf-accent-text)' },
           { label: 'Outstanding',     value: fmtR(totalOutstanding), fmt: true, color: overdueCount > 0 ? 'var(--hf-danger-text)' : 'var(--hf-warning-text)' },
         ].map(s => (
-          <div key={s.label} style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '16px 20px' }}>
+          <div key={s.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '16px 20px' }}>
             <div style={{ fontSize: s.fmt ? 18 : 26, fontWeight: 700, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 3 }}>{s.label}</div>
           </div>
@@ -131,7 +131,7 @@ export function InvoicesPage() {
           <button key={s} onClick={() => setStatusFilter(s)}
             style={{ padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
               background: statusFilter === s ? 'var(--hf-primary)' : 'var(--hf-surface-sunken)',
-              color:      statusFilter === s ? 'white'   : 'var(--hf-text-muted)',
+              color:      statusFilter === s ? 'var(--hf-text-on-solid)'   : 'var(--hf-text-muted)',
             }}>
             {s === 'ALL' ? 'All' : (STATUS_STYLES[s]?.label ?? s)}
             {s !== 'ALL' && ` (${invoices.filter(i => i.status === s).length})`}
@@ -140,7 +140,7 @@ export function InvoicesPage() {
       </div>
 
       {/* Table */}
-      <div style={{ background: 'white', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, overflow: 'hidden' }}>
         {isLoading ? (
           <div style={{ padding: 60, textAlign: 'center', color: 'var(--hf-text-faint)' }}>Loading invoices...</div>
         ) : filtered.length === 0 ? (
@@ -166,15 +166,15 @@ export function InvoicesPage() {
                   <>
                     <tr key={inv.id}
                       onClick={() => setExpanded(isExpanded ? null : inv.id)}
-                      style={{ borderBottom: '1px solid var(--hf-border-subtle)', cursor: 'pointer', background: isExpanded ? 'var(--hf-surface-muted)' : 'white' }}
+                      style={{ borderBottom: '1px solid var(--hf-border-subtle)', cursor: 'pointer', background: isExpanded ? 'var(--hf-surface-muted)' : 'var(--hf-surface)' }}
                       onMouseEnter={e => { if (!isExpanded) (e.currentTarget as HTMLElement).style.background = 'var(--hf-surface-muted)' }}
-                      onMouseLeave={e => { if (!isExpanded) (e.currentTarget as HTMLElement).style.background = 'white' }}
+                      onMouseLeave={e => { if (!isExpanded) (e.currentTarget as HTMLElement).style.background = 'var(--hf-surface)' }}
                     >
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <FileText size={14} color="#0D9488" />
+                          <FileText size={14} style={{ color: 'var(--hf-accent-text)' }} />
                           <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)' }}>{inv.invoiceNumber}</span>
-                          {isExpanded ? <ChevronUp size={13} color="#94A3B8" /> : <ChevronDown size={13} color="#94A3B8" />}
+                          {isExpanded ? <ChevronUp size={13} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={13} style={{ color: 'var(--hf-text-faint)' }} />}
                         </div>
                       </td>
                       <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)' }}>
@@ -274,7 +274,7 @@ export function InvoicesPage() {
       {/* Mark as Paid modal */}
       {payModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: 'white', borderRadius: 16, padding: 28, width: 460, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+          <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 28, width: 460, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>Mark as Paid</h3>
@@ -305,7 +305,7 @@ export function InvoicesPage() {
 
             <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
               <button onClick={() => setPayModal(null)}
-                style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'white', fontSize: 14, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
+                style={{ padding: '10px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'var(--hf-surface)', fontSize: 14, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
                 Cancel
               </button>
               <button
@@ -314,7 +314,7 @@ export function InvoicesPage() {
                   id: payModal.id,
                   body: { amount: Number(payForm.amount), paymentMethod: payForm.paymentMethod, reference: payForm.reference, note: payForm.note },
                 })}
-                style={{ padding: '10px 22px', background: 'var(--hf-success)', color: 'white', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                style={{ padding: '10px 22px', background: 'var(--hf-success)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
                 {markPaid.isPending ? 'Saving...' : '✓ Confirm payment'}
               </button>
             </div>
@@ -336,5 +336,5 @@ function MField({ label, children }: { label: string; children: React.ReactNode 
 
 const inp: React.CSSProperties = {
   width: '100%', padding: '10px 12px', border: '1.5px solid var(--hf-border)',
-  borderRadius: 9, fontSize: 14, boxSizing: 'border-box' as const, background: 'white',
+  borderRadius: 9, fontSize: 14, boxSizing: 'border-box' as const, background: 'var(--hf-surface)',
 }

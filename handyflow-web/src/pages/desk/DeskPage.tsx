@@ -40,16 +40,16 @@ interface Summary {
 const PRIORITY: Record<string, { color: string; bg: string; border: string; dot: string }> = {
   URGENT: { color: 'var(--hf-danger-text)', bg: 'var(--hf-danger-soft)', border: 'var(--hf-danger-border)', dot: 'var(--hf-danger)' },
   HIGH:   { color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)', border: 'var(--hf-warning-border)', dot: 'var(--hf-warning)' },
-  NORMAL: { color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)', border: 'var(--hf-info-border)', dot: '#60A5FA' },
-  LOW:    { color: 'var(--hf-text-muted)', bg: 'var(--hf-surface-muted)', border: 'var(--hf-border)', dot: '#CBD5E1' },
+  NORMAL: { color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)', border: 'var(--hf-info-border)', dot: 'var(--hf-info-dot)' },
+  LOW:    { color: 'var(--hf-text-muted)', bg: 'var(--hf-surface-muted)', border: 'var(--hf-border)', dot: 'var(--hf-border-strong)' },
 }
 const STATUS: Record<string, { color: string; bg: string; border: string; dot: string; label: string; action: string }> = {
   OPEN:                   { color: 'var(--hf-danger-text)', bg: 'var(--hf-danger-soft)', border: 'var(--hf-danger-border)', dot: 'var(--hf-danger)', label: 'Open',             action: 'REOPEN' },
   IN_PROGRESS:            { color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)', border: 'var(--hf-warning-border)', dot: 'var(--hf-warning)', label: 'In Progress',      action: 'START' },
-  WAITING_ON_CUSTOMER:    { color: 'var(--hf-violet-text)', bg: 'var(--hf-violet-soft)', border: 'var(--hf-violet-border)', dot: '#A78BFA', label: 'Waiting – Client',  action: 'WAIT_CUSTOMER' },
-  WAITING_ON_THIRD_PARTY: { color: 'var(--hf-sky-text-strong)', bg: 'var(--hf-sky-soft-strong)', border: 'var(--hf-sky-border)', dot: '#38BDF8', label: 'Waiting – 3rd Party',action: 'WAIT_THIRD_PARTY' },
+  WAITING_ON_CUSTOMER:    { color: 'var(--hf-violet-text)', bg: 'var(--hf-violet-soft)', border: 'var(--hf-violet-border)', dot: 'var(--hf-violet-dot)', label: 'Waiting – Client',  action: 'WAIT_CUSTOMER' },
+  WAITING_ON_THIRD_PARTY: { color: 'var(--hf-sky-text-strong)', bg: 'var(--hf-sky-soft-strong)', border: 'var(--hf-sky-border)', dot: 'var(--hf-sky-dot)', label: 'Waiting – 3rd Party',action: 'WAIT_THIRD_PARTY' },
   RESOLVED:               { color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)', border: 'var(--hf-success-border)', dot: 'var(--hf-success)', label: 'Resolved',         action: 'RESOLVE' },
-  CLOSED:                 { color: 'var(--hf-text-faint)', bg: 'var(--hf-surface-muted)', border: 'var(--hf-border)', dot: '#CBD5E1', label: 'Closed',           action: 'CLOSE' },
+  CLOSED:                 { color: 'var(--hf-text-faint)', bg: 'var(--hf-surface-muted)', border: 'var(--hf-border)', dot: 'var(--hf-border-strong)', label: 'Closed',           action: 'CLOSE' },
 }
 const STATUS_ACTIONS: { action: string; label: string; from: string[] }[] = [
   { action: 'START',            label: 'Start working',    from: ['OPEN','WAITING_ON_CUSTOMER','WAITING_ON_THIRD_PARTY'] },
@@ -69,10 +69,10 @@ const btnS: React.CSSProperties = { display: 'inline-flex', alignItems: 'center'
 const fmtDate = (d: any) => d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 const fmtDT   = (d: any) => d ? new Date(d).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'
 const slaColor = (ticket: Ticket) => {
-  if (ticket.slaBreached) return '#DC2626'
-  if (!ticket.dueAt) return '#64748B'
+  if (ticket.slaBreached) return 'var(--hf-danger-text)'
+  if (!ticket.dueAt) return 'var(--hf-text-muted)'
   const hrs = (new Date(ticket.dueAt).getTime() - Date.now()) / 3_600_000
-  return hrs < 4 ? '#D97706' : '#64748B'
+  return hrs < 4 ? 'var(--hf-warning-text)' : 'var(--hf-text-muted)'
 }
 const slaLabel = (ticket: Ticket) => {
   if (ticket.slaBreached) return 'SLA breached'
@@ -228,7 +228,7 @@ function TicketDetail({ ticket: initial, onClose, onUpdated }: {
                 const cfg = targetStatus ? STATUS[targetStatus[0]] : null
                 return (
                   <button key={a.action} onClick={() => doAction.mutate(a.action)} disabled={doAction.isPending}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: cfg?.bg ?? 'var(--hf-surface-muted)', color: cfg?.color ?? 'var(--hf-text-muted)', border: `1px solid ${cfg?.border ?? '#E2E8F0'}`, borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: cfg?.bg ?? 'var(--hf-surface-muted)', color: cfg?.color ?? 'var(--hf-text-muted)', border: `1px solid ${cfg?.border ?? 'var(--hf-border)'}`, borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                     <ChevronRight size={11} />{a.label}
                   </button>
                 )
@@ -240,7 +240,7 @@ function TicketDetail({ ticket: initial, onClose, onUpdated }: {
           <div style={{ display: 'flex', gap: 0, marginTop: 14 }}>
             {(['thread','details','notes'] as const).map(t => (
               <button key={t} onClick={() => setTab(t)}
-                style={{ padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t ? 'var(--hf-primary-text)' : 'var(--hf-text-faint)', borderBottom: `2px solid ${tab === t ? '#1B3A6B' : 'transparent'}`, marginBottom: -1, textTransform: 'capitalize' }}>
+                style={{ padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t ? 'var(--hf-primary-text)' : 'var(--hf-text-faint)', borderBottom: `2px solid ${tab === t ? 'var(--hf-primary)' : 'transparent'}`, marginBottom: -1, textTransform: 'capitalize' }}>
                 {t === 'thread' ? `Thread (${comments.filter(c => !c.internal).length})` : t === 'notes' ? `Notes (${comments.filter(c => c.internal).length})` : 'Details'}
               </button>
             ))}
@@ -553,7 +553,7 @@ export function DeskPage() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--hf-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <MessageSquare size={18} color="#fff" />
+              <MessageSquare size={18} style={{ color: 'var(--hf-text-on-solid)' }} />
             </div>
             <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>Desk Support</h1>
           </div>
@@ -602,7 +602,7 @@ export function DeskPage() {
               const cfg = STATUS[s]; const active = statusFilter === s
               return (
                 <button key={s} onClick={() => setStatusFilter(s)}
-                  style={{ padding: '6px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer', fontWeight: active ? 700 : 500, border: `1.5px solid ${active && cfg ? cfg.border : '#E2E8F0'}`, background: active && cfg ? cfg.bg : 'var(--hf-surface)', color: active && cfg ? cfg.color : 'var(--hf-text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  style={{ padding: '6px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer', fontWeight: active ? 700 : 500, border: `1.5px solid ${active && cfg ? cfg.border : 'var(--hf-border)'}`, background: active && cfg ? cfg.bg : 'var(--hf-surface)', color: active && cfg ? cfg.color : 'var(--hf-text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
                   {s && cfg && <span style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.dot }} />}
                   {s ? cfg.label : 'All tickets'}
                 </button>
@@ -658,14 +658,14 @@ export function DeskPage() {
                 {filtered.map((t, i) => {
                   const sc = STATUS[t.status] ?? STATUS.OPEN
                   const pc = PRIORITY[t.priority] ?? PRIORITY.NORMAL
-                  const rowBg = t.slaBreached ? '#FFF5F5' : t.priority === 'URGENT' && !['RESOLVED','CLOSED'].includes(t.status) ? '#FFFAF0' : i % 2 === 0 ? '#fff' : '#FAFAFA'
+                  const rowBg = t.slaBreached ? 'var(--hf-danger-soft)' : t.priority === 'URGENT' && !['RESOLVED','CLOSED'].includes(t.status) ? 'var(--hf-warning-soft)' : i % 2 === 0 ? 'var(--hf-surface)' : 'var(--hf-surface-muted)'
                   return (
                     <tr key={t.id} onClick={() => setSelectedTicket(t)} style={{ background: rowBg, cursor: 'pointer', transition: 'background 0.1s' }}
                       onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--hf-sky-soft)'}
                       onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = rowBg}>
                       <td style={{ padding: '12px 16px', maxWidth: 260 }}>
                         <div style={{ fontWeight: 700, color: 'var(--hf-text)', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                          {t.slaBreached && <AlertTriangle size={12} color="#DC2626" style={{ flexShrink: 0, marginTop: 2 }} />}
+                          {t.slaBreached && <AlertTriangle size={12} style={{ color: 'var(--hf-danger-text)', flexShrink: 0, marginTop: 2 }} />}
                           <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>{t.subject}</span>
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 2, display: 'flex', gap: 6 }}>
@@ -694,7 +694,7 @@ export function DeskPage() {
                         <div style={{ fontSize: 12, color: slaColor(t), fontWeight: t.slaBreached ? 700 : 400 }}>{slaLabel(t)}</div>
                       </td>
                       <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--hf-text-faint)' }}>{fmtDate(t.updatedAt)}</td>
-                      <td style={{ padding: '12px 16px' }}><ChevronRight size={14} color="#94A3B8" /></td>
+                      <td style={{ padding: '12px 16px' }}><ChevronRight size={14} style={{ color: 'var(--hf-text-faint)' }} /></td>
                     </tr>
                   )
                 })}

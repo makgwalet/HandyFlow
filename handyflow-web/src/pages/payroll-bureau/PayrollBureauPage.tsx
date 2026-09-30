@@ -17,12 +17,13 @@ import { required, validateSaId, validateTaxNumber, validateEmail, validatePhone
 const fmtR = (n: any) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
 const fmtD = (d: any) => (d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—")
 
-const NAVY = "#1B3A6B"
-const BORDER = "#E2E8F0"
-const CANVAS = "#F8FAFC"
-const INK = "#0F172A"
-const MUTED = "#64748B"
-const FAINT = "#94A3B8"
+const NAVY = "var(--hf-primary)"
+const NAVY_TEXT = "var(--hf-primary-text)";
+const BORDER = "var(--hf-border)"
+const CANVAS = "var(--hf-surface-muted)"
+const INK = "var(--hf-text)"
+const MUTED = "var(--hf-text-muted)"
+const FAINT = "var(--hf-text-faint)"
 
 type Tab = "employees" | "payruns" | "deadlines" | "feenotes" | "portal"
 
@@ -251,7 +252,7 @@ export function PayrollBureauPage() {
                 <button key={id} onClick={() => setTab(id)} style={{
                   padding: "8px 14px", background: "none", border: "none",
                   borderBottom: tab === id ? `2px solid ${NAVY}` : "2px solid transparent",
-                  color: tab === id ? NAVY : MUTED, fontWeight: tab === id ? 700 : 500, fontSize: 13, cursor: "pointer", marginBottom: -1,
+                  color: tab === id ? NAVY_TEXT : MUTED, fontWeight: tab === id ? 700 : 500, fontSize: 13, cursor: "pointer", marginBottom: -1,
                 }}>{label}</button>
               ))}
             </div>
@@ -1269,6 +1270,6 @@ const inputStyle: React.CSSProperties = { width: "100%", padding: "8px 10px", bo
 const errorInputStyle: React.CSSProperties = { borderColor: "var(--hf-danger)" }
 const btnPrimary: React.CSSProperties = { padding: "7px 14px", background: NAVY, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
 const btnPrimarySmall: React.CSSProperties = { ...btnPrimary, padding: "4px 10px", fontSize: 11.5 }
-const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "var(--hf-surface)", color: NAVY, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }
+const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "var(--hf-surface)", color: NAVY_TEXT, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }
 const rowStyle: React.CSSProperties = { borderTop: `1px solid ${BORDER}` }
 const cellStyle: React.CSSProperties = { padding: "8px 12px", fontSize: 12.5, color: INK }

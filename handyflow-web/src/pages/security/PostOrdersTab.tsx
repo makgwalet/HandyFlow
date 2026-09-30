@@ -68,7 +68,7 @@ export default function PostOrdersTab() {
   })
 
   return (
-    <div style={{ padding: "24px 28px" }}>
+    <div>
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "var(--hf-text)" }}>Post Orders</h1>
         <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginTop: 2 }}>Site and post instructions — versioned, acknowledgment-tracked. The guard-facing "My Post" view lives in the Shield app.</div>

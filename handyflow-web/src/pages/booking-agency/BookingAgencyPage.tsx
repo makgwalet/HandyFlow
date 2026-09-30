@@ -16,12 +16,13 @@ import type { BookAgencyClient, BookAgencyResource, BookAgencyOffering, BookAgen
 const fmtD = (d: any) => (d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—")
 const fmtDT = (d: any) => (d ? new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—")
 
-const NAVY = "#1B3A6B"
-const BORDER = "#E2E8F0"
-const CANVAS = "#F8FAFC"
-const INK = "#0F172A"
-const MUTED = "#64748B"
-const FAINT = "#94A3B8"
+const NAVY = "var(--hf-primary)"
+const NAVY_TEXT = "var(--hf-primary-text)";
+const BORDER = "var(--hf-border)"
+const CANVAS = "var(--hf-surface-muted)"
+const INK = "var(--hf-text)"
+const MUTED = "var(--hf-text-muted)"
+const FAINT = "var(--hf-text-faint)"
 
 type Tab = "resources" | "offerings" | "bookings" | "invoices" | "portal"
 
@@ -205,7 +206,7 @@ export function BookingAgencyPage() {
                 <button key={id} onClick={() => setTab(id)} style={{
                   padding: "8px 14px", background: "none", border: "none",
                   borderBottom: tab === id ? `2px solid ${NAVY}` : "2px solid transparent",
-                  color: tab === id ? NAVY : MUTED, fontWeight: tab === id ? 700 : 500, fontSize: 13, cursor: "pointer", marginBottom: -1,
+                  color: tab === id ? NAVY_TEXT : MUTED, fontWeight: tab === id ? 700 : 500, fontSize: 13, cursor: "pointer", marginBottom: -1,
                 }}>{label}</button>
               ))}
             </div>
@@ -934,6 +935,6 @@ function ModalActions({ onClose, onSubmit, saving, submitLabel }: { onClose: () 
 
 const inputStyle: React.CSSProperties = { width: "100%", padding: "8px 10px", border: `1.5px solid ${BORDER}`, borderRadius: 6, fontSize: 13, boxSizing: "border-box" }
 const btnPrimary: React.CSSProperties = { padding: "7px 14px", background: NAVY, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
-const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "var(--hf-surface)", color: NAVY, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }
+const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "var(--hf-surface)", color: NAVY_TEXT, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }
 const rowStyle: React.CSSProperties = { borderTop: `1px solid ${BORDER}` }
 const cellStyle: React.CSSProperties = { padding: "8px 12px", fontSize: 12.5, color: INK }

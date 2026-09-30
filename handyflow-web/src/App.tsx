@@ -281,7 +281,7 @@ export default function App() {
             <Route path="/billing"     element={<BillingPage />} />
             <Route path="/security/:section?" element={<SecurityPage />} />
             <Route path="/fuel/:section?" element={<FuelPage />} />
-            <Route path="/internal-audit" element={<InternalAuditPage />} />
+            <Route path="/internal-audit/:section?" element={<InternalAuditPage />} />
             <Route path="/earthmoving/:section?" element={<EarthMovingPage />} />
             <Route path="/property/:section?" element={<PropertyPage />} />
  <Route path="/fleet/:section?" element={<FleetPage />} />

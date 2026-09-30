@@ -9,6 +9,8 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
+import { INTERNAL_AUDIT_SECTIONS } from "../../navigation/moduleSections"
 import {
   Database, CalendarRange, ClipboardList, Plus, ChevronDown, ChevronUp,
   ShieldAlert, Users2, UserPlus, CheckCircle2, Ban,
@@ -108,11 +110,6 @@ const WP_STATUS_CFG: Record<string, { label: string; color: string; bg: string }
   SIGNED_OFF: { label: "Signed Off", color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
 }
 
-const TOP_TABS = [
-  { id: "universe",    label: "Audit Universe", icon: Database },
-  { id: "plans",       label: "Annual Plans",   icon: CalendarRange },
-  { id: "engagements", label: "Engagements",    icon: ClipboardList },
-] as const
 
 const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
 const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const, background: "var(--hf-surface)", outline: "none" }
@@ -130,7 +127,6 @@ function RiskBadge({ level }: { level: string | null }) {
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export default function InternalAuditPage() {
-  const [tab, setTab] = useState<typeof TOP_TABS[number]["id"]>("universe")
   const qc = useQueryClient()
 
   const { data: universe = [], isLoading: universeLoading } = useQuery<UniverseEntry[]>({
@@ -150,29 +146,20 @@ export default function InternalAuditPage() {
     queryFn: async () => (await apiClient.get("/api/v1/identity/users?size=200")).data?.content ?? (await apiClient.get("/api/v1/identity/users?size=200")).data,
   })
 
+  // Sections are routes (/internal-audit/:section) with navigation in the sidebar
+  // (see navigation/moduleSections.ts). The shared data above is loaded once for
+  // all three sections, as before.
   return (
-    <div style={{ padding: "24px 28px" }}>
-      <div style={{ marginBottom: 18 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "var(--hf-text)" }}>Internal Audit</h1>
-        <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginTop: 2 }}>Risk-based audit planning — Phase 1: universe, risk scoring, annual plan, engagements</div>
-      </div>
-
-      <div style={{ display: "flex", gap: 6, marginBottom: 20, borderBottom: "1px solid var(--hf-border)" }}>
-        {TOP_TABS.map(t => {
-          const Icon = t.icon; const active = tab === t.id
-          return (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", background: "none", border: "none", borderBottom: active ? "2px solid var(--hf-primary)" : "2px solid transparent", color: active ? "var(--hf-primary-text)" : "var(--hf-text-muted)", fontWeight: active ? 700 : 500, fontSize: 13, cursor: "pointer" }}>
-              <Icon size={15} /> {t.label}
-            </button>
-          )
-        })}
-      </div>
-
-      {tab === "universe" && <UniverseSection universe={universe} isLoading={universeLoading} qc={qc} />}
-      {tab === "plans" && <PlansSection plans={plans} universe={universe} isLoading={plansLoading} qc={qc} />}
-      {tab === "engagements" && <EngagementsSection engagements={engagements} universe={universe} plans={plans} users={users} isLoading={engagementsLoading} qc={qc} />}
-    </div>
+    <SectionedModulePage config={INTERNAL_AUDIT_SECTIONS}
+      subtitle="Risk-based audit planning — Phase 1: universe, risk scoring, annual plan, engagements"
+      render={id => {
+        switch (id) {
+          case "universe":    return <UniverseSection universe={universe} isLoading={universeLoading} qc={qc} />
+          case "plans":       return <PlansSection plans={plans} universe={universe} isLoading={plansLoading} qc={qc} />
+          case "engagements": return <EngagementsSection engagements={engagements} universe={universe} plans={plans} users={users} isLoading={engagementsLoading} qc={qc} />
+          default:            return null
+        }
+      }} />
   )
 }
 
@@ -852,7 +839,7 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                           {e.assignments.map(a => (
                             <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
-                              <Users2 size={13} color="#7C3AED" />
+                              <Users2 size={13} style={{ color: 'var(--hf-violet-text)' }} />
                               <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{a.userName}</span>
                               <span style={{ color: "var(--hf-violet-text)", fontWeight: 600 }}>{a.role.replace(/_/g, " ")}</span>
                             </div>
@@ -969,7 +956,7 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                                     return (
                                       <div key={f.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                          <FileText size={13} color="#94A3B8" />
+                                          <FileText size={13} style={{ color: 'var(--hf-text-faint)' }} />
                                           <span style={{ fontWeight: 600, color: "var(--hf-text)" }}>{f.fileName}</span>
                                           <span style={{ color: "var(--hf-text-disabled)" }}>v{f.versionNumber}</span>
                                           <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: sc.bg, color: sc.color }}>{sc.label}</span>
@@ -1019,7 +1006,7 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                             <div key={p.id} style={{ border: "1px solid var(--hf-border)", borderRadius: 8 }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", cursor: "pointer" }} onClick={() => setExpandedPlan(expandedPlan === p.id ? null : p.id)}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  {expandedPlan === p.id ? <ChevronUp size={13} color="#94A3B8" /> : <ChevronDown size={13} color="#94A3B8" />}
+                                  {expandedPlan === p.id ? <ChevronUp size={13} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={13} style={{ color: 'var(--hf-text-faint)' }} />}
                                   <span style={{ fontWeight: 700, fontSize: 12, color: "var(--hf-text)" }}>{p.samplePeriodFrom} to {p.samplePeriodTo}</span>
                                   <span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{p.sampleSize} of {p.population} entries</span>
                                 </div>
@@ -1088,8 +1075,8 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                       ) : (
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                           {exceptionsQuery.data.map(ex => {
-                            const sevColor = ex.severity === "CRITICAL" || ex.severity === "HIGH" ? "#DC2626" : ex.severity === "MEDIUM" ? "#B45309" : "#64748B"
-                            const sevBg = ex.severity === "CRITICAL" || ex.severity === "HIGH" ? "#FEF2F2" : ex.severity === "MEDIUM" ? "#FFFBEB" : "#F1F5F9"
+                            const sevColor = ex.severity === "CRITICAL" || ex.severity === "HIGH" ? "var(--hf-danger-text)" : ex.severity === "MEDIUM" ? "var(--hf-warning-text-strong)" : "var(--hf-text-muted)"
+                            const sevBg = ex.severity === "CRITICAL" || ex.severity === "HIGH" ? "var(--hf-danger-soft)" : ex.severity === "MEDIUM" ? "var(--hf-warning-soft)" : "var(--hf-surface-sunken)"
                             return (
                               <div key={ex.id} style={{ padding: "9px 12px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12 }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
@@ -1146,10 +1133,10 @@ function EngagementsSection({ engagements, universe, plans, users, isLoading, qc
                       ) : (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                           {findingsQuery.data.map(f => {
-                            const sevColor = f.severity === "CRITICAL" || f.severity === "HIGH" ? "#DC2626" : f.severity === "MEDIUM" ? "#B45309" : "#64748B"
-                            const sevBg = f.severity === "CRITICAL" || f.severity === "HIGH" ? "#FEF2F2" : f.severity === "MEDIUM" ? "#FFFBEB" : "#F1F5F9"
-                            const statusColor = f.status === "CLOSED" ? "#166534" : f.status === "RESOLVED" ? "#1D4ED8" : f.status === "IN_PROGRESS" ? "#B45309" : "#64748B"
-                            const statusBg = f.status === "CLOSED" ? "#DCFCE7" : f.status === "RESOLVED" ? "#EFF6FF" : f.status === "IN_PROGRESS" ? "#FFFBEB" : "#F1F5F9"
+                            const sevColor = f.severity === "CRITICAL" || f.severity === "HIGH" ? "var(--hf-danger-text)" : f.severity === "MEDIUM" ? "var(--hf-warning-text-strong)" : "var(--hf-text-muted)"
+                            const sevBg = f.severity === "CRITICAL" || f.severity === "HIGH" ? "var(--hf-danger-soft)" : f.severity === "MEDIUM" ? "var(--hf-warning-soft)" : "var(--hf-surface-sunken)"
+                            const statusColor = f.status === "CLOSED" ? "var(--hf-success-text-strong)" : f.status === "RESOLVED" ? "var(--hf-info-text)" : f.status === "IN_PROGRESS" ? "var(--hf-warning-text-strong)" : "var(--hf-text-muted)"
+                            const statusBg = f.status === "CLOSED" ? "var(--hf-success-soft-strong)" : f.status === "RESOLVED" ? "var(--hf-info-soft)" : f.status === "IN_PROGRESS" ? "var(--hf-warning-soft)" : "var(--hf-surface-sunken)"
                             return (
                               <div key={f.id} style={{ padding: "12px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 10, fontSize: 12 }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
