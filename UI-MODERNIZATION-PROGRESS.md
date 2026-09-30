@@ -256,3 +256,33 @@ The first browser test (`/security/guard-screening`) went blank with "Objects ar
   - Fuel (1): dispatch approval status. Property (1): lease portal-access grants.
 - Not fixed, different problem: `customers/ImportModal.tsx` posts to `/api/v1/crm/customers/import` and polls `/import/{jobId}`, but no such endpoints exist in the backend. Customer import cannot work until they are built.
 - The widespread `r.data?.data ?? r.data` form is harmless (it falls back to the payload) and is left alone.
+
+## Tasks module review and rebuild
+
+Backend (`platform`, tasks module):
+- **V304** adds `task_columns.category` (TODO / IN_PROGRESS / IN_REVIEW / BLOCKED / DONE), allows status `BLOCKED`,
+  and heals tasks whose status had drifted from their column. A task's status is now the category of its column,
+  not a guess from the column's name. Backfill uses the old name heuristics; correct any column in Board settings.
+- **V305** (optional) gives `EMPLOYEE` roles `TASKS_READ` + `TASKS_MANAGE`, as Clinic and Projects do. Do not apply it
+  if Tasks should stay admin-only.
+- A column id from the client must belong to the board and tenant (was a bare `findById`: cross-tenant write/delete).
+- Moving a task honours its position; fields can be cleared (`clearAssignee`, `clearDueDate`, ...); request validation
+  returns 400 instead of 500; priority sorts by rank; archived boards are excluded from counts and alert sweeps;
+  deleting a column no longer fails when soft-deleted tasks still point at it; a new tenant gets a default board on
+  first load; the notification sweeps no longer run in one transaction; business-day (Africa/Johannesburg) dates.
+- Verified: migrations and every new SQL statement against a real PostgreSQL 16 (36 checks). **Java not compiled**
+  (no Maven Central in the build sandbox): syntax, signature and enum-vs-CHECK checks only. Run
+  `mvn test -Dtest='TasksServiceTest,TaskTest'`.
+
+Frontend (`src/pages/tasks`): the 1,432-line `TasksPage.tsx` is split into types / constants / logic / api hooks /
+components. New Modernize-style board (tinted lists, cards with avatar + priority pill + footer counts), drag and drop
+with dnd-kit (mouse, touch long-press, keyboard) plus a "Move to" menu, optimistic moves with rollback, URL state
+(`?board=&task=&view=` + filters), permission gating with `usePermission`, toasts instead of swallowed errors, board
+settings (lists, stages, colours, archive), truncation warning, task modal can edit priority / due date / estimate and
+unassign. Fixed: a task due today showed as overdue from 02:00 SAST (UTC parse of date-only strings).
+- Needs `npm install` (new dependencies `@dnd-kit/*`).
+- Verified with throwaway vitest tests (33, in `tasks-scratch-tests/`, not committed: vitest is not a project dependency),
+  tsc/eslint clean for the Tasks files, production bundle builds. **Not verified in a browser**; real drag gestures are
+  untested (jsdom cannot drive them).
+- Not done: real server paging, tags, comment edit/delete, activity log, recurring tasks, multi-instance scheduler lock,
+  optimistic-lock conflict handling.

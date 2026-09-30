@@ -17,6 +17,7 @@ import { NotificationDrawer } from '../layout/NotificationDrawer'
 import { Sidebar } from './Sidebar'
 import { ProfileMenu } from './ProfileMenu'
 import { CustomizerDrawer } from './CustomizerDrawer'
+import { Toaster } from '../ui/Toaster'
 import './shell.css'
 
 const LEGACY_PINNED_KEY = 'handyflow-pinned-modules'
@@ -113,6 +114,7 @@ export function AppShell() {
 
       <NotificationDrawer open={notifOpen} onClose={() => setNotifOpen(false)} />
       <CustomizerDrawer open={customizerOpen} onClose={closeCustomizer} />
+      <Toaster />
     </div>
   )
 }
