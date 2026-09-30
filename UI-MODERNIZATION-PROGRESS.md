@@ -233,6 +233,16 @@ The Phase 0 codemod converted the default colour of a new bookable service (`EMP
 - Colours: 52 -> 0, except the service colour swatches, which are data (see above).
 
 
+## Regression found in the browser: null payloads leaked the response envelope
+
+The first browser test (`/security/guard-screening`) went blank with "Objects are not valid as a React child (found: object with keys {success, message, timestamp})".
+
+- **Cause:** `ApiResponse<T>` is serialised with `@JsonInclude(NON_NULL)`, so when a payload is null the `data` key is omitted. `apiClient`'s response interceptor only unwrapped when a `data` key existed, so a null payload returned the whole `{ success, message, timestamp }` envelope. The screening "gate warning" is a nullable string, and the page rendered the envelope.
+- **How I caused it:** the earlier double-unwrap fix changed `res.data?.data` to `res.data`. That is right when a payload exists but wrong when it does not (the old code got a harmless `undefined` from the envelope). I checked each endpoint's return type for paging, but not whether it could return nothing.
+- **Fix, in the client so it is correct everywhere:** a body with a boolean `success` and a string `timestamp` and no `data` key is now unwrapped to `null`. Any body with a `data` key unwraps as before; anything else is left alone. It also fixes a latent crash: the old `'data' in body` check threw a TypeError on any plain-text response.
+- **Verified** with a 10-case scratch test (payload list/object/explicit null/omitted, message omitted, non-envelope, a body with only `success` and `message`, string, array, empty); against the original client 3 of them fail (the regression, its variant, and the string body). Not committed (no test runner in the project).
+- **Residual risk (be aware):** a component that reads a property straight off a query result that can be null, or whose destructuring default (`= {}`) is skipped because `null` is not `undefined`, would now hit a TypeError where it used to get a leaked envelope. Searches for direct property reads on API results found none, but a browser pass is the real check.
+
 ## Bug found during Phase 2 review: double-unwrapped API responses
 
 `apiClient` (src/api/client.ts) already unwraps the `{ success, message, data }` envelope, so `res.data` is the payload. Code that reads `res.data.data` / `.data?.data` **without** a `?? res.data` fallback always gets `undefined`, and lists silently show as empty.

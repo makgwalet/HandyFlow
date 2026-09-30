@@ -87,8 +87,20 @@ function forceLogout() {
 apiClient.interceptors.response.use(
   (response) => {
     // Unwrap our ApiResponse wrapper
-    if (response.data && 'data' in response.data) {
-      return { ...response, data: response.data.data }
+    const body = response.data
+    if (body && typeof body === 'object') {
+      if ('data' in body) {
+        return { ...response, data: body.data }
+      }
+      // ApiResponse<T> is serialised with @JsonInclude(NON_NULL), so when the payload is
+      // null the `data` key is OMITTED and the body is just { success, message, timestamp }.
+      // Unwrap that to null. Returning the envelope itself would hand callers an object
+      // where they expect a string, list or record (e.g. a nullable warning string), and
+      // React throws "Objects are not valid as a React child". Recognised strictly: a
+      // boolean `success` and a string `timestamp` are present on every ApiResponse.
+      if (typeof body.success === 'boolean' && typeof body.timestamp === 'string') {
+        return { ...response, data: null }
+      }
     }
     return response
   },
