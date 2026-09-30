@@ -8,7 +8,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { GraduationCap, CalendarDays, Users, Award, TriangleAlert } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { TRAINING_ACCENT } from "./constants"
+import { TRAINING_ACCENT_TEXT } from "./constants"
 
 interface Page<T> { content: T[]; totalElements: number }
 interface SessionResponse { id: string; courseTitle: string; startDate: string; endDate: string; status: string; enrolledCount: number }
@@ -47,28 +47,28 @@ export default function TrainingDashboard() {
           <p style={label}>Active courses</p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <p style={value}>{courses?.totalElements ?? "—"}</p>
-            <GraduationCap size={22} color={TRAINING_ACCENT} />
+            <GraduationCap size={22} style={{ color: TRAINING_ACCENT_TEXT }} />
           </div>
         </div>
         <div style={card}>
           <p style={label}>Scheduled sessions</p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <p style={value}>{scheduledSessions?.totalElements ?? "—"}</p>
-            <CalendarDays size={22} color={TRAINING_ACCENT} />
+            <CalendarDays size={22} style={{ color: TRAINING_ACCENT_TEXT }} />
           </div>
         </div>
         <div style={card}>
           <p style={label}>Live enrollments</p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <p style={value}>{liveEnrollments?.totalElements ?? "—"}</p>
-            <Users size={22} color={TRAINING_ACCENT} />
+            <Users size={22} style={{ color: TRAINING_ACCENT_TEXT }} />
           </div>
         </div>
         <div style={card}>
           <p style={label}>Certificates expiring (30d)</p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <p style={{ ...value, color: expiringSoon.length > 0 ? "var(--hf-warning-text)" : "var(--hf-text)" }}>{expiringSoon.length}</p>
-            <Award size={22} color={expiringSoon.length > 0 ? "#D97706" : TRAINING_ACCENT} />
+            <Award size={22} style={{ color: expiringSoon.length > 0 ? "var(--hf-warning-text)" : TRAINING_ACCENT_TEXT }} />
           </div>
         </div>
       </div>
@@ -76,7 +76,7 @@ export default function TrainingDashboard() {
       {expiringSoon.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <TriangleAlert size={18} color="#D97706" />
+            <TriangleAlert size={18} style={{ color: 'var(--hf-warning-text)' }} />
             <div>
               <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-warning-text-deep)", margin: 0 }}>{expiringSoon.length} certificate{expiringSoon.length === 1 ? "" : "s"} expiring within 30 days</p>
               <p style={{ fontSize: 11.5, color: "var(--hf-warning-text-strong)", margin: 0 }}>Refresher training may be needed — see the Certificates tab.</p>

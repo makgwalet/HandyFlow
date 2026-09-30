@@ -16,7 +16,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Download, Plus, X, ShieldAlert } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { CA_ACCENT } from "./constants"
+import { CA_ACCENT, CA_ACCENT_TEXT } from "./constants"
 import { STATUSES, STATUS_COLORS, fmtMoney, type DebtorAccountResponse } from "./CollAgencyDebtorAccountsTab"
 
 interface ContactLogResponse {
@@ -98,7 +98,7 @@ function ContactLogForm({ accountId, onDone }: { accountId: string; onDone: () =
 
       <div style={{ background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 10, padding: 12, marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-          <ShieldAlert size={14} color="#92400E" />
+          <ShieldAlert size={14} style={{ color: 'var(--hf-warning-text-deep)' }} />
           <p style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-warning-text-deep)", margin: 0 }}>Mandatory NCA disclosures — all three required to record this contact</p>
         </div>
         {[
@@ -118,7 +118,7 @@ function ContactLogForm({ accountId, onDone }: { accountId: string; onDone: () =
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
         <button onClick={onDone} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", fontSize: 12.5, cursor: "pointer" }}>Cancel</button>
         <button onClick={() => save.mutate()} disabled={!valid || save.isPending}
-          style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: valid ? CA_ACCENT : "#CBD5E1", color: "var(--hf-text-on-solid)", fontSize: 12.5, fontWeight: 600, cursor: valid ? "pointer" : "not-allowed" }}>
+          style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: valid ? CA_ACCENT : "var(--hf-border-strong)", color: "var(--hf-text-on-solid)", fontSize: 12.5, fontWeight: 600, cursor: valid ? "pointer" : "not-allowed" }}>
           {save.isPending ? "Recording…" : "Record contact"}
         </button>
       </div>
@@ -157,7 +157,7 @@ function PaymentPlanForm({ accountId, onDone }: { accountId: string; onDone: () 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
         <button onClick={onDone} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", fontSize: 12.5, cursor: "pointer" }}>Cancel</button>
         <button onClick={() => save.mutate()} disabled={!valid || save.isPending}
-          style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: valid ? CA_ACCENT : "#CBD5E1", color: "var(--hf-text-on-solid)", fontSize: 12.5, fontWeight: 600, cursor: valid ? "pointer" : "not-allowed" }}>
+          style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: valid ? CA_ACCENT : "var(--hf-border-strong)", color: "var(--hf-text-on-solid)", fontSize: 12.5, fontWeight: 600, cursor: valid ? "pointer" : "not-allowed" }}>
           {save.isPending ? "Proposing…" : "Propose plan"}
         </button>
       </div>
@@ -270,7 +270,7 @@ export default function CollAgencyDebtorAccountDetail({ accountId, clientId, onB
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Contact trail ({contacts.length})</p>
         {!isTerminal && !showContactForm && (
-          <button onClick={() => setShowContactForm(true)} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: CA_ACCENT, cursor: "pointer" }}>
+          <button onClick={() => setShowContactForm(true)} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: CA_ACCENT_TEXT, cursor: "pointer" }}>
             <Plus size={13} /> Record contact
           </button>
         )}
@@ -296,7 +296,7 @@ export default function CollAgencyDebtorAccountDetail({ accountId, clientId, onB
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Payment plans ({plans.length})</p>
         {!isTerminal && !showPlanForm && !plans.some(p => p.status === "ACTIVE") && (
-          <button onClick={() => setShowPlanForm(true)} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: CA_ACCENT, cursor: "pointer" }}>
+          <button onClick={() => setShowPlanForm(true)} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: CA_ACCENT_TEXT, cursor: "pointer" }}>
             <Plus size={13} /> Propose plan
           </button>
         )}

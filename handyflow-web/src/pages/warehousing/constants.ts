@@ -4,4 +4,8 @@
 // accent color without creating a circular import back through
 // WarehousingPage.tsx (same fix already applied for collectionsagency's
 // CA_ACCENT after that exact cycle was caught pre-delivery there).
-export const WHSE_ACCENT = "#0F766E" // teal-700 — distinct from legalcompliance (indigo), debtcollection (rust), collectionsagency (violet)
+// Module accent: teal (teal-700).
+// Two tokens because fills and text diverge in dark mode: fills stay dark enough for
+// white labels, text gets lighter to stay readable on dark surfaces.
+export const WHSE_ACCENT = "var(--hf-accent-solid-strong)"       // fills, borders
+export const WHSE_ACCENT_TEXT = "var(--hf-accent-text-strong)"  // text and icons

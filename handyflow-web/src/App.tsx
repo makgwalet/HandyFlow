@@ -297,7 +297,7 @@ export default function App() {
             <Route path="/creative"               element={<CreativePage />} />
             <Route path="/desk"                   element={<DeskPage />} />
             <Route path="/tasks"                  element={<TasksPage />} />
-            <Route path="/marketing"              element={<MarketingPage />} />
+            <Route path="/marketing/:section?" element={<MarketingPage />} />
             <Route path="/recruiter"              element={<RecruiterPage />} />
             <Route path="/pos"                    element={<PosPage />} />
             <Route path="/accountant/:section?" element={<AccountantPage />} />
@@ -318,9 +318,9 @@ export default function App() {
             <Route path="/complianceservices/tenders/:id"              element={<ClientTenderDetailPage />} />
             <Route path="/debtcollection/:section?" element={<DebtCollectionPage />} />
             <Route path="/recruitment-agency" element={<RecruitmentAgencyPage />} />
-            <Route path="/collections-agency" element={<CollectionsAgencyPage />} />
-            <Route path="/warehousing" element={<WarehousingPage />} />
-            <Route path="/training" element={<TrainingPage />} />
+            <Route path="/collections-agency/:section?" element={<CollectionsAgencyPage />} />
+            <Route path="/warehousing/:section?" element={<WarehousingPage />} />
+            <Route path="/training/:section?" element={<TrainingPage />} />
             <Route path="/training-provider/:section?" element={<TrainProvPage />} />
             <Route path="/agriculture/:section?" element={<AgriculturePage />} />
             {/* NEW: shared "needs attention" board — see import comment above. */}

@@ -15,7 +15,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, X, Trash2, CheckCircle2 } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { CA_ACCENT } from "./constants"
+import { CA_ACCENT, CA_ACCENT_TEXT } from "./constants"
 
 interface PlacementBatchResponse {
   id: string; clientId: string; batchReference: string | null; placedDate: string
@@ -56,7 +56,7 @@ function NewBatchModal({ clientId, onClose }: { clientId: string; onClose: () =>
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 26, width: 720, maxHeight: "88vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Place a new batch of debtor accounts</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
@@ -71,7 +71,7 @@ function NewBatchModal({ clientId, onClose }: { clientId: string; onClose: () =>
           <div key={idx} style={{ border: "1px solid var(--hf-border)", borderRadius: 10, padding: 12, marginBottom: 10, position: "relative" }}>
             {lines.length > 1 && (
               <button onClick={() => setLines(lines.filter((_, i) => i !== idx))} style={{ position: "absolute", top: 8, right: 8, background: "none", border: "none", cursor: "pointer" }}>
-                <Trash2 size={13} color="#DC2626" />
+                <Trash2 size={13} style={{ color: 'var(--hf-danger-text)' }} />
               </button>
             )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
@@ -103,7 +103,7 @@ function NewBatchModal({ clientId, onClose }: { clientId: string; onClose: () =>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
           <button onClick={onClose} style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", fontSize: 13, cursor: "pointer" }}>Cancel</button>
           <button onClick={() => save.mutate()} disabled={!valid || save.isPending}
-            style={{ padding: "9px 18px", borderRadius: 8, border: "none", background: valid ? CA_ACCENT : "#CBD5E1", color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 600, cursor: valid ? "pointer" : "not-allowed" }}>
+            style={{ padding: "9px 18px", borderRadius: 8, border: "none", background: valid ? CA_ACCENT : "var(--hf-border-strong)", color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 600, cursor: valid ? "pointer" : "not-allowed" }}>
             {save.isPending ? "Placing…" : `Place batch (${lines.length} account${lines.length === 1 ? "" : "s"})`}
           </button>
         </div>
@@ -151,7 +151,7 @@ export default function CollAgencyPlacementBatchesTab({ clientId }: { clientId: 
               {b.acknowledgedAt ? (
                 <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 700, color: "var(--hf-success-text-strong)" }}><CheckCircle2 size={14} /> Acknowledged</span>
               ) : (
-                <button onClick={() => acknowledge.mutate(b.id)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: CA_ACCENT, cursor: "pointer" }}>
+                <button onClick={() => acknowledge.mutate(b.id)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: CA_ACCENT_TEXT, cursor: "pointer" }}>
                   Acknowledge receipt
                 </button>
               )}

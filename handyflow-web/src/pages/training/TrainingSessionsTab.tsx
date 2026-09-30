@@ -8,7 +8,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, X, ChevronRight, CalendarDays, Users } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { TRAINING_ACCENT } from "./constants"
+import { TRAINING_ACCENT, TRAINING_ACCENT_TEXT } from "./constants"
 import TrainingSessionDetail from "./TrainingSessionDetail"
 import type { CourseResponse } from "./TrainingCoursesTab"
 
@@ -20,10 +20,10 @@ export interface SessionResponse {
 interface SessionPage { content: SessionResponse[]; totalElements: number }
 interface CoursePage { content: CourseResponse[] }
 
-const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
-const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5, display: "block" }
+const inputStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }
+const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5, display: "block" }
 
-const STATUS_COLORS: Record<string, string> = { SCHEDULED: "#0369A1", IN_PROGRESS: "#D97706", COMPLETED: "#059669", CANCELLED: "#94A3B8" }
+const STATUS_COLORS: Record<string, string> = { SCHEDULED: "var(--hf-sky-text-strong)", IN_PROGRESS: "var(--hf-warning-text)", COMPLETED: "var(--hf-success-text)", CANCELLED: "var(--hf-text-faint)" }
 
 function CreateSessionModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient()
@@ -51,7 +51,7 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 480, maxHeight: "85vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Schedule a session</p>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
         <div style={{ display: "grid", gap: 12 }}>
           <div>
@@ -129,12 +129,12 @@ export default function TrainingSessionsTab() {
               style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", textAlign: "left", padding: "13px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)", background: "none", border: "none", cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--hf-success-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <CalendarDays size={15} color={TRAINING_ACCENT} />
+                  <CalendarDays size={15} style={{ color: TRAINING_ACCENT_TEXT }} />
                 </div>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <p style={{ fontSize: 13.5, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{s.courseTitle}</p>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: `${STATUS_COLORS[s.status]}18`, color: STATUS_COLORS[s.status] }}>{s.status.replace("_", " ")}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: `color-mix(in srgb, ${STATUS_COLORS[s.status]} 9%, transparent)`, color: STATUS_COLORS[s.status] }}>{s.status.replace("_", " ")}</span>
                   </div>
                   <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>
                     {s.startDate} → {s.endDate} {s.venue ? `· ${s.venue}` : ""} {s.trainerName ? `· ${s.trainerName}` : ""}
@@ -145,7 +145,7 @@ export default function TrainingSessionsTab() {
                 <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-text-muted)" }}>
                   <Users size={13} /> {s.enrolledCount}{s.capacity != null ? ` / ${s.capacity}` : ""}
                 </span>
-                <ChevronRight size={16} color="#CBD5E1" />
+                <ChevronRight size={16} style={{ color: 'var(--hf-text-disabled)' }} />
               </div>
             </button>
           ))}

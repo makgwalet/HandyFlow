@@ -13,7 +13,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { FileText, X, Download, CreditCard } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { WHSE_ACCENT } from "./constants"
+import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
 
 interface BillingInvoiceResponse {
   id: string; clientId: string; invoiceNumber: string; periodStart: string; periodEnd: string
@@ -45,7 +45,7 @@ function GenerateModal({ clientId, onClose }: { clientId: string; onClose: () =>
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 400 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Generate billing invoice</p>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
         <p style={{ fontSize: 12, color: "var(--hf-text-faint)", marginBottom: 14 }}>
           Bills storage + handling fees from the end of the last invoiced period (or client onboarding, if this is the first invoice) through the date below — and posts revenue to the GL immediately. This can't be undone from here.
@@ -75,7 +75,7 @@ function PaymentModal({ invoice, onClose }: { invoice: BillingInvoiceResponse; o
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 380 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Record payment</p>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", marginBottom: 14 }}>{invoice.invoiceNumber} — {fmtMoney(invoice.balance)} outstanding</p>
         <div><label style={labelStyle}>Amount *</label><input type="number" step="0.01" style={inputStyle} value={amount} onChange={e => setAmount(e.target.value)} /></div>
@@ -152,7 +152,7 @@ export default function WhseBillingInvoicesTab({ clientId }: { clientId: string 
                   {inv.balance > 0 && (
                     <button onClick={() => setPaying(inv)} title="Record payment"
                       style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
-                      <CreditCard size={14} color={WHSE_ACCENT} />
+                      <CreditCard size={14} style={{ color: WHSE_ACCENT_TEXT }} />
                     </button>
                   )}
                 </div>

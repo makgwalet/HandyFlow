@@ -35,6 +35,8 @@
   "bg": "primary-hover"
  },
  "#0F766E": {
+  "bd": "accent-solid-strong",
+  "bg": "accent-solid-strong",
   "fg": "accent-text-strong"
  },
  "#10B981": {
@@ -112,6 +114,8 @@
   "fg": "violet-text-strong"
  },
  "#5B21B6": {
+  "bd": "violet-solid-strong",
+  "bg": "violet-solid-strong",
   "fg": "violet-text-strong"
  },
  "#5EEAD4": {

@@ -81,7 +81,7 @@ App-wide dry run of step 1: 67 alpha sites and 566 icon props across 224 files.
 
 ## Phase 3 — module rollout (in progress)
 
-**Status (be careful with earlier optimism):** 500 hard-coded colours remain in `src/pages` (of ~17,700 originally) plus 13 elsewhere in `src` (components, theme). Largest left: auth pages 114, catalogue 41, training 38, marketing 34, collectionsagency 32, warehousing 29, internal-audit 24, accountant-portal 24, desk 19, auditor-portal 19, dashboard 18, careers 14, then a tail under 15 each (client portals, small modules). Stylesheets are now covered (see css-colors.mjs); re-measure rather than trusting counts written here.
+**Status (be careful with earlier optimism):** 327 hard-coded colours remain in `src/pages` (of ~17,700 originally). About 20 of those are intentional and must stay literal: the Tasks board and Bookings service colour palettes (saved data), the Contracting signature-pad canvas, and Marketing's sample email HTML. The rest: auth pages 114, internal-audit 24, accountant-portal 24, desk 19, auditor-portal 19, dashboard 18, careers 14, invoices 12, then client portals and small modules under 12 each. The shared shell components and the migrated modules are done; `styles/brand.ts` holds the brand palette definitions and correctly stays hex. Re-measure rather than trusting counts written here.
 
 
 Correction to the original analysis: its per-module "tab counts" were file counts. Agriculture has 3 top-level sections, not 20; the other files are drill-down views. Check each module's real navigation before planning.
@@ -188,6 +188,16 @@ The Phase 0 codemod converted the default colour of a new bookable service (`EMP
 - Small intentional look changes: "pending" button fills that were a hard-coded pale colour are now a tint of the button's own colour (`color-mix`). One was a copy-paste oddity: Quote detail's pending *red* button used a pale *navy*; it is now pale red.
 - Customer import has no backend: `ImportModal` calls `/api/v1/crm/customers/import`, and no controller under `crm` maps an import route (re-checked). The two `res.data?.data` reads there are moot until one exists.
 - Colours: ~200 in TSX plus 172 in the stylesheet; all seven modules at zero. POS `STATUS_COLORS` `[fg, bg]` pairs were mapped by position.
+
+### Next tier: Marketing, Training, Warehousing, Collections Agency (routed), Catalogue (colours only) ✅
+- **Routed sections:** Marketing `/marketing/:section` (Campaigns, Templates; Contacts; Analytics; the KPI strip rides in the banner slot and its summary still feeds Analytics), Training & L&D `/training/:section`, Warehousing `/warehousing/:section`, Collections Agency `/collections-agency/:section`. Catalogue is a single page: colours only.
+- **Portal routes verified.** Warehousing, Collections Agency, Training Provider and Property each have a client portal at `/<module>/portal/*` next to the staff `/<module>/:section?` route. A scratch router test (8 cases) confirmed the static `portal` segment outranks the `:section` parameter, that portal pages never render inside the staff shell, and that staff sections still resolve.
+- **Marketing's sample email HTML is deliberately a literal hex** (`EXAMPLE_EMAIL_HTML` in `TemplatesTab.tsx`): email clients cannot resolve CSS variables, so email markup must never use theme tokens.
+- **New tool `scripts/theme-codemod/split-shared-constant.mjs`** for a colour constant defined in one `constants.ts` and imported across a module (the case `split-constants.mjs` does not cover). Define `NAME` (fills/borders) and `NAME_TEXT` (text) in the constants file, then run it on the module folder: text usages become `NAME_TEXT`, and the import is rewritten (adds `NAME_TEXT`, drops `NAME` when nothing uses it). Used for `TRAINING_ACCENT`, `CA_ACCENT`, `WHSE_ACCENT`. The shared role logic moved to `roles.mjs`, which `split-constants.mjs` now also uses (verified on a scratch file covering text, fill, border, SVG and data usages).
+- New tokens `--hf-violet-solid-strong` and `--hf-accent-solid-strong`; map additions for `#5B21B6`, `#0F766E`, `#15803D` fills.
+- **Shared shell components fixed.** `NotificationDrawer` and `SessionExpiryModal` still had `background: 'white'` (the named-colour support came after Phase 0 and had only been run on page folders), so in dark mode the notification panel and the session-expiry dialog would have been glaring white boxes with light text. Also `ModuleSwitcher`'s icon colours. `src/components` is now at zero.
+- One component (`StatCard` in the Collections Agency dashboard) forwarded its `tone` prop to an icon's `color` attribute; moved to `style`.
+- Colours: 197 in the five modules -> 0 (plus 10 in shared components). Type errors 282 -> 262 (Marketing's 20 unused imports went with the rewrite).
 
 ### Navigation gaps found and fixed
 - 7 modules had dashboard tiles but were missing from the sidebar/Ctrl+K registry (carried over from the old top-nav): collections agency, warehousing, legal & compliance, business compliance & tender, compliance services, debt collection, projects. Added.

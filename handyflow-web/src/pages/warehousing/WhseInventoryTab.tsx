@@ -9,7 +9,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Boxes, SlidersHorizontal, X } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { WHSE_ACCENT } from "./constants"
+import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
 
 interface InventoryResponse { id: string; clientId: string; itemId: string; locationId: string; qtyOnHand: number; qtyAllocated: number; available: number }
 interface ItemResponse { id: string; sku: string }
@@ -33,7 +33,7 @@ function AdjustModal({ inv, itemLabel, onClose }: { inv: InventoryResponse; item
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 400 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Adjust stock</p>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", marginBottom: 14 }}>{itemLabel} — currently {inv.qtyOnHand} on hand</p>
         <div style={{ display: "grid", gap: 12 }}>
@@ -88,7 +88,7 @@ export default function WhseInventoryTab({ clientId }: { clientId: string }) {
           {inventory.map((inv, i) => (
             <div key={inv.id} style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 0.8fr 0.8fr 0.8fr 0.6fr", alignItems: "center", padding: "11px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Boxes size={14} color={WHSE_ACCENT} />
+                <Boxes size={14} style={{ color: WHSE_ACCENT_TEXT }} />
                 <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--hf-text)" }}>{skuOf(inv.itemId)}</span>
               </div>
               <span style={{ fontSize: 12.5, color: "var(--hf-text-muted)" }}>{codeOf(inv.locationId)}</span>
@@ -97,7 +97,7 @@ export default function WhseInventoryTab({ clientId }: { clientId: string }) {
               <span style={{ fontSize: 12.5, color: inv.available > 0 ? "var(--hf-success-text)" : "var(--hf-danger-text)", fontWeight: 600 }}>{inv.available}</span>
               <button onClick={() => setAdjusting(inv)} title="Adjust"
                 style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer", width: "fit-content" }}>
-                <SlidersHorizontal size={12} color="#64748B" />
+                <SlidersHorizontal size={12} style={{ color: 'var(--hf-text-muted)' }} />
               </button>
             </div>
           ))}

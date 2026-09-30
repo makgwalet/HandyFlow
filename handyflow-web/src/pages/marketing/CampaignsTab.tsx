@@ -20,8 +20,8 @@ const STATUS: Record<string, { color: string; bg: string; border: string; label:
   SCHEDULED: { color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)', border: 'var(--hf-info-border)', label: 'Scheduled', dot: 'var(--hf-info)' },
   SENDING:   { color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)', border: 'var(--hf-warning-border)', label: 'Sending',   dot: 'var(--hf-warning)' },
   SENT:      { color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)', border: 'var(--hf-success-border)', label: 'Sent',      dot: 'var(--hf-success)' },
-  PAUSED:    { color: 'var(--hf-violet-text)', bg: 'var(--hf-violet-soft)', border: 'var(--hf-violet-border)', label: 'Paused',    dot: '#A855F7' },
-  CANCELLED: { color: 'var(--hf-text-faint)', bg: 'var(--hf-surface-sunken)', border: 'var(--hf-border)', label: 'Cancelled', dot: '#CBD5E1' },
+  PAUSED:    { color: 'var(--hf-violet-text)', bg: 'var(--hf-violet-soft)', border: 'var(--hf-violet-border)', label: 'Paused',    dot: 'var(--hf-violet-dot)' },
+  CANCELLED: { color: 'var(--hf-text-faint)', bg: 'var(--hf-surface-sunken)', border: 'var(--hf-border)', label: 'Cancelled', dot: 'var(--hf-border-strong)' },
   FAILED:    { color: 'var(--hf-danger-text)', bg: 'var(--hf-danger-soft)', border: 'var(--hf-danger-border)', label: 'Failed',    dot: 'var(--hf-danger)' },
 }
 const AUDIENCE_TYPES = ['ALL_OPTED_IN', 'SEGMENT', 'MANUAL']
@@ -361,7 +361,7 @@ export default function CampaignsTab() {
           <div style={{ background: 'var(--hf-surface)', borderRadius: 14, padding: 28, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 22 }}>
               <div style={{ width: 40, height: 40, borderRadius: '50%', background: confirmAction.action === 'cancel' ? 'var(--hf-danger-soft)' : 'var(--hf-info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                {confirmAction.action === 'launch' ? <Send size={18} color="#1D4ED8" /> : confirmAction.action === 'pause' ? <Pause size={18} color="#D97706" /> : <XCircle size={18} color="#DC2626" />}
+                {confirmAction.action === 'launch' ? <Send size={18} style={{ color: 'var(--hf-info-text)' }} /> : confirmAction.action === 'pause' ? <Pause size={18} style={{ color: 'var(--hf-warning-text)' }} /> : <XCircle size={18} style={{ color: 'var(--hf-danger-text)' }} />}
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--hf-text)', marginBottom: 6, textTransform: 'capitalize' }}>{confirmAction.action} campaign</div>

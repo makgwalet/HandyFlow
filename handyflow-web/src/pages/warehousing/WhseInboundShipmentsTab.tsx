@@ -8,7 +8,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, Truck, X, ChevronRight, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { WHSE_ACCENT } from "./constants"
+import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
 import WhseInboundShipmentDetail from "./WhseInboundShipmentDetail"
 
 export interface InboundShipmentResponse {
@@ -51,7 +51,7 @@ function NewShipmentModal({ clientId, items, onClose }: { clientId: string; item
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 560, maxHeight: "85vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>New inbound shipment</p>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
           <div><label style={labelStyle}>Reference / ASN number</label><input style={inputStyle} value={referenceNumber} onChange={e => setReferenceNumber(e.target.value)} /></div>
@@ -68,7 +68,7 @@ function NewShipmentModal({ clientId, items, onClose }: { clientId: string; item
             </select>
             <input type="number" step="0.01" placeholder="Qty" style={{ ...inputStyle, flex: 1 }} value={line.expectedQty} onChange={e => updateLine(i, "expectedQty", e.target.value)} />
             {lines.length > 1 && (
-              <button onClick={() => removeLine(i)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><Trash2 size={14} color="#DC2626" /></button>
+              <button onClick={() => removeLine(i)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><Trash2 size={14} style={{ color: 'var(--hf-danger-text)' }} /></button>
             )}
           </div>
         ))}
@@ -126,7 +126,7 @@ export default function WhseInboundShipmentsTab({ clientId }: { clientId: string
               <button key={s.id} onClick={() => setSelectedId(s.id)}
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <Truck size={15} color={WHSE_ACCENT} />
+                  <Truck size={15} style={{ color: WHSE_ACCENT_TEXT }} />
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{s.referenceNumber ?? `Shipment ${s.id.slice(0, 8)}`}</p>
@@ -135,7 +135,7 @@ export default function WhseInboundShipmentsTab({ clientId }: { clientId: string
                     <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>{s.expectedDate ? `Expected ${s.expectedDate}` : "No expected date set"}</p>
                   </div>
                 </div>
-                <ChevronRight size={16} color="#CBD5E1" />
+                <ChevronRight size={16} style={{ color: 'var(--hf-text-disabled)' }} />
               </button>
             )
           })}

@@ -18,7 +18,7 @@
 // match your app's convention if you have one.
 import { useState } from "react"
 import { ArrowLeft, Users2, Package, Wallet, Receipt, KeyRound } from "lucide-react"
-import { CA_ACCENT } from "./constants"
+import { CA_ACCENT, CA_ACCENT_TEXT } from "./constants"
 import type { ClientResponse } from "./CollAgencyClientsTab"
 import CollAgencyDebtorAccountsTab from "./CollAgencyDebtorAccountsTab"
 import CollAgencyPlacementBatchesTab from "./CollAgencyPlacementBatchesTab"
@@ -72,7 +72,7 @@ export default function CollAgencyClientDetail({ clientId, client, onBack }: { c
                 display: "flex", alignItems: "center", gap: 6, padding: "9px 14px",
                 background: "none", border: "none", whiteSpace: "nowrap",
                 borderBottom: active ? `2px solid ${CA_ACCENT}` : "2px solid transparent",
-                color: active ? CA_ACCENT : "var(--hf-text-muted)",
+                color: active ? CA_ACCENT_TEXT : "var(--hf-text-muted)",
                 fontWeight: active ? 600 : 400, fontSize: 12.5, cursor: "pointer",
                 marginBottom: -1,
               }}>

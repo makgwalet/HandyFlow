@@ -136,7 +136,7 @@ export function SessionExpiryModal() {
       position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
     }}>
-      <div style={{ background: 'white', borderRadius: 16, padding: 32, maxWidth: 400, width: '90%', boxShadow: '0 24px 80px rgba(0,0,0,0.3)', textAlign: 'center' }}>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 32, maxWidth: 400, width: '90%', boxShadow: '0 24px 80px rgba(0,0,0,0.3)', textAlign: 'center' }}>
         <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--hf-warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 24 }}>
           ⏱️
         </div>
@@ -150,7 +150,7 @@ export function SessionExpiryModal() {
           {minutes}:{seconds.toString().padStart(2, '0')}
         </p>
         <button onClick={handleContinue} disabled={extending}
-          style={{ width: '100%', padding: '12px', background: 'var(--hf-primary)', color: 'white', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: extending ? 0.6 : 1 }}>
+          style={{ width: '100%', padding: '12px', background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: extending ? 0.6 : 1 }}>
           {extending ? 'Extending session...' : 'Continue working'}
         </button>
       </div>

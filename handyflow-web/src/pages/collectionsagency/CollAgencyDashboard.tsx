@@ -14,7 +14,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { Users, Wallet, UserCog, AlertTriangle } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { CA_ACCENT } from "./constants"
+import { CA_ACCENT, CA_ACCENT_TEXT } from "./constants"
 
 interface ClientResponse {
   id: string; tradingName: string; registrationNumber: string | null; commissionRatePct: number
@@ -36,8 +36,8 @@ function StatCard({ label, value, sub, icon: Icon, tone }: { label: string; valu
         <p style={{ fontSize: 24, fontWeight: 800, color: "var(--hf-text)", margin: "0 0 2px" }}>{value}</p>
         {sub && <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: 0 }}>{sub}</p>}
       </div>
-      <div style={{ width: 42, height: 42, borderRadius: 12, background: `${tone}1A`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <Icon size={20} color={tone} />
+      <div style={{ width: 42, height: 42, borderRadius: 12, background: `color-mix(in srgb, ${tone} 10%, transparent)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <Icon size={20} style={{ color: tone }} />
       </div>
     </div>
   )
@@ -75,14 +75,14 @@ export default function CollAgencyDashboard({ onNavigate }: { onNavigate: (tab: 
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 28 }}>
         <StatCard label="Active clients"     value={activeClients.length}          icon={Users}         tone={CA_ACCENT} />
-        <StatCard label="Trust held"         value={fmtMoney(totalTrustHeld)}      icon={Wallet}        tone="#059669" sub="Across all active clients" />
-        <StatCard label="Registered collectors" value={activeCollectors.length}    icon={UserCog}       tone="#0369A1" />
-        <StatCard label="Registrations expiring" value={expiringCollectors.length} icon={AlertTriangle} tone={expiringCollectors.length > 0 ? "#DC2626" : "#94A3B8"} sub="Within 30 days" />
+        <StatCard label="Trust held"         value={fmtMoney(totalTrustHeld)}      icon={Wallet}        tone="var(--hf-success-text)" sub="Across all active clients" />
+        <StatCard label="Registered collectors" value={activeCollectors.length}    icon={UserCog}       tone="var(--hf-sky-text-strong)" />
+        <StatCard label="Registrations expiring" value={expiringCollectors.length} icon={AlertTriangle} tone={expiringCollectors.length > 0 ? "var(--hf-danger-text)" : "var(--hf-text-faint)"} sub="Within 30 days" />
       </div>
 
       {expiringCollectors.length > 0 && (
         <div style={{ background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 12, padding: "14px 18px", marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
-          <AlertTriangle size={18} color="#DC2626" />
+          <AlertTriangle size={18} style={{ color: 'var(--hf-danger-text)' }} />
           <div>
             <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-danger-text-strong)", margin: "0 0 2px" }}>
               {expiringCollectors.length} collector registration{expiringCollectors.length === 1 ? "" : "s"} expiring within 30 days
@@ -101,7 +101,7 @@ export default function CollAgencyDashboard({ onNavigate }: { onNavigate: (tab: 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Largest trust balances</p>
         <button onClick={() => onNavigate("clients")}
-          style={{ background: "none", border: "1px solid var(--hf-border)", cursor: "pointer", fontSize: 12, color: CA_ACCENT, fontWeight: 600, padding: "6px 12px", borderRadius: 8 }}>
+          style={{ background: "none", border: "1px solid var(--hf-border)", cursor: "pointer", fontSize: 12, color: CA_ACCENT_TEXT, fontWeight: 600, padding: "6px 12px", borderRadius: 8 }}>
           All clients →
         </button>
       </div>

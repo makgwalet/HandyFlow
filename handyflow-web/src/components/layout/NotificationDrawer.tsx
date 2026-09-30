@@ -193,7 +193,7 @@ export function NotificationDrawer({ open, onClose }: { open: boolean; onClose: 
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.35)', zIndex: 400, animation: 'fadeIn 0.15s ease' }} />
       <div style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, width: 400, maxWidth: '90vw',
-        background: 'white', zIndex: 401, boxShadow: '-8px 0 32px rgba(0,0,0,0.15)',
+        background: 'var(--hf-surface)', zIndex: 401, boxShadow: '-8px 0 32px rgba(0,0,0,0.15)',
         display: 'flex', flexDirection: 'column', animation: 'slideIn 0.2s ease',
       }}>
         <style>{`
@@ -206,7 +206,7 @@ export function NotificationDrawer({ open, onClose }: { open: boolean; onClose: 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--hf-text)' }}>Notifications</h3>
             {unreadCount > 0 && (
-              <span style={{ background: 'var(--hf-primary)', color: 'white', fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 10 }}>{unreadCount}</span>
+              <span style={{ background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 10 }}>{unreadCount}</span>
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -226,7 +226,7 @@ export function NotificationDrawer({ open, onClose }: { open: boolean; onClose: 
               style={{
                 padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
                 border: unreadOnly === f.val ? '1px solid var(--hf-primary)' : '1px solid var(--hf-border)',
-                background: unreadOnly === f.val ? 'var(--hf-info-soft)' : 'white',
+                background: unreadOnly === f.val ? 'var(--hf-info-soft)' : 'var(--hf-surface)',
                 color: unreadOnly === f.val ? 'var(--hf-primary-text)' : 'var(--hf-text-muted)',
               }}>
               {f.label}
@@ -241,7 +241,7 @@ export function NotificationDrawer({ open, onClose }: { open: boolean; onClose: 
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--hf-text-faint)', fontSize: 13 }}>Couldn't load notifications. Please try again.</div>
           ) : notifications.length === 0 ? (
             <div style={{ padding: '60px 20px', textAlign: 'center' }}>
-              <Bell size={32} color="#CBD5E1" style={{ marginBottom: 10 }} />
+              <Bell size={32} style={{ color: 'var(--hf-text-disabled)', marginBottom: 10 }} />
               <div style={{ fontSize: 13, color: 'var(--hf-text-faint)' }}>{unreadOnly ? "No unread notifications" : "You're all caught up"}</div>
             </div>
           ) : (
@@ -250,10 +250,10 @@ export function NotificationDrawer({ open, onClose }: { open: boolean; onClose: 
                 <div key={n.id} onClick={() => handleClick(n)}
                   style={{
                     display: 'flex', gap: 10, padding: '14px 20px', cursor: 'pointer',
-                    borderBottom: '1px solid var(--hf-border-subtle)', background: n.read ? 'white' : 'var(--hf-sky-soft)',
+                    borderBottom: '1px solid var(--hf-border-subtle)', background: n.read ? 'var(--hf-surface)' : 'var(--hf-sky-soft)',
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.background = n.read ? '#FAFBFC' : 'var(--hf-sky-soft-strong)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = n.read ? 'white' : 'var(--hf-sky-soft)' }}>
+                  onMouseEnter={e => { e.currentTarget.style.background = n.read ? 'var(--hf-surface-muted)' : 'var(--hf-sky-soft-strong)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = n.read ? 'var(--hf-surface)' : 'var(--hf-sky-soft)' }}>
                   <div style={{ width: 7, height: 7, borderRadius: '50%', background: n.read ? 'transparent' : 'var(--hf-accent)', flexShrink: 0, marginTop: 6 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: n.read ? 500 : 700, color: 'var(--hf-text)', marginBottom: 2 }}>{n.title}</div>
@@ -265,7 +265,7 @@ export function NotificationDrawer({ open, onClose }: { open: boolean; onClose: 
               {hasMore && (
                 <div style={{ padding: '14px 20px', textAlign: 'center' }}>
                   <button onClick={loadMore} disabled={isFetching}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid var(--hf-border)', borderRadius: 8, background: 'white', color: 'var(--hf-primary-text)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid var(--hf-border)', borderRadius: 8, background: 'var(--hf-surface)', color: 'var(--hf-primary-text)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
                     {isFetching ? <><Loader2 size={13} style={{ animation: 'notifSpin 0.8s linear infinite' }} /> Loading...</> : 'Load more'}
                   </button>
                 </div>

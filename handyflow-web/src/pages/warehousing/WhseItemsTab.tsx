@@ -9,7 +9,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, Package, X, Power, PowerOff, Trash2, Pencil } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { WHSE_ACCENT } from "./constants"
+import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
 
 interface ItemResponse {
   id: string; clientId: string; sku: string; description: string | null; uom: string | null
@@ -41,7 +41,7 @@ function ItemFormModal({ clientId, initial, onClose }: { clientId: string; initi
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 420 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>{initial ? "Edit item" : "Add an item"}</p>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
         <div style={{ display: "grid", gap: 12 }}>
           <div>
@@ -108,7 +108,7 @@ export default function WhseItemsTab({ clientId }: { clientId: string }) {
             <div key={it.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)", opacity: it.active ? 1 : 0.55 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--hf-accent-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Package size={14} color={WHSE_ACCENT} />
+                  <Package size={14} style={{ color: WHSE_ACCENT_TEXT }} />
                 </div>
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{it.sku}</p>
@@ -117,13 +117,13 @@ export default function WhseItemsTab({ clientId }: { clientId: string }) {
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 {it.storageRatePerUnitPerMonth != null && <span style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>R{Number(it.storageRatePerUnitPerMonth).toFixed(2)}/mo</span>}
-                <button onClick={() => setEditing(it)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer" }}><Pencil size={12} color="#64748B" /></button>
+                <button onClick={() => setEditing(it)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer" }}><Pencil size={12} style={{ color: 'var(--hf-text-muted)' }} /></button>
                 {it.active ? (
-                  <button onClick={() => deactivate.mutate(it.id)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer" }}><PowerOff size={12} color="#94A3B8" /></button>
+                  <button onClick={() => deactivate.mutate(it.id)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer" }}><PowerOff size={12} style={{ color: 'var(--hf-text-faint)' }} /></button>
                 ) : (
-                  <button onClick={() => reactivate.mutate(it.id)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer" }}><Power size={12} color="#059669" /></button>
+                  <button onClick={() => reactivate.mutate(it.id)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer" }}><Power size={12} style={{ color: 'var(--hf-success-text)' }} /></button>
                 )}
-                <button onClick={() => { if (confirm(`Delete ${it.sku}?`)) remove.mutate(it.id) }} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer" }}><Trash2 size={12} color="#DC2626" /></button>
+                <button onClick={() => { if (confirm(`Delete ${it.sku}?`)) remove.mutate(it.id) }} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 6, padding: 5, cursor: "pointer" }}><Trash2 size={12} style={{ color: 'var(--hf-danger-text)' }} /></button>
               </div>
             </div>
           ))}

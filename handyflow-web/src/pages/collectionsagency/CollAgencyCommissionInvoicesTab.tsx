@@ -14,7 +14,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { X } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { CA_ACCENT } from "./constants"
+import { CA_ACCENT, CA_ACCENT_TEXT } from "./constants"
 
 interface CommissionInvoiceResponse {
   id: string; clientId: string; invoiceNumber: string; description: string | null
@@ -44,7 +44,7 @@ function RecordPaymentModal({ invoice, onClose }: { invoice: CommissionInvoiceRe
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 26, width: 380 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Record payment — {invoice.invoiceNumber}</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={17} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={17} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
         <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "0 0 12px" }}>Outstanding balance: {fmtMoney(invoice.balance)}. Internal tracking only — does not post a second GL journal.</p>
         <input type="number" step="0.01" style={inputStyle} value={amount} onChange={e => setAmount(e.target.value)} />
@@ -97,7 +97,7 @@ export default function CollAgencyCommissionInvoicesTab({ clientId }: { clientId
                     {inv.balance > 0 && <p style={{ fontSize: 11.5, color: "var(--hf-danger-text)", margin: 0 }}>{fmtMoney(inv.balance)} outstanding</p>}
                   </div>
                   {inv.balance > 0 && (
-                    <button onClick={() => setSelected(inv)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: CA_ACCENT, cursor: "pointer" }}>
+                    <button onClick={() => setSelected(inv)} style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: CA_ACCENT_TEXT, cursor: "pointer" }}>
                       Record payment
                     </button>
                   )}

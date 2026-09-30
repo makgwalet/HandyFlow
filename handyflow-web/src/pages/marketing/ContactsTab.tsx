@@ -106,7 +106,7 @@ export default function ContactsTab() {
     <div>
       {/* POPIA notice */}
       <div style={{ padding: '12px 16px', background: 'var(--hf-orange-soft)', border: '1px solid var(--hf-orange-border)', borderRadius: 10, marginBottom: 18, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Shield size={16} color="#D97706" style={{ flexShrink: 0 }} />
+        <Shield size={16} style={{ color: 'var(--hf-warning-text)', flexShrink: 0 }} />
         <div style={{ fontSize: 12, color: 'var(--hf-warning-text-deep)', lineHeight: 1.5 }}>
           <strong>POPIA compliance:</strong> Only contacts who have explicitly opted in are included in campaigns. CRM sync imports contacts but does not grant opt-in — opt-in must be collected separately per POPIA Section 69.
         </div>
@@ -243,7 +243,7 @@ export default function ContactsTab() {
               <button onClick={() => setShowImport(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={18} /></button>
             </div>
             <div style={{ padding: '10px 14px', background: 'var(--hf-orange-soft)', border: '1px solid var(--hf-orange-border)', borderRadius: 8, fontSize: 12, color: 'var(--hf-warning-text-deep)', marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-              <AlertTriangle size={14} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
+              <AlertTriangle size={14} style={{ color: 'var(--hf-warning-text)', flexShrink: 0, marginTop: 1 }} />
               <div><strong>POPIA declaration:</strong> By importing these contacts you confirm that each contact has given explicit consent to receive marketing communications from your business, and that you hold records of that consent.</div>
             </div>
             <div style={{ marginBottom: 14 }}>
@@ -277,10 +277,10 @@ export default function ContactsTab() {
 
       {/* Toast notification */}
       {toast && (
-        <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 3000, display: 'flex', alignItems: 'center', gap: 10, background: toast.ok ? 'var(--hf-success-soft-strong)' : 'var(--hf-danger-soft)', border: `1px solid ${toast.ok ? '#86EFAC' : '#FECACA'}`, borderRadius: 10, padding: '12px 18px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxWidth: 380, animation: 'fadeIn 0.2s ease' }}>
+        <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 3000, display: 'flex', alignItems: 'center', gap: 10, background: toast.ok ? 'var(--hf-success-soft-strong)' : 'var(--hf-danger-soft)', border: `1px solid ${toast.ok ? 'var(--hf-success-border)' : 'var(--hf-danger-border)'}`, borderRadius: 10, padding: '12px 18px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxWidth: 380, animation: 'fadeIn 0.2s ease' }}>
           {toast.ok
-            ? <CheckCircle size={16} color="#166534" style={{ flexShrink: 0 }} />
-            : <AlertTriangle size={16} color="#DC2626" style={{ flexShrink: 0 }} />}
+            ? <CheckCircle size={16} style={{ color: 'var(--hf-success-text-strong)', flexShrink: 0 }} />
+            : <AlertTriangle size={16} style={{ color: 'var(--hf-danger-text)', flexShrink: 0 }} />}
           <span style={{ fontSize: 13, fontWeight: 600, color: toast.ok ? 'var(--hf-success-text-strong)' : 'var(--hf-danger-text)' }}>{toast.msg}</span>
           <button onClick={() => setToast(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: toast.ok ? 'var(--hf-success-text-strong)' : 'var(--hf-danger-text)', marginLeft: 4, display: 'flex', padding: 0 }}><X size={14} /></button>
         </div>

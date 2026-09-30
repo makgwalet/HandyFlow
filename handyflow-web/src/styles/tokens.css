@@ -65,6 +65,7 @@
   --hf-accent: #0d9488;
   --hf-accent-text: #0d9488;
   --hf-accent-text-strong: #0f766e;
+  --hf-accent-solid-strong: #0f766e;
   --hf-accent-soft: #f0fdf9;
   --hf-accent-border: #99f6e4;
 
@@ -127,6 +128,7 @@
   --hf-violet: #7c3aed;
   --hf-violet-text: #7c3aed;
   --hf-violet-text-strong: #5b21b6;
+  --hf-violet-solid-strong: #5b21b6;
   --hf-violet-soft: #f5f3ff;
   --hf-violet-soft-strong: #ede9fe;
   --hf-violet-border: #ddd6fe;
@@ -193,6 +195,7 @@
   --hf-accent: #0d9488;
   --hf-accent-text: #2dd4bf;
   --hf-accent-text-strong: #5eead4;
+  --hf-accent-solid-strong: #0f766e;
   --hf-accent-soft: rgba(45, 212, 191, 0.1);
   --hf-accent-border: rgba(45, 212, 191, 0.32);
 
@@ -248,6 +251,7 @@
   --hf-violet: #7c3aed;
   --hf-violet-text: #a78bfa;
   --hf-violet-text-strong: #c4b5fd;
+  --hf-violet-solid-strong: #5b21b6;
   --hf-violet-soft: rgba(167, 139, 250, 0.1);
   --hf-violet-soft-strong: rgba(167, 139, 250, 0.18);
   --hf-violet-border: rgba(167, 139, 250, 0.32);

@@ -45,7 +45,7 @@ function ClientFormModal({ client, onClose }: { client: ClientResponse | null; o
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 480, maxHeight: "85vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{client ? "Edit client" : "Onboard a new creditor client"}</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
 
         <div style={{ display: "grid", gap: 14 }}>
@@ -164,12 +164,12 @@ export default function CollAgencyClientsTab() {
                   <p style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-success-text)", margin: 0 }}>{fmtMoney(c.trustBalance)}</p>
                 </div>
                 <div style={{ display: "flex", gap: 4 }}>
-                  <button title="Edit" onClick={() => setModalClient(c)} style={{ background: "none", border: "none", cursor: "pointer", padding: 6 }}><Pencil size={15} color="#64748B" /></button>
+                  <button title="Edit" onClick={() => setModalClient(c)} style={{ background: "none", border: "none", cursor: "pointer", padding: 6 }}><Pencil size={15} style={{ color: 'var(--hf-text-muted)' }} /></button>
                   <button title={c.status === "ACTIVE" ? "Deactivate" : "Reactivate"} onClick={() => toggleActive.mutate(c)} style={{ background: "none", border: "none", cursor: "pointer", padding: 6 }}>
-                    {c.status === "ACTIVE" ? <PowerOff size={15} color="#D97706" /> : <Power size={15} color="#059669" />}
+                    {c.status === "ACTIVE" ? <PowerOff size={15} style={{ color: 'var(--hf-warning-text)' }} /> : <Power size={15} style={{ color: 'var(--hf-success-text)' }} />}
                   </button>
                   <button title="Delete" onClick={() => { if (confirm(`Delete ${c.tradingName}? This is a soft delete and requires ADMIN.`)) remove.mutate(c.id) }}
-                    style={{ background: "none", border: "none", cursor: "pointer", padding: 6 }}><Trash2 size={15} color="#DC2626" /></button>
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: 6 }}><Trash2 size={15} style={{ color: 'var(--hf-danger-text)' }} /></button>
                 </div>
               </div>
             </div>

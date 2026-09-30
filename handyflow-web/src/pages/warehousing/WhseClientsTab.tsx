@@ -3,7 +3,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, ChevronRight, Building2, X, Power, PowerOff, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { WHSE_ACCENT } from "./constants"
+import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
 import WhseClientDetail from "./WhseClientDetail"
 
 export interface ClientResponse {
@@ -57,7 +57,7 @@ function ClientFormModal({ initial, onClose }: { initial?: ClientResponse; onClo
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 520, maxHeight: "85vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>{initial ? "Edit client" : "Onboard a new client"}</p>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
         <div style={{ display: "grid", gap: 12 }}>
           <div><label style={labelStyle}>Trading name *</label><input style={inputStyle} value={form.tradingName} onChange={e => setForm({ ...form, tradingName: e.target.value })} /></div>
@@ -143,7 +143,7 @@ export default function WhseClientsTab() {
             <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <button onClick={() => setSelectedId(c.id)} style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", textAlign: "left", flex: 1 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--hf-accent-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Building2 size={15} color={WHSE_ACCENT} />
+                  <Building2 size={15} style={{ color: WHSE_ACCENT_TEXT }} />
                 </div>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -163,19 +163,19 @@ export default function WhseClientsTab() {
                 {c.status === "ACTIVE" ? (
                   <button onClick={() => deactivate.mutate(c.id)} title="Deactivate"
                     style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
-                    <PowerOff size={13} color="#94A3B8" />
+                    <PowerOff size={13} style={{ color: 'var(--hf-text-faint)' }} />
                   </button>
                 ) : (
                   <button onClick={() => reactivate.mutate(c.id)} title="Reactivate"
                     style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
-                    <Power size={13} color="#059669" />
+                    <Power size={13} style={{ color: 'var(--hf-success-text)' }} />
                   </button>
                 )}
                 <button onClick={() => { if (confirm(`Delete ${c.tradingName}? This cannot be undone.`)) remove.mutate(c.id) }} title="Delete"
                   style={{ background: "none", border: "1px solid var(--hf-border)", borderRadius: 7, padding: 6, cursor: "pointer" }}>
-                  <Trash2 size={13} color="#DC2626" />
+                  <Trash2 size={13} style={{ color: 'var(--hf-danger-text)' }} />
                 </button>
-                <ChevronRight size={16} color="#CBD5E1" onClick={() => setSelectedId(c.id)} style={{ cursor: "pointer" }} />
+                <ChevronRight size={16} onClick={() => setSelectedId(c.id)} style={{ color: 'var(--hf-text-disabled)', cursor: "pointer" }} />
               </div>
             </div>
           ))}

@@ -57,7 +57,7 @@ export default function UnsubscribePage() {
         {status === 'success' && (
           <>
             <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'var(--hf-success-soft-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-              <CheckCircle size={28} color="#166534" />
+              <CheckCircle size={28} style={{ color: 'var(--hf-success-text-strong)' }} />
             </div>
             <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--hf-text)', marginBottom: 10 }}>You've been unsubscribed</h2>
             <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', lineHeight: 1.7 }}>{message}</p>
@@ -67,7 +67,7 @@ export default function UnsubscribePage() {
         {status === 'error' && (
           <>
             <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'var(--hf-danger-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-              <XCircle size={28} color="#DC2626" />
+              <XCircle size={28} style={{ color: 'var(--hf-danger-text)' }} />
             </div>
             <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--hf-text)', marginBottom: 10 }}>Link not valid</h2>
             <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', lineHeight: 1.7 }}>{message}</p>

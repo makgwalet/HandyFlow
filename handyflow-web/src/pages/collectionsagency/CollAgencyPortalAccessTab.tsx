@@ -26,7 +26,7 @@ function InviteModal({ clientId, onClose }: { clientId: string; onClose: () => v
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 26, width: 400 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Invite a client contact</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={17} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={17} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
         <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "0 0 12px" }}>They'll be able to log in and view their placed portfolio and trust/remittance statement. The invite link expires after 7 days.</p>
         <input type="email" placeholder="contact@client.co.za" style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box" }} value={email} onChange={e => setEmail(e.target.value)} />
@@ -75,7 +75,7 @@ export default function CollAgencyPortalAccessTab({ clientId }: { clientId: stri
             return (
               <div key={g.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <Mail size={15} color="#94A3B8" />
+                  <Mail size={15} style={{ color: 'var(--hf-text-faint)' }} />
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <p style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)", margin: 0 }}>{g.inviteEmail}</p>

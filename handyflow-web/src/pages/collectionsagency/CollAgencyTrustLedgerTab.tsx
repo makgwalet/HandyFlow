@@ -9,7 +9,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, X, Banknote, ArrowDownCircle, ArrowUpCircle } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { CA_ACCENT } from "./constants"
+import { CA_ACCENT, CA_ACCENT_TEXT } from "./constants"
 import type { ClientResponse } from "./CollAgencyClientsTab"
 import type { DebtorAccountResponse } from "./CollAgencyDebtorAccountsTab"
 
@@ -53,7 +53,7 @@ function RecordPaymentModal({ clientId, onClose }: { clientId: string; onClose: 
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 26, width: 440 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Record a debtor payment</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
         <div style={{ display: "grid", gap: 12 }}>
           <div>
@@ -117,7 +117,7 @@ function RemittanceModal({ clientId, client, onClose }: { clientId: string; clie
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 26, width: 440 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Process remittance</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#94A3B8" /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} style={{ color: 'var(--hf-text-faint)' }} /></button>
         </div>
         <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "0 0 18px" }}>Clears the client's entire trust balance, issues a commission invoice, and pays out the net. This action is ADMIN-only and cannot be undone.</p>
 
@@ -159,7 +159,7 @@ export default function CollAgencyTrustLedgerTab({ clientId, client }: { clientI
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Banknote size={16} color={CA_ACCENT} />
+          <Banknote size={16} style={{ color: CA_ACCENT_TEXT }} />
           <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>Currently held: {fmtMoney(client?.trustBalance ?? 0)}</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -181,7 +181,7 @@ export default function CollAgencyTrustLedgerTab({ clientId, client }: { clientI
           {txns.map((t, i) => (
             <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                {t.transactionType === "RECEIPT" ? <ArrowDownCircle size={18} color="#059669" /> : <ArrowUpCircle size={18} color="#D97706" />}
+                {t.transactionType === "RECEIPT" ? <ArrowDownCircle size={18} style={{ color: 'var(--hf-success-text)' }} /> : <ArrowUpCircle size={18} style={{ color: 'var(--hf-warning-text)' }} />}
                 <div>
                   <p style={{ fontSize: 12.5, fontWeight: 600, color: "var(--hf-text)", margin: "0 0 2px" }}>{t.transactionType === "RECEIPT" ? "Payment received" : "Remittance"}{t.reference ? ` · ${t.reference}` : ""}</p>
                   <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>{t.transactionDate}{t.notes ? ` · ${t.notes}` : ""}</p>

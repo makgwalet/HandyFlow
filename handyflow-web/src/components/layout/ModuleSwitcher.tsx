@@ -69,7 +69,7 @@ export function ModuleSwitcher({ modules, pinnedKeys, onTogglePin, currentPath }
         }}>
           <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--hf-border-subtle)' }}>
             <div style={{ position: 'relative' }}>
-              <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+              <Search size={14} style={{ color: 'var(--hf-text-faint)', position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
               <input ref={searchRef} value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search modules..."
                 style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px 8px 32px', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none' }} />
@@ -99,7 +99,7 @@ export function ModuleSwitcher({ modules, pinnedKeys, onTogglePin, currentPath }
                       onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--hf-surface-muted)' }}
                       onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}>
                       <div style={{ width: 28, height: 28, borderRadius: 7, background: isActive ? 'var(--hf-primary)' : 'var(--hf-surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <m.icon size={14} color={isActive ? 'white' : '#64748B'} />
+                        <m.icon size={14} style={{ color: isActive ? 'var(--hf-text-on-solid)' : 'var(--hf-text-muted)' }} />
                       </div>
                       <span style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--hf-text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.label}</span>
                       <button onClick={e => { e.stopPropagation(); onTogglePin(m.key) }}

@@ -20,6 +20,7 @@ import {
   ShoppingCart, Package, CalendarClock, ClipboardCheck,
   PartyPopper, FilePlus, LayoutTemplate, CreditCard,
   Stethoscope, ListPlus,
+  Megaphone, Warehouse, Handshake, UserCog,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -553,12 +554,89 @@ export const DEBT_COLLECTION_SECTIONS: ModuleSections = {
   ],
 }
 
+export const MARKETING_SECTIONS: ModuleSections = {
+  moduleKey: 'marketing',
+  basePath: '/marketing',
+  title: 'Marketing',
+  icon: Megaphone,
+  defaultSection: 'campaigns',
+  groups: [
+    {
+      label: 'Campaigns',
+      sections: [
+        { id: 'campaigns', label: 'Campaigns', icon: Megaphone },
+        { id: 'templates', label: 'Templates', icon: FileText },
+      ],
+    },
+    { label: 'Audience', sections: [{ id: 'contacts', label: 'Contacts', icon: Users }] },
+    { label: 'Insights', sections: [{ id: 'analytics', label: 'Analytics', icon: BarChart2 }] },
+  ],
+}
+
+export const TRAINING_SECTIONS: ModuleSections = {
+  moduleKey: 'training',
+  basePath: '/training',
+  title: 'Training & L&D',
+  icon: GraduationCap,
+  defaultSection: 'dashboard',
+  groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+    {
+      label: 'Learning',
+      sections: [
+        { id: 'courses', label: 'Courses', icon: GraduationCap },
+        { id: 'sessions', label: 'Sessions', icon: CalendarDays },
+        { id: 'certificates', label: 'Certificates', icon: Award },
+      ],
+    },
+  ],
+}
+
+export const WAREHOUSING_SECTIONS: ModuleSections = {
+  moduleKey: 'warehousing',
+  // /warehousing/portal/* is the client portal, routed separately outside the shell.
+  basePath: '/warehousing',
+  title: 'Warehousing',
+  icon: Warehouse,
+  defaultSection: 'dashboard',
+  groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+    {
+      label: 'Clients & locations',
+      sections: [
+        { id: 'clients', label: 'Clients', icon: Building2 },
+        { id: 'locations', label: 'Locations', icon: PinIcon },
+      ],
+    },
+  ],
+}
+
+export const COLLECTIONS_AGENCY_SECTIONS: ModuleSections = {
+  moduleKey: 'collectionsagency',
+  // /collections-agency/portal/* is the creditor-client portal, routed separately.
+  basePath: '/collections-agency',
+  title: 'Collections Agency',
+  icon: Handshake,
+  defaultSection: 'dashboard',
+  groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+    {
+      label: 'Portfolio',
+      sections: [
+        { id: 'clients', label: 'Clients', icon: Users },
+        { id: 'collectors', label: 'Collectors', icon: UserCog },
+      ],
+    },
+    { label: 'Setup', sections: [{ id: 'profile', label: 'Agency Profile', icon: Gavel }] },
+  ],
+}
+
 const REGISTRY: ModuleSections[] = [
   SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FLEET_SECTIONS, ACCOUNTING_SECTIONS, ACCOUNTANT_SECTIONS,
   HR_SECTIONS, BOOKINGS_SECTIONS, TRAINING_PROVIDER_SECTIONS, LEGAL_COMPLIANCE_SECTIONS, EARTHMOVING_SECTIONS,
   SUPPLY_CHAIN_SECTIONS, COMPLIANCE_TENDER_SECTIONS,
   EVENTS_SECTIONS, CONTRACTING_SECTIONS, AP_SECTIONS, PROPERTY_SECTIONS, CLINIC_SECTIONS,
-  DEBT_COLLECTION_SECTIONS,
+  DEBT_COLLECTION_SECTIONS, MARKETING_SECTIONS, TRAINING_SECTIONS, WAREHOUSING_SECTIONS, COLLECTIONS_AGENCY_SECTIONS,
 ]
 
 /** Groups with sections the user may not see removed (and empty groups dropped). */

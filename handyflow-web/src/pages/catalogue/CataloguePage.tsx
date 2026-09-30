@@ -36,7 +36,7 @@ const EMPTY_ERRORS: Record<string, string> = {}
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const inp: React.CSSProperties = {
   width: '100%', padding: '10px 12px', border: '1.5px solid var(--hf-border)', borderRadius: 9,
-  fontSize: 14, color: 'var(--hf-text)', outline: 'none', boxSizing: 'border-box', background: 'white',
+  fontSize: 14, color: 'var(--hf-text)', outline: 'none', boxSizing: 'border-box', background: 'var(--hf-surface)',
 }
 const inpErr: React.CSSProperties = { ...inp, borderColor: 'var(--hf-danger)', background: 'var(--hf-danger-soft)' }
 const sel: React.CSSProperties = {
@@ -49,7 +49,7 @@ const sel: React.CSSProperties = {
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, backdropFilter: 'blur(2px)' }}>
-      <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 500, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', overflow: 'hidden', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 16, width: '100%', maxWidth: 500, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', overflow: 'hidden', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--hf-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--hf-text)' }}>{title}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', padding: 4, display: 'flex' }}><X size={18} /></button>
@@ -70,7 +70,7 @@ function Field({ label, required, error, children }: { label: string; required?:
       {children}
       {error && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--hf-danger-text)', marginTop: 4 }}>
-          <AlertCircle size={12} color="#DC2626" />{error}
+          <AlertCircle size={12} style={{ color: 'var(--hf-danger-text)' }} />{error}
         </div>
       )}
     </div>
@@ -108,20 +108,20 @@ function UnitSelect({ value, onChange, hasError }: { value: string; onChange: (v
           ...(hasError ? { borderColor: 'var(--hf-danger)', background: 'var(--hf-danger-soft)' } : {}),
         }}>
         <span style={{ color: value ? 'var(--hf-text)' : 'var(--hf-text-faint)' }}>{value || 'Select unit...'}</span>
-        <ChevronDown size={14} color="#94A3B8" />
+        <ChevronDown size={14} style={{ color: 'var(--hf-text-faint)' }} />
       </button>
 
       {/* Dropdown */}
       {open && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 999,
-          background: 'white', border: '1.5px solid var(--hf-border)', borderRadius: 10,
+          background: 'var(--hf-surface)', border: '1.5px solid var(--hf-border)', borderRadius: 10,
           boxShadow: '0 8px 30px rgba(0,0,0,0.12)', overflow: 'hidden',
         }}>
           {/* Search inside dropdown */}
           <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--hf-border-subtle)' }}>
             <div style={{ position: 'relative' }}>
-              <Search size={13} color="#94A3B8" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+              <Search size={13} style={{ color: 'var(--hf-text-faint)', position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 autoFocus
                 value={query}
@@ -148,12 +148,12 @@ function UnitSelect({ value, onChange, hasError }: { value: string; onChange: (v
                       onClick={() => { onChange(unit); setOpen(false); setQuery('') }}
                       style={{
                         padding: '9px 14px', fontSize: 14, cursor: 'pointer',
-                        background: unit === value ? 'var(--hf-info-soft)' : 'white',
+                        background: unit === value ? 'var(--hf-info-soft)' : 'var(--hf-surface)',
                         color: unit === value ? 'var(--hf-info-text)' : 'var(--hf-text)',
                         fontWeight: unit === value ? 600 : 400,
                       }}
                       onMouseEnter={e => { if (unit !== value) (e.currentTarget as HTMLElement).style.background = 'var(--hf-surface-muted)' }}
-                      onMouseLeave={e => { if (unit !== value) (e.currentTarget as HTMLElement).style.background = 'white' }}
+                      onMouseLeave={e => { if (unit !== value) (e.currentTarget as HTMLElement).style.background = 'var(--hf-surface)' }}
                     >
                       {unit}
                     </div>
@@ -178,9 +178,9 @@ function DeleteModal({
 }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, backdropFilter: 'blur(2px)' }}>
-      <div style={{ background: 'white', borderRadius: 18, padding: 32, width: 420, boxShadow: '0 24px 64px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 18, padding: 32, width: 420, boxShadow: '0 24px 64px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
         <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--hf-orange-soft)', border: '2px solid var(--hf-orange-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-          <AlertTriangle size={24} color="#EA580C" strokeWidth={2} />
+          <AlertTriangle size={24} style={{ color: 'var(--hf-orange-text)' }} strokeWidth={2} />
         </div>
         <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: 'var(--hf-text)' }}>{title}</h3>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 40, padding: '7px 16px', margin: '10px 0' }}>
@@ -190,16 +190,16 @@ function DeleteModal({
         <div style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--hf-text-muted)', lineHeight: 1.7 }}>{description}</div>
         {error && (
           <div style={{ width: '100%', marginBottom: 16, padding: '10px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <AlertCircle size={15} color="#DC2626" style={{ flexShrink: 0 }} />{error}
+            <AlertCircle size={15} style={{ color: 'var(--hf-danger-text)', flexShrink: 0 }} />{error}
           </div>
         )}
         <div style={{ display: 'flex', gap: 10, width: '100%' }}>
           <button onClick={onCancel} disabled={isPending}
-            style={{ flex: 1, padding: '11px', border: '1.5px solid var(--hf-border)', borderRadius: 10, background: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
+            style={{ flex: 1, padding: '11px', border: '1.5px solid var(--hf-border)', borderRadius: 10, background: 'var(--hf-surface)', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
             Cancel
           </button>
           <button onClick={onConfirm} disabled={isPending}
-            style={{ flex: 1, padding: '11px', border: 'none', borderRadius: 10, background: isPending ? '#93A8C9' : 'var(--hf-primary)', color: 'white', fontSize: 14, fontWeight: 700, cursor: isPending ? 'not-allowed' : 'pointer' }}>
+            style={{ flex: 1, padding: '11px', border: 'none', borderRadius: 10, background: isPending ? 'color-mix(in srgb, var(--hf-primary) 45%, var(--hf-surface))' : 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', fontSize: 14, fontWeight: 700, cursor: isPending ? 'not-allowed' : 'pointer' }}>
             {isPending ? 'Deleting...' : 'Yes, Delete'}
           </button>
         </div>
@@ -275,14 +275,14 @@ function CategoryMenu({ cat, onEdit, onDelete }: { cat: Category; onEdit: () => 
         <MoreVertical size={14} />
       </button>
       {open && (
-        <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', background: 'white', border: '1px solid var(--hf-border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 100, minWidth: 140, overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 100, minWidth: 140, overflow: 'hidden' }}>
           <button onClick={() => { onEdit(); setOpen(false) }}
             style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'var(--hf-text-secondary)', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left' }}>
-            <Pencil size={13} color="#1D4ED8" /> Edit category
+            <Pencil size={13} style={{ color: 'var(--hf-info-text)' }} /> Edit category
           </button>
           <button onClick={() => { onDelete(); setOpen(false) }}
             style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'var(--hf-danger-text)', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left', borderTop: '1px solid var(--hf-danger-border)' }}>
-            <Trash2 size={13} color="#DC2626" /> Delete category
+            <Trash2 size={13} style={{ color: 'var(--hf-danger-text)' }} /> Delete category
           </button>
         </div>
       )}
@@ -476,11 +476,11 @@ export function CataloguePage() {
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={() => { setShowCatModal(true); setCatError(''); setCatFieldErrors(EMPTY_ERRORS) }}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', background: 'white', border: '1px solid var(--hf-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
             <Tag size={15} /> Add category
           </button>
           <button onClick={() => { setShowItemModal(true); setItemError(''); setItemFieldErrors(EMPTY_ERRORS) }}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', background: 'var(--hf-primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'white', cursor: 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', background: 'var(--hf-primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'var(--hf-text-on-solid)', cursor: 'pointer' }}>
             <Plus size={15} /> Add item
           </button>
         </div>
@@ -488,7 +488,7 @@ export function CataloguePage() {
 
       {/* Search */}
       <div style={{ position: 'relative', marginBottom: 24 }}>
-        <Search size={15} color="#94A3B8" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+        <Search size={15} style={{ color: 'var(--hf-text-faint)', position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items..."
           style={{ ...inp, paddingLeft: 38 }} />
       </div>
@@ -500,7 +500,7 @@ export function CataloguePage() {
           { label: 'Categories',  value: categories.length, color: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text)', icon: Tag },
           { label: 'Avg price', value: items.length ? `R ${Math.round(items.reduce((s, i) => s + i.defaultPrice, 0) / items.length).toLocaleString()}` : 'R 0', color: 'var(--hf-warning-soft)', iconColor: 'var(--hf-warning-text)', icon: Package },
         ].map(s => (
-          <div key={s.label} style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 12, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div key={s.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 12, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <p style={{ fontSize: 11, color: 'var(--hf-text-faint)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</p>
               <p style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>{s.value}</p>
@@ -514,8 +514,8 @@ export function CataloguePage() {
 
       {/* Content */}
       {categories.length === 0 && items.length === 0 ? (
-        <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: '60px 24px', textAlign: 'center' }}>
-          <Package size={40} color="#CBD5E1" style={{ marginBottom: 12 }} />
+        <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: '60px 24px', textAlign: 'center' }}>
+          <Package size={40} style={{ color: 'var(--hf-text-disabled)', marginBottom: 12 }} />
           <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--hf-text-muted)', margin: '0 0 6px' }}>No items yet</p>
           <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0 }}>Create a category and start adding your products and services</p>
         </div>
@@ -524,7 +524,7 @@ export function CataloguePage() {
 
           {/* Uncategorised */}
           {filtered.filter(i => !i.categoryName).length > 0 && (
-            <div style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 14, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 14, overflow: 'hidden' }}>
               <div style={{ padding: '12px 20px', background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border-subtle)' }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Uncategorised</span>
               </div>
@@ -537,12 +537,12 @@ export function CataloguePage() {
             const catItems = filtered.filter(i => i.categoryName === cat.name)
             const expanded = expandedCats.has(cat.id)
             return (
-              <div key={cat.id} style={{ background: 'white', border: '1px solid var(--hf-primary-border)', borderRadius: 14, overflow: 'hidden' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', cursor: 'pointer', background: expanded ? 'var(--hf-surface-muted)' : 'white' }}
+              <div key={cat.id} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 14, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', cursor: 'pointer', background: expanded ? 'var(--hf-surface-muted)' : 'var(--hf-surface)' }}
                   onClick={() => toggleCat(cat.id)}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--hf-violet-soft-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Tag size={15} color="#7C3AED" />
+                      <Tag size={15} style={{ color: 'var(--hf-violet-text)' }} />
                     </div>
                     <div>
                       <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--hf-text)', margin: 0 }}>{cat.name}</p>
@@ -552,7 +552,7 @@ export function CataloguePage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontSize: 12, color: 'var(--hf-text-faint)', fontWeight: 500 }}>{catItems.length} items</span>
                     <CategoryMenu cat={cat} onEdit={() => openEditCat(cat)} onDelete={() => { setDeleteCat(cat); setDeleteCatError('') }} />
-                    {expanded ? <ChevronUp size={16} color="#94A3B8" /> : <ChevronDown size={16} color="#94A3B8" />}
+                    {expanded ? <ChevronUp size={16} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={16} style={{ color: 'var(--hf-text-faint)' }} />}
                   </div>
                 </div>
                 {expanded && catItems.length > 0 && (
@@ -585,9 +585,9 @@ export function CataloguePage() {
           {catError && <ErrorBanner message={catError} />}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button onClick={() => { setShowCatModal(false); setCatForm(EMPTY_CAT_FORM); setCatError('') }}
-              style={{ padding: '9px 16px', background: 'white', border: '1px solid var(--hf-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>Cancel</button>
+              style={{ padding: '9px 16px', background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>Cancel</button>
             <button onClick={submitCreateCat} disabled={createCatMutation.isPending}
-              style={{ padding: '9px 18px', background: 'var(--hf-primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'white', cursor: 'pointer' }}>
+              style={{ padding: '9px 18px', background: 'var(--hf-primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'var(--hf-text-on-solid)', cursor: 'pointer' }}>
               {createCatMutation.isPending ? 'Creating...' : 'Create category'}
             </button>
           </div>
@@ -608,9 +608,9 @@ export function CataloguePage() {
           {editCatError && <ErrorBanner message={editCatError} />}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button onClick={() => { setEditCat(null); setEditCatError('') }}
-              style={{ padding: '9px 16px', background: 'white', border: '1px solid var(--hf-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>Cancel</button>
+              style={{ padding: '9px 16px', background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>Cancel</button>
             <button onClick={submitEditCat} disabled={updateCatMutation.isPending}
-              style={{ padding: '9px 18px', background: 'var(--hf-primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'white', cursor: 'pointer' }}>
+              style={{ padding: '9px 18px', background: 'var(--hf-primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'var(--hf-text-on-solid)', cursor: 'pointer' }}>
               {updateCatMutation.isPending ? 'Saving...' : 'Save changes'}
             </button>
           </div>
@@ -624,9 +624,9 @@ export function CataloguePage() {
           {itemError && <ErrorBanner message={itemError} />}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button onClick={() => { setShowItemModal(false); setItemForm(EMPTY_ITEM_FORM); setItemError('') }}
-              style={{ padding: '9px 16px', background: 'white', border: '1px solid var(--hf-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>Cancel</button>
+              style={{ padding: '9px 16px', background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>Cancel</button>
             <button onClick={submitCreateItem} disabled={createItemMutation.isPending}
-              style={{ padding: '9px 18px', background: 'var(--hf-primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'white', cursor: 'pointer' }}>
+              style={{ padding: '9px 18px', background: 'var(--hf-primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'var(--hf-text-on-solid)', cursor: 'pointer' }}>
               {createItemMutation.isPending ? 'Creating...' : 'Create item'}
             </button>
           </div>
@@ -640,9 +640,9 @@ export function CataloguePage() {
           {editError && <ErrorBanner message={editError} />}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button onClick={() => { setEditItem(null); setEditError('') }}
-              style={{ padding: '9px 16px', background: 'white', border: '1px solid var(--hf-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>Cancel</button>
+              style={{ padding: '9px 16px', background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>Cancel</button>
             <button onClick={submitEditItem} disabled={updateItemMutation.isPending}
-              style={{ padding: '9px 18px', background: 'var(--hf-primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'white', cursor: 'pointer' }}>
+              style={{ padding: '9px 18px', background: 'var(--hf-primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'var(--hf-text-on-solid)', cursor: 'pointer' }}>
               {updateItemMutation.isPending ? 'Saving...' : 'Save changes'}
             </button>
           </div>
@@ -654,7 +654,7 @@ export function CataloguePage() {
         <DeleteModal
           title="Delete Item?"
           badge={deleteItem.name}
-          badgeIcon={<Package size={14} color="#64748B" />}
+          badgeIcon={<Package size={14} style={{ color: 'var(--hf-text-muted)' }} />}
           description={<>This item will be permanently removed from your catalogue.<br />This action <strong>cannot be undone</strong>.</>}
           isPending={deleteItemMutation.isPending}
           error={deleteItemError}
@@ -668,7 +668,7 @@ export function CataloguePage() {
         <DeleteModal
           title="Delete Category?"
           badge={deleteCat.name}
-          badgeIcon={<Tag size={14} color="#7C3AED" />}
+          badgeIcon={<Tag size={14} style={{ color: 'var(--hf-violet-text)' }} />}
           description={
             catItemCount(deleteCat.name) > 0 ? (
               <>
@@ -707,7 +707,7 @@ function ItemTable({ items, onEdit, onDelete }: {
         {items.map((item, i) => (
           <tr key={item.id} style={{ borderTop: i === 0 ? 'none' : '1px solid var(--hf-border-subtle)' }}
             onMouseEnter={e => (e.currentTarget.style.background = 'var(--hf-surface-muted)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--hf-surface)')}>
             <td style={{ padding: '12px 20px' }}>
               <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--hf-text)', margin: 0 }}>{item.name}</p>
               {item.description && <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: '2px 0 0' }}>{item.description}</p>}
@@ -740,7 +740,7 @@ function ItemTable({ items, onEdit, onDelete }: {
 function ErrorBanner({ message }: { message: string }) {
   return (
     <div style={{ marginBottom: 16, padding: '10px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-      <AlertCircle size={15} color="#DC2626" style={{ flexShrink: 0 }} />{message}
+      <AlertCircle size={15} style={{ color: 'var(--hf-danger-text)', flexShrink: 0 }} />{message}
     </div>
   )
 }

@@ -4,15 +4,21 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import { Plus, X, FileText, Edit3, Eye, Send, AlertCircle } from 'lucide-react'
 
-const inp: React.CSSProperties = { width: '100%', padding: '9px 12px', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' as const, background: '#fff', outline: 'none' }
-const lbl: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }
+const inp: React.CSSProperties = { width: '100%', padding: '9px 12px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' as const, background: 'var(--hf-surface)', outline: 'none' }
+const lbl: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }
 
 const CATEGORIES = ['NEWSLETTER','PROMOTIONAL','TRANSACTIONAL','ANNOUNCEMENT','REENGAGEMENT']
 const CAT_COLOR: Record<string, string> = {
-  NEWSLETTER: '#1B3A6B', PROMOTIONAL: '#D97706', TRANSACTIONAL: '#166534',
-  ANNOUNCEMENT: '#0284C7', REENGAGEMENT: '#7C3AED',
+  NEWSLETTER: 'var(--hf-primary-text)', PROMOTIONAL: 'var(--hf-warning-text)', TRANSACTIONAL: 'var(--hf-success-text-strong)',
+  ANNOUNCEMENT: 'var(--hf-sky-text)', REENGAGEMENT: 'var(--hf-violet-text)',
 }
 const TOKENS = ['{{first_name}}','{{name}}','{{email}}','{{company_name}}','{{unsubscribe_url}}']
+
+// Sample email HTML shown as the editor placeholder. It deliberately uses a real hex
+// colour: email clients cannot resolve CSS variables, so email markup must never use
+// the app's theme tokens.
+const EXAMPLE_EMAIL_HTML =
+  '<h2 style="color:#1B3A6B">Hi {{first_name}},</h2>\n<p>Your message here.</p>\n<p><a href="{{unsubscribe_url}}">Unsubscribe</a></p>'
 
 export default function TemplatesTab() {
   const qc = useQueryClient()
@@ -88,7 +94,7 @@ export default function TemplatesTab() {
               </div>
             </div>
             <textarea value={form.htmlBody} onChange={e => f('htmlBody', e.target.value)} rows={10}
-              placeholder={'<h2 style="color:#1B3A6B">Hi {{first_name}},</h2>\n<p>Your message here.</p>\n<p><a href="{{unsubscribe_url}}">Unsubscribe</a></p>'}
+              placeholder={EXAMPLE_EMAIL_HTML}
               style={{ ...inp, resize: 'vertical' as const, fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5 }} />
           </div>
 
@@ -152,7 +158,7 @@ export default function TemplatesTab() {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           {(templates as any[]).map((t: any) => {
-            const catColor = CAT_COLOR[t.category] ?? '#64748B'
+            const catColor = CAT_COLOR[t.category] ?? 'var(--hf-text-muted)'
             return (
               <div key={t.id} style={{ border: '1px solid var(--hf-border)', borderRadius: 12, overflow: 'hidden', background: 'var(--hf-surface)', transition: 'box-shadow 0.15s' }}
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'}
@@ -170,7 +176,7 @@ export default function TemplatesTab() {
                 <div style={{ padding: '14px 16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                     <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)' }}>{t.name}</div>
-                    <span style={{ background: `${catColor}15`, color: catColor, padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>{t.category}</span>
+                    <span style={{ background: `color-mix(in srgb, ${catColor} 8%, transparent)`, color: catColor, padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>{t.category}</span>
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 4, lineHeight: 1.4 }}>{t.subject}</div>
                   {t.previewText && <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginBottom: 10, lineHeight: 1.4 }}>{t.previewText}</div>}

@@ -10,7 +10,7 @@ const pct = (n: number, d: number) => d > 0 ? `${Math.round((n / d) * 100)}%` : 
 const fmtDate = (d: any) => d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 
 const STATUS_COLOR: Record<string, string> = {
-  SENT: '#166534', SENDING: '#D97706', DRAFT: '#94A3B8', SCHEDULED: '#1D4ED8', CANCELLED: '#CBD5E1', FAILED: '#DC2626', PAUSED: '#9333EA',
+  SENT: 'var(--hf-success-text-strong)', SENDING: 'var(--hf-warning-text)', DRAFT: 'var(--hf-text-faint)', SCHEDULED: 'var(--hf-info-text)', CANCELLED: 'var(--hf-text-disabled)', FAILED: 'var(--hf-danger-text)', PAUSED: 'var(--hf-violet-text)',
 }
 
 interface Props { summary: any }
@@ -144,8 +144,8 @@ export default function AnalyticsTab({ summary }: Props) {
         ].map((item, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '6px 0', borderBottom: i < 5 ? '1px solid var(--hf-warning-border)' : 'none' }}>
             {item.done
-              ? <CheckCircle size={14} color="#166534" style={{ flexShrink: 0, marginTop: 1 }} />
-              : <AlertTriangle size={14} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />}
+              ? <CheckCircle size={14} style={{ color: 'var(--hf-success-text-strong)', flexShrink: 0, marginTop: 1 }} />
+              : <AlertTriangle size={14} style={{ color: 'var(--hf-warning-text)', flexShrink: 0, marginTop: 1 }} />}
             <div style={{ fontSize: 12, color: item.done ? 'var(--hf-success-text-strong)' : 'var(--hf-warning-text-deep)', lineHeight: 1.5 }}>{item.text}</div>
           </div>
         ))}

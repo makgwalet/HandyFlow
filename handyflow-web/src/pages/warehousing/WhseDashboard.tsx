@@ -13,7 +13,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { Building2, MapPin, Percent } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { WHSE_ACCENT } from "./constants"
+import { WHSE_ACCENT_TEXT } from "./constants"
 
 interface ClientResponse { id: string; tradingName: string; status: string }
 interface LocationResponse { id: string; code: string; zone: string | null; active: boolean }
@@ -53,7 +53,7 @@ export default function WhseDashboard() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
           <div style={cardStyle}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <Building2 size={16} color={WHSE_ACCENT} />
+              <Building2 size={16} style={{ color: WHSE_ACCENT_TEXT }} />
               <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0, fontWeight: 700, textTransform: "uppercase" }}>Active clients</p>
             </div>
             <p style={{ fontSize: 26, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>{activeClients}</p>
@@ -61,7 +61,7 @@ export default function WhseDashboard() {
           </div>
           <div style={cardStyle}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <MapPin size={16} color={WHSE_ACCENT} />
+              <MapPin size={16} style={{ color: WHSE_ACCENT_TEXT }} />
               <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0, fontWeight: 700, textTransform: "uppercase" }}>Active locations</p>
             </div>
             <p style={{ fontSize: 26, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>{activeLocations}</p>
@@ -70,7 +70,7 @@ export default function WhseDashboard() {
           {profile?.defaultStorageRatePerUnitPerMonth != null && (
             <div style={cardStyle}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <Percent size={16} color={WHSE_ACCENT} />
+                <Percent size={16} style={{ color: WHSE_ACCENT_TEXT }} />
                 <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0, fontWeight: 700, textTransform: "uppercase" }}>Default storage rate</p>
               </div>
               <p style={{ fontSize: 26, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>

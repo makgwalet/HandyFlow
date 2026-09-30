@@ -8,7 +8,7 @@
 // every other provider-module build this session.
 import { useState } from "react"
 import { ArrowLeft, Package, Boxes, Truck, PackageCheck, FileText, UserPlus } from "lucide-react"
-import { WHSE_ACCENT } from "./constants"
+import { WHSE_ACCENT, WHSE_ACCENT_TEXT } from "./constants"
 import WhseItemsTab from "./WhseItemsTab"
 import WhseInventoryTab from "./WhseInventoryTab"
 import WhseInboundShipmentsTab from "./WhseInboundShipmentsTab"
@@ -46,7 +46,7 @@ export default function WhseClientDetail({ clientId, clientName, onBack }: { cli
               style={{
                 display: "flex", alignItems: "center", gap: 6, padding: "9px 13px", border: "none",
                 background: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600,
-                color: active ? WHSE_ACCENT : "var(--hf-text-muted)",
+                color: active ? WHSE_ACCENT_TEXT : "var(--hf-text-muted)",
                 borderBottom: active ? `2px solid ${WHSE_ACCENT}` : "2px solid transparent",
                 marginBottom: -1, whiteSpace: "nowrap",
               }}>
