@@ -13,7 +13,8 @@ import { apiClient } from "../../api/client"
 import { usePortalAuthStore } from "../../store/portalAuth.store"
 import { Home } from "lucide-react"
 
-const ACCENT = "#0D9488"
+const ACCENT = "var(--hf-accent)"
+const ACCENT_TEXT = "var(--hf-accent-text)";
 
 export function PropPortalLoginPage() {
   const navigate = useNavigate()
@@ -46,7 +47,7 @@ export function PropPortalLoginPage() {
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 36, width: 380, boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
           <div style={{ width: 38, height: 38, borderRadius: 10, background: ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Home size={19} color="#fff" />
+            <Home size={19} style={{ color: 'var(--hf-text-on-solid)' }} />
           </div>
           <div>
             <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Tenant Portal</p>
@@ -75,7 +76,7 @@ export function PropPortalLoginPage() {
         </form>
 
         <p style={{ fontSize: 12, color: "var(--hf-text-faint)", textAlign: "center", marginTop: 18 }}>
-          Received an invite email? <Link to="/property/portal/auth/accept-invite" style={{ color: ACCENT, fontWeight: 600 }}>Accept it here</Link>
+          Received an invite email? <Link to="/property/portal/auth/accept-invite" style={{ color: ACCENT_TEXT, fontWeight: 600 }}>Accept it here</Link>
         </p>
       </div>
     </div>

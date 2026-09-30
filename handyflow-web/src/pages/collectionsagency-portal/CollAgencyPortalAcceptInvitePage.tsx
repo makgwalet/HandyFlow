@@ -12,7 +12,8 @@ import { apiClient } from "../../api/client"
 import { usePortalAuthStore } from "../../store/portalAuth.store"
 import { Handshake } from "lucide-react"
 
-const ACCENT = "#5B21B6"
+const ACCENT = "var(--hf-violet-solid-strong)"
+const ACCENT_TEXT = "var(--hf-violet-text-strong)";
 
 export function CollAgencyPortalAcceptInvitePage() {
   const navigate = useNavigate()
@@ -53,7 +54,7 @@ export function CollAgencyPortalAcceptInvitePage() {
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 36, width: 380, boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
           <div style={{ width: 38, height: 38, borderRadius: 10, background: ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Handshake size={19} color="#fff" />
+            <Handshake size={19} style={{ color: 'var(--hf-text-on-solid)' }} />
           </div>
           <div>
             <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Accept your invite</p>
@@ -93,7 +94,7 @@ export function CollAgencyPortalAcceptInvitePage() {
         </form>
 
         <p style={{ fontSize: 12, color: "var(--hf-text-faint)", textAlign: "center", marginTop: 18 }}>
-          Already have an account? <Link to="/collections-agency/portal/login" style={{ color: ACCENT, fontWeight: 600 }}>Sign in</Link>
+          Already have an account? <Link to="/collections-agency/portal/login" style={{ color: ACCENT_TEXT, fontWeight: 600 }}>Sign in</Link>
         </p>
       </div>
     </div>

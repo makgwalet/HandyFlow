@@ -18,7 +18,8 @@ import { apiClient } from "../../api/client"
 import { usePortalAuthStore } from "../../store/portalAuth.store"
 import { Handshake } from "lucide-react"
 
-const ACCENT = "#5B21B6"
+const ACCENT = "var(--hf-violet-solid-strong)"
+const ACCENT_TEXT = "var(--hf-violet-text-strong)";
 
 export function CollAgencyPortalLoginPage() {
   const navigate = useNavigate()
@@ -53,7 +54,7 @@ export function CollAgencyPortalLoginPage() {
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 36, width: 380, boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
           <div style={{ width: 38, height: 38, borderRadius: 10, background: ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Handshake size={19} color="#fff" />
+            <Handshake size={19} style={{ color: 'var(--hf-text-on-solid)' }} />
           </div>
           <div>
             <p style={{ fontSize: 15, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Client Portal</p>
@@ -82,7 +83,7 @@ export function CollAgencyPortalLoginPage() {
         </form>
 
         <p style={{ fontSize: 12, color: "var(--hf-text-faint)", textAlign: "center", marginTop: 18 }}>
-          Received an invite email? <Link to="/collections-agency/portal/auth/accept-invite" style={{ color: ACCENT, fontWeight: 600 }}>Accept it here</Link>
+          Received an invite email? <Link to="/collections-agency/portal/auth/accept-invite" style={{ color: ACCENT_TEXT, fontWeight: 600 }}>Accept it here</Link>
         </p>
       </div>
     </div>

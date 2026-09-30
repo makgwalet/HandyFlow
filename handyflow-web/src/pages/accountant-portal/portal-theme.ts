@@ -3,43 +3,48 @@
 // Shared design tokens for the accountant client portal. Every portal
 // page should pull from here instead of hardcoding hex values inline —
 // the four pages this replaces each independently reimplemented very
-// nearly the same palette (navy #1B3A6B, teal #0D9488, the status colors)
+// nearly the same palette (brand navy, brand teal, the status colors)
 // with small, accidental drifts between them. One source of truth means
 // a future fifth portal page (or a rebrand) is a one-file change, not a
 // four-file hunt.
 //
-// Palette is NOT invented fresh — #1B3A6B and #0D9488 are HandyFlow's
-// existing brand navy/teal, already used in the login page's logo mark
+// Palette is NOT invented fresh — the navy and teal are HandyFlow's
+// existing brand colours, already used in the login page's logo mark
 // and throughout the PDF generators (AccountingReportPdfService,
 // CreativePdfGenerator, etc.). This extends the existing identity
 // consistently rather than introducing a new one for just the portal.
 
 export const color = {
+  // Every value is a theme token, so the portal follows the theme and brand.
+  // Colours used for BOTH text and fills come in two variants, because in dark
+  // mode text must get lighter while fills must stay dark enough for white
+  // labels: `navy` (fills, borders) and `navyText` (text, icons). Pick by role.
+
   // Brand
-  navy: "#1B3A6B",
-  navyDark: "#132C52",
-  teal: "#0D9488",
+  navy: "var(--hf-primary)",            navyText: "var(--hf-primary-text)",
+  navyDark: "var(--hf-primary-hover)",
+  teal: "var(--hf-accent)",             tealText: "var(--hf-accent-text)",
 
   // Semantic status — matches the status colors already used across
   // fee notes, document requests, and deadlines, unified into one place
-  amber: "#D97706",
-  amberBg: "#FFFBEB",
-  red: "#DC2626",
-  redBg: "#FEF2F2",
-  green: "#166534",
-  greenBg: "#DCFCE7",
-  blue: "#1D4ED8",
-  blueBg: "#EFF6FF",
+  amber: "var(--hf-warning)",           amberText: "var(--hf-warning-text)",
+  amberBg: "var(--hf-warning-soft)",
+  red: "var(--hf-danger)",              redText: "var(--hf-danger-text)",
+  redBg: "var(--hf-danger-soft)",
+  green: "var(--hf-success-solid-strong)", greenText: "var(--hf-success-text-strong)",
+  greenBg: "var(--hf-success-soft-strong)",
+  blue: "var(--hf-info)",               blueText: "var(--hf-info-text)",
+  blueBg: "var(--hf-info-soft)",
 
   // Neutrals
-  ink: "#0F172A",       // primary text
-  slate: "#475569",     // secondary text
-  muted: "#64748B",     // tertiary text / labels
-  faint: "#94A3B8",     // placeholder / disabled text
+  ink: "var(--hf-text)",                // primary text
+  slate: "var(--hf-text-tertiary)",     // secondary text
+  muted: "var(--hf-text-muted)",        // tertiary text / labels
+  faint: "var(--hf-text-faint)",        // placeholder / disabled text
   border: "var(--hf-border)",
-  borderLight: "#F1F5F9",
-  surface: "#FFFFFF",
-  canvas: "#F8FAFC",
+  borderLight: "var(--hf-border-subtle)",
+  surface: "var(--hf-surface)",
+  canvas: "var(--hf-canvas)",
 } as const
 
 export const radius = {
@@ -81,13 +86,13 @@ export const type = {
 // can't silently drift.
 export const statusTone: Record<string, { color: string; bg: string }> = {
   DRAFT:     { color: color.muted, bg: color.borderLight },
-  SENT:      { color: color.blue,  bg: color.blueBg },
-  BILLED:    { color: color.blue,  bg: color.blueBg },
-  PENDING:   { color: color.amber, bg: color.amberBg },
-  PARTIAL:   { color: color.blue,  bg: color.blueBg },
-  PAID:      { color: color.green, bg: color.greenBg },
-  COMPLETE:  { color: color.green, bg: color.greenBg },
-  FILED:     { color: color.green, bg: color.greenBg },
-  OVERDUE:   { color: color.red,   bg: color.redBg },
+  SENT:      { color: color.blueText,  bg: color.blueBg },
+  BILLED:    { color: color.blueText,  bg: color.blueBg },
+  PENDING:   { color: color.amberText, bg: color.amberBg },
+  PARTIAL:   { color: color.blueText,  bg: color.blueBg },
+  PAID:      { color: color.greenText, bg: color.greenBg },
+  COMPLETE:  { color: color.greenText, bg: color.greenBg },
+  FILED:     { color: color.greenText, bg: color.greenBg },
+  OVERDUE:   { color: color.redText,   bg: color.redBg },
   CANCELLED: { color: color.muted, bg: color.borderLight },
 }

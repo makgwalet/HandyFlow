@@ -12,7 +12,8 @@ import { Handshake, LogOut, ChevronRight, Wallet } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { usePortalAuthStore } from "../../store/portalAuth.store"
 
-const ACCENT = "#5B21B6"
+const ACCENT = "var(--hf-violet-solid-strong)"
+const ACCENT_TEXT = "var(--hf-violet-text-strong)";
 
 interface PortalClientSummary { clientId: string; tradingName: string }
 
@@ -35,7 +36,7 @@ export function CollAgencyPortalHomePage() {
       <header style={{ background: "var(--hf-surface)", borderBottom: "1px solid var(--hf-border)", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 9, background: ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Handshake size={17} color="#fff" />
+            <Handshake size={17} style={{ color: 'var(--hf-text-on-solid)' }} />
           </div>
           <div>
             <p style={{ fontSize: 14, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Client Portal</p>
@@ -62,11 +63,11 @@ export function CollAgencyPortalHomePage() {
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "18px 20px", cursor: "pointer", textAlign: "left" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--hf-violet-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Wallet size={18} color={ACCENT} />
+                    <Wallet size={18} style={{ color: ACCENT_TEXT }} />
                   </div>
                   <p style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{c.tradingName}</p>
                 </div>
-                <ChevronRight size={18} color="#CBD5E1" />
+                <ChevronRight size={18} style={{ color: 'var(--hf-text-disabled)' }} />
               </button>
             ))}
           </div>

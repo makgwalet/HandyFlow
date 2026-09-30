@@ -3,12 +3,13 @@ import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { auditorPortalApi, type EvidenceItem, type ControlExceptionItem } from "../../api/auditorPortal.api"
 
-const NAVY = "#1B3A6B"
-const BORDER = "#E2E8F0"
-const CANVAS = "#F8FAFC"
-const INK = "#0F172A"
-const MUTED = "#64748B"
-const FAINT = "#94A3B8"
+const NAVY = "var(--hf-primary)"
+const NAVY_TEXT = "var(--hf-primary-text)";
+const BORDER = "var(--hf-border)"
+const CANVAS = "var(--hf-surface-muted)"
+const INK = "var(--hf-text)"
+const MUTED = "var(--hf-text-muted)"
+const FAINT = "var(--hf-text-faint)"
 
 const fmtD = (d: string) => new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })
 const fmtSize = (bytes: number) => bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(0)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
@@ -48,7 +49,7 @@ export function AuditorPortalTenantDetailPage() {
             <button key={id} onClick={() => setTab(id)} style={{
               padding: "8px 14px", background: "none", border: "none",
               borderBottom: tab === id ? `2px solid ${NAVY}` : "2px solid transparent",
-              color: tab === id ? NAVY : MUTED, fontWeight: tab === id ? 700 : 500, fontSize: 13, cursor: "pointer", marginBottom: -1,
+              color: tab === id ? NAVY_TEXT : MUTED, fontWeight: tab === id ? 700 : 500, fontSize: 13, cursor: "pointer", marginBottom: -1,
             }}>{label}</button>
           ))}
         </div>

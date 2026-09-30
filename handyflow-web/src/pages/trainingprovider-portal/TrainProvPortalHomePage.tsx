@@ -19,7 +19,8 @@ import { GraduationCap, LogOut, Users, ClipboardList, Award, FileText } from "lu
 import { apiClient } from "../../api/client"
 import { usePortalAuthStore } from "../../store/portalAuth.store"
 
-const ACCENT = "#B45309"
+const ACCENT = "var(--hf-warning-solid-strong)"
+const ACCENT_TEXT = "var(--hf-warning-text-strong)";
 const fmtMoney = (n: number) => new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(n ?? 0)
 
 interface DelegateResponse { id: string; delegateNumber: string; fullName: string; jobTitle: string | null; email: string | null; status: string }
@@ -68,7 +69,7 @@ export function TrainProvPortalHomePage() {
       <header style={{ background: "var(--hf-surface)", borderBottom: "1px solid var(--hf-border)", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 9, background: ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <GraduationCap size={17} color="#fff" />
+            <GraduationCap size={17} style={{ color: 'var(--hf-text-on-solid)' }} />
           </div>
           <div>
             <p style={{ fontSize: 14, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Training Provider Portal</p>
@@ -90,7 +91,7 @@ export function TrainProvPortalHomePage() {
             const active = sub === t.key
             return (
               <button key={t.key} onClick={() => setSub(t.key)}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", border: "none", background: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, color: active ? ACCENT : "var(--hf-text-muted)", borderBottom: active ? `2px solid ${ACCENT}` : "2px solid transparent", marginBottom: -1 }}>
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", border: "none", background: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, color: active ? ACCENT_TEXT : "var(--hf-text-muted)", borderBottom: active ? `2px solid ${ACCENT}` : "2px solid transparent", marginBottom: -1 }}>
                 <Icon size={13} /> {t.label}
               </button>
             )

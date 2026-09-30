@@ -186,7 +186,7 @@ export function PortalClientDetailPage() {
                 background: "none",
                 border: "none",
                 borderBottom: tab === t.id ? `2px solid ${color.navy}` : "2px solid transparent",
-                color: tab === t.id ? color.navy : color.muted,
+                color: tab === t.id ? color.navyText : color.muted,
                 fontWeight: tab === t.id ? 700 : 500,
                 fontSize: 13.5,
                 cursor: "pointer",
@@ -234,13 +234,13 @@ export function PortalClientDetailPage() {
                         </div>
                         <div style={{ fontSize: 12.5, color: color.faint }}>
                           Issued {fmtD(f.invoiceDate)} · Due {fmtD(f.dueDate)}
-                          {f.daysOverdue > 0 && <span style={{ color: color.red, fontWeight: 600 }}> · {f.daysOverdue}d overdue</span>}
+                          {f.daysOverdue > 0 && <span style={{ color: color.redText, fontWeight: 600 }}> · {f.daysOverdue}d overdue</span>}
                         </div>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: space(4) }}>
                         <div style={{ textAlign: "right" as const }}>
                           <div style={{ fontWeight: 700, fontSize: 15, color: color.ink }}>{fmtR(f.total)}</div>
-                          {f.balance > 0 && <div style={{ fontSize: 11.5, color: color.red, fontWeight: 600 }}>{fmtR(f.balance)} owing</div>}
+                          {f.balance > 0 && <div style={{ fontSize: 11.5, color: color.redText, fontWeight: 600 }}>{fmtR(f.balance)} owing</div>}
                         </div>
                         <PrimaryButton small onClick={() => handleDownloadPdf(f)} disabled={downloadingPdf === f.id}>
                           {downloadingPdf === f.id ? "…" : "PDF"}
@@ -342,7 +342,7 @@ export function PortalClientDetailPage() {
                           Due {fmtD(d.dueDate)}
                           {d.status === "PENDING" && d.daysUntilDue >= 0 && ` · ${d.daysUntilDue}d remaining`}
                           {d.status === "PENDING" && d.daysUntilDue < 0 && (
-                            <span style={{ color: color.red, fontWeight: 600 }}> · {Math.abs(d.daysUntilDue)}d overdue</span>
+                            <span style={{ color: color.redText, fontWeight: 600 }}> · {Math.abs(d.daysUntilDue)}d overdue</span>
                           )}
                           {d.status === "FILED" && d.filedDate && ` · Filed ${fmtD(d.filedDate)}`}
                         </div>
@@ -396,7 +396,7 @@ export function PortalClientDetailPage() {
             </div>
             {uploading && <div style={{ fontSize: 12.5, color: color.muted, marginTop: space(2) }}>Uploading…</div>}
             {uploadError && (
-              <div style={{ marginTop: space(3), padding: `${space(2)} ${space(3)}`, background: color.redBg, border: "1px solid var(--hf-danger-border)", borderRadius: radius.sm, fontSize: 13, color: color.red }}>
+              <div style={{ marginTop: space(3), padding: `${space(2)} ${space(3)}`, background: color.redBg, border: "1px solid var(--hf-danger-border)", borderRadius: radius.sm, fontSize: 13, color: color.redText }}>
                 {uploadError}
               </div>
             )}
@@ -485,7 +485,7 @@ function SecondaryButton({ children, onClick, disabled }: { children: React.Reac
       style={{
         padding: "7px 14px",
         background: color.surface,
-        color: disabled ? color.faint : color.navy,
+        color: disabled ? color.faint : color.navyText,
         border: `1px solid ${disabled ? color.border : color.navy}`,
         borderRadius: 8,
         fontSize: 12.5,

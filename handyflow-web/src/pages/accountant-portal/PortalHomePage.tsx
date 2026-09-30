@@ -94,7 +94,7 @@ function ClientCard({ client, onClick }: { client: PortalClientSummary; onClick:
           {client.tradingName}
         </span>
         {owing && (
-          <span style={{ fontSize: 15, fontWeight: 700, color: color.red, whiteSpace: "nowrap" as const }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: color.redText, whiteSpace: "nowrap" as const }}>
             {fmtR(client.outstandingBalance)} owing
           </span>
         )}
@@ -135,8 +135,8 @@ function ClientCard({ client, onClick }: { client: PortalClientSummary; onClick:
 
 function Badge({ tone, children }: { tone: "amber" | "blue"; children: React.ReactNode }) {
   const tones = {
-    amber: { color: color.amber, bg: color.amberBg },
-    blue: { color: color.blue, bg: color.blueBg },
+    amber: { color: color.amberText, bg: color.amberBg },
+    blue: { color: color.blueText, bg: color.blueBg },
   }[tone]
   return (
     <span

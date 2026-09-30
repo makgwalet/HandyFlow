@@ -11,11 +11,12 @@ import { useNavigate } from "react-router-dom"
 import { auditorPortalApi, type AuditorTenantAccess } from "../../api/auditorPortal.api"
 import { usePortalAuthStore } from "../../store/portalAuth.store"
 
-const NAVY = "#1B3A6B"
-const BORDER = "#E2E8F0"
-const INK = "#0F172A"
-const MUTED = "#64748B"
-const FAINT = "#94A3B8"
+const NAVY = "var(--hf-primary)"
+const NAVY_TEXT = "var(--hf-primary-text)";
+const BORDER = "var(--hf-border)"
+const INK = "var(--hf-text)"
+const MUTED = "var(--hf-text-muted)"
+const FAINT = "var(--hf-text-faint)"
 
 const fmtD = (d: string) => new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })
 
@@ -48,7 +49,7 @@ export function AuditorPortalHomePage() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 13, color: MUTED }}>{user?.fullName ?? user?.email}</span>
-          <button onClick={logout} style={{ padding: "6px 12px", background: "var(--hf-surface)", color: NAVY, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Log out</button>
+          <button onClick={logout} style={{ padding: "6px 12px", background: "var(--hf-surface)", color: NAVY_TEXT, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Log out</button>
         </div>
       </div>
 

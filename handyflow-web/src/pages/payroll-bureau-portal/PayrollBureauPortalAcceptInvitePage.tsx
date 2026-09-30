@@ -43,7 +43,7 @@ export function PayrollBureauPortalAcceptInvitePage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(180deg, ${color.canvas} 0%, #EEF2F7 100%)`, fontFamily: type.family, padding: space(4) }}>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(180deg, ${color.canvas} 0%, var(--hf-surface-sunken) 100%)`, fontFamily: type.family, padding: space(4) }}>
       <div style={{ width: 420, maxWidth: "100%", background: color.surface, borderRadius: radius.lg, padding: space(9), boxShadow: shadow.modal, border: `1px solid ${color.border}` }}>
         <div style={{ textAlign: "center" as const, marginBottom: space(8) }}>
           <div style={{ width: 48, height: 48, borderRadius: radius.md, background: `linear-gradient(135deg, ${color.navy}, ${color.navyDark})`, display: "flex", alignItems: "center", justifyContent: "center", margin: `0 auto ${space(4)}`, boxShadow: "0 4px 12px rgba(27, 58, 107, 0.25)" }}>
@@ -60,7 +60,7 @@ export function PayrollBureauPortalAcceptInvitePage() {
             <div style={{ fontSize: 11.5, color: color.faint, marginTop: space(1) }}>At least 8 characters</div></div>
           <div style={{ marginBottom: space(5) }}><label style={labelStyle}>Confirm password</label>
             <input type="password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inputStyle} /></div>
-          {error && <div style={{ marginBottom: space(4), padding: `${space(2.5)} ${space(3.5)}`, background: color.redBg, border: "1px solid var(--hf-danger-border)", borderRadius: radius.sm, fontSize: 13, color: color.red }}>{error}</div>}
+          {error && <div style={{ marginBottom: space(4), padding: `${space(2.5)} ${space(3.5)}`, background: color.redBg, border: "1px solid var(--hf-danger-border)", borderRadius: radius.sm, fontSize: 13, color: color.redText }}>{error}</div>}
           <button type="submit" disabled={loading} style={{ width: "100%", padding: `${space(3)} 0`, background: loading ? color.navyDark : color.navy, color: "var(--hf-text-on-solid)", border: "none", borderRadius: radius.sm, fontSize: 14, fontWeight: 700, cursor: loading ? "default" : "pointer" }}>
             {loading ? "Setting up…" : "Accept Invite & Sign In"}
           </button>

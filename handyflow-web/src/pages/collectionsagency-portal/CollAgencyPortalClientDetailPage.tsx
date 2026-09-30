@@ -11,7 +11,7 @@ import { ArrowLeft, LogOut, Handshake, ArrowDownCircle, ArrowUpCircle } from "lu
 import { apiClient } from "../../api/client"
 import { usePortalAuthStore } from "../../store/portalAuth.store"
 
-const ACCENT = "#5B21B6"
+const ACCENT = "var(--hf-violet-solid-strong)"
 const fmtMoney = (n: number) => new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(n ?? 0)
 
 interface DebtorAccountResponse {
@@ -56,7 +56,7 @@ export function CollAgencyPortalClientDetailPage() {
       <header style={{ background: "var(--hf-surface)", borderBottom: "1px solid var(--hf-border)", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 9, background: ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Handshake size={17} color="#fff" />
+            <Handshake size={17} style={{ color: 'var(--hf-text-on-solid)' }} />
           </div>
           <p style={{ fontSize: 14, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Client Portal</p>
         </div>
@@ -116,7 +116,7 @@ export function CollAgencyPortalClientDetailPage() {
             {trust.map((t, i) => (
               <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  {t.transactionType === "RECEIPT" ? <ArrowDownCircle size={17} color="#059669" /> : <ArrowUpCircle size={17} color="#D97706" />}
+                  {t.transactionType === "RECEIPT" ? <ArrowDownCircle size={17} style={{ color: 'var(--hf-success-text)' }} /> : <ArrowUpCircle size={17} style={{ color: 'var(--hf-warning-text)' }} />}
                   <div>
                     <p style={{ fontSize: 12.5, fontWeight: 600, color: "var(--hf-text)", margin: "0 0 2px" }}>{t.transactionType === "RECEIPT" ? "Payment received" : "Remittance paid to you"}{t.reference ? ` · ${t.reference}` : ""}</p>
                     <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: 0 }}>{t.transactionDate}</p>

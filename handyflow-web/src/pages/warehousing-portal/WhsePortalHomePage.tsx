@@ -8,7 +8,8 @@ import { Warehouse, LogOut, ChevronRight, Building2 } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { usePortalAuthStore } from "../../store/portalAuth.store"
 
-const ACCENT = "#0F766E"
+const ACCENT = "var(--hf-accent-solid-strong)"
+const ACCENT_TEXT = "var(--hf-accent-text-strong)";
 
 interface PortalClientSummary { clientId: string; tradingName: string }
 
@@ -31,7 +32,7 @@ export function WhsePortalHomePage() {
       <header style={{ background: "var(--hf-surface)", borderBottom: "1px solid var(--hf-border)", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 9, background: ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Warehouse size={17} color="#fff" />
+            <Warehouse size={17} style={{ color: 'var(--hf-text-on-solid)' }} />
           </div>
           <div>
             <p style={{ fontSize: 14, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Client Portal</p>
@@ -58,11 +59,11 @@ export function WhsePortalHomePage() {
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "18px 20px", cursor: "pointer", textAlign: "left" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--hf-accent-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Building2 size={18} color={ACCENT} />
+                    <Building2 size={18} style={{ color: ACCENT_TEXT }} />
                   </div>
                   <p style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)", margin: 0 }}>{c.tradingName}</p>
                 </div>
-                <ChevronRight size={18} color="#CBD5E1" />
+                <ChevronRight size={18} style={{ color: 'var(--hf-text-disabled)' }} />
               </button>
             ))}
           </div>

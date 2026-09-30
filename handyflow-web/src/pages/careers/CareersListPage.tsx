@@ -34,6 +34,12 @@ const JOB_TYPE_LABEL: Record<string, string> = {
   INTERNSHIP: 'Internship', FREELANCE: 'Freelance',
 }
 
+// Fixed editorial palette ON PURPOSE. This public, candidate-facing page has its own
+// look (warm paper and ink, forest-green accent), separate from the staff app's
+// brand, so it does not use the app's theme colours or follow its dark mode. To
+// keep the few app tokens it does use (card and input surfaces) consistent with
+// this palette, the page root carries data-theme="light", which re-declares every
+// token with its light value for the whole page.
 const paper = '#FAF8F4'
 const ink = '#1C1A16'
 const muted = '#736C5E'
@@ -63,7 +69,7 @@ export function CareersListPage() {
     (j.department ?? '').toLowerCase().includes(query.toLowerCase()))
 
   return (
-    <div style={{ minHeight: '100vh', background: paper, fontFamily: "'Inter', -apple-system, sans-serif", color: ink }}>
+    <div data-theme="light" style={{ minHeight: '100vh', background: paper, fontFamily: "'Inter', -apple-system, sans-serif", color: ink }}>
       <style>{fontImport}</style>
 
       <header style={{ borderBottom: `1px solid ${line}`, padding: '48px 24px 40px' }}>
@@ -143,7 +149,7 @@ export function CareersListPage() {
                   flexShrink: 0, width: 36, height: 36, borderRadius: '50%', background: accentSoft,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <ArrowRight size={16} color={accent} />
+                  <ArrowRight size={16} style={{ color: accent }} />
                 </div>
               </div>
             </Link>

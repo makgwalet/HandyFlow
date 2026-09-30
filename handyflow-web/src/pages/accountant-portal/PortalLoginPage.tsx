@@ -35,7 +35,7 @@ export function PortalLoginPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: `linear-gradient(180deg, ${color.canvas} 0%, #EEF2F7 100%)`,
+        background: `linear-gradient(180deg, ${color.canvas} 0%, var(--hf-surface-sunken) 100%)`,
         fontFamily: type.family,
         padding: space(4),
       }}
@@ -133,7 +133,7 @@ export function PortalLoginPage() {
                 border: `1px solid var(--hf-danger-border)`,
                 borderRadius: radius.sm,
                 fontSize: 13,
-                color: color.red,
+                color: color.redText,
                 lineHeight: 1.4,
               }}
             >

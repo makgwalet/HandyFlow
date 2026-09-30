@@ -50,7 +50,7 @@ export function RecruitmentAgencyPortalClientDetailPage() {
         <div style={{ display: "flex", gap: space(1), borderBottom: `1px solid ${color.border}`, marginBottom: space(6) }}>
           {tabs.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: `${space(2.5)} ${space(4)}`, background: "none", border: "none",
-              borderBottom: tab === t.id ? `2px solid ${color.navy}` : "2px solid transparent", color: tab === t.id ? color.navy : color.muted,
+              borderBottom: tab === t.id ? `2px solid ${color.navy}` : "2px solid transparent", color: tab === t.id ? color.navyText : color.muted,
               fontWeight: tab === t.id ? 700 : 500, fontSize: 13.5, cursor: "pointer", marginBottom: -1 }}>{t.label}</button>
           ))}
         </div>
@@ -97,7 +97,7 @@ export function RecruitmentAgencyPortalClientDetailPage() {
                   </div>
                   <div style={{ textAlign: "right" as const }}>
                     <div style={{ fontWeight: 700, fontSize: 15, color: color.ink }}>{fmtR(inv.total)}</div>
-                    {inv.balance > 0 && <div style={{ fontSize: 11.5, color: color.red, fontWeight: 600 }}>{fmtR(inv.balance)} owing</div>}
+                    {inv.balance > 0 && <div style={{ fontSize: 11.5, color: color.redText, fontWeight: 600 }}>{fmtR(inv.balance)} owing</div>}
                   </div>
                 </div>
               ))}

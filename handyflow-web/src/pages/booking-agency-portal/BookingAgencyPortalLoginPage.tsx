@@ -27,7 +27,7 @@ export function BookingAgencyPortalLoginPage() {
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-      background: `linear-gradient(180deg, ${color.canvas} 0%, #EEF2F7 100%)`, fontFamily: type.family, padding: space(4) }}>
+      background: `linear-gradient(180deg, ${color.canvas} 0%, var(--hf-surface-sunken) 100%)`, fontFamily: type.family, padding: space(4) }}>
       <div style={{ width: 400, maxWidth: "100%", background: color.surface, borderRadius: radius.lg,
         padding: space(9), boxShadow: shadow.modal, border: `1px solid ${color.border}` }}>
         <div style={{ textAlign: "center" as const, marginBottom: space(8) }}>
@@ -51,7 +51,7 @@ export function BookingAgencyPortalLoginPage() {
             <input type="password" required value={password} onChange={e => setPassword(e.target.value)}
               style={inputStyle} onFocus={e => (e.currentTarget.style.borderColor = color.navy)} onBlur={e => (e.currentTarget.style.borderColor = color.border)} />
           </div>
-          {error && <div style={{ marginBottom: space(4), padding: `${space(2.5)} ${space(3.5)}`, background: color.redBg, border: "1px solid var(--hf-danger-border)", borderRadius: radius.sm, fontSize: 13, color: color.red, lineHeight: 1.4 }}>{error}</div>}
+          {error && <div style={{ marginBottom: space(4), padding: `${space(2.5)} ${space(3.5)}`, background: color.redBg, border: "1px solid var(--hf-danger-border)", borderRadius: radius.sm, fontSize: 13, color: color.redText, lineHeight: 1.4 }}>{error}</div>}
           <button type="submit" disabled={loading} style={{ width: "100%", padding: `${space(3)} 0`, background: loading ? color.navyDark : color.navy,
             color: "var(--hf-text-on-solid)", border: "none", borderRadius: radius.sm, fontSize: 14, fontWeight: 700, cursor: loading ? "default" : "pointer", letterSpacing: "0.01em" }}>
             {loading ? "Signing in…" : "Sign In"}

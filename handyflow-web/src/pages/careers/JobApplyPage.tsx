@@ -33,6 +33,12 @@ const EXPERIENCE_LABEL: Record<string, string> = {
   JUNIOR: 'Junior', MID: 'Mid-level', SENIOR: 'Senior', LEAD: 'Lead', EXECUTIVE: 'Executive',
 }
 
+// Fixed editorial palette ON PURPOSE. This public, candidate-facing page has its own
+// look (warm paper and ink, forest-green accent), separate from the staff app's
+// brand, so it does not use the app's theme colours or follow its dark mode. To
+// keep the few app tokens it does use (card and input surfaces) consistent with
+// this palette, the page root carries data-theme="light", which re-declares every
+// token with its light value for the whole page.
 const paper = '#FAF8F4'
 const ink = '#1C1A16'
 const muted = '#736C5E'
@@ -144,7 +150,7 @@ export function JobApplyPage() {
         <style>{fontImport}</style>
         <div style={{ maxWidth: 480, textAlign: 'center' as const }}>
           <div style={{ width: 56, height: 56, borderRadius: '50%', background: accentSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
-            <CheckCircle2 size={26} color={accent} />
+            <CheckCircle2 size={26} style={{ color: accent }} />
           </div>
           <h1 style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 500, fontSize: 28, margin: '0 0 12px', color: ink }}>
             Application received
@@ -164,7 +170,7 @@ export function JobApplyPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: paper, fontFamily: "'Inter', -apple-system, sans-serif", color: ink }}>
+    <div data-theme="light" style={{ minHeight: '100vh', background: paper, fontFamily: "'Inter', -apple-system, sans-serif", color: ink }}>
       <style>{fontImport}</style>
 
       <header style={{ borderBottom: `1px solid ${line}`, padding: '20px 24px' }}>

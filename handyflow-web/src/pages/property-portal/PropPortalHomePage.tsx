@@ -14,7 +14,8 @@ import { Home, LogOut, ChevronRight, ChevronLeft, Calendar, Wallet, ClipboardChe
 import { apiClient } from "../../api/client"
 import { usePortalAuthStore } from "../../store/portalAuth.store"
 
-const ACCENT = "#0D9488"
+const ACCENT = "var(--hf-accent)"
+const ACCENT_TEXT = "var(--hf-accent-text)";
 
 interface LeaseSummary {
   leaseId: string; propertyName: string | null; propertyAddress: Record<string, string> | null
@@ -65,7 +66,7 @@ export function PropPortalHomePage() {
       <header style={{ background: "var(--hf-surface)", borderBottom: "1px solid var(--hf-border)", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 9, background: ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Home size={17} color="#fff" />
+            <Home size={17} style={{ color: 'var(--hf-text-on-solid)' }} />
           </div>
           <div>
             <p style={{ fontSize: 14, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Tenant Portal</p>
@@ -97,7 +98,7 @@ export function PropPortalHomePage() {
                     <p style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)", margin: "0 0 2px" }}>{l.propertyName ?? "Property"} {l.unitNumber ? `— Unit ${l.unitNumber}` : ""}</p>
                     <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: 0 }}>{fmtDate(l.startDate)} – {fmtDate(l.endDate)} · {l.status}</p>
                   </div>
-                  <ChevronRight size={18} color="#CBD5E1" />
+                  <ChevronRight size={18} style={{ color: 'var(--hf-text-disabled)' }} />
                 </button>
               ))}
             </div>
@@ -125,7 +126,7 @@ function LeaseDetail({ lease, onBack }: { lease: LeaseSummary; onBack?: () => vo
   return (
     <div>
       {onBack && (
-        <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", color: ACCENT, fontSize: 12.5, fontWeight: 600, cursor: "pointer", padding: 0, marginBottom: 16 }}>
+        <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", color: ACCENT_TEXT, fontSize: 12.5, fontWeight: 600, cursor: "pointer", padding: 0, marginBottom: 16 }}>
           <ChevronLeft size={14} /> All leases
         </button>
       )}
@@ -152,7 +153,7 @@ function LeaseDetail({ lease, onBack }: { lease: LeaseSummary; onBack?: () => vo
 
       <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "16px 18px", marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <Calendar size={14} color={ACCENT} />
+          <Calendar size={14} style={{ color: ACCENT_TEXT }} />
           <span style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-secondary)", textTransform: "uppercase" as const, letterSpacing: 0.4 }}>Lease Details</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, fontSize: 13 }}>
@@ -164,7 +165,7 @@ function LeaseDetail({ lease, onBack }: { lease: LeaseSummary; onBack?: () => vo
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <Wallet size={14} color={ACCENT} />
+        <Wallet size={14} style={{ color: ACCENT_TEXT }} />
         <span style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-secondary)", textTransform: "uppercase" as const, letterSpacing: 0.4 }}>Payment History</span>
       </div>
       {payments.length === 0 ? (
@@ -186,7 +187,7 @@ function LeaseDetail({ lease, onBack }: { lease: LeaseSummary; onBack?: () => vo
       )}
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <ClipboardCheck size={14} color={ACCENT} />
+        <ClipboardCheck size={14} style={{ color: ACCENT_TEXT }} />
         <span style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-secondary)", textTransform: "uppercase" as const, letterSpacing: 0.4 }}>Inspection Reports</span>
       </div>
       {inspections.length === 0 ? (

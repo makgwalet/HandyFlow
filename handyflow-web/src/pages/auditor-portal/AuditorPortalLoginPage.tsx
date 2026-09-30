@@ -4,10 +4,10 @@ import { useNavigate } from "react-router-dom"
 import { auditorPortalApi } from "../../api/auditorPortal.api"
 import { usePortalAuthStore } from "../../store/portalAuth.store"
 
-const NAVY = "#1B3A6B"
-const BORDER = "#E2E8F0"
-const INK = "#0F172A"
-const MUTED = "#64748B"
+const NAVY = "var(--hf-primary)"
+const BORDER = "var(--hf-border)"
+const INK = "var(--hf-text)"
+const MUTED = "var(--hf-text-muted)"
 
 export function AuditorPortalLoginPage() {
   const navigate = useNavigate()

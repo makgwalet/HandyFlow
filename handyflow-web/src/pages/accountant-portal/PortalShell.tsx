@@ -54,7 +54,7 @@ export function PortalShell({
                 gap: 4,
                 transition: "color 0.15s ease",
               }}
-              onMouseEnter={e => (e.currentTarget.style.color = color.navy)}
+              onMouseEnter={e => (e.currentTarget.style.color = color.navyText)}
               onMouseLeave={e => (e.currentTarget.style.color = color.muted)}
             >
               ← Back
@@ -100,7 +100,7 @@ export function PortalShell({
             }}
             onMouseEnter={e => {
               e.currentTarget.style.borderColor = color.navy
-              e.currentTarget.style.color = color.navy
+              e.currentTarget.style.color = color.navyText
             }}
             onMouseLeave={e => {
               e.currentTarget.style.borderColor = color.border
