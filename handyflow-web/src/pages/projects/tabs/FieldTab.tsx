@@ -178,9 +178,9 @@ function SnagsPanel({projectId}:{projectId:string}) {
                     {s.description&&<div style={{fontSize:12,color:'var(--hf-text-faint)',marginTop:4}}>{s.description}</div>}
                   </div>
                   <div style={{display:'flex',gap:6,flexShrink:0}}>
-                    {s.status==='OPEN'&&<TinyBtn onClick={()=>actionMut.mutate({snagId:s.id,action:'START'})} color="#92400E" bg="#FEF3C7">Start</TinyBtn>}
-                    {s.status==='IN_PROGRESS'&&<TinyBtn onClick={()=>actionMut.mutate({snagId:s.id,action:'RESOLVE'})} color="#166534" bg="#DCFCE7">Resolve</TinyBtn>}
-                    {s.status==='OPEN'&&<TinyBtn onClick={()=>actionMut.mutate({snagId:s.id,action:'REJECT'})} color="#DC2626" bg="#FEF2F2">Reject</TinyBtn>}
+                    {s.status==='OPEN'&&<TinyBtn onClick={()=>actionMut.mutate({snagId:s.id,action:'START'})} color="var(--hf-warning-text-deep)" bg="var(--hf-warning-soft-strong)">Start</TinyBtn>}
+                    {s.status==='IN_PROGRESS'&&<TinyBtn onClick={()=>actionMut.mutate({snagId:s.id,action:'RESOLVE'})} color="var(--hf-success-text-strong)" bg="var(--hf-success-soft-strong)">Resolve</TinyBtn>}
+                    {s.status==='OPEN'&&<TinyBtn onClick={()=>actionMut.mutate({snagId:s.id,action:'REJECT'})} color="var(--hf-danger-text)" bg="var(--hf-danger-soft)">Reject</TinyBtn>}
                   </div>
                 </div>
                 {s.photoUrls&&s.photoUrls.length>0&&(

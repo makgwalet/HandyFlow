@@ -34,11 +34,11 @@ export function OverviewTab({ project }: { project: Project }) {
       <Section title="Budget & Cost">
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
           <Stat label="Total Budget"  value={fmtR(project.budgetTotal)}    />
-          <Stat label="Spent"         value={fmtR(project.budgetSpent)}     color={spentPct>100?"#DC2626":undefined} />
-          <Stat label="Committed"     value={fmtR(project.budgetCommitted)} color="#D97706" />
-          <Stat label="Variance"      value={fmtR(project.budgetVariance)}  color={project.budgetVariance<0?"#DC2626":"#059669"} />
+          <Stat label="Spent"         value={fmtR(project.budgetSpent)}     color={spentPct>100?"var(--hf-danger-text)":undefined} />
+          <Stat label="Committed"     value={fmtR(project.budgetCommitted)} color="var(--hf-warning-text)" />
+          <Stat label="Variance"      value={fmtR(project.budgetVariance)}  color={project.budgetVariance<0?"var(--hf-danger-text)":"var(--hf-success-text)"} />
         </div>
-        <ProgressBar pct={spentPct} label="Budget used" color={spentPct>90?"#EF4444":spentPct>75?"#F59E0B":"#22C55E"}/>
+        <ProgressBar pct={spentPct} label="Budget used" color={spentPct>90?"var(--hf-danger-text)":spentPct>75?"var(--hf-warning-text)":"var(--hf-success-text)"}/>
         {evm && (
           <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginTop:14, paddingTop:14, borderTop:"1px solid var(--hf-border-subtle)" }}>
             <EVMStat label="SPI" value={evm.spi?.toFixed(2)??"—"} good={(evm.spi??1)>=1}/>
@@ -57,7 +57,7 @@ export function OverviewTab({ project }: { project: Project }) {
           <Stat label="Baseline End" value={fmtDate(project.baselineEnd)}/>
           <Stat label="Contract Ref" value={project.contractRef??"—"}/>
         </div>
-        <ProgressBar pct={taskPct} label={`Tasks ${project.completedTaskCount}/${project.taskCount}`} color="#1B3A6B"/>
+        <ProgressBar pct={taskPct} label={`Tasks ${project.completedTaskCount}/${project.taskCount}`} color="var(--hf-primary-text)"/>
         {(project.cidbGrade||project.nhbrcNumber) && (
           <div style={{ display:"flex", gap:8, marginTop:14, paddingTop:14, borderTop:"1px solid var(--hf-border-subtle)" }}>
             {project.cidbGrade && <Tag label="CIDB" value={project.cidbGrade}/>}
@@ -73,8 +73,8 @@ export function OverviewTab({ project }: { project: Project }) {
           : milestones.slice(0,6).map(m=>(
             <div key={m.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderBottom:"1px solid var(--hf-border-subtle)" }}>
               {m.status==="COMPLETED"
-                ? <CheckCircle size={14} color="#16A34A" style={{ flexShrink:0 }}/>
-                : <div style={{ width:14, height:14, borderRadius:"50%", border:`2px solid ${m.isCritical?"#EF4444":"#CBD5E1"}`, flexShrink:0 }}/>}
+                ? <CheckCircle size={14} style={{ color: 'var(--hf-success-text)', flexShrink:0 }}/>
+                : <div style={{ width:14, height:14, borderRadius:"50%", border:`2px solid ${m.isCritical?"var(--hf-danger)":"var(--hf-border-strong)"}`, flexShrink:0 }}/>}
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:13, fontWeight:600, color:"var(--hf-text)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{m.title}</div>
                 <div style={{ fontSize:11, color:"var(--hf-text-faint)" }}>{fmtDate(m.plannedEnd)}</div>

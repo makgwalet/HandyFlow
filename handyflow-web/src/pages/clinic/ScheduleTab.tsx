@@ -22,22 +22,24 @@ interface Patient { id: string; fullName: string }
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 
-const NAVY="#1B3A6B"; const TEAL="#0D9488"; const RED="#DC2626"
-const GREEN="#166534"; const AMBER="#D97706"; const PURPLE="#7C3AED"
-const GRAY="#64748B"; const BORDER="#E2E8F0"; const LIGHT="#F8FAFC"
+const NAVY="var(--hf-primary)"; const TEAL="var(--hf-accent-text)"; const RED="var(--hf-danger)"
+const RED_TEXT = "var(--hf-danger-text)";
+const GREEN="var(--hf-success-text-strong)"; const AMBER="var(--hf-warning-text)"; const PURPLE="var(--hf-violet)"
+const PURPLE_TEXT = "var(--hf-violet-text)";
+const GRAY="var(--hf-text-muted)"; const BORDER="var(--hf-border)"; const LIGHT="var(--hf-surface-muted)"
 
 const STATUS_CFG: Record<string,{color:string;bg:string;border:string;label:string}> = {
-  SCHEDULED:   {color:"#1D4ED8",bg:"#EFF6FF",border:"#BFDBFE",label:"Scheduled"},
-  CONFIRMED:   {color:PURPLE,   bg:"#F5F3FF",border:"#DDD6FE",label:"Confirmed"},
-  IN_PROGRESS: {color:AMBER,    bg:"#FFFBEB",border:"#FDE68A",label:"In Progress"},
-  COMPLETED:   {color:GREEN,    bg:"#DCFCE7",border:"#86EFAC",label:"Completed"},
-  CANCELLED:   {color:RED,      bg:"#FEF2F2",border:"#FECACA",label:"Cancelled"},
+  SCHEDULED:   {color:"var(--hf-info-text)",bg:"var(--hf-info-soft)",border:"var(--hf-info-border)",label:"Scheduled"},
+  CONFIRMED:   {color:PURPLE_TEXT,   bg:"var(--hf-violet-soft)",border:"var(--hf-violet-border)",label:"Confirmed"},
+  IN_PROGRESS: {color:AMBER,    bg:"var(--hf-warning-soft)",border:"var(--hf-warning-border)",label:"In Progress"},
+  COMPLETED:   {color:GREEN,    bg:"var(--hf-success-soft-strong)",border:"var(--hf-success-border)",label:"Completed"},
+  CANCELLED:   {color:RED_TEXT,      bg:"var(--hf-danger-soft)",border:"var(--hf-danger-border)",label:"Cancelled"},
   NO_SHOW:     {color:GRAY,     bg:LIGHT,    border:BORDER,   label:"No Show"},
 }
 
 const STATUS_FLOW: Record<string,{action:string;label:string;color:string}[]> = {
-  SCHEDULED:   [{action:"confirm",label:"Confirm",color:PURPLE},{action:"cancel",label:"Cancel",color:RED}],
-  CONFIRMED:   [{action:"start",label:"Start",color:AMBER},{action:"no_show",label:"No Show",color:GRAY},{action:"cancel",label:"Cancel",color:RED}],
+  SCHEDULED:   [{action:"confirm",label:"Confirm",color:PURPLE_TEXT},{action:"cancel",label:"Cancel",color:RED_TEXT}],
+  CONFIRMED:   [{action:"start",label:"Start",color:AMBER},{action:"no_show",label:"No Show",color:GRAY},{action:"cancel",label:"Cancel",color:RED_TEXT}],
   IN_PROGRESS: [{action:"complete",label:"Complete",color:GREEN}],
 }
 
@@ -378,7 +380,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
                   {actions.map(btn=>(
                     <button key={btn.action} onClick={()=>doAction.mutate({id:selected.id,action:btn.action})}
                       disabled={doAction.isPending}
-                      style={{padding:"8px 18px",border:"none",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",background:`${btn.color}18`,color:btn.color}}>
+                      style={{padding:"8px 18px",border:"none",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",background:`color-mix(in srgb, ${btn.color} 9%, transparent)`,color:btn.color}}>
                       {btn.label}
                     </button>
                   ))}
@@ -489,11 +491,11 @@ function ModalFooter({onCancel,onConfirm,confirmLabel,loading}:{onCancel:()=>voi
   return <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}><button onClick={onCancel} style={btnCancel}>Cancel</button><button onClick={onConfirm} disabled={loading} style={btnPrimary}>{loading?"Saving...":confirmLabel}</button></div>
 }
 function ErrBox({msg}:{msg:string}) {
-  return <div style={{marginTop:10,padding:"8px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:RED,display:"flex",alignItems:"center",gap:8}}><AlertCircle size={13}/>{msg}</div>
+  return <div style={{marginTop:10,padding:"8px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:RED_TEXT,display:"flex",alignItems:"center",gap:8}}><AlertCircle size={13}/>{msg}</div>
 }
 
-const lbl:React.CSSProperties      = {display:"block",fontSize:13,fontWeight:600,color:"#374151",marginBottom:5}
-const sinp:React.CSSProperties     = {width:"100%",padding:"9px 12px",boxSizing:"border-box" as const,border:"1.5px solid #E2E8F0",borderRadius:8,fontSize:14,outline:"none",background:"#fff"}
-const btnPrimary:React.CSSProperties = {background:NAVY,color:"#fff",border:"none",borderRadius:9,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}
-const btnCancel:React.CSSProperties  = {padding:"9px 18px",border:"1px solid #E2E8F0",borderRadius:9,background:"#fff",fontSize:13,cursor:"pointer",color:"#374151"}
-const navBtn:React.CSSProperties    = {display:"flex",alignItems:"center",justifyContent:"center",padding:"6px 10px",border:"1px solid #E2E8F0",borderRadius:8,background:"#fff",cursor:"pointer",color:GRAY}
+const lbl:React.CSSProperties      = {display:"block",fontSize:13,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}
+const sinp:React.CSSProperties     = {width:"100%",padding:"9px 12px",boxSizing:"border-box" as const,border:"1.5px solid var(--hf-border)",borderRadius:8,fontSize:14,outline:"none",background:"var(--hf-surface)"}
+const btnPrimary:React.CSSProperties = {background:NAVY,color:"var(--hf-text-on-solid)",border:"none",borderRadius:9,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}
+const btnCancel:React.CSSProperties  = {padding:"9px 18px",border:"1px solid var(--hf-border)",borderRadius:9,background:"var(--hf-surface)",fontSize:13,cursor:"pointer",color:"var(--hf-text-secondary)"}
+const navBtn:React.CSSProperties    = {display:"flex",alignItems:"center",justifyContent:"center",padding:"6px 10px",border:"1px solid var(--hf-border)",borderRadius:8,background:"var(--hf-surface)",cursor:"pointer",color:GRAY}

@@ -13,7 +13,8 @@ interface Deadline {
   dueDate: string; status: string; dueSoon: boolean; completedAt: string | null
 }
 
-const ACCENT = "#065F46"
+const ACCENT = "var(--hf-success-solid-strong)"
+const ACCENT_TEXT = "var(--hf-success-text-strong)";
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })
 const EMPTY_FORM = { deadlineType: "", description: "", dueDate: "" }
 
@@ -63,11 +64,11 @@ export default function ClientDeadlinesTab({ clientId }: { clientId: string }) {
 
   const inp = (k: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
-    border: `1.5px solid ${fieldErrors[k] ? "#DC2626" : "#E2E8F0"}`,
-    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "#FFF5F5" : "#fff", outline: "none",
+    border: `1.5px solid ${fieldErrors[k] ? "var(--hf-danger)" : "var(--hf-border)"}`,
+    borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
-    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#DC2626", marginTop: 4 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
       <AlertCircle size={12} />{fieldErrors[k]}
     </div>
   ) : null
@@ -81,43 +82,43 @@ export default function ClientDeadlinesTab({ clientId }: { clientId: string }) {
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
         {canManage && (
           <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") }}
-            style={{ display: "flex", alignItems: "center", gap: 7, background: ACCENT, color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            style={{ display: "flex", alignItems: "center", gap: 7, background: ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             <Plus size={15} /> New Deadline
           </button>
         )}
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading deadlines...</div>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading deadlines...</div>
       ) : deadlines.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
           <CalendarClock size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontWeight: 600, color: "#475569" }}>No pending deadlines</div>
+          <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No pending deadlines</div>
         </div>
       ) : (
         <>
           {[
-            { title: "Overdue", items: overdue, color: "#DC2626", bg: "#FEF2F2" },
-            { title: "Due Soon (within 14 days)", items: dueSoon, color: "#D97706", bg: "#FFFBEB" },
-            { title: "Upcoming", items: upcoming, color: ACCENT, bg: "#F8FAFC" },
+            { title: "Overdue", items: overdue, color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
+            { title: "Due Soon (within 14 days)", items: dueSoon, color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+            { title: "Upcoming", items: upcoming, color: ACCENT_TEXT, bg: "var(--hf-surface-muted)" },
           ].filter(g => g.items.length > 0).map(group => (
             <div key={group.title} style={{ marginBottom: 22 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: group.color, textTransform: "uppercase" as const, letterSpacing: "0.05em", marginBottom: 10 }}>{group.title} ({group.items.length})</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {group.items.map(d => (
-                  <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, border: `1px solid ${group.color}22`, borderRadius: 10, padding: "12px 16px", background: group.bg }}>
+                  <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, border: `1px solid color-mix(in srgb, ${group.color} 13%, transparent)`, borderRadius: 10, padding: "12px 16px", background: group.bg }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{d.deadlineType}</div>
-                      <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>{d.deadlineType}</div>
+                      <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 2 }}>
                         Due {fmtDate(d.dueDate)}{d.description ? ` · ${d.description}` : ""}
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                       {canManage && (
-                        <button onClick={() => markDone.mutate(d.id)} title="Mark done" style={{ background: "#DCFCE7", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#166534" }}><CheckCircle2 size={13} /></button>
+                        <button onClick={() => markDone.mutate(d.id)} title="Mark done" style={{ background: "var(--hf-success-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-success-text-strong)" }}><CheckCircle2 size={13} /></button>
                       )}
                       {canAdmin && (
-                        <button onClick={() => { if (confirm(`Delete deadline "${d.deadlineType}"?`)) remove.mutate(d.id) }} title="Delete" style={{ background: "#FEF2F2", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "#DC2626" }}><Trash2 size={13} /></button>
+                        <button onClick={() => { if (confirm(`Delete deadline "${d.deadlineType}"?`)) remove.mutate(d.id) }} title="Delete" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
                       )}
                     </div>
                   </div>
@@ -130,10 +131,10 @@ export default function ClientDeadlinesTab({ clientId }: { clientId: string }) {
 
       {showAdd && (
         <div onClick={() => { setShowAdd(false); setApiError("") }} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 16, padding: 28, width: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0F172A" }}>New Compliance Deadline</h3>
-              <button onClick={() => { setShowAdd(false); setApiError("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex" }}><X size={20} /></button>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>New Compliance Deadline</h3>
+              <button onClick={() => { setShowAdd(false); setApiError("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Deadline type *</label>
@@ -149,12 +150,12 @@ export default function ClientDeadlinesTab({ clientId }: { clientId: string }) {
               <label style={lbl}>Description</label>
               <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} style={{ ...inp("description"), resize: "vertical" as const }} />
             </div>
-            {apiError && <div style={{ marginBottom: 14, padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, fontSize: 13, color: "#DC2626" }}>{apiError}</div>}
+            {apiError && <div style={{ marginBottom: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{apiError}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button onClick={() => { setShowAdd(false); setApiError("") }} style={{ padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }}>Cancel</button>
+              <button onClick={() => { setShowAdd(false); setApiError("") }} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button onClick={() => { if (!validate()) return; create.mutate({ deadlineType: form.deadlineType, description: form.description || null, dueDate: form.dueDate, registrationId: null }) }}
                 disabled={create.isPending}
-                style={{ padding: "9px 22px", background: create.isPending ? "#94A3B8" : ACCENT, color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: create.isPending ? "not-allowed" : "pointer" }}>
+                style={{ padding: "9px 22px", background: create.isPending ? "var(--hf-text-faint)" : ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: create.isPending ? "not-allowed" : "pointer" }}>
                 {create.isPending ? "Saving..." : "Create Deadline"}
               </button>
             </div>
@@ -165,4 +166,4 @@ export default function ClientDeadlinesTab({ clientId }: { clientId: string }) {
   )
 }
 
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }

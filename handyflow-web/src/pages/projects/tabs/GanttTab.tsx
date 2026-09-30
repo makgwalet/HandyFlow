@@ -18,8 +18,8 @@ function unwrap<T>(res: any): T[] {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  NOT_STARTED: '#CBD5E1', IN_PROGRESS: '#3B82F6',
-  COMPLETED: '#22C55E', BLOCKED: '#EF4444', CANCELLED: '#9CA3AF',
+  NOT_STARTED: 'var(--hf-text-disabled)', IN_PROGRESS: 'var(--hf-info-text)',
+  COMPLETED: 'var(--hf-success-text)', BLOCKED: 'var(--hf-danger-text)', CANCELLED: 'var(--hf-text-faint)',
 }
 
 export function GanttTab({ projectId }: { projectId: string }) {
@@ -133,16 +133,16 @@ export function GanttTab({ projectId }: { projectId: string }) {
               {/* Month headers */}
               {months.map((m, i) => (
                 <g key={i}>
-                  <rect x={m.x} y={0} width={m.w} height={36} fill={i % 2 === 0 ? '#F8FAFC' : '#F1F5F9'} />
-                  <text x={m.x + 6} y={22} fontSize={10} fill="#94A3B8" fontWeight={600}>{m.label}</text>
-                  <line x1={m.x} y1={0} x2={m.x} y2={chartH} stroke="#E2E8F0" strokeWidth={1} />
+                  <rect x={m.x} y={0} width={m.w} height={36} style={{ fill: i % 2 === 0 ? 'var(--hf-surface-muted)' : 'var(--hf-surface-sunken)' }} />
+                  <text x={m.x + 6} y={22} fontSize={10} style={{ fill: 'var(--hf-text-faint)' }} fontWeight={600}>{m.label}</text>
+                  <line x1={m.x} y1={0} x2={m.x} y2={chartH} strokeWidth={1} style={{ stroke: 'var(--hf-border)' }} />
                 </g>
               ))}
 
               {/* Today line */}
               {(() => {
                 const todayX = toX(new Date().toISOString().split('T')[0])
-                return <line x1={todayX} y1={36} x2={todayX} y2={chartH} stroke="#EF4444" strokeWidth={1.5} strokeDasharray="4,3" />
+                return <line x1={todayX} y1={36} x2={todayX} y2={chartH} strokeWidth={1.5} strokeDasharray="4,3" style={{ stroke: 'var(--hf-danger)' }} />
               })()}
 
               {/* Task bars */}
@@ -156,7 +156,7 @@ export function GanttTab({ projectId }: { projectId: string }) {
                 const x = toX(t.plannedStart)
                 const w = toW(t.plannedStart, t.plannedEnd)
                 const progW = w * (t.progressPct / 100)
-                const color = STATUS_COLOR[t.status] ?? '#CBD5E1'
+                const color = STATUS_COLOR[t.status] ?? 'var(--hf-text-disabled)'
 
                 if (t.isMilestone) {
                   const cx = x + w / 2
@@ -165,17 +165,17 @@ export function GanttTab({ projectId }: { projectId: string }) {
                   return (
                     <g key={t.id}>
                       <polygon points={`${cx},${cy-sz} ${cx+sz},${cy} ${cx},${cy+sz} ${cx-sz},${cy}`}
-                        fill={t.status === 'COMPLETED' ? '#22C55E' : '#1D4ED8'} />
+                        style={{ fill: t.status === 'COMPLETED' ? 'var(--hf-success)' : 'var(--hf-info)' }} />
                     </g>
                   )
                 }
 
                 return (
                   <g key={t.id}>
-                    <rect x={x} y={barY} width={w} height={barH} rx={3} fill={t.isCritical ? '#FECACA' : '#DBEAFE'} />
-                    <rect x={x} y={barY} width={progW} height={barH} rx={3} fill={color} />
+                    <rect x={x} y={barY} width={w} height={barH} rx={3} style={{ fill: t.isCritical ? 'var(--hf-danger-soft-strong)' : 'var(--hf-info-soft-strong)' }} />
+                    <rect x={x} y={barY} width={progW} height={barH} rx={3} style={{ fill: color }} />
                     {w > 40 && (
-                      <text x={x + 5} y={barY + barH * 0.72} fontSize={9} fill="#fff" fontWeight={600}>{t.progressPct?.toFixed(0)}%</text>
+                      <text x={x + 5} y={barY + barH * 0.72} fontSize={9} style={{ fill: 'var(--hf-text-on-solid)' }} fontWeight={600}>{t.progressPct?.toFixed(0)}%</text>
                     )}
                   </g>
                 )

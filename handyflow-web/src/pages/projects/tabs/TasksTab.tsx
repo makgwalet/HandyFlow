@@ -178,10 +178,10 @@ function ListView({tasks,onAction}:{tasks:Task[];onAction:(a:any)=>void}) {
                 </td>
                 <td style={{padding:'10px 14px'}}>
                   <div style={{display:'flex',gap:4}}>
-                    {t.status==='NOT_STARTED'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'START'})} color="#1D4ED8" bg="#DBEAFE">Start</TinyBtn>}
-                    {t.status==='IN_PROGRESS'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'COMPLETE'})} color="#166534" bg="#DCFCE7">Done</TinyBtn>}
-                    {t.status==='IN_PROGRESS'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'BLOCK'})} color="#DC2626" bg="#FEF2F2">Block</TinyBtn>}
-                    {t.status==='BLOCKED'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'START'})} color="#1D4ED8" bg="#DBEAFE">Resume</TinyBtn>}
+                    {t.status==='NOT_STARTED'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'START'})} color="var(--hf-info-text)" bg="var(--hf-info-soft-strong)">Start</TinyBtn>}
+                    {t.status==='IN_PROGRESS'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'COMPLETE'})} color="var(--hf-success-text-strong)" bg="var(--hf-success-soft-strong)">Done</TinyBtn>}
+                    {t.status==='IN_PROGRESS'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'BLOCK'})} color="var(--hf-danger-text)" bg="var(--hf-danger-soft)">Block</TinyBtn>}
+                    {t.status==='BLOCKED'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'START'})} color="var(--hf-info-text)" bg="var(--hf-info-soft-strong)">Resume</TinyBtn>}
                   </div>
                 </td>
               </tr>
@@ -221,8 +221,8 @@ function KanbanView({tasks,onAction}:{tasks:Task[];onAction:(a:any)=>void}) {
                       <div style={{height:'100%',width:`${t.progressPct??0}%`,background:'var(--hf-info)',borderRadius:2}}/>
                     </div>
                     <div style={{display:'flex',gap:4}}>
-                      {t.status==='NOT_STARTED'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'START'})} color="#1D4ED8" bg="#DBEAFE">Start</TinyBtn>}
-                      {t.status==='IN_PROGRESS'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'COMPLETE'})} color="#166534" bg="#DCFCE7">Done</TinyBtn>}
+                      {t.status==='NOT_STARTED'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'START'})} color="var(--hf-info-text)" bg="var(--hf-info-soft-strong)">Start</TinyBtn>}
+                      {t.status==='IN_PROGRESS'&&<TinyBtn onClick={()=>onAction({taskId:t.id,action:'COMPLETE'})} color="var(--hf-success-text-strong)" bg="var(--hf-success-soft-strong)">Done</TinyBtn>}
                     </div>
                   </div>
                 )

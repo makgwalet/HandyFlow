@@ -114,7 +114,7 @@ export default function ConsultationsTab() {
 
   const inp = (key: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
-    border: `1.5px solid ${fieldErrors[key] ? "#DC2626" : "#E2E8F0"}`,
+    border: `1.5px solid ${fieldErrors[key] ? "var(--hf-danger)" : "var(--hf-border)"}`,
     borderRadius: 8, fontSize: 14, background: fieldErrors[key] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
 
@@ -158,7 +158,7 @@ export default function ConsultationsTab() {
                   style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", cursor: "pointer", background: isOpen ? "var(--hf-surface-muted)" : "var(--hf-surface)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <Activity size={16} color="#0D9488" />
+                      <Activity size={16} style={{ color: 'var(--hf-accent-text)' }} />
                     </div>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)", marginBottom: 2 }}>{c.chiefComplaint}</div>
@@ -196,7 +196,7 @@ export default function ConsultationsTab() {
                     {c.followUpDays && (
                       <span style={{ fontSize: 11, color: "var(--hf-warning-text)", background: "var(--hf-warning-soft)", padding: "2px 8px", borderRadius: 20, border: "1px solid var(--hf-warning-border)" }}>F/U {c.followUpDays}d</span>
                     )}
-                    {isOpen ? <ChevronUp size={16} color="#94A3B8" /> : <ChevronDown size={16} color="#94A3B8" />}
+                    {isOpen ? <ChevronUp size={16} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={16} style={{ color: 'var(--hf-text-faint)' }} />}
                   </div>
                 </div>
 
@@ -267,7 +267,7 @@ export default function ConsultationsTab() {
           <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 580, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--hf-success-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}><Pill size={16} color="#0D9488" /></div>
+                <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--hf-success-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}><Pill size={16} style={{ color: 'var(--hf-accent-text)' }} /></div>
                 <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Prescriptions</h3>
               </div>
               <button onClick={() => { setShowRx(null); setApiError("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
@@ -344,7 +344,7 @@ export default function ConsultationsTab() {
           <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 560, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--hf-danger-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}><FileText size={16} color="#B43C32" /></div>
+                <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--hf-danger-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}><FileText size={16} style={{ color: 'var(--hf-danger-text-strong)' }} /></div>
                 <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Referral Letter</h3>
               </div>
               <button onClick={() => { setShowReferral(null); setReferralError("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>

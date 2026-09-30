@@ -13,17 +13,17 @@ const fmtR = (n:number) => `R ${Number(n??0).toLocaleString("en-ZA",{minimumFrac
 const fmtDate = (d:string|null) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
 
 const HEALTH: Record<string,{dot:string;label:string}> = {
-  GREEN: {dot:"#16A34A",label:"On Track"},
-  AMBER: {dot:"#D97706",label:"Watch"},
-  RED:   {dot:"#DC2626",label:"At Risk"},
+  GREEN: {dot:"var(--hf-success)",label:"On Track"},
+  AMBER: {dot:"var(--hf-warning)",label:"Watch"},
+  RED:   {dot:"var(--hf-danger)",label:"At Risk"},
 }
 
 const STATUS_BADGE: Record<string,{bg:string;color:string}> = {
-  PLANNING:  {bg:"#F1F5F9",color:"#475569"},
-  ACTIVE:    {bg:"#DBEAFE",color:"#1D4ED8"},
-  ON_HOLD:   {bg:"#FEF3C7",color:"#92400E"},
-  COMPLETED: {bg:"#DCFCE7",color:"#166534"},
-  CANCELLED: {bg:"#FEE2E2",color:"#DC2626"},
+  PLANNING:  {bg:"var(--hf-surface-sunken)",color:"var(--hf-text-tertiary)"},
+  ACTIVE:    {bg:"var(--hf-info-soft-strong)",color:"var(--hf-info-text)"},
+  ON_HOLD:   {bg:"var(--hf-warning-soft-strong)",color:"var(--hf-warning-text-deep)"},
+  COMPLETED: {bg:"var(--hf-success-soft-strong)",color:"var(--hf-success-text-strong)"},
+  CANCELLED: {bg:"var(--hf-danger-soft-strong)",color:"var(--hf-danger-text)"},
 }
 
 export function ProjectDashboard({ onOpen, onList }: { onOpen:(id:string)=>void; onList:()=>void }) {
@@ -42,11 +42,11 @@ export function ProjectDashboard({ onOpen, onList }: { onOpen:(id:string)=>void;
   const redAmber = projects.filter(p => p.health === "RED" || p.health === "AMBER")
 
   const KPIs = [
-    { label:"Active Projects",  value: summary?.activeProjects??0,       icon:FolderOpen,    color:"#1D4ED8", bg:"#EFF6FF" },
-    { label:"At Risk (Red)",    value: summary?.redProjects??0,           icon:AlertTriangle, color:"#DC2626", bg:"#FEF2F2" },
-    { label:"Watch (Amber)",    value: summary?.amberProjects??0,         icon:TrendingUp,    color:"#D97706", bg:"#FFFBEB" },
-    { label:"Time Approvals",   value: summary?.pendingTimeApprovals??0,  icon:Clock,         color:"#7C3AED", bg:"#F5F3FF" },
-    { label:"Open Red Risks",   value: summary?.openRedRisks??0,          icon:AlertTriangle, color:"#DC2626", bg:"#FEF2F2" },
+    { label:"Active Projects",  value: summary?.activeProjects??0,       icon:FolderOpen,    color:"var(--hf-info-text)", bg:"var(--hf-info-soft)" },
+    { label:"At Risk (Red)",    value: summary?.redProjects??0,           icon:AlertTriangle, color:"var(--hf-danger-text)", bg:"var(--hf-danger-soft)" },
+    { label:"Watch (Amber)",    value: summary?.amberProjects??0,         icon:TrendingUp,    color:"var(--hf-warning-text)", bg:"var(--hf-warning-soft)" },
+    { label:"Time Approvals",   value: summary?.pendingTimeApprovals??0,  icon:Clock,         color:"var(--hf-violet-text)", bg:"var(--hf-violet-soft)" },
+    { label:"Open Red Risks",   value: summary?.openRedRisks??0,          icon:AlertTriangle, color:"var(--hf-danger-text)", bg:"var(--hf-danger-soft)" },
   ]
 
   return (
@@ -56,7 +56,7 @@ export function ProjectDashboard({ onOpen, onList }: { onOpen:(id:string)=>void;
         {KPIs.map(k => (
           <div key={k.label} style={{ background:k.bg, borderRadius:12, padding:"14px 16px" }}>
             <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
-              <k.icon size={15} color={k.color} />
+              <k.icon size={15} style={{ color: k.color }} />
               <span style={{ fontSize:11, fontWeight:600, color:"var(--hf-text-faint)", textTransform:"uppercase", letterSpacing:"0.05em" }}>{k.label}</span>
             </div>
             <div style={{ fontSize:28, fontWeight:800, color:k.color }}>{k.value}</div>

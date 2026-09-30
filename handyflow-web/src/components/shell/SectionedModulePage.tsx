@@ -23,6 +23,12 @@ interface SectionedModulePageProps {
   action?: ReactNode
   /** Line under the section title, e.g. a firm name. */
   subtitle?: ReactNode
+  /**
+   * An open record inside the current section (e.g. a patient file): the title
+   * becomes the record's name and the breadcrumb gains a final level, with the
+   * section crumb linking back to the section's list.
+   */
+  detail?: { label: string; subtitle?: ReactNode }
   /** Content between the header and the section panel on every section
    *  (e.g. a setup warning or a KPI strip). */
   banner?: ReactNode
@@ -30,7 +36,7 @@ interface SectionedModulePageProps {
   children?: ReactNode
 }
 
-export function SectionedModulePage({ config, render, action, subtitle, banner, children }: SectionedModulePageProps) {
+export function SectionedModulePage({ config, render, action, subtitle, detail, banner, children }: SectionedModulePageProps) {
   const { section: rawSection } = useParams<{ section?: string }>()
   const navigate = useNavigate()
   const permissions = useAuthStore(s => s.user?.permissions ?? NO_PERMISSIONS)
@@ -44,13 +50,14 @@ export function SectionedModulePage({ config, render, action, subtitle, banner, 
   return (
     <div>
       <PageHeader
-        title={section.label}
-        subtitle={subtitle}
+        title={detail ? detail.label : section.label}
+        subtitle={detail ? (detail.subtitle ?? subtitle) : subtitle}
         icon={section.icon}
         breadcrumbs={[
           { label: config.title, to: `${base}/${config.defaultSection}` },
           { label: group.label },
-          { label: section.label },
+          detail ? { label: section.label, to: `${base}/${section.id}` } : { label: section.label },
+          ...(detail ? [{ label: detail.label }] : []),
         ]}
         action={action}
       />

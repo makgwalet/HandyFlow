@@ -61,12 +61,12 @@ export function BudgetTab({projectId,project}:{projectId:string;project:Project}
       {/* EVM summary */}
       {evm && (
         <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:10,marginBottom:20,padding:'16px 20px',background:'var(--hf-surface-muted)',borderRadius:12,border:'1px solid var(--hf-border)'}}>
-          <EVMStat label="Total Budget" value={fmtR(evm.totalBudget)} color="#0F172A"/>
-          <EVMStat label="Actual Cost" value={fmtR(evm.totalActual)} color={evm.totalActual>evm.totalBudget?'#DC2626':'#059669'}/>
-          <EVMStat label="Committed" value={fmtR(evm.totalCommitted)} color="#D97706"/>
-          <EVMStat label="SPI" value={evm.spi?.toFixed(2)??'—'} color={(evm.spi??1)>=1?'#059669':'#DC2626'} sub="Schedule"/>
-          <EVMStat label="CPI" value={evm.cpi?.toFixed(2)??'—'} color={(evm.cpi??1)>=1?'#059669':'#DC2626'} sub="Cost"/>
-          <EVMStat label="EAC" value={fmtR(evm.eac)} color="#0F172A" sub="Est at completion"/>
+          <EVMStat label="Total Budget" value={fmtR(evm.totalBudget)} color="var(--hf-text)"/>
+          <EVMStat label="Actual Cost" value={fmtR(evm.totalActual)} color={evm.totalActual>evm.totalBudget?'var(--hf-danger-text)':'var(--hf-success-text)'}/>
+          <EVMStat label="Committed" value={fmtR(evm.totalCommitted)} color="var(--hf-warning-text)"/>
+          <EVMStat label="SPI" value={evm.spi?.toFixed(2)??'—'} color={(evm.spi??1)>=1?'var(--hf-success-text)':'var(--hf-danger-text)'} sub="Schedule"/>
+          <EVMStat label="CPI" value={evm.cpi?.toFixed(2)??'—'} color={(evm.cpi??1)>=1?'var(--hf-success-text)':'var(--hf-danger-text)'} sub="Cost"/>
+          <EVMStat label="EAC" value={fmtR(evm.eac)} color="var(--hf-text)" sub="Est at completion"/>
         </div>
       )}
 

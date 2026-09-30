@@ -81,7 +81,7 @@ App-wide dry run of step 1: 67 alpha sites and 566 icon props across 224 files.
 
 ## Phase 3 — module rollout (in progress)
 
-**Status (be careful with earlier optimism):** 1,714 hard-coded colours remain in `src/pages` (of ~17,700 originally). Largest: complianceservices 339, clinic 284, projects 179, auth pages 114, debtcollection 72, quotes 66, customers 58, billing 57, expenses 54, pos 53, settings 52, catalogue 41, training 38, marketing 34, collectionsagency 32, warehousing 29, internal-audit 24, accountant-portal 24. Re-measure rather than trusting counts written here.
+**Status (be careful with earlier optimism):** 912 hard-coded colours remain in `src/pages` (of ~17,700 originally), mostly in small modules: auth pages 114, debtcollection 72, quotes 66, customers 58, billing 57, expenses 54, pos 53, settings 52, catalogue 41, training 38, marketing 34, collectionsagency 32, warehousing 29, internal-audit 24, accountant-portal 24, then a long tail under 20 each (including the client portals). The seven largest modules are done. Re-measure rather than trusting counts written here.
 
 
 Correction to the original analysis: its per-module "tab counts" were file counts. Agriculture has 3 top-level sections, not 20; the other files are drill-down views. Check each module's real navigation before planning.
@@ -164,6 +164,19 @@ The Phase 0 codemod converted the default colour of a new bookable service (`EMP
 - Pending-state button fills (`create.isPending ? '#C4B5FD' : ...`) now tint the base colour toward the surface with `color-mix`, so they adapt to the theme.
 - SVG check: no migrated module feeds a token into an SVG attribute (only the not-yet-migrated `projects/tabs/GanttTab.tsx` does: convert its `fill={...}` to `style` when Projects is done).
 - No double-unwrap sites.
+
+### Clinic (routed), Compliance Services and Projects (colours only) ✅
+- **Clinic** `/clinic/:section`, the same nine sections as the old tabs, in four groups: Overview; Patients (Patients, Consultations, Recalls, Waitlist); Scheduling; Practice & finance (Practitioners, Claims, Billing).
+- **The patient file** (which replaces the whole page when a patient is opened) is carried in the history entry's router state on `/clinic/patients`: `{ openPatient, sessionAppointment }`. Effects: the browser Back button closes the file; a refresh keeps it open; clicking any sidebar section closes it (a plain link carries no state); header shows the patient's name with a "Back to Patients" action and a Clinic > Patients > name breadcrumb (new `detail` prop on `SectionedModulePage`).
+- **Starting a session from the Schedule is one-shot.** It opens the patient's file with the appointment; the file consumes it on mount and asks the page to clear it from the history entry (`replace`), so a refresh cannot restart the session. The file's state is only honoured on the Patients section.
+- Verified with a scratch vitest suite (11 behavioural cases: redirects, open/close, sidebar close, one-shot session, refresh, switching patients, state on the wrong section) plus two deliberate mutations, each caught by a test (one needed a stronger assertion first). **Not committed:** the project has no test runner; say the word to add vitest and keep the suite.
+- **Six dead dashboard buttons fixed.** The Clinic dashboard's "Today's appointments" and two other KPI cards, its two "view" buttons and "Book appointment" navigated to an `appointments` tab that has never existed, so each opened an empty panel. They now open Schedule. A scan of all 18 migrated modules found no other invalid navigation targets. (`AppointmentsTab.tsx` is an unused older leftover.)
+- **Compliance Services** is a client list whose detail routes (`/complianceservices/clients/:clientId`) have their own four tabs: list-plus-detail, no module-level sections. Colours only (339 -> 0, all one `ACCENT` constant per file).
+- **Projects** is a two-tab shell (Dashboard / Projects) with the project detail shown in-page, plus a second, older routed `/projects/:id` page. Two tabs need no sidebar sections, and `/projects/:section` would collide with `/projects/:id`. Colours only.
+- **Gantt chart SVG:** fills and strokes moved into `style` so tokens resolve. The scan for SVG colour attributes fed by expressions now finds only the theme-helper case in Supply Chain.
+- **New tool `scripts/theme-codemod/split-constants.mjs`** converts top-level `const NAME = "#hex"` constants and splits them by how each usage consumes the colour (text usages get a `NAME_TEXT` variant; fills/borders keep the base). It refuses to touch a constant used in an SVG attribute, a canvas call or a data position, and reports it. It converted 81 constants in 18 files here. (It first emitted `_TEXT` declarations without a terminating `;`, which broke same-line statements; fixed in the tool and repaired in the files before anything was committed.)
+- New tokens: `--hf-primary-deep` (header gradient end), `--hf-{danger,warning,accent}-on-brand` (pale badge text on the dark navy patient header; identical in both themes because that header is dark in both).
+- Colours: 284 + 339 + 179 -> 0. Two icon components that forwarded a colour prop to an icon's `color` attribute were moved to `style`.
 
 ### Navigation gaps found and fixed
 - 7 modules had dashboard tiles but were missing from the sidebar/Ctrl+K registry (carried over from the old top-nav): collections agency, warehousing, legal & compliance, business compliance & tender, compliance services, debt collection, projects. Added.

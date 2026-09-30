@@ -185,7 +185,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
 
   const inp = (key: string): React.CSSProperties => ({
     width:"100%", padding:"9px 12px", boxSizing:"border-box" as const,
-    border:`1.5px solid ${fieldErrors[key]?"#DC2626":"#E2E8F0"}`,
+    border:`1.5px solid ${fieldErrors[key]?"var(--hf-danger)":"var(--hf-border)"}`,
     borderRadius:8, fontSize:14, background:fieldErrors[key]?"var(--hf-danger-soft)":"var(--hf-surface)", outline:"none",
   })
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
@@ -277,7 +277,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                         <div style={{ width:34, height:34, borderRadius:"50%",
                           background: p.accountType==="PRINCIPAL"?"var(--hf-success-soft-strong)":p.accountType==="DEPENDANT"?"var(--hf-violet-soft)":"var(--hf-success-soft)",
-                          border:`2px solid ${p.accountType==="PRINCIPAL"?"#86EFAC":p.accountType==="DEPENDANT"?"#DDD6FE":"#86EFAC"}`,
+                          border:`2px solid ${p.accountType==="PRINCIPAL"?"var(--hf-success-border)":p.accountType==="DEPENDANT"?"var(--hf-violet-border)":"var(--hf-success-border)"}`,
                           display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                           <span style={{ fontSize:12, fontWeight:700, color:badge.color }}>
                             {p.firstName?.[0]}{p.lastName?.[0]}
@@ -310,8 +310,8 @@ export default function PatientsTab({ onOpenPatient }: Props) {
 
                     {/* Contact */}
                     <td style={{ padding:"11px 16px" }}>
-                      {p.phone && <div style={{ display:"flex", alignItems:"center", gap:4, fontSize:12, color:"var(--hf-text-muted)" }}><Phone size={11} color="#94A3B8"/>{p.phone}</div>}
-                      {p.email && <div style={{ display:"flex", alignItems:"center", gap:4, fontSize:11, color:"var(--hf-text-faint)" }}><Mail size={11} color="#CBD5E1"/>{p.email}</div>}
+                      {p.phone && <div style={{ display:"flex", alignItems:"center", gap:4, fontSize:12, color:"var(--hf-text-muted)" }}><Phone size={11} style={{ color: 'var(--hf-text-faint)' }}/>{p.phone}</div>}
+                      {p.email && <div style={{ display:"flex", alignItems:"center", gap:4, fontSize:11, color:"var(--hf-text-faint)" }}><Mail size={11} style={{ color: 'var(--hf-text-disabled)' }}/>{p.email}</div>}
                       {!p.phone && !p.email && <span style={{ color:"var(--hf-text-disabled)" }}>—</span>}
                     </td>
 
@@ -326,7 +326,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                       {p.lastVisitAt ? fmtDT(p.lastVisitAt) : <span style={{ color:"var(--hf-text-disabled)" }}>No visits</span>}
                     </td>
 
-                    <td style={{ padding:"11px 16px" }}><ChevronRight size={16} color="#CBD5E1"/></td>
+                    <td style={{ padding:"11px 16px" }}><ChevronRight size={16} style={{ color: 'var(--hf-text-disabled)' }}/></td>
                   </tr>
                 )
               })}
@@ -398,7 +398,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                 {(["individual","family"] as const).map(t => (
                   <button key={t} onClick={() => setRegType(t)}
                     style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 16px",
-                      borderRadius:8, border:`2px solid ${regType===t?"#1B3A6B":"#E2E8F0"}`,
+                      borderRadius:8, border:`2px solid ${regType===t?"var(--hf-primary)":"var(--hf-border)"}`,
                       background:regType===t?"var(--hf-info-soft)":"var(--hf-surface)",
                       color:regType===t?"var(--hf-primary-text)":"var(--hf-text-muted)",
                       fontWeight:regType===t?600:400, fontSize:13, cursor:"pointer" }}>

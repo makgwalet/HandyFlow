@@ -289,7 +289,7 @@ export default function App() {
             <Route path="/accounting/:section?" element={<AccountingPage />} />
             <Route path="/settings"    element={<SettingsPage />} />
             <Route path="/hr/:section?" element={<HrPage />} />
-            <Route path="/clinic"      element={<ClinicPage />} />
+            <Route path="/clinic/:section?" element={<ClinicPage />} />
             <Route path="/events/:section?" element={<EventsPage />} />
             <Route path="/contracts/:section?" element={<ContractingPage />} />
             <Route path="/expenses"    element={<ExpensesPage />} />

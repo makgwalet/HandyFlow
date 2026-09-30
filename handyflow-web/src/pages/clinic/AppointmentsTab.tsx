@@ -14,19 +14,19 @@ interface Patient      { id: string; fullName: string }
 interface Practitioner { id: string; fullName: string; specialty: string }
 
 const STATUS_CFG: Record<string, { color: string; bg: string; border: string; label: string; icon: React.ElementType }> = {
-  SCHEDULED:   { color: "#1D4ED8", bg: "#EFF6FF", border: "#BFDBFE", label: "Scheduled",   icon: Calendar },
-  CONFIRMED:   { color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE", label: "Confirmed",   icon: CheckCircle },
-  IN_PROGRESS: { color: "#D97706", bg: "#FFFBEB", border: "#FDE68A", label: "In Progress", icon: PlayCircle },
-  COMPLETED:   { color: "#166534", bg: "#DCFCE7", border: "#86EFAC", label: "Completed",   icon: CheckCircle },
-  CANCELLED:   { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", label: "Cancelled",   icon: XCircle },
-  NO_SHOW:     { color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0", label: "No Show",     icon: User },
+  SCHEDULED:   { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", border: "var(--hf-info-border)", label: "Scheduled",   icon: Calendar },
+  CONFIRMED:   { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", border: "var(--hf-violet-border)", label: "Confirmed",   icon: CheckCircle },
+  IN_PROGRESS: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)", label: "In Progress", icon: PlayCircle },
+  COMPLETED:   { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", border: "var(--hf-success-border)", label: "Completed",   icon: CheckCircle },
+  CANCELLED:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)", label: "Cancelled",   icon: XCircle },
+  NO_SHOW:     { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)", border: "var(--hf-border)", label: "No Show",     icon: User },
 }
 
 const APPT_TYPES  = ["CONSULTATION","FOLLOW_UP","PROCEDURE","EMERGENCY","CHECK_UP"]
 const STATUS_FLOW: Record<string, { action: string; label: string; color: string }[]> = {
-  SCHEDULED:   [{ action: "confirm",  label: "Confirm",  color: "#7C3AED" }, { action: "cancel", label: "Cancel", color: "#DC2626" }],
-  CONFIRMED:   [{ action: "start",    label: "Start",    color: "#D97706" }, { action: "no_show", label: "No Show", color: "#64748B" }, { action: "cancel", label: "Cancel", color: "#DC2626" }],
-  IN_PROGRESS: [{ action: "complete", label: "Complete", color: "#166534" }],
+  SCHEDULED:   [{ action: "confirm",  label: "Confirm",  color: "var(--hf-violet-text)" }, { action: "cancel", label: "Cancel", color: "var(--hf-danger-text)" }],
+  CONFIRMED:   [{ action: "start",    label: "Start",    color: "var(--hf-warning-text)" }, { action: "no_show", label: "No Show", color: "var(--hf-text-muted)" }, { action: "cancel", label: "Cancel", color: "var(--hf-danger-text)" }],
+  IN_PROGRESS: [{ action: "complete", label: "Complete", color: "var(--hf-success-text-strong)" }],
 }
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
@@ -94,8 +94,8 @@ export default function AppointmentsTab() {
 
   const inp = (key: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
-    border: `1.5px solid ${fieldErrors[key] ? "#DC2626" : "#E2E8F0"}`,
-    borderRadius: 8, fontSize: 14, background: fieldErrors[key] ? "#FFF5F5" : "#fff", outline: "none",
+    border: `1.5px solid ${fieldErrors[key] ? "var(--hf-danger)" : "var(--hf-border)"}`,
+    borderRadius: 8, fontSize: 14, background: fieldErrors[key] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
 
   const grouped = appointments.reduce((acc: Record<string,Appointment[]>, a) => {
@@ -127,10 +127,10 @@ export default function AppointmentsTab() {
       {/* Stats row */}
       <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
         {[
-          { label: "Total",       value: appointments.length, color: "#1B3A6B" },
-          { label: "Pending",     value: appointments.filter(a => ["SCHEDULED","CONFIRMED"].includes(a.status)).length, color: "#D97706" },
-          { label: "Completed",   value: appointments.filter(a => a.status === "COMPLETED").length, color: "#166534" },
-          { label: "No-shows",    value: appointments.filter(a => a.status === "NO_SHOW").length,  color: "#64748B" },
+          { label: "Total",       value: appointments.length, color: "var(--hf-primary-text)" },
+          { label: "Pending",     value: appointments.filter(a => ["SCHEDULED","CONFIRMED"].includes(a.status)).length, color: "var(--hf-warning-text)" },
+          { label: "Completed",   value: appointments.filter(a => a.status === "COMPLETED").length, color: "var(--hf-success-text-strong)" },
+          { label: "No-shows",    value: appointments.filter(a => a.status === "NO_SHOW").length,  color: "var(--hf-text-muted)" },
         ].map(s => (
           <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "10px 16px" }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div>
@@ -175,7 +175,7 @@ export default function AppointmentsTab() {
                           {appt.reason && ` · ${appt.reason}`}
                         </div>
                       </div>
-                      <ChevronRight size={16} color="#CBD5E1" />
+                      <ChevronRight size={16} style={{ color: 'var(--hf-text-disabled)' }} />
                     </div>
                   )
                 })}
@@ -224,7 +224,7 @@ export default function AppointmentsTab() {
                       {(STATUS_FLOW[selected.status] ?? []).map(btn => (
                         <button key={btn.action} onClick={() => doAction.mutate({ id: selected.id, action: btn.action })}
                           disabled={doAction.isPending}
-                          style={{ padding: "8px 18px", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", background: `${btn.color}18`, color: btn.color }}>
+                          style={{ padding: "8px 18px", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", background: `color-mix(in srgb, ${btn.color} 9%, transparent)`, color: btn.color }}>
                           {btn.label}
                         </button>
                       ))}
@@ -308,7 +308,7 @@ export default function AppointmentsTab() {
 }
 
 const omit = (obj: Record<string,string>, key: string) => { const n = { ...obj }; delete n[key]; return n }
-const inp  = (key: string): React.CSSProperties => ({ width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, outline: "none" })
-const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
-const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, padding: "9px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer" }
-const btnCancel:  React.CSSProperties = { padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }
+const inp  = (key: string): React.CSSProperties => ({ width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, outline: "none" })
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
+const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, padding: "9px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer" }
+const btnCancel:  React.CSSProperties = { padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }

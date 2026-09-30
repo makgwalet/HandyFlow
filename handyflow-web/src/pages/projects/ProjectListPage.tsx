@@ -115,7 +115,7 @@ export function ProjectListPage() {
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--hf-info-soft-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <HardHat size={20} color="#1D4ED8" />
+            <HardHat size={20} style={{ color: 'var(--hf-info-text)' }} />
           </div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>Projects</h1>
         </div>
@@ -234,7 +234,7 @@ export function ProjectListPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <Calendar size={11} />
                     {fmtDate(p.endDate)}
-                    <ChevronRight size={13} color="#CBD5E1" />
+                    <ChevronRight size={13} style={{ color: 'var(--hf-text-disabled)' }} />
                   </div>
                 </div>
               </div>

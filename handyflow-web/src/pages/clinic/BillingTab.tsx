@@ -24,9 +24,15 @@ interface RevenuePoint { period: string; consultations: number; grossBilled: num
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
 
-const NAVY="#1B3A6B"; const TEAL="#0D9488"; const RED="#DC2626"
-const GREEN="#166534"; const AMBER="#D97706"; const GRAY="#64748B"
-const BORDER="#E2E8F0"; const LIGHT="#F8FAFC"
+const NAVY="var(--hf-primary)";
+const NAVY_TEXT = "var(--hf-primary-text)"; const TEAL="var(--hf-accent)";
+const TEAL_TEXT = "var(--hf-accent-text)"; const RED="var(--hf-danger)"
+const RED_TEXT = "var(--hf-danger-text)";
+const GREEN="var(--hf-success-solid-strong)";
+const GREEN_TEXT = "var(--hf-success-text-strong)"; const AMBER="var(--hf-warning)";
+const AMBER_TEXT = "var(--hf-warning-text)"; const GRAY="var(--hf-neutral-solid)"
+const GRAY_TEXT = "var(--hf-text-muted)";
+const BORDER="var(--hf-border)"; const LIGHT="var(--hf-surface-muted)"
 
 const fmtR  = (v?:number) => `R ${((v??0)).toLocaleString("en-ZA",{minimumFractionDigits:2})}`
 const fmtDT = (iso?:string) => iso ? new Date(iso).toLocaleDateString("en-ZA",{day:"numeric",month:"short",year:"numeric"}) : "—"
@@ -114,10 +120,10 @@ export default function BillingTab() {
       {/* ── KPI strip ───────────────────────────────────────────────────── */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24}}>
         {[
-          {label:"Outstanding",     value:totalOutstanding, color:RED,   fmt:"rand"},
-          {label:"Collected",       value:totalCollected,   color:GREEN, fmt:"rand"},
-          {label:"Billed",          value:totalBilled,      color:NAVY,  fmt:"rand"},
-          {label:"Consultations",   value:totalConsults,    color:TEAL,  fmt:"num"},
+          {label:"Outstanding",     value:totalOutstanding, color:RED_TEXT,   fmt:"rand"},
+          {label:"Collected",       value:totalCollected,   color:GREEN_TEXT, fmt:"rand"},
+          {label:"Billed",          value:totalBilled,      color:NAVY_TEXT,  fmt:"rand"},
+          {label:"Consultations",   value:totalConsults,    color:TEAL_TEXT,  fmt:"num"},
         ].map(k=>(
           <div key={k.label} style={{background:LIGHT,border:`1px solid ${BORDER}`,borderRadius:12,padding:"14px 18px"}}>
             <div style={{fontSize:11,fontWeight:700,color:k.color,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>{k.label}</div>
@@ -136,7 +142,7 @@ export default function BillingTab() {
             return (
               <button key={v.id} onClick={()=>setActiveView(v.id)}
                 style={{display:"flex",alignItems:"center",gap:6,padding:"8px 16px",border:"none",fontSize:13,cursor:"pointer",
-                  background:active?NAVY:"var(--hf-surface)",color:active?"var(--hf-text-on-solid)":GRAY,fontWeight:active?600:400}}>
+                  background:active?NAVY:"var(--hf-surface)",color:active?"var(--hf-text-on-solid)":GRAY_TEXT,fontWeight:active?600:400}}>
                 <Icon size={14}/>{v.label}
               </button>
             )
@@ -169,14 +175,14 @@ export default function BillingTab() {
             style={{width:"100%",padding:"9px 12px",boxSizing:"border-box" as const,border:`1px solid ${BORDER}`,borderRadius:9,fontSize:13,outline:"none",marginBottom:14}}/>
 
           {loadingOut ? <Loading/> : filteredOut.length===0 ? (
-            <Empty icon={CheckCircle} msg={searchOut?"No matches":"No outstanding balances"} color={GREEN}/>
+            <Empty icon={CheckCircle} msg={searchOut?"No matches":"No outstanding balances"} color={GREEN_TEXT}/>
           ) : (
             <div style={{border:`1px solid ${BORDER}`,borderRadius:12,overflow:"hidden"}}>
               <table style={{width:"100%",borderCollapse:"collapse"}}>
                 <thead>
                   <tr style={{background:LIGHT,borderBottom:`1px solid ${BORDER}`}}>
                     {["Patient","Contact","Billed","Paid","Outstanding","Claims","Action"].map(h=>(
-                      <th key={h} style={{padding:"10px 16px",textAlign:"left",fontSize:11,fontWeight:700,color:GRAY,letterSpacing:"0.05em"}}>{h}</th>
+                      <th key={h} style={{padding:"10px 16px",textAlign:"left",fontSize:11,fontWeight:700,color:GRAY_TEXT,letterSpacing:"0.05em"}}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -185,19 +191,19 @@ export default function BillingTab() {
                     <tr key={b.patientId} style={{borderBottom:i<filteredOut.length-1?`1px solid var(--hf-border-subtle)`:"none"}}>
                       <td style={{padding:"12px 16px"}}>
                         <div style={{fontWeight:700,fontSize:14,color:"var(--hf-text)"}}>{b.patientName}</div>
-                        {b.oldestUnpaid && <div style={{fontSize:11,color:AMBER}}>Since {fmtDT(b.oldestUnpaid)}</div>}
+                        {b.oldestUnpaid && <div style={{fontSize:11,color:AMBER_TEXT}}>Since {fmtDT(b.oldestUnpaid)}</div>}
                       </td>
-                      <td style={{padding:"12px 16px",fontSize:13,color:GRAY}}>{b.phone||"—"}</td>
+                      <td style={{padding:"12px 16px",fontSize:13,color:GRAY_TEXT}}>{b.phone||"—"}</td>
                       <td style={{padding:"12px 16px",fontSize:13,color:"var(--hf-text)"}}>{fmtR(b.totalBilled)}</td>
-                      <td style={{padding:"12px 16px",fontSize:13,color:GREEN,fontWeight:600}}>{fmtR(b.totalPaid)}</td>
+                      <td style={{padding:"12px 16px",fontSize:13,color:GREEN_TEXT,fontWeight:600}}>{fmtR(b.totalPaid)}</td>
                       <td style={{padding:"12px 16px"}}>
-                        <span style={{fontSize:14,fontWeight:800,color:b.balance>0?RED:GREEN}}>{fmtR(b.balance)}</span>
+                        <span style={{fontSize:14,fontWeight:800,color:b.balance>0?RED_TEXT:GREEN_TEXT}}>{fmtR(b.balance)}</span>
                       </td>
-                      <td style={{padding:"12px 16px",fontSize:13,color:GRAY}}>{b.claimCount}</td>
+                      <td style={{padding:"12px 16px",fontSize:13,color:GRAY_TEXT}}>{b.claimCount}</td>
                       <td style={{padding:"12px 16px"}}>
                         <div style={{display:"flex",gap:6}}>
                           <button onClick={()=>{setPayForm(f=>({...f,patientId:b.patientId}));setShowPayment(true)}}
-                            style={{padding:"5px 12px",border:`1px solid ${TEAL}`,borderRadius:7,background:"var(--hf-success-soft)",color:TEAL,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                            style={{padding:"5px 12px",border:`1px solid ${TEAL}`,borderRadius:7,background:"var(--hf-success-soft)",color:TEAL_TEXT,fontSize:12,fontWeight:600,cursor:"pointer"}}>
                             Pay
                           </button>
                           {/* FIX: "no patient statement of account" gap. */}
@@ -233,26 +239,26 @@ export default function BillingTab() {
                 <thead>
                   <tr style={{background:LIGHT,borderBottom:`1px solid ${BORDER}`}}>
                     {["Date","Patient","Method","Amount","Reference","Notes"].map(h=>(
-                      <th key={h} style={{padding:"10px 16px",textAlign:"left",fontSize:11,fontWeight:700,color:GRAY,letterSpacing:"0.05em"}}>{h}</th>
+                      <th key={h} style={{padding:"10px 16px",textAlign:"left",fontSize:11,fontWeight:700,color:GRAY_TEXT,letterSpacing:"0.05em"}}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {paymentsList.sort((a,b)=>b.recordedAt.localeCompare(a.recordedAt)).map((p,i)=>{
-                    const methodColor: Record<string,string> = {CASH:"#166534",EFT:"#1D4ED8",CARD:"#7C3AED",MEDICAL_AID:"#D97706",FAMILY_ACCOUNT:"#0D9488"}
+                    const methodColor: Record<string,string> = {CASH:"var(--hf-success-text-strong)",EFT:"var(--hf-info-text)",CARD:"var(--hf-violet-text)",MEDICAL_AID:"var(--hf-warning-text)",FAMILY_ACCOUNT:"var(--hf-accent-text)"}
                     const color = methodColor[p.method]??GRAY
                     return (
                       <tr key={p.id} style={{borderBottom:i<paymentsList.length-1?`1px solid var(--hf-border-subtle)`:"none"}}>
-                        <td style={{padding:"11px 16px",fontSize:13,color:GRAY}}>{fmtDT(p.recordedAt)}</td>
+                        <td style={{padding:"11px 16px",fontSize:13,color:GRAY_TEXT}}>{fmtDT(p.recordedAt)}</td>
                         <td style={{padding:"11px 16px",fontWeight:600,fontSize:14,color:"var(--hf-text)"}}>{p.patientName||"—"}</td>
                         <td style={{padding:"11px 16px"}}>
-                          <span style={{background:`${color}14`,color,padding:"2px 8px",borderRadius:20,fontSize:11,fontWeight:700}}>
+                          <span style={{background:`color-mix(in srgb, ${color} 8%, transparent)`,color,padding:"2px 8px",borderRadius:20,fontSize:11,fontWeight:700}}>
                             {p.method.replace("_"," ")}
                           </span>
                         </td>
-                        <td style={{padding:"11px 16px",fontSize:14,fontWeight:700,color:GREEN}}>{fmtR(p.amount)}</td>
-                        <td style={{padding:"11px 16px",fontSize:12,color:GRAY}}>{p.reference||"—"}</td>
-                        <td style={{padding:"11px 16px",fontSize:12,color:GRAY}}>{p.notes||"—"}</td>
+                        <td style={{padding:"11px 16px",fontSize:14,fontWeight:700,color:GREEN_TEXT}}>{fmtR(p.amount)}</td>
+                        <td style={{padding:"11px 16px",fontSize:12,color:GRAY_TEXT}}>{p.reference||"—"}</td>
+                        <td style={{padding:"11px 16px",fontSize:12,color:GRAY_TEXT}}>{p.notes||"—"}</td>
                       </tr>
                     )
                   })}
@@ -260,8 +266,8 @@ export default function BillingTab() {
               </table>
               {/* Total row */}
               <div style={{padding:"12px 16px",background:LIGHT,borderTop:`1px solid ${BORDER}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontSize:13,fontWeight:600,color:GRAY}}>{paymentsList.length} payments</span>
-                <span style={{fontSize:16,fontWeight:800,color:GREEN}}>{fmtR(totalCollected)}</span>
+                <span style={{fontSize:13,fontWeight:600,color:GRAY_TEXT}}>{paymentsList.length} payments</span>
+                <span style={{fontSize:16,fontWeight:800,color:GREEN_TEXT}}>{fmtR(totalCollected)}</span>
               </div>
             </div>
           )}
@@ -310,19 +316,19 @@ export default function BillingTab() {
                             <div style={{flex:1,height:ph,background:AMBER,borderRadius:"3px 3px 0 0",minHeight:2}}/>
                           </div>
                           {showLabel && (
-                            <div style={{fontSize:9,color:GRAY,textAlign:"center" as const,whiteSpace:"nowrap"}}>{r.period}</div>
+                            <div style={{fontSize:9,color:GRAY_TEXT,textAlign:"center" as const,whiteSpace:"nowrap"}}>{r.period}</div>
                           )}
                         </div>
                       )
                     })}
                   </div>
                 </div>
-                <div style={{fontSize:10,color:GRAY,marginTop:4}}>Hover a bar for exact figures · full breakdown in the table below</div>
+                <div style={{fontSize:10,color:GRAY_TEXT,marginTop:4}}>Hover a bar for exact figures · full breakdown in the table below</div>
                 <div style={{display:"flex",gap:16,marginTop:12,justifyContent:"center"}}>
-                  {[{color:NAVY,label:"Gross billed"},{color:TEAL,label:"Scheme paid"},{color:AMBER,label:"Patient paid"}].map(l=>(
+                  {[{color:NAVY_TEXT,label:"Gross billed"},{color:TEAL_TEXT,label:"Scheme paid"},{color:AMBER_TEXT,label:"Patient paid"}].map(l=>(
                     <div key={l.label} style={{display:"flex",alignItems:"center",gap:4}}>
                       <div style={{width:10,height:10,borderRadius:2,background:l.color}}/>
-                      <span style={{fontSize:11,color:GRAY}}>{l.label}</span>
+                      <span style={{fontSize:11,color:GRAY_TEXT}}>{l.label}</span>
                     </div>
                   ))}
                 </div>
@@ -334,7 +340,7 @@ export default function BillingTab() {
                   <thead>
                     <tr style={{background:LIGHT,borderBottom:`1px solid ${BORDER}`}}>
                       {["Period","Consultations","Gross billed","Scheme paid","Patient paid","Collection rate"].map(h=>(
-                        <th key={h} style={{padding:"10px 16px",textAlign:"left",fontSize:11,fontWeight:700,color:GRAY,letterSpacing:"0.05em"}}>{h}</th>
+                        <th key={h} style={{padding:"10px 16px",textAlign:"left",fontSize:11,fontWeight:700,color:GRAY_TEXT,letterSpacing:"0.05em"}}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -344,16 +350,16 @@ export default function BillingTab() {
                       return (
                         <tr key={r.period} style={{borderBottom:i<revenueList.length-1?`1px solid var(--hf-border-subtle)`:"none"}}>
                           <td style={{padding:"11px 16px",fontWeight:600,fontSize:14,color:"var(--hf-text)"}}>{r.period}</td>
-                          <td style={{padding:"11px 16px",fontSize:13,color:GRAY}}>{r.consultations}</td>
+                          <td style={{padding:"11px 16px",fontSize:13,color:GRAY_TEXT}}>{r.consultations}</td>
                           <td style={{padding:"11px 16px",fontSize:13,fontWeight:700,color:"var(--hf-text)"}}>{fmtR(r.grossBilled)}</td>
-                          <td style={{padding:"11px 16px",fontSize:13,color:TEAL,fontWeight:600}}>{fmtR(r.schemePaid)}</td>
-                          <td style={{padding:"11px 16px",fontSize:13,color:AMBER,fontWeight:600}}>{fmtR(r.patientPaid)}</td>
+                          <td style={{padding:"11px 16px",fontSize:13,color:TEAL_TEXT,fontWeight:600}}>{fmtR(r.schemePaid)}</td>
+                          <td style={{padding:"11px 16px",fontSize:13,color:AMBER_TEXT,fontWeight:600}}>{fmtR(r.patientPaid)}</td>
                           <td style={{padding:"11px 16px"}}>
                             <div style={{display:"flex",alignItems:"center",gap:8}}>
                               <div style={{flex:1,height:6,background:"var(--hf-surface-sunken)",borderRadius:3}}>
                                 <div style={{width:`${rate}%`,height:"100%",background:+rate>=80?GREEN:+rate>=50?AMBER:RED,borderRadius:3}}/>
                               </div>
-                              <span style={{fontSize:12,fontWeight:700,color:+rate>=80?GREEN:+rate>=50?AMBER:RED}}>{rate}%</span>
+                              <span style={{fontSize:12,fontWeight:700,color:+rate>=80?GREEN_TEXT:+rate>=50?AMBER_TEXT:RED_TEXT}}>{rate}%</span>
                             </div>
                           </td>
                         </tr>
@@ -366,8 +372,8 @@ export default function BillingTab() {
                       <td style={{padding:"11px 16px",fontWeight:700,fontSize:13,color:"var(--hf-text)"}}>Total</td>
                       <td style={{padding:"11px 16px",fontSize:13,fontWeight:600}}>{totalConsults}</td>
                       <td style={{padding:"11px 16px",fontSize:13,fontWeight:800,color:"var(--hf-text)"}}>{fmtR(totalBilled)}</td>
-                      <td style={{padding:"11px 16px",fontSize:13,fontWeight:700,color:TEAL}}>{fmtR(revenueList.reduce((s,r)=>s+r.schemePaid,0))}</td>
-                      <td style={{padding:"11px 16px",fontSize:13,fontWeight:700,color:AMBER}}>{fmtR(revenueList.reduce((s,r)=>s+r.patientPaid,0))}</td>
+                      <td style={{padding:"11px 16px",fontSize:13,fontWeight:700,color:TEAL_TEXT}}>{fmtR(revenueList.reduce((s,r)=>s+r.schemePaid,0))}</td>
+                      <td style={{padding:"11px 16px",fontSize:13,fontWeight:700,color:AMBER_TEXT}}>{fmtR(revenueList.reduce((s,r)=>s+r.patientPaid,0))}</td>
                       <td style={{padding:"11px 16px"}}/>
                     </tr>
                   </tfoot>
@@ -384,7 +390,7 @@ export default function BillingTab() {
           <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:460,boxShadow:"0 24px 64px rgba(0,0,0,0.22)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
               <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"var(--hf-text)"}}>Record payment</h3>
-              <button onClick={()=>setShowPayment(false)} style={{background:"none",border:"none",cursor:"pointer",color:GRAY,display:"flex"}}><X size={20}/></button>
+              <button onClick={()=>setShowPayment(false)} style={{background:"none",border:"none",cursor:"pointer",color:GRAY_TEXT,display:"flex"}}><X size={20}/></button>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <div>
@@ -417,12 +423,12 @@ export default function BillingTab() {
               {/* Quick method badges */}
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {PAYMENT_METHODS.map(m=>{
-                  const colors:Record<string,string> = {CASH:GREEN,EFT:"#1D4ED8",CARD:"#7C3AED",MEDICAL_AID:AMBER,FAMILY_ACCOUNT:TEAL}
+                  const colors:Record<string,string> = {CASH:GREEN,EFT:"var(--hf-info-text)",CARD:"var(--hf-violet-text)",MEDICAL_AID:AMBER,FAMILY_ACCOUNT:TEAL}
                   const c=colors[m]??GRAY
                   return (
                     <button key={m} onClick={()=>setPayForm(f=>({...f,method:m}))}
                       style={{padding:"4px 12px",borderRadius:20,border:`1.5px solid ${payForm.method===m?c:BORDER}`,
-                        background:payForm.method===m?`${c}14`:"var(--hf-surface)",color:payForm.method===m?c:GRAY,
+                        background:payForm.method===m?`color-mix(in srgb, ${c} 8%, transparent)`:"var(--hf-surface)",color:payForm.method===m?c:GRAY_TEXT,
                         fontSize:12,fontWeight:payForm.method===m?700:400,cursor:"pointer"}}>
                       {m.replace("_"," ")}
                     </button>
@@ -430,7 +436,7 @@ export default function BillingTab() {
                 })}
               </div>
             </div>
-            {payError && <div style={{marginTop:12,padding:"8px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:RED,display:"flex",alignItems:"center",gap:8}}><AlertCircle size={13}/>{payError}</div>}
+            {payError && <div style={{marginTop:12,padding:"8px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:RED_TEXT,display:"flex",alignItems:"center",gap:8}}><AlertCircle size={13}/>{payError}</div>}
             <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}>
               <button onClick={()=>setShowPayment(false)} style={btnCancel}>Cancel</button>
               <button onClick={()=>{
@@ -449,11 +455,11 @@ export default function BillingTab() {
 
 // ── Shared ────────────────────────────────────────────────────────────────────
 
-function Loading() { return <div style={{textAlign:"center",padding:40,color:GRAY}}>Loading...</div> }
+function Loading() { return <div style={{textAlign:"center",padding:40,color:GRAY_TEXT}}>Loading...</div> }
 function Empty({icon:Icon,msg,color=GRAY}:{icon:React.ElementType;msg:string;color?:string}) {
-  return <div style={{textAlign:"center",padding:"60px 20px",color:GRAY,border:`1px dashed ${BORDER}`,borderRadius:12}}><Icon size={36} color={color} style={{marginBottom:12,opacity:0.4}}/><div style={{fontWeight:600,color:"var(--hf-text-tertiary)",fontSize:15}}>{msg}</div></div>
+  return <div style={{textAlign:"center",padding:"60px 20px",color:GRAY_TEXT,border:`1px dashed ${BORDER}`,borderRadius:12}}><Icon size={36} style={{color,marginBottom:12,opacity:0.4}}/><div style={{fontWeight:600,color:"var(--hf-text-tertiary)",fontSize:15}}>{msg}</div></div>
 }
-const lbl:React.CSSProperties      = {display:"block",fontSize:13,fontWeight:600,color:"#374151",marginBottom:5}
-const sinp:React.CSSProperties     = {width:"100%",padding:"9px 12px",boxSizing:"border-box" as const,border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:14,outline:"none",background:"#fff"}
-const btnPrimary:React.CSSProperties = {background:NAVY,color:"#fff",border:"none",borderRadius:9,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}
-const btnCancel:React.CSSProperties  = {padding:"9px 18px",border:`1px solid ${BORDER}`,borderRadius:9,background:"#fff",fontSize:13,cursor:"pointer",color:"#374151"}
+const lbl:React.CSSProperties      = {display:"block",fontSize:13,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}
+const sinp:React.CSSProperties     = {width:"100%",padding:"9px 12px",boxSizing:"border-box" as const,border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:14,outline:"none",background:"var(--hf-surface)"}
+const btnPrimary:React.CSSProperties = {background:NAVY,color:"var(--hf-text-on-solid)",border:"none",borderRadius:9,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}
+const btnCancel:React.CSSProperties  = {padding:"9px 18px",border:`1px solid ${BORDER}`,borderRadius:9,background:"var(--hf-surface)",fontSize:13,cursor:"pointer",color:"var(--hf-text-secondary)"}

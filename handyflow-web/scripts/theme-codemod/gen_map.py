@@ -31,7 +31,8 @@ M = {
  "#E8EDF5": (None,None,"primary-border"),
  "#0D9488": ("accent-text","accent","accent"),
  "#0F766E": ("accent-text-strong",None,None),
- "#5EEAD4": (None,None,None),
+ "#5EEAD4": ("accent-on-brand",None,None),
+ "#0D2145": (None,"primary-deep",None),
  "#60A5FA": (None,"info-dot",None),
  "#A78BFA": (None,"violet-dot",None),
  "#38BDF8": (None,"sky-dot",None),
@@ -53,7 +54,7 @@ M = {
  "#881337": ("danger-text-strong",None,None),
  "#B43C32": ("danger-text-strong",None,None),
  "#9D174D": ("danger-text-strong",None,None),
- "#FCA5A5": (None,None,"danger-border"),  # fg on dark surface: manual
+ "#FCA5A5": ("danger-on-brand",None,"danger-border"),
  "#FDA4AF": (None,None,None),  # light text on dark surface: manual
  "#FEF2F2": (None,"danger-soft","danger-border"),
  "#FFF5F5": (None,"danger-soft",None),
@@ -97,7 +98,7 @@ M = {
  "#FEF9C3": (None,"warning-soft",None),
  "#FEF3C7": (None,"warning-soft-strong","warning-border"),
  "#FDE68A": (None,None,"warning-border"),
- "#FCD34D": (None,None,"warning-border-strong"),
+ "#FCD34D": ("warning-on-brand",None,"warning-border-strong"),
  # orange
  "#EA580C": ("orange-text",None,None),
  "#C2410C": ("orange-text-strong",None,None),

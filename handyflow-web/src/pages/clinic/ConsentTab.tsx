@@ -17,8 +17,11 @@ interface ConsentEvent {
   capturedByName?: string; notes?: string; createdAt: string
 }
 
-const NAVY="#1B3A6B"; const TEAL="#0D9488"; const RED="#DC2626"
-const GREEN="#166534"; const GRAY="#64748B"; const BORDER="#E2E8F0"; const LIGHT="#F8FAFC"
+const NAVY="var(--hf-primary)";
+const NAVY_TEXT = "var(--hf-primary-text)"; const TEAL="var(--hf-accent)"; const RED="var(--hf-danger)"
+const RED_TEXT = "var(--hf-danger-text)";
+const GREEN="var(--hf-success-solid-strong)";
+const GREEN_TEXT = "var(--hf-success-text-strong)"; const GRAY="var(--hf-text-muted)"; const BORDER="var(--hf-border)"; const LIGHT="var(--hf-surface-muted)"
 
 const TYPE_LABELS: Record<string,string> = {
   TREATMENT: "Treatment / health information processing",
@@ -75,8 +78,8 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
   })
 
   const cfgFor = (s: string) =>
-    s === "GRANTED" ? { color: GREEN, bg: "#F0FDF4", border: "#86EFAC", icon: ShieldCheck, label: "Granted" }
-    : s === "REVOKED" ? { color: RED, bg: "#FEF2F2", border: "#FECACA", icon: ShieldX, label: "Revoked" }
+    s === "GRANTED" ? { color: GREEN_TEXT, bg: "var(--hf-success-soft)", border: "var(--hf-success-border)", icon: ShieldCheck, label: "Granted" }
+    : s === "REVOKED" ? { color: RED_TEXT, bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)", icon: ShieldX, label: "Revoked" }
     : { color: GRAY, bg: LIGHT, border: BORDER, icon: ShieldQuestion, label: "Not recorded" }
 
   return (
@@ -95,7 +98,7 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
         <div style={{fontSize:14,fontWeight:700,color:"var(--hf-text)"}}>Consent status</div>
         <div style={{display:"flex",gap:8}}>
           <button onClick={()=>setShowHistory(true)}
-            style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",border:`1px solid ${BORDER}`,borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",background:"var(--hf-surface)",color:NAVY}}>
+            style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",border:`1px solid ${BORDER}`,borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",background:"var(--hf-surface)",color:NAVY_TEXT}}>
             <Clock size={14}/> History
           </button>
           <button onClick={()=>{setShowRecord(true);setApiError("")}}
@@ -115,7 +118,7 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
             return (
               <div key={s.consentType} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",background:c.bg,border:`1px solid ${c.border}`,borderRadius:10}}>
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <Icon size={18} color={c.color}/>
+                  <Icon size={18} style={{ color: c.color }}/>
                   <div>
                     <div style={{fontSize:13,fontWeight:600,color:"var(--hf-text)"}}>{TYPE_LABELS[s.consentType] ?? s.consentType}</div>
                     {s.lastActionAt && (
@@ -152,7 +155,7 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
                   style={{flex:1,padding:"9px",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",
                     border: form.action===a ? `2px solid ${a==="GRANTED"?GREEN:RED}` : `1.5px solid ${BORDER}`,
                     background: form.action===a ? (a==="GRANTED"?"var(--hf-success-soft)":"var(--hf-danger-soft)") : "var(--hf-surface)",
-                    color: form.action===a ? (a==="GRANTED"?GREEN:RED) : GRAY}}>
+                    color: form.action===a ? (a==="GRANTED"?GREEN_TEXT:RED_TEXT) : GRAY}}>
                   {a==="GRANTED"?"Grant":"Revoke"}
                 </button>
               ))}
@@ -172,7 +175,7 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
               placeholder="e.g. Signed consent form on file" style={inp}/>
 
             {apiError && (
-              <div style={{marginTop:4,marginBottom:14,padding:"10px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:RED}}>{apiError}</div>
+              <div style={{marginTop:4,marginBottom:14,padding:"10px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:13,color:RED_TEXT}}>{apiError}</div>
             )}
 
             <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:6}}>
@@ -202,7 +205,7 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
                   const Icon = c.icon
                   return (
                     <div key={h.id} style={{display:"flex",gap:10,padding:"10px 14px",background:LIGHT,borderRadius:8}}>
-                      <Icon size={16} color={c.color} style={{flexShrink:0,marginTop:2}}/>
+                      <Icon size={16} style={{ color: c.color, flexShrink:0, marginTop:2 }}/>
                       <div style={{flex:1}}>
                         <div style={{fontSize:13,fontWeight:600,color:"var(--hf-text)"}}>
                           {TYPE_LABELS[h.consentType] ?? h.consentType} — <span style={{color:c.color}}>{c.label}</span>
@@ -226,5 +229,5 @@ export default function ConsentTab({ patient }: { patient: Patient }) {
   )
 }
 
-const lbl: React.CSSProperties = { display:"block", fontSize:12, fontWeight:600, color:"#374151", marginBottom:5, marginTop:12 }
-const inp: React.CSSProperties = { width:"100%", padding:"9px 12px", boxSizing:"border-box", border:"1.5px solid #E2E8F0", borderRadius:8, fontSize:14, background:"#fff" }
+const lbl: React.CSSProperties = { display:"block", fontSize:12, fontWeight:600, color:"var(--hf-text-secondary)", marginBottom:5, marginTop:12 }
+const inp: React.CSSProperties = { width:"100%", padding:"9px 12px", boxSizing:"border-box", border:"1.5px solid var(--hf-border)", borderRadius:8, fontSize:14, background:"var(--hf-surface)" }

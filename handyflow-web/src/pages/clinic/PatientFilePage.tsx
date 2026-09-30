@@ -55,27 +55,32 @@ interface BillLine {
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 
-const NAVY="#1B3A6B"; const TEAL="#0D9488"; const RED="#DC2626"
-const GREEN="#166534"; const AMBER="#D97706"; const PURPLE="#7C3AED"
-const GRAY="#64748B"; const BORDER="#E2E8F0"; const LIGHT="#F8FAFC"
+const NAVY="var(--hf-primary)";
+const NAVY_TEXT = "var(--hf-primary-text)"; const TEAL="var(--hf-accent)";
+const TEAL_TEXT = "var(--hf-accent-text)"; const RED="var(--hf-danger)"
+const RED_TEXT = "var(--hf-danger-text)";
+const GREEN="var(--hf-success-solid-strong)";
+const GREEN_TEXT = "var(--hf-success-text-strong)"; const AMBER="var(--hf-warning-text)"; const PURPLE="var(--hf-violet)"
+const PURPLE_TEXT = "var(--hf-violet-text)";
+const GRAY="var(--hf-text-muted)"; const BORDER="var(--hf-border)"; const LIGHT="var(--hf-surface-muted)"
 
 const STATUS_CFG: Record<string,{color:string;bg:string;label:string;icon:any}> = {
-  SCHEDULED:   {color:"#1D4ED8",bg:"#EFF6FF",label:"Scheduled",  icon:Calendar},
-  CONFIRMED:   {color:PURPLE,   bg:"#F5F3FF",label:"Confirmed",  icon:CheckCircle},
-  IN_PROGRESS: {color:AMBER,    bg:"#FFFBEB",label:"In Progress",icon:PlayCircle},
-  COMPLETED:   {color:GREEN,    bg:"#DCFCE7",label:"Completed",  icon:CheckCircle},
-  CANCELLED:   {color:RED,      bg:"#FEF2F2",label:"Cancelled",  icon:XCircle},
+  SCHEDULED:   {color:"var(--hf-info-text)",bg:"var(--hf-info-soft)",label:"Scheduled",  icon:Calendar},
+  CONFIRMED:   {color:PURPLE_TEXT,   bg:"var(--hf-violet-soft)",label:"Confirmed",  icon:CheckCircle},
+  IN_PROGRESS: {color:AMBER,    bg:"var(--hf-warning-soft)",label:"In Progress",icon:PlayCircle},
+  COMPLETED:   {color:GREEN_TEXT,    bg:"var(--hf-success-soft-strong)",label:"Completed",  icon:CheckCircle},
+  CANCELLED:   {color:RED_TEXT,      bg:"var(--hf-danger-soft)",label:"Cancelled",  icon:XCircle},
   NO_SHOW:     {color:GRAY,     bg:LIGHT,    label:"No Show",    icon:User},
 }
 const STATUS_FLOW: Record<string,{action:string;label:string;color:string}[]> = {
-  SCHEDULED:   [{action:"confirm",label:"Confirm",color:PURPLE},{action:"cancel",label:"Cancel",color:RED}],
-  CONFIRMED:   [{action:"start",label:"Start",color:AMBER},{action:"no_show",label:"No Show",color:GRAY},{action:"cancel",label:"Cancel",color:RED}],
-  IN_PROGRESS: [{action:"complete",label:"Complete",color:GREEN}],
+  SCHEDULED:   [{action:"confirm",label:"Confirm",color:PURPLE_TEXT},{action:"cancel",label:"Cancel",color:RED_TEXT}],
+  CONFIRMED:   [{action:"start",label:"Start",color:AMBER},{action:"no_show",label:"No Show",color:GRAY},{action:"cancel",label:"Cancel",color:RED_TEXT}],
+  IN_PROGRESS: [{action:"complete",label:"Complete",color:GREEN_TEXT}],
 }
 const ACCOUNT_CFG: Record<string,{label:string;bg:string;color:string}> = {
-  INDIVIDUAL: {label:"Individual",bg:"#EFF6FF",color:"#1D4ED8"},
-  PRINCIPAL:  {label:"Principal", bg:"#F0FDF4",color:"#166534"},
-  DEPENDANT:  {label:"Dependant", bg:"#F5F3FF",color:PURPLE},
+  INDIVIDUAL: {label:"Individual",bg:"var(--hf-info-soft)",color:"var(--hf-info-text)"},
+  PRINCIPAL:  {label:"Principal", bg:"var(--hf-success-soft)",color:"var(--hf-success-text-strong)"},
+  DEPENDANT:  {label:"Dependant", bg:"var(--hf-violet-soft)",color:PURPLE_TEXT},
 }
 
 const saId = (id?: string) => {
@@ -185,7 +190,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
   return (
     <div style={{ fontFamily:"'Inter',system-ui,sans-serif", minHeight:600 }}>
       {/* ── Patient banner ──────────────────────────────────────────────── */}
-      <div style={{ background:`linear-gradient(135deg,${NAVY} 0%,#0D2145 100%)`,
+      <div style={{ background:`linear-gradient(135deg,${NAVY} 0%,var(--hf-primary-deep) 100%)`,
         borderRadius:12, marginBottom:24, padding:"24px 28px 0", overflow:"hidden" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
           <div style={{ display:"flex", alignItems:"center", gap:16 }}>
@@ -197,16 +202,16 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
             <div>
               <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:4 }}>
                 <h2 style={{ margin:0, fontSize:22, fontWeight:800, color:"var(--hf-text-on-solid)" }}>{patient.fullName}</h2>
-                <span style={{ background:`${acctCfg.bg}25`, color:acctCfg.bg,
+                <span style={{ background:`color-mix(in srgb, ${acctCfg.bg} 15%, transparent)`, color:acctCfg.bg,
                   padding:"2px 10px", borderRadius:20, fontSize:11, fontWeight:700,
-                  border:`1px solid ${acctCfg.bg}50` }}>
+                  border:`1px solid color-mix(in srgb, ${acctCfg.bg} 31%, transparent)` }}>
                   {acctCfg.label}
                 </span>
                 {isArchived && <span style={{ background:"rgba(255,255,255,0.15)", color:"rgba(255,255,255,0.7)", padding:"2px 8px", borderRadius:20, fontSize:11 }}>ARCHIVED</span>}
               </div>
               <div style={{ display:"flex", gap:12, flexWrap:"wrap", fontSize:13, color:"rgba(255,255,255,0.7)" }}>
                 {idInfo && <span>{idInfo.dob} · {idInfo.age} yrs · {idInfo.gender}</span>}
-                {patient.bloodType && <span style={{ background:"rgba(220,38,38,0.3)", color:"#FCA5A5", padding:"1px 8px", borderRadius:20, fontSize:12, fontWeight:700 }}>{patient.bloodType}</span>}
+                {patient.bloodType && <span style={{ background:"rgba(220,38,38,0.3)", color:"var(--hf-danger-on-brand)", padding:"1px 8px", borderRadius:20, fontSize:12, fontWeight:700 }}>{patient.bloodType}</span>}
                 {patient.phone && <span style={{ display:"flex", alignItems:"center", gap:4 }}><Phone size={11}/>{patient.phone}</span>}
               </div>
               {/* Family link */}
@@ -219,14 +224,14 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
               {/* Alert badges */}
               <div style={{ display:"flex", gap:8, marginTop:8, flexWrap:"wrap" }}>
                 {patient.allergies?.length > 0 && (
-                  <span style={{ background:"rgba(220,38,38,0.25)", color:"#FCA5A5",
+                  <span style={{ background:"rgba(220,38,38,0.25)", color:"var(--hf-danger-on-brand)",
                     padding:"2px 8px", borderRadius:20, fontSize:11, fontWeight:600,
                     display:"flex", alignItems:"center", gap:4 }}>
                     <AlertCircle size={10}/> ⚠ {patient.allergies.length} allerg{patient.allergies.length===1?"y":"ies"}
                   </span>
                 )}
                 {patient.chronicConditions?.length > 0 && (
-                  <span style={{ background:"rgba(217,119,6,0.25)", color:"#FCD34D",
+                  <span style={{ background:"rgba(217,119,6,0.25)", color:"var(--hf-warning-on-brand)",
                     padding:"2px 8px", borderRadius:20, fontSize:11, fontWeight:600,
                     display:"flex", alignItems:"center", gap:4 }}>
                     <Heart size={10}/> {patient.chronicConditions.length} chronic
@@ -250,7 +255,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
                 {/* Convert individual → principal */}
                 {patient.accountType==="INDIVIDUAL" && (
                   <ActionItem icon={Users} label="Convert to family account"
-                    color={PURPLE} onClick={()=>convertToFamily.mutate()}
+                    color={PURPLE_TEXT} onClick={()=>convertToFamily.mutate()}
                     hint="Promotes patient to principal — add dependants after"/>
                 )}
                 {/* Deactivate / reactivate */}
@@ -260,13 +265,13 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
                     hint="Patient hidden from active list"/>
                 ) : (
                   <ActionItem icon={UserCheck} label="Reactivate account"
-                    color={GREEN} onClick={()=>reactivate.mutate()}
+                    color={GREEN_TEXT} onClick={()=>reactivate.mutate()}
                     hint="Restore to active status"/>
                 )}
                 {/* Archive */}
                 {!isArchived && (
                   <ActionItem icon={Archive} label="Archive record"
-                    color={RED} onClick={()=>{
+                    color={RED_TEXT} onClick={()=>{
                       const reason = window.prompt("Archive reason (HPCSA records retained 6 years):")
                       if (reason !== null) archive.mutate(reason)
                     }}
@@ -383,7 +388,7 @@ function ActionItem({ icon:Icon, label, color, onClick, hint }: {
         textAlign:"left" as const, cursor:"pointer", display:"flex", alignItems:"flex-start", gap:10 }}
       onMouseEnter={e=>(e.currentTarget.style.background=LIGHT)}
       onMouseLeave={e=>(e.currentTarget.style.background="none")}>
-      <Icon size={15} color={color} style={{ marginTop:2, flexShrink:0 }}/>
+      <Icon size={15} style={{ color, marginTop:2, flexShrink:0 }}/>
       <div>
         <div style={{ fontSize:13, fontWeight:600, color:"var(--hf-text)" }}>{label}</div>
         <div style={{ fontSize:11, color:GRAY, marginTop:1 }}>{hint}</div>
@@ -442,12 +447,12 @@ function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc }: {
           <div style={{ marginBottom:12, padding:"14px 16px", background:"var(--hf-danger-soft)",
             border:"1px solid var(--hf-danger-border)", borderRadius:12 }}>
             <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
-              <AlertCircle size={13} color={RED}/>
-              <span style={{ fontSize:11, fontWeight:700, color:RED, textTransform:"uppercase", letterSpacing:"0.06em" }}>⚠ Allergies</span>
+              <AlertCircle size={13} style={{ color: RED_TEXT }}/>
+              <span style={{ fontSize:11, fontWeight:700, color:RED_TEXT, textTransform:"uppercase", letterSpacing:"0.06em" }}>⚠ Allergies</span>
             </div>
             <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
               {patient.allergies.map(a=>(
-                <span key={a} style={{ background:"var(--hf-surface)", color:RED, padding:"3px 10px",
+                <span key={a} style={{ background:"var(--hf-surface)", color:RED_TEXT, padding:"3px 10px",
                   borderRadius:6, fontSize:13, fontWeight:600, border:"1px solid var(--hf-danger-border)" }}>{a}</span>
               ))}
             </div>
@@ -459,7 +464,7 @@ function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc }: {
           <div style={{ marginBottom:12, padding:"14px 16px", background:"var(--hf-warning-soft)",
             border:"1px solid var(--hf-warning-border)", borderRadius:12 }}>
             <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
-              <Heart size={13} color={AMBER}/>
+              <Heart size={13} style={{ color: AMBER }}/>
               <span style={{ fontSize:11, fontWeight:700, color:AMBER, textTransform:"uppercase", letterSpacing:"0.06em" }}>Chronic conditions</span>
             </div>
             <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
@@ -486,7 +491,7 @@ function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc }: {
           <div style={{ fontSize:11, fontWeight:700, color:GRAY, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:8 }}>Account status</div>
           <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
             <span style={{ background:patient.active?"var(--hf-success-soft-strong)":"var(--hf-danger-soft)",
-              color:patient.active?GREEN:RED, padding:"3px 10px", borderRadius:20,
+              color:patient.active?GREEN_TEXT:RED_TEXT, padding:"3px 10px", borderRadius:20,
               fontSize:12, fontWeight:700 }}>{patient.active?"ACTIVE":"INACTIVE"}</span>
             {patient.archivedAt && <span style={{ background:"var(--hf-surface-sunken)", color:GRAY, padding:"3px 10px", borderRadius:20, fontSize:12, fontWeight:700 }}>ARCHIVED</span>}
           </div>
@@ -527,7 +532,7 @@ function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc }: {
                       <div style={{ width:28, height:28, borderRadius:"50%",
                         background:isCurrentPatient?"var(--hf-sky-soft-strong)":"var(--hf-success-soft)",
                         display:"flex", alignItems:"center", justifyContent:"center",
-                        fontSize:11, fontWeight:700, color:isCurrentPatient?"var(--hf-sky-text-strong)":TEAL, flexShrink:0 }}>
+                        fontSize:11, fontWeight:700, color:isCurrentPatient?"var(--hf-sky-text-strong)":TEAL_TEXT, flexShrink:0 }}>
                         {m.firstName?.[0]}{m.lastName?.[0]}
                       </div>
                       <div style={{ flex:1, minWidth:0 }}>
@@ -542,7 +547,7 @@ function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc }: {
                           </div>
                         )}
                       </div>
-                      {!isCurrentPatient && <ArrowRight size={12} color={GRAY}/>}
+                      {!isCurrentPatient && <ArrowRight size={12} style={{ color: GRAY }}/>}
                     </div>
                   )
                 })}
@@ -607,7 +612,7 @@ function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc }: {
               <input value={depForm.phone} onChange={e=>setDepForm(f=>({...f,phone:e.target.value}))} placeholder="+27 82 000 0000" style={sinp}/>
             </div>
           </div>
-          {depError && <div style={{ marginTop:10, padding:"8px 12px", background:"var(--hf-danger-soft)", border:"1px solid var(--hf-danger-border)", borderRadius:8, fontSize:13, color:RED }}>{depError}</div>}
+          {depError && <div style={{ marginTop:10, padding:"8px 12px", background:"var(--hf-danger-soft)", border:"1px solid var(--hf-danger-border)", borderRadius:8, fontSize:13, color:RED_TEXT }}>{depError}</div>}
           <ModalFooter onCancel={()=>setShowAddDep(false)}
             onConfirm={()=>{
               if (!depForm.firstName.trim()||!depForm.lastName.trim()) return
@@ -692,7 +697,7 @@ function AppointmentsTab({ patient, appointments, practitioners, qc, onStartSess
                       {actions.map((btn:any)=>(
                         <button key={btn.action} onClick={()=>doAction.mutate({id:a.id,action:btn.action})}
                           disabled={doAction.isPending}
-                          style={{ padding:"5px 12px", border:"none", borderRadius:7, fontSize:12, fontWeight:600, cursor:"pointer", background:`${btn.color}18`, color:btn.color }}>
+                          style={{ padding:"5px 12px", border:"none", borderRadius:7, fontSize:12, fontWeight:600, cursor:"pointer", background:`color-mix(in srgb, ${btn.color} 9%, transparent)`, color:btn.color }}>
                           {btn.label}
                         </button>
                       ))}
@@ -853,7 +858,7 @@ function ConsultationTab({ patient, consultations, practitioners, qc, addToBill,
                   style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", cursor:"pointer", background:isOpen?LIGHT:"var(--hf-surface)" }}>
                   <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                     <div style={{ width:36, height:36, borderRadius:8, background:"var(--hf-success-soft)", border:"1px solid var(--hf-success-border)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                      <Activity size={16} color={TEAL}/>
+                      <Activity size={16} style={{ color: TEAL_TEXT }}/>
                     </div>
                     <div>
                       <div style={{ fontWeight:700, fontSize:14, color:"var(--hf-text)", marginBottom:2 }}>{c.chiefComplaint}</div>
@@ -862,10 +867,10 @@ function ConsultationTab({ patient, consultations, practitioners, qc, addToBill,
                   </div>
                   <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                     <button onClick={e=>{e.stopPropagation();openEdit(c)}} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:"var(--hf-info-soft)", color:"var(--hf-info-text)", border:"1px solid var(--hf-info-border)", borderRadius:6, fontSize:12, cursor:"pointer", fontWeight:600 }}>✏ Edit</button>
-                    <button onClick={e=>{e.stopPropagation();setShowRx(c.id)}} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:"var(--hf-success-soft)", color:GREEN, border:"1px solid var(--hf-success-border)", borderRadius:6, fontSize:12, cursor:"pointer", fontWeight:600 }}><Pill size={11}/> Rx</button>
+                    <button onClick={e=>{e.stopPropagation();setShowRx(c.id)}} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:"var(--hf-success-soft)", color:GREEN_TEXT, border:"1px solid var(--hf-success-border)", borderRadius:6, fontSize:12, cursor:"pointer", fontWeight:600 }}><Pill size={11}/> Rx</button>
                     <button onClick={e=>{e.stopPropagation();downloadPdf(`/api/v1/clinic/consultations/${c.id}/prescription-pdf`,`rx-${c.id}.pdf`)}} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:"var(--hf-info-soft)", color:"var(--hf-info-text)", border:"1px solid var(--hf-info-border)", borderRadius:6, fontSize:12, cursor:"pointer", fontWeight:600 }}>Rx PDF</button>
                     {c.followUpDays&&<span style={{ fontSize:11, color:AMBER, background:"var(--hf-warning-soft)", padding:"2px 8px", borderRadius:20, border:"1px solid var(--hf-warning-border)" }}>F/U {c.followUpDays}d</span>}
-                    {isOpen?<ChevronUp size={16} color={GRAY}/>:<ChevronDown size={16} color={GRAY}/>}
+                    {isOpen?<ChevronUp size={16} style={{ color: GRAY }}/>:<ChevronDown size={16} style={{ color: GRAY }}/>}
                   </div>
                 </div>
                 {isOpen&&(
@@ -908,7 +913,7 @@ function ConsultationTab({ patient, consultations, practitioners, qc, addToBill,
                   <div style={{ fontWeight:700, fontSize:14, color:"var(--hf-text)", marginBottom:3 }}>{rx.medicationName}</div>
                   <div style={{ fontSize:12, color:GRAY }}>{[rx.dosage,rx.frequency,rx.duration].filter(Boolean).join(" · ")}{rx.quantity?` · Qty: ${rx.quantity}`:""}{rx.repeats>0?` · Repeats: ${rx.repeats}`:""}</div>
                   {rx.instructions&&<div style={{ fontSize:12, color:"var(--hf-text-tertiary)", marginTop:4, fontStyle:"italic" }}>{rx.instructions}</div>}
-                  {rx.dispensed&&<span style={{ marginTop:6, display:"inline-block", background:"var(--hf-success-soft-strong)", color:GREEN, padding:"1px 8px", borderRadius:20, fontSize:11, fontWeight:700 }}>DISPENSED</span>}
+                  {rx.dispensed&&<span style={{ marginTop:6, display:"inline-block", background:"var(--hf-success-soft-strong)", color:GREEN_TEXT, padding:"1px 8px", borderRadius:20, fontSize:11, fontWeight:700 }}>DISPENSED</span>}
                 </div>
               ))}
             </div>
@@ -1005,7 +1010,7 @@ function ConsultationTab({ patient, consultations, practitioners, qc, addToBill,
           {/* Speech panel */}
           <div style={{ marginBottom:20, padding:"16px 18px", background:"var(--hf-violet-soft)", border:"1px solid var(--hf-violet-border)", borderRadius:12 }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:PURPLE, display:"flex", alignItems:"center", gap:6 }}><Mic size={14}/> Voice-to-notes</div>
+              <div style={{ fontSize:13, fontWeight:700, color:PURPLE_TEXT, display:"flex", alignItems:"center", gap:6 }}><Mic size={14}/> Voice-to-notes</div>
               <div style={{ display:"flex", gap:8 }}>
                 {!isRecording
                   ? <button onClick={startRecording} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", background:PURPLE, color:"var(--hf-text-on-solid)", border:"none", borderRadius:7, fontSize:12, fontWeight:600, cursor:"pointer" }}><Mic size={12}/> Start recording</button>
@@ -1015,7 +1020,7 @@ function ConsultationTab({ patient, consultations, practitioners, qc, addToBill,
                 {transcript&&<button onClick={()=>setTranscript("")} style={{ padding:"6px 10px", background:"none", border:`1px solid ${BORDER}`, borderRadius:7, fontSize:12, cursor:"pointer", color:GRAY }}>Clear</button>}
               </div>
             </div>
-            {isRecording&&<div style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:RED, marginBottom:6 }}><span style={{ width:7, height:7, borderRadius:"50%", background:RED }}/> Recording — speak clearly</div>}
+            {isRecording&&<div style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:RED_TEXT, marginBottom:6 }}><span style={{ width:7, height:7, borderRadius:"50%", background:RED }}/> Recording — speak clearly</div>}
             <textarea value={transcript} onChange={e=>setTranscript(e.target.value)} rows={3}
               style={{ ...sinp, fontSize:12, color:"var(--hf-text-tertiary)", background:"rgba(255,255,255,0.7)", resize:"vertical" as const }}
               placeholder="Transcript appears here after recording. Then click Extract SOAP to fill the form below using Claude AI."/>
@@ -1081,10 +1086,10 @@ function RunningBillTab({ billLines, onRemove, patient }:
   }
 
   const TYPE_CFG:Record<string,{color:string;bg:string;label:string}> = {
-    CONSULTATION:{color:TEAL,bg:"#F0FDF4",label:"Consultation"},
-    PROCEDURE:   {color:NAVY,bg:"#EFF6FF",label:"Procedure"},
-    MEDICINE:    {color:GREEN,bg:"#DCFCE7",label:"Medicine"},
-    CONSUMABLE:  {color:AMBER,bg:"#FFFBEB",label:"Consumable"},
+    CONSULTATION:{color:TEAL_TEXT,bg:"var(--hf-success-soft)",label:"Consultation"},
+    PROCEDURE:   {color:NAVY_TEXT,bg:"var(--hf-info-soft)",label:"Procedure"},
+    MEDICINE:    {color:GREEN_TEXT,bg:"var(--hf-success-soft-strong)",label:"Medicine"},
+    CONSUMABLE:  {color:AMBER,bg:"var(--hf-warning-soft)",label:"Consumable"},
   }
 
   return (
@@ -1124,7 +1129,7 @@ function RunningBillTab({ billLines, onRemove, patient }:
                       <td style={{ padding:"11px 14px", fontSize:13, color:"var(--hf-text)" }}>{l.quantity}</td>
                       <td style={{ padding:"11px 14px", fontSize:13, color:"var(--hf-text)" }}>{fmtR(l.unitPrice)}</td>
                       <td style={{ padding:"11px 14px", fontSize:13, fontWeight:700, color:"var(--hf-text)" }}>{fmtR(l.gross)}</td>
-                      <td style={{ padding:"11px 14px" }}><button onClick={()=>isExtra?setExtra(e=>e.filter(x=>x.id!==l.id)):onRemove(l.id)} style={{ background:"none", border:"none", cursor:"pointer", color:RED, display:"flex" }}><X size={14}/></button></td>
+                      <td style={{ padding:"11px 14px" }}><button onClick={()=>isExtra?setExtra(e=>e.filter(x=>x.id!==l.id)):onRemove(l.id)} style={{ background:"none", border:"none", cursor:"pointer", color:RED_TEXT, display:"flex" }}><X size={14}/></button></td>
                     </tr>
                   )
                 })}
@@ -1133,8 +1138,8 @@ function RunningBillTab({ billLines, onRemove, patient }:
           </div>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
             <div style={{ display:"flex", gap:10 }}>
-              <button style={{ ...btnOutline, color:TEAL, borderColor:TEAL }}>Generate claim (medical aid)</button>
-              <button style={{ ...btnOutline, color:NAVY, borderColor:NAVY }}>Record payment</button>
+              <button style={{ ...btnOutline, color:TEAL_TEXT, borderColor:TEAL }}>Generate claim (medical aid)</button>
+              <button style={{ ...btnOutline, color:NAVY_TEXT, borderColor:NAVY }}>Record payment</button>
             </div>
             <div style={{ padding:"16px 24px", background:NAVY, borderRadius:12, textAlign:"right" as const }}>
               <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.6)", textTransform:"uppercase", letterSpacing:"0.06em" }}>Total</div>
@@ -1152,7 +1157,7 @@ function RunningBillTab({ billLines, onRemove, patient }:
               <label style={lbl}>Item type</label>
               <div style={{ display:"flex", gap:6 }}>
                 {(["PROCEDURE","MEDICINE","CONSUMABLE"] as const).map(t=>(
-                  <button key={t} onClick={()=>setAddType(t)} style={{ padding:"6px 14px", borderRadius:8, border:`2px solid ${addType===t?NAVY:BORDER}`, background:addType===t?"var(--hf-info-soft)":"var(--hf-surface)", color:addType===t?NAVY:GRAY, fontSize:12, fontWeight:addType===t?600:400, cursor:"pointer" }}>
+                  <button key={t} onClick={()=>setAddType(t)} style={{ padding:"6px 14px", borderRadius:8, border:`2px solid ${addType===t?NAVY:BORDER}`, background:addType===t?"var(--hf-info-soft)":"var(--hf-surface)", color:addType===t?NAVY_TEXT:GRAY, fontSize:12, fontWeight:addType===t?600:400, cursor:"pointer" }}>
                     {t.charAt(0)+t.slice(1).toLowerCase()}
                   </button>
                 ))}
@@ -1165,7 +1170,7 @@ function RunningBillTab({ billLines, onRemove, patient }:
               <div><label style={lbl}>Quantity</label><input type="number" step="0.5" value={addForm.quantity} onChange={e=>setAddForm(f=>({...f,quantity:e.target.value}))} style={sinp}/></div>
               <div><label style={lbl}>Unit price (R) *</label><input type="number" step="0.01" value={addForm.unitPrice} onChange={e=>setAddForm(f=>({...f,unitPrice:e.target.value}))} placeholder="0.00" style={sinp}/></div>
             </div>
-            {addForm.quantity&&addForm.unitPrice&&<div style={{ padding:"8px 12px", background:"var(--hf-success-soft)", border:"1px solid var(--hf-success-border)", borderRadius:8, fontSize:13, color:GREEN, fontWeight:600 }}>Line total: {fmtR(parseFloat(addForm.quantity)*parseFloat(addForm.unitPrice))}</div>}
+            {addForm.quantity&&addForm.unitPrice&&<div style={{ padding:"8px 12px", background:"var(--hf-success-soft)", border:"1px solid var(--hf-success-border)", borderRadius:8, fontSize:13, color:GREEN_TEXT, fontWeight:600 }}>Line total: {fmtR(parseFloat(addForm.quantity)*parseFloat(addForm.unitPrice))}</div>}
           </div>
           <ModalFooter onCancel={()=>setShowAdd(false)} onConfirm={addLine} confirmLabel="Add to bill"/>
         </Modal>
@@ -1207,7 +1212,7 @@ function PrescriptionsTab({ patient, consultations }:
       :displayed.length===0?<Empty icon={Pill} msg={filter==="active"?"No active prescriptions":"No prescription history"}/>:(
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {[...displayed].sort((a:any,b:any)=>b.prescribedAt.localeCompare(a.prescribedAt)).map((rx:Prescription)=>(
-            <div key={rx.id} style={{ border:`1px solid ${rx.dispensed?"#86EFAC":BORDER}`, borderLeft:`4px solid ${rx.dispensed?GREEN:TEAL}`, borderRadius:10, padding:"14px 18px", background:rx.dispensed?"var(--hf-success-soft)":"var(--hf-surface)" }}>
+            <div key={rx.id} style={{ border:`1px solid ${rx.dispensed?"var(--hf-success-border)":BORDER}`, borderLeft:`4px solid ${rx.dispensed?GREEN:TEAL}`, borderRadius:10, padding:"14px 18px", background:rx.dispensed?"var(--hf-success-soft)":"var(--hf-surface)" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
                 <div style={{ flex:1 }}>
                   <div style={{ fontWeight:700, fontSize:15, color:"var(--hf-text)", marginBottom:4 }}>{rx.medicationName}</div>
@@ -1216,7 +1221,7 @@ function PrescriptionsTab({ patient, consultations }:
                   <div style={{ fontSize:11, color:GRAY }}>Prescribed {fmtDT(rx.prescribedAt)}{rx.practitionerName&&` · Dr. ${rx.practitionerName}`}</div>
                 </div>
                 <div style={{ flexShrink:0, marginLeft:12 }}>
-                  {rx.dispensed?<span style={{ background:"var(--hf-success-soft-strong)",color:GREEN,padding:"3px 10px",borderRadius:20,fontSize:12,fontWeight:700 }}>DISPENSED</span>:<span style={{ background:"var(--hf-orange-soft)",color:AMBER,padding:"3px 10px",borderRadius:20,fontSize:12,fontWeight:700 }}>ACTIVE</span>}
+                  {rx.dispensed?<span style={{ background:"var(--hf-success-soft-strong)",color:GREEN_TEXT,padding:"3px 10px",borderRadius:20,fontSize:12,fontWeight:700 }}>DISPENSED</span>:<span style={{ background:"var(--hf-orange-soft)",color:AMBER,padding:"3px 10px",borderRadius:20,fontSize:12,fontWeight:700 }}>ACTIVE</span>}
                 </div>
               </div>
             </div>
@@ -1243,8 +1248,8 @@ function LabsTab({ patient }:{patient:Patient}) {
     queryFn: async ()=>unwrap(await apiClient.get(`/api/v1/clinic/lab/patients/${patient.id}/results`)),
   })
   const STATUS_LAB:Record<string,{color:string;bg:string}> = {
-    UNREVIEWED:{color:RED,bg:"#FEF2F2"}, REVIEWED:{color:AMBER,bg:"#FFFBEB"},
-    FILED:{color:GREEN,bg:"#DCFCE7"},   REJECTED:{color:GRAY,bg:LIGHT},
+    UNREVIEWED:{color:RED_TEXT,bg:"var(--hf-danger-soft)"}, REVIEWED:{color:AMBER,bg:"var(--hf-warning-soft)"},
+    FILED:{color:GREEN_TEXT,bg:"var(--hf-success-soft-strong)"},   REJECTED:{color:GRAY,bg:LIGHT},
   }
 
   return (
@@ -1264,11 +1269,11 @@ function LabsTab({ patient }:{patient:Patient}) {
                   <div>
                     <div style={{ fontWeight:700, fontSize:14, color:"var(--hf-text)", marginBottom:4 }}>{lab.pdfFilename||"Lab result"}</div>
                     <div style={{ fontSize:12, color:GRAY }}>{lab.source} · Received {fmtDT(lab.receivedAt)}{lab.labReference&&` · Ref: ${lab.labReference}`}</div>
-                    {lab.interpretation&&<div style={{ marginTop:8, padding:"8px 12px", background:"var(--hf-success-soft)", border:"1px solid var(--hf-success-border)", borderRadius:8, fontSize:12, color:"var(--hf-text)" }}><span style={{ fontWeight:700, color:TEAL }}>AI interpretation: </span>{lab.interpretation}</div>}
+                    {lab.interpretation&&<div style={{ marginTop:8, padding:"8px 12px", background:"var(--hf-success-soft)", border:"1px solid var(--hf-success-border)", borderRadius:8, fontSize:12, color:"var(--hf-text)" }}><span style={{ fontWeight:700, color:TEAL_TEXT }}>AI interpretation: </span>{lab.interpretation}</div>}
                   </div>
                   <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6, flexShrink:0, marginLeft:12 }}>
                     <span style={{ background:cfg.bg, color:cfg.color, padding:"2px 8px", borderRadius:20, fontSize:11, fontWeight:700 }}>{lab.status}</span>
-                    {lab.pdfUrl&&<button onClick={()=>downloadPdf(`/api/v1/clinic/lab/results/${lab.id}/pdf`,lab.pdfFilename||"result.pdf")} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:LIGHT, color:NAVY, border:`1px solid ${BORDER}`, borderRadius:6, fontSize:12, cursor:"pointer" }}><Download size={11}/> PDF</button>}
+                    {lab.pdfUrl&&<button onClick={()=>downloadPdf(`/api/v1/clinic/lab/results/${lab.id}/pdf`,lab.pdfFilename||"result.pdf")} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px", background:LIGHT, color:NAVY_TEXT, border:`1px solid ${BORDER}`, borderRadius:6, fontSize:12, cursor:"pointer" }}><Download size={11}/> PDF</button>}
                   </div>
                 </div>
               </div>
@@ -1284,13 +1289,13 @@ function LabsTab({ patient }:{patient:Patient}) {
             <div>
               <label style={lbl}>PDF file</label>
               <div style={{ border:`2px dashed ${BORDER}`, borderRadius:10, padding:"24px", textAlign:"center", cursor:"pointer", background:LIGHT }} onClick={()=>fileRef.current?.click()}>
-                <Upload size={24} color={GRAY} style={{ marginBottom:8 }}/>
+                <Upload size={24} style={{ color: GRAY, marginBottom:8 }}/>
                 <div style={{ fontSize:13, color:GRAY }}>Click to select PDF</div>
                 <div style={{ fontSize:11, color:"var(--hf-text-faint)", marginTop:4 }}>PDF only · max 10MB</div>
                 <input ref={fileRef} type="file" accept=".pdf" style={{ display:"none" }} onChange={e=>{ const file=e.target.files?.[0]; if (file) { setUploadFile(file); setUploadError("") } }}/>
               </div>
-              {uploadFile&&<div style={{ marginTop:6, fontSize:13, color:GREEN, display:"flex", alignItems:"center", gap:6 }}><CheckCircle size={13}/> {uploadFile.name}</div>}
-              {uploadError&&<div style={{ marginTop:6, fontSize:13, color:RED, display:"flex", alignItems:"center", gap:6 }}><AlertCircle size={13}/> {uploadError}</div>}
+              {uploadFile&&<div style={{ marginTop:6, fontSize:13, color:GREEN_TEXT, display:"flex", alignItems:"center", gap:6 }}><CheckCircle size={13}/> {uploadFile.name}</div>}
+              {uploadError&&<div style={{ marginTop:6, fontSize:13, color:RED_TEXT, display:"flex", alignItems:"center", gap:6 }}><AlertCircle size={13}/> {uploadError}</div>}
             </div>
           </div>
           <ModalFooter onCancel={()=>setShowUpload(false)}
@@ -1352,9 +1357,9 @@ function DocumentsTab({ patient, consultations }:
   const [certForm, setCertForm]=useState({consultationId:"",unfitFrom:"",unfitTo:"",notes:""})
   const [loading, setLoading]=useState(false)
   const docs=[
-    {icon:FileText, label:"Medical certificate", desc:"Generate sick note — select consultation + dates", color:PURPLE, action:()=>setShowCert(true)},
-    {icon:Pill,     label:"Prescription PDF",    desc:"Download prescription from latest consultation",  color:TEAL,   action:()=>{ if (consultations[0]) downloadPdf(`/api/v1/clinic/consultations/${consultations[0].id}/prescription-pdf`,`rx-${patient.id}.pdf`) }},
-    {icon:Download, label:"Patient summary",     desc:"Full record export for referral or transfer",     color:NAVY,   action:()=>{}},
+    {icon:FileText, label:"Medical certificate", desc:"Generate sick note — select consultation + dates", color:PURPLE_TEXT, action:()=>setShowCert(true)},
+    {icon:Pill,     label:"Prescription PDF",    desc:"Download prescription from latest consultation",  color:TEAL_TEXT,   action:()=>{ if (consultations[0]) downloadPdf(`/api/v1/clinic/consultations/${consultations[0].id}/prescription-pdf`,`rx-${patient.id}.pdf`) }},
+    {icon:Download, label:"Patient summary",     desc:"Full record export for referral or transfer",     color:NAVY_TEXT,   action:()=>{}},
   ]
   return (
     <div>
@@ -1363,7 +1368,7 @@ function DocumentsTab({ patient, consultations }:
           <button key={d.label} onClick={d.action} style={{ display:"flex", alignItems:"flex-start", gap:14, padding:"18px 20px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:12, cursor:"pointer", textAlign:"left" as const }}
             onMouseEnter={e=>{ (e.currentTarget as HTMLButtonElement).style.borderColor=d.color; (e.currentTarget as HTMLButtonElement).style.background=LIGHT }}
             onMouseLeave={e=>{ (e.currentTarget as HTMLButtonElement).style.borderColor=BORDER; (e.currentTarget as HTMLButtonElement).style.background="var(--hf-surface)" }}>
-            <div style={{ width:40, height:40, borderRadius:10, background:`${d.color}14`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><d.icon size={18} color={d.color}/></div>
+            <div style={{ width:40, height:40, borderRadius:10, background:`color-mix(in srgb, ${d.color} 8%, transparent)`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><d.icon size={18} style={{ color: d.color }}/></div>
             <div><div style={{ fontSize:14, fontWeight:700, color:"var(--hf-text)", marginBottom:3 }}>{d.label}</div><div style={{ fontSize:12, color:GRAY }}>{d.desc}</div></div>
           </button>
         ))}
@@ -1405,8 +1410,8 @@ function HistoryTab({ appointments, consultations }:
           return (
             <div key={item.id} style={{ display:"flex", gap:16, alignItems:"flex-start" }}>
               <div style={{ display:"flex", flexDirection:"column", alignItems:"center", flexShrink:0 }}>
-                <div style={{ width:36, height:36, borderRadius:"50%", background:isAppt?"var(--hf-info-soft)":"var(--hf-success-soft)", border:`2px solid ${isAppt?"#BFDBFE":"#86EFAC"}`, display:"flex", alignItems:"center", justifyContent:"center" }}>
-                  {isAppt?<Calendar size={14} color="#1D4ED8"/>:<Stethoscope size={14} color={TEAL}/>}
+                <div style={{ width:36, height:36, borderRadius:"50%", background:isAppt?"var(--hf-info-soft)":"var(--hf-success-soft)", border:`2px solid ${isAppt?"var(--hf-info-border)":"var(--hf-success-border)"}`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  {isAppt?<Calendar size={14} style={{ color: 'var(--hf-info-text)' }}/>:<Stethoscope size={14} style={{ color: TEAL_TEXT }}/>}
                 </div>
                 {i<timeline.length-1&&<div style={{ width:2, height:32, background:BORDER, marginTop:4 }}/>}
               </div>
@@ -1456,14 +1461,14 @@ function Empty({ icon:Icon, msg, children }:{icon:React.ElementType;msg:string;c
   return <div style={{ textAlign:"center", padding:"60px 20px", color:GRAY, border:`1px dashed ${BORDER}`, borderRadius:12 }}><Icon size={36} style={{ marginBottom:12, opacity:0.4 }}/><div style={{ fontWeight:600, color:"var(--hf-text-tertiary)", fontSize:15 }}>{msg}</div>{children}</div>
 }
 function ErrBox({ msg }:{msg:string}) {
-  return <div style={{ padding:"10px 12px", background:"var(--hf-danger-soft)", border:"1px solid var(--hf-danger-border)", borderRadius:8, fontSize:13, color:RED, display:"flex", alignItems:"center", gap:8 }}><AlertCircle size={14}/>{msg}</div>
+  return <div style={{ padding:"10px 12px", background:"var(--hf-danger-soft)", border:"1px solid var(--hf-danger-border)", borderRadius:8, fontSize:13, color:RED_TEXT, display:"flex", alignItems:"center", gap:8 }}><AlertCircle size={14}/>{msg}</div>
 }
 function FSect({ title, children }:{title:string;children:React.ReactNode}) {
   return <div style={{ marginBottom:20 }}><div style={{ fontSize:10, fontWeight:700, color:GRAY, letterSpacing:"0.07em", textTransform:"uppercase", marginBottom:12, paddingBottom:8, borderBottom:`1px solid ${BORDER}` }}>{title}</div>{children}</div>
 }
 
-const lbl:React.CSSProperties     = {display:"block",fontSize:13,fontWeight:600,color:"#374151",marginBottom:5}
-const sinp:React.CSSProperties    = {width:"100%",padding:"9px 12px",boxSizing:"border-box" as const,border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:14,outline:"none",background:"#fff"}
-const btnPrimary:React.CSSProperties = {display:"flex",alignItems:"center",gap:7,background:NAVY,color:"#fff",border:"none",borderRadius:9,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}
-const btnCancel:React.CSSProperties  = {padding:"9px 18px",border:`1px solid ${BORDER}`,borderRadius:9,background:"#fff",fontSize:13,cursor:"pointer",color:"#374151"}
-const btnOutline:React.CSSProperties = {padding:"9px 18px",border:"1.5px solid",borderRadius:9,background:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}
+const lbl:React.CSSProperties     = {display:"block",fontSize:13,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}
+const sinp:React.CSSProperties    = {width:"100%",padding:"9px 12px",boxSizing:"border-box" as const,border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:14,outline:"none",background:"var(--hf-surface)"}
+const btnPrimary:React.CSSProperties = {display:"flex",alignItems:"center",gap:7,background:NAVY,color:"var(--hf-text-on-solid)",border:"none",borderRadius:9,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}
+const btnCancel:React.CSSProperties  = {padding:"9px 18px",border:`1px solid ${BORDER}`,borderRadius:9,background:"var(--hf-surface)",fontSize:13,cursor:"pointer",color:"var(--hf-text-secondary)"}
+const btnOutline:React.CSSProperties = {padding:"9px 18px",border:"1.5px solid",borderRadius:9,background:"var(--hf-surface)",fontSize:13,fontWeight:600,cursor:"pointer"}

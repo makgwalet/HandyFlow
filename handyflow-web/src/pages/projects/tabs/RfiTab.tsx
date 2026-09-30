@@ -113,7 +113,7 @@ export function RfiTab({ projectId }: { projectId: string }) {
                     return (
                       <tr key={r.id} onClick={()=>{ setSelected(r); setResponse('') }}
                         style={{borderTop:'1px solid var(--hf-border-subtle)',background:i%2===0?'var(--hf-surface)':'var(--hf-surface-muted)',cursor:'pointer'}}
-                        onMouseEnter={e=>(e.currentTarget.style.background='#F0F7FF')}
+                        onMouseEnter={e=>(e.currentTarget.style.background='var(--hf-info-soft)')}
                         onMouseLeave={e=>(e.currentTarget.style.background=i%2===0?'var(--hf-surface)':'var(--hf-surface-muted)')}>
                         <td style={{padding:'10px 14px',fontSize:12,fontWeight:700,color:'var(--hf-primary-text)',whiteSpace:'nowrap'}}>{r.rfiNumber}</td>
                         <td style={{padding:'10px 14px',fontSize:13,fontWeight:600,color:'var(--hf-text)',maxWidth:220,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.title}</td>

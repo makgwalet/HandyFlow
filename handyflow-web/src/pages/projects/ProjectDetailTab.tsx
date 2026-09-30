@@ -30,8 +30,9 @@ export interface Project {
 
 type TabKey = 'overview'|'gantt'|'tasks'|'resources'|'budget'|'risks'|'documents'|'field'|'rfi'
 
-const ACCENT = '#1B3A6B'
-const HEALTH_DOT: Record<string,string> = { GREEN:'#16A34A', AMBER:'#D97706', RED:'#DC2626' }
+const ACCENT = "var(--hf-primary)"
+const ACCENT_TEXT = "var(--hf-primary-text)";
+const HEALTH_DOT: Record<string,string> = { GREEN:'var(--hf-success)', AMBER:'var(--hf-warning)', RED:'var(--hf-danger)' }
 const STATUS_BADGE: Record<string,{bg:string;color:string}> = {
   PLANNING:{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)'}, ACTIVE:{bg:'var(--hf-info-soft-strong)',color:'var(--hf-info-text)'},
   ON_HOLD:{bg:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)'}, COMPLETED:{bg:'var(--hf-success-soft-strong)',color:'var(--hf-success-text-strong)'},
@@ -78,7 +79,7 @@ export function ProjectDetailTab({ projectId, onBack }: { projectId:string; onBa
   if (!project)  return <div style={{padding:'40px 0',textAlign:'center',color:'var(--hf-danger-text)', fontSize:13}}>Project not found</div>
 
   const st   = STATUS_BADGE[project.status] ?? STATUS_BADGE.PLANNING
-  const hDot = HEALTH_DOT[project.health]   ?? '#16A34A'
+  const hDot = HEALTH_DOT[project.health]   ?? 'var(--hf-success)'
 
   return (
     <div>
@@ -106,11 +107,11 @@ export function ProjectDetailTab({ projectId, onBack }: { projectId:string; onBa
             </div>
           </div>
           <div style={{display:'flex',gap:8,flexShrink:0,flexWrap:'wrap',justifyContent:'flex-end'}}>
-            {project.status==='PLANNING' && <Btn onClick={()=>actionMut.mutate('activate')} color="#166534" bg="#DCFCE7" border="#86EFAC" icon={Play}>Activate</Btn>}
-            {project.status==='ACTIVE'   && <Btn onClick={()=>actionMut.mutate('hold')}     color="#92400E" bg="#FEF3C7" border="#FCD34D" icon={Pause}>Hold</Btn>}
-            {project.status==='ON_HOLD'  && <Btn onClick={()=>actionMut.mutate('activate')} color="#166534" bg="#DCFCE7" border="#86EFAC" icon={Play}>Resume</Btn>}
+            {project.status==='PLANNING' && <Btn onClick={()=>actionMut.mutate('activate')} color="var(--hf-success-text-strong)" bg="var(--hf-success-soft-strong)" border="var(--hf-success-border)" icon={Play}>Activate</Btn>}
+            {project.status==='ACTIVE'   && <Btn onClick={()=>actionMut.mutate('hold')}     color="var(--hf-warning-text-deep)" bg="var(--hf-warning-soft-strong)" border="var(--hf-warning-border-strong)" icon={Pause}>Hold</Btn>}
+            {project.status==='ON_HOLD'  && <Btn onClick={()=>actionMut.mutate('activate')} color="var(--hf-success-text-strong)" bg="var(--hf-success-soft-strong)" border="var(--hf-success-border)" icon={Play}>Resume</Btn>}
             {['PLANNING','ACTIVE','ON_HOLD'].includes(project.status) && (
-              <Btn onClick={()=>actionMut.mutate('complete')} color="#166534" bg="#F0FDF4" border="#BBF7D0" icon={CheckCircle}>Complete</Btn>
+              <Btn onClick={()=>actionMut.mutate('complete')} color="var(--hf-success-text-strong)" bg="var(--hf-success-soft)" border="var(--hf-success-border-subtle)" icon={CheckCircle}>Complete</Btn>
             )}
             {project.clientPortalToken && (
               <button onClick={()=>window.open(`/projects/portal/${project.clientPortalToken}`,'_blank')}
@@ -130,7 +131,7 @@ export function ProjectDetailTab({ projectId, onBack }: { projectId:string; onBa
               padding:'8px 14px',background:'none',border:'none',cursor:'pointer',
               fontSize:13,whiteSpace:'nowrap',
               fontWeight:   tab===t.key ? 600 : 400,
-              color:        tab===t.key ? ACCENT : 'var(--hf-text-muted)',
+              color:        tab===t.key ? ACCENT_TEXT : 'var(--hf-text-muted)',
               borderBottom: tab===t.key ? `2px solid ${ACCENT}` : '2px solid transparent',
               marginBottom:-1,
             }}>

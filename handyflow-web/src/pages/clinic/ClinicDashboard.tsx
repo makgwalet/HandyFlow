@@ -8,12 +8,12 @@ const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hou
 const today   = new Date().toISOString().split("T")[0]
 
 const STATUS_CFG: Record<string, { color: string; bg: string; label: string }> = {
-  SCHEDULED:   { color: "#1D4ED8", bg: "#EFF6FF", label: "Scheduled" },
-  CONFIRMED:   { color: "#7C3AED", bg: "#F5F3FF", label: "Confirmed" },
-  IN_PROGRESS: { color: "#D97706", bg: "#FFFBEB", label: "In Progress" },
-  COMPLETED:   { color: "#166534", bg: "#DCFCE7", label: "Completed" },
-  CANCELLED:   { color: "#DC2626", bg: "#FEF2F2", label: "Cancelled" },
-  NO_SHOW:     { color: "#64748B", bg: "#F8FAFC", label: "No Show" },
+  SCHEDULED:   { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", label: "Scheduled" },
+  CONFIRMED:   { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", label: "Confirmed" },
+  IN_PROGRESS: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", label: "In Progress" },
+  COMPLETED:   { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", label: "Completed" },
+  CANCELLED:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", label: "Cancelled" },
+  NO_SHOW:     { color: "var(--hf-text-muted)", bg: "var(--hf-surface-muted)", label: "No Show" },
 }
 
 export default function ClinicDashboard({ onNavigate }: { onNavigate: (tab: any) => void }) {
@@ -38,16 +38,16 @@ export default function ClinicDashboard({ onNavigate }: { onNavigate: (tab: any)
 
   const kpis = [
     { label: "Today's appointments", value: todayA.length,
-      color: "#1B3A6B", bg: "#EFF6FF", icon: Calendar, tab: "appointments" },
+      color: "var(--hf-primary-text)", bg: "var(--hf-info-soft)", icon: Calendar, tab: "schedule" },
     { label: "Awaiting today",
       value: todayA.filter((a: any) => ["SCHEDULED","CONFIRMED"].includes(a.status)).length,
-      color: "#D97706", bg: "#FFFBEB", icon: Clock, tab: "appointments" },
+      color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", icon: Clock, tab: "schedule" },
     { label: "Completed today",
       value: todayA.filter((a: any) => a.status === "COMPLETED").length,
-      color: "#166534", bg: "#DCFCE7", icon: CheckCircle, tab: "appointments" },
+      color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", icon: CheckCircle, tab: "schedule" },
     { label: "Total patients",
       value: (patientsData as any)?.totalElements ?? "—",
-      color: "#7C3AED", bg: "#F5F3FF", icon: Users, tab: "patients" },
+      color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", icon: Users, tab: "patients" },
   ]
 
   return (
@@ -62,7 +62,7 @@ export default function ClinicDashboard({ onNavigate }: { onNavigate: (tab: any)
             onMouseLeave={e => (e.currentTarget.style.boxShadow = "none")}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: k.color, textTransform: "uppercase" }}>{k.label}</div>
-              <k.icon size={16} color={k.color} />
+              <k.icon size={16} style={{ color: k.color }} />
             </div>
             <div style={{ fontSize: 28, fontWeight: 800, color: k.color }}>{k.value}</div>
           </div>
@@ -76,7 +76,7 @@ export default function ClinicDashboard({ onNavigate }: { onNavigate: (tab: any)
             <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>
               Today — {new Date().toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long" })}
             </span>
-            <button onClick={() => onNavigate("appointments")}
+            <button onClick={() => onNavigate("schedule")}
               style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-accent-text)",
                 background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
               View all <ArrowRight size={13} />
@@ -86,9 +86,9 @@ export default function ClinicDashboard({ onNavigate }: { onNavigate: (tab: any)
           {todayA.length === 0 ? (
             <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed var(--hf-border)",
               borderRadius: 12, color: "var(--hf-text-faint)" }}>
-              <Calendar size={32} color="#CBD5E1" style={{ marginBottom: 10 }} />
+              <Calendar size={32} style={{ color: 'var(--hf-text-disabled)', marginBottom: 10 }} />
               <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No appointments today</div>
-              <button onClick={() => onNavigate("appointments")}
+              <button onClick={() => onNavigate("schedule")}
                 style={{ marginTop: 12, padding: "7px 16px", background: "var(--hf-accent)", color: "var(--hf-text-on-solid)",
                   border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
                 Book appointment
@@ -171,9 +171,9 @@ export default function ClinicDashboard({ onNavigate }: { onNavigate: (tab: any)
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 10 }}>Quick actions</div>
             {[
-              { label: "Register patient",    tab: "patients",      color: "#1B3A6B" },
-              { label: "Book appointment",    tab: "appointments",  color: "#0D9488" },
-              { label: "Record consultation", tab: "consultations", color: "#7C3AED" },
+              { label: "Register patient",    tab: "patients",      color: "var(--hf-primary-text)" },
+              { label: "Book appointment",    tab: "schedule",  color: "var(--hf-accent-text)" },
+              { label: "Record consultation", tab: "consultations", color: "var(--hf-violet-text)" },
             ].map(a => (
               <button key={a.label} onClick={() => onNavigate(a.tab)}
                 style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "var(--hf-surface)",

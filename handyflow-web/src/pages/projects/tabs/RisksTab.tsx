@@ -138,8 +138,8 @@ export function RisksTab({projectId}:{projectId:string}) {
                 <input type="range" min={1} max={5} value={form.impact} onChange={(e:any)=>sf('impact',parseInt(e.target.value))} style={{width:'100%'}}/>
                 <div style={{fontSize:12,color:'var(--hf-text-muted)',textAlign:'center' as const}}>{form.impact}/5</div>
               </div>
-              <div style={{gridColumn:'span 2',padding:'8px 12px',borderRadius:8,background:(()=>{const s=form.probability*form.impact;return s>=15?'#FEF2F2':s>=9?'#FEF3C7':'#DCFCE7'})()}}>
-                <span style={{fontSize:12,fontWeight:700,color:(()=>{const s=form.probability*form.impact;return s>=15?'#DC2626':s>=9?'#92400E':'#166534'})()}}>
+              <div style={{gridColumn:'span 2',padding:'8px 12px',borderRadius:8,background:(()=>{const s=form.probability*form.impact;return s>=15?'var(--hf-danger-soft)':s>=9?'var(--hf-warning-soft-strong)':'var(--hf-success-soft-strong)'})()}}>
+                <span style={{fontSize:12,fontWeight:700,color:(()=>{const s=form.probability*form.impact;return s>=15?'var(--hf-danger-text)':s>=9?'var(--hf-warning-text-deep)':'var(--hf-success-text-strong)'})()}}>
                   Risk Score: {form.probability*form.impact} — {form.probability*form.impact>=15?'RED':form.probability*form.impact>=9?'AMBER':'GREEN'}
                 </span>
               </div>

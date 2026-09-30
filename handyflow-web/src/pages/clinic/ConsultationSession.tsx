@@ -32,9 +32,16 @@ interface RxDraft {
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
 
-const NAVY="#1B3A6B"; const TEAL="#0D9488"; const RED="#DC2626"
-const GREEN="#166534"; const AMBER="#D97706"; const PURPLE="#7C3AED"
-const GRAY="#64748B"; const BORDER="#E2E8F0"; const LIGHT="#F8FAFC"
+const NAVY="var(--hf-primary)";
+const NAVY_TEXT = "var(--hf-primary-text)"; const TEAL="var(--hf-accent)";
+const TEAL_TEXT = "var(--hf-accent-text)"; const RED="var(--hf-danger)"
+const RED_TEXT = "var(--hf-danger-text)";
+const GREEN="var(--hf-success-solid-strong)";
+const GREEN_TEXT = "var(--hf-success-text-strong)"; const AMBER="var(--hf-warning)";
+const AMBER_TEXT = "var(--hf-warning-text)"; const PURPLE="var(--hf-violet)"
+const PURPLE_TEXT = "var(--hf-violet-text)";
+const GRAY="var(--hf-neutral-solid)";
+const GRAY_TEXT = "var(--hf-text-muted)"; const BORDER="var(--hf-border)"; const LIGHT="var(--hf-surface-muted)"
 
 const QUICK_PROCEDURES = [
   { label:"Injection IM",    tariff:"0115", price: 85,  icon: Syringe,      type:"PROCEDURE" },
@@ -306,7 +313,7 @@ Transcript: ${transcript}`}]})
     <div style={{ fontFamily:"'Inter',system-ui,sans-serif", height:"100%", display:"flex", flexDirection:"column" }}>
 
       {/* ── Session header ─────────────────────────────────────────────── */}
-      <div style={{ background:`linear-gradient(135deg,${NAVY} 0%,#0D2145 100%)`,
+      <div style={{ background:`linear-gradient(135deg,${NAVY} 0%,var(--hf-primary-deep) 100%)`,
         borderRadius:12, padding:"16px 24px", marginBottom:16,
         display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
         <div style={{ display:"flex", alignItems:"center", gap:16 }}>
@@ -318,7 +325,7 @@ Transcript: ${transcript}`}]})
           <div>
             <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:2 }}>
               <span style={{ fontSize:18, fontWeight:800, color:"var(--hf-text-on-solid)" }}>{patient.fullName}</span>
-              <span style={{ background:"rgba(13,148,136,0.3)", color:"#5EEAD4",
+              <span style={{ background:"rgba(13,148,136,0.3)", color:"var(--hf-accent-on-brand)",
                 padding:"2px 8px", borderRadius:20, fontSize:11, fontWeight:700 }}>
                 {appointment.appointmentType?.replace("_"," ")}
               </span>
@@ -329,8 +336,8 @@ Transcript: ${transcript}`}]})
             </div>
             {patient.allergies && patient.allergies.length > 0 && (
               <div style={{ display:"flex", alignItems:"center", gap:4, marginTop:4 }}>
-                <AlertCircle size={11} color="#FCA5A5"/>
-                <span style={{ fontSize:11, color:"#FCA5A5", fontWeight:600 }}>
+                <AlertCircle size={11} style={{ color: 'var(--hf-danger-on-brand)' }}/>
+                <span style={{ fontSize:11, color:"var(--hf-danger-on-brand)", fontWeight:600 }}>
                   ⚠ {patient.allergies.join(", ")}
                 </span>
               </div>
@@ -393,7 +400,7 @@ Transcript: ${transcript}`}]})
           <button key={p.id} onClick={()=>setActivePanel(p.id as any)}
             style={{ flex:1, padding:"8px 12px", borderRadius:8, border:"none",
               background:activePanel===p.id?NAVY:LIGHT,
-              color:activePanel===p.id?"var(--hf-text-on-solid)":GRAY,
+              color:activePanel===p.id?"var(--hf-text-on-solid)":GRAY_TEXT,
               fontWeight:activePanel===p.id?600:400, fontSize:13, cursor:"pointer",
               display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
             {p.label}
@@ -419,7 +426,7 @@ Transcript: ${transcript}`}]})
           <div style={{ padding:"12px 14px", background:"var(--hf-violet-soft)", border:"1px solid var(--hf-violet-border)",
             borderRadius:10 }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-              <span style={{ fontSize:12, fontWeight:700, color:PURPLE, display:"flex", alignItems:"center", gap:5 }}>
+              <span style={{ fontSize:12, fontWeight:700, color:PURPLE_TEXT, display:"flex", alignItems:"center", gap:5 }}>
                 <Mic size={13}/> Voice-to-notes
               </span>
               <div style={{ display:"flex", gap:6 }}>
@@ -433,7 +440,7 @@ Transcript: ${transcript}`}]})
                 }
                 {transcript && (
                   <>
-                    <button onClick={extractSOAP} disabled={extracting} style={voiceBtn(extracting?"#94A3B8":TEAL)}>
+                    <button onClick={extractSOAP} disabled={extracting} style={voiceBtn(extracting?"var(--hf-text-faint)":TEAL)}>
                       {extracting ? <><Loader size={11}/> Extracting</> : <><Sparkles size={11}/> Extract SOAP</>}
                     </button>
                     <button onClick={()=>setTranscript("")} style={voiceBtn(GRAY)}>Clear</button>
@@ -442,7 +449,7 @@ Transcript: ${transcript}`}]})
               </div>
             </div>
             {isRecording && (
-              <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:11, color:RED, marginBottom:4 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:11, color:RED_TEXT, marginBottom:4 }}>
                 <div style={{ width:6, height:6, borderRadius:"50%", background:RED }}/>
                 Recording
               </div>
@@ -474,7 +481,7 @@ Transcript: ${transcript}`}]})
               ))}
             </div>
             {soap.weightKg && soap.heightCm && (
-              <div style={{ marginTop:6, fontSize:11, color:GRAY }}>
+              <div style={{ marginTop:6, fontSize:11, color:GRAY_TEXT }}>
                 BMI: {(parseFloat(soap.weightKg)/Math.pow(parseFloat(soap.heightCm)/100,2)).toFixed(1)}
               </div>
             )}
@@ -517,10 +524,10 @@ Transcript: ${transcript}`}]})
                 <button key={proc.tariff} onClick={()=>addQuickProcedure(proc)}
                   style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 10px",
                     background:LIGHT, border:`1px solid ${BORDER}`, borderRadius:7,
-                    fontSize:11, fontWeight:600, color:NAVY, cursor:"pointer" }}
+                    fontSize:11, fontWeight:600, color:NAVY_TEXT, cursor:"pointer" }}
                   onMouseEnter={e=>(e.currentTarget.style.borderColor=TEAL)}
                   onMouseLeave={e=>(e.currentTarget.style.borderColor=BORDER)}>
-                  <proc.icon size={11}/>{proc.label} <span style={{color:GRAY}}>R{proc.price}</span>
+                  <proc.icon size={11}/>{proc.label} <span style={{color:GRAY_TEXT}}>R{proc.price}</span>
                 </button>
               ))}
             </div>
@@ -530,7 +537,7 @@ Transcript: ${transcript}`}]})
           <div style={{ padding:"12px 14px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:10, position:"relative" }}>
             <div style={sectionLabel}>Add medication (bill + Rx)</div>
             <div style={{ position:"relative" }}>
-              <Search size={13} style={{ position:"absolute", left:8, top:"50%", transform:"translateY(-50%)", color:GRAY }}/>
+              <Search size={13} style={{ position:"absolute", left:8, top:"50%", transform:"translateY(-50%)", color:GRAY_TEXT }}/>
               <input value={medSearch} onChange={e=>{setMedSearch(e.target.value);setShowMedSearch(true)}}
                 onFocus={()=>setShowMedSearch(true)}
                 placeholder="Search NAPPI catalogue…"
@@ -540,7 +547,7 @@ Transcript: ${transcript}`}]})
               <div style={{ position:"absolute", left:14, right:14, zIndex:50,
                 background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:8,
                 boxShadow:"0 8px 32px rgba(0,0,0,0.12)", maxHeight:240, overflowY:"auto" }}>
-                {medLoading && <div style={{padding:"10px 14px",fontSize:12,color:GRAY}}>Searching…</div>}
+                {medLoading && <div style={{padding:"10px 14px",fontSize:12,color:GRAY_TEXT}}>Searching…</div>}
                 {medResults.map((med:any)=>(
                   <div key={med.id||med.nappiCode}
                     onClick={()=>addMedicationToBillAndRx({
@@ -551,12 +558,12 @@ Transcript: ${transcript}`}]})
                     style={{ padding:"8px 14px", cursor:"pointer", borderBottom:`1px solid var(--hf-border-subtle)` }}
                     onMouseEnter={e=>(e.currentTarget.style.background=LIGHT)}
                     onMouseLeave={e=>(e.currentTarget.style.background="var(--hf-surface)")}>
-                    <div style={{fontWeight:600,fontSize:13,color:"var(--hf-text)"}}>{med.genericName} <span style={{color:GRAY,fontWeight:400}}>{med.strength}</span></div>
-                    <div style={{fontSize:11,color:GRAY}}>{med.brandName} · NAPPI: {med.nappiCode} · SEP: {fmtR(parseFloat(med.singleExitPrice)||0)}</div>
+                    <div style={{fontWeight:600,fontSize:13,color:"var(--hf-text)"}}>{med.genericName} <span style={{color:GRAY_TEXT,fontWeight:400}}>{med.strength}</span></div>
+                    <div style={{fontSize:11,color:GRAY_TEXT}}>{med.brandName} · NAPPI: {med.nappiCode} · SEP: {fmtR(parseFloat(med.singleExitPrice)||0)}</div>
                   </div>
                 ))}
                 <div onClick={()=>setShowMedSearch(false)}
-                  style={{padding:"6px 14px",fontSize:11,color:GRAY,cursor:"pointer",borderTop:`1px solid var(--hf-border-subtle)`,textAlign:"center" as const}}>
+                  style={{padding:"6px 14px",fontSize:11,color:GRAY_TEXT,cursor:"pointer",borderTop:`1px solid var(--hf-border-subtle)`,textAlign:"center" as const}}>
                   Close
                 </div>
               </div>
@@ -579,7 +586,7 @@ Transcript: ${transcript}`}]})
                       overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" as const }}>
                       {line.description}
                     </div>
-                    <div style={{ fontSize:10, color:GRAY }}>
+                    <div style={{ fontSize:10, color:GRAY_TEXT }}>
                       {line.tariffCode||line.nappiCode||""} · qty {line.quantity}
                     </div>
                   </div>
@@ -588,7 +595,7 @@ Transcript: ${transcript}`}]})
                   </div>
                   {line.id!=="consult-0191" && (
                     <button onClick={()=>removeBillLine(line.id)}
-                      style={{background:"none",border:"none",cursor:"pointer",color:RED,display:"flex",padding:2}}>
+                      style={{background:"none",border:"none",cursor:"pointer",color:RED_TEXT,display:"flex",padding:2}}>
                       <X size={12}/>
                     </button>
                   )}
@@ -601,7 +608,7 @@ Transcript: ${transcript}`}]})
               <button onClick={()=>setShowCustom(true)}
                 style={{display:"flex",alignItems:"center",gap:5,padding:"7px 12px",
                   border:`1px dashed ${BORDER}`,borderRadius:8,background:LIGHT,
-                  color:GRAY,fontSize:12,cursor:"pointer"}}>
+                  color:GRAY_TEXT,fontSize:12,cursor:"pointer"}}>
                 <Plus size={12}/> Add custom item
               </button>
             ) : (
@@ -641,24 +648,24 @@ Transcript: ${transcript}`}]})
 
           <div style={{padding:"12px 14px",background:"var(--hf-surface)",border:`1px solid ${BORDER}`,borderRadius:10}}>
             <div style={{...sectionLabel,marginBottom:8}}>Prescriptions ({rxDrafts.length})</div>
-            <div style={{fontSize:11,color:GRAY}}>
+            <div style={{fontSize:11,color:GRAY_TEXT}}>
               Medications added via search auto-appear here. Complete dosage details before finishing.
             </div>
           </div>
 
           <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:10}}>
             {rxDrafts.length===0 ? (
-              <div style={{textAlign:"center",padding:"40px 20px",color:GRAY,
+              <div style={{textAlign:"center",padding:"40px 20px",color:GRAY_TEXT,
                 border:`1px dashed ${BORDER}`,borderRadius:10,fontSize:13}}>
                 <Pill size={28} style={{marginBottom:8,opacity:0.4}}/>
                 <div>Medications added during the consultation appear here.</div>
               </div>
             ) : rxDrafts.map(rx=>(
               <div key={rx.id} style={{padding:"12px 14px",background:rx.fromBill?"var(--hf-success-soft)":"var(--hf-surface)",
-                border:`1px solid ${rx.fromBill?"#86EFAC":BORDER}`,borderRadius:10,position:"relative"}}>
+                border:`1px solid ${rx.fromBill?"var(--hf-success-border)":BORDER}`,borderRadius:10,position:"relative"}}>
                 {rx.fromBill && (
                   <div style={{position:"absolute",top:8,right:8,fontSize:10,fontWeight:700,
-                    color:GREEN,background:"var(--hf-success-soft-strong)",padding:"1px 6px",borderRadius:20}}>
+                    color:GREEN_TEXT,background:"var(--hf-success-soft-strong)",padding:"1px 6px",borderRadius:20}}>
                     Added to bill
                   </div>
                 )}
@@ -694,7 +701,7 @@ Transcript: ${transcript}`}]})
                 </div>
                 <button onClick={()=>removeRx(rx.id)}
                   style={{position:"absolute",bottom:8,right:8,background:"none",border:"none",
-                    cursor:"pointer",color:RED,fontSize:11,display:"flex",alignItems:"center",gap:3}}>
+                    cursor:"pointer",color:RED_TEXT,fontSize:11,display:"flex",alignItems:"center",gap:3}}>
                   <X size={10}/> Remove
                 </button>
               </div>
@@ -705,7 +712,7 @@ Transcript: ${transcript}`}]})
               medicationName:"",dosage:"",frequency:"",duration:"",quantity:30,instructions:"",fromBill:false}])}
               style={{display:"flex",alignItems:"center",gap:5,padding:"7px 12px",
                 border:`1px dashed ${BORDER}`,borderRadius:8,background:LIGHT,
-                color:GRAY,fontSize:12,cursor:"pointer"}}>
+                color:GRAY_TEXT,fontSize:12,cursor:"pointer"}}>
               <Plus size={12}/> Add prescription manually
             </button>
           </div>
@@ -720,25 +727,25 @@ Transcript: ${transcript}`}]})
             boxShadow:"0 24px 64px rgba(0,0,0,0.25)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
               <h3 style={{margin:0,fontSize:18,fontWeight:700,color:"var(--hf-text)"}}>Complete consultation</h3>
-              <button onClick={()=>setShowComplete(false)} style={{background:"none",border:"none",cursor:"pointer",color:GRAY}}><X size={18}/></button>
+              <button onClick={()=>setShowComplete(false)} style={{background:"none",border:"none",cursor:"pointer",color:GRAY_TEXT}}><X size={18}/></button>
             </div>
 
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
               {[
-                {label:"Duration",    value:`${durationMinutes} minutes`, color:NAVY},
-                {label:"Bill total",  value:fmtR(billTotal),              color:GREEN},
-                {label:"Bill items",  value:`${billLines.length} lines`,  color:TEAL},
-                {label:"Prescriptions",value:`${rxDrafts.length} items`,  color:PURPLE},
+                {label:"Duration",    value:`${durationMinutes} minutes`, color:NAVY_TEXT},
+                {label:"Bill total",  value:fmtR(billTotal),              color:GREEN_TEXT},
+                {label:"Bill items",  value:`${billLines.length} lines`,  color:TEAL_TEXT},
+                {label:"Prescriptions",value:`${rxDrafts.length} items`,  color:PURPLE_TEXT},
               ].map(s=>(
                 <div key={s.label} style={{padding:"10px 14px",background:LIGHT,borderRadius:8}}>
-                  <div style={{fontSize:10,fontWeight:700,color:GRAY,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:2}}>{s.label}</div>
+                  <div style={{fontSize:10,fontWeight:700,color:GRAY_TEXT,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:2}}>{s.label}</div>
                   <div style={{fontSize:16,fontWeight:800,color:s.color}}>{s.value}</div>
                 </div>
               ))}
             </div>
 
             {!soap.chiefComplaint.trim() && (
-              <div style={{marginBottom:12,padding:"8px 12px",background:"var(--hf-warning-soft)",border:"1px solid var(--hf-warning-border)",borderRadius:8,fontSize:12,color:AMBER}}>
+              <div style={{marginBottom:12,padding:"8px 12px",background:"var(--hf-warning-soft)",border:"1px solid var(--hf-warning-border)",borderRadius:8,fontSize:12,color:AMBER_TEXT}}>
                 ⚠ Chief complaint is empty — add a reason for the visit before completing.
               </div>
             )}
@@ -749,7 +756,7 @@ Transcript: ${transcript}`}]})
             )}
 
             {completeError && (
-              <div style={{marginBottom:12,padding:"8px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:12,color:RED}}>
+              <div style={{marginBottom:12,padding:"8px 12px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:12,color:RED_TEXT}}>
                 {completeError}
               </div>
             )}
@@ -772,7 +779,7 @@ Transcript: ${transcript}`}]})
 
 // ── Style helpers ─────────────────────────────────────────────────────────────
 const lbl:React.CSSProperties         = {display:"block",fontSize:11,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:3}
-const sectionLabel:React.CSSProperties = {fontSize:10,fontWeight:700,color:GRAY,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}
+const sectionLabel:React.CSSProperties = {fontSize:10,fontWeight:700,color:GRAY_TEXT,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}
 const sinp:React.CSSProperties        = {width:"100%",padding:"8px 10px",boxSizing:"border-box" as const,border:`1.5px solid ${BORDER}`,borderRadius:7,fontSize:13,outline:"none",background:"var(--hf-surface)"}
 const primaryBtn:React.CSSProperties  = {background:NAVY,color:"var(--hf-text-on-solid)",border:"none",borderRadius:9,padding:"9px 18px",fontSize:13,fontWeight:600,cursor:"pointer"}
 const cancelBtn:React.CSSProperties   = {padding:"9px 16px",border:`1px solid ${BORDER}`,borderRadius:9,background:"var(--hf-surface)",fontSize:13,cursor:"pointer",color:"var(--hf-text-secondary)"}

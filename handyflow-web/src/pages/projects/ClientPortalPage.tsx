@@ -97,8 +97,8 @@ export function ClientPortalPage() {
           ) : portal.milestones.map(m => (
             <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--hf-border-subtle)' }}>
               {m.status === 'COMPLETED'
-                ? <CheckCircle size={18} color="#16A34A" />
-                : <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${m.isCritical ? '#EF4444' : '#CBD5E1'}`, flexShrink: 0 }} />
+                ? <CheckCircle size={18} style={{ color: 'var(--hf-success-text)' }} />
+                : <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${m.isCritical ? 'var(--hf-danger)' : 'var(--hf-border-strong)'}`, flexShrink: 0 }} />
               }
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--hf-text)' }}>{m.title}</div>
@@ -132,7 +132,7 @@ export function ClientPortalPage() {
           <Section title={`Active Risks (${portal.redRisks.length})`}>
             {portal.redRisks.map(r => (
               <div key={r.id} style={{ display: 'flex', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--hf-border-subtle)' }}>
-                <AlertTriangle size={16} color="#DC2626" style={{ flexShrink: 0, marginTop: 2 }} />
+                <AlertTriangle size={16} style={{ color: 'var(--hf-danger-text)', flexShrink: 0, marginTop: 2 }} />
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-text)' }}>{r.title}</div>
                   {r.mitigation && <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 2 }}>Mitigation: {r.mitigation}</div>}

@@ -14,8 +14,9 @@ interface WaitlistEntry {
 interface PatientOption { id: string; fullName: string; phone?: string }
 interface PractitionerOption { id: string; fullName: string }
 
-const NAVY="#1B3A6B"; const TEAL="#0D9488"; const GRAY="#64748B"
-const BORDER="#E2E8F0"; const LIGHT="#F8FAFC"
+const NAVY="var(--hf-primary)";
+const NAVY_TEXT = "var(--hf-primary-text)"; const TEAL="var(--hf-accent)"; const GRAY="var(--hf-text-muted)"
+const BORDER="var(--hf-border)"; const LIGHT="var(--hf-surface-muted)"
 
 const fmtDT = (iso?:string) => iso ? new Date(iso).toLocaleDateString("en-ZA",{day:"numeric",month:"short"}) : "—"
 const unwrap = (r:any) => { const p=r.data?.data??r.data; return Array.isArray(p)?p:(p?.content??[]) }
@@ -112,7 +113,7 @@ export default function WaitlistTab() {
               <div style={{display:"flex",gap:8}}>
                 {e.status !== "CONTACTED" && (
                   <button onClick={()=>contactAction.mutate(e.id)}
-                    style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",background:LIGHT,color:NAVY,border:`1px solid ${BORDER}`,borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                    style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",background:LIGHT,color:NAVY_TEXT,border:`1px solid ${BORDER}`,borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer"}}>
                     <Phone size={12}/> Mark contacted
                   </button>
                 )}

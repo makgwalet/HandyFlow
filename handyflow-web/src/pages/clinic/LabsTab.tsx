@@ -26,30 +26,32 @@ interface Marker {
 }
 interface Consultation { id: string; chiefComplaint: string; consultedAt: string }
 
-const TEAL="#0D9488"; const RED="#DC2626"; const GREEN="#166534"
-const AMBER="#D97706"; const GRAY="#64748B"; const NAVY="#1B3A6B"
+const TEAL="var(--hf-accent)";
+const TEAL_TEXT = "var(--hf-accent-text)"; const RED="var(--hf-danger-text)"; const GREEN="var(--hf-success-text-strong)"
+const AMBER="var(--hf-warning-text)"; const GRAY="var(--hf-text-muted)"; const NAVY="var(--hf-primary)"
+const NAVY_TEXT = "var(--hf-primary-text)";
 // FIX: PURPLE was referenced (AI-interpretation button) but never defined
 // anywhere in this file — a ReferenceError waiting to happen the first time
 // someone expands a lab result, since it never surfaced while upload was
 // broken and no result ever existed to expand.
-const PURPLE="#7C3AED"
-const BORDER="#E2E8F0"; const LIGHT="#F8FAFC"
+const PURPLE="var(--hf-violet-text)"
+const BORDER="var(--hf-border)"; const LIGHT="var(--hf-surface-muted)"
 
 const fmtDT = (iso?: string) => iso
   ? new Date(iso).toLocaleDateString("en-ZA", { day:"numeric", month:"short", year:"numeric" })
   : "—"
 
 const STATUS_LAB: Record<string,{color:string;bg:string;border:string}> = {
-  UNREVIEWED: {color:RED,   bg:"#FEF2F2",border:"#FECACA"},
-  REVIEWED:   {color:AMBER, bg:"#FFFBEB",border:"#FDE68A"},
-  FILED:      {color:GREEN, bg:"#DCFCE7",border:"#86EFAC"},
+  UNREVIEWED: {color:RED,   bg:"var(--hf-danger-soft)",border:"var(--hf-danger-border)"},
+  REVIEWED:   {color:AMBER, bg:"var(--hf-warning-soft)",border:"var(--hf-warning-border)"},
+  FILED:      {color:GREEN, bg:"var(--hf-success-soft-strong)",border:"var(--hf-success-border)"},
   REJECTED:   {color:GRAY,  bg:LIGHT,    border:BORDER},
 }
 
 const FLAG_CFG = {
-  HIGH:   {color:RED,   bg:"#FEF2F2",label:"H"},
-  LOW:    {color:AMBER, bg:"#FFFBEB",label:"L"},
-  NORMAL: {color:GREEN, bg:"#DCFCE7",label:"N"},
+  HIGH:   {color:RED,   bg:"var(--hf-danger-soft)",label:"H"},
+  LOW:    {color:AMBER, bg:"var(--hf-warning-soft)",label:"L"},
+  NORMAL: {color:GREEN, bg:"var(--hf-success-soft-strong)",label:"N"},
 }
 
 const parseMarkers = (json?: string): Marker[] => {
@@ -169,7 +171,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                   style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 18px",cursor:"pointer",background:isOpen?LIGHT:"var(--hf-surface)"}}>
                   <div style={{flex:1}}>
                     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
-                      <FlaskConical size={14} color={s.color}/>
+                      <FlaskConical size={14} style={{ color: s.color }}/>
                       <span style={{fontWeight:700,fontSize:14,color:"var(--hf-text)"}}>{lab.pdfFilename||`${lab.source} result`}</span>
                       <span style={{background:s.bg,color:s.color,padding:"1px 7px",borderRadius:20,fontSize:11,fontWeight:700,border:`1px solid ${s.border}`}}>{lab.status}</span>
                       {abnormal.length>0 && (
@@ -202,7 +204,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                           setTimeout(() => URL.revokeObjectURL(url), 60_000)
                         } catch { /* silent — button just won't open anything */ }
                       }}
-                        style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px",background:LIGHT,color:NAVY,border:`1px solid ${BORDER}`,borderRadius:6,fontSize:12,cursor:"pointer"}}>
+                        style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px",background:LIGHT,color:NAVY_TEXT,border:`1px solid ${BORDER}`,borderRadius:6,fontSize:12,cursor:"pointer"}}>
                         <Download size={11}/> PDF
                       </button>
                     )}
@@ -218,10 +220,10 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                         setTimeout(() => URL.revokeObjectURL(url), 60_000)
                       } catch { /* silent — button just won't download anything */ }
                     }}
-                      style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px",background:LIGHT,color:TEAL,border:`1px solid ${BORDER}`,borderRadius:6,fontSize:12,cursor:"pointer"}}>
+                      style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px",background:LIGHT,color:TEAL_TEXT,border:`1px solid ${BORDER}`,borderRadius:6,fontSize:12,cursor:"pointer"}}>
                       <Download size={11}/> Summary
                     </button>
-                    {isOpen ? <ChevronUp size={16} color={GRAY}/> : <ChevronDown size={16} color={GRAY}/>}
+                    {isOpen ? <ChevronUp size={16} style={{ color: GRAY }}/> : <ChevronDown size={16} style={{ color: GRAY }}/>}
                   </div>
                 </div>
 
@@ -253,7 +255,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                                     <td style={{padding:"8px 12px",fontSize:12,color:GRAY}}>{m.refRange||"—"}</td>
                                     <td style={{padding:"8px 12px"}}>
                                       {flag ? (
-                                        <span style={{background:flag.bg,color:flag.color,padding:"2px 8px",borderRadius:20,fontSize:11,fontWeight:700,border:`1px solid ${flag.color}30`}}>
+                                        <span style={{background:flag.bg,color:flag.color,padding:"2px 8px",borderRadius:20,fontSize:11,fontWeight:700,border:`1px solid color-mix(in srgb, ${flag.color} 19%, transparent)`}}>
                                           {m.flag}
                                         </span>
                                       ) : <span style={{color:GREEN,fontSize:11,fontWeight:600}}>NORMAL</span>}
@@ -277,7 +279,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                           style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",
                             background:isInterpreting?"var(--hf-surface-sunken)":"var(--hf-violet-soft)",
                             color:isInterpreting?GRAY:PURPLE,
-                            border:`1px solid ${isInterpreting?BORDER:"#DDD6FE"}`,
+                            border:`1px solid ${isInterpreting?BORDER:"var(--hf-violet-border)"}`,
                             borderRadius:7,fontSize:12,fontWeight:600,cursor:isInterpreting?"wait":"pointer"}}>
                           {isInterpreting
                             ? <><Loader size={12} style={{animation:"spin 1s linear infinite"}}/> Interpreting...</>
@@ -287,7 +289,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                       </div>
                       {lab.interpretation ? (
                         <div style={{padding:"12px 14px",background:"var(--hf-success-soft)",border:"1px solid var(--hf-success-border)",borderRadius:8,fontSize:13,color:"var(--hf-text)",lineHeight:1.6}}>
-                          <span style={{fontWeight:700,color:TEAL}}>Claude: </span>{lab.interpretation}
+                          <span style={{fontWeight:700,color:TEAL_TEXT}}>Claude: </span>{lab.interpretation}
                         </div>
                       ) : interpretError[lab.id] ? (
                         <div style={{padding:"10px 14px",background:"var(--hf-danger-soft)",border:"1px solid var(--hf-danger-border)",borderRadius:8,fontSize:12,color:RED,display:"flex",alignItems:"center",gap:6}}>
@@ -370,7 +372,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                     <button key={s} onClick={()=>setUploadForm(f=>({...f,source:s}))}
                       style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${uploadForm.source===s?TEAL:BORDER}`,
                         background:uploadForm.source===s?"var(--hf-success-soft)":"var(--hf-surface)",
-                        color:uploadForm.source===s?TEAL:GRAY,
+                        color:uploadForm.source===s?TEAL_TEXT:GRAY,
                         fontSize:12,fontWeight:uploadForm.source===s?700:400,cursor:"pointer"}}>
                       {s}
                     </button>
@@ -394,7 +396,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
                 <label style={lbl}>PDF file</label>
                 <div style={{border:`2px dashed ${BORDER}`,borderRadius:10,padding:"20px",textAlign:"center" as const,cursor:"pointer",background:LIGHT}}
                   onClick={()=>fileRef.current?.click()}>
-                  <Upload size={22} color={GRAY} style={{marginBottom:6}}/>
+                  <Upload size={22} style={{ color: GRAY,marginBottom:6}}/>
                   <div style={{fontSize:13,color:GRAY}}>Click to select PDF</div>
                   <div style={{fontSize:11,color:"var(--hf-text-faint)",marginTop:3}}>Ampath, Lancet, Pathcare reports · PDF only</div>
                   <input ref={fileRef} type="file" accept=".pdf" style={{display:"none"}}
@@ -475,7 +477,7 @@ export function LabsTabEnhanced({ patient }: LabsTabProps) {
 
 function Spinner() { return <div style={{textAlign:"center",padding:40,color:GRAY}}>Loading...</div> }
 
-const lbl:React.CSSProperties      = {display:"block",fontSize:13,fontWeight:600,color:"#374151",marginBottom:5}
-const sinp:React.CSSProperties     = {width:"100%",padding:"9px 12px",boxSizing:"border-box" as const,border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:14,outline:"none",background:"#fff"}
-const btnPrimary:React.CSSProperties = {display:"flex",alignItems:"center",gap:6,background:NAVY,color:"#fff",border:"none",borderRadius:9,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}
-const btnCancel:React.CSSProperties  = {padding:"9px 18px",border:`1px solid ${BORDER}`,borderRadius:9,background:"#fff",fontSize:13,cursor:"pointer",color:"#374151"}
+const lbl:React.CSSProperties      = {display:"block",fontSize:13,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}
+const sinp:React.CSSProperties     = {width:"100%",padding:"9px 12px",boxSizing:"border-box" as const,border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:14,outline:"none",background:"var(--hf-surface)"}
+const btnPrimary:React.CSSProperties = {display:"flex",alignItems:"center",gap:6,background:NAVY,color:"var(--hf-text-on-solid)",border:"none",borderRadius:9,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}
+const btnCancel:React.CSSProperties  = {padding:"9px 18px",border:`1px solid ${BORDER}`,borderRadius:9,background:"var(--hf-surface)",fontSize:13,cursor:"pointer",color:"var(--hf-text-secondary)"}

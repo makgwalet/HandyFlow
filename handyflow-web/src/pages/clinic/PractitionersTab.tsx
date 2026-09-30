@@ -18,17 +18,17 @@ const SPECIALTIES = [
 ]
 
 const SPECIALTY_COLORS: Record<string,string> = {
-  "General Practitioner": "#0D9488",
-  "Cardiologist":         "#DC2626",
-  "Paediatrician":        "#D97706",
-  "Physiotherapist":      "#7C3AED",
-  "Dentist":              "#1D4ED8",
-  "Surgeon":              "#166534",
-  "Psychiatrist":         "#DB2777",
-  "Nurse":                "#0369A1",
+  "General Practitioner": "var(--hf-accent-text)",
+  "Cardiologist":         "var(--hf-danger-text)",
+  "Paediatrician":        "var(--hf-warning-text)",
+  "Physiotherapist":      "var(--hf-violet-text)",
+  "Dentist":              "var(--hf-info-text)",
+  "Surgeon":              "var(--hf-success-text-strong)",
+  "Psychiatrist":         "var(--hf-pink-text)",
+  "Nurse":                "var(--hf-sky-text-strong)",
 }
 
-const getColor = (s: string) => SPECIALTY_COLORS[s] ?? "#64748B"
+const getColor = (s: string) => SPECIALTY_COLORS[s] ?? "var(--hf-text-muted)"
 
 const EMPTY_FORM = { firstName: "", lastName: "", specialty: "General Practitioner", hpcsaNumber: "", practiceNumber: "", phone: "", email: "" }
 
@@ -73,8 +73,8 @@ export default function PractitionersTab() {
 
   const inp = (key: string): React.CSSProperties => ({
     width: "100%", padding: "9px 12px", boxSizing: "border-box" as const,
-    border: `1.5px solid ${fieldErrors[key] ? "#DC2626" : "#E2E8F0"}`,
-    borderRadius: 8, fontSize: 14, background: fieldErrors[key] ? "#FFF5F5" : "#fff", outline: "none",
+    border: `1.5px solid ${fieldErrors[key] ? "var(--hf-danger)" : "var(--hf-border)"}`,
+    borderRadius: 8, fontSize: 14, background: fieldErrors[key] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
   const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
     <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
@@ -107,20 +107,20 @@ export default function PractitionersTab() {
               <div key={p.id} style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden", background: "var(--hf-surface)", transition: "box-shadow 0.15s" }}
                 onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)")}
                 onMouseLeave={e => (e.currentTarget.style.boxShadow = "none")}>
-                <div style={{ height: 5, background: `linear-gradient(90deg, ${color}, ${color}99)` }} />
+                <div style={{ height: 5, background: `linear-gradient(90deg, ${color}, color-mix(in srgb, ${color} 60%, transparent))` }} />
                 <div style={{ padding: "18px 20px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-                    <div style={{ width: 46, height: 46, borderRadius: "50%", background: `${color}14`, border: `2px solid ${color}40`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <div style={{ width: 46, height: 46, borderRadius: "50%", background: `color-mix(in srgb, ${color} 8%, transparent)`, border: `2px solid color-mix(in srgb, ${color} 25%, transparent)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <span style={{ fontSize: 18, fontWeight: 800, color }}>{p.firstName?.[0]}{p.lastName?.[0]}</span>
                     </div>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>Dr. {p.fullName}</div>
-                      <span style={{ background: `${color}14`, color, padding: "2px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{p.specialty}</span>
+                      <span style={{ background: `color-mix(in srgb, ${color} 8%, transparent)`, color, padding: "2px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{p.specialty}</span>
                     </div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {p.email && <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--hf-text-muted)" }}><Mail size={12} color="#94A3B8" />{p.email}</div>}
-                    {p.phone && <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--hf-text-muted)" }}><Phone size={12} color="#94A3B8" />{p.phone}</div>}
+                    {p.email && <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--hf-text-muted)" }}><Mail size={12} style={{ color: 'var(--hf-text-faint)' }} />{p.email}</div>}
+                    {p.phone && <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--hf-text-muted)" }}><Phone size={12} style={{ color: 'var(--hf-text-faint)' }} />{p.phone}</div>}
                     {p.hpcsaNumber && <div style={{ fontSize: 11, color: "var(--hf-text-faint)", paddingTop: 4 }}>HPCSA: <span style={{ fontWeight: 600, color: "var(--hf-text-muted)" }}>{p.hpcsaNumber}</span></div>}
                     {p.practiceNumber && <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>Practice: <span style={{ fontWeight: 600, color: "var(--hf-text-muted)" }}>{p.practiceNumber}</span></div>}
                   </div>
@@ -198,6 +198,6 @@ export default function PractitionersTab() {
   )
 }
 
-const lbl: React.CSSProperties      = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }
-const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, background: "#1B3A6B", color: "#fff", border: "none", borderRadius: 9, padding: "9px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer" }
-const btnCancel:  React.CSSProperties = { padding: "9px 18px", border: "1px solid #E2E8F0", borderRadius: 9, background: "#fff", fontSize: 14, cursor: "pointer", color: "#374151" }
+const lbl: React.CSSProperties      = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
+const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, padding: "9px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer" }
+const btnCancel:  React.CSSProperties = { padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }

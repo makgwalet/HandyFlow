@@ -19,6 +19,7 @@ import {
   Building2, GraduationCap, CalendarDays, Award, Scale, Gavel, FileSearch, MapPin as PinIcon, HardHat,
   ShoppingCart, Package, CalendarClock, ClipboardCheck,
   PartyPopper, FilePlus, LayoutTemplate, CreditCard,
+  Stethoscope, ListPlus,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -511,11 +512,40 @@ export const PROPERTY_SECTIONS: ModuleSections = {
   ],
 }
 
+export const CLINIC_SECTIONS: ModuleSections = {
+  moduleKey: 'clinic',
+  basePath: '/clinic',
+  title: 'Clinic',
+  icon: Stethoscope,
+  defaultSection: 'dashboard',
+  groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+    {
+      label: 'Patients',
+      sections: [
+        { id: 'patients', label: 'Patients', icon: Users },
+        { id: 'consultations', label: 'Consultations', icon: FileText },
+        { id: 'recalls', label: 'Recalls', icon: CalendarClock },
+        { id: 'waitlist', label: 'Waitlist', icon: ListPlus },
+      ],
+    },
+    { label: 'Scheduling', sections: [{ id: 'schedule', label: 'Schedule', icon: Calendar }] },
+    {
+      label: 'Practice & finance',
+      sections: [
+        { id: 'practitioners', label: 'Practitioners', icon: Stethoscope },
+        { id: 'claims', label: 'Claims', icon: CreditCard },
+        { id: 'billing', label: 'Billing', icon: BarChart2 },
+      ],
+    },
+  ],
+}
+
 const REGISTRY: ModuleSections[] = [
   SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FLEET_SECTIONS, ACCOUNTING_SECTIONS, ACCOUNTANT_SECTIONS,
   HR_SECTIONS, BOOKINGS_SECTIONS, TRAINING_PROVIDER_SECTIONS, LEGAL_COMPLIANCE_SECTIONS, EARTHMOVING_SECTIONS,
   SUPPLY_CHAIN_SECTIONS, COMPLIANCE_TENDER_SECTIONS,
-  EVENTS_SECTIONS, CONTRACTING_SECTIONS, AP_SECTIONS, PROPERTY_SECTIONS,
+  EVENTS_SECTIONS, CONTRACTING_SECTIONS, AP_SECTIONS, PROPERTY_SECTIONS, CLINIC_SECTIONS,
 ]
 
 /** Groups with sections the user may not see removed (and empty groups dropped). */

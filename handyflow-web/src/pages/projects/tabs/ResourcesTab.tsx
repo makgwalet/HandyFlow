@@ -9,12 +9,12 @@ interface Resource { id:string; resourceType:string; resourceName:string; role:s
 function unwrap<T>(r:any):T[]{const d=r?.data?.data??r?.data??[];return Array.isArray(d)?d as T[]:d?.content??[]}
 const fmtDate=(d:string|null)=>d?new Date(d).toLocaleDateString('en-ZA'):'—'
 const fmtR=(n:number|null)=>n!=null?`R${Number(n).toLocaleString('en-ZA',{minimumFractionDigits:0})}`:'—'
-const inp:React.CSSProperties={width:'100%',padding:'9px 12px',border:'1.5px solid #E2E8F0',borderRadius:9,fontSize:14,boxSizing:'border-box' as const,outline:'none',background:'#fff'}
+const inp:React.CSSProperties={width:'100%',padding:'9px 12px',border:'1.5px solid var(--hf-border)',borderRadius:9,fontSize:14,boxSizing:'border-box' as const,outline:'none',background:'var(--hf-surface)'}
 
 const TYPE_ICON:Record<string,React.ElementType>={HUMAN:Users,EQUIPMENT:Wrench,VEHICLE:Truck,SUBCONTRACTOR:Building2}
 const TYPE_COLOR:Record<string,{bg:string;color:string}>={
-  HUMAN:{bg:'#DBEAFE',color:'#1D4ED8'},EQUIPMENT:{bg:'#FEF3C7',color:'#92400E'},
-  VEHICLE:{bg:'#DCFCE7',color:'#166534'},SUBCONTRACTOR:{bg:'#EDE9FE',color:'#7C3AED'},
+  HUMAN:{bg:'var(--hf-info-soft-strong)',color:'var(--hf-info-text)'},EQUIPMENT:{bg:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)'},
+  VEHICLE:{bg:'var(--hf-success-soft-strong)',color:'var(--hf-success-text-strong)'},SUBCONTRACTOR:{bg:'var(--hf-violet-soft-strong)',color:'var(--hf-violet-text)'},
 }
 
 export function ResourcesTab({projectId}:{projectId:string}) {
@@ -60,7 +60,7 @@ export function ResourcesTab({projectId}:{projectId:string}) {
       {/* Conflict warnings banner — shown after a successful assignment with warnings */}
       {warnings.length > 0 && (
         <div style={{marginBottom:14,padding:'12px 16px',background:'var(--hf-warning-soft)',border:'1px solid var(--hf-warning-border-strong)',borderRadius:10,display:'flex',alignItems:'flex-start',gap:10}}>
-          <AlertTriangle size={16} color="#D97706" style={{flexShrink:0,marginTop:1}}/>
+          <AlertTriangle size={16} style={{ color: 'var(--hf-warning-text)',flexShrink:0,marginTop:1}}/>
           <div style={{flex:1}}>
             <div style={{fontSize:13,fontWeight:700,color:'var(--hf-warning-text-deep)',marginBottom:4}}>Scheduling conflicts detected</div>
             {warnings.map((w,i)=>(
@@ -85,13 +85,13 @@ export function ResourcesTab({projectId}:{projectId:string}) {
       {isLoading?<div style={{padding:40,textAlign:'center',color:'var(--hf-text-faint)'}}>Loading…</div>
         :resources.length===0?<Empty text="No resources assigned"/>
         :Object.entries(grouped).map(([type,items])=>{
-          const tc=TYPE_COLOR[type]??{bg:'#F1F5F9',color:'#475569'}
+          const tc=TYPE_COLOR[type]??{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)'}
           const Icon=TYPE_ICON[type]??Users
           return (
             <div key={type} style={{marginBottom:20}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
                 <div style={{width:26,height:26,borderRadius:6,background:tc.bg,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  <Icon size={13} color={tc.color}/>
+                  <Icon size={13} style={{ color: tc.color }}/>
                 </div>
                 <span style={{fontSize:12,fontWeight:700,color:tc.color,textTransform:'uppercase' as const,letterSpacing:'0.05em'}}>{type}</span>
                 <span style={{fontSize:11,color:'var(--hf-text-faint)'}}>({items.length})</span>

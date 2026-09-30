@@ -12,8 +12,10 @@ interface Recall {
   diagnosis?: string
 }
 
-const NAVY="#1B3A6B"; const TEAL="#0D9488"; const RED="#DC2626"
-const AMBER="#D97706"; const GRAY="#64748B"; const BORDER="#E2E8F0"; const LIGHT="#F8FAFC"
+const NAVY="var(--hf-primary-text)"; const TEAL="var(--hf-accent-text)"; const RED="var(--hf-danger)"
+const RED_TEXT = "var(--hf-danger-text)";
+const AMBER="var(--hf-warning)";
+const AMBER_TEXT = "var(--hf-warning-text)"; const GRAY="var(--hf-text-muted)"; const BORDER="var(--hf-border)"; const LIGHT="var(--hf-surface-muted)"
 
 const fmtDT = (iso?:string) => iso ? new Date(iso).toLocaleDateString("en-ZA",{day:"numeric",month:"short",year:"numeric"}) : "—"
 const unwrap = (r:any) => { const p=r.data?.data??r.data; return Array.isArray(p)?p:(p?.content??[]) }
@@ -33,7 +35,7 @@ export default function RecallsTab() {
         {[
           {label:"Due for follow-up", value:recalls.length, color:NAVY, bg:LIGHT},
           {label:"Due today",         value:dueToday.length, color:TEAL, bg:"var(--hf-accent-soft)"},
-          {label:"Overdue",           value:overdue.length,  color:RED,  bg:"var(--hf-danger-soft)"},
+          {label:"Overdue",           value:overdue.length,  color:RED_TEXT,  bg:"var(--hf-danger-soft)"},
         ].map(k => (
           <div key={k.label} style={{background:k.bg,border:`1px solid ${BORDER}`,borderRadius:12,padding:"14px 18px"}}>
             <div style={{fontSize:11,fontWeight:700,color:k.color,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>{k.label}</div>
@@ -58,11 +60,11 @@ export default function RecallsTab() {
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
                   <span style={{fontWeight:700,fontSize:14,color:"var(--hf-text)"}}>{r.patientName}</span>
                   {r.overdueDays > 0 ? (
-                    <span style={{display:"flex",alignItems:"center",gap:3,background:"var(--hf-danger-soft)",color:RED,padding:"1px 8px",borderRadius:20,fontSize:11,fontWeight:700}}>
+                    <span style={{display:"flex",alignItems:"center",gap:3,background:"var(--hf-danger-soft)",color:RED_TEXT,padding:"1px 8px",borderRadius:20,fontSize:11,fontWeight:700}}>
                       <AlertTriangle size={10}/> {r.overdueDays}d overdue
                     </span>
                   ) : (
-                    <span style={{background:"var(--hf-warning-soft)",color:AMBER,padding:"1px 8px",borderRadius:20,fontSize:11,fontWeight:700}}>Due today</span>
+                    <span style={{background:"var(--hf-warning-soft)",color:AMBER_TEXT,padding:"1px 8px",borderRadius:20,fontSize:11,fontWeight:700}}>Due today</span>
                   )}
                 </div>
                 <div style={{fontSize:12,color:GRAY,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>

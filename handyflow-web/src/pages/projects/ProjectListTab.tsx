@@ -36,7 +36,7 @@ const STATUS_BADGE: Record<string,{bg:string;color:string}> = {
   COMPLETED: {bg:'var(--hf-success-soft-strong)',color:'var(--hf-success-text-strong)'},
   CANCELLED: {bg:'var(--hf-danger-soft-strong)',color:'var(--hf-danger-text)'},
 }
-const HEALTH_DOT: Record<string,string> = { GREEN:'#16A34A', AMBER:'#D97706', RED:'#DC2626' }
+const HEALTH_DOT: Record<string,string> = { GREEN:'var(--hf-success)', AMBER:'var(--hf-warning)', RED:'var(--hf-danger)' }
 const HEALTH_LABEL: Record<string,string> = { GREEN:'On Track', AMBER:'Watch', RED:'At Risk' }
 
 export function ProjectListTab({ onOpen }: { onOpen:(id:string)=>void }) {
@@ -90,7 +90,7 @@ export function ProjectListTab({ onOpen }: { onOpen:(id:string)=>void }) {
         {/* Search + create */}
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
           <div style={{position:'relative'}}>
-            <Search size={13} color="#94A3B8" style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)'}}/>
+            <Search size={13} style={{ color: 'var(--hf-text-faint)',position:'absolute',left:10,top:'50%',transform:'translateY(-50%)'}}/>
             <input
               value={search} onChange={e=>setSearch(e.target.value)}
               placeholder="Search projects…"
@@ -139,7 +139,7 @@ export function ProjectListTab({ onOpen }: { onOpen:(id:string)=>void }) {
             <tbody>
               {filtered.map((p, i) => {
                 const st = STATUS_BADGE[p.status] ?? STATUS_BADGE.PLANNING
-                const hDot = HEALTH_DOT[p.health] ?? '#16A34A'
+                const hDot = HEALTH_DOT[p.health] ?? 'var(--hf-success)'
                 const spentPct = p.budgetTotal > 0 ? Math.min(100,(p.budgetSpent/p.budgetTotal)*100) : 0
                 const taskPct  = p.taskCount   > 0 ? Math.round((p.completedTaskCount/p.taskCount)*100) : 0
 
@@ -152,7 +152,7 @@ export function ProjectListTab({ onOpen }: { onOpen:(id:string)=>void }) {
                       cursor:'pointer',
                       transition:'background 0.1s',
                     }}
-                    onMouseEnter={e=>(e.currentTarget.style.background='#F0F7FF')}
+                    onMouseEnter={e=>(e.currentTarget.style.background='var(--hf-info-soft)')}
                     onMouseLeave={e=>(e.currentTarget.style.background=i%2===0?'var(--hf-surface)':'var(--hf-surface-muted)')}
                   >
                     {/* Project number */}

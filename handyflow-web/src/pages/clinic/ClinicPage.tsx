@@ -1,6 +1,18 @@
 // src/pages/clinic/ClinicPage.tsx
-import { useState } from "react"
-import { Users, Calendar, FileText, Stethoscope, LayoutDashboard, CreditCard, BarChart2, CalendarClock, ListPlus } from "lucide-react"
+//
+// Sections are routes (/clinic/:section) with navigation in the sidebar (see
+// navigation/moduleSections.ts and components/shell/SectionedModulePage).
+//
+// The patient file is NOT a separate route: it is carried in the history
+// entry's router state ({ openPatient, sessionAppointment }) on
+// /clinic/patients. That gives the behaviour the old in-page state had, plus:
+//   - the browser Back button closes the file;
+//   - a refresh keeps it open (history state survives a reload);
+//   - clicking any section in the sidebar closes it (a plain link has no state).
+// "Start session" from the Schedule opens the patient's file with an
+// appointment to begin; that is a ONE-SHOT: the file clears it from the
+// history entry as soon as it has consumed it, so a refresh cannot restart it.
+import { useLocation, useNavigate, useParams } from "react-router-dom"
 import ClinicDashboard   from "./ClinicDashboard"
 import PatientsTab       from "./PatientsTab"
 import ScheduleTab       from "./ScheduleTab"
@@ -11,106 +23,69 @@ import BillingTab        from "./BillingTab"
 import PatientFilePage   from "./PatientFilePage"
 import RecallsTab        from "./RecallsTab"
 import WaitlistTab       from "./WaitlistTab"
+import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
+import { CLINIC_SECTIONS } from "../../navigation/moduleSections"
 
 export type ClinicTab = "dashboard"|"patients"|"schedule"|"consultations"|"practitioners"|"claims"|"billing"|"recalls"|"waitlist"
 
 interface Patient { id: string; firstName: string; lastName: string; fullName: string; [key: string]: any }
-
-const TABS: { id: ClinicTab; label: string; icon: React.ElementType }[] = [
-  { id:"dashboard",     label:"Dashboard",     icon:LayoutDashboard },
-  { id:"patients",      label:"Patients",      icon:Users           },
-  { id:"schedule",      label:"Schedule",      icon:Calendar        },
-  { id:"consultations", label:"Consultations", icon:FileText        },
-  { id:"recalls",       label:"Recalls",       icon:CalendarClock   },
-  { id:"waitlist",      label:"Waitlist",      icon:ListPlus        },
-  { id:"practitioners", label:"Practitioners", icon:Stethoscope     },
-  { id:"claims",        label:"Claims",        icon:CreditCard      },
-  { id:"billing",       label:"Billing",       icon:BarChart2       },
-]
+interface FileState { openPatient?: Patient | null; sessionAppointment?: unknown }
 
 export function ClinicPage() {
-  const [tab, setTab]             = useState<ClinicTab>("dashboard")
-  const [openPatient, setOpenPatient] = useState<Patient|null>(null)
-  const [sessionAppointment, setSessionAppointment] = useState<any|null>(null)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { section } = useParams<{ section?: string }>()
+  const base = CLINIC_SECTIONS.basePath
+
+  const state = (location.state ?? {}) as FileState
+  // The file only ever belongs to the Patients section.
+  const openPatient = section === "patients" ? (state.openPatient ?? null) : null
+  const sessionAppointment = openPatient ? (state.sessionAppointment ?? null) : null
+
+  const openFile = (patient: Patient, appointment?: unknown) =>
+    navigate(`${base}/patients`, { state: { openPatient: patient, sessionAppointment: appointment ?? null } satisfies FileState })
+  const closeFile = () => navigate(`${base}/patients`, { replace: true })
+  // One-shot: drop the appointment from this history entry once consumed.
+  const clearSession = () =>
+    navigate(location.pathname, { replace: true, state: { openPatient } satisfies FileState })
+
+  const backButton = openPatient ? (
+    <button onClick={closeFile}
+      style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none",
+        cursor: "pointer", color: "var(--hf-accent-text)", fontSize: 13, fontWeight: 600, padding: 0 }}>
+      ← Back to Patients
+    </button>
+  ) : undefined
 
   return (
-    <div style={{ fontFamily:"'Inter',system-ui,sans-serif" }}>
-      {/* Page header */}
-      <div style={{ marginBottom:24 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:4 }}>
-          {openPatient ? (
-            <button onClick={()=>setOpenPatient(null)}
-              style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none",
-                cursor:"pointer", color:"var(--hf-accent-text)", fontSize:13, fontWeight:600, padding:0 }}>
-              ← Back to Patients
-            </button>
-          ) : (
-            <>
-              <div style={{ width:36, height:36, borderRadius:10, background:"var(--hf-accent)",
-                display:"flex", alignItems:"center", justifyContent:"center" }}>
-                <Stethoscope size={18} color="#fff"/>
-              </div>
-              <h1 style={{ fontSize:24, fontWeight:800, color:"var(--hf-text)", margin:0 }}>Clinic</h1>
-            </>
-          )}
-        </div>
-        {openPatient ? (
-          <div style={{ fontSize:13, color:"var(--hf-text-faint)" }}>
-            Patient file — <strong style={{ color:"var(--hf-text)" }}>{openPatient.fullName}</strong>
-          </div>
-        ) : (
-          <p style={{ fontSize:13, color:"var(--hf-text-faint)", margin:0, paddingLeft:46 }}>
-            Patient records · Appointments · Consultations · Prescriptions
-          </p>
-        )}
-      </div>
-
-      {/* Card */}
-      <div style={{ background:"var(--hf-surface)", border:"1px solid var(--hf-border)", borderRadius:14, padding:24 }}>
-        {!openPatient && (
-          <div style={{ display:"flex", gap:2, borderBottom:"1px solid var(--hf-border)", marginBottom:28, overflowX:"auto" }}>
-            {TABS.map(t => {
-              const Icon=t.icon; const active=tab===t.id
-              return (
-                <button key={t.id} onClick={()=>setTab(t.id)}
-                  style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 16px",
-                    background:"none", border:"none", whiteSpace:"nowrap",
-                    borderBottom:active?"2px solid var(--hf-accent)":"2px solid transparent",
-                    color:active?"var(--hf-accent-text)":"var(--hf-text-muted)",
-                    fontWeight:active?600:400, fontSize:13, cursor:"pointer", marginBottom:-1 }}>
-                  <Icon size={14}/>{t.label}
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {openPatient ? (
-          <PatientFilePage
-            patient={openPatient}
-            onClose={()=>setOpenPatient(null)}
-            onNavigate={setTab}
-            onOpenPatient={setOpenPatient}
-            initialSession={sessionAppointment}
-            onSessionClear={()=>setSessionAppointment(null)}/>
-        ) : (
-          <>
-            {tab==="dashboard"     && <ClinicDashboard onNavigate={setTab}/>}
-            {tab==="patients"      && <PatientsTab onOpenPatient={setOpenPatient}/>}
-            {tab==="schedule"      && <ScheduleTab onStartSession={(appt, pat) => {
-              setOpenPatient(pat)
-              setSessionAppointment(appt)
-              setTab("patients")
-            }}/>}
-            {tab==="consultations" && <ConsultationsTab/>}
-            {tab==="recalls"       && <RecallsTab/>}
-            {tab==="waitlist"      && <WaitlistTab/>}
-            {tab==="practitioners" && <PractitionersTab/>}
-            {tab==="claims"        && <ClaimsTab/>}
-            {tab==="billing"       && <BillingTab/>}
-          </>
-        )}
-      </div>
-    </div>
+    <SectionedModulePage config={CLINIC_SECTIONS}
+      action={backButton}
+      subtitle="Patient records · Appointments · Consultations · Prescriptions"
+      detail={openPatient ? { label: openPatient.fullName, subtitle: "Patient file" } : undefined}
+      render={(id, goTo) => {
+        if (id === "patients" && openPatient) {
+          return (
+            <PatientFilePage
+              patient={openPatient}
+              onClose={closeFile}
+              onNavigate={goTo}
+              onOpenPatient={p => openFile(p)}
+              initialSession={sessionAppointment}
+              onSessionClear={clearSession} />
+          )
+        }
+        switch (id) {
+          case "dashboard":     return <ClinicDashboard onNavigate={goTo} />
+          case "patients":      return <PatientsTab onOpenPatient={p => openFile(p)} />
+          case "schedule":      return <ScheduleTab onStartSession={(appt: unknown, pat: Patient) => openFile(pat, appt)} />
+          case "consultations": return <ConsultationsTab />
+          case "recalls":       return <RecallsTab />
+          case "waitlist":      return <WaitlistTab />
+          case "practitioners": return <PractitionersTab />
+          case "claims":        return <ClaimsTab />
+          case "billing":       return <BillingTab />
+          default:              return null
+        }
+      }} />
   )
 }

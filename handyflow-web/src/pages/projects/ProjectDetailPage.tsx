@@ -23,7 +23,7 @@ import { FieldTab }      from './tabs/FieldTab'
 
 type TabKey = 'overview'|'gantt'|'tasks'|'resources'|'budget'|'risks'|'documents'|'field'
 
-const HEALTH_DOT: Record<string, string> = { GREEN:'#16A34A', AMBER:'#D97706', RED:'#DC2626' }
+const HEALTH_DOT: Record<string, string> = { GREEN:'var(--hf-success)', AMBER:'var(--hf-warning)', RED:'var(--hf-danger)' }
 const STATUS_LABEL: Record<string, { bg:string; color:string }> = {
   PLANNING:{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)'}, ACTIVE:{bg:'var(--hf-info-soft-strong)',color:'var(--hf-info-text)'},
   ON_HOLD:{bg:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)'}, COMPLETED:{bg:'var(--hf-success-soft-strong)',color:'var(--hf-success-text-strong)'},
@@ -91,16 +91,16 @@ export function ProjectDetailPage() {
           {/* Action buttons */}
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             {project.status === 'PLANNING' && (
-              <ActionBtn color="#166534" bg="#DCFCE7" border="#86EFAC" onClick={() => actionMut.mutate('activate')} icon={Play}>Activate</ActionBtn>
+              <ActionBtn color="var(--hf-success-text-strong)" bg="var(--hf-success-soft-strong)" border="var(--hf-success-border)" onClick={() => actionMut.mutate('activate')} icon={Play}>Activate</ActionBtn>
             )}
             {project.status === 'ACTIVE' && (
-              <ActionBtn color="#92400E" bg="#FEF3C7" border="#FCD34D" onClick={() => actionMut.mutate('hold')} icon={Pause}>Hold</ActionBtn>
+              <ActionBtn color="var(--hf-warning-text-deep)" bg="var(--hf-warning-soft-strong)" border="var(--hf-warning-border-strong)" onClick={() => actionMut.mutate('hold')} icon={Pause}>Hold</ActionBtn>
             )}
             {project.status === 'ON_HOLD' && (
-              <ActionBtn color="#166534" bg="#DCFCE7" border="#86EFAC" onClick={() => actionMut.mutate('activate')} icon={Play}>Resume</ActionBtn>
+              <ActionBtn color="var(--hf-success-text-strong)" bg="var(--hf-success-soft-strong)" border="var(--hf-success-border)" onClick={() => actionMut.mutate('activate')} icon={Play}>Resume</ActionBtn>
             )}
             {['PLANNING','ACTIVE','ON_HOLD'].includes(project.status) && (
-              <ActionBtn color="#166534" bg="#F0FDF4" border="#BBF7D0" onClick={() => actionMut.mutate('complete')} icon={CheckCircle}>Complete</ActionBtn>
+              <ActionBtn color="var(--hf-success-text-strong)" bg="var(--hf-success-soft)" border="var(--hf-success-border-subtle)" onClick={() => actionMut.mutate('complete')} icon={CheckCircle}>Complete</ActionBtn>
             )}
             {project.clientPortalToken && (
               <button onClick={() => window.open(`/projects/portal/${project.clientPortalToken}`, '_blank')}

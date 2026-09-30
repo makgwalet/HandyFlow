@@ -28,7 +28,8 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "tenders",       label: "Tenders",       icon: Briefcase     },
 ]
 
-const ACCENT = "#065F46"
+const ACCENT = "var(--hf-success-solid-strong)"
+const ACCENT_TEXT = "var(--hf-success-text-strong)";
 const unwrap = (r: any) => r.data?.data ?? r.data
 
 export default function ClientDetailPage() {
@@ -42,26 +43,26 @@ export default function ClientDetailPage() {
     enabled: !!clientId,
   })
 
-  if (isLoading || !client || !clientId) return <div style={{ padding: 40, textAlign: "center", color: "#94A3B8" }}>Loading client...</div>
+  if (isLoading || !client || !clientId) return <div style={{ padding: 40, textAlign: "center", color: "var(--hf-text-faint)" }}>Loading client...</div>
 
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif", maxWidth: 1000, margin: "0 auto", padding: "0 4px" }}>
-      <button onClick={() => nav("/complianceservices")} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "#64748B", fontSize: 13, marginBottom: 18, padding: 0 }}>
+      <button onClick={() => nav("/complianceservices")} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-muted)", fontSize: 13, marginBottom: 18, padding: 0 }}>
         <ArrowLeft size={15} /> Back to Clients
       </button>
 
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24 }}>
-        <div style={{ width: 48, height: 48, borderRadius: 12, background: "#ECFDF5", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Building2 size={22} color={ACCENT} />
+        <div style={{ width: 48, height: 48, borderRadius: 12, background: "var(--hf-success-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Building2 size={22} style={{ color: ACCENT_TEXT }} />
         </div>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#0F172A" }}>{client.name}</h1>
-            <span style={{ background: client.status === "ACTIVE" ? "#DCFCE7" : "#F1F5F9", color: client.status === "ACTIVE" ? "#166534" : "#64748B", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "var(--hf-text)" }}>{client.name}</h1>
+            <span style={{ background: client.status === "ACTIVE" ? "var(--hf-success-soft-strong)" : "var(--hf-surface-sunken)", color: client.status === "ACTIVE" ? "var(--hf-success-text-strong)" : "var(--hf-text-muted)", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
               {client.status === "ACTIVE" ? "Active" : "Inactive"}
             </span>
           </div>
-          <div style={{ fontSize: 13, color: "#94A3B8", marginTop: 3 }}>
+          <div style={{ fontSize: 13, color: "var(--hf-text-faint)", marginTop: 3 }}>
             {client.crmCustomerId ? (client.crmCustomerFound ? `Linked to CRM: ${client.crmCustomerName}` : "CRM link no longer available") : "No CRM link"}
             {client.contactEmail ? ` · ${client.contactEmail}` : ""}
           </div>
@@ -69,13 +70,13 @@ export default function ClientDetailPage() {
       </div>
 
       {client.mandateNotes && (
-        <div style={{ marginBottom: 20, padding: "12px 16px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, fontSize: 13, color: "#374151" }}>
+        <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, fontSize: 13, color: "var(--hf-text-secondary)" }}>
           <strong>Mandate:</strong> {client.mandateNotes}
         </div>
       )}
 
-      <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 14, padding: 24 }}>
-        <div style={{ display: "flex", gap: 2, borderBottom: "1px solid #E2E8F0", marginBottom: 28, overflowX: "auto" }}>
+      <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: 24 }}>
+        <div style={{ display: "flex", gap: 2, borderBottom: "1px solid var(--hf-border)", marginBottom: 28, overflowX: "auto" }}>
           {TABS.map(t => {
             const Icon = t.icon
             const active = tab === t.id
@@ -85,7 +86,7 @@ export default function ClientDetailPage() {
                   display: "flex", alignItems: "center", gap: 6, padding: "10px 16px",
                   background: "none", border: "none", whiteSpace: "nowrap",
                   borderBottom: active ? `2px solid ${ACCENT}` : "2px solid transparent",
-                  color: active ? ACCENT : "#64748B",
+                  color: active ? ACCENT_TEXT : "var(--hf-text-muted)",
                   fontWeight: active ? 600 : 400, fontSize: 13, cursor: "pointer",
                   marginBottom: -1,
                 }}>

@@ -51,6 +51,10 @@
   --hf-sky-dot: #38bdf8;
   /* Pale text used on the dark brand header (signing page etc.). */
   --hf-on-brand-muted: #93c5fd;
+  --hf-danger-on-brand: #fca5a5;
+  --hf-warning-on-brand: #fcd34d;
+  --hf-accent-on-brand: #5eead4;
+  --hf-primary-deep: #0d2145;
 
   /* Brand */
   --hf-primary: #1b3a6b;
@@ -174,6 +178,10 @@
   --hf-accent-dot: #2dd4bf;
   --hf-sky-dot: #38bdf8;
   --hf-on-brand-muted: #93c5fd;
+  --hf-danger-on-brand: #fca5a5;
+  --hf-warning-on-brand: #fcd34d;
+  --hf-accent-on-brand: #5eead4;
+  --hf-primary-deep: #0d2145;
 
   --hf-primary: #3563ae;
   --hf-primary-hover: #2b5596;

@@ -61,7 +61,7 @@ export class TabErrorBoundary extends React.Component<Props, State> {
           width: 56, height: 56, borderRadius: '50%', background: 'var(--hf-danger-soft)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16,
         }}>
-          <AlertTriangle size={26} color="#DC2626" />
+          <AlertTriangle size={26} style={{ color: 'var(--hf-danger-text)' }} />
         </div>
         <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--hf-text)', marginBottom: 6 }}>
           This tab ran into a problem

@@ -11,7 +11,8 @@ export type ProjectsView =
   | { screen: "list" }
   | { screen: "detail"; projectId: string }
 
-const ACCENT = "#1B3A6B"
+const ACCENT = "var(--hf-primary)"
+const ACCENT_TEXT = "var(--hf-primary-text)";
 
 export function ProjectsPage() {
   const [view, setView] = useState<ProjectsView>({ screen: "dashboard" })
@@ -31,7 +32,7 @@ export function ProjectsPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: ACCENT,
             display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <HardHat size={18} color="#fff" />
+            <HardHat size={18} style={{ color: 'var(--hf-text-on-solid)' }} />
           </div>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Projects</h1>
         </div>
@@ -56,7 +57,7 @@ export function ProjectsPage() {
                   padding: "10px 16px", background: "none", border: "none",
                   whiteSpace: "nowrap",
                   borderBottom: active ? `2px solid ${ACCENT}` : "2px solid transparent",
-                  color:      active ? ACCENT : "var(--hf-text-muted)",
+                  color:      active ? ACCENT_TEXT : "var(--hf-text-muted)",
                   fontWeight: active ? 600 : 400,
                   fontSize: 13, cursor: "pointer", marginBottom: -1,
                 }}>

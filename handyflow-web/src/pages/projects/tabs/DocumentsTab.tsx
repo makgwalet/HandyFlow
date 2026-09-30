@@ -11,16 +11,16 @@ interface Doc {
 }
 
 function unwrap<T>(r:any):T[]{const d=r?.data?.data??r?.data??[];return Array.isArray(d)?d as T[]:d?.content??[]}
-const inp:React.CSSProperties={width:'100%',padding:'9px 12px',border:'1.5px solid #E2E8F0',borderRadius:9,fontSize:14,boxSizing:'border-box' as const,outline:'none',background:'#fff'}
+const inp:React.CSSProperties={width:'100%',padding:'9px 12px',border:'1.5px solid var(--hf-border)',borderRadius:9,fontSize:14,boxSizing:'border-box' as const,outline:'none',background:'var(--hf-surface)'}
 const DOC_TYPES=['DRAWING','RFI','SUBMITTAL','CONTRACT','REPORT','PHOTO','GENERAL']
 const DOC_COLOR:Record<string,{bg:string;color:string}>={
-  DRAWING:{bg:'#DBEAFE',color:'#1D4ED8'},RFI:{bg:'#FEF3C7',color:'#92400E'},
-  SUBMITTAL:{bg:'#EDE9FE',color:'#7C3AED'},CONTRACT:{bg:'#DCFCE7',color:'#166534'},
-  REPORT:{bg:'#F1F5F9',color:'#475569'},PHOTO:{bg:'#FEF2F2',color:'#DC2626'},GENERAL:{bg:'#F1F5F9',color:'#64748B'},
+  DRAWING:{bg:'var(--hf-info-soft-strong)',color:'var(--hf-info-text)'},RFI:{bg:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)'},
+  SUBMITTAL:{bg:'var(--hf-violet-soft-strong)',color:'var(--hf-violet-text)'},CONTRACT:{bg:'var(--hf-success-soft-strong)',color:'var(--hf-success-text-strong)'},
+  REPORT:{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)'},PHOTO:{bg:'var(--hf-danger-soft)',color:'var(--hf-danger-text)'},GENERAL:{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-muted)'},
 }
 const STATUS_COLOR:Record<string,{bg:string;color:string}>={
-  CURRENT:{bg:'#DCFCE7',color:'#166534'},APPROVED:{bg:'#DBEAFE',color:'#1D4ED8'},
-  FOR_REVIEW:{bg:'#FEF3C7',color:'#92400E'},DRAFT:{bg:'#F1F5F9',color:'#475569'},SUPERSEDED:{bg:'#F1F5F9',color:'#9CA3AF'},
+  CURRENT:{bg:'var(--hf-success-soft-strong)',color:'var(--hf-success-text-strong)'},APPROVED:{bg:'var(--hf-info-soft-strong)',color:'var(--hf-info-text)'},
+  FOR_REVIEW:{bg:'var(--hf-warning-soft-strong)',color:'var(--hf-warning-text-deep)'},DRAFT:{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)'},SUPERSEDED:{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-faint)'},
 }
 
 const MAX_FILE_MB = 10
@@ -44,7 +44,7 @@ function DropZone({ file, onFile, onClear }:{ file:File|null; onFile:(f:File)=>v
     return (
       <div style={{border:'1.5px solid var(--hf-info-border)',borderRadius:10,padding:'14px 16px',display:'flex',alignItems:'center',gap:12,background:'var(--hf-surface-muted)'}}>
         <div style={{width:40,height:40,borderRadius:8,background:'var(--hf-info-soft-strong)',display:'flex',flexDirection:'column' as const,alignItems:'center',justifyContent:'center',flexShrink:0}}>
-          <FileText size={17} color="#1D4ED8"/>
+          <FileText size={17} style={{ color: 'var(--hf-info-text)' }}/>
           <span style={{fontSize:8,fontWeight:800,color:'var(--hf-info-text)',marginTop:1}}>{ext}</span>
         </div>
         <div style={{flex:1,minWidth:0}}>
@@ -65,7 +65,7 @@ function DropZone({ file, onFile, onClear }:{ file:File|null; onFile:(f:File)=>v
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
       style={{
-        border:`2px dashed ${dragging?'#1B3A6B':'#CBD5E1'}`,borderRadius:10,
+        border:`2px dashed ${dragging?'var(--hf-primary)':'var(--hf-border-strong)'}`,borderRadius:10,
         padding:'32px 20px',textAlign:'center' as const,cursor:'pointer',
         background:dragging?'var(--hf-info-soft)':'var(--hf-surface-muted)',transition:'all 0.15s',userSelect:'none' as const,
       }}
@@ -76,7 +76,7 @@ function DropZone({ file, onFile, onClear }:{ file:File|null; onFile:(f:File)=>v
         display:'flex',alignItems:'center',justifyContent:'center',
         margin:'0 auto 12px',transition:'all 0.15s',
       }}>
-        <Upload size={22} color={dragging?'#1B3A6B':'#94A3B8'}/>
+        <Upload size={22} style={{ color: dragging?'var(--hf-primary-text)':'var(--hf-text-faint)' }}/>
       </div>
       <div style={{fontSize:14,fontWeight:600,color:dragging?'var(--hf-primary-text)':'var(--hf-text-secondary)',marginBottom:4}}>
         {dragging ? 'Drop to upload' : 'Drag & drop or click to browse'}
@@ -279,13 +279,13 @@ function DocList({docs,onAction}:{docs:Doc[];onAction:(a:any)=>void}) {
   return (
     <div style={{border:'1px solid var(--hf-border)',borderRadius:10,overflow:'hidden'}}>
       {docs.map((d,i)=>{
-        const dc = DOC_COLOR[d.documentType]??{bg:'#F1F5F9',color:'#475569'}
-        const sc = STATUS_COLOR[d.status]??{bg:'#F1F5F9',color:'#64748B'}
+        const dc = DOC_COLOR[d.documentType]??{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-tertiary)'}
+        const sc = STATUS_COLOR[d.status]??{bg:'var(--hf-surface-sunken)',color:'var(--hf-text-muted)'}
         const ext = d.fileName?.split('.').pop()?.toUpperCase()??null
         return (
           <div key={d.id} style={{display:'flex',alignItems:'center',gap:12,padding:'11px 14px',borderTop:i>0?'1px solid var(--hf-border-subtle)':'none',background:i%2===0?'var(--hf-surface)':'var(--hf-surface-muted)'}}>
             <div style={{width:34,height:34,borderRadius:7,background:dc.bg,display:'flex',flexDirection:'column' as const,alignItems:'center',justifyContent:'center',flexShrink:0}}>
-              <FileText size={13} color={dc.color}/>
+              <FileText size={13} style={{ color: dc.color }}/>
               {ext&&<span style={{fontSize:7,fontWeight:800,color:dc.color,marginTop:1,lineHeight:1}}>{ext}</span>}
             </div>
             <div style={{flex:1,minWidth:0}}>

@@ -19,6 +19,9 @@
  "#0891B2": {
   "fg": "sky-text"
  },
+ "#0D2145": {
+  "bg": "primary-deep"
+ },
  "#0D9488": {
   "bd": "accent",
   "bg": "accent",
@@ -108,7 +111,9 @@
  "#5B21B6": {
   "fg": "violet-text-strong"
  },
- "#5EEAD4": {},
+ "#5EEAD4": {
+  "fg": "accent-on-brand"
+ },
  "#60A5FA": {
   "bg": "info-dot"
  },
@@ -368,10 +373,12 @@
   "bg": "surface-muted"
  },
  "#FCA5A5": {
-  "bd": "danger-border"
+  "bd": "danger-border",
+  "fg": "danger-on-brand"
  },
  "#FCD34D": {
-  "bd": "warning-border-strong"
+  "bd": "warning-border-strong",
+  "fg": "warning-on-brand"
  },
  "#FCE7F3": {
   "bg": "danger-soft"
