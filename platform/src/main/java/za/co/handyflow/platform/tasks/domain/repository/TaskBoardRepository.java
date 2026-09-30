@@ -11,5 +11,6 @@ import java.util.UUID;
 public interface TaskBoardRepository extends JpaRepository<TaskBoard, UUID> {
     List<TaskBoard> findByTenantIdAndArchivedFalseOrderByIsDefaultDescCreatedAtAsc(TenantId tenantId);
     Optional<TaskBoard> findByIdAndTenantId(UUID id, TenantId tenantId);
+    boolean existsByTenantId(TenantId tenantId);
     Optional<TaskBoard> findByTenantIdAndIsDefaultTrue(TenantId tenantId);
 }

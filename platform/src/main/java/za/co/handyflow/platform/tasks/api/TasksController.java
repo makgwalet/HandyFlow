@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -271,7 +272,7 @@ public class TasksController {
     @Operation(summary = "Partial update — currently supports { columnId } for quick column moves")
     public ResponseEntity<ApiResponse<TaskResponse>> patchTask(
             @PathVariable UUID id,
-            @RequestBody MoveTaskRequest req) {
+            @Valid @RequestBody MoveTaskRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Task moved",
                 tasksService.moveTask(TenantContext.getTenantIdAsObject(), id, req)));
     }
@@ -347,7 +348,8 @@ public class TasksController {
         TasksService.DownloadedFile file = tasksService.downloadAttachment(
                 TenantContext.getTenantIdAsObject(), id, attachmentId);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.fileName() + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.builder("attachment")
+                        .filename(file.fileName(), StandardCharsets.UTF_8).build().toString())
                 .contentType(file.contentType() != null
                         ? MediaType.parseMediaType(file.contentType())
                         : MediaType.APPLICATION_OCTET_STREAM)

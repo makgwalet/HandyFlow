@@ -24,6 +24,8 @@ import za.co.handyflow.platform.tasks.dto.*;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -67,6 +69,7 @@ public class TasksService {
         Long doneByColumn = jdbc.queryForObject(
                 "SELECT COUNT(t.id) FROM tasks t " +
                         "JOIN task_columns tc ON tc.id = t.column_id " +
+                        "JOIN task_boards tb ON tb.id = t.board_id AND tb.archived = false " +
                         "WHERE t.tenant_id = ? AND t.deleted_at IS NULL AND tc.is_done_column = true",
                 Long.class, tenantId.getValue());
         long doneCount  = doneByColumn != null ? doneByColumn : 0;
@@ -74,16 +77,26 @@ public class TasksService {
         long todo       = taskRepo.countByStatus(tenantId, "TODO");
         long inProgress = taskRepo.countByStatus(tenantId, "IN_PROGRESS");
         long inReview   = taskRepo.countByStatus(tenantId, "IN_REVIEW");
-        long overdue    = taskRepo.countOverdue(tenantId, LocalDate.now());
+        long overdue    = taskRepo.countOverdue(tenantId, Task.today());
         long mine       = userId != null ? taskRepo.countMyTasks(tenantId, userId) : 0;
-        long total      = todo + inProgress + inReview + doneCount;
+        long blocked    = taskRepo.countByStatus(tenantId, "BLOCKED");
+        long total      = todo + inProgress + inReview + blocked + doneCount;
         return new TasksSummaryResponse(total, todo, inProgress, inReview, doneCount, overdue, mine);
     }
 
     // ── Boards ────────────────────────────────────────────────────────────────
 
-    @Transactional(readOnly = true)
+    /**
+     * Lists the tenant's active boards. A tenant that has never had a board gets a default one on
+     * first load, so a new tenant lands on a usable board instead of an empty state (and the
+     * "default board cannot be archived" rule can finally apply).
+     */
+    @Transactional
     public List<BoardResponse> getBoards(TenantId tenantId) {
+        if (!boardRepo.existsByTenantId(tenantId)) {
+            createBoardWithDefaultColumns(tenantId, "General", "Your default task board",
+                    "#3B82F6", true, null);
+        }
         return boardRepo
                 .findByTenantIdAndArchivedFalseOrderByIsDefaultDescCreatedAtAsc(tenantId)
                 .stream()
@@ -98,18 +111,23 @@ public class TasksService {
 
     @Transactional
     public BoardResponse createBoard(TenantId tenantId, UUID createdBy, CreateBoardRequest req) {
-        TaskBoard board = TaskBoard.create(tenantId, req.name(), req.description(),
+        return createBoardWithDefaultColumns(tenantId, req.name(), req.description(),
                 req.color(), false, createdBy);
+    }
+
+    private BoardResponse createBoardWithDefaultColumns(TenantId tenantId, String name, String description,
+                                                        String color, boolean isDefault, UUID createdBy) {
+        TaskBoard board = TaskBoard.create(tenantId, name, description, color, isDefault, createdBy);
         boardRepo.save(board);
 
         List.of(
-                TaskColumn.create(board.getId(), tenantId.getValue(), "To Do",       "#94A3B8", 0, false),
-                TaskColumn.create(board.getId(), tenantId.getValue(), "In Progress", "#3B82F6", 1, false),
-                TaskColumn.create(board.getId(), tenantId.getValue(), "In Review",   "#F59E0B", 2, false),
-                TaskColumn.create(board.getId(), tenantId.getValue(), "Done",        "#10B981", 3, true)
+                TaskColumn.create(board.getId(), tenantId.getValue(), "To Do",       "#94A3B8", 0, false, TaskCategory.TODO),
+                TaskColumn.create(board.getId(), tenantId.getValue(), "In Progress", "#3B82F6", 1, false, TaskCategory.IN_PROGRESS),
+                TaskColumn.create(board.getId(), tenantId.getValue(), "In Review",   "#F59E0B", 2, false, TaskCategory.IN_REVIEW),
+                TaskColumn.create(board.getId(), tenantId.getValue(), "Done",        "#10B981", 3, true,  TaskCategory.DONE)
         ).forEach(columnRepo::save);
 
-        log.info("Created board={} tenant={}", board.getId(), tenantId);
+        log.info("Created board={} tenant={} default={}", board.getId(), tenantId, isDefault);
         return toBoardResponse(board, false);
     }
 
@@ -136,7 +154,8 @@ public class TasksService {
     public ColumnResponse addColumn(TenantId tenantId, UUID boardId, CreateColumnRequest req) {
         findBoard(tenantId, boardId);
         TaskColumn col = TaskColumn.create(boardId, tenantId.getValue(),
-                req.name(), req.color(), req.sortOrder(), req.isDoneColumn());
+                req.name(), req.color(), req.sortOrder(), req.isDoneColumn(),
+                TaskCategory.parseOrNull(req.category()));
         columnRepo.save(col);
         return toColumnResponse(col, null);
     }
@@ -144,23 +163,39 @@ public class TasksService {
     @Transactional
     public ColumnResponse updateColumn(TenantId tenantId, UUID boardId, UUID columnId, CreateColumnRequest req) {
         findBoard(tenantId, boardId);
-        TaskColumn col = columnRepo.findById(columnId)
-                .orElseThrow(() -> new ResourceNotFoundException("Column", columnId.toString()));
+        TaskColumn col = findColumn(tenantId, boardId, columnId);
         col.update(req.name(), req.color(), req.sortOrder(), req.isDoneColumn());
+        col.applyCategory(TaskCategory.parseOrNull(req.category()));
         columnRepo.save(col);
+        syncTaskStatuses(tenantId, col);   // tasks already in the column follow a changed category
         return toColumnResponse(col, null);
     }
 
     @Transactional
     public void deleteColumn(TenantId tenantId, UUID boardId, UUID columnId) {
         findBoard(tenantId, boardId);
+        TaskColumn column = findColumn(tenantId, boardId, columnId);
         List<TaskColumn> allCols = columnRepo.findByBoardIdOrderBySortOrderAsc(boardId);
         if (allCols.size() <= 1) throw new HandyFlowException(
                 "Cannot delete the only column on a board", HttpStatus.BAD_REQUEST, "LAST_COLUMN");
-        TaskColumn target = allCols.stream().filter(c -> !c.getId().equals(columnId)).findFirst().orElseThrow();
-        jdbc.update("UPDATE tasks SET column_id = ? WHERE column_id = ? AND deleted_at IS NULL",
-                target.getId(), columnId);
-        columnRepo.deleteById(columnId);
+        // Tasks move to another column of THIS board. Soft-deleted tasks move too: they still
+        // reference the column, and deleting it underneath them would violate the foreign key.
+        TaskColumn target = allCols.stream()
+                .filter(c -> !c.getId().equals(column.getId())).findFirst().orElseThrow();
+        jdbc.update("UPDATE tasks SET column_id = ? WHERE column_id = ? AND tenant_id = ?",
+                target.getId(), column.getId(), tenantId.getValue());
+        syncTaskStatuses(tenantId, target);
+        columnRepo.delete(column);
+    }
+
+    /** A column's category is the status of every live task in it; call after the category or membership changes. */
+    private void syncTaskStatuses(TenantId tenantId, TaskColumn col) {
+        String category = col.getCategory().name();
+        jdbc.update("UPDATE tasks SET status = ?, " +
+                        "completed_at = CASE WHEN ? = 'DONE' THEN COALESCE(completed_at, NOW()) ELSE NULL END " +
+                        "WHERE column_id = ? AND tenant_id = ? AND deleted_at IS NULL " +
+                        "AND status <> 'CANCELLED' AND status <> ?",
+                category, category, col.getId(), tenantId.getValue(), category);
     }
 
     // ── Tasks ─────────────────────────────────────────────────────────────────
@@ -184,6 +219,11 @@ public class TasksService {
         List<Task> tasks = taskRepo.findByBoardIdAndDeletedAtIsNullOrderBySortOrderAscCreatedAtAsc(boardId);
 
         // FIX: pre-load all columns and comment counts in batch — eliminates N+1
+        // One name lookup per distinct assignee, not one per task.
+        Map<UUID, String> userNames = new HashMap<>();
+        for (Task t : tasks) {
+            if (t.getAssigneeId() != null) userNames.computeIfAbsent(t.getAssigneeId(), this::resolveUserName);
+        }
         Map<UUID, String> columnNames = columnRepo.findByBoardIdOrderBySortOrderAsc(boardId)
                 .stream().collect(Collectors.toMap(TaskColumn::getId, TaskColumn::getName));
         Map<UUID, Integer> commentCounts = commentRepo.countByTaskIds(
@@ -194,7 +234,7 @@ public class TasksService {
                 tasks.stream().map(Task::getId).toList());
 
         return tasks.stream()
-                .map(t -> toTaskResponseBatched(t, columnNames, commentCounts, loggedHours, checklistProgress))
+                .map(t -> toTaskResponseBatched(t, columnNames, userNames, commentCounts, loggedHours, checklistProgress))
                 .toList();
     }
 
@@ -278,7 +318,7 @@ public class TasksService {
 
     @Transactional(readOnly = true)
     public List<TaskResponse> getOverdueTasks(TenantId tenantId) {
-        return taskRepo.findOverdue(tenantId, LocalDate.now()).stream()
+        return taskRepo.findOverdue(tenantId, Task.today()).stream()
                 .map(t -> toTaskResponse(t, false)).toList();
     }
 
@@ -296,27 +336,33 @@ public class TasksService {
     @Transactional
     public TaskResponse createTask(TenantId tenantId, UUID boardId, UUID createdBy, CreateTaskRequest req) {
         findBoard(tenantId, boardId);
+        validateAssignee(tenantId, req.assigneeId());
+        validateLinkType(req.linkedEntityType());
+        if ((req.linkedEntityType() == null) != (req.linkedEntityId() == null)) {
+            throw new HandyFlowException("A linked record needs both a type and an id",
+                    HttpStatus.BAD_REQUEST, "INVALID_LINK");
+        }
 
-        UUID columnId;
+        // A client-supplied column must belong to THIS board and tenant.
+        TaskColumn column;
         if (req.columnId() != null) {
-            columnId = req.columnId();
+            column = findColumn(tenantId, boardId, req.columnId());
         } else {
-            columnId = columnRepo.findFirstByBoardIdOrderBySortOrderAsc(boardId)
-                    .map(TaskColumn::getId)
+            column = columnRepo.findFirstByBoardIdOrderBySortOrderAsc(boardId)
                     .orElseThrow(() -> new HandyFlowException(
                             "Board has no columns", HttpStatus.BAD_REQUEST, "NO_COLUMNS"));
         }
+        UUID columnId = column.getId();
 
-        int sortOrder = taskRepo.findByColumnIdAndDeletedAtIsNullOrderBySortOrderAsc(columnId).size();
+        // Next position = one past the current maximum (counting rows collides after deletes).
+        int sortOrder = taskRepo.findByColumnIdAndDeletedAtIsNullOrderBySortOrderAsc(columnId).stream()
+                .mapToInt(Task::getSortOrder).max().orElse(-1) + 1;
         Task task = Task.create(tenantId, boardId, columnId,
                 req.title(), req.description(), req.priority(),
                 req.assigneeId(), req.dueDate(), req.estimatedHours(), sortOrder,
                 req.linkedEntityType(), req.linkedEntityId(), createdBy);
+        task.applyCategory(column.getCategory());   // status follows the column it is created in
         taskRepo.save(task);
-        // Sync status field based on which column the task is created in
-        final UUID finalColumnId = columnId;
-        columnRepo.findById(finalColumnId).ifPresent(col ->
-                jdbc.update("UPDATE tasks SET status = ? WHERE id = ?", deriveStatus(col), task.getId()));
         log.info("Created task={} board={} column={}", task.getId(), boardId, columnId);
         notifyAssignment(tenantId, task, createdBy);
         return toTaskResponse(task, false);
@@ -325,12 +371,16 @@ public class TasksService {
     @Transactional
     public TaskResponse updateTask(TenantId tenantId, UUID taskId, UpdateTaskRequest req, UUID updatedBy) {
         Task task = findTask(tenantId, taskId);
+        validateAssignee(tenantId, req.assigneeId());
+        validateLinkType(req.linkedEntityType());
         UUID previousAssignee = task.getAssigneeId();
         task.update(req.title(), req.description(), req.priority(),
                 req.assigneeId(), req.dueDate(), req.estimatedHours(),
-                req.linkedEntityType(), req.linkedEntityId());
+                req.linkedEntityType(), req.linkedEntityId(),
+                req.clearAssignee(), req.clearDueDate(), req.clearDescription(),
+                req.clearEstimatedHours(), req.clearLink());
         taskRepo.save(task);
-        boolean reassigned = req.assigneeId() != null && !req.assigneeId().equals(previousAssignee);
+        boolean reassigned = task.getAssigneeId() != null && !task.getAssigneeId().equals(previousAssignee);
         if (reassigned) {
             notifyAssignment(tenantId, task, updatedBy);
         }
@@ -340,22 +390,20 @@ public class TasksService {
     @Transactional
     public TaskResponse moveTask(TenantId tenantId, UUID taskId, MoveTaskRequest req) {
         Task task = findTask(tenantId, taskId);
-        TaskColumn col = columnRepo.findById(req.columnId())
-                .orElseThrow(() -> new ResourceNotFoundException("Column", req.columnId().toString()));
-        task.moveToColumn(req.columnId(), col.isDoneColumn());
-        taskRepo.save(task);
-        // Sync status field with column name so summary counts stay accurate
-        jdbc.update("UPDATE tasks SET status = ? WHERE id = ?", deriveStatus(col), taskId);
-        return toTaskResponse(task, false);
-    }
+        // The target column must belong to the task's own board (and so to this tenant).
+        TaskColumn col = findColumn(tenantId, task.getBoardId(), req.columnId());
+        task.moveToColumn(col.getId(), col.getCategory());   // status follows the column, in the entity
 
-    /** Derive a status string from the column name for backward compat with status-based queries. */
-    private String deriveStatus(TaskColumn col) {
-        if (col.isDoneColumn()) return "DONE";
-        String upper = col.getName().toUpperCase();
-        if (upper.contains("PROGRESS") || upper.contains("DOING"))    return "IN_PROGRESS";
-        if (upper.contains("REVIEW")   || upper.contains("TESTING"))  return "IN_REVIEW";
-        return "TODO";
+        // Place the task at the requested position and renumber the column 0..n-1, so ordering is
+        // stable and never collides (the UI used to send 0 every time and nothing honoured it).
+        List<Task> siblings = new ArrayList<>(
+                taskRepo.findByColumnIdAndDeletedAtIsNullOrderBySortOrderAsc(col.getId()));
+        siblings.removeIf(t -> t.getId().equals(task.getId()));
+        int index = Math.max(0, Math.min(req.sortOrder(), siblings.size()));
+        siblings.add(index, task);
+        for (int i = 0; i < siblings.size(); i++) siblings.get(i).reposition(i);
+        taskRepo.saveAll(siblings);
+        return toTaskResponse(task, false);
     }
 
     @Transactional
@@ -363,7 +411,7 @@ public class TasksService {
         Task task = findTask(tenantId, taskId);
         columnRepo.findByBoardIdOrderBySortOrderAsc(task.getBoardId()).stream()
                 .filter(TaskColumn::isDoneColumn).findFirst()
-                .ifPresent(done -> task.moveToColumn(done.getId(), true));
+                .ifPresent(done -> task.moveToColumn(done.getId(), TaskCategory.DONE));
         task.complete();
         taskRepo.save(task);
         return toTaskResponse(task, false);
@@ -546,7 +594,7 @@ public class TasksService {
     public TimeLogResponse logTime(TenantId tenantId, UUID taskId,
                                    LogTimeRequest req, UUID userId, String userName) {
         findTask(tenantId, taskId);
-        LocalDate logDate = req.loggedDate() != null ? req.loggedDate() : LocalDate.now();
+        LocalDate logDate = req.loggedDate() != null ? req.loggedDate() : Task.today();
         TaskTimeLog entry = TaskTimeLog.create(taskId, tenantId.getValue(),
                 userId, userName, req.hours(), req.description(), logDate);
         timeLogRepo.save(entry);
@@ -590,21 +638,21 @@ public class TasksService {
     // ── Notifications ────────────────────────────────────────────────────────
 
     /**
-     +     * FIX: previously ran its own jdbc query directly, annotated
-     +     * @Transactional(readOnly = true) — but called only via self-invocation
-     +     * from notifyAssignment()/notifyComment() below, where that annotation
-     +     * is silently ignored (Spring's proxy never sees a call through `this`).
-     +     * A failed lookup there would poison whatever transaction was already
-     +     * open on the calling create/update method — the exact failure mode
-     +     * that surfaced as a Postgres 25P02 in Expenses' approveClaim(). Also
-     +     * had no tenant_id scoping at all. Now delegates to a genuinely
-     +     * separate bean (UserRecipientResolver, REQUIRES_NEW, tenant-scoped)
-     +     * so a failure here is isolated and this class no longer runs the
-     +     * query itself.
-     +     */
+     * FIX: previously ran its own jdbc query directly, annotated
+     * @Transactional(readOnly = true) — but called only via self-invocation
+     * from notifyAssignment()/notifyComment() below, where that annotation
+     * is silently ignored (Spring's proxy never sees a call through `this`).
+     * A failed lookup there would poison whatever transaction was already
+     * open on the calling create/update method — the exact failure mode
+     * that surfaced as a Postgres 25P02 in Expenses' approveClaim(). Also
+     * had no tenant_id scoping at all. Now delegates to a genuinely
+     * separate bean (UserRecipientResolver, REQUIRES_NEW, tenant-scoped)
+     * so a failure here is isolated and this class no longer runs the
+     * query itself.
+     */
     public Recipient resolveRecipient(TenantId tenantId, UUID userId) {
-                return userRecipientResolver.resolveUser(tenantId, userId).orElse(null);
-            }
+        return userRecipientResolver.resolveUser(tenantId, userId).orElse(null);
+    }
 
     /** Fires TASK_ASSIGNED — skipped if unassigned, or if the actor assigned it to themselves. */
     private void notifyAssignment(TenantId tenantId, Task task, UUID actorId) {
@@ -618,7 +666,7 @@ public class TasksService {
                 .title("Task assigned to you: " + task.getTitle())
                 .message((resolveUserName(actorId)) + " assigned you a task: \"" + task.getTitle() + "\""
                         + (task.getDueDate() != null ? " — due " + task.getDueDate() : "") + ".")
-                .actionUrl("/tasks")
+                .actionUrl("/tasks?board=" + task.getBoardId() + "&task=" + task.getId())
                 .sourceModule("tasks")
                 .sourceEntityId(task.getId().toString())
                 .recipient(recipient)
@@ -636,7 +684,7 @@ public class TasksService {
                 .type(NotificationType.TASK_COMMENT_ADDED)
                 .title(authorName + " commented on: " + task.getTitle())
                 .message(authorName + " commented on \"" + task.getTitle() + "\".")
-                .actionUrl("/tasks")
+                .actionUrl("/tasks?board=" + task.getBoardId() + "&task=" + task.getId())
                 .sourceModule("tasks")
                 .sourceEntityId(task.getId().toString())
                 .recipient(recipient)
@@ -648,6 +696,32 @@ public class TasksService {
     private TaskBoard findBoard(TenantId tenantId, UUID boardId) {
         return boardRepo.findByIdAndTenantId(boardId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Board", boardId.toString()));
+    }
+
+    /** Loads a column only if it belongs to this board AND this tenant (never a bare findById). */
+    private TaskColumn findColumn(TenantId tenantId, UUID boardId, UUID columnId) {
+        return columnRepo.findByIdAndBoardIdAndTenantId(columnId, boardId, tenantId.getValue())
+                .orElseThrow(() -> new ResourceNotFoundException("Column", columnId.toString()));
+    }
+
+    /** The assignee must be a user of THIS tenant. */
+    private void validateAssignee(TenantId tenantId, UUID assigneeId) {
+        if (assigneeId == null) return;
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM users WHERE id = ? AND tenant_id = ?",
+                Integer.class, assigneeId, tenantId.getValue());
+        if (n == null || n == 0) throw new HandyFlowException(
+                "Assignee is not a user of this organisation", HttpStatus.BAD_REQUEST, "INVALID_ASSIGNEE");
+    }
+
+    /** Record types a task may link to (the set documented in V37). */
+    private static final Set<String> LINKABLE_TYPES = Set.of(
+            "QUOTE", "INVOICE", "CUSTOMER", "LEASE", "EMPLOYEE",
+            "CREATIVE_JOB", "AP_BILL", "PROPERTY", "TICKET");
+
+    private void validateLinkType(String type) {
+        if (type != null && !LINKABLE_TYPES.contains(type)) throw new HandyFlowException(
+                "Unsupported link type: " + type, HttpStatus.BAD_REQUEST, "INVALID_LINK");
     }
 
     private Task findTask(TenantId tenantId, UUID taskId) {
@@ -669,7 +743,8 @@ public class TasksService {
     }
 
     private ColumnResponse toColumnResponse(TaskColumn c, List<TaskResponse> tasks) {
-        return new ColumnResponse(c.getId(), c.getName(), c.getColor(), c.getSortOrder(), c.isDoneColumn(), tasks);
+        return new ColumnResponse(c.getId(), c.getName(), c.getColor(), c.getSortOrder(), c.isDoneColumn(),
+                c.getCategory().name(), tasks);
     }
 
     /**
@@ -678,11 +753,12 @@ public class TasksService {
      */
     private TaskResponse toTaskResponseBatched(Task t,
                                                Map<UUID, String> columnNames,
+                                               Map<UUID, String> userNames,
                                                Map<UUID, Integer> commentCounts,
                                                Map<UUID, BigDecimal> loggedHoursMap,
                                                Map<UUID, TaskChecklistItemRepository.ChecklistProgress> checklistProgressMap) {
         String     columnName   = columnNames.getOrDefault(t.getColumnId(), null);
-        String     assigneeName = resolveUserName(t.getAssigneeId());
+        String     assigneeName = t.getAssigneeId() == null ? null : userNames.getOrDefault(t.getAssigneeId(), "Team Member");
         BigDecimal logged       = loggedHoursMap.getOrDefault(t.getId(), BigDecimal.ZERO);
         int        commentCount = commentCounts.getOrDefault(t.getId(), 0);
         TaskChecklistItemRepository.ChecklistProgress checklist = checklistProgressMap
@@ -703,7 +779,7 @@ public class TasksService {
      */
     private TaskResponse toTaskResponse(Task t, boolean includeComments) {
         String     columnName   = fetchColumnName(t.getColumnId());
-        String     assigneeName = resolveUserName(t.getAssigneeId());
+        String     assigneeName = t.getAssigneeId() == null ? null : resolveUserName(t.getAssigneeId());
         BigDecimal logged       = timeLogRepo.sumHoursByTask(t.getId());
         int        commentCount = commentRepo.countByTask(t.getId());
         TaskChecklistItemRepository.ChecklistProgress checklist = checklistRepo

@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.notifications.application.NotificationRequest;
 import za.co.handyflow.platform.notifications.application.Recipient;
 import za.co.handyflow.platform.notifications.application.internal.NotificationService;
@@ -33,27 +32,41 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TasksNotificationScheduler {
 
-    /** Exact-day-match lead times — same idempotency style as Fleet's compliance alerts. */
+    /** Exact-day-match lead times: same idempotency style as Fleet's compliance alerts. */
     private static final int[] DUE_SOON_ALERT_DAYS = {3, 1};
 
     private final TaskRepository taskRepo;
     private final TasksService tasksService;
     private final NotificationService notificationService;
 
-    // ── Due-soon reminder — daily at 08:00 SAST ─────────────────────────────
+    // These sweeps are deliberately NOT wrapped in one transaction. Each notification send and each
+    // alert-marker save commits on its own, so one bad task cannot abort the whole sweep, and cannot
+    // roll back the markers of tasks already handled (which would make them alert again tomorrow).
+    // "Today" is the business day (Task.today()), not the server's zone, so the sweeps agree with the
+    // Africa/Johannesburg cron they run on even on a UTC host.
+    //
+    // NOT covered here: two application instances would both run these sweeps. That needs a
+    // distributed lock (e.g. ShedLock), which is a dependency and infrastructure decision.
+
+    //  Due-soon reminder: daily at 08:00 SAST
 
     @Scheduled(cron = "0 0 8 * * *", zone = "Africa/Johannesburg")
-    @Transactional(readOnly = true)
     public void checkDueSoon() {
         int sent = 0;
+        int failed = 0;
         for (int leadDays : DUE_SOON_ALERT_DAYS) {
-            LocalDate target = LocalDate.now().plusDays(leadDays);
+            LocalDate target = Task.today().plusDays(leadDays);
             List<Task> due = taskRepo.findDueOnDateAcrossTenants(target);
             for (Task task : due) {
-                if (notifyDueSoon(task, leadDays)) sent++;
+                try {
+                    if (notifyDueSoon(task, leadDays)) sent++;
+                } catch (Exception e) {
+                    failed++;
+                    log.warn("Due-soon notification failed for task={}: {}", task.getId(), e.toString());
+                }
             }
         }
-        log.info("Task due-soon sweep complete — notifications sent={}", sent);
+        log.info("Task due-soon sweep complete: notifications sent={} failed={}", sent, failed);
     }
 
     private boolean notifyDueSoon(Task task, int daysUntil) {
@@ -66,7 +79,7 @@ public class TasksNotificationScheduler {
                 .title("Task due in " + daysUntil + " day" + (daysUntil == 1 ? "" : "s") + ": " + task.getTitle())
                 .message("\"" + task.getTitle() + "\" is due on " + task.getDueDate()
                         + " (" + daysUntil + " day" + (daysUntil == 1 ? "" : "s") + " from now).")
-                .actionUrl("/tasks")
+                .actionUrl("/tasks?board=" + task.getBoardId() + "&task=" + task.getId())
                 .sourceModule("tasks")
                 .sourceEntityId(task.getId().toString())
                 .recipient(recipient)
@@ -74,39 +87,44 @@ public class TasksNotificationScheduler {
         return true;
     }
 
-    // ── Overdue alert — daily at 08:30 SAST, after the due-soon sweep ──────
+    //  Overdue alert: daily at 08:30 SAST, after the due-soon sweep
 
     @Scheduled(cron = "0 30 8 * * *", zone = "Africa/Johannesburg")
-    @Transactional
     public void checkOverdue() {
-        List<Task> overdue = taskRepo.findOverdueNeedingAlertAcrossTenants(LocalDate.now());
+        LocalDate today = Task.today();
+        List<Task> overdue = taskRepo.findOverdueNeedingAlertAcrossTenants(today);
         int sent = 0;
+        int failed = 0;
 
         for (Task task : overdue) {
-            // Mark first — matches Trip.markLongRunningAlertSent() in Fleet: idempotency
-            // guard is set regardless of whether a recipient could be resolved, so a task
-            // with no resolvable recipient doesn't get re-checked (and potentially
-            // re-logged as a failure) every single day.
-            task.markOverdueAlertSent();
-            taskRepo.save(task);
+            try {
+                // Mark first, as Trip.markLongRunningAlertSent() does in Fleet: the idempotency guard is
+                // set whether or not a recipient can be resolved, so a task with no resolvable recipient
+                // is not re-checked (and re-logged as a failure) every single day.
+                task.markOverdueAlertSent();
+                taskRepo.save(task);
 
-            Recipient recipient = tasksService.resolveRecipient(task.getTenantId(), task.getAssigneeId());
-            if (recipient == null) continue;
+                Recipient recipient = tasksService.resolveRecipient(task.getTenantId(), task.getAssigneeId());
+                if (recipient == null) continue;
 
-            long daysOverdue = LocalDate.now().toEpochDay() - task.getDueDate().toEpochDay();
-            notificationService.send(NotificationRequest.builder()
-                    .tenantId(task.getTenantId())
-                    .type(NotificationType.TASK_OVERDUE)
-                    .title("Task overdue: " + task.getTitle())
-                    .message("\"" + task.getTitle() + "\" was due on " + task.getDueDate()
-                            + " and is now " + daysOverdue + " day" + (daysOverdue == 1 ? "" : "s") + " overdue.")
-                    .actionUrl("/tasks")
-                    .sourceModule("tasks")
-                    .sourceEntityId(task.getId().toString())
-                    .recipient(recipient)
-                    .build());
-            sent++;
+                long daysOverdue = today.toEpochDay() - task.getDueDate().toEpochDay();
+                notificationService.send(NotificationRequest.builder()
+                        .tenantId(task.getTenantId())
+                        .type(NotificationType.TASK_OVERDUE)
+                        .title("Task overdue: " + task.getTitle())
+                        .message("\"" + task.getTitle() + "\" was due on " + task.getDueDate()
+                                + " and is now " + daysOverdue + " day" + (daysOverdue == 1 ? "" : "s") + " overdue.")
+                        .actionUrl("/tasks?board=" + task.getBoardId() + "&task=" + task.getId())
+                        .sourceModule("tasks")
+                        .sourceEntityId(task.getId().toString())
+                        .recipient(recipient)
+                        .build());
+                sent++;
+            } catch (Exception e) {
+                failed++;
+                log.warn("Overdue alert failed for task={}: {}", task.getId(), e.toString());
+            }
         }
-        log.info("Task overdue sweep complete — flagged={} notifications sent={}", overdue.size(), sent);
+        log.info("Task overdue sweep complete: flagged={} notifications sent={} failed={}", overdue.size(), sent, failed);
     }
 }

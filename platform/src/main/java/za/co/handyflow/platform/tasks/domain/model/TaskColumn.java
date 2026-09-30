@@ -21,6 +21,11 @@ public class TaskColumn {
     @Column(name = "sort_order")    private int     sortOrder   = 0;
     @Column(name = "is_done_column") private boolean isDoneColumn = false;
 
+    /** Workflow stage of this column. Drives the status of every task in it (see V304). */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private TaskCategory category = TaskCategory.TODO;
+
     public static TaskColumn create(UUID boardId, UUID tenantId, String name,
                                      String color, int sortOrder, boolean isDoneColumn) {
         TaskColumn c  = new TaskColumn();
@@ -30,6 +35,16 @@ public class TaskColumn {
         c.color       = color;
         c.sortOrder   = sortOrder;
         c.isDoneColumn = isDoneColumn;
+        c.category    = isDoneColumn ? TaskCategory.DONE : TaskCategory.TODO;
+        return c;
+    }
+
+    /** Same, with an explicit category (null keeps the default derived from isDoneColumn). */
+    public static TaskColumn create(UUID boardId, UUID tenantId, String name,
+                                     String color, int sortOrder, boolean isDoneColumn,
+                                     TaskCategory category) {
+        TaskColumn c = create(boardId, tenantId, name, color, sortOrder, isDoneColumn);
+        c.applyCategory(category);
         return c;
     }
 
@@ -38,5 +53,15 @@ public class TaskColumn {
         if (color != null) this.color = color;
         this.sortOrder    = sortOrder;
         this.isDoneColumn = isDoneColumn;
+        // keep the category consistent with the done flag when only the flag is sent
+        if (isDoneColumn) this.category = TaskCategory.DONE;
+        else if (this.category == TaskCategory.DONE) this.category = TaskCategory.TODO;
+    }
+
+    /** Sets the category (and with it the done flag). A null category changes nothing. */
+    public void applyCategory(TaskCategory category) {
+        if (category == null) return;
+        this.category     = category;
+        this.isDoneColumn = category == TaskCategory.DONE;
     }
 }

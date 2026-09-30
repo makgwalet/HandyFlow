@@ -8,6 +8,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.UUID;
 
 @Entity
@@ -15,6 +16,12 @@ import java.util.UUID;
 @Getter
 @NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
 public class Task {
+
+    /** The business time zone. Dates such as "due" and "overdue" follow it, not the server's zone. */
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Africa/Johannesburg");
+
+    /** Today in the business time zone, so a task turns overdue at local midnight on any server. */
+    public static LocalDate today() { return LocalDate.now(BUSINESS_ZONE); }
 
     @Id private UUID id = UUID.randomUUID();
 
@@ -81,32 +88,68 @@ public class Task {
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-    public void moveToColumn(UUID newColumnId, boolean isDoneColumn) {
-        this.columnId  = newColumnId;
-        this.status    = isDoneColumn ? "DONE" : this.status;
-        if (isDoneColumn && this.completedAt == null) {
-            this.completedAt = Instant.now();
-        } else if (!isDoneColumn) {
-            this.completedAt = null;
-        }
+    public void moveToColumn(UUID newColumnId, TaskCategory category) {
+        this.columnId = newColumnId;
+        applyCategory(category);
         touch();
     }
 
+    /**
+     * The single place a task's status follows its column: status becomes the column's category,
+     * completedAt is set on entering a done column and cleared on leaving it.
+     */
+    public void applyCategory(TaskCategory category) {
+        TaskCategory c = category != null ? category : TaskCategory.TODO;
+        this.status = c.name();
+        if (c == TaskCategory.DONE) {
+            if (this.completedAt == null) this.completedAt = Instant.now();
+        } else {
+            this.completedAt = null;
+        }
+    }
+
+    /** Sets the position within the column (0 = top). */
+    public void reposition(int sortOrder) { this.sortOrder = sortOrder; }
+
+    /**
+     * Applies a task edit. A null value means "leave unchanged"; to CLEAR a field the caller sets
+     * the matching clear flag (a plain null could not tell "no change" from "remove it").
+     */
     public void update(String title, String description, String priority,
                        UUID assigneeId, LocalDate dueDate,
                        BigDecimal estimatedHours, String linkedEntityType,
-                       UUID linkedEntityId) {
-        if (title            != null) this.title            = title;
-        if (description      != null) this.description      = description;
-        if (priority         != null) this.priority         = priority;
-        if (assigneeId       != null) this.assigneeId       = assigneeId;
-        if (dueDate          != null && !dueDate.equals(this.dueDate)) {
+                       UUID linkedEntityId,
+                       boolean clearAssignee, boolean clearDueDate,
+                       boolean clearDescription, boolean clearEstimatedHours,
+                       boolean clearLink) {
+        if (title != null) this.title = title;
+
+        if (clearDescription)           this.description = null;
+        else if (description != null)   this.description = description;
+
+        if (priority != null) this.priority = priority;
+
+        if (clearAssignee)              this.assigneeId = null;
+        else if (assigneeId != null)    this.assigneeId = assigneeId;
+
+        if (clearDueDate) {
+            this.dueDate            = null;
+            this.overdueAlertSentAt = null;
+        } else if (dueDate != null && !dueDate.equals(this.dueDate)) {
             this.dueDate            = dueDate;
             this.overdueAlertSentAt = null; // re-arm: new deadline, eligible to alert again
         }
-        if (estimatedHours   != null) this.estimatedHours   = estimatedHours;
-        if (linkedEntityType != null) this.linkedEntityType = linkedEntityType;
-        if (linkedEntityId   != null) this.linkedEntityId   = linkedEntityId;
+
+        if (clearEstimatedHours)        this.estimatedHours = null;
+        else if (estimatedHours != null) this.estimatedHours = estimatedHours;
+
+        if (clearLink) {
+            this.linkedEntityType = null;
+            this.linkedEntityId   = null;
+        } else {
+            if (linkedEntityType != null) this.linkedEntityType = linkedEntityType;
+            if (linkedEntityId   != null) this.linkedEntityId   = linkedEntityId;
+        }
         touch();
     }
 
@@ -134,7 +177,7 @@ public class Task {
         return dueDate != null
                 && !"DONE".equals(status)
                 && !"CANCELLED".equals(status)
-                && LocalDate.now().isAfter(dueDate);
+                && today().isAfter(dueDate);
     }
 
     /** Marks the overdue alert as sent — mirrors Trip.markLongRunningAlertSent() in Fleet. */

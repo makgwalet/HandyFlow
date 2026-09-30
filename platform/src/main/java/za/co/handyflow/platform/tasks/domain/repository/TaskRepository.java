@@ -24,7 +24,9 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
         SELECT t FROM Task t
         WHERE t.tenantId = :tenantId AND t.assigneeId = :userId
         AND t.status NOT IN ('DONE','CANCELLED') AND t.deletedAt IS NULL
-        ORDER BY t.dueDate ASC NULLS LAST, t.priority DESC
+        AND t.boardId NOT IN (SELECT b.id FROM TaskBoard b WHERE b.archived = true)
+        ORDER BY t.dueDate ASC NULLS LAST,
+                 CASE t.priority WHEN 'URGENT' THEN 4 WHEN 'HIGH' THEN 3 WHEN 'NORMAL' THEN 2 ELSE 1 END DESC
         """)
     List<Task> findMyTasks(TenantId tenantId, UUID userId);
 
@@ -32,6 +34,7 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
         SELECT t FROM Task t
         WHERE t.tenantId = :tenantId AND t.dueDate < :today
         AND t.status NOT IN ('DONE','CANCELLED') AND t.deletedAt IS NULL
+        AND t.boardId NOT IN (SELECT b.id FROM TaskBoard b WHERE b.archived = true)
         """)
     List<Task> findOverdue(TenantId tenantId, LocalDate today);
 
@@ -46,6 +49,7 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
     @Query("""
         SELECT COUNT(t) FROM Task t
         WHERE t.tenantId = :tenantId AND t.status = :status AND t.deletedAt IS NULL
+        AND t.boardId NOT IN (SELECT b.id FROM TaskBoard b WHERE b.archived = true)
         """)
     long countByStatus(TenantId tenantId, String status);
 
@@ -56,6 +60,7 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
         SELECT COUNT(t) FROM Task t
         WHERE t.tenantId = :tenantId AND t.dueDate < :today
         AND t.status NOT IN ('DONE','CANCELLED') AND t.deletedAt IS NULL
+        AND t.boardId NOT IN (SELECT b.id FROM TaskBoard b WHERE b.archived = true)
         """)
     long countOverdue(TenantId tenantId, LocalDate today);
 
@@ -66,6 +71,7 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
         SELECT COUNT(t) FROM Task t
         WHERE t.tenantId = :tenantId AND t.assigneeId = :userId
         AND t.status NOT IN ('DONE','CANCELLED') AND t.deletedAt IS NULL
+        AND t.boardId NOT IN (SELECT b.id FROM TaskBoard b WHERE b.archived = true)
         """)
     long countMyTasks(TenantId tenantId, UUID userId);
 
@@ -81,6 +87,7 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
         SELECT t FROM Task t
         WHERE t.dueDate = :targetDate AND t.assigneeId IS NOT NULL
         AND t.status NOT IN ('DONE','CANCELLED') AND t.deletedAt IS NULL
+        AND t.boardId NOT IN (SELECT b.id FROM TaskBoard b WHERE b.archived = true)
         """)
     List<Task> findDueOnDateAcrossTenants(LocalDate targetDate);
 
@@ -93,6 +100,7 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
         SELECT t FROM Task t
         WHERE t.dueDate < :today AND t.assigneeId IS NOT NULL
         AND t.status NOT IN ('DONE','CANCELLED') AND t.deletedAt IS NULL
+        AND t.boardId NOT IN (SELECT b.id FROM TaskBoard b WHERE b.archived = true)
         AND t.overdueAlertSentAt IS NULL
         """)
     List<Task> findOverdueNeedingAlertAcrossTenants(LocalDate today);
