@@ -112,7 +112,7 @@ export default function AgCropCycleDetail({ farmId, cycleId, onBack }: { farmId:
           {a.markGrowing && <button type="button" style={btnPrimary} onClick={() => grow.mutate(undefined)}>Mark growing</button>}
           {a.startHarvest && <button type="button" style={btnPrimary} onClick={() => startHarvest.mutate(undefined)}>Start harvest</button>}
           {a.completeHarvest && <button type="button" style={btnPrimary} onClick={() => (harvests.length === 0 ? setOpen("complete") : completeHarvest.mutate(undefined))}>Complete harvest</button>}
-          {a.edit && <button type="button" style={btnGhost} onClick={() => { setF({ ...f, variety: cycle.variety ?? "", name: cycle.cycleName ?? "", hectares: String(cycle.areaPlantedHectares), expected: cycle.expectedHarvestDate ?? "", notes: "" }); setOpen("edit") }}>Edit</button>}
+          {a.edit && <button type="button" style={btnGhost} onClick={() => { setF({ ...f, variety: cycle.variety ?? "", name: cycle.cycleName ?? "", hectares: String(cycle.areaPlantedHectares), expected: cycle.expectedHarvestDate ?? "", notes: cycle.notes ?? "" }); setOpen("edit") }}>Edit</button>}
           {a.fail && <button type="button" style={btnDanger} onClick={() => setOpen("fail")}>Mark failed</button>}
           {a.abandon && <button type="button" style={btnDanger} onClick={() => setOpen("abandon")}>Abandon</button>}
           {canDelete && <button type="button" style={btnDanger} onClick={() => setOpen("delete")}>Delete</button>}
@@ -151,9 +151,9 @@ export default function AgCropCycleDetail({ farmId, cycleId, onBack }: { farmId:
             <Field label="Variety" htmlFor="ed-var"><input id="ed-var" style={inp} value={f.variety} onChange={e => setF({ ...f, variety: e.target.value })} /></Field>
             <Field label="Area planted (ha)" htmlFor="ed-ha"><input id="ed-ha" type="number" min="0" step="0.01" style={inp} value={f.hectares} onChange={e => setF({ ...f, hectares: e.target.value })} /></Field>
             <Field label="Expected harvest" htmlFor="ed-exp"><input id="ed-exp" type="date" style={inp} value={f.expected} onChange={e => setF({ ...f, expected: e.target.value })} /></Field>
-            <Field label="Add a note" htmlFor="ed-notes"><input id="ed-notes" style={inp} value={f.notes} onChange={e => setF({ ...f, notes: e.target.value })} /></Field>
+            <Field label="Notes" htmlFor="ed-notes"><input id="ed-notes" style={inp} value={f.notes} onChange={e => setF({ ...f, notes: e.target.value })} /></Field>
           </div>
-          <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: "8px 0 0" }}>Blank fields are left unchanged; the server can't clear a value once set.</p>
+          <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: "8px 0 0" }}>Saving replaces these fields with what is shown here, so clearing one removes it.</p>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}><button type="button" style={btnPrimary} onClick={() => save.mutate(undefined, { onSuccess: close })}>Save</button><button type="button" style={btnGhost} onClick={close}>Cancel</button></div>
         </div>
       )}

@@ -28,7 +28,6 @@ function SeasonForm({ farmId, initial, onDone }: { farmId: string; initial?: Sea
         <Field label="Notes" htmlFor="se-notes"><input id="se-notes" style={inp} value={f.notes} onChange={e => setF({ ...f, notes: e.target.value })} /></Field>
       </div>
       {endBeforeStart && <Warn tone="danger">The end date can't be before the start date.</Warn>}
-      {initial?.endDate && <Warn>An end date can't be removed once set; it can only be changed.</Warn>}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <button type="button" style={{ ...btnPrimary, opacity: valid && !run.isPending ? 1 : 0.5 }} disabled={!valid || run.isPending} onClick={() => run.mutate(undefined, { onSuccess: onDone })}>{initial ? "Save" : "Create season"}</button>
         <button type="button" style={btnGhost} onClick={onDone}>Cancel</button>
