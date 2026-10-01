@@ -143,7 +143,13 @@ export const AGRICULTURE_SECTIONS: ModuleSections = {
         { id: 'crop-types', label: 'Crop types', icon: Wheat },
       ],
     },
-    { label: 'Insights', sections: [{ id: 'costs', label: 'Cost reports', icon: BarChart2 }] },
+    {
+      label: 'Insights',
+      sections: [
+        { id: 'trends', label: 'Trends', icon: TrendingUp },
+        { id: 'costs', label: 'Cost reports', icon: BarChart2 },
+      ],
+    },
   ],
 }
 

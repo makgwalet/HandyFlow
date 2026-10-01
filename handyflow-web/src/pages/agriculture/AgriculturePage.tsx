@@ -19,6 +19,7 @@ import AgCropCyclesTab from "./AgCropCyclesTab"
 import AgSeasonsTab from "./AgSeasonsTab"
 import AgCropTypesTab from "./AgCropTypesTab"
 import AgCostReportsTab from "./AgCostReportsTab"
+import AgTrendsTab from "./AgTrendsTab"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { AGRICULTURE_SECTIONS, findSection } from "../../navigation/moduleSections"
 
@@ -58,6 +59,7 @@ export default function AgriculturePage() {
           {section.id === "crop-cycles" && <AgFarmScope>{farm => <AgCropCyclesTab farmId={farm.id} />}</AgFarmScope>}
           {section.id === "seasons" && <AgFarmScope>{farm => <AgSeasonsTab farmId={farm.id} />}</AgFarmScope>}
           {section.id === "crop-types" && <AgCropTypesTab />}
+          {section.id === "trends" && <AgTrendsTab />}
           {section.id === "costs" && <AgFarmScope>{farm => <AgCostReportsTab farmId={farm.id} />}</AgFarmScope>}
         </>
       )}

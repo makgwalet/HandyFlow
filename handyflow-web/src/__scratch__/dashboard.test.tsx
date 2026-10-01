@@ -61,14 +61,34 @@ const data = (o: Partial<AgDashboardData> = {}): AgDashboardData => ({
   ...o,
 })
 const wrap = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter><AgDashboard /></MemoryRouter></QueryClientProvider>)
-const serve = (d: AgDashboardData) => api.get.mockResolvedValue({ data: d })
-beforeEach(() => { vi.clearAllMocks(); serve(data()) })
+const cmp = (key: string, label: string, unit: string, current: number, previous: number, pct: number | null) => ({ key, label, unit, current, previous, changePercent: pct, currentFrom: '2026-09-02', currentTo: '2026-10-01', previousFrom: '2026-08-03', previousTo: '2026-09-01' })
+const trendsData = () => ({ asOf: '2026-10-01', farmId: null, months: [], costs: [], production: { tonnes: [], byCrop: [], excludedRecords: 0 }, livestock: [], limitations: [],
+  comparisons: [cmp('TOTAL_COST', 'Total cost', 'R', 12000, 10000, 20), cmp('HARVEST_TONNES', 'Harvested', 't', 5.8, 8, -27.5), cmp('BIRTHS', 'Births', 'head', 12, 0, null), cmp('DEATHS', 'Deaths', 'head', 1, 4, -75), cmp('CROP_COST', 'Crop cost', 'R', 1, 1, 0)] })
+let trendsFails = false
+// the dashboard page now asks two endpoints, so answer each with its own shape
+const serve = (d: AgDashboardData) => api.get.mockImplementation(async (url: string) => {
+  if (url.endsWith('/trends')) { if (trendsFails) throw new Error('trends down'); return { data: trendsData() } }
+  return { data: d }
+})
+beforeEach(() => { vi.clearAllMocks(); trendsFails = false; serve(data()) })
 const kpi = (label: string) => nb(screen.getAllByText(label)[0].parentElement!.textContent)     // the KPI card comes first; "In production" and "Livestock" are also table headings
 
 describe('Agriculture dashboard', () => {
-  it('asks the single tenant-wide endpoint, not one call per farm', async () => {
-    wrap(); await screen.findByText('Active farms')
-    expect(api.get).toHaveBeenCalledTimes(1); expect(api.get).toHaveBeenCalledWith('/api/v1/agriculture/dashboard')
+  it('asks the tenant-wide endpoints once each, not one call per farm', async () => {
+    wrap(); await screen.findByText('Active farms'); await screen.findByLabelText('Last 30 days')
+    expect(api.get.mock.calls.map(c => c[0]).sort()).toEqual(['/api/v1/agriculture/dashboard', '/api/v1/agriculture/trends'])
+    expect(api.get).toHaveBeenCalledWith('/api/v1/agriculture/trends', { params: { farmId: undefined, months: 1 } })
+  })
+  it('last-30-days strip: four comparisons with direction, and a link to the trends page', async () => {
+    wrap(); const strip = within(await screen.findByLabelText('Last 30 days'))
+    expect(strip.getByText('Total cost')).toBeTruthy(); expect(strip.getByText('+20%')).toBeTruthy()
+    expect(strip.getByText('\u221227.5%')).toBeTruthy(); expect(strip.getByText('No earlier data')).toBeTruthy(); expect(strip.getByText('\u221275%')).toBeTruthy()
+    expect(strip.queryByText('Crop cost')).toBeNull()                                         // only the four headline measures
+    expect(strip.getByRole('link', { name: 'See trends' }).getAttribute('href')).toBe('/agriculture/trends')
+  })
+  it('a failing trends call leaves the dashboard intact, just without the strip', async () => {
+    trendsFails = true; wrap(); expect(await screen.findByText('Active farms')).toBeTruthy()
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith('/api/v1/agriculture/trends', expect.anything())); expect(screen.queryByLabelText('Last 30 days')).toBeNull()
   })
   it('KPIs: farms, land, production share, cycles and livestock, with the caveats', async () => {
     wrap(); await screen.findByText('Active farms')
@@ -135,7 +155,8 @@ describe('Agriculture dashboard', () => {
   })
   it('a failed load offers a retry that asks again', async () => {
     api.get.mockRejectedValueOnce(new Error('boom')); wrap(); expect((await screen.findByRole('alert')).textContent).toContain("couldn't load the dashboard")
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' })); expect(await screen.findByText('Active farms')).toBeTruthy(); expect(api.get).toHaveBeenCalledTimes(2)
+    api.get.mockImplementation(async (url: string) => (url.endsWith('/trends') ? { data: trendsData() } : { data: data() }))
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' })); expect(await screen.findByText('Active farms')).toBeTruthy()
   })
   it('shows a loading state first', () => { api.get.mockReturnValue(new Promise(() => {})); wrap(); expect(screen.getByText('Loading dashboard…')).toBeTruthy() })
 })

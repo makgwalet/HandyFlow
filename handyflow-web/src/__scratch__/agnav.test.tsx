@@ -17,6 +17,7 @@ beforeEach(() => {
   api.get.mockImplementation(async (url: string) => {
     if (url.endsWith('/farms')) return { data: { content: [{ id: 'f1', name: 'Green Valley', status: 'ACTIVE' }], totalElements: 1 } }
     if (url.includes('cost-summary')) return { data: [] }
+    if (url.endsWith('/trends')) return { data: { asOf: '2026-10-01', farmId: null, months: [], costs: [], production: { tonnes: [], byCrop: [], excludedRecords: 0 }, livestock: [], comparisons: [], limitations: [] } }
     return { data: { content: [], totalElements: 0 } }
   })
 })
@@ -29,7 +30,7 @@ describe('Agriculture sidebar context', () => {
     </MemoryRouter></QueryClientProvider>)
     for (const t of ['Crops', 'Insights']) expect(screen.getAllByText(t).length).toBeGreaterThan(0)
     const hrefs = screen.getAllByRole('link').map(a => a.getAttribute('href'))
-    for (const h of ['/agriculture/crop-cycles', '/agriculture/seasons', '/agriculture/crop-types', '/agriculture/costs', '/agriculture/farms']) expect(hrefs, h).toContain(h)
+    for (const h of ['/agriculture/crop-cycles', '/agriculture/seasons', '/agriculture/crop-types', '/agriculture/costs', '/agriculture/trends', '/agriculture/farms']) expect(hrefs, h).toContain(h)
     const active = screen.getAllByRole('link').filter(a => a.className.includes('active')).map(a => a.textContent?.trim())
     expect(active).toEqual(['Crop cycles'])
   })
@@ -45,6 +46,9 @@ describe('AgriculturePage renders the new sections', () => {
     ['/agriculture/costs', /Export CSV/],
   ])('%s', async (url, marker) => {
     at(url); expect(await screen.findByRole('button', { name: marker })).toBeTruthy()
+  })
+  it('/agriculture/trends', async () => {
+    at('/agriculture/trends'); expect(await screen.findByLabelText('Period')).toBeTruthy(); expect(screen.getByLabelText('Farm')).toBeTruthy()
   })
   it('farm-scoped sections show the farm picker; crop types do not need one', async () => {
     at('/agriculture/seasons'); expect(await screen.findByLabelText('Farm')).toBeTruthy(); cleanup()

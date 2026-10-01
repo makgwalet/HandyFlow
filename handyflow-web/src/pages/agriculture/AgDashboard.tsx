@@ -8,11 +8,14 @@ import { Link } from "react-router-dom"
 import { PieChart, Pie, Cell, Tooltip } from "recharts"
 import { MapPin, Sprout, Tractor, Wheat } from "lucide-react"
 import { useAgDashboard, type AttentionItem } from "./agDashboard.api"
+import { useAgTrends } from "./agTrends.api"
+import { ComparisonCard } from "./AgTrendParts"
 import { barPercent, dueLabel, fmtNum, percent, severityLabel, tidy, typeLabel } from "./agDashboard.logic"
 import { todayISO } from "./agCrops.logic"
 import { AG_ACCENT, AG_ACCENT_TEXT, btnGhost, card, kpiLabel, kpiValue, statusBadge } from "./constants"
 
 const AgFarmMap = lazy(() => import("./AgFarmMap"))
+const STRIP_KEYS = ["TOTAL_COST", "HARVEST_TONNES", "BIRTHS", "DEATHS"]
 const SLICES = ["var(--hf-accent)", "var(--hf-info)", "var(--hf-warning)", "var(--hf-violet)", "var(--hf-success)", "var(--hf-danger)"]
 const title: React.CSSProperties = { fontSize: 13, fontWeight: 800, color: "var(--hf-text)", margin: "0 0 12px" }
 const muted: React.CSSProperties = { fontSize: 12, color: "var(--hf-text-muted)", margin: 0 }
@@ -65,6 +68,8 @@ function AttentionRow({ item, today }: { item: AttentionItem; today: string }) {
 
 export default function AgDashboard() {
   const { data, isLoading, isError, refetch } = useAgDashboard()
+  // the strip is a bonus: if the trends call fails the dashboard simply has no strip
+  const { data: trends } = useAgTrends(null, 1, !isLoading && !!data && data.totals.farmCount > 0)
   if (isLoading) return <p style={{ fontSize: 13, color: "var(--hf-text-faint)" }}>Loading dashboard…</p>
   if (isError || !data) {
     return (
@@ -97,6 +102,18 @@ export default function AgDashboard() {
         <Kpi label="Crop cycles in production" value={String(t.cropCyclesInProduction)} sub={`${t.plannedCropCycles} planned`} />
         <Kpi label="Livestock" value={fmtNum(t.totalHead, 0)} sub={`${fmtNum(t.animalCount, 0)} animals · ${fmtNum(t.groupHead, 0)} in ${t.groupCount} group${t.groupCount === 1 ? "" : "s"}`} />
       </div>
+
+      {trends && (
+        <section aria-label="Last 30 days" style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
+            <h3 style={{ ...title, margin: 0 }}>Last 30 days <span style={{ ...muted, fontWeight: 400 }}>vs the 30 days before</span></h3>
+            <Link to="/agriculture/trends" style={{ fontSize: 12.5, fontWeight: 600, color: AG_ACCENT_TEXT }}>See trends</Link>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
+            {STRIP_KEYS.map(k => trends.comparisons.find(c => c.key === k)).filter((c): c is NonNullable<typeof c> => !!c).map(c => <ComparisonCard key={c.key} c={c} />)}
+          </div>
+        </section>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14, marginBottom: 14 }}>
         <section style={card} aria-label="Needs attention">
