@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local scratch tests: vitest is not a project dependency, so these must never be committed or they break tsc for everyone else.
+src/__scratch__/
+vitest.scratch.config.ts
