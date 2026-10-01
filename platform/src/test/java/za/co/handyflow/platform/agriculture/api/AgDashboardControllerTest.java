@@ -1,5 +1,7 @@
 package za.co.handyflow.platform.agriculture.api;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,10 +14,12 @@ import za.co.handyflow.platform.WebMvcTestSecuritySupport;
 import za.co.handyflow.platform.agriculture.application.internal.AgDashboardService;
 import za.co.handyflow.platform.agriculture.dto.AgDashboardResponse;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.shared.TenantContext;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -32,6 +36,19 @@ class AgDashboardControllerTest {
     @MockitoBean FeatureGuard featureGuard;
 
     static final String URL = "/api/v1/agriculture/dashboard";
+
+    // The handlers read the tenant from TenantContext, which the JWT filter normally fills. This slice has no real login, so seed it
+    // (the same pattern LpClientControllerTest uses) and always clear it, or a leaked value would hide a missing one in other tests.
+    @BeforeEach
+    void seedTenantContext() {
+        TenantContext.setTenantId(UUID.randomUUID().toString());
+        TenantContext.setUserId(UUID.randomUUID().toString());
+    }
+
+    @AfterEach
+    void clearTenantContext() {
+        TenantContext.clear();
+    }
 
     private AgDashboardResponse emptyDashboard() {
         return new AgDashboardResponse(LocalDate.of(2026, 10, 1),
