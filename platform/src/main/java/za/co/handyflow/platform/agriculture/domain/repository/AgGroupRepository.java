@@ -37,4 +37,8 @@ public interface AgGroupRepository extends JpaRepository<AgGroup, UUID> {
     // Rows are [farmId, speciesId, group count, head count] for groups still active.
     @Query("SELECT g.farmId, g.speciesId, COUNT(g), SUM(g.currentCount) FROM AgGroup g WHERE g.tenantId = :tenantId AND g.deletedAt IS NULL AND g.status = 'ACTIVE' GROUP BY g.farmId, g.speciesId")
     List<Object[]> summarizeActiveByFarmAndSpecies(TenantId tenantId);
+
+    // Trends: which farm each (non-deleted) group belongs to: [groupId, farmId].
+    @Query("SELECT g.id, g.farmId FROM AgGroup g WHERE g.tenantId = :tenantId AND g.deletedAt IS NULL")
+    List<Object[]> findGroupFarms(TenantId tenantId);
 }

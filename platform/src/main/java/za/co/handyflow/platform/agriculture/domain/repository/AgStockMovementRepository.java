@@ -9,6 +9,8 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.util.Optional;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 public interface AgStockMovementRepository extends JpaRepository<AgStockMovement, UUID> {
@@ -28,4 +30,8 @@ public interface AgStockMovementRepository extends JpaRepository<AgStockMovement
     // issue time) returns 0, not null.
     @Query("SELECT COALESCE(SUM(m.totalCost), 0) FROM AgStockMovement m WHERE m.tenantId = :tenantId AND m.referenceType = :referenceType AND m.referenceId = :referenceId")
     BigDecimal sumTotalCostByReference(TenantId tenantId, String referenceType, UUID referenceId);
+
+    // Trends: seed cost is the stock issued against a crop cycle (the cost reports' definition): [movementDate, totalCost, cropCycleId].
+    @Query("SELECT m.movementDate, m.totalCost, m.referenceId FROM AgStockMovement m WHERE m.tenantId = :tenantId AND m.referenceType = 'AgCropCycle' AND m.movementDate >= :startDate AND m.movementDate <= :endDate AND m.totalCost IS NOT NULL")
+    List<Object[]> findCropCycleCostsBetween(TenantId tenantId, LocalDate startDate, LocalDate endDate);
 }

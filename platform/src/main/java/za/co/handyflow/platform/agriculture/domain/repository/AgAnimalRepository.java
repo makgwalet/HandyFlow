@@ -9,6 +9,7 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.Optional;
 import java.util.List;
+import java.time.LocalDate;
 import java.util.UUID;
 
 public interface AgAnimalRepository extends JpaRepository<AgAnimal, UUID> {
@@ -40,4 +41,13 @@ public interface AgAnimalRepository extends JpaRepository<AgAnimal, UUID> {
     // Rows are [farmId, speciesId, count] of animals still on the farm.
     @Query("SELECT a.farmId, a.speciesId, COUNT(a) FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.deletedAt IS NULL AND a.status = 'ACTIVE' GROUP BY a.farmId, a.speciesId")
     List<Object[]> countActiveByFarmAndSpecies(TenantId tenantId);
+
+    // Trends: which farm each (non-deleted) animal belongs to: [animalId, farmId]. Records of deleted animals are not attributed,
+    // matching the cost reports, which only walk live animals.
+    @Query("SELECT a.id, a.farmId FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.deletedAt IS NULL")
+    List<Object[]> findAnimalFarms(TenantId tenantId);
+
+    // Trends: animal purchases [acquisitionDate, acquisitionCost, farmId].
+    @Query("SELECT a.acquisitionDate, a.acquisitionCost, a.farmId FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.deletedAt IS NULL AND a.acquisitionCost IS NOT NULL AND a.acquisitionDate >= :startDate AND a.acquisitionDate <= :endDate")
+    List<Object[]> findPurchasesBetween(TenantId tenantId, LocalDate startDate, LocalDate endDate);
 }

@@ -10,6 +10,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.List;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /** Append-only, cycle-scoped — mirrors AgFeedRecordRepository's own shape. */
@@ -31,4 +32,8 @@ public interface AgHarvestRecordRepository extends JpaRepository<AgHarvestRecord
     // Quantity per unit, so yield can be converted to the crop's own unit before summing. Rows are [unitOfMeasure, quantity].
     @Query("SELECT h.unitOfMeasure, SUM(h.quantityHarvested) FROM AgHarvestRecord h WHERE h.tenantId = :tenantId AND h.cropCycleId = :cropCycleId GROUP BY h.unitOfMeasure")
     List<Object[]> sumQuantityByCropCycleAndUnit(TenantId tenantId, UUID cropCycleId);
+
+    // Trends: [harvestDate, quantityHarvested, unitOfMeasure, cropCycleId].
+    @Query("SELECT h.harvestDate, h.quantityHarvested, h.unitOfMeasure, h.cropCycleId FROM AgHarvestRecord h WHERE h.tenantId = :tenantId AND h.harvestDate >= :startDate AND h.harvestDate <= :endDate")
+    List<Object[]> findBetween(TenantId tenantId, LocalDate startDate, LocalDate endDate);
 }

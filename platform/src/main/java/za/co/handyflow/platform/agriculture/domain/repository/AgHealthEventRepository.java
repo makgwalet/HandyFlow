@@ -59,4 +59,8 @@ public interface AgHealthEventRepository extends JpaRepository<AgHealthEvent, UU
 
     @Query("SELECT COALESCE(SUM(e.cost), 0) FROM AgHealthEvent e WHERE e.tenantId = :tenantId AND e.groupId = :groupId")
     BigDecimal sumCostByGroup(TenantId tenantId, UUID groupId);
+
+    // Trends: [eventDate, cost, animalId, groupId]. Like the cost reports, every event with a cost counts, whatever its status.
+    @Query("SELECT e.eventDate, e.cost, e.animalId, e.groupId FROM AgHealthEvent e WHERE e.tenantId = :tenantId AND e.eventDate >= :startDate AND e.eventDate <= :endDate AND e.cost IS NOT NULL")
+    List<Object[]> findCostsBetween(TenantId tenantId, LocalDate startDate, LocalDate endDate);
 }

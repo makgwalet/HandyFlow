@@ -9,6 +9,8 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.util.Optional;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /** Append-only, cycle-scoped — mirrors AgFeedRecordRepository's own shape. */
@@ -32,4 +34,8 @@ public interface AgInputApplicationRepository extends JpaRepository<AgInputAppli
     // responsibly go without inventing a rate.
     @Query("SELECT COALESCE(SUM(a.laborHours), 0) FROM AgInputApplication a WHERE a.tenantId = :tenantId AND a.cropCycleId = :cropCycleId")
     BigDecimal sumLaborHoursByCropCycle(TenantId tenantId, UUID cropCycleId);
+
+    // Trends: [applicationDate, cost, cropCycleId].
+    @Query("SELECT a.applicationDate, a.cost, a.cropCycleId FROM AgInputApplication a WHERE a.tenantId = :tenantId AND a.applicationDate >= :startDate AND a.applicationDate <= :endDate AND a.cost IS NOT NULL")
+    List<Object[]> findCostsBetween(TenantId tenantId, LocalDate startDate, LocalDate endDate);
 }

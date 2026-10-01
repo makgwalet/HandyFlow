@@ -9,6 +9,8 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.util.Optional;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 public interface AgFeedRecordRepository extends JpaRepository<AgFeedRecord, UUID> {
@@ -30,4 +32,8 @@ public interface AgFeedRecordRepository extends JpaRepository<AgFeedRecord, UUID
 
     @Query("SELECT COALESCE(SUM(f.totalCost), 0) FROM AgFeedRecord f WHERE f.tenantId = :tenantId AND f.groupId = :groupId")
     BigDecimal sumTotalCostByGroup(TenantId tenantId, UUID groupId);
+
+    // Trends: [feedDate, totalCost, animalId, groupId] in a date range. Same cost definition as the cost reports (totalCost).
+    @Query("SELECT f.feedDate, f.totalCost, f.animalId, f.groupId FROM AgFeedRecord f WHERE f.tenantId = :tenantId AND f.feedDate >= :startDate AND f.feedDate <= :endDate AND f.totalCost IS NOT NULL")
+    List<Object[]> findCostsBetween(TenantId tenantId, LocalDate startDate, LocalDate endDate);
 }

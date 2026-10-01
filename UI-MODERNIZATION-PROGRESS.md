@@ -377,3 +377,31 @@ tsc 247 (baseline 249), guards pass.
 Not browser-tested.
 
 **Next:** trends and a production chart (phase 3); then revenue, labour and equipment cost, suppliers, report export, weather, NDVI.
+
+## Agriculture phase 3: trends and the production chart
+
+**`GET /api/v1/agriculture/trends?farmId=&months=`** (AGRICULTURE_READ; `farmId` omitted = every farm; `months` 1 to 24, default 12).
+Computed from dated records only, with the cost reports' own definitions so monthly totals agree with them:
+- costs by month: seed (stock issued to a crop cycle), inputs, feed, health (any status), animal purchases
+- harvest by month in tonnes (kg, g, t, lb convert; a unit that is not a mass is excluded and counted), and per crop in the crop's own unit
+- livestock EVENTS by month: births (a birth with no head count counts as 1), deaths (head) and the recorded value of losses
+- last 30 days against the 30 before (like-for-like, not a part month against a full one): total/crop/livestock cost, harvest tonnes,
+  births, deaths, high-severity scouting; percentage is null when the earlier period was zero
+
+**What it cannot say, by design:** herd size over time (an animal's status changes but not when, so there is no head-count history:
+births and deaths are shown instead) and anything about revenue, labour or equipment cost (no data). The response carries these as
+`limitations` and the page prints them.
+
+**Frontend:** Insights > Trends (All farms or one, 6/12/24 months): comparison cards with good/bad colouring (cost and deaths rising is
+bad; harvest and births rising is good), harvested-tonnes, stacked-cost and births-vs-deaths charts, harvest by crop. The dashboard has a
+last-30-days strip that disappears quietly if trends cannot be loaded. The current month is marked `*` (partial).
+
+**Known limits:** each request loads an id-to-farm lookup for all animals, groups and crop cycles of the tenant (fine for thousands, a
+join would scale better); records whose animal, group or cycle was deleted are left out (as in the cost reports).
+
+**Verification:** same method as phases 1 and 2. Java is not built here; the real sources compile against stubs with 0 errors, the pure
+rules and aggregator tests RUN (57, of which 17 are the trends aggregator) plus 36 entity tests, the Mockito service tests are type-checked only, and the new `@Query` methods and the
+controller test have never run. **Run `mvn test` and the application context-load test.** Frontend: 252 scratch tests, tsc 246 (baseline
+249), guards pass, not browser-tested.
+
+**Next (needs decisions first):** revenue and gross margin, labour cost, equipment cost; then suppliers, report export, weather, NDVI.

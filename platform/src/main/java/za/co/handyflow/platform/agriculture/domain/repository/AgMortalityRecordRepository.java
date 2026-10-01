@@ -8,6 +8,8 @@ import za.co.handyflow.platform.agriculture.domain.model.AgMortalityRecord;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.Optional;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 public interface AgMortalityRecordRepository extends JpaRepository<AgMortalityRecord, UUID> {
@@ -20,4 +22,8 @@ public interface AgMortalityRecordRepository extends JpaRepository<AgMortalityRe
 
     @Query("SELECT m FROM AgMortalityRecord m WHERE m.tenantId = :tenantId AND m.groupId = :groupId ORDER BY m.mortalityDate DESC")
     Page<AgMortalityRecord> findByGroup(TenantId tenantId, UUID groupId, Pageable pageable);
+
+    // Trends: [mortalityDate, countLost, estimatedValueLoss, animalId, groupId].
+    @Query("SELECT m.mortalityDate, m.countLost, m.estimatedValueLoss, m.animalId, m.groupId FROM AgMortalityRecord m WHERE m.tenantId = :tenantId AND m.mortalityDate >= :startDate AND m.mortalityDate <= :endDate")
+    List<Object[]> findBetween(TenantId tenantId, LocalDate startDate, LocalDate endDate);
 }

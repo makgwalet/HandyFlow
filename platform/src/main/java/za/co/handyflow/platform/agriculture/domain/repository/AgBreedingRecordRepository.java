@@ -8,6 +8,8 @@ import za.co.handyflow.platform.agriculture.domain.model.AgBreedingRecord;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.Optional;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 public interface AgBreedingRecordRepository extends JpaRepository<AgBreedingRecord, UUID> {
@@ -20,4 +22,8 @@ public interface AgBreedingRecordRepository extends JpaRepository<AgBreedingReco
 
     @Query("SELECT b FROM AgBreedingRecord b WHERE b.tenantId = :tenantId AND b.groupId = :groupId ORDER BY b.matingDate DESC")
     Page<AgBreedingRecord> findByGroup(TenantId tenantId, UUID groupId, Pageable pageable);
+
+    // Trends: births that have been recorded: [actualBirthDate, offspringCount, animalId, groupId].
+    @Query("SELECT b.actualBirthDate, b.offspringCount, b.animalId, b.groupId FROM AgBreedingRecord b WHERE b.tenantId = :tenantId AND b.actualBirthDate IS NOT NULL AND b.actualBirthDate >= :startDate AND b.actualBirthDate <= :endDate")
+    List<Object[]> findBirthsBetween(TenantId tenantId, LocalDate startDate, LocalDate endDate);
 }

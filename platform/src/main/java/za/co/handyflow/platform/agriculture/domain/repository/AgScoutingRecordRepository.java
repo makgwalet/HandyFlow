@@ -51,4 +51,8 @@ public interface AgScoutingRecordRepository extends JpaRepository<AgScoutingReco
         ORDER BY r.scoutingDate ASC
         """)
     List<AgScoutingRecord> findOpenHighSeverityForFarm(TenantId tenantId, UUID farmId);
+
+    // Trends: [scoutingDate, severity, cropCycleId].
+    @Query("SELECT r.scoutingDate, r.severity, r.cropCycleId FROM AgScoutingRecord r WHERE r.tenantId = :tenantId AND r.scoutingDate >= :startDate AND r.scoutingDate <= :endDate")
+    List<Object[]> findBetween(TenantId tenantId, LocalDate startDate, LocalDate endDate);
 }

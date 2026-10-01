@@ -52,4 +52,8 @@ public interface AgCropCycleRepository extends JpaRepository<AgCropCycle, UUID> 
     // Crops still in the field whose expected harvest date is on or before :until (overdue and upcoming harvests).
     @Query("SELECT c FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.farmId = :farmId AND c.deletedAt IS NULL AND c.status IN ('PLANTED', 'GROWING') AND c.expectedHarvestDate IS NOT NULL AND c.expectedHarvestDate <= :until ORDER BY c.expectedHarvestDate ASC")
     List<AgCropCycle> findHarvestDueForFarm(TenantId tenantId, UUID farmId, LocalDate until);
+
+    // Trends: which farm and crop each (non-deleted) crop cycle belongs to: [cropCycleId, farmId, cropTypeId].
+    @Query("SELECT c.id, c.farmId, c.cropTypeId FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.deletedAt IS NULL")
+    List<Object[]> findCycleFarmsAndCrops(TenantId tenantId);
 }
