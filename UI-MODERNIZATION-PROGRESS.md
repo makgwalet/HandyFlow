@@ -320,3 +320,28 @@ the same sidebar as the other modules: "All modules", the module name, then its 
   for Tasks, and derives its allow-list from the navigation registry instead of a hand-kept copy.
 - Verified: 124 throwaway vitest tests (not committed; vitest is not a project dependency); `check:navigation` passes
   (33 configs); no new type or lint errors against the clean baseline (type errors 247, was 249). Not verified in a browser.
+
+## Agriculture: crops, seasons and cost reports (frontend only)
+
+**What shipped.** Crop cycles, seasons, crop types and cost reports, using 49 backend endpoints that previously had no UI. No Java was changed.
+Sidebar gained **Crops** (Crop cycles, Seasons, Crop types) and **Insights** (Cost reports). The same components are also tabs inside a farm.
+
+**Farm scope.** Crop cycles, seasons and costs are farm-scoped on the server, so those sections use a farm picker (`?farm=<id>`, default first active farm).
+An "all farms" view is deliberately not built: it would mean looping over every farm, and needs a tenant-wide endpoint.
+
+**Costs only.** Agriculture records no revenue, labour cost, equipment cost or weather, so there is no margin or profit anywhere. Decision: revisit later.
+Crop cost = seed + recorded inputs; labour hours are shown but not costed.
+
+**Rules the backend does not enforce, so the UI does:**
+- fail/abandon/delete are accepted by the server in any status; the UI only offers them on live cycles
+- input cost is stored as sent and reports read it, so the form prefills quantity x stock unit cost
+- stock over-issue is caught before the 409
+- yield per hectare is a plain sum labelled with the crop type's default unit, so mixed harvest units are warned about
+- season activate/close have no guard, so activating a second season asks first
+- crop category, input type, observation type, unit and grade are free text on the server; the UI offers a fixed vocabulary
+
+**Verification.** On a fresh clone of origin with the nav, sidebar and agriculture patches applied: `npm ci`, `vite build`, `check:navigation` (33 configs), `audit:data-colors` (0),
+tsc 247 errors (baseline 249), 203 scratch tests pass, 7 mutation checks all caught. **Not verified in a browser.**
+
+**Still needs backend work:** tenant-wide farm dashboard, trends, richer attention severities (only OVERDUE / DUE_TODAY / MEDIUM exist), harvest unit normalisation, server-side guards on lifecycle and seasons.
+**Not built:** scouting edit (PUT exists, unused), per-record input/harvest edit and delete (no endpoints).

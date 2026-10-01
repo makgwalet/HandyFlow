@@ -10,7 +10,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Upload, Download, Trash2, FileImage } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, AG_ACCENT_TEXT, fmtDateTime, type AgTargetType } from "./constants"
+import { AG_ACCENT, AG_ACCENT_TEXT, fmtDateTime, type AgEvidenceTarget } from "./constants"
 
 interface EvidenceResponse {
   id: string; fileName: string; evidenceType: string; contentType: string
@@ -19,9 +19,9 @@ interface EvidenceResponse {
 
 const EVIDENCE_TYPES = ["PHOTO", "DOCUMENT", "OTHER"]
 
-export default function AgEvidenceTab({ targetType, targetId }: { targetType: AgTargetType; targetId: string }) {
+export default function AgEvidenceTab({ targetType, targetId }: { targetType: AgEvidenceTarget; targetId: string }) {
   const qc = useQueryClient()
-  const segment = targetType === "animal" ? "animals" : "groups"
+  const segment = targetType === "animal" ? "animals" : targetType === "group" ? "groups" : "crop-cycles"
   const [evidenceType, setEvidenceType] = useState("PHOTO")
   const [file, setFile] = useState<File | null>(null)
 

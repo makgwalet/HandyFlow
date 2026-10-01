@@ -22,7 +22,7 @@ import {
   Stethoscope, ListPlus,
   Megaphone, Warehouse, Handshake, UserCog,
   Database, CalendarRange,
-  UserCheck, Palette, Headphones, Wallet, Receipt, CheckSquare, LayoutGrid, ListChecks,
+  UserCheck, Palette, Headphones, Wallet, Receipt, CheckSquare, LayoutGrid, ListChecks, Sprout,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -135,6 +135,15 @@ export const AGRICULTURE_SECTIONS: ModuleSections = {
         { id: 'species', label: 'Species', icon: PawPrint },
       ],
     },
+    {
+      label: 'Crops',
+      sections: [
+        { id: 'crop-cycles', label: 'Crop cycles', icon: Sprout },
+        { id: 'seasons', label: 'Seasons', icon: CalendarRange },
+        { id: 'crop-types', label: 'Crop types', icon: Wheat },
+      ],
+    },
+    { label: 'Insights', sections: [{ id: 'costs', label: 'Cost reports', icon: BarChart2 }] },
   ],
 }
 

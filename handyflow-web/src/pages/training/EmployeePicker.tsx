@@ -58,7 +58,7 @@ export default function EmployeePicker({ value, onChange }: { value: EmployeeOpt
         const page = res.data
         setResults(Array.isArray(page) ? page : (page?.content ?? []))
       } catch (err: any) {
-        setError("Could not load employees — check that GET /api/v1/hr/employees exists with this shape (see this file's header comment)")
+        setError("Could not load employees. You may not have access to HR; you can leave this blank.")
         setResults([])
       } finally {
         setLoading(false)

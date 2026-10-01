@@ -52,10 +52,10 @@ export default function AgDashboard() {
       <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "16px 18px" }}>
         <p style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", margin: "0 0 6px" }}>Getting started</p>
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: 0, lineHeight: 1.6 }}>
-          Register a farm, add species to the catalogue, then open a farm to add production areas, enterprises,
-          and register your animals or groups. Feed/health/breeding/movement/mortality history and evidence
-          photos live under each animal or group. Crop cycles and cost-reporting views ship as a follow-up
-          delivery, matching this module's own backend rollout.
+          Register a farm, add species and crop types, then open a farm to add production areas, enterprises,
+          and register your animals or groups. Feed, health, breeding, movement and mortality history live
+          under each animal or group. Crops are under Crop cycles and Seasons, and Cost reports show what each
+          crop cycle, animal and group has cost you.
         </p>
       </div>
     </div>

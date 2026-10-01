@@ -1,7 +1,6 @@
 // src/pages/agriculture/AgFarmDetail.tsx
 //
-// Farm-scoped shell: Production Areas | Enterprises | Animals | Groups |
-// Inventory. Same sub-tab shell pattern as WhseClientDetail/
+// Farm-scoped shell: Animals | Groups | Production Areas | Enterprises | Inventory | Crop cycles | Seasons | Costs. Same sub-tab shell pattern as WhseClientDetail/
 // TrainProvClientDetail from earlier modules this engagement, drilling
 // one level further into Animal/Group detail when a row is clicked.
 import type React from "react"
@@ -16,11 +15,15 @@ import AgAnimalDetail from "./AgAnimalDetail"
 import AgGroupsTab, { type GroupResponse } from "./AgGroupsTab"
 import AgGroupDetail from "./AgGroupDetail"
 import AgInventoryTab from "./AgInventoryTab"
+import AgCropCyclesTab from "./AgCropCyclesTab"
+import AgSeasonsTab from "./AgSeasonsTab"
+import AgCostReportsTab from "./AgCostReportsTab"
 
-type Tab = "areas" | "enterprises" | "animals" | "groups" | "inventory"
+type Tab = "areas" | "enterprises" | "animals" | "groups" | "inventory" | "crops" | "seasons" | "costs"
 const TABS: { key: Tab; label: string }[] = [
   { key: "animals", label: "Animals" }, { key: "groups", label: "Groups" },
   { key: "areas", label: "Production Areas" }, { key: "enterprises", label: "Enterprises" }, { key: "inventory", label: "Inventory" },
+  { key: "crops", label: "Crop cycles" }, { key: "seasons", label: "Seasons" }, { key: "costs", label: "Costs" },
 ]
 
 export default function AgFarmDetail({ farm, onBack }: { farm: FarmResponse; onBack: () => void }) {
@@ -63,6 +66,9 @@ export default function AgFarmDetail({ farm, onBack }: { farm: FarmResponse; onB
       {tab === "areas" && <AgProductionAreasTab farmId={farm.id} />}
       {tab === "enterprises" && <AgEnterprisesTab farmId={farm.id} />}
       {tab === "inventory" && <AgInventoryTab farmId={farm.id} />}
+      {tab === "crops" && <AgCropCyclesTab farmId={farm.id} />}
+      {tab === "seasons" && <AgSeasonsTab farmId={farm.id} />}
+      {tab === "costs" && <AgCostReportsTab farmId={farm.id} />}
     </div>
   )
 }

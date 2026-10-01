@@ -63,6 +63,19 @@ export const STATUS_COLORS: Record<string, [string, string]> = {
   ABORTED: ["var(--hf-danger-soft)", "var(--hf-danger-text)"],
   FAILED: ["var(--hf-danger-soft)", "var(--hf-danger-text)"],
   NOT_PREGNANT: ["var(--hf-surface-sunken)", "var(--hf-text-muted)"],
+  // crop cycles, seasons and scouting
+  PLANNED: ["var(--hf-surface-sunken)", "var(--hf-text-muted)"],
+  PLANNING: ["var(--hf-warning-soft)", "var(--hf-warning-text)"],
+  PLANTED: ["var(--hf-info-soft)", "var(--hf-info-text)"],
+  GROWING: ["var(--hf-success-soft-strong)", "var(--hf-success-text-strong)"],
+  HARVESTING: ["var(--hf-warning-soft)", "var(--hf-warning-text)"],
+  HARVESTED: ["var(--hf-accent-soft)", "var(--hf-accent-text)"],
+  ABANDONED: ["var(--hf-surface-sunken)", "var(--hf-text-muted)"],
+  OPEN: ["var(--hf-warning-soft)", "var(--hf-warning-text)"],
+  RESOLVED: ["var(--hf-success-soft-strong)", "var(--hf-success-text-strong)"],
+  LOW: ["var(--hf-surface-sunken)", "var(--hf-text-muted)"],
+  MEDIUM: ["var(--hf-warning-soft)", "var(--hf-warning-text)"],
+  HIGH: ["var(--hf-danger-soft)", "var(--hf-danger-text)"],
 }
 
 export function statusBadge(status: string | null | undefined) {
@@ -79,3 +92,21 @@ export type AgTargetType = "animal" | "group"
 export function targetBasePath(targetType: AgTargetType, targetId: string) {
   return `/api/v1/agriculture/${targetType === "animal" ? "animals" : "groups"}/${targetId}`
 }
+
+// Evidence also hangs off a crop cycle (/crop-cycles/{id}/evidence), which is NOT a livestock target, so it
+// is kept out of AgTargetType: targetBasePath() would silently treat an unknown member as "groups".
+export type AgEvidenceTarget = AgTargetType | "crop-cycle"
+
+// -- Shared form and layout styles (new crop, season and cost screens) -----------------------------------
+export const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4, display: "block" }
+export const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12.5, boxSizing: "border-box", background: "var(--hf-surface)", color: "var(--hf-text)" }
+export const btnPrimary: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "none", background: AG_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
+export const btnGhost: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }
+export const btnDanger: React.CSSProperties = { ...btnGhost, color: "var(--hf-danger-text)", borderColor: "var(--hf-danger-border)" }
+export const panel: React.CSSProperties = { background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16, marginBottom: 16 }
+export const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: "16px 18px" }
+export const kpiLabel: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", letterSpacing: 0.4, textTransform: "uppercase", margin: "0 0 6px" }
+export const kpiValue: React.CSSProperties = { fontSize: 24, fontWeight: 800, color: "var(--hf-text)", margin: 0 }
+export const grid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 10 }
+export const theadStyle: React.CSSProperties = { color: "var(--hf-text-faint)", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.4 }
+export const td: React.CSSProperties = { padding: "9px 10px", verticalAlign: "top" }
