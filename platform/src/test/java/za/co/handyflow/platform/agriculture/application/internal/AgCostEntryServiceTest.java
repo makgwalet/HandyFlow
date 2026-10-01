@@ -54,7 +54,8 @@ class AgCostEntryServiceTest {
     final UUID groupId = UUID.randomUUID();
 
     private AgCostEntryService service() {
-        return new AgCostEntryService(costEntryRepository, farmRepository, cropCycleRepository, groupRepository, animalRepository, enterpriseRepository);
+        return new AgCostEntryService(costEntryRepository, farmRepository,
+                new AgTargetOwnership(cropCycleRepository, groupRepository, animalRepository, enterpriseRepository));
     }
 
     private static void assertNumber(String expected, BigDecimal actual) {

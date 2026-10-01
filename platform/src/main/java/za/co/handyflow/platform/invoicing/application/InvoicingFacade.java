@@ -3,8 +3,11 @@ package za.co.handyflow.platform.invoicing.application;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -79,4 +82,46 @@ public interface InvoicingFacade {
             BigDecimal total,
             BigDecimal amountPaid
     ) {}
+
+    // ---- Read-only sale lines (ADR-001, W2): lets Agriculture link invoice lines to production without owning any sales data ----
+
+    /**
+     * One invoice line with the context needed to attribute its revenue. Strictly read-only: nothing here lets another module create or change a sale.
+     *
+     * @param invoiceStatus   the InvoiceStatus name (DRAFT, ISSUED, PARTIALLY_PAID, PAID, OVERPAID, OVERDUE, CANCELLED); the caller decides which count
+     * @param customerName    the customer's name, or the walk-in client's name; null if neither is known
+     * @param issuedAt        null until the invoice is issued
+     * @param lineTotal       the line's total EXCLUDING VAT
+     * @param invoiceSubtotal the whole invoice's subtotal excluding VAT
+     * @param creditedSubtotal credit notes issued against the invoice, excluding VAT. Credit notes belong to the invoice, not to a line.
+     */
+    record SaleLine(
+            UUID invoiceId,
+            String invoiceNumber,
+            String invoiceStatus,
+            UUID customerId,
+            String customerName,
+            Instant issuedAt,
+            String currency,
+            UUID lineItemId,
+            String description,
+            String unit,
+            BigDecimal quantity,
+            BigDecimal unitPrice,
+            BigDecimal lineTotal,
+            BigDecimal invoiceSubtotal,
+            BigDecimal creditedSubtotal
+    ) {}
+
+    /** A single invoice line, or empty if it does not exist for this tenant (or its invoice was deleted). */
+    Optional<SaleLine> findSaleLine(TenantId tenantId, UUID lineItemId);
+
+    /** The lines with these ids; ids that do not exist are simply absent from the result. */
+    List<SaleLine> findSaleLines(TenantId tenantId, Collection<UUID> lineItemIds);
+
+    /**
+     * Lines of invoices ISSUED in [from, to) whose status is one of {@code statuses}, newest invoice first. {@code maxInvoices} caps the invoices
+     * read (not the lines), at most 500.
+     */
+    List<SaleLine> searchSaleLines(TenantId tenantId, Instant from, Instant to, Collection<String> statuses, int maxInvoices);
 }

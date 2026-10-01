@@ -6,9 +6,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import za.co.handyflow.platform.invoicing.domain.model.Invoice;
+import za.co.handyflow.platform.invoicing.domain.model.InvoiceStatus;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -96,4 +99,26 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
         AND i.deletedAt IS NULL
         """)
     List<Invoice> findOverdueInvoices(@Param("today") LocalDate today);
+
+    // Read-only sale lines for other modules (InvoicingFacade): the invoices that contain these line items.
+    @Query("""
+        SELECT DISTINCT i FROM Invoice i
+        JOIN i.lineItems li
+        WHERE i.tenantId = :tenantId
+        AND i.deletedAt IS NULL
+        AND li.id IN :lineIds
+        """)
+    List<Invoice> findByLineItemIds(TenantId tenantId, Collection<UUID> lineIds);
+
+    // Invoices issued in [fromInstant, toInstant) with one of the given statuses, newest first.
+    @Query("""
+        SELECT i FROM Invoice i
+        WHERE i.tenantId = :tenantId
+        AND i.deletedAt IS NULL
+        AND i.status IN :statuses
+        AND i.issuedAt >= :fromInstant
+        AND i.issuedAt < :toInstant
+        ORDER BY i.issuedAt DESC
+        """)
+    List<Invoice> findIssuedBetween(TenantId tenantId, Collection<InvoiceStatus> statuses, Instant fromInstant, Instant toInstant, Pageable pageable);
 }

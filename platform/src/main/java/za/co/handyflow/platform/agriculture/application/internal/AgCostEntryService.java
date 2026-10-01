@@ -7,12 +7,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.agriculture.domain.model.AgCostEntry;
-import za.co.handyflow.platform.agriculture.domain.repository.AgAnimalRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgCostEntryRepository;
-import za.co.handyflow.platform.agriculture.domain.repository.AgCropCycleRepository;
-import za.co.handyflow.platform.agriculture.domain.repository.AgEnterpriseRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgFarmRepository;
-import za.co.handyflow.platform.agriculture.domain.repository.AgGroupRepository;
 import za.co.handyflow.platform.agriculture.domain.rules.AgCostAllocation;
 import za.co.handyflow.platform.agriculture.dto.CostEntryDtos.AllocationShare;
 import za.co.handyflow.platform.agriculture.dto.CostEntryDtos.CategoryTotal;
@@ -46,10 +42,7 @@ public class AgCostEntryService {
 
     private final AgCostEntryRepository costEntryRepository;
     private final AgFarmRepository farmRepository;
-    private final AgCropCycleRepository cropCycleRepository;
-    private final AgGroupRepository groupRepository;
-    private final AgAnimalRepository animalRepository;
-    private final AgEnterpriseRepository enterpriseRepository;
+    private final AgTargetOwnership targetOwnership;
 
     @Transactional
     public List<CostEntryResponse> createManual(TenantId tenantId, UUID farmId, UUID userId, CreateCostEntryRequest req) {
@@ -77,7 +70,7 @@ public class AgCostEntryService {
             throw new IllegalArgumentException("entryDate cannot be in the future");
         }
         List<AgCostAllocation.Part> parts = AgCostAllocation.split(amount, shares);
-        for (AgCostAllocation.Part p : parts) requireTargetOnFarm(tenantId, farmId, p.targetType(), p.targetId());
+        for (AgCostAllocation.Part p : parts) targetOwnership.requireOnFarm(tenantId, farmId, p.targetType(), p.targetId());
 
         UUID groupId = UUID.randomUUID();
         List<AgCostEntry> entries = new ArrayList<>();
@@ -148,24 +141,6 @@ public class AgCostEntryService {
             throw new IllegalArgumentException("targetType must be one of " + AgCostAllocation.TARGET_TYPES);
         }
         if (targetId == null) throw new IllegalArgumentException("targetId is required with targetType");
-    }
-
-    /** The target must exist in this tenant AND belong to this farm, so a cost can never be pinned on another farm's crop or herd. */
-    private void requireTargetOnFarm(TenantId tenantId, UUID farmId, String targetType, UUID targetId) {
-        UUID owner = switch (targetType) {
-            case AgCostAllocation.CROP_CYCLE -> cropCycleRepository.findActiveById(tenantId, targetId)
-                    .orElseThrow(() -> new ResourceNotFoundException("CropCycle", targetId.toString())).getFarmId();
-            case AgCostAllocation.GROUP -> groupRepository.findActiveById(tenantId, targetId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Group", targetId.toString())).getFarmId();
-            case AgCostAllocation.ANIMAL -> animalRepository.findActiveById(tenantId, targetId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Animal", targetId.toString())).getFarmId();
-            case AgCostAllocation.ENTERPRISE -> enterpriseRepository.findActiveById(tenantId, targetId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Enterprise", targetId.toString())).getFarmId();
-            default -> throw new IllegalArgumentException("targetType must be one of " + AgCostAllocation.TARGET_TYPES);
-        };
-        if (!farmId.equals(owner)) {
-            throw new IllegalArgumentException(targetType.toLowerCase().replace('_', ' ') + " " + targetId + " does not belong to this farm");
-        }
     }
 
     private CostEntryResponse toResponse(AgCostEntry e) {

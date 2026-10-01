@@ -89,9 +89,11 @@
  * allowedDependencies: {@code shared}, {@code billing} (FeatureGuard),
  * {@code hr} (HrFacade — see above), {@code evidence} (scouting/
  * treatment/harvest photo attachments), {@code notifications} (daily
- * sweep for vaccinations/health follow-ups due).
+ * sweep for vaccinations/health follow-ups due), {@code invoicing}
+ * (InvoicingFacade, read-only sale lines: ADR-001 W2 attributes revenue
+ * to production without owning any sales data).
  */
-@ApplicationModule(allowedDependencies = {"shared", "billing", "hr", "evidence", "notifications"})
+@ApplicationModule(allowedDependencies = {"shared", "billing", "hr", "evidence", "notifications", "invoicing"})
 package za.co.handyflow.platform.agriculture;
 
 import org.springframework.modulith.ApplicationModule;
