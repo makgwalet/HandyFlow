@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 /**
+ * Registry coverage (runs after the section checks):
+ *   - the sidebar registry (navigation/modules.ts) and the dashboard registry (pages/dashboard/
+ *     DashboardPage.tsx) list the same module keys. The dashboard silently drops a subscribed
+ *     module it has no tile for, and so does the sidebar, so a mismatch hides a module;
+ *   - every top-level route in App.tsx is owned by a registry entry, one of its aliases, or a
+ *     workspace link, or is listed in NON_MODULE_ROUTES below with a reason.
+ *
  * Integrity check for the sidebar section navigation.
  *
  *   npm run check:navigation      (exit 1 if anything is inconsistent)
@@ -78,5 +85,30 @@ for (const c of consts) {
   if (badTargets.length) fail(`navigation targets that are not sections: ${badTargets.join(', ')}`)
 }
 
+// ---- Registry coverage -------------------------------------------------------------------
+const dashboard = src('pages/dashboard/DashboardPage.tsx')
+const between = (text, startRe, end = '\n}\n') => { const m = startRe.exec(text); return m ? text.slice(m.index, text.indexOf(end, m.index)) : '' }
+const navBlock = between(registry, /export const MODULE_REGISTRY/)
+const dashBlock = between(dashboard, /const MODULE_REGISTRY: Record<string, AppTile> = \{/)
+const keysOf = (blk, first) => new Set([...blk.matchAll(new RegExp(`^\\s*'?([a-z_-]+)'?:\\s*\\{\\s*${first}`, 'gm'))].map(m => m[1]))
+const navKeys = keysOf(navBlock, 'icon'), dashKeys = keysOf(dashBlock, 'key')
+if (!navKeys.size || !dashKeys.size) problems.push('registry: could not read module keys (did the registry format change?)')
+for (const k of navKeys) if (!dashKeys.has(k)) problems.push(`registry: module '${k}' is in the sidebar registry but has no dashboard tile`)
+for (const k of dashKeys) if (!navKeys.has(k)) problems.push(`registry: module '${k}' has a dashboard tile but is not in the sidebar registry`)
+
+// Routes that are deliberately not modules: auth screens, public and external-user surfaces, home, profile.
+const NON_MODULE_ROUTES = new Set([
+  '/login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/account-locked', // sign-in flow
+  '/dashboard',                                                                                      // "All modules" home
+  '/portal', '/auditor', '/careers', '/sign', '/unsubscribe', '/invite',                            // client, auditor and public pages
+  '/profile',                                                                                        // user menu
+])
+const owned = new Set([...registry.matchAll(/route:\s*'(\/[^']*)'/g)].map(m => m[1]))
+for (const m of registry.matchAll(/aliases:\s*\[([^\]]*)\]/g)) for (const a of m[1].matchAll(/'(\/[^']*)'/g)) owned.add(a[1])
+const appBases = new Set([...app.matchAll(/<Route\s+path="(\/[^"]*)"/g)].map(m => '/' + m[1].split('/')[1]).filter(b => b !== '/'))
+for (const b of [...appBases].sort()) {
+  if (!owned.has(b) && !NON_MODULE_ROUTES.has(b)) problems.push(`routes: ${b} is routed in App.tsx but no registry entry, alias or workspace link owns it (add it to navigation/modules.ts, or to NON_MODULE_ROUTES in this script with a reason)`)
+}
+
 if (problems.length) { console.error(problems.join('\n')); console.error(`\n${problems.length} problem(s) in ${consts.length} section configs`); process.exit(1) }
-console.log(`${consts.length} section configs OK`)
+console.log(`${consts.length} section configs OK; ${navKeys.size} modules and ${appBases.size} route bases covered`)

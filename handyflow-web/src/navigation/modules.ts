@@ -13,6 +13,7 @@ import {
   Palette, Headphones, CheckSquare, Megaphone, UserCheck, ShoppingCart,
   Truck, Receipt, UserCog, ShieldCheck, Wheat,
   Handshake, Warehouse, Scale, ClipboardCheck, Landmark, GraduationCap, BookOpen,
+  CalendarClock, Banknote, UserSearch, ShieldAlert,
 } from 'lucide-react'
 import type { ElementType } from 'react'
 import { apiClient } from '../api/client'
@@ -22,11 +23,24 @@ export interface ModuleNavItem {
   icon: ElementType
   label: string
   route: string
+  /**
+   * Extra path prefixes this module owns when they live outside its own route. Invoicing's
+   * Recurring tab is at /recurring, so without this no sidebar item is highlighted there.
+   */
+  aliases?: string[]
 }
+
+/** True when `pathname` is `route` or anything beneath it. */
+export const routeMatches = (pathname: string, route: string) =>
+  pathname === route || pathname.startsWith(route + '/')
+
+/** True when the path is inside the item's route or any of its aliases. */
+export const isNavItemActive = (pathname: string, item: Pick<ModuleNavItem, 'route' | 'aliases'>) =>
+  [item.route, ...(item.aliases ?? [])].some(r => routeMatches(pathname, r))
 
 export const MODULE_REGISTRY: Record<string, Omit<ModuleNavItem, 'key'>> = {
   crm:          { icon: Users,         label: 'Customers',    route: '/customers'    },
-  invoicing:    { icon: FileText,      label: 'Invoices',     route: '/invoices'     },
+  invoicing:    { icon: FileText,      label: 'Invoices',     route: '/invoices',    aliases: ['/recurring'] },
   catalogue:    { icon: Package,       label: 'Catalogue',    route: '/catalogue'    },
   security:     { icon: Shield,        label: 'Security',     route: '/security'     },
   fuel:         { icon: Fuel,          label: 'Fuel',         route: '/fuel'         },
@@ -63,6 +77,11 @@ export const MODULE_REGISTRY: Record<string, Omit<ModuleNavItem, 'key'>> = {
   // Active catalogue modules that were on neither the dashboard nor the sidebar.
   training:           { icon: BookOpen,       label: 'Training & L&D',               route: '/training'           },
   trainingprovider:   { icon: GraduationCap,  label: 'Training Provider',            route: '/training-provider'  },
+  // Routed in App.tsx and enforced by the backend (requireModule) but never registered here, so a
+  // subscribed tenant could not reach them from the sidebar or Ctrl+K.
+  bookingagency:      { icon: CalendarClock,  label: 'Booking Agency',               route: '/booking-agency'     },
+  payrollbureau:      { icon: Banknote,       label: 'Payroll Bureau',               route: '/payroll-bureau'     },
+  recruitmentagency:  { icon: UserSearch,     label: 'Recruitment Agency',           route: '/recruitment-agency' },
 }
 
 /** Always reachable regardless of subscription. */
@@ -70,6 +89,9 @@ export const WORKSPACE_NAV: Omit<ModuleNavItem, 'key'>[] = [
   { icon: FileText,   label: 'Quotes',   route: '/quotes'   },
   { icon: CreditCard, label: 'Billing',  route: '/billing'  },
   { icon: Settings,   label: 'Settings', route: '/settings' },
+  // A cross-module "needs attention" board, open to any signed-in user (the API only requires
+  // authentication). It is not a subscribed module, so it lives here, not in MODULE_REGISTRY.
+  { icon: ShieldAlert, label: 'Control Exceptions', route: '/control-exceptions' },
 ]
 
 /** Core modules every tenant has, even if the billing API omits them. */
@@ -94,5 +116,5 @@ export function useSubscribedModules(): { modules: ModuleNavItem[]; isLoading: b
 
 /** The module whose route the given path is inside, if any. */
 export function activeModuleFor(pathname: string, modules: ModuleNavItem[]): ModuleNavItem | undefined {
-  return modules.find(m => pathname === m.route || pathname.startsWith(m.route + '/'))
+  return modules.find(m => isNavItemActive(pathname, m))
 }

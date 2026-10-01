@@ -15,7 +15,7 @@ import {
   Handshake,
   Warehouse,
   ClipboardCheck,
-  ShieldCheck, Wheat, GraduationCap
+  ShieldCheck, Wheat, GraduationCap, CalendarClock, Banknote, UserSearch,
 } from 'lucide-react'
 import { apiClient } from '../../api/client'
 import { useAuthStore } from '../../store/auth.store'
@@ -70,6 +70,9 @@ const MODULE_REGISTRY: Record<string, AppTile> = {
   complianceservices: { key: 'complianceservices', name: 'Compliance Services', description: 'Manage compliance and tender work for your client companies', icon: Building2, bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text-strong)', route: '/complianceservices' },
   'internal-audit': { key: 'internal-audit', name: 'Internal Audit', description: 'Risk-based audit planning, annual plan and engagement management', icon: ShieldCheck, bg: 'var(--hf-surface-sunken)', iconColor: 'var(--hf-text-secondary)', route: '/internal-audit' },
   trainingprovider: { key: 'trainingprovider', name: 'Training Provider', description: 'Courses, sessions & certificates', icon: GraduationCap, bg: 'var(--hf-warning-soft)', iconColor: 'var(--hf-warning-text-strong)', route: '/training-provider' },
+  bookingagency: { key: 'bookingagency', name: 'Booking Agency', description: 'Resources, offerings, bookings & client invoicing', icon: CalendarClock, bg: 'var(--hf-sky-soft)', iconColor: 'var(--hf-sky-text-strong)', route: '/booking-agency' },
+  payrollbureau: { key: 'payrollbureau', name: 'Payroll Bureau', description: 'Client employees, pay runs, deadlines & fee notes', icon: Banknote, bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text-strong)', route: '/payroll-bureau' },
+  recruitmentagency: { key: 'recruitmentagency', name: 'Recruitment Agency', description: 'Candidate pool, requisitions & placements', icon: UserSearch, bg: 'var(--hf-orange-soft)', iconColor: 'var(--hf-orange-text-strong)', route: '/recruitment-agency' },
   training: { key: 'training', name: 'Training & L&D', description: 'Employee courses & certifications', icon: BookOpen, bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text)', route: '/training' },
   agriculture: { key: 'agriculture', name: 'Agriculture', description: 'Farms, livestock, health, breeding & feed', icon: Wheat, bg: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text-strong)', route: '/agriculture' },
   debtcollection: { key: 'debtcollection',  name: 'Debt Collection', description: 'Cases, contact trail & payment plans', icon: Landmark, bg: 'var(--hf-orange-soft)', iconColor: 'var(--hf-orange-text-strong)', route: '/debtcollection',
@@ -291,7 +294,7 @@ export function DashboardPage() {
 
           {/* Profile */}
           <div ref={profileRef} style={{ position: 'relative' }}>
-            <button onClick={() => { setProfileOpen(o => !o); setNotifOpen(false) }}
+            <button onClick={() => { setProfileOpen(o => !o) }}
               style={{ display: 'flex', alignItems: 'center', gap: 9, background: profileOpen ? 'rgba(255,255,255,0.12)' : 'none', border: 'none', borderRadius: 10, padding: '5px 10px 5px 6px', cursor: 'pointer' }}>
               <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--hf-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--hf-text-on-solid)', fontSize: 12, fontWeight: 700 }}>
                 {user?.firstName?.[0]}{user?.lastName?.[0]}

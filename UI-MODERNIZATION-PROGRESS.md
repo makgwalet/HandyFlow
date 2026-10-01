@@ -286,3 +286,17 @@ unassign. Fixed: a task due today showed as overdue from 02:00 SAST (UTC parse o
   untested (jsdom cannot drive them).
 - Not done: real server paging, tags, comment edit/delete, activity log, recurring tasks, multi-instance scheduler lock,
   optimistic-lock conflict handling.
+
+## The five unregistered routes
+`/booking-agency`, `/payroll-bureau`, `/recruitment-agency`, `/control-exceptions`, `/recurring` were routed in
+`App.tsx` but owned by no navigation entry.
+- `bookingagency`, `payrollbureau`, `recruitmentagency` added to the sidebar registry (`navigation/modules.ts`) and
+  the dashboard registry. Keys match what the backend enforces (`requireModule(...)`). Both registries silently drop a
+  subscribed module they have no entry for, so these were invisible to subscribed tenants.
+- `/recurring` is not a module: it is the Recurring tab of Invoicing. Invoicing now declares it as an `alias`, and the
+  sidebar highlights by alias (before, nothing was highlighted there).
+- `/control-exceptions` is a cross-module board open to any signed-in user, so it is a Workspace link, not a module.
+- `check:navigation` now also fails when the two registries list different module keys, or when an `App.tsx` route
+  base is owned by nothing and is not in `NON_MODULE_ROUTES` (auth, public, portal, profile, home). Run against the
+  old registries it reports exactly these five routes.
+- Fixed in passing: the dashboard's profile button called `setNotifOpen`, which does not exist (ReferenceError on click).

@@ -1,9 +1,9 @@
 // src/components/shell/Sidebar.tsx
 import { useState } from 'react'
-import { NavLink, Link } from 'react-router-dom'
+import { NavLink, Link, useLocation } from 'react-router-dom'
 import { ArrowLeft, Building2, LayoutGrid, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import type { ModuleNavItem } from '../../navigation/modules'
-import { WORKSPACE_NAV } from '../../navigation/modules'
+import { WORKSPACE_NAV, isNavItemActive } from '../../navigation/modules'
 import { sectionsForPath, visibleGroups, type ModuleSections } from '../../navigation/moduleSections'
 import { useSectionBadges } from '../../navigation/sectionBadges'
 import { useAuthStore } from '../../store/auth.store'
@@ -21,6 +21,7 @@ interface SidebarProps {
 
 interface NavEntry {
   key: string; icon: ModuleNavItem['icon']; label: string; route: string
+  aliases?: string[]
   badge?: string
   /** Hide the badge while this item is the current page (no need to remind
    *  people of what they are already looking at). */
@@ -28,20 +29,25 @@ interface NavEntry {
 }
 
 function NavSection({ label, items, onNavigate }: { label: string; items: NavEntry[]; onNavigate: () => void }) {
+  const { pathname } = useLocation()
   if (items.length === 0) return null
   return (
     <div className="hf-nav-section" role="group" aria-label={label}>
       <div className="hf-nav-section-label" aria-hidden="true">{label}</div>
-      {items.map(({ key, icon: Icon, label: text, route, badge, badgeHideWhenActive }) => (
+      {items.map(({ key, icon: Icon, label: text, route, aliases, badge, badgeHideWhenActive }) => {
+        // NavLink only matches the item's own route; aliases (e.g. /recurring for Invoices) are added here
+        const owns = isNavItemActive(pathname, { route, aliases })
+        return (
         <NavLink key={key} to={route} title={badge ? `${text} (${badge})` : text} onClick={onNavigate}
-          className={({ isActive }) => 'hf-nav-item' + (isActive ? ' active' : '')}>
-          {({ isActive }) => (<>
+          className={({ isActive }) => 'hf-nav-item' + (isActive || owns ? ' active' : '')}>
+          {({ isActive: linkActive }) => { const isActive = linkActive || owns; return (<>
             <Icon size={18} aria-hidden="true" />
             <span className="hf-nav-label">{text}</span>
             {badge && !(badgeHideWhenActive && isActive) && <span className="hf-nav-badge">{badge}</span>}
-          </>)}
+          </>)}}
         </NavLink>
-      ))}
+        )
+      })}
     </div>
   )
 }
