@@ -52,6 +52,8 @@ export interface CropCycleCost {
   areaPlantedHectares: number | null; totalSeedCost: number; totalInputCost: number; totalCost: number
   costPerHectare: number | null; totalLaborHours: number | null
   totalYieldHarvested: number; yieldUnitOfMeasure: string | null; yieldPerHectare: number | null
+  /** Harvest units that could not be converted to the crop's unit and are NOT in the yield (absent on older servers). */
+  unconvertedYieldUnits?: number
 }
 export interface AnimalCost {
   animalId: string; tagNumber: string; farmId: string; acquisitionCost: number; totalHealthCost: number

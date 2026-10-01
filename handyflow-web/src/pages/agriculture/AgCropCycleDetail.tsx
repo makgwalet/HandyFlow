@@ -6,7 +6,7 @@ import { useState } from "react"
 import { ArrowLeft, Check } from "lucide-react"
 import { usePermission } from "../../hooks/usePermission"
 import { agKeys, api, cycleKeys, useAgMutation, useAreas, useCropCycle, useCropTypes, useCycleCost, useHarvests, useInventory, useSeasons } from "./agCrops.api"
-import { STATUS_LABEL, STEPS, allowedActions, cropName, cycleLabel, distinctUnits, isHarvestOverdue, stepIndex, stockProblem, todayISO } from "./agCrops.logic"
+import { STATUS_LABEL, STEPS, allowedActions, cropName, cycleLabel, isHarvestOverdue, stepIndex, stockProblem, todayISO } from "./agCrops.logic"
 import type { CropCycle } from "./agCrops.types"
 import AgCropInputsTab from "./AgCropInputsTab"
 import AgCropScoutingTab from "./AgCropScoutingTab"
@@ -81,7 +81,6 @@ export default function AgCropCycleDetail({ farmId, cycleId, onBack }: { farmId:
   const label = cycleLabel(cycle, types)
   const season = seasons.find(s => s.id === cycle.seasonId)
   const area = areas.find(x => x.id === cycle.productionAreaId)
-  const units = distinctUnits(harvests)
   const overdue = isHarvestOverdue(cycle)
   const reasonPanel = (kind: "fail" | "abandon") => (
     <div style={panel}>
@@ -197,7 +196,7 @@ export default function AgCropCycleDetail({ farmId, cycleId, onBack }: { farmId:
                   <dt style={{ color: "var(--hf-text-faint)" }}>Labour hours</dt><dd style={{ margin: 0 }}>{cost.data.totalLaborHours ?? 0}</dd>
                 </dl>
                 <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: "10px 0 0" }}>Costs only: seed and recorded inputs. Labour hours are shown but not costed.</p>
-                {units.length > 1 && <Warn>Harvests use more than one unit ({units.join(", ")}), so yield is not reliable.</Warn>}
+                {(cost.data.unconvertedYieldUnits ?? 0) > 0 && <Warn>Some harvests use a unit that can't be converted to {cost.data.yieldUnitOfMeasure ?? "the crop unit"}, so yield is understated.</Warn>}
               </>
             ) : <p style={{ fontSize: 12.5, color: "var(--hf-text-faint)", margin: 0 }}>Cost summary unavailable.</p>}
           </div>

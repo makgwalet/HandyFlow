@@ -6,7 +6,8 @@ import { Plus } from "lucide-react"
 import { usePermission } from "../../hooks/usePermission"
 import EmployeePicker, { type EmployeeOption } from "../training/EmployeePicker"
 import { agKeys, api, useAgMutation, useCropTypes, useHarvests } from "./agCrops.api"
-import { canLog, distinctUnits, harvestUnitWarning, round, todayISO } from "./agCrops.logic"
+import { canLog, harvestUnitProblem, todayISO } from "./agCrops.logic"
+import { sumHarvests } from "./agUnits"
 import type { CropCycle } from "./agCrops.types"
 import { Empty, Field, Th, Warn } from "./agCropsUi"
 import { btnGhost, btnPrimary, fmtDate, grid, inp, panel, td, theadStyle } from "./constants"
@@ -17,8 +18,8 @@ function HarvestForm({ cycle, defaultUnit, onDone }: { cycle: CropCycle; default
   const existing = useHarvests(cycle.id).data ?? []
   const [f, setF] = useState({ date: todayISO(), qty: "", unit: defaultUnit ?? existing[0]?.unitOfMeasure ?? "kg", grade: "", moisture: "", storage: "", hours: "", notes: "" })
   const [by, setBy] = useState<EmployeeOption | null>(null)
-  const warning = harvestUnitWarning(f.unit, defaultUnit, existing)
-  const valid = !!f.date && Number(f.qty) > 0 && !!f.unit.trim()
+  const problem = harvestUnitProblem(f.unit, defaultUnit, existing)    // the server rejects this too
+  const valid = !!f.date && Number(f.qty) > 0 && !!f.unit.trim() && !problem
   const create = useAgMutation(
     () => api.post(`/crop-cycles/${cycle.id}/harvest-records`, {
       harvestDate: f.date, quantityHarvested: Number(f.qty), unitOfMeasure: f.unit.trim(), qualityGrade: f.grade.trim() || undefined,
@@ -39,7 +40,7 @@ function HarvestForm({ cycle, defaultUnit, onDone }: { cycle: CropCycle; default
         <Field label="Harvested by"><EmployeePicker value={by} onChange={setBy} /></Field>
         <Field label="Notes" htmlFor="hv-notes"><input id="hv-notes" style={inp} value={f.notes} onChange={e => setF({ ...f, notes: e.target.value })} /></Field>
       </div>
-      {warning && <Warn>{warning}</Warn>}
+      {problem && <Warn tone="danger">{problem}</Warn>}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <button type="button" style={{ ...btnPrimary, opacity: valid && !create.isPending ? 1 : 0.5 }} disabled={!valid || create.isPending} onClick={() => create.mutate(undefined, { onSuccess: onDone })}>Record harvest</button>
         <button type="button" style={btnGhost} onClick={onDone}>Cancel</button>
@@ -53,8 +54,9 @@ export default function AgCropHarvestsTab({ cycle }: { cycle: CropCycle }) {
   const [adding, setAdding] = useState(false)
   const { data: records = [], isLoading } = useHarvests(cycle.id)
   const defaultUnit = (useCropTypes().data ?? []).find(t => t.id === cycle.cropTypeId)?.defaultUnitOfMeasure ?? null
-  const units = distinctUnits(records)
-  const total = round(records.reduce((s, r) => s + r.quantityHarvested, 0), 3)
+  // yield is shown in the crop's own unit, converting kg and t exactly as the server does
+  const yieldUnit = defaultUnit ?? records[0]?.unitOfMeasure ?? null
+  const sum = sumHarvests(yieldUnit, records)
   return (
     <div>
       {canManage && canLog("harvest", cycle.status) && !adding && <div style={{ marginBottom: 12 }}><button type="button" style={btnPrimary} onClick={() => setAdding(true)}><Plus size={14} />Record harvest</button></div>}
@@ -72,11 +74,11 @@ export default function AgCropHarvestsTab({ cycle }: { cycle: CropCycle }) {
                 </tr>
               ))}
               <tr style={{ borderTop: "2px solid var(--hf-border)", fontWeight: 700 }}>
-                <td style={td}>Total</td><td style={td} colSpan={6}>{units.length === 1 ? `${total} ${units[0]}` : `${total} (mixed units: ${units.join(", ")})`}</td>
+                <td style={td}>Total</td><td style={td} colSpan={6}>{sum.total} {yieldUnit ?? ""}</td>
               </tr>
             </tbody>
           </table>
-          {units.length > 1 && <Warn>These records use different units, so the yield figures in the cost report will be wrong until they match.</Warn>}
+          {sum.unconvertedUnits.length > 0 && <Warn>Not included in the total: {sum.unconvertedUnits.join(", ")}. {sum.unconvertedUnits.length === 1 ? "That unit" : "Those units"} can't be converted to {yieldUnit}.</Warn>}
         </div>
       )}
     </div>

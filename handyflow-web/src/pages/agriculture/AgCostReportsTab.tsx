@@ -84,7 +84,8 @@ export default function AgCostReportsTab({ farmId }: { farmId: string }) {
           <Split parts={[{ label: "Seed", value: sumBy(rows, r => r.totalSeedCost) }, { label: "Inputs", value: sumBy(rows, r => r.totalInputCost) }]} />
         </div>
         <Table head={head} rows={data} foot={["Total", num(area), fmtMoney(sumBy(rows, r => r.totalSeedCost)), fmtMoney(sumBy(rows, r => r.totalInputCost)), fmtMoney(total), "", num(sumBy(rows, r => r.totalLaborHours)), "", ""]} />
-        <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", marginTop: 10 }}>Crop cost is seed plus recorded inputs; labour hours are shown but not costed. Cycles are listed highest cost per hectare first. Yield assumes every harvest was recorded in the crop's own unit.</p>
+        {rows.some(r => (r.unconvertedYieldUnits ?? 0) > 0) && <p role="status" style={{ fontSize: 12, color: "var(--hf-warning-text)", marginTop: 10 }}>{rows.filter(r => (r.unconvertedYieldUnits ?? 0) > 0).length} crop cycle(s) have harvests in a unit that can't be converted to the crop's unit, so their yield is understated.</p>}
+        <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", marginTop: 10 }}>Crop cost is seed plus recorded inputs; labour hours are shown but not costed. Cycles are listed highest cost per hectare first. Yield is converted into each crop's own unit (kg, t, g and lb convert; other units must match).</p>
       </>
     )
   } else if (kind === "animals" && animals.data) {

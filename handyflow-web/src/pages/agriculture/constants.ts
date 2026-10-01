@@ -76,6 +76,10 @@ export const STATUS_COLORS: Record<string, [string, string]> = {
   LOW: ["var(--hf-surface-sunken)", "var(--hf-text-muted)"],
   MEDIUM: ["var(--hf-warning-soft)", "var(--hf-warning-text)"],
   HIGH: ["var(--hf-danger-soft)", "var(--hf-danger-text)"],
+  // attention severities (OVERDUE and DUE_TODAY are defined above)
+  CRITICAL: ["var(--hf-danger-text)", "var(--hf-danger-soft)"],
+  UPCOMING: ["var(--hf-info-soft)", "var(--hf-info-text)"],
+  DUE_TODAY: ["var(--hf-warning-soft)", "var(--hf-warning-text)"],
 }
 
 export function statusBadge(status: string | null | undefined) {

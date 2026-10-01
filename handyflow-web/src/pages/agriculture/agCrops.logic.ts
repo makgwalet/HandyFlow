@@ -3,6 +3,7 @@
 // Pure rules for crops and costs: no React, no network. Several exist because the BACKEND does not enforce
 // them, so the screens have to (see the notes on each).
 import type { CropCycle, CropType, CycleStatus, HarvestRecord } from "./agCrops.types"
+import { canConvertUnit, isMassUnit } from "./agUnits"
 
 // -- Lifecycle ----------------------------------------------------------------------------------------------
 
@@ -123,22 +124,16 @@ export function stockProblem(quantity: number, item: { itemName: string; current
   return quantity > item.currentQuantity ? `Only ${item.currentQuantity} ${item.unitOfMeasure} of ${item.itemName} in stock.` : null
 }
 
-const norm = (u: string) => u.trim().toLowerCase()
-
 /**
- * Yield per hectare is a plain SUM of harvest quantities labelled with the crop type's default unit, so mixed
- * units (kg and t) silently give a wrong figure. Returns a warning when this entry's unit differs from the
- * crop's default or from units already recorded for the cycle.
+ * The server converts kg and t before summing yield and REJECTS a unit it cannot convert to the crop's unit, so this returns
+ * the problem (to show and to block on) rather than a soft warning. With no crop unit it falls back to the unit already
+ * used on this cycle. Mixing kg and t is fine; mixing kg and bags is not.
  */
-export function harvestUnitWarning(unit: string, defaultUnit: string | null | undefined, existing: Pick<HarvestRecord, "unitOfMeasure">[]): string | null {
+export function harvestUnitProblem(unit: string, cropUnit: string | null | undefined, existing: Pick<HarvestRecord, "unitOfMeasure">[]): string | null {
   if (!unit.trim()) return null
-  const base = defaultUnit ? norm(defaultUnit) : existing.length ? norm(existing[0].unitOfMeasure) : null
-  if (base && norm(unit) !== base) {
-    return `This crop's yield is reported in ${defaultUnit ?? existing[0].unitOfMeasure}. Mixing units makes yield per hectare wrong.`
-  }
-  const others = new Set(existing.map(r => norm(r.unitOfMeasure)))
-  others.add(norm(unit))
-  return others.size > 1 ? "Earlier harvests use a different unit. Mixing units makes yield per hectare wrong." : null
+  const target = cropUnit?.trim() ? cropUnit : existing[0]?.unitOfMeasure
+  if (!target || canConvertUnit(unit, target)) return null
+  return `${unit.trim()} can't be converted to ${target.trim()}, which this crop is reported in. ${isMassUnit(target) ? "Use a mass unit such as kg or t." : `Use ${target.trim()}.`}`
 }
 
 export function distinctUnits(records: Pick<HarvestRecord, "unitOfMeasure">[]): string[] {

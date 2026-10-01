@@ -62,13 +62,17 @@ export default function AgSeasonsTab({ farmId }: { farmId: string }) {
         <div style={panel}>
           {confirm.kind === "activate" ? (
             <p style={{ fontSize: 13, margin: "0 0 10px" }}>{activeOthers(confirm.season).map(s => s.name).join(", ")} {activeOthers(confirm.season).length === 1 ? "is" : "are"} already active. Activate "{confirm.season.name}" as well?</p>
+          ) : cycleCount(confirm.season) > 0 ? (
+            <p role="alert" style={{ fontSize: 13, margin: "0 0 10px" }}>"{confirm.season.name}" can't be deleted while {cycleCount(confirm.season)} crop cycle(s) are linked to it. Move or delete them first.</p>
           ) : (
-            <p style={{ fontSize: 13, margin: "0 0 10px" }}>Delete "{confirm.season.name}"?{cycleCount(confirm.season) > 0 ? ` ${cycleCount(confirm.season)} crop cycle(s) are linked to it.` : ""}</p>
+            <p style={{ fontSize: 13, margin: "0 0 10px" }}>Delete "{confirm.season.name}"?</p>
           )}
           <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" style={confirm.kind === "delete" ? btnDanger : btnPrimary}
-              onClick={() => { (confirm.kind === "activate" ? activate : remove).mutate(confirm.season.id); setConfirm(null) }}>{confirm.kind === "activate" ? "Activate" : "Delete season"}</button>
-            <button type="button" style={btnGhost} onClick={() => setConfirm(null)}>Cancel</button>
+            {!(confirm.kind === "delete" && cycleCount(confirm.season) > 0) && (
+              <button type="button" style={confirm.kind === "delete" ? btnDanger : btnPrimary}
+                onClick={() => { (confirm.kind === "activate" ? activate : remove).mutate(confirm.season.id); setConfirm(null) }}>{confirm.kind === "activate" ? "Activate" : "Delete season"}</button>
+            )}
+            <button type="button" style={btnGhost} onClick={() => setConfirm(null)}>{confirm.kind === "delete" && cycleCount(confirm.season) > 0 ? "OK" : "Cancel"}</button>
           </div>
         </div>
       )}
