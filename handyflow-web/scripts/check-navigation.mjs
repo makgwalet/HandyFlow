@@ -29,7 +29,10 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const src = p => fs.readFileSync(path.join(root, 'src', p), 'utf8')
+// Normalise Windows line endings on read: the parsing below looks for '\n}\n' to find where a block ends, which a CRLF checkout
+// (git autocrlf on Windows) never matches, so every block silently ran to the end of the file and reported dozens of false problems.
+const readText = f => fs.readFileSync(f, 'utf8').replace(/\r\n?/g, '\n')
+const src = p => readText(path.join(root, 'src', p))
 const nav = src('navigation/moduleSections.ts')
 const registry = src('navigation/modules.ts')
 const app = src('App.tsx')
@@ -45,7 +48,7 @@ function walk(dir, out = []) {
 const stripComments = t => t.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter(l => !l.trim().startsWith('//')).join('\n')
 
 const pageFiles = walk(path.join(root, 'src/pages'))
-const pageText = new Map(pageFiles.map(f => [f, fs.readFileSync(f, 'utf8')]))
+const pageText = new Map(pageFiles.map(f => [f, readText(f)]))
 const problems = []
 const consts = [...nav.matchAll(/export const (\w+_SECTIONS): ModuleSections/g)].map(m => m[1])
 

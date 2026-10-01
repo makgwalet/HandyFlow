@@ -7,8 +7,9 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const src = fs.readFileSync(path.join(root, 'src/styles/brand.ts'), 'utf8')
-const tokens = fs.readFileSync(path.join(root, 'src/styles/tokens.css'), 'utf8')
+const readText = f => fs.readFileSync(f, 'utf8').replace(/\r\n?/g, '\n')      // CRLF-safe: see check-navigation.mjs
+const src = readText(path.join(root, 'src/styles/brand.ts'))
+const tokens = readText(path.join(root, 'src/styles/tokens.css'))
 const [lightCss, darkCss] = tokens.split("[data-theme='dark']")
 const surface = {
   light: lightCss.match(/--hf-surface:\s*(#[0-9a-f]{6})/i)[1],
