@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, Bell, CheckCheck, Loader2 } from 'lucide-react'
 import { apiClient } from '../../api/client'
+import { resolveSafeActionUrl } from '../../navigation/actionUrl'
 
 // Matches NotificationQueryService.toResponse() field-for-field —
 // id, type, severity, title, message, actionUrl, sourceModule,
@@ -41,47 +42,6 @@ interface NotificationPage {
 
 const PAGE_SIZE = 25
 
-// FIX: "clicking a notification redirects to dashboard" — confirmed root
-// cause via App.tsx: <Route path="*" element={<Navigate to="/dashboard" />} />
-// is a catch-all, and several modules (Clinic, Projects' list view, etc.)
-// are single-page shells with internal tab state, not real sub-routes —
-// there's no /clinic/claims or /clinic/appointments route at all, only
-// /clinic itself. Any notification whose actionUrl pointed one level
-// deeper than a module's real route was silently hitting that catch-all
-// and bouncing to dashboard, on every single click, regardless of which
-// notification — matching exactly what was reported.
-//
-// This list is the exact set of top-level module routes from App.tsx's
-// <ModuleLayout> route group (plus /dashboard) — not guessed, copied
-// directly from that file. Deliberately checking only the FIRST path
-// segment rather than trying to replicate React Router's full matching
-// (including dynamic segments like /quotes/:id, /projects/:id): if the
-// actionUrl's base segment is a real route, land on that module's page —
-// even if the deeper path wasn't real, landing on the right module is a
-// far better outcome than bouncing to dashboard. If the base segment
-// itself isn't recognized, that's a genuine dead link, and dashboard is
-// the correct fallback for that case.
-const KNOWN_ROUTES = new Set([
-  'dashboard', 'customers', 'quotes', 'invoices', 'catalogue', 'billing',
-  'security', 'fuel', 'earthmoving', 'property', 'fleet', 'bookings',
-  'accounting', 'settings', 'hr', 'clinic', 'events', 'contracts',
-  'expenses', 'invite', 'creative', 'desk', 'tasks', 'marketing',
-  'recruiter', 'pos', 'accountant', 'ap', 'profile', 'recurring',
-  'supply-chain', 'projects',
-])
-
-/** Returns a safe URL to navigate to, or null if actionUrl doesn't target any known route at all. */
-function resolveSafeActionUrl(actionUrl: string): string | null {
-  const segments = actionUrl.split('/').filter(Boolean)
-  if (segments.length === 0) return null
-  const base = segments[0]
-  if (!KNOWN_ROUTES.has(base)) return null
-  // Known dynamic-segment routes where the deeper path is real and should
-  // be preserved, not truncated — everything else lands on the module's
-  // base page since its sub-paths are just internal tab state, not routes.
-  const preservesDeepPath = new Set(['quotes', 'projects'])
-  return preservesDeepPath.has(base) ? actionUrl : '/' + base
-}
 
 const timeAgo = (iso: string) => {
   const diffMs = Date.now() - new Date(iso).getTime()

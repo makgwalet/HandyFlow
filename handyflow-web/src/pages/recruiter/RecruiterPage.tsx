@@ -3,13 +3,15 @@ import { useState } from 'react'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import {
-  Plus, X, Search, Download, ChevronRight, Star,
-  Briefcase, Users, Calendar, UserCheck, AlertTriangle,
+  Plus, X, Search, Download, ChevronRight, Briefcase, Users, Calendar, UserCheck, AlertTriangle,
   CheckCircle, Clock, MapPin, Building2, ExternalLink,
   FileText, Edit3, Trash2, Send, Video, Phone,
-  Monitor, Mic, BarChart2, Link2, UserPlus, Filter,
+  Monitor, Mic, Link2, UserPlus, Filter,
   ChevronDown, ChevronUp,
 } from 'lucide-react'
+import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
+import { RECRUITER_SECTIONS } from '../../navigation/moduleSections'
+import { useParams } from 'react-router-dom'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Job {
@@ -1288,7 +1290,8 @@ function JobModal({ job, onClose, onSaved }: { job?: Job; onClose: () => void; o
 // ── Main Page ──────────────────────────────────────────────────────────────
 export function RecruiterPage() {
   const qc = useQueryClient()
-  const [tab,           setTab]           = useState<'jobs'|'pipeline'|'applications'>('jobs')
+  const { section } = useParams<{ section?: string }>()
+  const tab: 'jobs' | 'pipeline' | 'applications' = section === 'pipeline' || section === 'applications' ? section : 'jobs'
   const [statusFilter,  setStatusFilter]  = useState('')
   const [stageFilter,   setStageFilter]   = useState('')
   const [jobFilter,     setJobFilter]     = useState('')
@@ -1387,280 +1390,260 @@ export function RecruiterPage() {
   ]
 
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 22, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--hf-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Briefcase size={18} style={{ color: 'var(--hf-text-on-solid)' }} />
-            </div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>Recruiter</h1>
-          </div>
-          <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0, paddingLeft: 46 }}>
-            Job postings · Applicant pipeline · Interviews · HR onboarding
-          </p>
+    <SectionedModulePage config={RECRUITER_SECTIONS}
+      subtitle="Job postings · Applicant pipeline · Interviews · HR onboarding"
+      action={(
+        <div style={{ display: 'flex', gap: 8 }}>
+          {tab === 'applications' && (
+            <button onClick={exportCSV} style={btnS}><Download size={13} /> Export</button>
+          )}
+          <button onClick={() => setShowCreate(true)} style={btnP}><Plus size={14} /> Post job</button>
         </div>
-        <button onClick={() => setShowCreate(true)} style={btnP}><Plus size={14} /> Post job</button>
-      </div>
-
-      {/* KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 22 }}>
-        {kpis.map(k => (
-          <div key={k.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: k.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: k.color, flexShrink: 0 }}>{k.icon}</div>
-            <div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: k.color }}>{k.value}</div>
-              <div style={{ fontSize: 10, color: 'var(--hf-text-faint)' }}>{k.label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Main card */}
-      <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14 }}>
-        {/* Tab bar + toolbar */}
-        <div style={{ borderBottom: '1px solid var(--hf-border)', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex' }}>
-            {([
-              { key: 'jobs',         label: 'Job Postings',  icon: <Briefcase size={13} /> },
-              { key: 'pipeline',     label: 'Pipeline',      icon: <BarChart2 size={13} /> },
-              { key: 'applications', label: 'Applications',  icon: <Users size={13} /> },
-            ] as const).map(t => (
-              <button key={t.key} onClick={() => setTab(t.key)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '14px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: tab === t.key ? 'var(--hf-primary-text)' : 'var(--hf-text-faint)', borderBottom: `2px solid ${tab === t.key ? 'var(--hf-primary)' : 'transparent'}`, marginBottom: -1 }}>
-                {t.icon}{t.label}
-              </button>
+      )}
+      banner={(
+        <>
+          {/* KPI strip */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 22 }}>
+            {kpis.map(k => (
+              <div key={k.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: k.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: k.color, flexShrink: 0 }}>{k.icon}</div>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: k.color }}>{k.value}</div>
+                  <div style={{ fontSize: 10, color: 'var(--hf-text-faint)' }}>{k.label}</div>
+                </div>
+              </div>
             ))}
           </div>
-          <div style={{ display: 'flex', gap: 8, padding: '8px 0' }}>
-            {tab === 'applications' && (
-              <button onClick={exportCSV} style={btnS}><Download size={13} /> Export</button>
-            )}
-          </div>
-        </div>
-
-        <div style={{ padding: 24 }}>
-          {/* Toolbar */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 18 }}>
-            <div style={{ position: 'relative' as const }}>
-              <Search size={13} style={{ position: 'absolute' as const, left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--hf-text-faint)' }} />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tab === 'jobs' ? 'Search jobs...' : 'Search applicants...'}
-                style={{ paddingLeft: 28, padding: '7px 10px 7px 28px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', width: 200 }} />
-            </div>
-            {tab === 'jobs' && (
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-                style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
-                <option value="">All statuses</option>
-                {Object.entries(JOB_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-              </select>
-            )}
-            {(tab === 'applications') && (
-              <>
-                <select value={stageFilter} onChange={e => setStageFilter(e.target.value)}
-                  style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
-                  <option value="">All stages</option>
-                  {Object.entries(STAGE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                </select>
-                <select value={jobFilter} onChange={e => setJobFilter(e.target.value)}
-                  style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
-                  <option value="">All jobs</option>
-                  {jobs.map(j => <option key={j.id} value={j.id}>{j.title}</option>)}
-                </select>
-              </>
-            )}
-            {(search || statusFilter || stageFilter || jobFilter) && (
-              <button onClick={() => { setSearch(''); setStatusFilter(''); setStageFilter(''); setJobFilter('') }}
-                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, background: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)', cursor: 'pointer' }}>
-                <X size={11} /> Clear
-              </button>
-            )}
-            <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--hf-text-faint)' }}>
-              {tab === 'jobs' ? `${filteredJobs.length} jobs` : `${filteredApps.length} applicants`}
-            </div>
-          </div>
-
-          {/* ── JOBS TAB ── */}
-          {tab === 'jobs' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {filteredJobs.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-                  <Briefcase size={36} style={{ marginBottom: 12, color: 'var(--hf-text-disabled)' }} />
-                  <div style={{ fontWeight: 700, color: 'var(--hf-text-tertiary)', fontSize: 15, marginBottom: 6 }}>No job postings yet</div>
-                  <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', marginBottom: 18 }}>Create your first job posting to start receiving applications.</div>
-                  <button onClick={() => setShowCreate(true)} style={btnP}><Plus size={14} /> Post first job</button>
+        </>
+      )}
+      render={id => {
+        switch (id) {
+          case 'jobs':
+          case 'pipeline':
+          case 'applications': return (
+            <>
+              {/* Toolbar */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 18 }}>
+                <div style={{ position: 'relative' as const }}>
+                  <Search size={13} style={{ position: 'absolute' as const, left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--hf-text-faint)' }} />
+                  <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tab === 'jobs' ? 'Search jobs...' : 'Search applicants...'}
+                    style={{ paddingLeft: 28, padding: '7px 10px 7px 28px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', width: 200 }} />
                 </div>
-              ) : filteredJobs.map(job => {
-                const cfg = JOB_STATUS[job.status] ?? JOB_STATUS.DRAFT
-                const closing = job.closesAt && new Date(job.closesAt) < new Date() && job.status === 'OPEN'
-                return (
-                  <div key={job.id} style={{ border: `1px solid ${closing ? 'var(--hf-danger-border)' : 'var(--hf-border)'}`, borderRadius: 12, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: 'var(--hf-surface)' }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                        <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--hf-text)' }}>{job.title}</span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
-                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color }} />{cfg.label}
-                        </span>
-                        {closing && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}><AlertTriangle size={9} /> Closing date passed</span>}
-                      </div>
-                      <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--hf-text-muted)', flexWrap: 'wrap', marginBottom: 8 }}>
-                        {job.department && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Building2 size={11} />{job.department}</span>}
-                        {job.location && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={11} />{job.location}</span>}
-                        <span>{job.jobType.replace('_',' ')} · {job.experienceLevel}</span>
-                        {job.showSalary && job.salaryMin && <span style={{ color: 'var(--hf-accent-text)', fontWeight: 600 }}>{fmtR(job.salaryMin)}{job.salaryMax ? ` – ${fmtR(job.salaryMax)}` : '+'}</span>}
-                        {job.closesAt && <span>Closes {fmtDate(job.closesAt)}</span>}
-                      </div>
-                      <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
-                        <span style={{ color: job.applicationCount > 0 ? 'var(--hf-accent-text)' : 'var(--hf-text-faint)', fontWeight: job.applicationCount > 0 ? 700 : 400 }}>
-                          {job.applicationCount} application{job.applicationCount !== 1 ? 's' : ''}
-                        </span>
-                        {job.slug && (
-                          <a href={`/careers/zeta-earthmoving/${job.slug}`} target="_blank" rel="noreferrer"
-                            style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--hf-primary-text)', fontWeight: 600, textDecoration: 'none' }}>
-                            <ExternalLink size={10} /> View posting
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      {job.status === 'DRAFT' && (
-                        <button onClick={() => setShowPublish(job)}
-                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', border: '1px solid var(--hf-success-border)', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                          <ExternalLink size={11} /> Publish
-                        </button>
-                      )}
-                      {job.status === 'OPEN' && (
-                        <>
-                          <button onClick={() => doJobAction.mutate({ id: job.id, action: 'PAUSE' })}
-                            style={{ padding: '6px 12px', background: 'var(--hf-warning-soft)', color: 'var(--hf-warning-text)', border: '1px solid var(--hf-warning-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>Pause</button>
-                          <button onClick={() => doJobAction.mutate({ id: job.id, action: 'FILL' })}
-                            style={{ padding: '6px 12px', background: 'var(--hf-accent-soft)', color: 'var(--hf-accent-text)', border: '1px solid var(--hf-accent-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>Mark filled</button>
-                        </>
-                      )}
-                      {job.status === 'PAUSED' && (
-                        <button onClick={() => doJobAction.mutate({ id: job.id, action: 'PUBLISH' })}
-                          style={{ padding: '6px 12px', background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', border: '1px solid var(--hf-success-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>Resume</button>
-                      )}
-                      <button onClick={() => setEditJob(job)} style={{ padding: '6px 10px', background: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', border: '1px solid var(--hf-info-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <Edit3 size={11} /> Edit
-                      </button>
-                      <button onClick={() => setShowDeleteJob(job)} style={{ padding: '6px 10px', background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', border: '1px solid var(--hf-danger-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                        <Trash2 size={11} />
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+                {tab === 'jobs' && (
+                  <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+                    style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
+                    <option value="">All statuses</option>
+                    {Object.entries(JOB_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                  </select>
+                )}
+                {(tab === 'applications') && (
+                  <>
+                    <select value={stageFilter} onChange={e => setStageFilter(e.target.value)}
+                      style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
+                      <option value="">All stages</option>
+                      {Object.entries(STAGE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                    </select>
+                    <select value={jobFilter} onChange={e => setJobFilter(e.target.value)}
+                      style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
+                      <option value="">All jobs</option>
+                      {jobs.map(j => <option key={j.id} value={j.id}>{j.title}</option>)}
+                    </select>
+                  </>
+                )}
+                {(search || statusFilter || stageFilter || jobFilter) && (
+                  <button onClick={() => { setSearch(''); setStatusFilter(''); setStageFilter(''); setJobFilter('') }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, background: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)', cursor: 'pointer' }}>
+                    <X size={11} /> Clear
+                  </button>
+                )}
+                <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--hf-text-faint)' }}>
+                  {tab === 'jobs' ? `${filteredJobs.length} jobs` : `${filteredApps.length} applicants`}
+                </div>
+              </div>
 
-          {/* ── PIPELINE TAB (Kanban) ── */}
-          {tab === 'pipeline' && (
-            <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 16, alignItems: 'flex-start' }}>
-              {PIPELINE_STAGES.map(stage => {
-                const cfg  = STAGE[stage]
-                const col  = pipelineGroups[stage] ?? []
-                return (
-                  <div key={stage} style={{ minWidth: 230, maxWidth: 230, flexShrink: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.dot }} />
-                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-secondary)' }}>{cfg.label}</span>
-                      <span style={{ background: 'var(--hf-surface-sunken)', color: 'var(--hf-text-muted)', borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>{col.length}</span>
+              {/* ── JOBS TAB ── */}
+              {tab === 'jobs' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {filteredJobs.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                      <Briefcase size={36} style={{ marginBottom: 12, color: 'var(--hf-text-disabled)' }} />
+                      <div style={{ fontWeight: 700, color: 'var(--hf-text-tertiary)', fontSize: 15, marginBottom: 6 }}>No job postings yet</div>
+                      <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', marginBottom: 18 }}>Create your first job posting to start receiving applications.</div>
+                      <button onClick={() => setShowCreate(true)} style={btnP}><Plus size={14} /> Post first job</button>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {col.map(a => (
-                        <div key={a.id} onClick={() => setSelectedApp(a)}
-                          style={{ border: '1px solid var(--hf-border)', borderLeft: `3px solid ${cfg.dot}`, borderRadius: 9, padding: '11px 13px', cursor: 'pointer', background: 'var(--hf-surface)', transition: 'box-shadow 0.15s' }}
-                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'}
-                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
-                          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)', marginBottom: 3 }}>{a.applicantName}</div>
-                          <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginBottom: 6 }}>{a.jobTitle}</div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                            <span style={{ color: 'var(--hf-text-muted)' }}>{fmtDate(a.appliedAt)}</span>
-                            {a.score && <span style={{ color: 'var(--hf-warning-text)' }}>{'★'.repeat(a.score)}</span>}
+                  ) : filteredJobs.map(job => {
+                    const cfg = JOB_STATUS[job.status] ?? JOB_STATUS.DRAFT
+                    const closing = job.closesAt && new Date(job.closesAt) < new Date() && job.status === 'OPEN'
+                    return (
+                      <div key={job.id} style={{ border: `1px solid ${closing ? 'var(--hf-danger-border)' : 'var(--hf-border)'}`, borderRadius: 12, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: 'var(--hf-surface)' }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                            <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--hf-text)' }}>{job.title}</span>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                              <span style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color }} />{cfg.label}
+                            </span>
+                            {closing && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}><AlertTriangle size={9} /> Closing date passed</span>}
+                          </div>
+                          <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--hf-text-muted)', flexWrap: 'wrap', marginBottom: 8 }}>
+                            {job.department && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Building2 size={11} />{job.department}</span>}
+                            {job.location && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={11} />{job.location}</span>}
+                            <span>{job.jobType.replace('_',' ')} · {job.experienceLevel}</span>
+                            {job.showSalary && job.salaryMin && <span style={{ color: 'var(--hf-accent-text)', fontWeight: 600 }}>{fmtR(job.salaryMin)}{job.salaryMax ? ` – ${fmtR(job.salaryMax)}` : '+'}</span>}
+                            {job.closesAt && <span>Closes {fmtDate(job.closesAt)}</span>}
+                          </div>
+                          <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
+                            <span style={{ color: job.applicationCount > 0 ? 'var(--hf-accent-text)' : 'var(--hf-text-faint)', fontWeight: job.applicationCount > 0 ? 700 : 400 }}>
+                              {job.applicationCount} application{job.applicationCount !== 1 ? 's' : ''}
+                            </span>
+                            {job.slug && (
+                              <a href={`/careers/zeta-earthmoving/${job.slug}`} target="_blank" rel="noreferrer"
+                                style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--hf-primary-text)', fontWeight: 600, textDecoration: 'none' }}>
+                                <ExternalLink size={10} /> View posting
+                              </a>
+                            )}
                           </div>
                         </div>
-                      ))}
-                      {col.length === 0 && (
-                        <div style={{ padding: '16px', textAlign: 'center', fontSize: 12, color: 'var(--hf-text-disabled)', border: '1.5px dashed var(--hf-border)', borderRadius: 9 }}>Empty</div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          {job.status === 'DRAFT' && (
+                            <button onClick={() => setShowPublish(job)}
+                              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', border: '1px solid var(--hf-success-border)', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                              <ExternalLink size={11} /> Publish
+                            </button>
+                          )}
+                          {job.status === 'OPEN' && (
+                            <>
+                              <button onClick={() => doJobAction.mutate({ id: job.id, action: 'PAUSE' })}
+                                style={{ padding: '6px 12px', background: 'var(--hf-warning-soft)', color: 'var(--hf-warning-text)', border: '1px solid var(--hf-warning-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>Pause</button>
+                              <button onClick={() => doJobAction.mutate({ id: job.id, action: 'FILL' })}
+                                style={{ padding: '6px 12px', background: 'var(--hf-accent-soft)', color: 'var(--hf-accent-text)', border: '1px solid var(--hf-accent-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>Mark filled</button>
+                            </>
+                          )}
+                          {job.status === 'PAUSED' && (
+                            <button onClick={() => doJobAction.mutate({ id: job.id, action: 'PUBLISH' })}
+                              style={{ padding: '6px 12px', background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', border: '1px solid var(--hf-success-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>Resume</button>
+                          )}
+                          <button onClick={() => setEditJob(job)} style={{ padding: '6px 10px', background: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', border: '1px solid var(--hf-info-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Edit3 size={11} /> Edit
+                          </button>
+                          <button onClick={() => setShowDeleteJob(job)} style={{ padding: '6px 10px', background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', border: '1px solid var(--hf-danger-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
 
-          {/* ── APPLICATIONS TAB ── */}
-          {tab === 'applications' && (
-            filteredApps.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-                <Users size={36} style={{ marginBottom: 12, color: 'var(--hf-text-disabled)' }} />
-                <div style={{ fontWeight: 700, color: 'var(--hf-text-tertiary)', fontSize: 15 }}>No applications found</div>
-              </div>
-            ) : (
-              <div style={{ border: '1px solid var(--hf-border)', borderRadius: 12, overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border)' }}>
-                      {['', 'Applicant', 'Job', 'Stage', 'Score', 'Source', 'Applied', 'CV', ''].map(h => (
-                        <th key={h} style={{ padding: '10px 16px', textAlign: 'left' as const, fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', letterSpacing: '0.05em' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredApps.map((a, i) => {
-                      const sc = STAGE[a.stage] ?? STAGE.APPLIED
-                      const checked = compareIds.includes(a.id)
-                      return (
-                        <tr key={a.id} onClick={() => setSelectedApp(a)}
-                          style={{ background: i % 2 === 0 ? 'var(--hf-surface)' : 'var(--hf-surface-muted)', cursor: 'pointer', transition: 'background 0.1s' }}
-                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--hf-sky-soft)'}
-                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? 'var(--hf-surface)' : 'var(--hf-surface-muted)'}>
-                          <td style={{ padding: '12px 8px 12px 16px' }} onClick={e => e.stopPropagation()}>
-                            <input type="checkbox" checked={checked}
-                              onChange={() => setCompareIds(prev => checked ? prev.filter(id => id !== a.id) : [...prev, a.id])}
-                              style={{ width: 15, height: 15, cursor: 'pointer' }} />
-                          </td>
-                          <td style={{ padding: '12px 16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                              <div style={{ width: 28, height: 28, borderRadius: '50%', background: sc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                <span style={{ fontSize: 10, fontWeight: 700, color: sc.color }}>{(a.applicantName ?? 'A').charAt(0).toUpperCase()}</span>
-                              </div>
-                              <div>
-                                <div style={{ fontWeight: 700, color: 'var(--hf-text)' }}>{a.applicantName}</div>
-                                <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{a.applicantEmail}</div>
+              {/* ── PIPELINE TAB (Kanban) ── */}
+              {tab === 'pipeline' && (
+                <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 16, alignItems: 'flex-start' }}>
+                  {PIPELINE_STAGES.map(stage => {
+                    const cfg  = STAGE[stage]
+                    const col  = pipelineGroups[stage] ?? []
+                    return (
+                      <div key={stage} style={{ minWidth: 230, maxWidth: 230, flexShrink: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.dot }} />
+                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-secondary)' }}>{cfg.label}</span>
+                          <span style={{ background: 'var(--hf-surface-sunken)', color: 'var(--hf-text-muted)', borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>{col.length}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {col.map(a => (
+                            <div key={a.id} onClick={() => setSelectedApp(a)}
+                              style={{ border: '1px solid var(--hf-border)', borderLeft: `3px solid ${cfg.dot}`, borderRadius: 9, padding: '11px 13px', cursor: 'pointer', background: 'var(--hf-surface)', transition: 'box-shadow 0.15s' }}
+                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'}
+                              onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
+                              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)', marginBottom: 3 }}>{a.applicantName}</div>
+                              <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginBottom: 6 }}>{a.jobTitle}</div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                                <span style={{ color: 'var(--hf-text-muted)' }}>{fmtDate(a.appliedAt)}</span>
+                                {a.score && <span style={{ color: 'var(--hf-warning-text)' }}>{'★'.repeat(a.score)}</span>}
                               </div>
                             </div>
-                          </td>
-                          <td style={{ padding: '12px 16px', color: 'var(--hf-text-secondary)' }}>{a.jobTitle}</td>
-                          <td style={{ padding: '12px 16px' }}>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
-                              <span style={{ width: 4, height: 4, borderRadius: '50%', background: sc.dot }} />{sc.label}
-                            </span>
-                          </td>
-                          <td style={{ padding: '12px 16px', color: 'var(--hf-warning-text)', fontWeight: 700 }}>
-                            {a.score ? '★'.repeat(a.score) : <span style={{ color: 'var(--hf-text-disabled)' }}>—</span>}
-                          </td>
-                          <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--hf-text-muted)' }}>{a.source?.replace('_',' ') ?? '—'}</td>
-                          <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--hf-text-faint)' }}>{fmtDate(a.appliedAt)}</td>
-                          <td style={{ padding: '12px 16px' }}>
-                            {a.hasCv ? <CheckCircle size={13} style={{ color: 'var(--hf-accent-text)' }} /> : <span style={{ color: 'var(--hf-text-disabled)', fontSize: 11 }}>—</span>}
-                          </td>
-                          <td style={{ padding: '12px 16px' }}><ChevronRight size={14} style={{ color: 'var(--hf-text-faint)' }} /></td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )
-          )}
-        </div>
-      </div>
+                          ))}
+                          {col.length === 0 && (
+                            <div style={{ padding: '16px', textAlign: 'center', fontSize: 12, color: 'var(--hf-text-disabled)', border: '1.5px dashed var(--hf-border)', borderRadius: 9 }}>Empty</div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
 
+              {/* ── APPLICATIONS TAB ── */}
+              {tab === 'applications' && (
+                filteredApps.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                    <Users size={36} style={{ marginBottom: 12, color: 'var(--hf-text-disabled)' }} />
+                    <div style={{ fontWeight: 700, color: 'var(--hf-text-tertiary)', fontSize: 15 }}>No applications found</div>
+                  </div>
+                ) : (
+                  <div style={{ border: '1px solid var(--hf-border)', borderRadius: 12, overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border)' }}>
+                          {['', 'Applicant', 'Job', 'Stage', 'Score', 'Source', 'Applied', 'CV', ''].map(h => (
+                            <th key={h} style={{ padding: '10px 16px', textAlign: 'left' as const, fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', letterSpacing: '0.05em' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredApps.map((a, i) => {
+                          const sc = STAGE[a.stage] ?? STAGE.APPLIED
+                          const checked = compareIds.includes(a.id)
+                          return (
+                            <tr key={a.id} onClick={() => setSelectedApp(a)}
+                              style={{ background: i % 2 === 0 ? 'var(--hf-surface)' : 'var(--hf-surface-muted)', cursor: 'pointer', transition: 'background 0.1s' }}
+                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--hf-sky-soft)'}
+                              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? 'var(--hf-surface)' : 'var(--hf-surface-muted)'}>
+                              <td style={{ padding: '12px 8px 12px 16px' }} onClick={e => e.stopPropagation()}>
+                                <input type="checkbox" checked={checked}
+                                  onChange={() => setCompareIds(prev => checked ? prev.filter(id => id !== a.id) : [...prev, a.id])}
+                                  style={{ width: 15, height: 15, cursor: 'pointer' }} />
+                              </td>
+                              <td style={{ padding: '12px 16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: sc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                    <span style={{ fontSize: 10, fontWeight: 700, color: sc.color }}>{(a.applicantName ?? 'A').charAt(0).toUpperCase()}</span>
+                                  </div>
+                                  <div>
+                                    <div style={{ fontWeight: 700, color: 'var(--hf-text)' }}>{a.applicantName}</div>
+                                    <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{a.applicantEmail}</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td style={{ padding: '12px 16px', color: 'var(--hf-text-secondary)' }}>{a.jobTitle}</td>
+                              <td style={{ padding: '12px 16px' }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                                  <span style={{ width: 4, height: 4, borderRadius: '50%', background: sc.dot }} />{sc.label}
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 16px', color: 'var(--hf-warning-text)', fontWeight: 700 }}>
+                                {a.score ? '★'.repeat(a.score) : <span style={{ color: 'var(--hf-text-disabled)' }}>—</span>}
+                              </td>
+                              <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--hf-text-muted)' }}>{a.source?.replace('_',' ') ?? '—'}</td>
+                              <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--hf-text-faint)' }}>{fmtDate(a.appliedAt)}</td>
+                              <td style={{ padding: '12px 16px' }}>
+                                {a.hasCv ? <CheckCircle size={13} style={{ color: 'var(--hf-accent-text)' }} /> : <span style={{ color: 'var(--hf-text-disabled)', fontSize: 11 }}>—</span>}
+                              </td>
+                              <td style={{ padding: '12px 16px' }}><ChevronRight size={14} style={{ color: 'var(--hf-text-faint)' }} /></td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              )}
+            </>
+          )
+          default: return null
+        }
+      }}>
       {compareIds.length > 0 && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--hf-inverse-surface)', color: 'var(--hf-text-on-solid)', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 10px 40px rgba(0,0,0,0.3)', zIndex: 900 }}>
           <span style={{ fontSize: 13, fontWeight: 600 }}>{compareIds.length} candidate{compareIds.length === 1 ? '' : 's'} selected</span>
@@ -1702,6 +1685,6 @@ export function RecruiterPage() {
       {selectedApp && (
         <ApplicationDetail app={selectedApp} onClose={() => setSelectedApp(null)} onUpdated={invalidate} />
       )}
-    </div>
+    </SectionedModulePage>
   )
 }

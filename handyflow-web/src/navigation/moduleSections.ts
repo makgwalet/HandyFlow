@@ -22,6 +22,7 @@ import {
   Stethoscope, ListPlus,
   Megaphone, Warehouse, Handshake, UserCog,
   Database, CalendarRange,
+  UserCheck, Palette, Headphones, Wallet, Receipt, CheckSquare, LayoutGrid, ListChecks,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -650,6 +651,130 @@ export const INTERNAL_AUDIT_SECTIONS: ModuleSections = {
   ],
 }
 
+// Modules that used to keep their own tab bar (or a single screen) inside the page. They now use the
+// same sidebar context mode as the rest: "All modules", the module name, then its sections.
+
+export const RECRUITER_SECTIONS: ModuleSections = {
+  moduleKey: 'recruiter',
+  basePath: '/recruiter',
+  title: 'Recruiter',
+  icon: UserCheck,
+  defaultSection: 'jobs',
+  groups: [
+    {
+      label: 'Hiring',
+      sections: [
+        { id: 'jobs', label: 'Job Postings', icon: Briefcase },
+        { id: 'pipeline', label: 'Pipeline', icon: BarChart2 },
+        { id: 'applications', label: 'Applications', icon: Users },
+      ],
+    },
+  ],
+}
+
+export const CREATIVE_SECTIONS: ModuleSections = {
+  moduleKey: 'creative',
+  basePath: '/creative',
+  title: 'Creative',
+  icon: Palette,
+  defaultSection: 'jobs',
+  groups: [{ label: 'Overview', sections: [{ id: 'jobs', label: 'Jobs', icon: Palette }] }],
+}
+
+export const CATALOGUE_SECTIONS: ModuleSections = {
+  moduleKey: 'catalogue',
+  basePath: '/catalogue',
+  title: 'Catalogue',
+  icon: Package,
+  defaultSection: 'items',
+  groups: [{ label: 'Overview', sections: [{ id: 'items', label: 'Products & services', icon: Package }] }],
+}
+
+export const COMPLIANCE_SERVICES_SECTIONS: ModuleSections = {
+  moduleKey: 'complianceservices',
+  basePath: '/complianceservices',
+  title: 'Compliance Services',
+  icon: Building2,
+  defaultSection: 'clients',
+  groups: [{ label: 'Overview', sections: [{ id: 'clients', label: 'Clients', icon: Users }] }],
+}
+
+export const DESK_SECTIONS: ModuleSections = {
+  moduleKey: 'desk',
+  basePath: '/desk',
+  title: 'Desk Support',
+  icon: Headphones,
+  defaultSection: 'tickets',
+  groups: [{ label: 'Overview', sections: [{ id: 'tickets', label: 'Tickets', icon: Headphones }] }],
+}
+
+export const EXPENSES_SECTIONS: ModuleSections = {
+  moduleKey: 'expenses',
+  basePath: '/expenses',
+  title: 'Expenses',
+  icon: Wallet,
+  defaultSection: 'claims',
+  groups: [{ label: 'Overview', sections: [{ id: 'claims', label: 'Claims', icon: Receipt }] }],
+}
+
+export const POS_SECTIONS: ModuleSections = {
+  moduleKey: 'pos',
+  basePath: '/pos',
+  title: 'POS & Stock',
+  icon: ShoppingCart,
+  defaultSection: 'sell',
+  groups: [
+    {
+      label: 'Point of sale',
+      sections: [
+        { id: 'sell', label: 'POS Terminal', icon: ShoppingCart },
+        { id: 'transactions', label: 'Transactions', icon: Receipt },
+      ],
+    },
+    {
+      label: 'Inventory',
+      sections: [
+        { id: 'stock', label: 'Stock', icon: Package },
+        { id: 'orders', label: 'Purchase Orders', icon: Truck },
+      ],
+    },
+  ],
+}
+
+export const PROJECTS_SECTIONS: ModuleSections = {
+  moduleKey: 'projects',
+  basePath: '/projects',
+  title: 'Projects',
+  icon: HardHat,
+  defaultSection: 'dashboard',
+  groups: [
+    {
+      label: 'Overview',
+      sections: [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'projects', label: 'Projects', icon: FolderOpen },
+      ],
+    },
+  ],
+}
+
+export const TASKS_SECTIONS: ModuleSections = {
+  moduleKey: 'tasks',
+  basePath: '/tasks',
+  title: 'Tasks',
+  icon: CheckSquare,
+  defaultSection: 'boards',
+  groups: [
+    {
+      label: 'Overview',
+      sections: [
+        { id: 'boards', label: 'Boards', icon: LayoutGrid },
+        { id: 'my-tasks', label: 'My tasks', icon: ListChecks },
+      ],
+    },
+  ],
+}
+
 const REGISTRY: ModuleSections[] = [
   SECURITY_SECTIONS, AGRICULTURE_SECTIONS, FUEL_SECTIONS, FLEET_SECTIONS, ACCOUNTING_SECTIONS, ACCOUNTANT_SECTIONS,
   HR_SECTIONS, BOOKINGS_SECTIONS, TRAINING_PROVIDER_SECTIONS, LEGAL_COMPLIANCE_SECTIONS, EARTHMOVING_SECTIONS,
@@ -657,6 +782,8 @@ const REGISTRY: ModuleSections[] = [
   EVENTS_SECTIONS, CONTRACTING_SECTIONS, AP_SECTIONS, PROPERTY_SECTIONS, CLINIC_SECTIONS,
   DEBT_COLLECTION_SECTIONS, MARKETING_SECTIONS, TRAINING_SECTIONS, WAREHOUSING_SECTIONS, COLLECTIONS_AGENCY_SECTIONS,
   INTERNAL_AUDIT_SECTIONS,
+  RECRUITER_SECTIONS, CREATIVE_SECTIONS, CATALOGUE_SECTIONS, COMPLIANCE_SERVICES_SECTIONS, DESK_SECTIONS,
+  EXPENSES_SECTIONS, POS_SECTIONS, PROJECTS_SECTIONS, TASKS_SECTIONS,
 ]
 
 /** Groups with sections the user may not see removed (and empty groups dropped). */

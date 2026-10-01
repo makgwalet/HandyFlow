@@ -1,8 +1,7 @@
 // src/pages/tasks/BoardList.tsx
 import { Plus, Loader2, AlertCircle } from 'lucide-react'
 import type { Board, Summary, Task } from './tasks.types'
-import { PRIORITY, fmtDate } from './tasks.constants'
-import { isTaskOverdue } from './tasks.logic'
+import { MyTasksList } from './MyTasksList'
 import { btnPrimary, btnSecondary } from './tasks.styles'
 import { OrgSummary } from './StatsStrip'
 
@@ -17,19 +16,19 @@ interface Props {
   onOpenBoard: (id: string) => void
   onOpenTask: (t: Task) => void
   onNewBoard: () => void
+  onViewAllMine: () => void
 }
 
-export function BoardList({ boards, loading, error, onRetry, summary, myTasks, canAdmin, onOpenBoard, onOpenTask, onNewBoard }: Props) {
-  const boardName = (id: string) => boards?.find(b => b.id === id)?.name ?? 'Board'
+const MY_TASKS_PREVIEW = 8
+
+export function BoardList({ boards, loading, error, onRetry, summary, myTasks, canAdmin, onOpenBoard, onOpenTask, onNewBoard, onViewAllMine }: Props) {
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-        <div style={{ flex: 1 }}>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--hf-text)' }}>Tasks</h1>
-          <div style={{ fontSize: 13, color: 'var(--hf-text-muted)', marginTop: 2 }}>Plan, assign and track work across your team.</div>
+      {canAdmin && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+          <button type="button" onClick={onNewBoard} style={btnPrimary}><Plus size={15} />New board</button>
         </div>
-        {canAdmin && <button type="button" onClick={onNewBoard} style={btnPrimary}><Plus size={15} />New board</button>}
-      </div>
+      )}
 
       {summary && <OrgSummary summary={summary} />}
 
@@ -55,29 +54,16 @@ export function BoardList({ boards, loading, error, onRetry, summary, myTasks, c
         </div>
       )}
 
-      <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--hf-text)', margin: '0 0 10px' }}>Assigned to me</h2>
-      {myTasks.length === 0 ? (
-        <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', padding: '8px 0' }}>Nothing is assigned to you right now.</div>
-      ) : (
-        <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, overflow: 'hidden' }}>
-          {myTasks.slice(0, 8).map((t, i) => {
-            const pr = PRIORITY[t.priority] ?? PRIORITY.NORMAL
-            const overdue = isTaskOverdue(t)
-            return (
-              <button key={t.id} type="button" onClick={() => onOpenTask(t)}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', cursor: 'pointer', background: 'none', border: 'none',
-                  borderTop: i ? '1px solid var(--hf-border-subtle)' : 'none', padding: '11px 16px' }}>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--hf-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
-                  <span style={{ fontSize: 12, color: 'var(--hf-text-faint)' }}>{boardName(t.boardId)}</span>
-                </span>
-                <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 99, background: pr.bg, color: pr.color }}>{pr.label}</span>
-                {t.dueDate && <span style={{ fontSize: 12, fontWeight: 600, color: overdue ? 'var(--hf-danger-text)' : 'var(--hf-text-muted)' }}>{fmtDate(t.dueDate)}</span>}
-              </button>
-            )
-          })}
-        </div>
-      )}
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '0 0 10px' }}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--hf-text)', margin: 0 }}>Assigned to me</h2>
+        {myTasks.length > MY_TASKS_PREVIEW && (
+          <button type="button" onClick={onViewAllMine}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-primary-text)', fontSize: 13, fontWeight: 600 }}>
+            View all {myTasks.length}
+          </button>
+        )}
+      </div>
+      <MyTasksList tasks={myTasks} boards={boards} onOpen={onOpenTask} limit={MY_TASKS_PREVIEW} />
     </div>
   )
 }

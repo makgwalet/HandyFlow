@@ -7,6 +7,9 @@ import {
   Search, RefreshCw, Printer, ChevronDown, Truck, Receipt,
   CheckCircle, TrendingUp, RotateCcw, Scan, Settings,
 } from 'lucide-react'
+import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
+import { POS_SECTIONS } from '../../navigation/moduleSections'
+import { useParams } from 'react-router-dom'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -394,7 +397,8 @@ export function PosPage() {
   const qc = useQueryClient()
 
   // ── UI state ────────────────────────────────────────────────────────────────
-  const [tab,         setTab]       = useState<Tab>('sell')
+  const { section } = useParams<{ section?: string }>()
+  const tab: Tab = section === 'stock' || section === 'transactions' || section === 'orders' ? section : 'sell'
   const [cart,        setCart]      = useState<CartItem[]>([])
   const [payment,     setPayment]   = useState('CASH')
   const [tendered,    setTendered]  = useState('')
@@ -760,18 +764,9 @@ export function PosPage() {
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
-    <div>
-
-      {/* ── Page header ─────────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 2px' }}>
-            POS & Stock
-          </h1>
-          <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: 0 }}>
-            Point of sale · Inventory · Purchase orders
-          </p>
-        </div>
+    <SectionedModulePage config={POS_SECTIONS}
+      subtitle="Point of sale · Inventory · Purchase orders"
+      action={(
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={invalidateAll} style={btnSecondary} title="Refresh all data">
             <RefreshCw size={14} />
@@ -783,599 +778,586 @@ export function PosPage() {
             <Settings size={14} />
           </button>
         </div>
-      </div>
-
-      {/* ── Stats ───────────────────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 20 }}>
-        {STATS.map(({ label, value, color, Icon }) => (
-          <div key={label} style={{
-            background: 'var(--hf-surface)', border: '1px solid var(--hf-border)',
-            borderRadius: 12, padding: '14px 16px',
-            display: 'flex', alignItems: 'flex-start', gap: 10,
-          }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: 8,
-              background: `color-mix(in srgb, ${color} 9%, transparent)`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-            }}>
-              <Icon size={15} style={{ color }} />
-            </div>
-            <div>
+      )}
+      banner={(
+        <>
+          {/* ── Stats ───────────────────────────────────────────────────────────── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 20 }}>
+            {STATS.map(({ label, value, color, Icon }) => (
+              <div key={label} style={{
+                background: 'var(--hf-surface)', border: '1px solid var(--hf-border)',
+                borderRadius: 12, padding: '14px 16px',
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+              }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: `color-mix(in srgb, ${color} 9%, transparent)`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <Icon size={15} style={{ color }} />
+                </div>
+                <div>
+                  <div style={{
+                    fontSize: typeof value === 'string' ? 15 : 22,
+                    fontWeight: 800, color, lineHeight: 1.1,
+                  }}>{value}</div>
+                  <div style={{ fontSize: 10, color: 'var(--hf-text-faint)', marginTop: 2 }}>{label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+            {/* Cash session banner */}
+            {localSession === 'loading' ? null : localSession == null ? (
               <div style={{
-                fontSize: typeof value === 'string' ? 15 : 22,
-                fontWeight: 800, color, lineHeight: 1.1,
-              }}>{value}</div>
-              <div style={{ fontSize: 10, color: 'var(--hf-text-faint)', marginTop: 2 }}>{label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Main card ───────────────────────────────────────────────────────── */}
-      <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, padding: 24 }}>
-
-        {/* Cash session banner */}
-        {localSession === 'loading' ? null : localSession == null ? (
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '10px 16px', background: 'var(--hf-warning-soft)',
-            border: '1px solid var(--hf-warning-border)', borderRadius: 10, marginBottom: 16,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <AlertTriangle size={14} style={{ color: 'var(--hf-warning-text)' }} />
-              <span style={{ fontSize: 13, color: 'var(--hf-warning-text-deep)', fontWeight: 500 }}>
-                No cash session open — CASH sales are blocked.
-              </span>
-            </div>
-            <button
-              onClick={() => { setCashModal('open'); setErrMsg('') }}
-              style={{ ...btnPrimary('var(--hf-warning)'), padding: '6px 14px', fontSize: 12 }}>
-              Open Session
-            </button>
-          </div>
-        ) : (
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '10px 16px', background: 'var(--hf-success-soft)',
-            border: '1px solid var(--hf-success-border)', borderRadius: 10, marginBottom: 16,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <CheckCircle size={14} style={{ color: 'var(--hf-success-text-strong)' }} />
-              <span style={{ fontSize: 13, color: 'var(--hf-success-text-strong)', fontWeight: 600 }}>
-                Session {(localSession as CashSession).sessionNumber}
-              </span>
-              <span style={{ fontSize: 12, color: 'var(--hf-success-text-strong)', opacity: 0.7 }}>
-                · Float {fmtR((localSession as CashSession).openingFloat)}
-                · {(localSession as CashSession).transactionCount} txns
-                · {fmtR((localSession as CashSession).totalSales)} total
-              </span>
-            </div>
-            <button
-              onClick={() => { setCashModal('close'); setCloseFloat(''); setErrMsg('') }}
-              style={{ ...btnSecondary, padding: '6px 14px', fontSize: 12 }}>
-              Cash Up
-            </button>
-          </div>
-        )}
-
-        {/* Tab bar */}
-        <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid var(--hf-border)', marginBottom: 22 }}>
-          {([
-            { id: 'sell',         label: 'POS Terminal',    Icon: ShoppingCart },
-            { id: 'stock',        label: 'Stock',           Icon: Package      },
-            { id: 'transactions', label: 'Transactions',    Icon: Receipt      },
-            { id: 'orders',       label: 'Purchase Orders', Icon: Truck        },
-          ] as { id: Tab; label: string; Icon: any }[]).map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '9px 16px', background: 'none', border: 'none',
-              borderBottom: tab === t.id ? '2px solid var(--hf-accent)' : '2px solid transparent',
-              color: tab === t.id ? 'var(--hf-accent-text)' : 'var(--hf-text-muted)',
-              fontWeight: tab === t.id ? 700 : 400,
-              fontSize: 13, cursor: 'pointer', marginBottom: -1,
-            }}>
-              <t.Icon size={13} />{t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        {/* SELL TAB                                                            */}
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        {tab === 'sell' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 375px', gap: 20 }}>
-
-            {/* Left — item grid */}
-            <div>
-              {/* Search / barcode bar */}
-              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                <div style={{ flex: 1, position: 'relative' }}>
-                  <Search size={13} style={{
-                    position: 'absolute', left: 10, top: '50%',
-                    transform: 'translateY(-50%)', color: 'var(--hf-text-faint)',
-                  }} />
-                  <input
-                    value={itemSearch}
-                    onChange={e => setItemSearch(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleBarcodeScan(itemSearch)}
-                    placeholder="Search items or scan barcode…"
-                    style={{ ...inp, paddingLeft: 32 }}
-                  />
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '10px 16px', background: 'var(--hf-warning-soft)',
+                border: '1px solid var(--hf-warning-border)', borderRadius: 10, marginBottom: 16,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <AlertTriangle size={14} style={{ color: 'var(--hf-warning-text)' }} />
+                  <span style={{ fontSize: 13, color: 'var(--hf-warning-text-deep)', fontWeight: 500 }}>
+                    No cash session open — CASH sales are blocked.
+                  </span>
                 </div>
                 <button
-                  onClick={() => handleBarcodeScan(itemSearch)}
-                  style={{ ...btnSecondary, padding: '9px 12px' }}
-                  title="Confirm barcode">
-                  <Scan size={14} />
+                  onClick={() => { setCashModal('open'); setErrMsg('') }}
+                  style={{ ...btnPrimary('var(--hf-warning)'), padding: '6px 14px', fontSize: 12 }}>
+                  Open Session
                 </button>
               </div>
-
-              {/* Product grid */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(145px, 1fr))',
-                gap: 8,
-              }}>
-                {visibleStock.filter(s => s.availableQty > 0).map(item => (
-                  <button
-                    key={item.id}
-                    onClick={() => addToCart(item)}
-                    style={{
-                      padding: 12, border: '1px solid var(--hf-border)',
-                      borderRadius: 10, background: 'var(--hf-surface)',
-                      cursor: 'pointer', textAlign: 'left', transition: 'all 0.12s',
-                    }}
-                    onMouseEnter={e => {
-                      const el = e.currentTarget as HTMLButtonElement
-                      el.style.borderColor = 'var(--hf-accent)'
-                      el.style.background  = 'var(--hf-success-soft)'
-                    }}
-                    onMouseLeave={e => {
-                      const el = e.currentTarget as HTMLButtonElement
-                      el.style.borderColor = 'var(--hf-border)'
-                      el.style.background  = 'var(--hf-surface)'
-                    }}
-                  >
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', marginBottom: 3, lineHeight: 1.3 }}>
-                      {item.itemName}
-                    </div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--hf-accent-text)' }}>
-                      {fmtR(item.sellingPrice)}
-                    </div>
-                    <div style={{
-                      fontSize: 10, marginTop: 2,
-                      color: item.lowStock ? 'var(--hf-danger-text)' : 'var(--hf-text-faint)',
-                      fontWeight: item.lowStock ? 700 : 400,
-                    }}>
-                      {item.lowStock ? `⚠ Low: ${item.availableQty}` : `Stock: ${item.availableQty}`}
-                    </div>
-                  </button>
-                ))}
-
-                {visibleStock.filter(s => s.availableQty > 0).length === 0 && (
-                  <div style={{ gridColumn: '1/-1', padding: '50px 0', textAlign: 'center', color: 'var(--hf-text-disabled)' }}>
-                    <Package size={30} style={{ marginBottom: 10, opacity: 0.3 }} />
-                    <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', fontWeight: 500 }}>
-                      {itemSearch ? 'No match found' : 'No stock items yet — add some in the Stock tab'}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Right — cart panel */}
-            <div style={{
-              border: '1px solid var(--hf-border)', borderRadius: 12,
-              padding: 16, display: 'flex', flexDirection: 'column',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--hf-text)' }}>Current Sale</span>
-                {cart.length > 0 && (
-                  <button onClick={() => setCart([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', fontSize: 12 }}>
-                    Clear
-                  </button>
-                )}
-              </div>
-
-              {/* Cart items */}
-              <div style={{ flex: 1, marginBottom: 12, minHeight: 80 }}>
-                {cart.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--hf-text-disabled)' }}>
-                    <ShoppingCart size={26} style={{ marginBottom: 8, opacity: 0.3 }} />
-                    <div style={{ fontSize: 12 }}>Tap items or scan barcode</div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {cart.map(item => (
-                      <div key={item.catalogueItemId} style={{ background: 'var(--hf-surface-muted)', borderRadius: 8, padding: '10px 12px' }}>
-                        {/* Item row */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--hf-text)', flex: 1, marginRight: 6 }}>
-                            {item.itemName}
-                          </span>
-                          <button
-                            onClick={() => removeFromCart(item.catalogueItemId)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-disabled)', padding: 0 }}>
-                            <X size={11} />
-                          </button>
-                        </div>
-                        {/* Qty + total */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <button
-                            onClick={() => updateQty(item.catalogueItemId, item.qty - 1)}
-                            style={{ width: 22, height: 22, borderRadius: 4, border: '1px solid var(--hf-border)', background: 'var(--hf-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Minus size={10} />
-                          </button>
-                          <span style={{ fontSize: 13, fontWeight: 700, minWidth: 20, textAlign: 'center' }}>
-                            {item.qty}
-                          </span>
-                          <button
-                            onClick={() => updateQty(item.catalogueItemId, item.qty + 1)}
-                            style={{ width: 22, height: 22, borderRadius: 4, border: '1px solid var(--hf-border)', background: 'var(--hf-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Plus size={10} />
-                          </button>
-                          <span style={{ fontSize: 11, color: 'var(--hf-text-faint)', flex: 1, textAlign: 'right' }}>
-                            @ {fmtR(item.unitPrice)}
-                          </span>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--hf-text)', minWidth: 65, textAlign: 'right' }}>
-                            {fmtR(item.unitPrice * item.qty * (1 - item.discountPct / 100))}
-                          </span>
-                        </div>
-                        {/* Per-item discount */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5 }}>
-                          <span style={{ fontSize: 10, color: 'var(--hf-text-faint)' }}>Disc %</span>
-                          <input
-                            type="number" min="0" max="100"
-                            value={item.discountPct || ''}
-                            onChange={e => updateDiscount(item.catalogueItemId, Number(e.target.value))}
-                            placeholder="0"
-                            style={{ width: 50, padding: '2px 6px', border: '1px solid var(--hf-border)', borderRadius: 4, fontSize: 11, textAlign: 'center', background: 'var(--hf-surface)' }}
-                          />
-                          {item.discountPct > 0 && (
-                            <span style={{ fontSize: 10, color: 'var(--hf-accent-text)' }}>
-                              − {fmtR(item.unitPrice * item.qty * item.discountPct / 100)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Totals */}
-              {cart.length > 0 && (
-                <div style={{ borderTop: '1px solid var(--hf-border-subtle)', paddingTop: 10, marginBottom: 10 }}>
-                  {totals.discount > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--hf-accent-text)', marginBottom: 2 }}>
-                      <span>Discount</span><span>− {fmtR(totals.discount)}</span>
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 2 }}>
-                    <span>Subtotal (excl. VAT)</span><span>{fmtR(totals.subtotal - totals.discount)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 7 }}>
-                    <span>VAT (15%)</span><span>{fmtR(totals.vat)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: 'var(--hf-text)', borderTop: '1px solid var(--hf-border)', paddingTop: 8 }}>
-                    <span>Total</span><span>{fmtR(totals.total)}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Payment method + tendered */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
-                <input
-                  value={customer}
-                  onChange={e => setCustomer(e.target.value)}
-                  placeholder="Customer name (optional)"
-                  style={{ ...inp, fontSize: 12 }}
-                />
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5 }}>
-                  {['CASH', 'CARD', 'EFT', 'ACCOUNT'].map(m => (
-                    <button key={m} onClick={() => setPayment(m)} style={{
-                      padding: '7px 4px',
-                      border: `1px solid ${payment === m ? 'var(--hf-primary)' : 'var(--hf-border)'}`,
-                      borderRadius: 7, fontSize: 11,
-                      fontWeight: payment === m ? 700 : 400,
-                      background: payment === m ? 'var(--hf-primary)' : 'var(--hf-surface)',
-                      color: payment === m ? 'var(--hf-text-on-solid)' : 'var(--hf-text-tertiary)',
-                      cursor: 'pointer',
-                    }}>
-                      {m}
-                    </button>
-                  ))}
-                </div>
-                {payment === 'CASH' && (
-                  <input
-                    type="number"
-                    value={tendered}
-                    onChange={e => setTendered(e.target.value)}
-                    placeholder={`Tendered (min ${fmtR(totals.total)})`}
-                    style={{ ...inp, fontSize: 12 }}
-                  />
-                )}
-                {(payment === 'EFT' || payment === 'CARD') && (
-                  <input
-                    value={paymentRef}
-                    onChange={e => setPaymentRef(e.target.value)}
-                    placeholder={
-                      payment === 'EFT'
-                        ? 'EFT reference / proof of payment number'
-                        : 'Card authorisation code (optional)'
-                    }
-                    style={{ ...inp, fontSize: 12 }}
-                  />
-                )}
-                {change !== null && change >= 0 && (
-                  <div style={{ padding: '8px 12px', background: 'var(--hf-success-soft-strong)', borderRadius: 8, fontSize: 14, fontWeight: 700, color: 'var(--hf-success-text-strong)', textAlign: 'center' }}>
-                    Change: {fmtR(change)}
-                  </div>
-                )}
-              </div>
-
-              {saleErr && (
-                <div style={{ color: 'var(--hf-danger-text)', fontSize: 12, marginBottom: 8, padding: '6px 10px', background: 'var(--hf-danger-soft)', borderRadius: 6 }}>
-                  {saleErr}
-                </div>
-              )}
-
-              <button
-                disabled={!canCharge}
-                onClick={() => saleMut.mutate({
-                  customerName: customer || null,
-                  paymentMethod: payment,
-                  amountTendered: tendered ? Number(tendered) : null,
-                  paymentRef: paymentRef || null,
-                  items: cart.map(i => ({
-                    catalogueItemId: i.catalogueItemId,
-                    qty: i.qty,
-                    unitPrice: i.unitPrice,
-                    discountPct: i.discountPct,
-                  })),
-                })}
-                style={{
-                  background: canCharge ? 'var(--hf-accent)' : 'var(--hf-text-faint)',
-                  color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 10,
-                  padding: '13px', fontSize: 15, fontWeight: 800,
-                  cursor: canCharge ? 'pointer' : 'not-allowed', width: '100%',
-                }}>
-                {saleMut.isPending ? 'Processing…' : `Charge ${fmtR(totals.total)}`}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        {/* STOCK TAB                                                           */}
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        {tab === 'stock' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {(summary?.lowStockItems ?? 0) > 0 && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
-                    <AlertTriangle size={11} /> {summary.lowStockItems} low stock
-                  </span>
-                )}
-              </div>
-              <button onClick={() => { setShowStock(true); setErrMsg('') }} style={btnPrimary()}>
-                <Plus size={14} /> Add Stock Item
-              </button>
-            </div>
-
-            {stockLoading ? (
-              <div style={{ textAlign: 'center', padding: 40, color: 'var(--hf-text-faint)' }}>Loading…</div>
-            ) : stock.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '50px 0', color: 'var(--hf-text-faint)' }}>
-                <Package size={34} style={{ marginBottom: 12, opacity: 0.3 }} />
-                <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No stock items yet</div>
-                <div style={{ fontSize: 12, marginTop: 3 }}>Add catalogue items to start tracking inventory.</div>
-              </div>
             ) : (
-              <div style={{ border: '1px solid var(--hf-border)', borderRadius: 10, overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      {['Item', 'Available', 'On Hand', 'Reorder At', 'Cost', 'Sell Price', 'Location', 'Status'].map(h => (
-                        <th key={h} style={TH}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stock.map((s, i) => (
-                      <tr key={s.id} style={{ background: i % 2 === 0 ? 'var(--hf-surface)' : 'var(--hf-surface-muted)' }}>
-                        <td style={TD}>
-                          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--hf-text)' }}>{s.itemName}</div>
-                          {s.sku && <div style={{ fontSize: 10, color: 'var(--hf-text-faint)' }}>SKU: {s.sku}</div>}
-                        </td>
-                        <td style={TD}>
-                          <span style={{ fontWeight: 800, fontSize: 15, color: s.lowStock ? 'var(--hf-danger-text)' : 'var(--hf-text)' }}>
-                            {s.availableQty}
-                          </span>
-                        </td>
-                        <td style={TD}><span style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>{s.qtyOnHand}</span></td>
-                        <td style={TD}><span style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>{s.reorderLevel}</span></td>
-                        <td style={TD}><span style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>{fmtR(s.costPrice)}</span></td>
-                        <td style={TD}><span style={{ fontWeight: 700, color: 'var(--hf-accent-text)' }}>{fmtR(s.sellingPrice)}</span></td>
-                        <td style={TD}><span style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{s.location || '—'}</span></td>
-                        <td style={TD}>
-                          {s.lowStock ? (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, width: 'fit-content' }}>
-                              <AlertTriangle size={9} /> LOW
-                            </span>
-                          ) : (
-                            <span style={{ background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600 }}>
-                              OK
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '10px 16px', background: 'var(--hf-success-soft)',
+                border: '1px solid var(--hf-success-border)', borderRadius: 10, marginBottom: 16,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <CheckCircle size={14} style={{ color: 'var(--hf-success-text-strong)' }} />
+                  <span style={{ fontSize: 13, color: 'var(--hf-success-text-strong)', fontWeight: 600 }}>
+                    Session {(localSession as CashSession).sessionNumber}
+                  </span>
+                  <span style={{ fontSize: 12, color: 'var(--hf-success-text-strong)', opacity: 0.7 }}>
+                    · Float {fmtR((localSession as CashSession).openingFloat)}
+                    · {(localSession as CashSession).transactionCount} txns
+                    · {fmtR((localSession as CashSession).totalSales)} total
+                  </span>
+                </div>
+                <button
+                  onClick={() => { setCashModal('close'); setCloseFloat(''); setErrMsg('') }}
+                  style={{ ...btnSecondary, padding: '6px 14px', fontSize: 12 }}>
+                  Cash Up
+                </button>
               </div>
             )}
-          </div>
-        )}
+        </>
+      )}
+      render={id => {
+        switch (id) {
+          case 'sell':
+          case 'transactions':
+          case 'stock':
+          case 'orders': return (
+            <>
+              {/* ════════════════════════════════════════════════════════════════════ */}
+              {/* SELL TAB                                                            */}
+              {/* ════════════════════════════════════════════════════════════════════ */}
+              {tab === 'sell' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 375px', gap: 20 }}>
 
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        {/* TRANSACTIONS TAB                                                    */}
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        {tab === 'transactions' && (
-          <div>
-            {transactions.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '50px 0', color: 'var(--hf-text-faint)' }}>
-                <Receipt size={34} style={{ marginBottom: 12, opacity: 0.3 }} />
-                <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No transactions yet</div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {transactions.map(t => {
-                  const open = expandedTxn === t.id
-                  return (
-                    <div key={t.id} style={{ border: '1px solid var(--hf-border)', borderRadius: 10, overflow: 'hidden' }}>
-                      {/* Row header */}
-                      <div
-                        onClick={() => setExpanded(open ? null : t.id)}
-                        style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', cursor: 'pointer', background: open ? 'var(--hf-surface-muted)' : 'var(--hf-surface)', gap: 12 }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 2 }}>
-                            <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)' }}>{t.transactionNumber}</span>
-                            <StatusBadge status={t.status} />
-                            <span style={{ fontSize: 10, color: 'var(--hf-text-muted)', background: 'var(--hf-surface-sunken)', padding: '1px 6px', borderRadius: 20 }}>
-                              {t.paymentMethod}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>
-                            {t.customerName || 'Walk-in'} · {t.servedByName || '—'} · {fmtDate(t.createdAt)}
-                            {t.cashSessionNumber && <> · {t.cashSessionNumber}</>}
-                          </div>
-                        </div>
-                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--hf-text)' }}>{fmtR(t.totalAmount)}</div>
-                          {(t.changeGiven ?? 0) > 0 && (
-                            <div style={{ fontSize: 10, color: 'var(--hf-accent-text)' }}>Chg: {fmtR(t.changeGiven)}</div>
-                          )}
-                        </div>
-                        <ChevronDown size={14} style={{ color: 'var(--hf-text-faint)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }} />
+                  {/* Left — item grid */}
+                  <div>
+                    {/* Search / barcode bar */}
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                      <div style={{ flex: 1, position: 'relative' }}>
+                        <Search size={13} style={{
+                          position: 'absolute', left: 10, top: '50%',
+                          transform: 'translateY(-50%)', color: 'var(--hf-text-faint)',
+                        }} />
+                        <input
+                          value={itemSearch}
+                          onChange={e => setItemSearch(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && handleBarcodeScan(itemSearch)}
+                          placeholder="Search items or scan barcode…"
+                          style={{ ...inp, paddingLeft: 32 }}
+                        />
                       </div>
+                      <button
+                        onClick={() => handleBarcodeScan(itemSearch)}
+                        style={{ ...btnSecondary, padding: '9px 12px' }}
+                        title="Confirm barcode">
+                        <Scan size={14} />
+                      </button>
+                    </div>
 
-                      {/* Expanded detail */}
-                      {open && (
-                        <div style={{ borderTop: '1px solid var(--hf-border-subtle)', padding: '12px 16px', background: 'var(--hf-surface-muted)' }}>
-                          {t.items?.length > 0 && (
-                            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
-                              <thead>
-                                <tr>
-                                  {['Item', 'Qty', 'Unit Price', 'Disc %', 'VAT', 'Total'].map(h => (
-                                    <th key={h} style={{ ...TH, padding: '5px 10px', background: 'var(--hf-surface-sunken)' }}>{h}</th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {t.items.map(li => (
-                                  <tr key={li.id}>
-                                    <td style={{ ...TD, padding: '5px 10px' }}>{li.itemName}</td>
-                                    <td style={{ ...TD, padding: '5px 10px' }}>{li.qty}</td>
-                                    <td style={{ ...TD, padding: '5px 10px' }}>{fmtR(li.unitPrice)}</td>
-                                    <td style={{ ...TD, padding: '5px 10px', color: 'var(--hf-accent-text)' }}>{li.discountPct > 0 ? `${li.discountPct}%` : '—'}</td>
-                                    <td style={{ ...TD, padding: '5px 10px' }}>{fmtR(li.vatAmount)}</td>
-                                    <td style={{ ...TD, padding: '5px 10px', fontWeight: 700 }}>{fmtR(li.lineTotal)}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          )}
-                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                            <button onClick={() => setShowReceipt(t)} style={{ ...btnSecondary, fontSize: 12 }}>
-                              <Printer size={13} /> Receipt
-                            </button>
-                            {t.status === 'COMPLETED' && (
-                              <button
-                                onClick={() => { setShowRefund(t); setRefundLines({}); setRefundReason(''); setErrMsg('') }}
-                                style={{ ...btnSecondary, fontSize: 12, color: 'var(--hf-warning-text)', borderColor: 'var(--hf-warning-border)' }}>
-                                <RotateCcw size={13} /> Refund
-                              </button>
-                            )}
+                    {/* Product grid */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(145px, 1fr))',
+                      gap: 8,
+                    }}>
+                      {visibleStock.filter(s => s.availableQty > 0).map(item => (
+                        <button
+                          key={item.id}
+                          onClick={() => addToCart(item)}
+                          style={{
+                            padding: 12, border: '1px solid var(--hf-border)',
+                            borderRadius: 10, background: 'var(--hf-surface)',
+                            cursor: 'pointer', textAlign: 'left', transition: 'all 0.12s',
+                          }}
+                          onMouseEnter={e => {
+                            const el = e.currentTarget as HTMLButtonElement
+                            el.style.borderColor = 'var(--hf-accent)'
+                            el.style.background  = 'var(--hf-success-soft)'
+                          }}
+                          onMouseLeave={e => {
+                            const el = e.currentTarget as HTMLButtonElement
+                            el.style.borderColor = 'var(--hf-border)'
+                            el.style.background  = 'var(--hf-surface)'
+                          }}
+                        >
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text)', marginBottom: 3, lineHeight: 1.3 }}>
+                            {item.itemName}
+                          </div>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--hf-accent-text)' }}>
+                            {fmtR(item.sellingPrice)}
+                          </div>
+                          <div style={{
+                            fontSize: 10, marginTop: 2,
+                            color: item.lowStock ? 'var(--hf-danger-text)' : 'var(--hf-text-faint)',
+                            fontWeight: item.lowStock ? 700 : 400,
+                          }}>
+                            {item.lowStock ? `⚠ Low: ${item.availableQty}` : `Stock: ${item.availableQty}`}
+                          </div>
+                        </button>
+                      ))}
+
+                      {visibleStock.filter(s => s.availableQty > 0).length === 0 && (
+                        <div style={{ gridColumn: '1/-1', padding: '50px 0', textAlign: 'center', color: 'var(--hf-text-disabled)' }}>
+                          <Package size={30} style={{ marginBottom: 10, opacity: 0.3 }} />
+                          <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', fontWeight: 500 }}>
+                            {itemSearch ? 'No match found' : 'No stock items yet — add some in the Stock tab'}
                           </div>
                         </div>
                       )}
                     </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
+                  </div>
 
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        {/* PURCHASE ORDERS TAB                                                 */}
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        {tab === 'orders' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
-              <button onClick={() => { setShowPO(true); setErrMsg('') }} style={btnPrimary()}>
-                <Plus size={14} /> New Purchase Order
-              </button>
-            </div>
-
-            {purchaseOrders.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '50px 0', color: 'var(--hf-text-faint)' }}>
-                <Truck size={34} style={{ marginBottom: 12, opacity: 0.3 }} />
-                <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No purchase orders yet</div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {purchaseOrders.map(po => (
-                  <div key={po.id} style={{ border: '1px solid var(--hf-border)', borderRadius: 10, padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                          <span style={{ fontWeight: 700, fontSize: 13 }}>{po.orderNumber}</span>
-                          <StatusBadge status={po.status} />
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>
-                          {po.supplierName} · Ordered {fmtDateShort(po.orderDate)}
-                          {po.expectedDate && ` · Expected ${fmtDateShort(po.expectedDate)}`}
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontWeight: 800, fontSize: 15 }}>{fmtR(po.totalAmount)}</div>
-                        <div style={{ fontSize: 10, color: 'var(--hf-text-faint)' }}>incl. VAT</div>
-                      </div>
+                  {/* Right — cart panel */}
+                  <div style={{
+                    border: '1px solid var(--hf-border)', borderRadius: 12,
+                    padding: 16, display: 'flex', flexDirection: 'column',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--hf-text)' }}>Current Sale</span>
+                      {cart.length > 0 && (
+                        <button onClick={() => setCart([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', fontSize: 12 }}>
+                          Clear
+                        </button>
+                      )}
                     </div>
 
-                    {/* PO lines */}
-                    <div style={{ background: 'var(--hf-surface-muted)', borderRadius: 7, padding: '8px 12px', marginBottom: 10 }}>
-                      {po.items?.map(li => (
-                        <div key={li.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', color: 'var(--hf-text-secondary)' }}>
-                          <span>{li.itemName}</span>
-                          <span style={{ color: 'var(--hf-text-muted)' }}>
-                            {li.qtyReceived}/{li.qtyOrdered} received
-                            {li.fullyReceived && <span style={{ color: 'var(--hf-success-text-strong)', marginLeft: 5, fontWeight: 700 }}>✓</span>}
-                          </span>
+                    {/* Cart items */}
+                    <div style={{ flex: 1, marginBottom: 12, minHeight: 80 }}>
+                      {cart.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--hf-text-disabled)' }}>
+                          <ShoppingCart size={26} style={{ marginBottom: 8, opacity: 0.3 }} />
+                          <div style={{ fontSize: 12 }}>Tap items or scan barcode</div>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {cart.map(item => (
+                            <div key={item.catalogueItemId} style={{ background: 'var(--hf-surface-muted)', borderRadius: 8, padding: '10px 12px' }}>
+                              {/* Item row */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--hf-text)', flex: 1, marginRight: 6 }}>
+                                  {item.itemName}
+                                </span>
+                                <button
+                                  onClick={() => removeFromCart(item.catalogueItemId)}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-disabled)', padding: 0 }}>
+                                  <X size={11} />
+                                </button>
+                              </div>
+                              {/* Qty + total */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <button
+                                  onClick={() => updateQty(item.catalogueItemId, item.qty - 1)}
+                                  style={{ width: 22, height: 22, borderRadius: 4, border: '1px solid var(--hf-border)', background: 'var(--hf-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Minus size={10} />
+                                </button>
+                                <span style={{ fontSize: 13, fontWeight: 700, minWidth: 20, textAlign: 'center' }}>
+                                  {item.qty}
+                                </span>
+                                <button
+                                  onClick={() => updateQty(item.catalogueItemId, item.qty + 1)}
+                                  style={{ width: 22, height: 22, borderRadius: 4, border: '1px solid var(--hf-border)', background: 'var(--hf-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Plus size={10} />
+                                </button>
+                                <span style={{ fontSize: 11, color: 'var(--hf-text-faint)', flex: 1, textAlign: 'right' }}>
+                                  @ {fmtR(item.unitPrice)}
+                                </span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--hf-text)', minWidth: 65, textAlign: 'right' }}>
+                                  {fmtR(item.unitPrice * item.qty * (1 - item.discountPct / 100))}
+                                </span>
+                              </div>
+                              {/* Per-item discount */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5 }}>
+                                <span style={{ fontSize: 10, color: 'var(--hf-text-faint)' }}>Disc %</span>
+                                <input
+                                  type="number" min="0" max="100"
+                                  value={item.discountPct || ''}
+                                  onChange={e => updateDiscount(item.catalogueItemId, Number(e.target.value))}
+                                  placeholder="0"
+                                  style={{ width: 50, padding: '2px 6px', border: '1px solid var(--hf-border)', borderRadius: 4, fontSize: 11, textAlign: 'center', background: 'var(--hf-surface)' }}
+                                />
+                                {item.discountPct > 0 && (
+                                  <span style={{ fontSize: 10, color: 'var(--hf-accent-text)' }}>
+                                    − {fmtR(item.unitPrice * item.qty * item.discountPct / 100)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Totals */}
+                    {cart.length > 0 && (
+                      <div style={{ borderTop: '1px solid var(--hf-border-subtle)', paddingTop: 10, marginBottom: 10 }}>
+                        {totals.discount > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--hf-accent-text)', marginBottom: 2 }}>
+                            <span>Discount</span><span>− {fmtR(totals.discount)}</span>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 2 }}>
+                          <span>Subtotal (excl. VAT)</span><span>{fmtR(totals.subtotal - totals.discount)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 7 }}>
+                          <span>VAT (15%)</span><span>{fmtR(totals.vat)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: 'var(--hf-text)', borderTop: '1px solid var(--hf-border)', paddingTop: 8 }}>
+                          <span>Total</span><span>{fmtR(totals.total)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Payment method + tendered */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                      <input
+                        value={customer}
+                        onChange={e => setCustomer(e.target.value)}
+                        placeholder="Customer name (optional)"
+                        style={{ ...inp, fontSize: 12 }}
+                      />
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5 }}>
+                        {['CASH', 'CARD', 'EFT', 'ACCOUNT'].map(m => (
+                          <button key={m} onClick={() => setPayment(m)} style={{
+                            padding: '7px 4px',
+                            border: `1px solid ${payment === m ? 'var(--hf-primary)' : 'var(--hf-border)'}`,
+                            borderRadius: 7, fontSize: 11,
+                            fontWeight: payment === m ? 700 : 400,
+                            background: payment === m ? 'var(--hf-primary)' : 'var(--hf-surface)',
+                            color: payment === m ? 'var(--hf-text-on-solid)' : 'var(--hf-text-tertiary)',
+                            cursor: 'pointer',
+                          }}>
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                      {payment === 'CASH' && (
+                        <input
+                          type="number"
+                          value={tendered}
+                          onChange={e => setTendered(e.target.value)}
+                          placeholder={`Tendered (min ${fmtR(totals.total)})`}
+                          style={{ ...inp, fontSize: 12 }}
+                        />
+                      )}
+                      {(payment === 'EFT' || payment === 'CARD') && (
+                        <input
+                          value={paymentRef}
+                          onChange={e => setPaymentRef(e.target.value)}
+                          placeholder={
+                            payment === 'EFT'
+                              ? 'EFT reference / proof of payment number'
+                              : 'Card authorisation code (optional)'
+                          }
+                          style={{ ...inp, fontSize: 12 }}
+                        />
+                      )}
+                      {change !== null && change >= 0 && (
+                        <div style={{ padding: '8px 12px', background: 'var(--hf-success-soft-strong)', borderRadius: 8, fontSize: 14, fontWeight: 700, color: 'var(--hf-success-text-strong)', textAlign: 'center' }}>
+                          Change: {fmtR(change)}
+                        </div>
+                      )}
+                    </div>
+
+                    {saleErr && (
+                      <div style={{ color: 'var(--hf-danger-text)', fontSize: 12, marginBottom: 8, padding: '6px 10px', background: 'var(--hf-danger-soft)', borderRadius: 6 }}>
+                        {saleErr}
+                      </div>
+                    )}
+
+                    <button
+                      disabled={!canCharge}
+                      onClick={() => saleMut.mutate({
+                        customerName: customer || null,
+                        paymentMethod: payment,
+                        amountTendered: tendered ? Number(tendered) : null,
+                        paymentRef: paymentRef || null,
+                        items: cart.map(i => ({
+                          catalogueItemId: i.catalogueItemId,
+                          qty: i.qty,
+                          unitPrice: i.unitPrice,
+                          discountPct: i.discountPct,
+                        })),
+                      })}
+                      style={{
+                        background: canCharge ? 'var(--hf-accent)' : 'var(--hf-text-faint)',
+                        color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 10,
+                        padding: '13px', fontSize: 15, fontWeight: 800,
+                        cursor: canCharge ? 'pointer' : 'not-allowed', width: '100%',
+                      }}>
+                      {saleMut.isPending ? 'Processing…' : `Charge ${fmtR(totals.total)}`}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ════════════════════════════════════════════════════════════════════ */}
+              {/* STOCK TAB                                                           */}
+              {/* ════════════════════════════════════════════════════════════════════ */}
+              {tab === 'stock' && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {(summary?.lowStockItems ?? 0) > 0 && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
+                          <AlertTriangle size={11} /> {summary.lowStockItems} low stock
+                        </span>
+                      )}
+                    </div>
+                    <button onClick={() => { setShowStock(true); setErrMsg('') }} style={btnPrimary()}>
+                      <Plus size={14} /> Add Stock Item
+                    </button>
+                  </div>
+
+                  {stockLoading ? (
+                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--hf-text-faint)' }}>Loading…</div>
+                  ) : stock.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '50px 0', color: 'var(--hf-text-faint)' }}>
+                      <Package size={34} style={{ marginBottom: 12, opacity: 0.3 }} />
+                      <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No stock items yet</div>
+                      <div style={{ fontSize: 12, marginTop: 3 }}>Add catalogue items to start tracking inventory.</div>
+                    </div>
+                  ) : (
+                    <div style={{ border: '1px solid var(--hf-border)', borderRadius: 10, overflow: 'hidden' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr>
+                            {['Item', 'Available', 'On Hand', 'Reorder At', 'Cost', 'Sell Price', 'Location', 'Status'].map(h => (
+                              <th key={h} style={TH}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stock.map((s, i) => (
+                            <tr key={s.id} style={{ background: i % 2 === 0 ? 'var(--hf-surface)' : 'var(--hf-surface-muted)' }}>
+                              <td style={TD}>
+                                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--hf-text)' }}>{s.itemName}</div>
+                                {s.sku && <div style={{ fontSize: 10, color: 'var(--hf-text-faint)' }}>SKU: {s.sku}</div>}
+                              </td>
+                              <td style={TD}>
+                                <span style={{ fontWeight: 800, fontSize: 15, color: s.lowStock ? 'var(--hf-danger-text)' : 'var(--hf-text)' }}>
+                                  {s.availableQty}
+                                </span>
+                              </td>
+                              <td style={TD}><span style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>{s.qtyOnHand}</span></td>
+                              <td style={TD}><span style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>{s.reorderLevel}</span></td>
+                              <td style={TD}><span style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>{fmtR(s.costPrice)}</span></td>
+                              <td style={TD}><span style={{ fontWeight: 700, color: 'var(--hf-accent-text)' }}>{fmtR(s.sellingPrice)}</span></td>
+                              <td style={TD}><span style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{s.location || '—'}</span></td>
+                              <td style={TD}>
+                                {s.lowStock ? (
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, width: 'fit-content' }}>
+                                    <AlertTriangle size={9} /> LOW
+                                  </span>
+                                ) : (
+                                  <span style={{ background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600 }}>
+                                    OK
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ════════════════════════════════════════════════════════════════════ */}
+              {/* TRANSACTIONS TAB                                                    */}
+              {/* ════════════════════════════════════════════════════════════════════ */}
+              {tab === 'transactions' && (
+                <div>
+                  {transactions.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '50px 0', color: 'var(--hf-text-faint)' }}>
+                      <Receipt size={34} style={{ marginBottom: 12, opacity: 0.3 }} />
+                      <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No transactions yet</div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {transactions.map(t => {
+                        const open = expandedTxn === t.id
+                        return (
+                          <div key={t.id} style={{ border: '1px solid var(--hf-border)', borderRadius: 10, overflow: 'hidden' }}>
+                            {/* Row header */}
+                            <div
+                              onClick={() => setExpanded(open ? null : t.id)}
+                              style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', cursor: 'pointer', background: open ? 'var(--hf-surface-muted)' : 'var(--hf-surface)', gap: 12 }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 2 }}>
+                                  <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)' }}>{t.transactionNumber}</span>
+                                  <StatusBadge status={t.status} />
+                                  <span style={{ fontSize: 10, color: 'var(--hf-text-muted)', background: 'var(--hf-surface-sunken)', padding: '1px 6px', borderRadius: 20 }}>
+                                    {t.paymentMethod}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>
+                                  {t.customerName || 'Walk-in'} · {t.servedByName || '—'} · {fmtDate(t.createdAt)}
+                                  {t.cashSessionNumber && <> · {t.cashSessionNumber}</>}
+                                </div>
+                              </div>
+                              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--hf-text)' }}>{fmtR(t.totalAmount)}</div>
+                                {(t.changeGiven ?? 0) > 0 && (
+                                  <div style={{ fontSize: 10, color: 'var(--hf-accent-text)' }}>Chg: {fmtR(t.changeGiven)}</div>
+                                )}
+                              </div>
+                              <ChevronDown size={14} style={{ color: 'var(--hf-text-faint)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }} />
+                            </div>
+
+                            {/* Expanded detail */}
+                            {open && (
+                              <div style={{ borderTop: '1px solid var(--hf-border-subtle)', padding: '12px 16px', background: 'var(--hf-surface-muted)' }}>
+                                {t.items?.length > 0 && (
+                                  <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
+                                    <thead>
+                                      <tr>
+                                        {['Item', 'Qty', 'Unit Price', 'Disc %', 'VAT', 'Total'].map(h => (
+                                          <th key={h} style={{ ...TH, padding: '5px 10px', background: 'var(--hf-surface-sunken)' }}>{h}</th>
+                                        ))}
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {t.items.map(li => (
+                                        <tr key={li.id}>
+                                          <td style={{ ...TD, padding: '5px 10px' }}>{li.itemName}</td>
+                                          <td style={{ ...TD, padding: '5px 10px' }}>{li.qty}</td>
+                                          <td style={{ ...TD, padding: '5px 10px' }}>{fmtR(li.unitPrice)}</td>
+                                          <td style={{ ...TD, padding: '5px 10px', color: 'var(--hf-accent-text)' }}>{li.discountPct > 0 ? `${li.discountPct}%` : '—'}</td>
+                                          <td style={{ ...TD, padding: '5px 10px' }}>{fmtR(li.vatAmount)}</td>
+                                          <td style={{ ...TD, padding: '5px 10px', fontWeight: 700 }}>{fmtR(li.lineTotal)}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                  <button onClick={() => setShowReceipt(t)} style={{ ...btnSecondary, fontSize: 12 }}>
+                                    <Printer size={13} /> Receipt
+                                  </button>
+                                  {t.status === 'COMPLETED' && (
+                                    <button
+                                      onClick={() => { setShowRefund(t); setRefundLines({}); setRefundReason(''); setErrMsg('') }}
+                                      style={{ ...btnSecondary, fontSize: 12, color: 'var(--hf-warning-text)', borderColor: 'var(--hf-warning-border)' }}>
+                                      <RotateCcw size={13} /> Refund
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ════════════════════════════════════════════════════════════════════ */}
+              {/* PURCHASE ORDERS TAB                                                 */}
+              {/* ════════════════════════════════════════════════════════════════════ */}
+              {tab === 'orders' && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+                    <button onClick={() => { setShowPO(true); setErrMsg('') }} style={btnPrimary()}>
+                      <Plus size={14} /> New Purchase Order
+                    </button>
+                  </div>
+
+                  {purchaseOrders.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '50px 0', color: 'var(--hf-text-faint)' }}>
+                      <Truck size={34} style={{ marginBottom: 12, opacity: 0.3 }} />
+                      <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No purchase orders yet</div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {purchaseOrders.map(po => (
+                        <div key={po.id} style={{ border: '1px solid var(--hf-border)', borderRadius: 10, padding: '14px 16px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                                <span style={{ fontWeight: 700, fontSize: 13 }}>{po.orderNumber}</span>
+                                <StatusBadge status={po.status} />
+                              </div>
+                              <div style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>
+                                {po.supplierName} · Ordered {fmtDateShort(po.orderDate)}
+                                {po.expectedDate && ` · Expected ${fmtDateShort(po.expectedDate)}`}
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontWeight: 800, fontSize: 15 }}>{fmtR(po.totalAmount)}</div>
+                              <div style={{ fontSize: 10, color: 'var(--hf-text-faint)' }}>incl. VAT</div>
+                            </div>
+                          </div>
+
+                          {/* PO lines */}
+                          <div style={{ background: 'var(--hf-surface-muted)', borderRadius: 7, padding: '8px 12px', marginBottom: 10 }}>
+                            {po.items?.map(li => (
+                              <div key={li.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', color: 'var(--hf-text-secondary)' }}>
+                                <span>{li.itemName}</span>
+                                <span style={{ color: 'var(--hf-text-muted)' }}>
+                                  {li.qtyReceived}/{li.qtyOrdered} received
+                                  {li.fullyReceived && <span style={{ color: 'var(--hf-success-text-strong)', marginLeft: 5, fontWeight: 700 }}>✓</span>}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {(po.status === 'ORDERED' || po.status === 'PARTIALLY_RECEIVED') && (
+                            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                              <button
+                                onClick={() => { setShowReceive(po); setReceiveQtys({}) }}
+                                style={{ ...btnPrimary('var(--hf-accent)'), fontSize: 12 }}>
+                                <Truck size={13} /> Receive Stock
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
-
-                    {(po.status === 'ORDERED' || po.status === 'PARTIALLY_RECEIVED') && (
-                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                        <button
-                          onClick={() => { setShowReceive(po); setReceiveQtys({}) }}
-                          style={{ ...btnPrimary('var(--hf-accent)'), fontSize: 12 }}>
-                          <Truck size={13} /> Receive Stock
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
+                  )}
+                </div>
+              )}
+            </>
+          )
+          default: return null
+        }
+      }}>
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {/* MODALS                                                                */}
       {/* ══════════════════════════════════════════════════════════════════════ */}
@@ -1871,7 +1853,6 @@ export function PosPage() {
           </div>
         </div>
       )}
-
-    </div>
+    </SectionedModulePage>
   )
 }

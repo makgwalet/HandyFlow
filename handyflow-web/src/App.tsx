@@ -61,7 +61,6 @@ import { PayrollBureauPortalClientDetailPage }  from "./pages/payroll-bureau-por
 
 // ── Projects module ────────────────────────────────────────────────────────────
 import { ProjectsPage }     from "./pages/projects/ProjectsPage"
-import { ProjectDetailPage } from "./pages/projects/ProjectDetailPage"
 import { ClientPortalPage }  from "./pages/projects/ClientPortalPage"
 import { EarthMovingPage } from "./pages/earthmoving/EarthMovingPage"
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage"
@@ -277,7 +276,7 @@ export default function App() {
             <Route path="/invoices"    element={<InvoicingPage />} />
             <Route path="/quotes/new"  element={<CreateQuotePage />} />
             <Route path="/quotes/:id"  element={<QuoteDetailPage />} />
-            <Route path="/catalogue"   element={<CataloguePage />} />
+            <Route path="/catalogue/:section?" element={<CataloguePage />} />
             <Route path="/billing"     element={<BillingPage />} />
             <Route path="/security/:section?" element={<SecurityPage />} />
             <Route path="/fuel/:section?" element={<FuelPage />} />
@@ -292,14 +291,14 @@ export default function App() {
             <Route path="/clinic/:section?" element={<ClinicPage />} />
             <Route path="/events/:section?" element={<EventsPage />} />
             <Route path="/contracts/:section?" element={<ContractingPage />} />
-            <Route path="/expenses"    element={<ExpensesPage />} />
+            <Route path="/expenses/:section?" element={<ExpensesPage />} />
             <Route path="/invite/accept"          element={<AcceptInvitePage />} />
-            <Route path="/creative"               element={<CreativePage />} />
-            <Route path="/desk"                   element={<DeskPage />} />
-            <Route path="/tasks"                  element={<TasksPage />} />
+            <Route path="/creative/:section?" element={<CreativePage />} />
+            <Route path="/desk/:section?" element={<DeskPage />} />
+            <Route path="/tasks/:section?" element={<TasksPage />} />
             <Route path="/marketing/:section?" element={<MarketingPage />} />
-            <Route path="/recruiter"              element={<RecruiterPage />} />
-            <Route path="/pos"                    element={<PosPage />} />
+            <Route path="/recruiter/:section?" element={<RecruiterPage />} />
+            <Route path="/pos/:section?" element={<PosPage />} />
             <Route path="/accountant/:section?" element={<AccountantPage />} />
             <Route path="/ap/:section?" element={<AccountsPayablePage />} />
             <Route path="/booking-agency"       element={<BookingAgencyPage />} />
@@ -313,7 +312,7 @@ export default function App() {
             <Route path="/legalcompliance/:section?" element={<LegalCompliancePage />} />
             <Route path="/compliancetender/:section?" element={<CompliancePage />} />
             <Route path="/compliancetender/tenders/:id"  element={<TenderDetailPage />} />
-            <Route path="/complianceservices"                          element={<ComplianceServicesPage />} />
+            <Route path="/complianceservices/:section?" element={<ComplianceServicesPage />} />
             <Route path="/complianceservices/clients/:clientId"        element={<ClientDetailPage />} />
             <Route path="/complianceservices/tenders/:id"              element={<ClientTenderDetailPage />} />
             <Route path="/debtcollection/:section?" element={<DebtCollectionPage />} />
@@ -327,8 +326,7 @@ export default function App() {
             <Route path="/control-exceptions"     element={<ControlExceptionsPage />} />
 
             {/* ── Projects ── */}
-            <Route path="/projects"     element={<ProjectsPage />} />
-            <Route path="/projects/:id" element={<ProjectDetailPage />} />
+            <Route path="/projects/:section?" element={<ProjectsPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

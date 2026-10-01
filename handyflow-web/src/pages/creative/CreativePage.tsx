@@ -8,8 +8,10 @@ import {
   BarChart2, Search, RefreshCw, Archive, Flag, User,
   Package, Image, Video, Camera, Layers, Globe, Film,
   PenTool, Box, Monitor, MoreHorizontal, Trash2, Edit3,
-  Download, Link2, Star,
+  Link2, Star,
 } from 'lucide-react'
+import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
+import { CREATIVE_SECTIONS } from '../../navigation/moduleSections'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Job {
@@ -1173,164 +1175,160 @@ export function CreativePage() {
   ]
 
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 22, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--hf-violet)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Palette size={18} style={{ color: 'var(--hf-text-on-solid)' }} />
-            </div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>Creative Studio</h1>
-          </div>
-          <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0, paddingLeft: 46 }}>
-            Design briefs · Proof approvals · Client sign-off portal · Deliverables
-          </p>
-        </div>
+    <SectionedModulePage config={CREATIVE_SECTIONS}
+      subtitle="Design briefs · Proof approvals · Client sign-off portal · Deliverables"
+      action={(
         <button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={14} /> New Job</button>
-      </div>
-
-      {/* KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 10, marginBottom: 22 }}>
-        {kpis.map(k => (
-          <div key={k.label} onClick={() => setStatusFilter(statusFilter === k.label.toUpperCase().replace(/ /g,'_') ? '' : k.label.toUpperCase().replace(/ /g,'_'))}
-            style={{ background: k.bg, border: `1px solid transparent`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer', transition: 'all 0.15s' }}>
-            <div style={{ fontSize: 22, fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: 10, color: k.color, opacity: 0.8, marginTop: 2 }}>{k.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Main card */}
-      <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, padding: 24 }}>
-        {/* Toolbar */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ position: 'relative' as const }}>
-              <Search size={13} style={{ position: 'absolute' as const, left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--hf-text-faint)' }} />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search jobs..."
-                style={{ paddingLeft: 28, padding: '7px 10px 7px 28px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', width: 200 }} />
-            </div>
-            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-              style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
-              <option value="">All statuses</option>
-              {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-            </select>
-            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
-              style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
-              <option value="">All types</option>
-              {JOB_TYPES.map(t => <option key={t} value={t}>{t.replace('_',' ')}</option>)}
-            </select>
-            {(search || statusFilter || typeFilter) && (
-              <button onClick={() => { setSearch(''); setStatusFilter(''); setTypeFilter('') }}
-                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '7px 10px', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, background: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)', cursor: 'pointer' }}>
-                <X size={11} /> Clear
-              </button>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {(['grid','pipeline'] as const).map(v => (
-              <button key={v} onClick={() => setView(v)}
-                style={{ padding: '6px 14px', borderRadius: 7, border: '1.5px solid var(--hf-border)', background: view === v ? 'var(--hf-primary)' : 'var(--hf-surface)', color: view === v ? 'var(--hf-text-on-solid)' : 'var(--hf-text-muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>
-                {v}
-              </button>
+      )}
+      banner={(
+        <>
+          {/* KPI strip */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 10, marginBottom: 22 }}>
+            {kpis.map(k => (
+              <div key={k.label} onClick={() => setStatusFilter(statusFilter === k.label.toUpperCase().replace(/ /g,'_') ? '' : k.label.toUpperCase().replace(/ /g,'_'))}
+                style={{ background: k.bg, border: `1px solid transparent`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer', transition: 'all 0.15s' }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: k.color }}>{k.value}</div>
+                <div style={{ fontSize: 10, color: k.color, opacity: 0.8, marginTop: 2 }}>{k.label}</div>
+              </div>
             ))}
           </div>
-        </div>
-
-        {isLoading ? (
-          <div style={{ textAlign: 'center', padding: 48, color: 'var(--hf-text-faint)' }}>Loading jobs...</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-            <Palette size={40} style={{ marginBottom: 12, color: 'var(--hf-text-disabled)' }} />
-            <div style={{ fontWeight: 700, color: 'var(--hf-text-tertiary)', fontSize: 16, marginBottom: 6 }}>No creative jobs yet</div>
-            <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', marginBottom: 20 }}>Create your first job bag to start the design workflow.</div>
-            <button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={14} /> Create first job</button>
-          </div>
-        ) : view === 'grid' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-            {filtered.map(job => {
-              const cfg  = STATUS[job.status] ?? STATUS.BRIEFING
-              const Icon = TYPE_ICON[job.jobType] ?? Palette
-              const overdue = isOverdue(job.dueDate, job.status)
-              return (
-                <div key={job.id} onClick={() => setSelectedJob(job)}
-                  style={{ border: `1px solid ${overdue ? 'var(--hf-danger-border)' : 'var(--hf-border)'}`, borderLeft: `3px solid ${cfg.dot}`, borderRadius: 12, padding: '18px 20px', cursor: 'pointer', background: 'var(--hf-surface)', transition: 'box-shadow 0.15s' }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 9, background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Icon size={18} style={{ color: cfg.color }} />
-                    </div>
-                    <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-                      {overdue && <AlertTriangle size={12} style={{ color: 'var(--hf-danger-text)' }} />}
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700 }}>
-                        <span style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.dot }} />{cfg.label}
-                      </span>
-                    </div>
+        </>
+      )}
+      render={id => {
+        switch (id) {
+          case 'jobs': return (
+            <>
+              {/* Toolbar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ position: 'relative' as const }}>
+                    <Search size={13} style={{ position: 'absolute' as const, left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--hf-text-faint)' }} />
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search jobs..."
+                      style={{ paddingLeft: 28, padding: '7px 10px 7px 28px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', width: 200 }} />
                   </div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)', marginBottom: 4 }}>{job.title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 10 }}>
-                    {job.clientName} · {job.jobType.replace('_',' ')}
-                  </div>
-                  {job.description && (
-                    <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', lineHeight: 1.4, marginBottom: 10, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>
-                      {job.description}
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--hf-text-faint)' }}>
-                    <div style={{ display: 'flex', gap: 10 }}>
-                      {job.proofCount > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Eye size={10} />{job.proofCount} proofs</span>}
-                      {job.deliverableCount > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'var(--hf-accent-text)' }}><Package size={10} />{job.deliverableCount} files</span>}
-                    </div>
-                    {job.dueDate && <span style={{ color: overdue ? 'var(--hf-danger-text)' : 'var(--hf-text-faint)', fontWeight: overdue ? 700 : 400 }}>Due {fmtDate(job.dueDate)}</span>}
-                  </div>
-                  {job.quotedAmount && (
-                    <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: 'var(--hf-accent-text)' }}>{fmtR(job.quotedAmount)}</div>
+                  <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+                    style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
+                    <option value="">All statuses</option>
+                    {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                  </select>
+                  <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
+                    style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
+                    <option value="">All types</option>
+                    {JOB_TYPES.map(t => <option key={t} value={t}>{t.replace('_',' ')}</option>)}
+                  </select>
+                  {(search || statusFilter || typeFilter) && (
+                    <button onClick={() => { setSearch(''); setStatusFilter(''); setTypeFilter('') }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '7px 10px', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, background: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)', cursor: 'pointer' }}>
+                      <X size={11} /> Clear
+                    </button>
                   )}
                 </div>
-              )
-            })}
-          </div>
-        ) : (
-          // Pipeline view
-          <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 16, alignItems: 'flex-start' }}>
-            {PIPELINE_STATUSES.map(status => {
-              const cfg  = STATUS[status]
-              const col  = filtered.filter(j => j.status === status)
-              return (
-                <div key={status} style={{ minWidth: 260, maxWidth: 260, flexShrink: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10, padding: '0 2px' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.dot }} />
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-secondary)' }}>{cfg.label}</span>
-                    <span style={{ background: 'var(--hf-surface-sunken)', color: 'var(--hf-text-muted)', borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>{col.length}</span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {col.map(job => (
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {(['grid','pipeline'] as const).map(v => (
+                    <button key={v} onClick={() => setView(v)}
+                      style={{ padding: '6px 14px', borderRadius: 7, border: '1.5px solid var(--hf-border)', background: view === v ? 'var(--hf-primary)' : 'var(--hf-surface)', color: view === v ? 'var(--hf-text-on-solid)' : 'var(--hf-text-muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {isLoading ? (
+                <div style={{ textAlign: 'center', padding: 48, color: 'var(--hf-text-faint)' }}>Loading jobs...</div>
+              ) : filtered.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                  <Palette size={40} style={{ marginBottom: 12, color: 'var(--hf-text-disabled)' }} />
+                  <div style={{ fontWeight: 700, color: 'var(--hf-text-tertiary)', fontSize: 16, marginBottom: 6 }}>No creative jobs yet</div>
+                  <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', marginBottom: 20 }}>Create your first job bag to start the design workflow.</div>
+                  <button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={14} /> Create first job</button>
+                </div>
+              ) : view === 'grid' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+                  {filtered.map(job => {
+                    const cfg  = STATUS[job.status] ?? STATUS.BRIEFING
+                    const Icon = TYPE_ICON[job.jobType] ?? Palette
+                    const overdue = isOverdue(job.dueDate, job.status)
+                    return (
                       <div key={job.id} onClick={() => setSelectedJob(job)}
-                        style={{ border: '1px solid var(--hf-border)', borderRadius: 9, padding: '12px 14px', cursor: 'pointer', background: 'var(--hf-surface)', transition: 'box-shadow 0.15s' }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'}
+                        style={{ border: `1px solid ${overdue ? 'var(--hf-danger-border)' : 'var(--hf-border)'}`, borderLeft: `3px solid ${cfg.dot}`, borderRadius: 12, padding: '18px 20px', cursor: 'pointer', background: 'var(--hf-surface)', transition: 'box-shadow 0.15s' }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'}
                         onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
-                        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)', marginBottom: 3 }}>{job.title}</div>
-                        <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginBottom: 6 }}>{job.clientName}</div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                          <span style={{ color: 'var(--hf-text-muted)' }}>{job.jobType.replace('_',' ')}</span>
-                          {isOverdue(job.dueDate, job.status) && <span style={{ color: 'var(--hf-danger-text)', fontWeight: 700 }}>Overdue</span>}
-                          {job.quotedAmount ? <span style={{ color: 'var(--hf-accent-text)', fontWeight: 600 }}>{fmtR(job.quotedAmount)}</span> : null}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                          <div style={{ width: 38, height: 38, borderRadius: 9, background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Icon size={18} style={{ color: cfg.color }} />
+                          </div>
+                          <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                            {overdue && <AlertTriangle size={12} style={{ color: 'var(--hf-danger-text)' }} />}
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700 }}>
+                              <span style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.dot }} />{cfg.label}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)', marginBottom: 4 }}>{job.title}</div>
+                        <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 10 }}>
+                          {job.clientName} · {job.jobType.replace('_',' ')}
+                        </div>
+                        {job.description && (
+                          <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', lineHeight: 1.4, marginBottom: 10, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>
+                            {job.description}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--hf-text-faint)' }}>
+                          <div style={{ display: 'flex', gap: 10 }}>
+                            {job.proofCount > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Eye size={10} />{job.proofCount} proofs</span>}
+                            {job.deliverableCount > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'var(--hf-accent-text)' }}><Package size={10} />{job.deliverableCount} files</span>}
+                          </div>
+                          {job.dueDate && <span style={{ color: overdue ? 'var(--hf-danger-text)' : 'var(--hf-text-faint)', fontWeight: overdue ? 700 : 400 }}>Due {fmtDate(job.dueDate)}</span>}
+                        </div>
+                        {job.quotedAmount && (
+                          <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: 'var(--hf-accent-text)' }}>{fmtR(job.quotedAmount)}</div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                // Pipeline view
+                <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 16, alignItems: 'flex-start' }}>
+                  {PIPELINE_STATUSES.map(status => {
+                    const cfg  = STATUS[status]
+                    const col  = filtered.filter(j => j.status === status)
+                    return (
+                      <div key={status} style={{ minWidth: 260, maxWidth: 260, flexShrink: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10, padding: '0 2px' }}>
+                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.dot }} />
+                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-secondary)' }}>{cfg.label}</span>
+                          <span style={{ background: 'var(--hf-surface-sunken)', color: 'var(--hf-text-muted)', borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>{col.length}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {col.map(job => (
+                            <div key={job.id} onClick={() => setSelectedJob(job)}
+                              style={{ border: '1px solid var(--hf-border)', borderRadius: 9, padding: '12px 14px', cursor: 'pointer', background: 'var(--hf-surface)', transition: 'box-shadow 0.15s' }}
+                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'}
+                              onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
+                              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--hf-text)', marginBottom: 3 }}>{job.title}</div>
+                              <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginBottom: 6 }}>{job.clientName}</div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                                <span style={{ color: 'var(--hf-text-muted)' }}>{job.jobType.replace('_',' ')}</span>
+                                {isOverdue(job.dueDate, job.status) && <span style={{ color: 'var(--hf-danger-text)', fontWeight: 700 }}>Overdue</span>}
+                                {job.quotedAmount ? <span style={{ color: 'var(--hf-accent-text)', fontWeight: 600 }}>{fmtR(job.quotedAmount)}</span> : null}
+                              </div>
+                            </div>
+                          ))}
+                          {col.length === 0 && (
+                            <div style={{ padding: '20px', textAlign: 'center', fontSize: 12, color: 'var(--hf-text-disabled)', border: '1.5px dashed var(--hf-border)', borderRadius: 9 }}>No jobs</div>
+                          )}
                         </div>
                       </div>
-                    ))}
-                    {col.length === 0 && (
-                      <div style={{ padding: '20px', textAlign: 'center', fontSize: 12, color: 'var(--hf-text-disabled)', border: '1.5px dashed var(--hf-border)', borderRadius: 9 }}>No jobs</div>
-                    )}
-                  </div>
+                    )
+                  })}
                 </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
+              )}
+            </>
+          )
+          default: return null
+        }
+      }}>
       {showCreate && (
         <CreateJobModal onClose={() => setShowCreate(false)}
           onSaved={() => { qc.invalidateQueries({ queryKey: ['creative-jobs'] }); qc.invalidateQueries({ queryKey: ['creative-summary'] }) }} />
@@ -1340,6 +1338,6 @@ export function CreativePage() {
         <JobDetailModal job={selectedJob} onClose={() => setSelectedJob(null)}
           onRefresh={() => refreshJob(selectedJob.id)} />
       )}
-    </div>
+    </SectionedModulePage>
   )
 }

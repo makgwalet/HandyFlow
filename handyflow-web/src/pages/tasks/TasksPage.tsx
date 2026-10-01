@@ -4,10 +4,12 @@
 // button and notification deep links work), permissions, and the modals. The board itself lives in
 // KanbanBoard; data access in tasks.api; the ordering/filter rules in tasks.logic.
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle } from 'lucide-react'
 import { usePermission } from '../../hooks/usePermission'
+import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
+import { TASKS_SECTIONS } from '../../navigation/moduleSections'
 import { toast } from '../../store/toast.store'
 import type { Task, TasksView } from './tasks.types'
 import { boardStats, filterTasks, type TaskFilters } from './tasks.logic'
@@ -16,6 +18,7 @@ import {
   useDeleteTask, useMoveTask, useMyTasks, useSummary, useUpdateTask,
 } from './tasks.api'
 import { BoardList } from './BoardList'
+import { MyTasksList } from './MyTasksList'
 import { BoardToolbar } from './BoardToolbar'
 import { BoardStatsStrip } from './StatsStrip'
 import { KanbanBoard } from './KanbanBoard'
@@ -34,8 +37,11 @@ export function TasksPage() {
   const canAdmin = usePermission('TASKS_ADMIN')
   const qc = useQueryClient()
   const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
+  const { section } = useParams<{ section?: string }>()
 
-  const boardId = params.get('board')
+  // a board only means something inside the Boards section
+  const boardId = section === 'my-tasks' ? null : params.get('board')
   const taskId = params.get('task')
   const view: TasksView = VIEWS.includes(params.get('view') as TasksView) ? (params.get('view') as TasksView) : 'board'
   const filters: TaskFilters = {
@@ -55,7 +61,7 @@ export function TasksPage() {
   const boardsQ = useBoards()
   const summaryQ = useSummary()
   const usersQ = useAssignableUsers()
-  const myQ = useMyTasks(canRead && !boardId)
+  const myQ = useMyTasks(canRead && (section === 'my-tasks' || !boardId))
   const board = boardsQ.data?.find(b => b.id === boardId) ?? null
   const columns = useMemo(() => [...(board?.columns ?? [])].sort((a, b) => a.sortOrder - b.sortOrder), [board])
   const tasksQ = useBoardTasks(board ? board.id : null)
@@ -94,43 +100,63 @@ export function TasksPage() {
   const endOf = (columnId: string) => allTasks.filter(t => t.columnId === columnId).length
 
   return (
-    <div style={{ padding: '24px 28px', maxWidth: '100%' }}>
-      {!board ? (
-        <BoardList boards={boardsQ.data} loading={boardsQ.isLoading} error={boardsQ.isError} onRetry={() => boardsQ.refetch()}
-          summary={summaryQ.data} myTasks={myQ.data ?? []} canAdmin={canAdmin}
-          onOpenBoard={id => setUrl({ board: id }, true)} onOpenTask={t => setUrl({ board: t.boardId, task: t.id }, true)} onNewBoard={() => setShowNewBoard(true)} />
-      ) : (
-        <>
-          <BoardToolbar board={board} taskCount={stats.total} view={view} onView={v => setUrl({ view: v === 'board' ? null : v })}
-            filters={filters} onFilters={setFilters} users={usersQ.data ?? []} canManage={canManage} canAdmin={canAdmin}
-            onBack={() => setParams(new URLSearchParams(), { replace: false })} onNewTask={() => setShowCreate({})}
-            onAddList={() => setSettings('lists')} onSettings={() => setSettings('general')}
-            onExport={kind => downloadBoardExport(board.id, kind, board.name)} />
+    <SectionedModulePage config={TASKS_SECTIONS}
+      subtitle="Boards · Assignments · Due dates · Time tracking"
+      detail={section !== 'my-tasks' && board ? { label: board.name, subtitle: 'Board' } : undefined}
+      render={id => {
+        switch (id) {
+          case 'boards': return (
+            !board ? (
+              <BoardList boards={boardsQ.data} loading={boardsQ.isLoading} error={boardsQ.isError} onRetry={() => boardsQ.refetch()}
+                summary={summaryQ.data} myTasks={myQ.data ?? []} canAdmin={canAdmin}
+                onOpenBoard={id => setUrl({ board: id }, true)} onOpenTask={t => setUrl({ board: t.boardId, task: t.id }, true)} onNewBoard={() => setShowNewBoard(true)}
+            onViewAllMine={() => navigate(`${TASKS_SECTIONS.basePath}/my-tasks`)} />
+            ) : (
+              <>
+                <BoardToolbar board={board} taskCount={stats.total} view={view} onView={v => setUrl({ view: v === 'board' ? null : v })}
+                  filters={filters} onFilters={setFilters} users={usersQ.data ?? []} canManage={canManage} canAdmin={canAdmin}
+                  onBack={() => setParams(new URLSearchParams(), { replace: false })} onNewTask={() => setShowCreate({})}
+                  onAddList={() => setSettings('lists')} onSettings={() => setSettings('general')}
+                  onExport={kind => downloadBoardExport(board.id, kind, board.name)} />
 
-          {total > allTasks.length && (
-            <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '10px 14px', borderRadius: 10, fontSize: 13,
-              background: 'var(--hf-warning-soft)', border: '1px solid var(--hf-warning-border)', color: 'var(--hf-warning-text-strong)' }}>
-              <AlertTriangle size={15} />Showing the first {allTasks.length} of {total} tasks. Use filters or archive finished work to see the rest.
-            </div>
-          )}
-          {tasksQ.isError && (
-            <div role="alert" style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 10, fontSize: 13, background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', color: 'var(--hf-danger-text)' }}>
-              Couldn't load this board's tasks. <button type="button" onClick={() => tasksQ.refetch()} style={{ background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', color: 'inherit', fontWeight: 700 }}>Try again</button>
-            </div>
-          )}
+                {total > allTasks.length && (
+                  <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '10px 14px', borderRadius: 10, fontSize: 13,
+                    background: 'var(--hf-warning-soft)', border: '1px solid var(--hf-warning-border)', color: 'var(--hf-warning-text-strong)' }}>
+                    <AlertTriangle size={15} />Showing the first {allTasks.length} of {total} tasks. Use filters or archive finished work to see the rest.
+                  </div>
+                )}
+                {tasksQ.isError && (
+                  <div role="alert" style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 10, fontSize: 13, background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', color: 'var(--hf-danger-text)' }}>
+                    Couldn't load this board's tasks. <button type="button" onClick={() => tasksQ.refetch()} style={{ background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', color: 'inherit', fontWeight: 700 }}>Try again</button>
+                  </div>
+                )}
 
-          <BoardStatsStrip stats={stats} />
+                <BoardStatsStrip stats={stats} />
 
-          {view === 'board' && (
-            <KanbanBoard columns={columns} tasks={visible} canManage={canManage} canAdmin={canAdmin}
-              onOpen={t => setUrl({ task: t.id }, true)} onMove={moveTo} onComplete={t => complete.mutate(t.id)}
-              onQuickAdd={(columnId, title) => create.mutateAsync({ title, columnId })} onEditLists={() => setSettings('lists')} />
-          )}
-          {view === 'calendar' && <CalendarView tasks={visible} onTaskClick={t => setUrl({ task: t.id }, true)} />}
-          {view === 'timeline' && <TimelineView tasks={visible} onTaskClick={t => setUrl({ task: t.id }, true)} />}
-        </>
-      )}
-
+                {view === 'board' && (
+                  <KanbanBoard columns={columns} tasks={visible} canManage={canManage} canAdmin={canAdmin}
+                    onOpen={t => setUrl({ task: t.id }, true)} onMove={moveTo} onComplete={t => complete.mutate(t.id)}
+                    onQuickAdd={(columnId, title) => create.mutateAsync({ title, columnId })} onEditLists={() => setSettings('lists')} />
+                )}
+                {view === 'calendar' && <CalendarView tasks={visible} onTaskClick={t => setUrl({ task: t.id }, true)} />}
+                {view === 'timeline' && <TimelineView tasks={visible} onTaskClick={t => setUrl({ task: t.id }, true)} />}
+              </>
+            )
+          )
+          case 'my-tasks': return (
+            myQ.isError ? (
+              <div role="alert" style={{ fontSize: 14, color: 'var(--hf-danger-text)' }}>
+                We couldn't load your tasks. <button type="button" onClick={() => myQ.refetch()} style={{ background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', color: 'inherit', fontWeight: 700 }}>Try again</button>
+              </div>
+            ) : myQ.isLoading ? (
+              <div style={{ fontSize: 14, color: 'var(--hf-text-muted)' }}>Loading your tasks…</div>
+            ) : (
+              <MyTasksList tasks={myQ.data ?? []} boards={boardsQ.data} onOpen={t => navigate(`${TASKS_SECTIONS.basePath}/boards?board=${t.boardId}&task=${t.id}`)} />
+            )
+          )
+          default: return null
+        }
+      }}>
       {selected && board && (
         <TaskDetailModal key={selected.id} task={selected} columns={columns} users={usersQ.data ?? []} readOnly={!canManage}
           onClose={() => setUrl({ task: null })} onRefresh={refresh}
@@ -148,7 +174,7 @@ export function TasksPage() {
         <BoardSettingsModal board={board} columns={columns} initialTab={settings} onClose={() => setSettings(null)}
           onArchived={() => { setSettings(null); setUrl({ board: null, task: null }) }} />
       )}
-    </div>
+    </SectionedModulePage>
   )
 }
 

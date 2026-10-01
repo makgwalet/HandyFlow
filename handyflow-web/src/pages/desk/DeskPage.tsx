@@ -8,6 +8,8 @@ import {
   Shield, Link2, Send, Lock, Inbox, BarChart2,
   RefreshCw, UserCheck, Filter, Download, Edit3,
 } from 'lucide-react'
+import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
+import { DESK_SECTIONS } from '../../navigation/moduleSections'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Ticket {
@@ -547,163 +549,159 @@ export function DeskPage() {
   ]
 
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 22, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--hf-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <MessageSquare size={18} style={{ color: 'var(--hf-text-on-solid)' }} />
-            </div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>Desk Support</h1>
-          </div>
-          <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0, paddingLeft: 46 }}>
-            Support tickets · SLA tracking · Customer portal · Internal issues
-          </p>
-        </div>
+    <SectionedModulePage config={DESK_SECTIONS}
+      subtitle="Support tickets · SLA tracking · Customer portal · Internal issues"
+      action={(
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={exportCSV} style={btnS}><Download size={13} /> Export</button>
           <button onClick={() => setShowCreate(true)} style={btnP}><Plus size={14} /> New Ticket</button>
         </div>
-      </div>
+      )}
+      banner={(
+        <>
+          {/* KPI strip */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 10 }}>
+            {kpis.slice(0, 4).map(k => (
+              <div key={k.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+                onClick={() => setStatusFilter(statusFilter === k.label.toUpperCase().replace(/ /g, '_') ? '' : k.label.toUpperCase().replace(/ /g, '_'))}>
+                <div style={{ width: 36, height: 36, borderRadius: 9, background: k.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: k.color, flexShrink: 0 }}>{k.icon}</div>
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: k.color }}>{k.value}</div>
+                  <div style={{ fontSize: 10, color: 'var(--hf-text-faint)' }}>{k.label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 22 }}>
+            {kpis.slice(4).map(k => (
+              <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ color: k.color }}>{k.icon}</div>
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: k.color }}>{k.value}</div>
+                  <div style={{ fontSize: 10, color: k.color, opacity: 0.7 }}>{k.label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      render={id => {
+        switch (id) {
+          case 'tickets': return (
+            <>
+              {/* Toolbar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {/* Status filters */}
+                  {['', 'OPEN', 'IN_PROGRESS', 'WAITING_ON_CUSTOMER', 'RESOLVED', 'CLOSED'].map(s => {
+                    const cfg = STATUS[s]; const active = statusFilter === s
+                    return (
+                      <button key={s} onClick={() => setStatusFilter(s)}
+                        style={{ padding: '6px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer', fontWeight: active ? 700 : 500, border: `1.5px solid ${active && cfg ? cfg.border : 'var(--hf-border)'}`, background: active && cfg ? cfg.bg : 'var(--hf-surface)', color: active && cfg ? cfg.color : 'var(--hf-text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {s && cfg && <span style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.dot }} />}
+                        {s ? cfg.label : 'All tickets'}
+                      </button>
+                    )
+                  })}
+                  <div style={{ position: 'relative' as const }}>
+                    <Search size={13} style={{ position: 'absolute' as const, left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--hf-text-faint)' }} />
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tickets..."
+                      style={{ paddingLeft: 28, padding: '7px 10px 7px 28px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', width: 180 }} />
+                  </div>
+                  <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)}
+                    style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
+                    <option value="">All priorities</option>
+                    {['URGENT','HIGH','NORMAL','LOW'].map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                  <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)}
+                    style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
+                    <option value="">All channels</option>
+                    <option value="HELPDESK">Helpdesk</option>
+                    <option value="INTERNAL">Internal</option>
+                  </select>
+                  {(search || statusFilter || priorityFilter || channelFilter) && (
+                    <button onClick={() => { setSearch(''); setStatusFilter(''); setPriorityFilter(''); setChannelFilter('') }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, background: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)', cursor: 'pointer' }}>
+                      <X size={11} /> Clear
+                    </button>
+                  )}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--hf-text-faint)' }}>{filtered.length} ticket{filtered.length !== 1 ? 's' : ''}</div>
+              </div>
 
-      {/* KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 10 }}>
-        {kpis.slice(0, 4).map(k => (
-          <div key={k.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
-            onClick={() => setStatusFilter(statusFilter === k.label.toUpperCase().replace(/ /g, '_') ? '' : k.label.toUpperCase().replace(/ /g, '_'))}>
-            <div style={{ width: 36, height: 36, borderRadius: 9, background: k.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: k.color, flexShrink: 0 }}>{k.icon}</div>
-            <div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: k.color }}>{k.value}</div>
-              <div style={{ fontSize: 10, color: 'var(--hf-text-faint)' }}>{k.label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 22 }}>
-        {kpis.slice(4).map(k => (
-          <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ color: k.color }}>{k.icon}</div>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: k.color }}>{k.value}</div>
-              <div style={{ fontSize: 10, color: k.color, opacity: 0.7 }}>{k.label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Main card */}
-      <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, padding: 24 }}>
-        {/* Toolbar */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {/* Status filters */}
-            {['', 'OPEN', 'IN_PROGRESS', 'WAITING_ON_CUSTOMER', 'RESOLVED', 'CLOSED'].map(s => {
-              const cfg = STATUS[s]; const active = statusFilter === s
-              return (
-                <button key={s} onClick={() => setStatusFilter(s)}
-                  style={{ padding: '6px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer', fontWeight: active ? 700 : 500, border: `1.5px solid ${active && cfg ? cfg.border : 'var(--hf-border)'}`, background: active && cfg ? cfg.bg : 'var(--hf-surface)', color: active && cfg ? cfg.color : 'var(--hf-text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  {s && cfg && <span style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.dot }} />}
-                  {s ? cfg.label : 'All tickets'}
-                </button>
-              )
-            })}
-            <div style={{ position: 'relative' as const }}>
-              <Search size={13} style={{ position: 'absolute' as const, left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--hf-text-faint)' }} />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tickets..."
-                style={{ paddingLeft: 28, padding: '7px 10px 7px 28px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', width: 180 }} />
-            </div>
-            <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)}
-              style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
-              <option value="">All priorities</option>
-              {['URGENT','HIGH','NORMAL','LOW'].map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-            <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)}
-              style={{ padding: '7px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--hf-surface)' }}>
-              <option value="">All channels</option>
-              <option value="HELPDESK">Helpdesk</option>
-              <option value="INTERNAL">Internal</option>
-            </select>
-            {(search || statusFilter || priorityFilter || channelFilter) && (
-              <button onClick={() => { setSearch(''); setStatusFilter(''); setPriorityFilter(''); setChannelFilter('') }}
-                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, background: 'var(--hf-surface-muted)', color: 'var(--hf-text-muted)', cursor: 'pointer' }}>
-                <X size={11} /> Clear
-              </button>
-            )}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--hf-text-faint)' }}>{filtered.length} ticket{filtered.length !== 1 ? 's' : ''}</div>
-        </div>
-
-        {/* Tickets table */}
-        {isLoading ? (
-          <div style={{ textAlign: 'center', padding: 48, color: 'var(--hf-text-faint)' }}>Loading tickets...</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-            <MessageSquare size={40} style={{ marginBottom: 12, color: 'var(--hf-text-disabled)' }} />
-            <div style={{ fontWeight: 700, color: 'var(--hf-text-tertiary)', fontSize: 15, marginBottom: 6 }}>No tickets found</div>
-            <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', marginBottom: 18 }}>Create your first ticket or adjust the filters.</div>
-            <button onClick={() => setShowCreate(true)} style={btnP}><Plus size={14} /> New ticket</button>
-          </div>
-        ) : (
-          <div style={{ border: '1px solid var(--hf-border)', borderRadius: 12, overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border)' }}>
-                  {['Subject', 'Requester', 'Category', 'Priority', 'Status', 'SLA', 'Updated', ''].map(h => (
-                    <th key={h} style={{ padding: '10px 16px', textAlign: 'left' as const, fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', letterSpacing: '0.05em' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((t, i) => {
-                  const sc = STATUS[t.status] ?? STATUS.OPEN
-                  const pc = PRIORITY[t.priority] ?? PRIORITY.NORMAL
-                  const rowBg = t.slaBreached ? 'var(--hf-danger-soft)' : t.priority === 'URGENT' && !['RESOLVED','CLOSED'].includes(t.status) ? 'var(--hf-warning-soft)' : i % 2 === 0 ? 'var(--hf-surface)' : 'var(--hf-surface-muted)'
-                  return (
-                    <tr key={t.id} onClick={() => setSelectedTicket(t)} style={{ background: rowBg, cursor: 'pointer', transition: 'background 0.1s' }}
-                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--hf-sky-soft)'}
-                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = rowBg}>
-                      <td style={{ padding: '12px 16px', maxWidth: 260 }}>
-                        <div style={{ fontWeight: 700, color: 'var(--hf-text)', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                          {t.slaBreached && <AlertTriangle size={12} style={{ color: 'var(--hf-danger-text)', flexShrink: 0, marginTop: 2 }} />}
-                          <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>{t.subject}</span>
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 2, display: 'flex', gap: 6 }}>
-                          <span>#{t.ticketNumber}</span>
-                          {t.channel === 'INTERNAL' && <span style={{ color: 'var(--hf-violet-text)' }}>Internal</span>}
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <div style={{ fontWeight: 500, color: 'var(--hf-text-secondary)', fontSize: 13 }}>{t.requesterName ?? '—'}</div>
-                        <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{t.requesterEmail ?? ''}</div>
-                      </td>
-                      <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--hf-text-muted)' }}>
-                        {t.categoryName ? <span style={{ background: 'var(--hf-surface-sunken)', padding: '2px 8px', borderRadius: 20, fontSize: 11 }}>{t.categoryName}</span> : '—'}
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: pc.bg, color: pc.color, border: `1px solid ${pc.border}`, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
-                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: pc.dot }} />{t.priority}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
-                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: sc.dot }} />{sc.label}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <div style={{ fontSize: 12, color: slaColor(t), fontWeight: t.slaBreached ? 700 : 400 }}>{slaLabel(t)}</div>
-                      </td>
-                      <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--hf-text-faint)' }}>{fmtDate(t.updatedAt)}</td>
-                      <td style={{ padding: '12px 16px' }}><ChevronRight size={14} style={{ color: 'var(--hf-text-faint)' }} /></td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
+              {/* Tickets table */}
+              {isLoading ? (
+                <div style={{ textAlign: 'center', padding: 48, color: 'var(--hf-text-faint)' }}>Loading tickets...</div>
+              ) : filtered.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                  <MessageSquare size={40} style={{ marginBottom: 12, color: 'var(--hf-text-disabled)' }} />
+                  <div style={{ fontWeight: 700, color: 'var(--hf-text-tertiary)', fontSize: 15, marginBottom: 6 }}>No tickets found</div>
+                  <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', marginBottom: 18 }}>Create your first ticket or adjust the filters.</div>
+                  <button onClick={() => setShowCreate(true)} style={btnP}><Plus size={14} /> New ticket</button>
+                </div>
+              ) : (
+                <div style={{ border: '1px solid var(--hf-border)', borderRadius: 12, overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border)' }}>
+                        {['Subject', 'Requester', 'Category', 'Priority', 'Status', 'SLA', 'Updated', ''].map(h => (
+                          <th key={h} style={{ padding: '10px 16px', textAlign: 'left' as const, fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', letterSpacing: '0.05em' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((t, i) => {
+                        const sc = STATUS[t.status] ?? STATUS.OPEN
+                        const pc = PRIORITY[t.priority] ?? PRIORITY.NORMAL
+                        const rowBg = t.slaBreached ? 'var(--hf-danger-soft)' : t.priority === 'URGENT' && !['RESOLVED','CLOSED'].includes(t.status) ? 'var(--hf-warning-soft)' : i % 2 === 0 ? 'var(--hf-surface)' : 'var(--hf-surface-muted)'
+                        return (
+                          <tr key={t.id} onClick={() => setSelectedTicket(t)} style={{ background: rowBg, cursor: 'pointer', transition: 'background 0.1s' }}
+                            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--hf-sky-soft)'}
+                            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = rowBg}>
+                            <td style={{ padding: '12px 16px', maxWidth: 260 }}>
+                              <div style={{ fontWeight: 700, color: 'var(--hf-text)', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                                {t.slaBreached && <AlertTriangle size={12} style={{ color: 'var(--hf-danger-text)', flexShrink: 0, marginTop: 2 }} />}
+                                <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>{t.subject}</span>
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 2, display: 'flex', gap: 6 }}>
+                                <span>#{t.ticketNumber}</span>
+                                {t.channel === 'INTERNAL' && <span style={{ color: 'var(--hf-violet-text)' }}>Internal</span>}
+                              </div>
+                            </td>
+                            <td style={{ padding: '12px 16px' }}>
+                              <div style={{ fontWeight: 500, color: 'var(--hf-text-secondary)', fontSize: 13 }}>{t.requesterName ?? '—'}</div>
+                              <div style={{ fontSize: 11, color: 'var(--hf-text-faint)' }}>{t.requesterEmail ?? ''}</div>
+                            </td>
+                            <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--hf-text-muted)' }}>
+                              {t.categoryName ? <span style={{ background: 'var(--hf-surface-sunken)', padding: '2px 8px', borderRadius: 20, fontSize: 11 }}>{t.categoryName}</span> : '—'}
+                            </td>
+                            <td style={{ padding: '12px 16px' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: pc.bg, color: pc.color, border: `1px solid ${pc.border}`, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                                <span style={{ width: 4, height: 4, borderRadius: '50%', background: pc.dot }} />{t.priority}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px 16px' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                                <span style={{ width: 4, height: 4, borderRadius: '50%', background: sc.dot }} />{sc.label}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px 16px' }}>
+                              <div style={{ fontSize: 12, color: slaColor(t), fontWeight: t.slaBreached ? 700 : 400 }}>{slaLabel(t)}</div>
+                            </td>
+                            <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--hf-text-faint)' }}>{fmtDate(t.updatedAt)}</td>
+                            <td style={{ padding: '12px 16px' }}><ChevronRight size={14} style={{ color: 'var(--hf-text-faint)' }} /></td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )
+          default: return null
+        }
+      }}>
       {showCreate && (
         <CreateTicketModal categories={categories as Category[]} onClose={() => setShowCreate(false)}
           onSaved={invalidate} />
@@ -713,6 +711,6 @@ export function DeskPage() {
         <TicketDetail ticket={selectedTicket} onClose={() => setSelectedTicket(null)}
           onUpdated={updated => { setSelectedTicket(updated); invalidate() }} />
       )}
-    </div>
+    </SectionedModulePage>
   )
 }

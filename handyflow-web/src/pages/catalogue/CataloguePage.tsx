@@ -6,6 +6,8 @@ import {
   X, Pencil, AlertTriangle, AlertCircle, MoreVertical,
 } from 'lucide-react'
 import { apiClient } from '../../api/client'
+import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
+import { CATALOGUE_SECTIONS } from '../../navigation/moduleSections'
 
 interface Category { id: string; name: string; description: string; sortOrder: number }
 interface CatalogueItem {
@@ -466,14 +468,9 @@ export function CataloguePage() {
   const catItemCount = (catName: string) => items.filter(i => i.categoryName === catName).length
 
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 }}>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--hf-text)', margin: '0 0 4px', letterSpacing: '-0.4px' }}>Catalogue</h1>
-          <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0 }}>Manage your products and services</p>
-        </div>
+    <SectionedModulePage config={CATALOGUE_SECTIONS}
+      subtitle="Manage your products and services"
+      action={(
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={() => { setShowCatModal(true); setCatError(''); setCatFieldErrors(EMPTY_ERRORS) }}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
@@ -484,93 +481,100 @@ export function CataloguePage() {
             <Plus size={15} /> Add item
           </button>
         </div>
-      </div>
-
-      {/* Search */}
-      <div style={{ position: 'relative', marginBottom: 24 }}>
-        <Search size={15} style={{ color: 'var(--hf-text-faint)', position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items..."
-          style={{ ...inp, paddingLeft: 38 }} />
-      </div>
-
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 28 }}>
-        {[
-          { label: 'Total items', value: items.length, color: 'var(--hf-info-soft)', iconColor: 'var(--hf-info-text)', icon: Package },
-          { label: 'Categories',  value: categories.length, color: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text)', icon: Tag },
-          { label: 'Avg price', value: items.length ? `R ${Math.round(items.reduce((s, i) => s + i.defaultPrice, 0) / items.length).toLocaleString()}` : 'R 0', color: 'var(--hf-warning-soft)', iconColor: 'var(--hf-warning-text)', icon: Package },
-        ].map(s => (
-          <div key={s.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 12, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <p style={{ fontSize: 11, color: 'var(--hf-text-faint)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</p>
-              <p style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>{s.value}</p>
-            </div>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <s.icon size={18} style={{ color: s.iconColor }} />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Content */}
-      {categories.length === 0 && items.length === 0 ? (
-        <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: '60px 24px', textAlign: 'center' }}>
-          <Package size={40} style={{ color: 'var(--hf-text-disabled)', marginBottom: 12 }} />
-          <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--hf-text-muted)', margin: '0 0 6px' }}>No items yet</p>
-          <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0 }}>Create a category and start adding your products and services</p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-          {/* Uncategorised */}
-          {filtered.filter(i => !i.categoryName).length > 0 && (
-            <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 14, overflow: 'hidden' }}>
-              <div style={{ padding: '12px 20px', background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border-subtle)' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Uncategorised</span>
-              </div>
-              <ItemTable items={filtered.filter(i => !i.categoryName)} onEdit={openEditItem} onDelete={item => { setDeleteItem(item); setDeleteItemError('') }} />
-            </div>
-          )}
-
-          {/* Per-category */}
-          {categories.map(cat => {
-            const catItems = filtered.filter(i => i.categoryName === cat.name)
-            const expanded = expandedCats.has(cat.id)
-            return (
-              <div key={cat.id} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 14, overflow: 'hidden' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', cursor: 'pointer', background: expanded ? 'var(--hf-surface-muted)' : 'var(--hf-surface)' }}
-                  onClick={() => toggleCat(cat.id)}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--hf-violet-soft-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Tag size={15} style={{ color: 'var(--hf-violet-text)' }} />
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--hf-text)', margin: 0 }}>{cat.name}</p>
-                      {cat.description && <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: 0 }}>{cat.description}</p>}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 12, color: 'var(--hf-text-faint)', fontWeight: 500 }}>{catItems.length} items</span>
-                    <CategoryMenu cat={cat} onEdit={() => openEditCat(cat)} onDelete={() => { setDeleteCat(cat); setDeleteCatError('') }} />
-                    {expanded ? <ChevronUp size={16} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={16} style={{ color: 'var(--hf-text-faint)' }} />}
-                  </div>
-                </div>
-                {expanded && catItems.length > 0 && (
-                  <div style={{ borderTop: '1px solid var(--hf-border-subtle)' }}>
-                    <ItemTable items={catItems} onEdit={openEditItem} onDelete={item => { setDeleteItem(item); setDeleteItemError('') }} />
-                  </div>
-                )}
-                {expanded && catItems.length === 0 && (
-                  <div style={{ padding: '20px 24px', borderTop: '1px solid var(--hf-border-subtle)', textAlign: 'center' }}>
-                    <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0 }}>No items in this category yet</p>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
       )}
+      render={id => {
+        switch (id) {
+          case 'items': return (
+            <>
+              {/* Search */}
+              <div style={{ position: 'relative', marginBottom: 24 }}>
+                <Search size={15} style={{ color: 'var(--hf-text-faint)', position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items..."
+                  style={{ ...inp, paddingLeft: 38 }} />
+              </div>
 
+              {/* Stats */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 28 }}>
+                {[
+                  { label: 'Total items', value: items.length, color: 'var(--hf-info-soft)', iconColor: 'var(--hf-info-text)', icon: Package },
+                  { label: 'Categories',  value: categories.length, color: 'var(--hf-success-soft)', iconColor: 'var(--hf-success-text)', icon: Tag },
+                  { label: 'Avg price', value: items.length ? `R ${Math.round(items.reduce((s, i) => s + i.defaultPrice, 0) / items.length).toLocaleString()}` : 'R 0', color: 'var(--hf-warning-soft)', iconColor: 'var(--hf-warning-text)', icon: Package },
+                ].map(s => (
+                  <div key={s.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 12, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <p style={{ fontSize: 11, color: 'var(--hf-text-faint)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</p>
+                      <p style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>{s.value}</p>
+                    </div>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <s.icon size={18} style={{ color: s.iconColor }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Content */}
+              {categories.length === 0 && items.length === 0 ? (
+                <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 16, padding: '60px 24px', textAlign: 'center' }}>
+                  <Package size={40} style={{ color: 'var(--hf-text-disabled)', marginBottom: 12 }} />
+                  <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--hf-text-muted)', margin: '0 0 6px' }}>No items yet</p>
+                  <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0 }}>Create a category and start adding your products and services</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+                  {/* Uncategorised */}
+                  {filtered.filter(i => !i.categoryName).length > 0 && (
+                    <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 14, overflow: 'hidden' }}>
+                      <div style={{ padding: '12px 20px', background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border-subtle)' }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Uncategorised</span>
+                      </div>
+                      <ItemTable items={filtered.filter(i => !i.categoryName)} onEdit={openEditItem} onDelete={item => { setDeleteItem(item); setDeleteItemError('') }} />
+                    </div>
+                  )}
+
+                  {/* Per-category */}
+                  {categories.map(cat => {
+                    const catItems = filtered.filter(i => i.categoryName === cat.name)
+                    const expanded = expandedCats.has(cat.id)
+                    return (
+                      <div key={cat.id} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 14, overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', cursor: 'pointer', background: expanded ? 'var(--hf-surface-muted)' : 'var(--hf-surface)' }}
+                          onClick={() => toggleCat(cat.id)}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--hf-violet-soft-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Tag size={15} style={{ color: 'var(--hf-violet-text)' }} />
+                            </div>
+                            <div>
+                              <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--hf-text)', margin: 0 }}>{cat.name}</p>
+                              {cat.description && <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: 0 }}>{cat.description}</p>}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: 12, color: 'var(--hf-text-faint)', fontWeight: 500 }}>{catItems.length} items</span>
+                            <CategoryMenu cat={cat} onEdit={() => openEditCat(cat)} onDelete={() => { setDeleteCat(cat); setDeleteCatError('') }} />
+                            {expanded ? <ChevronUp size={16} style={{ color: 'var(--hf-text-faint)' }} /> : <ChevronDown size={16} style={{ color: 'var(--hf-text-faint)' }} />}
+                          </div>
+                        </div>
+                        {expanded && catItems.length > 0 && (
+                          <div style={{ borderTop: '1px solid var(--hf-border-subtle)' }}>
+                            <ItemTable items={catItems} onEdit={openEditItem} onDelete={item => { setDeleteItem(item); setDeleteItemError('') }} />
+                          </div>
+                        )}
+                        {expanded && catItems.length === 0 && (
+                          <div style={{ padding: '20px 24px', borderTop: '1px solid var(--hf-border-subtle)', textAlign: 'center' }}>
+                            <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0 }}>No items in this category yet</p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )
+          default: return null
+        }
+      }}>
       {/* ── Add Category Modal ─────────────────────────────────────────── */}
       {showCatModal && (
         <Modal title="New Category" onClose={() => { setShowCatModal(false); setCatForm(EMPTY_CAT_FORM); setCatError(''); setCatFieldErrors(EMPTY_ERRORS) }}>
@@ -686,7 +690,7 @@ export function CataloguePage() {
           onCancel={() => { setDeleteCat(null); setDeleteCatError('') }}
         />
       )}
-    </div>
+    </SectionedModulePage>
   )
 }
 

@@ -9,6 +9,8 @@ import {
   Utensils, Car, Package, Phone, BookOpen, Wrench,
   Briefcase, MoreHorizontal, BarChart2, Filter,
 } from "lucide-react"
+import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
+import { EXPENSES_SECTIONS } from "../../navigation/moduleSections"
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Claim {
@@ -212,225 +214,221 @@ export function ExpensesPage() {
   }
 
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 22, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--hf-warning)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Receipt size={18} style={{ color: 'var(--hf-text-on-solid)' }} />
-            </div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Expenses</h1>
-          </div>
-          <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0, paddingLeft: 46 }}>
-            Staff expense claims · Approval workflow · Accounting integration
-          </p>
-        </div>
+    <SectionedModulePage config={EXPENSES_SECTIONS}
+      subtitle="Staff expense claims · Approval workflow · Accounting integration"
+      action={(
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={exportCSV} style={btnSecondary}><Download size={13} /> Export CSV</button>
           <button onClick={() => { setShowCreate(true); setError("") }} style={btnPrimary}><Plus size={14} /> Submit Claim</button>
         </div>
-      </div>
-
-      {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 22 }}>
-        {[
-          { label: "Pending approval", value: fmtR(pendingTotal), sub: `${pendingCount} claim${pendingCount !== 1 ? "s" : ""}`, color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", icon: <Clock size={16} /> },
-          { label: "Approved this month", value: fmtR(monthlyTotal ?? 0), sub: `${approvedCount} approved`, color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", icon: <CheckCircle size={16} /> },
-          { label: "Reimbursed", value: `${reimbursedCount}`, sub: "claims paid out", color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", icon: <DollarSign size={16} /> },
-          { label: "Total claims", value: `${allClaims.length}`, sub: "all time", color: "var(--hf-primary-text)", bg: "var(--hf-indigo-soft)", icon: <Receipt size={16} /> },
-          { label: "Top category", value: topCategory ? CATEGORIES[topCategory[0]]?.label ?? topCategory[0] : "—", sub: topCategory ? fmtR(topCategory[1]) : "No data", color: "var(--hf-accent-text)", bg: "var(--hf-accent-soft)", icon: <BarChart2 size={16} /> },
-        ].map(k => (
-          <div key={k.label} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 9, background: k.bg, display: "flex", alignItems: "center", justifyContent: "center", color: k.color, flexShrink: 0 }}>{k.icon}</div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: k.color, letterSpacing: "-0.02em" }}>{k.value}</div>
-              <div style={{ fontSize: 10, color: "var(--hf-text-faint)", marginTop: 1 }}>{k.label}</div>
-              <div style={{ fontSize: 10, color: k.color, opacity: 0.7 }}>{k.sub}</div>
-            </div>
+      )}
+      banner={(
+        <>
+          {/* KPI strip */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 22 }}>
+            {[
+              { label: "Pending approval", value: fmtR(pendingTotal), sub: `${pendingCount} claim${pendingCount !== 1 ? "s" : ""}`, color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", icon: <Clock size={16} /> },
+              { label: "Approved this month", value: fmtR(monthlyTotal ?? 0), sub: `${approvedCount} approved`, color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", icon: <CheckCircle size={16} /> },
+              { label: "Reimbursed", value: `${reimbursedCount}`, sub: "claims paid out", color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", icon: <DollarSign size={16} /> },
+              { label: "Total claims", value: `${allClaims.length}`, sub: "all time", color: "var(--hf-primary-text)", bg: "var(--hf-indigo-soft)", icon: <Receipt size={16} /> },
+              { label: "Top category", value: topCategory ? CATEGORIES[topCategory[0]]?.label ?? topCategory[0] : "—", sub: topCategory ? fmtR(topCategory[1]) : "No data", color: "var(--hf-accent-text)", bg: "var(--hf-accent-soft)", icon: <BarChart2 size={16} /> },
+            ].map(k => (
+              <div key={k.label} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 9, background: k.bg, display: "flex", alignItems: "center", justifyContent: "center", color: k.color, flexShrink: 0 }}>{k.icon}</div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: k.color, letterSpacing: "-0.02em" }}>{k.value}</div>
+                  <div style={{ fontSize: 10, color: "var(--hf-text-faint)", marginTop: 1 }}>{k.label}</div>
+                  <div style={{ fontSize: 10, color: k.color, opacity: 0.7 }}>{k.sub}</div>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
+      render={id => {
+        switch (id) {
+          case "claims": return (
+            <>
+              {/* Toolbar */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  {/* Status filters */}
+                  {["", "PENDING", "APPROVED", "REJECTED", "REIMBURSED"].map(s => {
+                    const cfg = STATUS[s]
+                    const active = statusFilter === s
+                    return (
+                      <button key={s} onClick={() => setStatus(s)}
+                        style={{ padding: "6px 13px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: active ? 700 : 500, border: `1.5px solid ${active && cfg ? cfg.border : "var(--hf-border)"}`, background: active && cfg ? cfg.bg : "var(--hf-surface)", color: active && cfg ? cfg.color : "var(--hf-text-muted)", display: "flex", alignItems: "center", gap: 5 }}>
+                        {s && cfg && <span style={{ width: 6, height: 6, borderRadius: "50%", background: cfg.dot }} />}
+                        {s ? cfg.label : "All claims"}
+                      </button>
+                    )
+                  })}
 
-      {/* Main card */}
-      <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: 24 }}>
-        {/* Toolbar */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            {/* Status filters */}
-            {["", "PENDING", "APPROVED", "REJECTED", "REIMBURSED"].map(s => {
-              const cfg = STATUS[s]
-              const active = statusFilter === s
-              return (
-                <button key={s} onClick={() => setStatus(s)}
-                  style={{ padding: "6px 13px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: active ? 700 : 500, border: `1.5px solid ${active && cfg ? cfg.border : "var(--hf-border)"}`, background: active && cfg ? cfg.bg : "var(--hf-surface)", color: active && cfg ? cfg.color : "var(--hf-text-muted)", display: "flex", alignItems: "center", gap: 5 }}>
-                  {s && cfg && <span style={{ width: 6, height: 6, borderRadius: "50%", background: cfg.dot }} />}
-                  {s ? cfg.label : "All claims"}
-                </button>
-              )
-            })}
-
-            {/* Search */}
-            <div style={{ position: "relative" as const }}>
-              <Search size={13} style={{ position: "absolute" as const, left: 9, top: "50%", transform: "translateY(-50%)", color: "var(--hf-text-faint)" }} />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search claims..."
-                style={{ paddingLeft: 28, padding: "7px 10px 7px 28px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", width: 180 }} />
-            </div>
-
-            {/* Category filter */}
-            <select value={catFilter} onChange={e => setCat(e.target.value)}
-              style={{ padding: "7px 10px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", background: "var(--hf-surface)" }}>
-              <option value="">All categories</option>
-              {Object.entries(CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-            </select>
-
-            {/* Employee filter */}
-            {employees.length > 0 && (
-              <select value={empFilter} onChange={e => setEmp(e.target.value)}
-                style={{ padding: "7px 10px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", background: "var(--hf-surface)" }}>
-                <option value="">All employees</option>
-                {employees.map((e: Employee) => <option key={e.id} value={e.id}>{e.fullName}</option>)}
-              </select>
-            )}
-
-            {(search || catFilter || empFilter) && (
-              <button onClick={() => { setSearch(""); setCat(""); setEmp("") }}
-                style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12, background: "var(--hf-surface-muted)", color: "var(--hf-text-muted)", cursor: "pointer" }}>
-                <X size={11} /> Clear
-              </button>
-            )}
-          </div>
-          <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>{filtered.length} claim{filtered.length !== 1 ? "s" : ""}</div>
-        </div>
-
-        {/* Category spending bar */}
-        {Object.keys(byCategory).length > 0 && (
-          <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--hf-surface-muted)", borderRadius: 10, border: "1px solid var(--hf-border)" }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Approved spend by category</div>
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-              {Object.entries(byCategory).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([cat, total]) => {
-                const cfg = CATEGORIES[cat]
-                const Icon = cfg?.icon ?? Tag
-                return (
-                  <div key={cat} style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                    <div style={{ width: 24, height: 24, borderRadius: 6, background: `color-mix(in srgb, ${cfg?.color ?? "var(--hf-neutral-solid)"} 13%, transparent)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <Icon size={12} style={{ color: cfg?.color ?? "var(--hf-text-muted)" }} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 10, color: "var(--hf-text-faint)" }}>{cfg?.label ?? cat}</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text)" }}>{fmtR(total)}</div>
-                    </div>
+                  {/* Search */}
+                  <div style={{ position: "relative" as const }}>
+                    <Search size={13} style={{ position: "absolute" as const, left: 9, top: "50%", transform: "translateY(-50%)", color: "var(--hf-text-faint)" }} />
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search claims..."
+                      style={{ paddingLeft: 28, padding: "7px 10px 7px 28px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", width: 180 }} />
                   </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
 
-        {/* Claims table */}
-        {isLoading ? (
-          <div style={{ textAlign: "center", padding: 48, color: "var(--hf-text-faint)" }}>Loading claims...</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
-            <Receipt size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
-            <div style={{ fontWeight: 700, color: "var(--hf-text-tertiary)", fontSize: 15, marginBottom: 6 }}>No expense claims found</div>
-            <div style={{ fontSize: 13, marginBottom: 20 }}>Submit your first claim or adjust the filters above.</div>
-            <button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={14} /> Submit Claim</button>
-          </div>
-        ) : (
-          <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" as const, fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border)" }}>
-                  {["Claim", "Employee", "Category", "Date", "Amount", "Status", ""].map(h => (
-                    <th key={h} style={{ padding: "10px 16px", textAlign: "left" as const, fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", letterSpacing: "0.05em", whiteSpace: "nowrap" as const }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((c, i) => {
-                  const sc  = STATUS[c.status] ?? STATUS.PENDING
-                  const catCfg = CATEGORIES[c.category]
-                  const Icon   = catCfg?.icon ?? Tag
-                  return (
-                    <tr key={c.id}
-                      style={{ background: i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)", cursor: "pointer", transition: "background 0.1s" }}
-                      onClick={() => setSelected(c)}
-                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--hf-sky-soft)"}
-                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)"}>
-                      <td style={{ padding: "12px 16px" }}>
-                        <div style={{ fontWeight: 700, color: "var(--hf-text)" }}>{c.description}</div>
-                        <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 1 }}>#{c.claimNumber}</div>
-                      </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                          <div style={{ width: 26, height: 26, borderRadius: "50%", background: "var(--hf-primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                            <span style={{ fontSize: 10, color: "var(--hf-text-on-solid)", fontWeight: 700 }}>{c.employeeName.charAt(0).toUpperCase()}</span>
+                  {/* Category filter */}
+                  <select value={catFilter} onChange={e => setCat(e.target.value)}
+                    style={{ padding: "7px 10px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", background: "var(--hf-surface)" }}>
+                    <option value="">All categories</option>
+                    {Object.entries(CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                  </select>
+
+                  {/* Employee filter */}
+                  {employees.length > 0 && (
+                    <select value={empFilter} onChange={e => setEmp(e.target.value)}
+                      style={{ padding: "7px 10px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none", background: "var(--hf-surface)" }}>
+                      <option value="">All employees</option>
+                      {employees.map((e: Employee) => <option key={e.id} value={e.id}>{e.fullName}</option>)}
+                    </select>
+                  )}
+
+                  {(search || catFilter || empFilter) && (
+                    <button onClick={() => { setSearch(""); setCat(""); setEmp("") }}
+                      style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 12, background: "var(--hf-surface-muted)", color: "var(--hf-text-muted)", cursor: "pointer" }}>
+                      <X size={11} /> Clear
+                    </button>
+                  )}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>{filtered.length} claim{filtered.length !== 1 ? "s" : ""}</div>
+              </div>
+
+              {/* Category spending bar */}
+              {Object.keys(byCategory).length > 0 && (
+                <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--hf-surface-muted)", borderRadius: 10, border: "1px solid var(--hf-border)" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Approved spend by category</div>
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                    {Object.entries(byCategory).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([cat, total]) => {
+                      const cfg = CATEGORIES[cat]
+                      const Icon = cfg?.icon ?? Tag
+                      return (
+                        <div key={cat} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                          <div style={{ width: 24, height: 24, borderRadius: 6, background: `color-mix(in srgb, ${cfg?.color ?? "var(--hf-neutral-solid)"} 13%, transparent)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <Icon size={12} style={{ color: cfg?.color ?? "var(--hf-text-muted)" }} />
                           </div>
-                          <span style={{ color: "var(--hf-text-secondary)" }}>{c.employeeName}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <div style={{ width: 22, height: 22, borderRadius: 5, background: `color-mix(in srgb, ${catCfg?.color ?? "var(--hf-text-faint)"} 9%, transparent)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <Icon size={11} style={{ color: catCfg?.color ?? "var(--hf-text-faint)" }} />
+                          <div>
+                            <div style={{ fontSize: 10, color: "var(--hf-text-faint)" }}>{cfg?.label ?? cat}</div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text)" }}>{fmtR(total)}</div>
                           </div>
-                          <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{catCfg?.label ?? c.category}</span>
                         </div>
-                      </td>
-                      <td style={{ padding: "12px 16px", color: "var(--hf-text-muted)", fontSize: 12 }}>{fmtDate(c.claimDate)}</td>
-                      <td style={{ padding: "12px 16px", fontWeight: 800, color: "var(--hf-text)", fontSize: 14 }}>{fmtR(c.amount)}</td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, padding: "2px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
-                          <span style={{ width: 5, height: 5, borderRadius: "50%", background: sc.dot }} />{sc.label}
-                        </span>
-                      </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <div style={{ display: "flex", gap: 5 }}>
-                          {c.status === "PENDING" && (
-                            <>
-                              <button onClick={e => { e.stopPropagation(); setSelected(c); setShowApproveConfirm(true) }}
-                                style={{ display: "flex", alignItems: "center", gap: 3, padding: "4px 10px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-                                <CheckCircle size={10} /> Approve
-                              </button>
-                              <button onClick={e => { e.stopPropagation(); setSelected(c); setShowReject(true); setError("") }}
-                                style={{ display: "flex", alignItems: "center", gap: 3, padding: "4px 8px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>
-                                <XCircle size={10} />
-                              </button>
-                            </>
-                          )}
-                          {c.status === "APPROVED" && (
-                            <button onClick={e => { e.stopPropagation(); setSelected(c); setShowReimburseConfirm(true) }}
-                              style={{ display: "flex", alignItems: "center", gap: 3, padding: "4px 10px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1px solid var(--hf-info-border)", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-                              <DollarSign size={10} /> Pay
-                            </button>
-                          )}
-                          <ChevronRight size={14} style={{ color: 'var(--hf-text-faint)' }} />
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-              {/* Totals footer */}
-              {filtered.length > 1 && (
-                <tfoot>
-                  <tr style={{ background: "var(--hf-surface-muted)", borderTop: "1px solid var(--hf-border)" }}>
-                    <td colSpan={4} style={{ padding: "10px 16px", fontSize: 12, color: "var(--hf-text-muted)", fontWeight: 600 }}>
-                      {filtered.length} claims shown
-                    </td>
-                    <td style={{ padding: "10px 16px", fontWeight: 800, color: "var(--hf-text)", fontSize: 14 }}>
-                      {fmtR(filtered.reduce((s, c) => s + Number(c.amount), 0))}
-                    </td>
-                    <td colSpan={2} />
-                  </tr>
-                </tfoot>
+                      )
+                    })}
+                  </div>
+                </div>
               )}
-            </table>
-          </div>
-        )}
-      </div>
 
+              {/* Claims table */}
+              {isLoading ? (
+                <div style={{ textAlign: "center", padding: 48, color: "var(--hf-text-faint)" }}>Loading claims...</div>
+              ) : filtered.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
+                  <Receipt size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
+                  <div style={{ fontWeight: 700, color: "var(--hf-text-tertiary)", fontSize: 15, marginBottom: 6 }}>No expense claims found</div>
+                  <div style={{ fontSize: 13, marginBottom: 20 }}>Submit your first claim or adjust the filters above.</div>
+                  <button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={14} /> Submit Claim</button>
+                </div>
+              ) : (
+                <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" as const, fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: "var(--hf-surface-muted)", borderBottom: "1px solid var(--hf-border)" }}>
+                        {["Claim", "Employee", "Category", "Date", "Amount", "Status", ""].map(h => (
+                          <th key={h} style={{ padding: "10px 16px", textAlign: "left" as const, fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)", letterSpacing: "0.05em", whiteSpace: "nowrap" as const }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((c, i) => {
+                        const sc  = STATUS[c.status] ?? STATUS.PENDING
+                        const catCfg = CATEGORIES[c.category]
+                        const Icon   = catCfg?.icon ?? Tag
+                        return (
+                          <tr key={c.id}
+                            style={{ background: i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)", cursor: "pointer", transition: "background 0.1s" }}
+                            onClick={() => setSelected(c)}
+                            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--hf-sky-soft)"}
+                            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)"}>
+                            <td style={{ padding: "12px 16px" }}>
+                              <div style={{ fontWeight: 700, color: "var(--hf-text)" }}>{c.description}</div>
+                              <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 1 }}>#{c.claimNumber}</div>
+                            </td>
+                            <td style={{ padding: "12px 16px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                                <div style={{ width: 26, height: 26, borderRadius: "50%", background: "var(--hf-primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                  <span style={{ fontSize: 10, color: "var(--hf-text-on-solid)", fontWeight: 700 }}>{c.employeeName.charAt(0).toUpperCase()}</span>
+                                </div>
+                                <span style={{ color: "var(--hf-text-secondary)" }}>{c.employeeName}</span>
+                              </div>
+                            </td>
+                            <td style={{ padding: "12px 16px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <div style={{ width: 22, height: 22, borderRadius: 5, background: `color-mix(in srgb, ${catCfg?.color ?? "var(--hf-text-faint)"} 9%, transparent)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                  <Icon size={11} style={{ color: catCfg?.color ?? "var(--hf-text-faint)" }} />
+                                </div>
+                                <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{catCfg?.label ?? c.category}</span>
+                              </div>
+                            </td>
+                            <td style={{ padding: "12px 16px", color: "var(--hf-text-muted)", fontSize: 12 }}>{fmtDate(c.claimDate)}</td>
+                            <td style={{ padding: "12px 16px", fontWeight: 800, color: "var(--hf-text)", fontSize: 14 }}>{fmtR(c.amount)}</td>
+                            <td style={{ padding: "12px 16px" }}>
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, padding: "2px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                                <span style={{ width: 5, height: 5, borderRadius: "50%", background: sc.dot }} />{sc.label}
+                              </span>
+                            </td>
+                            <td style={{ padding: "12px 16px" }}>
+                              <div style={{ display: "flex", gap: 5 }}>
+                                {c.status === "PENDING" && (
+                                  <>
+                                    <button onClick={e => { e.stopPropagation(); setSelected(c); setShowApproveConfirm(true) }}
+                                      style={{ display: "flex", alignItems: "center", gap: 3, padding: "4px 10px", background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", border: "1px solid var(--hf-success-border)", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                                      <CheckCircle size={10} /> Approve
+                                    </button>
+                                    <button onClick={e => { e.stopPropagation(); setSelected(c); setShowReject(true); setError("") }}
+                                      style={{ display: "flex", alignItems: "center", gap: 3, padding: "4px 8px", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>
+                                      <XCircle size={10} />
+                                    </button>
+                                  </>
+                                )}
+                                {c.status === "APPROVED" && (
+                                  <button onClick={e => { e.stopPropagation(); setSelected(c); setShowReimburseConfirm(true) }}
+                                    style={{ display: "flex", alignItems: "center", gap: 3, padding: "4px 10px", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", border: "1px solid var(--hf-info-border)", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                                    <DollarSign size={10} /> Pay
+                                  </button>
+                                )}
+                                <ChevronRight size={14} style={{ color: 'var(--hf-text-faint)' }} />
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                    {/* Totals footer */}
+                    {filtered.length > 1 && (
+                      <tfoot>
+                        <tr style={{ background: "var(--hf-surface-muted)", borderTop: "1px solid var(--hf-border)" }}>
+                          <td colSpan={4} style={{ padding: "10px 16px", fontSize: 12, color: "var(--hf-text-muted)", fontWeight: 600 }}>
+                            {filtered.length} claims shown
+                          </td>
+                          <td style={{ padding: "10px 16px", fontWeight: 800, color: "var(--hf-text)", fontSize: 14 }}>
+                            {fmtR(filtered.reduce((s, c) => s + Number(c.amount), 0))}
+                          </td>
+                          <td colSpan={2} />
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              )}
+            </>
+          )
+          default: return null
+        }
+      }}>
       {/* ── Claim detail slide-over ─────────────────────────────────────── */}
       {selected && !showReject && !showApproveConfirm && !showReimburseConfirm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "flex-end", zIndex: 1000 }}>
@@ -677,6 +675,6 @@ export function ExpensesPage() {
           onCancel={() => setShowReimburseConfirm(false)}
         />
       )}
-    </div>
+    </SectionedModulePage>
   )
 }

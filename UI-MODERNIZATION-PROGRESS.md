@@ -300,3 +300,23 @@ unassign. Fixed: a task due today showed as overdue from 02:00 SAST (UTC parse o
   base is owned by nothing and is not in `NON_MODULE_ROUTES` (auth, public, portal, profile, home). Run against the
   old registries it reports exactly these five routes.
 - Fixed in passing: the dashboard's profile button called `setNotifOpen`, which does not exist (ReferenceError on click).
+
+## Sidebar context mode for the last nine modules
+Recruiter, Creative, Catalogue, Compliance Services, Desk Support, Expenses, POS & Stock, Projects and Tasks now use
+the same sidebar as the other modules: "All modules", the module name, then its sections (`*_SECTIONS` in
+`navigation/moduleSections.ts`, 33 configs in all). Each page renders through `SectionedModulePage`, and its route is
+`/<module>/:section?`.
+- Recruiter: Job Postings / Pipeline / Applications. POS: POS Terminal, Transactions / Stock, Purchase Orders.
+  Projects: Dashboard / Projects. Tasks: Boards / My tasks. Creative, Catalogue, Compliance Services, Desk and Expenses
+  have one section each, under "Overview".
+- The in-page header and tab bar are gone (the shared header supplies the title, breadcrumbs and actions); the section
+  is chosen by the URL, not by `useState`.
+- URLs gain a section (`/tasks` -> `/tasks/boards`); old URLs redirect and **the redirect now keeps the query string**
+  (`SectionedModulePage`), so `/tasks?board=&task=` deep links still work.
+- Projects: the open project is `?project=<id>`; the old orphan `/projects/:id` route is removed and a legacy
+  `/projects/<uuid>` link redirects there. `ProjectDetailPage.tsx` and `ProjectListPage.tsx` are now unreferenced.
+- Fixed: `NotificationDrawer` read the route base from the whole URL, so `/tasks?board=...` (and every actionUrl with a
+  query) fell back to the dashboard. The logic is now `navigation/actionUrl.ts`, reads the path only, keeps the query
+  for Tasks, and derives its allow-list from the navigation registry instead of a hand-kept copy.
+- Verified: 124 throwaway vitest tests (not committed; vitest is not a project dependency); `check:navigation` passes
+  (33 configs); no new type or lint errors against the clean baseline (type errors 247, was 249). Not verified in a browser.

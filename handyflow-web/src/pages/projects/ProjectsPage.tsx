@@ -1,85 +1,44 @@
 // src/pages/projects/ProjectsPage.tsx
-// Single-page module — matches ClinicPage pattern exactly
-import { useState } from "react"
-import { HardHat, LayoutDashboard, FolderOpen } from "lucide-react"
+//
+// Sections are routes (/projects/:section) with navigation in the sidebar (see PROJECTS_SECTIONS in
+// navigation/moduleSections.ts and components/shell/SectionedModulePage). An open project is
+// /projects/projects?project=<id>, so it can be bookmarked and survives a refresh.
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom"
+import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
+import { PROJECTS_SECTIONS, findSection } from "../../navigation/moduleSections"
 import { ProjectDashboard } from "./ProjectDashboard"
 import { ProjectListTab }   from "./ProjectListTab"
 import { ProjectDetailTab } from "./ProjectDetailTab"
 
-export type ProjectsView =
-  | { screen: "dashboard" }
-  | { screen: "list" }
-  | { screen: "detail"; projectId: string }
-
-const ACCENT = "var(--hf-primary)"
-const ACCENT_TEXT = "var(--hf-primary-text)";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function ProjectsPage() {
-  const [view, setView] = useState<ProjectsView>({ screen: "dashboard" })
+  const { section } = useParams<{ section?: string }>()
+  const [params] = useSearchParams()
+  const navigate = useNavigate()
+  const base = PROJECTS_SECTIONS.basePath
+  const projectId = params.get("project")
 
-  type Tab = "dashboard" | "projects"
-  const tab: Tab = view.screen === "dashboard" ? "dashboard" : "projects"
+  // /projects/<id> used to be a separate detail page. Keep those links working.
+  if (section && UUID.test(section) && !findSection(PROJECTS_SECTIONS, section)) {
+    return <Navigate replace to={`${base}/projects?project=${section}`} />
+  }
 
-  const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "projects",  label: "Projects",  icon: FolderOpen      },
-  ]
+  const openProject = (id: string) => navigate(`${base}/projects?project=${id}`)
+  const closeProject = () => navigate(`${base}/projects`)
 
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-      {/* Page header — matches ClinicPage exactly */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: ACCENT,
-            display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <HardHat size={18} style={{ color: 'var(--hf-text-on-solid)' }} />
-          </div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Projects</h1>
-        </div>
-        <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0, paddingLeft: 46 }}>
-          Gantt · Resources · Budget · Risk register · Site diaries
-        </p>
-      </div>
-
-      {/* Card */}
-      <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: 24 }}>
-        {/* Tab bar */}
-        <div style={{ display: "flex", gap: 2, borderBottom: "1px solid var(--hf-border)",
-          marginBottom: 28, overflowX: "auto" }}>
-          {TABS.map(t => {
-            const Icon   = t.icon
-            const active = tab === t.id
-            return (
-              <button key={t.id}
-                onClick={() => setView(t.id === "dashboard" ? { screen: "dashboard" } : { screen: "list" })}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "10px 16px", background: "none", border: "none",
-                  whiteSpace: "nowrap",
-                  borderBottom: active ? `2px solid ${ACCENT}` : "2px solid transparent",
-                  color:      active ? ACCENT_TEXT : "var(--hf-text-muted)",
-                  fontWeight: active ? 600 : 400,
-                  fontSize: 13, cursor: "pointer", marginBottom: -1,
-                }}>
-                <Icon size={14} />{t.label}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Content */}
-        {view.screen === "dashboard" && (
-          <ProjectDashboard onOpen={(id) => setView({ screen: "detail", projectId: id })}
-                            onList={() => setView({ screen: "list" })} />
-        )}
-        {view.screen === "list" && (
-          <ProjectListTab onOpen={(id) => setView({ screen: "detail", projectId: id })} />
-        )}
-        {view.screen === "detail" && (
-          <ProjectDetailTab projectId={view.projectId}
-                            onBack={() => setView({ screen: "list" })} />
-        )}
-      </div>
-    </div>
+    <SectionedModulePage config={PROJECTS_SECTIONS}
+      subtitle="Gantt · Resources · Budget · Risk register · Site diaries"
+      detail={section === "projects" && projectId ? { label: "Project", subtitle: "Project details" } : undefined}
+      render={(id, goTo) => {
+        switch (id) {
+          case "dashboard": return <ProjectDashboard onOpen={openProject} onList={() => goTo("projects")} />
+          case "projects":  return projectId
+            ? <ProjectDetailTab projectId={projectId} onBack={closeProject} />
+            : <ProjectListTab onOpen={openProject} />
+          default:          return null
+        }
+      }} />
   )
 }

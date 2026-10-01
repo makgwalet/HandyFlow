@@ -38,7 +38,6 @@ export function BoardToolbar(p: Props) {
         <button type="button" onClick={p.onBack} aria-label="Back to all boards"
           style={{ ...btnSecondary, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '7px 10px' }}><ChevronLeft size={15} />Boards</button>
         <span aria-hidden style={{ width: 11, height: 11, borderRadius: '50%', background: p.board.color ?? 'var(--hf-text-faint)' }} />
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: 'var(--hf-text)' }}>{p.board.name}</h1>
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-muted)', background: 'var(--hf-surface-sunken)', borderRadius: 99, padding: '2px 10px' }}>
           {p.taskCount} {p.taskCount === 1 ? 'task' : 'tasks'}
         </span>

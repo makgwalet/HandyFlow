@@ -21,6 +21,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { Plus, Building2, X, AlertCircle, ChevronRight, Ban, CheckCircle2 } from "lucide-react"
+import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
+import { COMPLIANCE_SERVICES_SECTIONS } from "../../navigation/moduleSections"
 
 interface Client {
   id: string; name: string; crmCustomerId: string | null; crmCustomerFound: boolean
@@ -95,86 +97,81 @@ export default function ComplianceServicesPage() {
   })
 
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Building2 size={18} style={{ color: 'var(--hf-text-on-solid)' }} />
-          </div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Compliance Services</h1>
-        </div>
-        <p style={{ fontSize: 13, color: "var(--hf-text-faint)", margin: 0, paddingLeft: 46 }}>
-          Manage compliance and tender work for your client companies
-        </p>
-      </div>
-
-      <div style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: 24 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
-          <div style={{ display: "flex", gap: 6 }}>
-            {["ALL", "ACTIVE", "INACTIVE"].map(s => (
-              <button key={s} onClick={() => setFilterStatus(s)}
-                style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterStatus === s ? 600 : 400,
-                  background: filterStatus === s ? ACCENT : "var(--hf-surface-sunken)", color: filterStatus === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
-                {s === "ALL" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
-              </button>
-            ))}
-          </div>
-          {canManage && (
-            <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") }}
-              style={{ display: "flex", alignItems: "center", gap: 7, background: ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-              <Plus size={15} /> Add Client
-            </button>
-          )}
-        </div>
-
-        {isLoading ? (
-          <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading clients...</div>
-        ) : clients.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
-            <Building2 size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-            <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No clients yet</div>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {clients.map(c => (
-              <div key={c.id} onClick={() => nav(`/complianceservices/clients/${c.id}`)}
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, border: "1px solid var(--hf-border)", borderRadius: 10, padding: "14px 18px", background: c.status === "INACTIVE" ? "var(--hf-surface-muted)" : "var(--hf-surface)", cursor: "pointer" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--hf-success-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Building2 size={17} style={{ color: ACCENT_TEXT }} />
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{c.name}</div>
-                    <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 2 }}>
-                      {c.crmCustomerId ? (c.crmCustomerFound ? `Linked to CRM: ${c.crmCustomerName}` : "CRM link no longer available") : "No CRM link"}
-                      {c.contactEmail ? ` · ${c.contactEmail}` : ""}
-                    </div>
-                  </div>
+    <SectionedModulePage config={COMPLIANCE_SERVICES_SECTIONS}
+      subtitle="Manage compliance and tender work for your client companies"
+      render={id => {
+        switch (id) {
+          case "clients": return (
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {["ALL", "ACTIVE", "INACTIVE"].map(s => (
+                    <button key={s} onClick={() => setFilterStatus(s)}
+                      style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "none", fontWeight: filterStatus === s ? 600 : 400,
+                        background: filterStatus === s ? ACCENT : "var(--hf-surface-sunken)", color: filterStatus === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)" }}>
+                      {s === "ALL" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
+                    </button>
+                  ))}
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                  <span style={{ background: c.status === "ACTIVE" ? "var(--hf-success-soft-strong)" : "var(--hf-surface-sunken)", color: c.status === "ACTIVE" ? "var(--hf-success-text-strong)" : "var(--hf-text-muted)", padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
-                    {c.status === "ACTIVE" ? "Active" : "Inactive"}
-                  </span>
-                  {canManage && (
-                    <>
-                      {c.status === "ACTIVE" ? (
-                        <button onClick={() => deactivate.mutate(c.id)} title="Deactivate" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><Ban size={13} /></button>
-                      ) : (
-                        <button onClick={() => reactivate.mutate(c.id)} title="Reactivate" style={{ background: "var(--hf-success-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-success-text-strong)" }}><CheckCircle2 size={13} /></button>
-                      )}
-                    </>
-                  )}
-                  {canAdmin && (
-                    <button onClick={() => { if (confirm(`Delete client "${c.name}"? This cannot be undone.`)) remove.mutate(c.id) }} style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)", fontSize: 11, fontWeight: 700 }}>Delete</button>
-                  )}
-                  <ChevronRight size={16} style={{ color: 'var(--hf-text-disabled)' }} />
-                </div>
+                {canManage && (
+                  <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") }}
+                    style={{ display: "flex", alignItems: "center", gap: 7, background: ACCENT, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                    <Plus size={15} /> Add Client
+                  </button>
+                )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
 
+              {isLoading ? (
+                <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading clients...</div>
+              ) : clients.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
+                  <Building2 size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
+                  <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No clients yet</div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {clients.map(c => (
+                    <div key={c.id} onClick={() => nav(`/complianceservices/clients/${c.id}`)}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, border: "1px solid var(--hf-border)", borderRadius: 10, padding: "14px 18px", background: c.status === "INACTIVE" ? "var(--hf-surface-muted)" : "var(--hf-surface)", cursor: "pointer" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--hf-success-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <Building2 size={17} style={{ color: ACCENT_TEXT }} />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-text)" }}>{c.name}</div>
+                          <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 2 }}>
+                            {c.crmCustomerId ? (c.crmCustomerFound ? `Linked to CRM: ${c.crmCustomerName}` : "CRM link no longer available") : "No CRM link"}
+                            {c.contactEmail ? ` · ${c.contactEmail}` : ""}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                        <span style={{ background: c.status === "ACTIVE" ? "var(--hf-success-soft-strong)" : "var(--hf-surface-sunken)", color: c.status === "ACTIVE" ? "var(--hf-success-text-strong)" : "var(--hf-text-muted)", padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                          {c.status === "ACTIVE" ? "Active" : "Inactive"}
+                        </span>
+                        {canManage && (
+                          <>
+                            {c.status === "ACTIVE" ? (
+                              <button onClick={() => deactivate.mutate(c.id)} title="Deactivate" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><Ban size={13} /></button>
+                            ) : (
+                              <button onClick={() => reactivate.mutate(c.id)} title="Reactivate" style={{ background: "var(--hf-success-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-success-text-strong)" }}><CheckCircle2 size={13} /></button>
+                            )}
+                          </>
+                        )}
+                        {canAdmin && (
+                          <button onClick={() => { if (confirm(`Delete client "${c.name}"? This cannot be undone.`)) remove.mutate(c.id) }} style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)", fontSize: 11, fontWeight: 700 }}>Delete</button>
+                        )}
+                        <ChevronRight size={16} style={{ color: 'var(--hf-text-disabled)' }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )
+          default: return null
+        }
+      }}>
       {showAdd && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}
           onClick={() => { setShowAdd(false); setApiError("") }}>
@@ -230,7 +227,7 @@ export default function ComplianceServicesPage() {
           </div>
         </div>
       )}
-    </div>
+    </SectionedModulePage>
   )
 }
 
