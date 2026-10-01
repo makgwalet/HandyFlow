@@ -81,5 +81,10 @@ W7 supplier/SCM, W8 weather, W9 NDVI/satellite. W7 to W9 do not block a first pr
   across crop cycles, groups, animals and enterprises with an exact largest-remainder split, append-only with reversal, Insights > Cost ledger.
   It holds ONLY the new categories, so the existing direct costs are not counted twice. Cost reports, trends and the dashboard do not include
   ledger costs yet: they will be combined in W5 (profitability engine) in one place, to avoid double counting.
-- W2 to W9: not started. W2 needs a read-only extension of `InvoicingFacade` (invoice lines, status, credit notes); W3 needs the hourly-rate derivation
-  and on-cost setting; W4 needs the Fleet changes in decision 6 (hours meter, operating rate, `FleetFacade`) and a Fuel facade.
+- **W2 (sales and revenue): built.** Read-only `InvoicingFacade` extension (invoice lines with status, ex-VAT totals and credit notes), `ag_sales_allocations` (V307),
+  Insights > Sales. A user attributes part of an issued invoice line to a crop cycle, group, animal or enterprise. **Revenue is never stored**: it is computed live
+  (ex-VAT, issued onwards only, credit notes netted in proportion across the invoice's lines, apportioned across ALL allocations of a line to the exact cent), so a
+  cancelled invoice or a later credit note is reflected. Needs AGRICULTURE_FINANCE **and** INVOICE_READ (it shows invoice data). It records attribution only: it does
+  NOT mark animals sold or change a head count. Agriculture's allowed module dependencies now include `invoicing`.
+- W3 to W9: not started. W3 needs the hourly-rate derivation and on-cost setting; W4 needs the Fleet changes in decision 6 (hours meter, operating rate,
+  `FleetFacade`) and a Fuel facade; W5 combines costs and revenue (cost reports, trends and the dashboard do not include ledger costs or revenue yet).

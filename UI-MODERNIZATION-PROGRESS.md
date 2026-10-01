@@ -430,3 +430,25 @@ tsc 246 (baseline 249), guards pass, not browser-tested.
 
 **Process note:** the scratch tests were accidentally committed in two earlier patches (they import vitest, which is not a project dependency). A corrective commit
 untracks them and `.gitignore` now excludes `src/__scratch__/` and `vitest.scratch.config.ts`.
+
+## Agriculture W2: sales and revenue linked to production (ADR-001)
+
+W2 is built. **W3 to W9 are not started.**
+
+- **Invoicing facade (read-only):** `findSaleLine`, `findSaleLines`, `searchSaleLines` return invoice lines with status, customer name, ex-VAT line total, the invoice's
+  ex-VAT subtotal and the credit notes against it. Nothing lets another module create or change a sale. New `InvoiceRepository`/`CreditNoteRepository` queries back it.
+- **Table `ag_sales_allocations` (V307):** which part of an invoice line belongs to which target. It stores NO money. Allocations are removed (status REMOVED), not deleted.
+- **Revenue rules** (`AgRevenueRules`): issued onwards only (ISSUED, PARTIALLY_PAID, PAID, OVERPAID, OVERDUE; never DRAFT or CANCELLED); ex-VAT; credit notes netted in
+  proportion across the invoice's lines (they belong to the invoice, not a line); a line's revenue is shared across all its allocations by quantity with an exact
+  largest-remainder split, and can never pay out more than the line earned. The tests caught a real over-payout bug here (a hair over the line paid R500.02 on R500.00).
+- **Integrity:** the target must exist and belong to the farm (one shared check with the cost ledger, `AgTargetOwnership`); only issued invoices can be allocated; a line cannot be
+  over-allocated, counting every farm's allocations; no future sale date; a single animal is one head.
+- **Access:** every endpoint needs AGRICULTURE_FINANCE; those that read or return invoice data also need INVOICE_READ and an Invoicing subscription.
+- **Not done on purpose:** it does not mark animals sold or reduce a group's count (there is still no real livestock sale event; the allocation records when and how many).
+  Revenue is not in cost reports, trends or the dashboard yet (W5). Currency is assumed to be ZAR (it is returned but not converted). The invoice picker filters text in memory
+  over at most 200 invoices.
+- **Module boundary:** Agriculture's `allowedDependencies` now include `invoicing` (Debt Collection already does the same). `ArchitectureVerificationTest` has not been run.
+
+**Verification:** same method as before. Pure and entity tests RUN (revenue rules 12, sales allocation 6), Mockito tests type-checked only (sales service, Invoicing facade),
+controller test, the new `@Query` methods and V307 never run. **Run `mvn test` (including `ArchitectureVerificationTest`), the context-load test, and apply V307.**
+Frontend: 301 scratch tests, tsc 246 (baseline 249), guards pass, not browser-tested.
