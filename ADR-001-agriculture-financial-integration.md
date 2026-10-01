@@ -51,7 +51,9 @@ W7 supplier/SCM, W8 weather, W9 NDVI/satellite. W7 to W9 do not block a first pr
 7. **Stock.** Agriculture has its own inventory and stock-movement ledger (`AgInventoryItem`, `AgStockMovement`), written when no Supply Chain facade
    existed. This contradicts the ownership table above and is treated as an INTERIM exception until W7.
 
-## 4. Open decisions (recommended default in brackets)
+## 4. Decisions on the open questions
+
+**Defaults accepted on 1 Oct 2026**: every default in brackets below is the decision. Status per work item is in section 5.
 
 1. **Production unit.** Cost and revenue attach to: crop cycle, animal group, individual animal, enterprise. [Yes; poultry batches as groups for W1-W6;
    eggs and FCR are a later, separate increment.]
@@ -72,3 +74,12 @@ W7 supplier/SCM, W8 weather, W9 NDVI/satellite. W7 to W9 do not block a first pr
 9. **W1 shape.** [One cost-entry table (source, source reference, date, target, quantity, rate snapshot, amount, reversal link) that W3 and W4 write
    to. The existing direct costs stay where they are; the ledger holds only the NEW categories (labour, equipment, fuel, other direct), so nothing is
    counted twice.]
+
+## 5. Progress
+
+- **W1 (cost allocation ledger): built.** `ag_cost_entries` (V306), `AGRICULTURE_FINANCE` permission (ADMIN by default), manual OTHER_DIRECT costs split
+  across crop cycles, groups, animals and enterprises with an exact largest-remainder split, append-only with reversal, Insights > Cost ledger.
+  It holds ONLY the new categories, so the existing direct costs are not counted twice. Cost reports, trends and the dashboard do not include
+  ledger costs yet: they will be combined in W5 (profitability engine) in one place, to avoid double counting.
+- W2 to W9: not started. W2 needs a read-only extension of `InvoicingFacade` (invoice lines, status, credit notes); W3 needs the hourly-rate derivation
+  and on-cost setting; W4 needs the Fleet changes in decision 6 (hours meter, operating rate, `FleetFacade`) and a Fuel facade.

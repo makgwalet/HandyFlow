@@ -405,3 +405,28 @@ controller test have never run. **Run `mvn test` and the application context-loa
 249), guards pass, not browser-tested.
 
 **Next (needs decisions first):** revenue and gross margin, labour cost, equipment cost; then suppliers, report export, weather, NDVI.
+
+## Agriculture W1: cost allocation ledger (ADR-001)
+
+Defaults in ADR-001 section 4 were accepted, and W1 is built. **W2 to W9 are not started.**
+
+- **Table `ag_cost_entries` (V306)**, append-only: a cost is one or more rows, one per target (crop cycle, group, animal, enterprise), sharing an
+  `allocation_group_id`. A mistake is REVERSED: the original is flagged and a negative REVERSAL row, dated like the original, nets it out. Net cost is a plain SUM.
+  Columns for the snapshot (`quantity`, `unit`, `rate`, `amount`) and a `source_type`/`source_ref` are ready for HR, Fleet and Fuel (W3, W4).
+- **Only the NEW categories** (LABOUR, EQUIPMENT, FUEL, OTHER_DIRECT) live here. Feed, health, inputs, seed and animal purchases stay in their own tables, so
+  nothing is counted twice. Only OTHER_DIRECT can be typed in; the others will be costed from their owning modules.
+- **Exact splitting:** a cost split by percentage is apportioned by largest remainder in whole cents, so the parts always add up to the cost to the cent. The
+  server (`AgCostAllocation`) and the page preview (`agLedger.logic.ts`) use the same algorithm.
+- **Integrity:** every target must exist in the tenant AND belong to the farm; percentages must total 100; no future dates; one bad target stops the whole cost.
+- **Permission `AGRICULTURE_FINANCE`** (seeded to ADMIN; new tenants get it because their ADMIN role is given every permission). Every ledger endpoint needs it:
+  READ, MANAGE and ADMIN are not enough, because rates behind labour cost are derived from salaries. The page makes no request for a user without it.
+- **API:** `POST/GET /farms/{id}/cost-entries`, `GET /farms/{id}/cost-entries/totals`, `POST /cost-entries/groups/{id}/reverse`.
+- **UI:** Insights > Cost ledger: net cost by category, costs with their splits, filter by target, record a cost (live exact preview, "Split evenly"), reverse.
+- **Not yet:** cost reports, trends and the dashboard do not include ledger costs; they will be combined in W5 in one place.
+
+**Verification:** same method as before. Pure and entity tests RUN (allocation 12 tests, cost entry 7), Mockito service test type-checked only, controller test and the
+new `@Query` methods and the V306 migration never run. **Run `mvn test`, the context-load test, and apply V306 to a database.** Frontend: 276 scratch tests,
+tsc 246 (baseline 249), guards pass, not browser-tested.
+
+**Process note:** the scratch tests were accidentally committed in two earlier patches (they import vitest, which is not a project dependency). A corrective commit
+untracks them and `.gitignore` now excludes `src/__scratch__/` and `vitest.scratch.config.ts`.
