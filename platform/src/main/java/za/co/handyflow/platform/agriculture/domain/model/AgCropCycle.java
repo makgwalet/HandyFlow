@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import za.co.handyflow.platform.agriculture.domain.rules.AgCropLifecycle;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
@@ -108,6 +109,7 @@ public class AgCropCycle {
         if (productionAreaId == null) throw new IllegalArgumentException("productionAreaId is required");
         if (cropTypeId == null) throw new IllegalArgumentException("cropTypeId is required");
         if (areaPlantedHectares == null || areaPlantedHectares.signum() <= 0) throw new IllegalArgumentException("areaPlantedHectares must be positive");
+        AgCropLifecycle.requireHarvestNotBeforePlanting(plantingDate, expectedHarvestDate);
 
         AgCropCycle c = new AgCropCycle();
         c.tenantId = tenantId;
@@ -133,6 +135,7 @@ public class AgCropCycle {
 
     public void update(String variety, String cycleName, BigDecimal areaPlantedHectares,
                         LocalDate expectedHarvestDate, String notes) {
+        AgCropLifecycle.requireHarvestNotBeforePlanting(this.plantingDate, expectedHarvestDate);
         this.variety = variety;
         this.cycleName = cycleName;
         if (areaPlantedHectares != null && areaPlantedHectares.signum() > 0) this.areaPlantedHectares = areaPlantedHectares;
@@ -143,6 +146,7 @@ public class AgCropCycle {
     public void recordPlanting(LocalDate plantingDate, UUID seedInventoryItemId, BigDecimal seedQuantity, String seedSource) {
         if (plantingDate == null) throw new IllegalArgumentException("plantingDate is required");
         if (!"PLANNED".equals(status)) throw new IllegalStateException("cannot record planting for a cycle already in status " + status);
+        AgCropLifecycle.requireHarvestNotBeforePlanting(plantingDate, this.expectedHarvestDate);
         this.plantingDate = plantingDate;
         this.seedInventoryItemId = seedInventoryItemId;
         this.seedQuantity = seedQuantity;
@@ -168,11 +172,13 @@ public class AgCropCycle {
     }
 
     public void markFailed(String reason) {
+        AgCropLifecycle.requireCanFail(status);
         this.status = "FAILED";
         if (reason != null && !reason.isBlank()) this.notes = (this.notes != null ? this.notes + " | " : "") + "Failed: " + reason;
     }
 
     public void abandon(String reason) {
+        AgCropLifecycle.requireCanAbandon(status);
         this.status = "ABANDONED";
         if (reason != null && !reason.isBlank()) this.notes = (this.notes != null ? this.notes + " | " : "") + "Abandoned: " + reason;
     }

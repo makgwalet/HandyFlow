@@ -97,7 +97,7 @@ class AgCropCycleTest {
     }
 
     @Test
-    @DisplayName("markFailed() sets status FAILED from any state and appends the reason to notes")
+    @DisplayName("markFailed() sets status FAILED from a planted cycle and appends the reason to notes")
     void markFailedSetsStatusAndAppendsReason() {
         AgCropCycle cycle = newCycle(LocalDate.now());
         cycle.markFailed("Hailstorm destroyed the crop");
@@ -122,5 +122,47 @@ class AgCropCycleTest {
         assertThrows(IllegalArgumentException.class, () -> AgCropCycle.create(
                 TENANT, UUID.randomUUID(), UUID.randomUUID(), null, null, UUID.randomUUID(),
                 null, null, BigDecimal.ZERO, null, null, null, null, null, null));
+    }
+
+    @Test
+    @DisplayName("markFailed() is refused before planting and once the cycle is finished")
+    void markFailedIsGuarded() {
+        assertThrows(IllegalStateException.class, () -> newCycle(null).markFailed("Never planted"));
+
+        AgCropCycle harvested = newCycle(LocalDate.now());
+        harvested.startHarvest();
+        harvested.completeHarvest();
+        assertThrows(IllegalStateException.class, () -> harvested.markFailed("Too late"));
+        assertEquals("HARVESTED", harvested.getStatus());
+    }
+
+    @Test
+    @DisplayName("abandon() is refused on a finished cycle but allowed on a planned one")
+    void abandonIsGuarded() {
+        AgCropCycle harvested = newCycle(LocalDate.now());
+        harvested.startHarvest();
+        harvested.completeHarvest();
+        assertThrows(IllegalStateException.class, () -> harvested.abandon("Too late"));
+        assertEquals("HARVESTED", harvested.getStatus());
+
+        AgCropCycle failed = newCycle(LocalDate.now());
+        failed.markFailed("Hail");
+        assertThrows(IllegalStateException.class, () -> failed.abandon("Again"));
+    }
+
+    @Test
+    @DisplayName("expected harvest cannot be before planting, on create, on update or when recording planting")
+    void expectedHarvestNotBeforePlanting() {
+        LocalDate planting = LocalDate.of(2026, 10, 15);
+        assertThrows(IllegalArgumentException.class, () -> AgCropCycle.create(TENANT, UUID.randomUUID(), UUID.randomUUID(), null, null,
+                UUID.randomUUID(), null, null, new BigDecimal("5"), planting, planting.minusDays(1), null, null, null, null));
+
+        AgCropCycle cycle = newCycle(planting);
+        assertThrows(IllegalArgumentException.class, () -> cycle.update(null, null, null, planting.minusDays(1), null));
+
+        AgCropCycle planned = AgCropCycle.create(TENANT, UUID.randomUUID(), UUID.randomUUID(), null, null,
+                UUID.randomUUID(), null, null, new BigDecimal("5"), null, LocalDate.of(2026, 3, 1), null, null, null, null);
+        assertThrows(IllegalArgumentException.class, () -> planned.recordPlanting(LocalDate.of(2026, 4, 1), null, null, null));
+        assertEquals("PLANNED", planned.getStatus());
     }
 }

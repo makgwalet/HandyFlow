@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.agriculture.domain.model.AgAnimal;
 import za.co.handyflow.platform.agriculture.domain.model.AgCropCycle;
 import za.co.handyflow.platform.agriculture.domain.model.AgCropType;
+import za.co.handyflow.platform.agriculture.domain.rules.AgUnits;
 import za.co.handyflow.platform.agriculture.domain.model.AgGroup;
 import za.co.handyflow.platform.agriculture.domain.repository.*;
 import za.co.handyflow.platform.agriculture.dto.AnimalCostSummaryResponse;
@@ -17,6 +18,7 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -205,18 +207,25 @@ public class AgCostReportingService {
                 : null;
 
         BigDecimal laborHours = inputApplicationRepository.sumLaborHoursByCropCycle(tenantId, cycle.getId());
-        BigDecimal yield = harvestRecordRepository.sumQuantityByCropCycle(tenantId, cycle.getId());
+        String yieldUnit = cropTypeRepository.findActiveById(tenantId, cycle.getCropTypeId())
+                .map(AgCropType::getDefaultUnitOfMeasure)
+                .orElse(null);
+        // Yield is summed in the crop's own unit: kg and t are converted before adding, so mixed units no longer
+        // produce a wrong figure. Units that cannot be converted are left out and counted (see AgUnits.sumInto).
+        List<AgUnits.UnitQuantity> harvested = new ArrayList<>();
+        for (Object[] row : harvestRecordRepository.sumQuantityByCropCycleAndUnit(tenantId, cycle.getId())) {
+            harvested.add(new AgUnits.UnitQuantity((String) row[0], row[1] == null ? null : new BigDecimal(row[1].toString())));
+        }
+        AgUnits.YieldTotal yieldTotal = AgUnits.sumInto(yieldUnit, harvested);
+        BigDecimal yield = yieldTotal.total();
         BigDecimal yieldPerHectare = (hectares != null && hectares.signum() > 0)
                 ? yield.divide(hectares, 3, RoundingMode.HALF_UP)
                 : null;
 
-        String yieldUnit = cropTypeRepository.findActiveById(tenantId, cycle.getCropTypeId())
-                .map(AgCropType::getDefaultUnitOfMeasure)
-                .orElse(null);
-
         return new CropCycleCostSummaryResponse(
                 cycle.getId(), cycle.getCycleName(), cycle.getFarmId(), cycle.getCropTypeId(), hectares,
-                seedCost, inputCost, totalCost, costPerHectare, laborHours, yield, yieldUnit, yieldPerHectare
+                seedCost, inputCost, totalCost, costPerHectare, laborHours, yield, yieldUnit, yieldPerHectare,
+                yieldTotal.unconvertedUnits()
         );
     }
 }

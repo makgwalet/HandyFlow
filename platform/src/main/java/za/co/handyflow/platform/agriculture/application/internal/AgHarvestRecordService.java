@@ -6,9 +6,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.agriculture.domain.model.AgCropCycle;
+import za.co.handyflow.platform.agriculture.domain.model.AgCropType;
 import za.co.handyflow.platform.agriculture.domain.model.AgHarvestRecord;
 import za.co.handyflow.platform.agriculture.domain.repository.AgCropCycleRepository;
+import za.co.handyflow.platform.agriculture.domain.repository.AgCropTypeRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgHarvestRecordRepository;
+import za.co.handyflow.platform.agriculture.domain.rules.AgCropLifecycle;
+import za.co.handyflow.platform.agriculture.domain.rules.AgUnits;
 import za.co.handyflow.platform.agriculture.dto.CreateHarvestRecordRequest;
 import za.co.handyflow.platform.agriculture.dto.HarvestRecordResponse;
 import za.co.handyflow.platform.hr.application.HrFacade;
@@ -34,6 +39,7 @@ public class AgHarvestRecordService {
 
     private final AgHarvestRecordRepository harvestRecordRepository;
     private final AgCropCycleRepository cropCycleRepository;
+    private final AgCropTypeRepository cropTypeRepository;
     private final HrFacade hrFacade;
 
     @Transactional(readOnly = true)
@@ -43,9 +49,14 @@ public class AgHarvestRecordService {
 
     @Transactional
     public HarvestRecordResponse createHarvestRecord(TenantId tenantId, UUID cropCycleId, CreateHarvestRecordRequest req) {
-        if (cropCycleRepository.findActiveById(tenantId, cropCycleId).isEmpty()) {
-            throw new ResourceNotFoundException("CropCycle", cropCycleId.toString());
-        }
+        AgCropCycle cycle = cropCycleRepository.findActiveById(tenantId, cropCycleId)
+                .orElseThrow(() -> new ResourceNotFoundException("CropCycle", cropCycleId.toString()));
+        AgCropLifecycle.requireAcceptsRecords(AgCropLifecycle.RecordKind.HARVEST, cycle.getStatus());
+        // Yield is summed in the crop's own unit, so the unit entered must be convertible to it (a crop type that has
+        // since been deleted simply skips the check).
+        cropTypeRepository.findActiveById(tenantId, cycle.getCropTypeId())
+                .map(AgCropType::getDefaultUnitOfMeasure)
+                .ifPresent(cropUnit -> AgUnits.requireConvertible(req.unitOfMeasure(), cropUnit));
         String harvestedByName = resolveEmployeeName(tenantId, req.harvestedBy());
         AgHarvestRecord record = AgHarvestRecord.create(tenantId, cropCycleId, req.harvestDate(),
                 req.quantityHarvested(), req.unitOfMeasure(), req.qualityGrade(), req.moistureContent(),

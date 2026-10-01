@@ -28,5 +28,6 @@ public record CropCycleCostSummaryResponse(
         BigDecimal totalLaborHours,
         BigDecimal totalYieldHarvested,
         String yieldUnitOfMeasure, // the crop type's own default unit — see AgCostReportingService
-        BigDecimal yieldPerHectare // null if areaPlantedHectares is 0
+        BigDecimal yieldPerHectare, // null if areaPlantedHectares is 0
+        int unconvertedYieldUnits // harvest units that could not be converted to the crop's unit and are NOT in totalYieldHarvested; 0 when the yield is complete
 ) {}

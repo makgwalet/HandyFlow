@@ -345,3 +345,35 @@ tsc 247 errors (baseline 249), 203 scratch tests pass, 7 mutation checks all cau
 
 **Still needs backend work:** tenant-wide farm dashboard, trends, richer attention severities (only OVERDUE / DUE_TODAY / MEDIUM exist), harvest unit normalisation, server-side guards on lifecycle and seasons.
 **Not built:** scouting edit (PUT exists, unused), per-record input/harvest edit and delete (no endpoints).
+
+## Agriculture phases 1 and 2: backend hardening and the tenant-wide dashboard
+
+**Phase 1: server-side guards (previously enforced only by the web UI)**
+- Crop cycle: mark-failed only from PLANTED/GROWING/HARVESTING; abandon not from a finished cycle; expected harvest not before planting.
+- Inputs and scouting refused on FAILED/ABANDONED cycles; harvests also refused before planting.
+- Season: activate not when already active, close only from ACTIVE, update re-checks the dates, delete refused while crop cycles use it.
+  Deliberately NOT enforced: one active season per farm (farms run overlapping seasons; the UI warns instead).
+- Crop cycle create now checks its references exist in the tenant and belong to the same farm (area, season, enterprise, crop type
+  active, season not closed); seed/inventory stock must belong to the cycle's farm. Season create checks the farm exists.
+- Harvest units: kg, g, t, lb convert; anything else must match the crop type's unit; incompatible units are rejected (400). Yield is
+  summed in the crop's unit; units that cannot convert (older data) are excluded and counted in `unconvertedYieldUnits`.
+- Richer attention severities: CRITICAL (out of stock, open HIGH scouting), OVERDUE, DUE_TODAY, UPCOMING (next 7 days), MEDIUM.
+  New item types HARVEST_DUE and SCOUTING_HIGH_SEVERITY; every item carries farmId/farmName.
+- Bug fixed: `countActiveForFarm` for animals and groups counted sold/deceased/culled animals and closed groups as "active".
+
+**Phase 2: `GET /api/v1/agriculture/dashboard`** (AGRICULTURE_READ): totals, farm types, farm locations, crops in production,
+livestock by species and the ranked attention list for all ACTIVE farms, from grouped queries (not one request per farm).
+Attention is computed per farm on the server (a few queries per farm); fine for a handful of farms, would need joins to scale.
+
+**Frontend:** new dashboard (KPIs, attention list, farm-type donut, livestock and crop bars, farm map, farm table); harvest tab
+converts and blocks units like the server; season delete explains why it is blocked. Fixed: crop cycle Edit erased notes
+(PUT replaces variety, name, expected harvest and notes).
+
+**Verification.** Java cannot be built here (no Maven). Instead: the real Agriculture sources (150 files) were compiled against stubbed
+libraries with Lombok emulated, 0 errors, and the harness catches planted mistakes; the dependency-free rules and aggregator and the
+entity tests were RUN (JUnit stand-in), 57 tests; Mockito service tests were type-checked, not run. Frontend: 231 scratch tests,
+tsc 247 (baseline 249), guards pass.
+**Still to do on your side:** `mvn test`, and the `HandyFlowApplicationTests` context load (Spring validates every new @Query at startup).
+Not browser-tested.
+
+**Next:** trends and a production chart (phase 3); then revenue, labour and equipment cost, suppliers, report export, weather, NDVI.

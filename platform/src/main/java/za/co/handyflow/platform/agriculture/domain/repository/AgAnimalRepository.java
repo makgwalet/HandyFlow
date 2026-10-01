@@ -8,6 +8,7 @@ import za.co.handyflow.platform.agriculture.domain.model.AgAnimal;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 public interface AgAnimalRepository extends JpaRepository<AgAnimal, UUID> {
@@ -21,7 +22,7 @@ public interface AgAnimalRepository extends JpaRepository<AgAnimal, UUID> {
     // FIX (Agriculture GAP 4 — mobile gap report, "Home/Today" summary):
     // backs the animal-count tile — avoids pulling a full page just to
     // count.
-    @Query("SELECT COUNT(a) FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.deletedAt IS NULL")
+    @Query("SELECT COUNT(a) FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.deletedAt IS NULL AND a.status = 'ACTIVE'")
     long countActiveForFarm(TenantId tenantId, UUID farmId);
 
     @Query("SELECT a FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.status = :status AND a.deletedAt IS NULL ORDER BY a.tagNumber")
@@ -35,4 +36,8 @@ public interface AgAnimalRepository extends JpaRepository<AgAnimal, UUID> {
     // DB-level uq_ag_animals_tenant_farm_tag unique index.
     @Query("SELECT COUNT(a) > 0 FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.tagNumber = :tagNumber AND a.deletedAt IS NULL")
     boolean existsActiveByFarmAndTagNumber(TenantId tenantId, UUID farmId, String tagNumber);
+
+    // Rows are [farmId, speciesId, count] of animals still on the farm.
+    @Query("SELECT a.farmId, a.speciesId, COUNT(a) FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.deletedAt IS NULL AND a.status = 'ACTIVE' GROUP BY a.farmId, a.speciesId")
+    List<Object[]> countActiveByFarmAndSpecies(TenantId tenantId);
 }

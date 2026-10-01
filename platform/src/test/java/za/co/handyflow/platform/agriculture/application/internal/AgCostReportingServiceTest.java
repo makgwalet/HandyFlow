@@ -18,6 +18,7 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -162,7 +163,8 @@ class AgCostReportingServiceTest {
                     .thenReturn(new BigDecimal("500.00")); // seed cost
             when(inputApplicationRepository.sumCostByCropCycle(eq(TENANT), any())).thenReturn(new BigDecimal("1500.00"));
             when(inputApplicationRepository.sumLaborHoursByCropCycle(eq(TENANT), any())).thenReturn(new BigDecimal("40.00"));
-            when(harvestRecordRepository.sumQuantityByCropCycle(eq(TENANT), any())).thenReturn(new BigDecimal("6000.000"));
+            when(harvestRecordRepository.sumQuantityByCropCycleAndUnit(eq(TENANT), any()))
+                    .thenReturn(List.<Object[]>of(new Object[] {"kg", new BigDecimal("6000.000")}));
             when(cropTypeRepository.findActiveById(eq(TENANT), eq(cropTypeId))).thenReturn(Optional.of(cropType));
 
             CropCycleCostSummaryResponse result = newService().getCropCycleCostSummary(TENANT, UUID.randomUUID());
@@ -188,7 +190,7 @@ class AgCostReportingServiceTest {
             when(stockMovementRepository.sumTotalCostByReference(eq(TENANT), eq("AgCropCycle"), any())).thenReturn(BigDecimal.ZERO);
             when(inputApplicationRepository.sumCostByCropCycle(eq(TENANT), any())).thenReturn(BigDecimal.ZERO);
             when(inputApplicationRepository.sumLaborHoursByCropCycle(eq(TENANT), any())).thenReturn(BigDecimal.ZERO);
-            when(harvestRecordRepository.sumQuantityByCropCycle(eq(TENANT), any())).thenReturn(BigDecimal.ZERO);
+            when(harvestRecordRepository.sumQuantityByCropCycleAndUnit(eq(TENANT), any())).thenReturn(List.of());
             when(cropTypeRepository.findActiveById(eq(TENANT), eq(cropTypeId))).thenReturn(Optional.empty());
 
             CropCycleCostSummaryResponse result = newService().getCropCycleCostSummary(TENANT, UUID.randomUUID());
@@ -197,6 +199,51 @@ class AgCostReportingServiceTest {
             assertThat(result.totalCost()).isEqualByComparingTo(BigDecimal.ZERO);
             // still not null — an actively-tracked cycle always has a positive area (entity-enforced)
             assertThat(result.costPerHectare()).isEqualByComparingTo(BigDecimal.ZERO);
+        }
+
+        private AgCropCycle tenHectareCycle(UUID cropTypeId) {
+            return AgCropCycle.create(TENANT, UUID.randomUUID(), UUID.randomUUID(), null, null,
+                    cropTypeId, null, "Mixed units", new BigDecimal("10.00"),
+                    LocalDate.now(), null, null, null, null, null);
+        }
+
+        private void stubCycleWithHarvests(UUID cropTypeId, String cropUnit, List<Object[]> harvestRows) {
+            AgCropType cropType = AgCropType.create(TENANT, "Maize", "FIELD_CROP", 120, cropUnit);
+            when(cropCycleRepository.findActiveById(eq(TENANT), any())).thenReturn(Optional.of(tenHectareCycle(cropTypeId)));
+            when(stockMovementRepository.sumTotalCostByReference(eq(TENANT), eq("AgCropCycle"), any())).thenReturn(BigDecimal.ZERO);
+            when(inputApplicationRepository.sumCostByCropCycle(eq(TENANT), any())).thenReturn(BigDecimal.ZERO);
+            when(inputApplicationRepository.sumLaborHoursByCropCycle(eq(TENANT), any())).thenReturn(BigDecimal.ZERO);
+            when(harvestRecordRepository.sumQuantityByCropCycleAndUnit(eq(TENANT), any())).thenReturn(harvestRows);
+            when(cropTypeRepository.findActiveById(eq(TENANT), eq(cropTypeId))).thenReturn(Optional.of(cropType));
+        }
+
+        @Test
+        @DisplayName("converts kilograms and tonnes into the crop's unit instead of adding them as the same thing")
+        void convertsMixedMassUnits() {
+            UUID cropTypeId = UUID.randomUUID();
+            stubCycleWithHarvests(cropTypeId, "t", List.of(
+                    new Object[] {"t", new BigDecimal("5.000")}, new Object[] {"kg", new BigDecimal("800.000")}));
+
+            CropCycleCostSummaryResponse result = newService().getCropCycleCostSummary(TENANT, UUID.randomUUID());
+
+            // 5 t + 800 kg = 5.8 t over 10 ha = 0.580 t/ha (the old code reported 805 t)
+            assertThat(result.totalYieldHarvested()).isEqualByComparingTo("5.8");
+            assertThat(result.yieldPerHectare()).isEqualByComparingTo("0.580");
+            assertThat(result.yieldUnitOfMeasure()).isEqualTo("t");
+            assertThat(result.unconvertedYieldUnits()).isZero();
+        }
+
+        @Test
+        @DisplayName("leaves out harvest units that cannot be converted and says so")
+        void flagsUnconvertibleUnits() {
+            UUID cropTypeId = UUID.randomUUID();
+            stubCycleWithHarvests(cropTypeId, "t", List.of(
+                    new Object[] {"t", new BigDecimal("5.000")}, new Object[] {"bags", new BigDecimal("40.000")}));
+
+            CropCycleCostSummaryResponse result = newService().getCropCycleCostSummary(TENANT, UUID.randomUUID());
+
+            assertThat(result.totalYieldHarvested()).isEqualByComparingTo("5");
+            assertThat(result.unconvertedYieldUnits()).isEqualTo(1);
         }
     }
 }

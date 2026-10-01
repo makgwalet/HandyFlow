@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.agriculture.domain.model.AgCropCycle;
+import za.co.handyflow.platform.agriculture.domain.rules.AgCropLifecycle;
 import za.co.handyflow.platform.agriculture.domain.model.AgInputApplication;
 import za.co.handyflow.platform.agriculture.domain.model.AgInventoryItem;
 import za.co.handyflow.platform.agriculture.domain.model.AgStockMovement;
@@ -50,6 +51,7 @@ public class AgInputApplicationService {
     public InputApplicationResponse createInputApplication(TenantId tenantId, UUID cropCycleId, CreateInputApplicationRequest req) {
         AgCropCycle cycle = cropCycleRepository.findActiveById(tenantId, cropCycleId)
                 .orElseThrow(() -> new ResourceNotFoundException("CropCycle", cropCycleId.toString()));
+        AgCropLifecycle.requireAcceptsRecords(AgCropLifecycle.RecordKind.INPUT, cycle.getStatus());
         String appliedByName = resolveEmployeeName(tenantId, req.appliedBy());
 
         AgInputApplication application = AgInputApplication.create(tenantId, cropCycleId, req.applicationDate(),
@@ -61,6 +63,9 @@ public class AgInputApplicationService {
         if (req.inventoryItemId() != null) {
             AgInventoryItem item = inventoryItemRepository.findActiveById(tenantId, req.inventoryItemId())
                     .orElseThrow(() -> new ResourceNotFoundException("InventoryItem", req.inventoryItemId().toString()));
+            if (!item.getFarmId().equals(cycle.getFarmId())) {
+                throw new IllegalArgumentException("inventory item " + item.getItemName() + " belongs to a different farm than this crop cycle");
+            }
             item.issue(req.quantityApplied());
             // FIX (applied alongside AgCostReportingService, for the same
             // reason as AgCropCycleService.issueSeed()): snapshot the

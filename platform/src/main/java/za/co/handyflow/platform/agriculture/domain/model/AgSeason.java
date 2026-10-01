@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import za.co.handyflow.platform.agriculture.domain.rules.AgSeasonLifecycle;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.Instant;
@@ -68,7 +69,7 @@ public class AgSeason {
         if (farmId == null) throw new IllegalArgumentException("farmId is required");
         if (name == null || name.isBlank()) throw new IllegalArgumentException("name is required");
         if (startDate == null) throw new IllegalArgumentException("startDate is required");
-        if (endDate != null && endDate.isBefore(startDate)) throw new IllegalArgumentException("endDate must not be before startDate");
+        AgSeasonLifecycle.requireValidDates(startDate, endDate);
 
         AgSeason s = new AgSeason();
         s.tenantId = tenantId;
@@ -83,15 +84,23 @@ public class AgSeason {
     }
 
     public void update(String name, LocalDate startDate, LocalDate endDate, String notes) {
+        // endDate and notes are REPLACED (null clears them); the dates must still make sense together
+        AgSeasonLifecycle.requireValidDates(startDate != null ? startDate : this.startDate, endDate);
         if (name != null && !name.isBlank()) this.name = name;
         if (startDate != null) this.startDate = startDate;
         this.endDate = endDate;
         this.notes = notes;
     }
 
-    public void activate() { this.status = "ACTIVE"; }
+    public void activate() {
+        AgSeasonLifecycle.requireCanActivate(status);
+        this.status = "ACTIVE";
+    }
 
-    public void close() { this.status = "CLOSED"; }
+    public void close() {
+        AgSeasonLifecycle.requireCanClose(status);
+        this.status = "CLOSED";
+    }
 
     public void softDelete() { this.deletedAt = Instant.now(); }
 

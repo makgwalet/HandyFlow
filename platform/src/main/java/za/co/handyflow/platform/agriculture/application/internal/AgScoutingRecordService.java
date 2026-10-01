@@ -7,7 +7,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.agriculture.domain.model.AgScoutingRecord;
+import za.co.handyflow.platform.agriculture.domain.model.AgCropCycle;
 import za.co.handyflow.platform.agriculture.domain.repository.AgCropCycleRepository;
+import za.co.handyflow.platform.agriculture.domain.rules.AgCropLifecycle;
 import za.co.handyflow.platform.agriculture.domain.repository.AgScoutingRecordRepository;
 import za.co.handyflow.platform.agriculture.dto.CreateScoutingRecordRequest;
 import za.co.handyflow.platform.agriculture.dto.ScoutingRecordResponse;
@@ -42,9 +44,9 @@ public class AgScoutingRecordService {
 
     @Transactional
     public ScoutingRecordResponse createScoutingRecord(TenantId tenantId, UUID cropCycleId, CreateScoutingRecordRequest req) {
-        if (cropCycleRepository.findActiveById(tenantId, cropCycleId).isEmpty()) {
-            throw new ResourceNotFoundException("CropCycle", cropCycleId.toString());
-        }
+        AgCropCycle cycle = cropCycleRepository.findActiveById(tenantId, cropCycleId)
+                .orElseThrow(() -> new ResourceNotFoundException("CropCycle", cropCycleId.toString()));
+        AgCropLifecycle.requireAcceptsRecords(AgCropLifecycle.RecordKind.SCOUTING, cycle.getStatus());
         String scoutedByName = resolveEmployeeName(tenantId, req.scoutedBy());
         AgScoutingRecord record = AgScoutingRecord.create(tenantId, cropCycleId, req.scoutingDate(),
                 req.observationType(), req.severity(), req.description(), req.recommendedAction(),

@@ -8,6 +8,7 @@ import za.co.handyflow.platform.agriculture.domain.model.AgGroup;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 public interface AgGroupRepository extends JpaRepository<AgGroup, UUID> {
@@ -19,7 +20,7 @@ public interface AgGroupRepository extends JpaRepository<AgGroup, UUID> {
     Page<AgGroup> findAllActiveForFarm(TenantId tenantId, UUID farmId, Pageable pageable);
 
     // FIX (Agriculture GAP 4 — mobile gap report, "Home/Today" summary).
-    @Query("SELECT COUNT(g) FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.deletedAt IS NULL")
+    @Query("SELECT COUNT(g) FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.deletedAt IS NULL AND g.status = 'ACTIVE'")
     long countActiveForFarm(TenantId tenantId, UUID farmId);
 
     @Query("SELECT g FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.status = :status AND g.deletedAt IS NULL ORDER BY g.batchNumber")
@@ -32,4 +33,8 @@ public interface AgGroupRepository extends JpaRepository<AgGroup, UUID> {
     // fronts the DB-level uq_ag_groups_tenant_farm_batch unique index.
     @Query("SELECT COUNT(g) > 0 FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.batchNumber = :batchNumber AND g.deletedAt IS NULL")
     boolean existsActiveByFarmAndBatchNumber(TenantId tenantId, UUID farmId, String batchNumber);
+
+    // Rows are [farmId, speciesId, group count, head count] for groups still active.
+    @Query("SELECT g.farmId, g.speciesId, COUNT(g), SUM(g.currentCount) FROM AgGroup g WHERE g.tenantId = :tenantId AND g.deletedAt IS NULL AND g.status = 'ACTIVE' GROUP BY g.farmId, g.speciesId")
+    List<Object[]> summarizeActiveByFarmAndSpecies(TenantId tenantId);
 }

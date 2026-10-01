@@ -9,6 +9,7 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 /** Append-only, cycle-scoped — mirrors AgFeedRecordRepository's own shape. */
@@ -26,4 +27,8 @@ public interface AgHarvestRecordRepository extends JpaRepository<AgHarvestRecord
     // a cycle harvested in mixed units would need this revisited.
     @Query("SELECT COALESCE(SUM(h.quantityHarvested), 0) FROM AgHarvestRecord h WHERE h.tenantId = :tenantId AND h.cropCycleId = :cropCycleId")
     BigDecimal sumQuantityByCropCycle(TenantId tenantId, UUID cropCycleId);
+
+    // Quantity per unit, so yield can be converted to the crop's own unit before summing. Rows are [unitOfMeasure, quantity].
+    @Query("SELECT h.unitOfMeasure, SUM(h.quantityHarvested) FROM AgHarvestRecord h WHERE h.tenantId = :tenantId AND h.cropCycleId = :cropCycleId GROUP BY h.unitOfMeasure")
+    List<Object[]> sumQuantityByCropCycleAndUnit(TenantId tenantId, UUID cropCycleId);
 }

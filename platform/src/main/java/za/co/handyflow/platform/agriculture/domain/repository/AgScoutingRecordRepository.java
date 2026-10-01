@@ -41,4 +41,14 @@ public interface AgScoutingRecordRepository extends JpaRepository<AgScoutingReco
         ORDER BY r.followUpDate ASC
         """)
     List<AgScoutingRecord> findFollowUpDueForFarm(TenantId tenantId, UUID farmId, LocalDate today);
+
+    // Findings still open that were rated HIGH severity, whether or not a follow-up date was set.
+    @Query("""
+        SELECT r FROM AgScoutingRecord r
+        WHERE r.tenantId = :tenantId
+        AND r.status = 'OPEN' AND r.severity = 'HIGH'
+        AND r.cropCycleId IN (SELECT c.id FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.farmId = :farmId AND c.deletedAt IS NULL)
+        ORDER BY r.scoutingDate ASC
+        """)
+    List<AgScoutingRecord> findOpenHighSeverityForFarm(TenantId tenantId, UUID farmId);
 }
