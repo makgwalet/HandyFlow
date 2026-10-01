@@ -8,10 +8,9 @@ import { Plus, X } from "lucide-react"
 import { todayISO } from "./agCrops.logic"
 import { Field, Warn } from "./agCropsUi"
 import { useCreateCost, type TargetType } from "./agLedger.api"
+import type { TargetOption } from "./agTargets"
 import { TARGET_LABEL, TARGET_TYPES, evenShares, percentTotal, splitPreview, validateAllocation, type ShareInput } from "./agLedger.logic"
 import { btnGhost, btnPrimary, fmtMoney, grid, inp, panel } from "./constants"
-
-export interface TargetOption { type: TargetType; id: string; label: string }
 
 export default function AgCostEntryForm({ farmId, options, initialTarget, onDone }: { farmId: string; options: TargetOption[]; initialTarget?: { type: TargetType; id: string } | null; onDone: () => void }) {
   const [f, setF] = useState({ date: todayISO(), description: "", amount: "", quantity: "", unit: "", notes: "" })

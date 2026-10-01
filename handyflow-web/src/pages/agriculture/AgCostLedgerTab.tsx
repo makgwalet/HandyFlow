@@ -7,11 +7,10 @@
 import { useState } from "react"
 import { Plus, Lock } from "lucide-react"
 import { usePermission } from "../../hooks/usePermission"
-import { useCropCycles, useCropTypes, useEnterprises } from "./agCrops.api"
-import { cycleLabel } from "./agCrops.logic"
-import { useCostEntries, useCostTotals, useFarmAnimals, useFarmGroups, useReverseCost, type TargetFilter, type TargetType } from "./agLedger.api"
+import { useCostEntries, useCostTotals, useReverseCost, type TargetFilter, type TargetType } from "./agLedger.api"
+import { useTargetOptions } from "./agTargets"
 import { CATEGORY_LABEL, TARGET_LABEL, TARGET_TYPES, groupEntries, type CostGroup } from "./agLedger.logic"
-import AgCostEntryForm, { type TargetOption } from "./AgCostEntryForm"
+import AgCostEntryForm from "./AgCostEntryForm"
 import { Empty, Field } from "./agCropsUi"
 import { btnDanger, btnGhost, btnPrimary, card, fmtDate, fmtMoney, inp, kpiLabel, kpiValue, panel, statusBadge } from "./constants"
 
@@ -23,18 +22,7 @@ function LedgerBody({ farmId }: { farmId: string }) {
   const [adding, setAdding] = useState(false)
   const [reversing, setReversing] = useState<CostGroup | null>(null)
   const [reason, setReason] = useState("")
-  const cycles = useCropCycles(farmId).data ?? []
-  const cropTypes = useCropTypes().data ?? []
-  const groups = useFarmGroups(farmId).data ?? []
-  const animals = useFarmAnimals(farmId).data ?? []
-  const enterprises = useEnterprises(farmId).data ?? []
-
-  const options: TargetOption[] = [
-    ...cycles.map(c => ({ type: "CROP_CYCLE" as const, id: c.id, label: cycleLabel(c, cropTypes) })),
-    ...groups.map(g => ({ type: "GROUP" as const, id: g.id, label: g.batchNumber })),
-    ...animals.map(a => ({ type: "ANIMAL" as const, id: a.id, label: a.name ? `${a.tagNumber} (${a.name})` : a.tagNumber })),
-    ...enterprises.map(e => ({ type: "ENTERPRISE" as const, id: e.id, label: e.name })),
-  ]
+  const options = useTargetOptions(farmId)
   const filter: TargetFilter | null = type && targetId ? { type, id: targetId } : null
   const entries = useCostEntries(farmId, filter)
   const totals = useCostTotals(farmId, filter)
