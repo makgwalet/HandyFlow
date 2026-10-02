@@ -38,4 +38,15 @@ public interface AgInputApplicationRepository extends JpaRepository<AgInputAppli
     // Trends: [applicationDate, cost, cropCycleId].
     @Query("SELECT a.applicationDate, a.cost, a.cropCycleId FROM AgInputApplication a WHERE a.tenantId = :tenantId AND a.applicationDate >= :startDate AND a.applicationDate <= :endDate AND a.cost IS NOT NULL")
     List<Object[]> findCostsBetween(TenantId tenantId, LocalDate startDate, LocalDate endDate);
+
+    // Input applications with labour hours that have not been costed yet, newest first (ADR-001 W3). A record has no farm of its own, so its
+    // farm comes from its crop cycle. "Costed" means an ACTIVE labour entry in the cost ledger points at it; reversing that entry frees it again.
+    @Query("""
+        SELECT a FROM AgInputApplication a
+        WHERE a.tenantId = :tenantId AND a.laborHours > 0
+        AND a.cropCycleId IN (SELECT c.id FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.farmId = :farmId AND c.deletedAt IS NULL)
+        AND NOT EXISTS (SELECT 1 FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.sourceType = 'HR_LABOUR' AND e.sourceRef = a.id AND e.status = 'ACTIVE')
+        ORDER BY a.applicationDate DESC, a.createdAt DESC
+        """)
+    List<AgInputApplication> findUncostedLabourForFarm(TenantId tenantId, UUID farmId, Pageable pageable);
 }

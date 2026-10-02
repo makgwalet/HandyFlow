@@ -150,6 +150,7 @@ export const AGRICULTURE_SECTIONS: ModuleSections = {
         { id: 'costs', label: 'Cost reports', icon: BarChart2 },
         { id: 'ledger', label: 'Cost ledger', icon: Receipt },
         { id: 'sales', label: 'Sales', icon: Wallet },
+        { id: 'labour', label: 'Labour', icon: Users },
       ],
     },
   ],

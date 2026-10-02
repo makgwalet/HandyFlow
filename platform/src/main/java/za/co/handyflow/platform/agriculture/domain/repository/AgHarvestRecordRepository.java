@@ -36,4 +36,14 @@ public interface AgHarvestRecordRepository extends JpaRepository<AgHarvestRecord
     // Trends: [harvestDate, quantityHarvested, unitOfMeasure, cropCycleId].
     @Query("SELECT h.harvestDate, h.quantityHarvested, h.unitOfMeasure, h.cropCycleId FROM AgHarvestRecord h WHERE h.tenantId = :tenantId AND h.harvestDate >= :startDate AND h.harvestDate <= :endDate")
     List<Object[]> findBetween(TenantId tenantId, LocalDate startDate, LocalDate endDate);
+
+    // Harvests with labour hours that have not been costed yet, newest first (ADR-001 W3). See AgInputApplicationRepository for the rules.
+    @Query("""
+        SELECT h FROM AgHarvestRecord h
+        WHERE h.tenantId = :tenantId AND h.laborHours > 0
+        AND h.cropCycleId IN (SELECT c.id FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.farmId = :farmId AND c.deletedAt IS NULL)
+        AND NOT EXISTS (SELECT 1 FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.sourceType = 'HR_LABOUR' AND e.sourceRef = h.id AND e.status = 'ACTIVE')
+        ORDER BY h.harvestDate DESC, h.createdAt DESC
+        """)
+    List<AgHarvestRecord> findUncostedLabourForFarm(TenantId tenantId, UUID farmId, Pageable pageable);
 }

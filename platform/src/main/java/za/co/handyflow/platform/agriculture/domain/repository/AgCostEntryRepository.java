@@ -31,4 +31,8 @@ public interface AgCostEntryRepository extends JpaRepository<AgCostEntry, UUID> 
 
     @Query("SELECT e.category, SUM(e.amount) FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.targetType = :targetType AND e.targetId = :targetId GROUP BY e.category")
     List<Object[]> sumByCategoryForTarget(TenantId tenantId, String targetType, UUID targetId);
+
+    // How many ACTIVE ledger entries of this source already point at this record (labour: at most one; the V308 unique index enforces it).
+    @Query("SELECT COUNT(e) FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.sourceType = :sourceType AND e.sourceRef = :sourceRef AND e.status = 'ACTIVE'")
+    long countActiveBySource(TenantId tenantId, String sourceType, UUID sourceRef);
 }
