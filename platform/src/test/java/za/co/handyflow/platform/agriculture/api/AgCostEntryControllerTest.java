@@ -1,7 +1,6 @@
 package za.co.handyflow.platform.agriculture.api;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +17,6 @@ import za.co.handyflow.platform.agriculture.dto.CostEntryDtos.CategoryTotal;
 import za.co.handyflow.platform.agriculture.dto.CostEntryDtos.CostEntryResponse;
 import za.co.handyflow.platform.agriculture.dto.CostEntryDtos.CostTotalsResponse;
 import za.co.handyflow.platform.billing.FeatureGuard;
-import za.co.handyflow.platform.shared.TenantContext;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -49,15 +47,9 @@ class AgCostEntryControllerTest {
     final UUID targetId = UUID.randomUUID();
     final UUID groupId = UUID.randomUUID();
 
-    @BeforeEach
-    void seedTenantContext() {
-        TenantContext.setTenantId(UUID.randomUUID().toString());
-        TenantContext.setUserId(UUID.randomUUID().toString());
-    }
-
     @AfterEach
     void clearTenantContext() {
-        TenantContext.clear();
+        TenantRequests.clear();
     }
 
     private CostEntryResponse row(String amount) {
@@ -79,7 +71,7 @@ class AgCostEntryControllerTest {
     void createReturns201() throws Exception {
         when(costEntryService.createManual(any(), eq(farmId), any(), any())).thenReturn(List.of(row("1250.50")));
 
-        mvc.perform(post(BASE + "/farms/" + farmId + "/cost-entries").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body(oneTarget())))
+        TenantRequests.asTenant(mvc, post(BASE + "/farms/" + farmId + "/cost-entries").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body(oneTarget())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data[0].amount").value(1250.50))
                 .andExpect(jsonPath("$.data[0].status").value("ACTIVE"));
@@ -91,10 +83,10 @@ class AgCostEntryControllerTest {
     @WithMockUser(authorities = "AGRICULTURE_FINANCE")
     @DisplayName("POST without allocations, or with a non-positive amount, is a 400 and never reaches the service")
     void createValidatesTheRequest() throws Exception {
-        mvc.perform(post(BASE + "/farms/" + farmId + "/cost-entries").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        TenantRequests.asTenant(mvc, post(BASE + "/farms/" + farmId + "/cost-entries").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"entryDate\":\"2026-09-15\",\"description\":\"x\",\"amount\":10}"))
                 .andExpect(status().isBadRequest());
-        mvc.perform(post(BASE + "/farms/" + farmId + "/cost-entries").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        TenantRequests.asTenant(mvc, post(BASE + "/farms/" + farmId + "/cost-entries").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"entryDate\":\"2026-09-15\",\"description\":\"x\",\"amount\":0,\"allocations\":" + oneTarget() + "}"))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(costEntryService);
@@ -104,11 +96,11 @@ class AgCostEntryControllerTest {
     @WithMockUser(authorities = {"AGRICULTURE_READ", "AGRICULTURE_MANAGE", "AGRICULTURE_ADMIN"})
     @DisplayName("every ledger endpoint needs AGRICULTURE_FINANCE: READ, MANAGE and ADMIN are not enough")
     void financeIsRequired() throws Exception {
-        mvc.perform(post(BASE + "/farms/" + farmId + "/cost-entries").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body(oneTarget())))
+        TenantRequests.asTenant(mvc, post(BASE + "/farms/" + farmId + "/cost-entries").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body(oneTarget())))
                 .andExpect(status().isForbidden());
-        mvc.perform(get(BASE + "/farms/" + farmId + "/cost-entries")).andExpect(status().isForbidden());
-        mvc.perform(get(BASE + "/farms/" + farmId + "/cost-entries/totals")).andExpect(status().isForbidden());
-        mvc.perform(post(BASE + "/cost-entries/groups/" + groupId + "/reverse").with(csrf())).andExpect(status().isForbidden());
+        TenantRequests.asTenant(mvc, get(BASE + "/farms/" + farmId + "/cost-entries")).andExpect(status().isForbidden());
+        TenantRequests.asTenant(mvc, get(BASE + "/farms/" + farmId + "/cost-entries/totals")).andExpect(status().isForbidden());
+        TenantRequests.asTenant(mvc, post(BASE + "/cost-entries/groups/" + groupId + "/reverse").with(csrf())).andExpect(status().isForbidden());
         verifyNoInteractions(costEntryService);
     }
 
@@ -118,10 +110,10 @@ class AgCostEntryControllerTest {
     void listPassesTheFilter() throws Exception {
         when(costEntryService.list(any(), eq(farmId), any(), any(), any())).thenReturn(new PageImpl<CostEntryResponse>(List.of(row("10"))));
 
-        mvc.perform(get(BASE + "/farms/" + farmId + "/cost-entries")).andExpect(status().isOk()).andExpect(jsonPath("$.data.content[0].description").value("Hired sprayer"));
+        TenantRequests.asTenant(mvc, get(BASE + "/farms/" + farmId + "/cost-entries")).andExpect(status().isOk()).andExpect(jsonPath("$.data.content[0].description").value("Hired sprayer"));
         verify(costEntryService).list(any(), eq(farmId), isNull(), isNull(), any());
 
-        mvc.perform(get(BASE + "/farms/" + farmId + "/cost-entries").param("targetType", "GROUP").param("targetId", targetId.toString())).andExpect(status().isOk());
+        TenantRequests.asTenant(mvc, get(BASE + "/farms/" + farmId + "/cost-entries").param("targetType", "GROUP").param("targetId", targetId.toString())).andExpect(status().isOk());
         verify(costEntryService).list(any(), eq(farmId), eq("GROUP"), eq(targetId), any());
     }
 
@@ -132,7 +124,7 @@ class AgCostEntryControllerTest {
         when(costEntryService.totals(any(), eq(farmId), any(), any()))
                 .thenReturn(new CostTotalsResponse(List.of(new CategoryTotal("LABOUR", new BigDecimal("250.50")), new CategoryTotal("OTHER_DIRECT", new BigDecimal("100"))), new BigDecimal("350.50")));
 
-        mvc.perform(get(BASE + "/farms/" + farmId + "/cost-entries/totals"))
+        TenantRequests.asTenant(mvc, get(BASE + "/farms/" + farmId + "/cost-entries/totals"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(350.50))
                 .andExpect(jsonPath("$.data.byCategory[0].category").value("LABOUR"));
@@ -144,10 +136,10 @@ class AgCostEntryControllerTest {
     void reverse() throws Exception {
         when(costEntryService.reverseGroup(any(), eq(groupId), any(), any())).thenReturn(List.of(row("-10")));
 
-        mvc.perform(post(BASE + "/cost-entries/groups/" + groupId + "/reverse").with(csrf())).andExpect(status().isOk()).andExpect(jsonPath("$.data[0].amount").value(-10));
+        TenantRequests.asTenant(mvc, post(BASE + "/cost-entries/groups/" + groupId + "/reverse").with(csrf())).andExpect(status().isOk()).andExpect(jsonPath("$.data[0].amount").value(-10));
         verify(costEntryService).reverseGroup(any(), eq(groupId), any(), isNull());
 
-        mvc.perform(post(BASE + "/cost-entries/groups/" + groupId + "/reverse").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Wrong crop\"}")).andExpect(status().isOk());
+        TenantRequests.asTenant(mvc, post(BASE + "/cost-entries/groups/" + groupId + "/reverse").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Wrong crop\"}")).andExpect(status().isOk());
         verify(costEntryService).reverseGroup(any(), eq(groupId), any(), eq("Wrong crop"));
     }
 }

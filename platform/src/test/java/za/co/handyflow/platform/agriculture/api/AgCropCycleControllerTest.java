@@ -1,6 +1,7 @@
 package za.co.handyflow.platform.agriculture.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,6 +65,11 @@ class AgCropCycleControllerTest {
                 "OPEN", null, Instant.now(), Instant.now());
     }
 
+    @AfterEach
+    void clearTenantContext() {
+        TenantRequests.clear();
+    }
+
     @Test
     @WithMockUser(authorities = "AGRICULTURE_READ")
     @DisplayName("GET /crop-cycles/{id} returns 200 and calls featureGuard.requireModule(\"agriculture\")")
@@ -71,7 +77,7 @@ class AgCropCycleControllerTest {
         UUID id = UUID.randomUUID();
         when(cropCycleService.getCropCycle(any(), any())).thenReturn(cropCycleResponse(id));
 
-        mvc.perform(get(BASE + "/crop-cycles/" + id))
+        TenantRequests.asTenant(mvc, get(BASE + "/crop-cycles/" + id))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("PLANTED"));
 
@@ -83,7 +89,7 @@ class AgCropCycleControllerTest {
     @DisplayName("PATCH /crop-cycles/{id}/mark-growing with only AGRICULTURE_READ returns 403")
     void markGrowingWithReadOnlyReturns403() throws Exception {
         UUID id = UUID.randomUUID();
-        mvc.perform(patch(BASE + "/crop-cycles/" + id + "/mark-growing").with(csrf()))
+        TenantRequests.asTenant(mvc, patch(BASE + "/crop-cycles/" + id + "/mark-growing").with(csrf()))
                 .andExpect(status().isForbidden());
 
         verify(cropCycleService, never()).markGrowing(any(), any());
@@ -96,7 +102,7 @@ class AgCropCycleControllerTest {
         UUID recordId = UUID.randomUUID();
         when(scoutingRecordService.acknowledgeFollowUp(any(), any())).thenReturn(scoutingRecordResponse(recordId));
 
-        mvc.perform(patch(BASE + "/scouting-records/" + recordId + "/acknowledge-follow-up").with(csrf()))
+        TenantRequests.asTenant(mvc, patch(BASE + "/scouting-records/" + recordId + "/acknowledge-follow-up").with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.followUpAcknowledged").value(true));
 
@@ -109,7 +115,7 @@ class AgCropCycleControllerTest {
     @DisplayName("DELETE /crop-cycles/{id} with AGRICULTURE_ADMIN succeeds")
     void deleteCropCycleWithAdminSucceeds() throws Exception {
         UUID id = UUID.randomUUID();
-        mvc.perform(delete(BASE + "/crop-cycles/" + id).with(csrf()))
+        TenantRequests.asTenant(mvc, delete(BASE + "/crop-cycles/" + id).with(csrf()))
                 .andExpect(status().isOk());
 
         verify(cropCycleService).deleteCropCycle(any(), org.mockito.ArgumentMatchers.eq(id));
@@ -119,7 +125,7 @@ class AgCropCycleControllerTest {
     @WithMockUser(authorities = "AGRICULTURE_MANAGE")
     @DisplayName("DELETE /crop-cycles/{id} with only AGRICULTURE_MANAGE (no ADMIN) returns 403")
     void deleteCropCycleWithManageOnlyReturns403() throws Exception {
-        mvc.perform(delete(BASE + "/crop-cycles/" + UUID.randomUUID()).with(csrf()))
+        TenantRequests.asTenant(mvc, delete(BASE + "/crop-cycles/" + UUID.randomUUID()).with(csrf()))
                 .andExpect(status().isForbidden());
 
         verify(cropCycleService, never()).deleteCropCycle(any(), any());

@@ -1,7 +1,6 @@
 package za.co.handyflow.platform.agriculture.api;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +17,6 @@ import za.co.handyflow.platform.agriculture.dto.SalesDtos.SaleLineResponse;
 import za.co.handyflow.platform.agriculture.dto.SalesDtos.SalesAllocationResponse;
 import za.co.handyflow.platform.agriculture.dto.SalesDtos.SalesTotalsResponse;
 import za.co.handyflow.platform.billing.FeatureGuard;
-import za.co.handyflow.platform.shared.TenantContext;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -50,15 +48,9 @@ class AgSalesControllerTest {
     final UUID lineId = UUID.randomUUID();
     final UUID groupId = UUID.randomUUID();
 
-    @BeforeEach
-    void seedTenantContext() {
-        TenantContext.setTenantId(UUID.randomUUID().toString());
-        TenantContext.setUserId(UUID.randomUUID().toString());
-    }
-
     @AfterEach
     void clearTenantContext() {
-        TenantContext.clear();
+        TenantRequests.clear();
     }
 
     private SalesAllocationResponse row() {
@@ -82,7 +74,7 @@ class AgSalesControllerTest {
                 new SaleLineResponse(UUID.randomUUID(), "INV-0042", "ISSUED", null, "ABC Foods", LocalDate.of(2026, 9, 18), "ZAR", lineId, "Broiler chicken", "kg",
                         new BigDecimal("2100"), new BigDecimal("42"), new BigDecimal("88200.00"), new BigDecimal("88200.00"), BigDecimal.ZERO, new BigDecimal("2100"))));
 
-        mvc.perform(get(BASE + "/farms/" + farmId + "/sales/lines").param("from", "2026-09-01").param("to", "2026-09-30").param("q", "abc"))
+        TenantRequests.asTenant(mvc, get(BASE + "/farms/" + farmId + "/sales/lines").param("from", "2026-09-01").param("to", "2026-09-30").param("q", "abc"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].invoiceNumber").value("INV-0042"))
                 .andExpect(jsonPath("$.data[0].remainingQuantity").value(2100));
@@ -98,7 +90,7 @@ class AgSalesControllerTest {
     void searchDefaults() throws Exception {
         when(salesService.searchLines(any(), eq(farmId), any(), any(), any())).thenReturn(List.of());
 
-        mvc.perform(get(BASE + "/farms/" + farmId + "/sales/lines")).andExpect(status().isOk());
+        TenantRequests.asTenant(mvc, get(BASE + "/farms/" + farmId + "/sales/lines")).andExpect(status().isOk());
 
         verify(salesService).searchLines(any(), eq(farmId), isNull(), isNull(), isNull());
     }
@@ -109,7 +101,7 @@ class AgSalesControllerTest {
     void allocate() throws Exception {
         when(salesService.allocate(any(), eq(farmId), any(), any())).thenReturn(List.of(row()));
 
-        mvc.perform(post(BASE + "/farms/" + farmId + "/sales-allocations").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body(oneShare())))
+        TenantRequests.asTenant(mvc, post(BASE + "/farms/" + farmId + "/sales-allocations").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body(oneShare())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data[0].revenue").value(88200.00))
                 .andExpect(jsonPath("$.data[0].counted").value(true));
@@ -119,11 +111,11 @@ class AgSalesControllerTest {
     @WithMockUser(authorities = {"AGRICULTURE_FINANCE", "INVOICE_READ"})
     @DisplayName("POST without targets, without an invoice line, or with a non-positive quantity is a 400 and never reaches the service")
     void allocateValidatesTheRequest() throws Exception {
-        mvc.perform(post(BASE + "/farms/" + farmId + "/sales-allocations").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"invoiceLineId\":\"" + lineId + "\"}"))
+        TenantRequests.asTenant(mvc, post(BASE + "/farms/" + farmId + "/sales-allocations").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"invoiceLineId\":\"" + lineId + "\"}"))
                 .andExpect(status().isBadRequest());
-        mvc.perform(post(BASE + "/farms/" + farmId + "/sales-allocations").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"allocations\":" + oneShare() + "}"))
+        TenantRequests.asTenant(mvc, post(BASE + "/farms/" + farmId + "/sales-allocations").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"allocations\":" + oneShare() + "}"))
                 .andExpect(status().isBadRequest());
-        mvc.perform(post(BASE + "/farms/" + farmId + "/sales-allocations").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        TenantRequests.asTenant(mvc, post(BASE + "/farms/" + farmId + "/sales-allocations").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(body("[{\"targetType\":\"GROUP\",\"targetId\":\"" + groupId + "\",\"quantity\":0}]")))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(salesService);
@@ -136,21 +128,21 @@ class AgSalesControllerTest {
         when(salesService.list(any(), eq(farmId), any(), any(), any())).thenReturn(new PageImpl<SalesAllocationResponse>(List.of(row())));
         when(salesService.totals(any(), eq(farmId), any(), any())).thenReturn(new SalesTotalsResponse(new BigDecimal("88200.00"), 1, 0, List.of()));
 
-        mvc.perform(get(BASE + "/farms/" + farmId + "/sales-allocations").param("targetType", "GROUP").param("targetId", groupId.toString()))
+        TenantRequests.asTenant(mvc, get(BASE + "/farms/" + farmId + "/sales-allocations").param("targetType", "GROUP").param("targetId", groupId.toString()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.content[0].invoiceNumber").value("INV-0042"));
         verify(salesService).list(any(), eq(farmId), eq("GROUP"), eq(groupId), any());
 
-        mvc.perform(get(BASE + "/farms/" + farmId + "/sales-allocations/totals")).andExpect(status().isOk()).andExpect(jsonPath("$.data.revenue").value(88200.00));
+        TenantRequests.asTenant(mvc, get(BASE + "/farms/" + farmId + "/sales-allocations/totals")).andExpect(status().isOk()).andExpect(jsonPath("$.data.revenue").value(88200.00));
     }
 
     @Test
     @WithMockUser(authorities = "AGRICULTURE_FINANCE")
     @DisplayName("AGRICULTURE_FINANCE alone is not enough to read invoice data: every endpoint that returns it also needs INVOICE_READ")
     void financeAloneCannotReadInvoices() throws Exception {
-        mvc.perform(get(BASE + "/farms/" + farmId + "/sales/lines")).andExpect(status().isForbidden());
-        mvc.perform(get(BASE + "/farms/" + farmId + "/sales-allocations")).andExpect(status().isForbidden());
-        mvc.perform(get(BASE + "/farms/" + farmId + "/sales-allocations/totals")).andExpect(status().isForbidden());
-        mvc.perform(post(BASE + "/farms/" + farmId + "/sales-allocations").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body(oneShare()))).andExpect(status().isForbidden());
+        TenantRequests.asTenant(mvc, get(BASE + "/farms/" + farmId + "/sales/lines")).andExpect(status().isForbidden());
+        TenantRequests.asTenant(mvc, get(BASE + "/farms/" + farmId + "/sales-allocations")).andExpect(status().isForbidden());
+        TenantRequests.asTenant(mvc, get(BASE + "/farms/" + farmId + "/sales-allocations/totals")).andExpect(status().isForbidden());
+        TenantRequests.asTenant(mvc, post(BASE + "/farms/" + farmId + "/sales-allocations").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body(oneShare()))).andExpect(status().isForbidden());
         verifyNoInteractions(salesService);
     }
 
@@ -158,8 +150,8 @@ class AgSalesControllerTest {
     @WithMockUser(authorities = {"INVOICE_READ", "AGRICULTURE_READ", "AGRICULTURE_MANAGE", "AGRICULTURE_ADMIN"})
     @DisplayName("INVOICE_READ without AGRICULTURE_FINANCE is forbidden too")
     void invoiceReadAloneIsNotEnough() throws Exception {
-        mvc.perform(get(BASE + "/farms/" + farmId + "/sales/lines")).andExpect(status().isForbidden());
-        mvc.perform(delete(BASE + "/sales-allocations/" + UUID.randomUUID()).with(csrf())).andExpect(status().isForbidden());
+        TenantRequests.asTenant(mvc, get(BASE + "/farms/" + farmId + "/sales/lines")).andExpect(status().isForbidden());
+        TenantRequests.asTenant(mvc, delete(BASE + "/sales-allocations/" + UUID.randomUUID()).with(csrf())).andExpect(status().isForbidden());
         verifyNoInteractions(salesService);
     }
 
@@ -169,7 +161,7 @@ class AgSalesControllerTest {
     void remove() throws Exception {
         UUID id = UUID.randomUUID();
 
-        mvc.perform(delete(BASE + "/sales-allocations/" + id).with(csrf())).andExpect(status().isNoContent());
+        TenantRequests.asTenant(mvc, delete(BASE + "/sales-allocations/" + id).with(csrf())).andExpect(status().isNoContent());
 
         verify(salesService).remove(any(), eq(id), any());
     }

@@ -1,6 +1,7 @@
 package za.co.handyflow.platform.agriculture.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import za.co.handyflow.platform.WebMvcTestSecuritySupport;
+import za.co.handyflow.platform.agriculture.application.internal.AgDashboardService;
 import za.co.handyflow.platform.agriculture.application.internal.AgFarmService;
 import za.co.handyflow.platform.agriculture.dto.FarmResponse;
 import za.co.handyflow.platform.billing.FeatureGuard;
@@ -41,6 +43,7 @@ class AgFarmControllerTest {
     @Autowired ObjectMapper mapper;
 
     @MockitoBean AgFarmService farmService;
+    @MockitoBean AgDashboardService dashboardService;      // AgFarmController needs it; without a mock the slice context cannot start
     @MockitoBean FeatureGuard featureGuard;
 
     static final String BASE = "/api/v1/agriculture/farms";
@@ -50,6 +53,11 @@ class AgFarmControllerTest {
                 null, null, null, null, null, "ACTIVE", null, Instant.now(), Instant.now());
     }
 
+    @AfterEach
+    void clearTenantContext() {
+        TenantRequests.clear();
+    }
+
     @Test
     @WithMockUser(authorities = "AGRICULTURE_READ")
     @DisplayName("GET /farms returns 200 and calls featureGuard.requireModule(\"agriculture\")")
@@ -57,7 +65,7 @@ class AgFarmControllerTest {
         Page<FarmResponse> page = new PageImpl<>(List.of(farmResponse(UUID.randomUUID())));
         when(farmService.getFarms(any(), any(), any())).thenReturn(page);
 
-        mvc.perform(get(BASE))
+        TenantRequests.asTenant(mvc, get(BASE))
                 .andExpect(status().isOk());
 
         verify(featureGuard, atLeastOnce()).requireModule("agriculture");
@@ -67,7 +75,7 @@ class AgFarmControllerTest {
     @WithMockUser(authorities = "AGRICULTURE_MANAGE")
     @DisplayName("GET /farms with only AGRICULTURE_MANAGE (no READ) returns 403")
     void getFarmsWithoutReadReturns403() throws Exception {
-        mvc.perform(get(BASE))
+        TenantRequests.asTenant(mvc, get(BASE))
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(farmService);
@@ -77,7 +85,7 @@ class AgFarmControllerTest {
     @WithMockUser(authorities = "AGRICULTURE_READ")
     @DisplayName("POST /farms with only AGRICULTURE_READ returns 403")
     void createFarmWithReadOnlyReturns403() throws Exception {
-        mvc.perform(post(BASE).with(csrf())
+        TenantRequests.asTenant(mvc, post(BASE).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Rietvlei\",\"farmType\":\"LIVESTOCK\"}"))
                 .andExpect(status().isForbidden());
@@ -92,7 +100,7 @@ class AgFarmControllerTest {
         UUID id = UUID.randomUUID();
         when(farmService.createFarm(any(), any())).thenReturn(farmResponse(id));
 
-        mvc.perform(post(BASE).with(csrf())
+        TenantRequests.asTenant(mvc, post(BASE).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Rietvlei Farm\",\"farmType\":\"LIVESTOCK\"}"))
                 .andExpect(status().isCreated())
@@ -103,7 +111,7 @@ class AgFarmControllerTest {
     @WithMockUser(authorities = "AGRICULTURE_MANAGE")
     @DisplayName("DELETE /farms/{id} with only AGRICULTURE_MANAGE (no ADMIN) returns 403")
     void deleteFarmWithManageOnlyReturns403() throws Exception {
-        mvc.perform(delete(BASE + "/" + UUID.randomUUID()).with(csrf()))
+        TenantRequests.asTenant(mvc, delete(BASE + "/" + UUID.randomUUID()).with(csrf()))
                 .andExpect(status().isForbidden());
 
         verify(farmService, never()).deleteFarm(any(), any());
@@ -114,7 +122,7 @@ class AgFarmControllerTest {
     @DisplayName("DELETE /farms/{id} with AGRICULTURE_ADMIN succeeds")
     void deleteFarmWithAdminSucceeds() throws Exception {
         UUID id = UUID.randomUUID();
-        mvc.perform(delete(BASE + "/" + id).with(csrf()))
+        TenantRequests.asTenant(mvc, delete(BASE + "/" + id).with(csrf()))
                 .andExpect(status().isOk());
 
         verify(farmService).deleteFarm(any(), org.mockito.ArgumentMatchers.eq(id));

@@ -1,6 +1,7 @@
 package za.co.handyflow.platform.agriculture.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,6 +68,11 @@ class AgAnimalControllerTest {
                 "COMPLETED", null, Instant.now(), Instant.now());
     }
 
+    @AfterEach
+    void clearTenantContext() {
+        TenantRequests.clear();
+    }
+
     @Test
     @WithMockUser(authorities = "AGRICULTURE_READ")
     @DisplayName("GET /animals/{id} returns 200 and calls featureGuard.requireModule(\"agriculture\")")
@@ -74,7 +80,7 @@ class AgAnimalControllerTest {
         UUID id = UUID.randomUUID();
         when(animalService.getAnimal(any(), any())).thenReturn(animalResponse(id));
 
-        mvc.perform(get(BASE + "/animals/" + id))
+        TenantRequests.asTenant(mvc, get(BASE + "/animals/" + id))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.tagNumber").value("T-1042"));
 
@@ -86,7 +92,7 @@ class AgAnimalControllerTest {
     @DisplayName("PATCH /animals/{id}/status with only AGRICULTURE_READ returns 403")
     void changeStatusWithReadOnlyReturns403() throws Exception {
         UUID id = UUID.randomUUID();
-        mvc.perform(patch(BASE + "/animals/" + id + "/status").with(csrf())
+        TenantRequests.asTenant(mvc, patch(BASE + "/animals/" + id + "/status").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"SOLD\"}"))
                 .andExpect(status().isForbidden());
@@ -101,7 +107,7 @@ class AgAnimalControllerTest {
         UUID eventId = UUID.randomUUID();
         when(healthEventService.acknowledgeReminder(any(), any())).thenReturn(healthEventResponse(eventId));
 
-        mvc.perform(patch(BASE + "/health-events/" + eventId + "/acknowledge").with(csrf()))
+        TenantRequests.asTenant(mvc, patch(BASE + "/health-events/" + eventId + "/acknowledge").with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.reminderAcknowledged").value(true));
 
@@ -114,7 +120,7 @@ class AgAnimalControllerTest {
     @DisplayName("DELETE /animals/{id} with AGRICULTURE_ADMIN succeeds")
     void deleteAnimalWithAdminSucceeds() throws Exception {
         UUID id = UUID.randomUUID();
-        mvc.perform(delete(BASE + "/animals/" + id).with(csrf()))
+        TenantRequests.asTenant(mvc, delete(BASE + "/animals/" + id).with(csrf()))
                 .andExpect(status().isOk());
 
         verify(animalService).deleteAnimal(any(), org.mockito.ArgumentMatchers.eq(id));
@@ -124,7 +130,7 @@ class AgAnimalControllerTest {
     @WithMockUser(authorities = "AGRICULTURE_MANAGE")
     @DisplayName("DELETE /animals/{id} with only AGRICULTURE_MANAGE (no ADMIN) returns 403")
     void deleteAnimalWithManageOnlyReturns403() throws Exception {
-        mvc.perform(delete(BASE + "/animals/" + UUID.randomUUID()).with(csrf()))
+        TenantRequests.asTenant(mvc, delete(BASE + "/animals/" + UUID.randomUUID()).with(csrf()))
                 .andExpect(status().isForbidden());
 
         verify(animalService, never()).deleteAnimal(any(), any());

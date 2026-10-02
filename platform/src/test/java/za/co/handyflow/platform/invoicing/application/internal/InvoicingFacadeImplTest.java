@@ -116,7 +116,8 @@ class InvoicingFacadeImplTest {
     @DisplayName("an invoice with no credit notes reports zero credited; a walk-in sale uses the walk-in name and asks CRM nothing")
     void walkInAndNoCredit() {
         UUID invId = UUID.randomUUID(), line = UUID.randomUUID();
-        when(invoiceRepo.findByLineItemIds(eq(TENANT), any())).thenReturn(List.of(invoice(invId, "INV-7", InvoiceStatus.PAID, null, "Walk-in Co", "300.00", lineItem(line, "Eggs", "5", "300.00"))));
+        Invoice walkIn = invoice(invId, "INV-7", InvoiceStatus.PAID, null, "Walk-in Co", "300.00", lineItem(line, "Eggs", "5", "300.00"));       // built BEFORE when(...): Mockito cannot stub a mock inside an open stubbing
+        when(invoiceRepo.findByLineItemIds(eq(TENANT), any())).thenReturn(List.of(walkIn));
         when(creditNoteRepo.sumSubtotalByInvoice(eq(TENANT), any())).thenReturn(List.<Object[]>of());
 
         SaleLine l = facade().findSaleLines(TENANT, List.of(line)).get(0);
@@ -130,9 +131,9 @@ class InvoicingFacadeImplTest {
     @DisplayName("a customer with several invoices is looked up once")
     void customerLookedUpOnce() {
         UUID customerId = UUID.randomUUID(), l1 = UUID.randomUUID(), l2 = UUID.randomUUID();
-        when(invoiceRepo.findByLineItemIds(eq(TENANT), any())).thenReturn(List.of(
-                invoice(UUID.randomUUID(), "INV-1", InvoiceStatus.PAID, customerId, null, "100.00", lineItem(l1, "A", "1", "100.00")),
-                invoice(UUID.randomUUID(), "INV-2", InvoiceStatus.PAID, customerId, null, "200.00", lineItem(l2, "B", "2", "200.00"))));
+        Invoice first = invoice(UUID.randomUUID(), "INV-1", InvoiceStatus.PAID, customerId, null, "100.00", lineItem(l1, "A", "1", "100.00"));
+        Invoice second = invoice(UUID.randomUUID(), "INV-2", InvoiceStatus.PAID, customerId, null, "200.00", lineItem(l2, "B", "2", "200.00"));
+        when(invoiceRepo.findByLineItemIds(eq(TENANT), any())).thenReturn(List.of(first, second));
         when(creditNoteRepo.sumSubtotalByInvoice(eq(TENANT), any())).thenReturn(List.<Object[]>of());
         customerNamed(customerId, "ABC Foods");
 
@@ -163,8 +164,8 @@ class InvoicingFacadeImplTest {
     @DisplayName("a search returns every line of the invoices found, for the statuses asked, ignoring unknown status names")
     void searchesBySatus() {
         UUID invId = UUID.randomUUID(), l1 = UUID.randomUUID(), l2 = UUID.randomUUID();
-        when(invoiceRepo.findIssuedBetween(eq(TENANT), eq(List.of(InvoiceStatus.ISSUED, InvoiceStatus.PAID)), any(), any(), any()))
-                .thenReturn(List.of(invoice(invId, "INV-9", InvoiceStatus.PAID, null, "X", "400.00", lineItem(l1, "A", "1", "100.00"), lineItem(l2, "B", "3", "300.00"))));
+        Invoice found = invoice(invId, "INV-9", InvoiceStatus.PAID, null, "X", "400.00", lineItem(l1, "A", "1", "100.00"), lineItem(l2, "B", "3", "300.00"));
+        when(invoiceRepo.findIssuedBetween(eq(TENANT), eq(List.of(InvoiceStatus.ISSUED, InvoiceStatus.PAID)), any(), any(), any())).thenReturn(List.of(found));
         when(creditNoteRepo.sumSubtotalByInvoice(eq(TENANT), any())).thenReturn(List.<Object[]>of());
 
         List<SaleLine> lines = facade().searchSaleLines(TENANT, ISSUED.minusSeconds(3600), ISSUED.plusSeconds(3600), List.of("ISSUED", "NOT_A_STATUS", "PAID"), 50);

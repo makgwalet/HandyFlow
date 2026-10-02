@@ -1,7 +1,6 @@
 package za.co.handyflow.platform.agriculture.api;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +13,6 @@ import za.co.handyflow.platform.WebMvcTestSecuritySupport;
 import za.co.handyflow.platform.agriculture.application.internal.AgTrendsService;
 import za.co.handyflow.platform.agriculture.dto.AgTrendsResponse;
 import za.co.handyflow.platform.billing.FeatureGuard;
-import za.co.handyflow.platform.shared.TenantContext;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -38,17 +36,11 @@ class AgTrendsControllerTest {
 
     static final String URL = "/api/v1/agriculture/trends";
 
-    // The handlers read the tenant from TenantContext, which the JWT filter normally fills. This slice has no real login, so seed it
-    // (the same pattern LpClientControllerTest uses) and always clear it, or a leaked value would hide a missing one in other tests.
-    @BeforeEach
-    void seedTenantContext() {
-        TenantContext.setTenantId(UUID.randomUUID().toString());
-        TenantContext.setUserId(UUID.randomUUID().toString());
-    }
-
+    // The handlers read the tenant from TenantContext, which the JWT filter normally fills and then clears after every request. This slice has
+    // no real login, so TenantRequests seeds it right before each request; clearing it here keeps it from leaking into other test classes.
     @AfterEach
     void clearTenantContext() {
-        TenantContext.clear();
+        TenantRequests.clear();
     }
 
     private AgTrendsResponse response() {
@@ -63,7 +55,7 @@ class AgTrendsControllerTest {
     void defaults() throws Exception {
         when(trendsService.getTrends(any(), any(), anyInt())).thenReturn(response());
 
-        mvc.perform(get(URL))
+        TenantRequests.asTenant(mvc, get(URL))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.months[0].key").value("2026-10"))
                 .andExpect(jsonPath("$.data.limitations[0]").value("Herd size over time is not recorded."));
@@ -79,7 +71,7 @@ class AgTrendsControllerTest {
         UUID farm = UUID.randomUUID();
         when(trendsService.getTrends(any(), any(), anyInt())).thenReturn(response());
 
-        mvc.perform(get(URL).param("farmId", farm.toString()).param("months", "6")).andExpect(status().isOk());
+        TenantRequests.asTenant(mvc, get(URL).param("farmId", farm.toString()).param("months", "6")).andExpect(status().isOk());
 
         verify(trendsService).getTrends(any(), eq(farm), eq(6));
     }
@@ -88,7 +80,7 @@ class AgTrendsControllerTest {
     @WithMockUser(authorities = "AGRICULTURE_MANAGE")
     @DisplayName("GET /trends without AGRICULTURE_READ is forbidden")
     void requiresRead() throws Exception {
-        mvc.perform(get(URL)).andExpect(status().isForbidden());
+        TenantRequests.asTenant(mvc, get(URL)).andExpect(status().isForbidden());
         verifyNoInteractions(trendsService);
     }
 }

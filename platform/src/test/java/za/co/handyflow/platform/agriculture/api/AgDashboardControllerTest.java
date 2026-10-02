@@ -1,7 +1,6 @@
 package za.co.handyflow.platform.agriculture.api;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +13,6 @@ import za.co.handyflow.platform.WebMvcTestSecuritySupport;
 import za.co.handyflow.platform.agriculture.application.internal.AgDashboardService;
 import za.co.handyflow.platform.agriculture.dto.AgDashboardResponse;
 import za.co.handyflow.platform.billing.FeatureGuard;
-import za.co.handyflow.platform.shared.TenantContext;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -37,17 +35,11 @@ class AgDashboardControllerTest {
 
     static final String URL = "/api/v1/agriculture/dashboard";
 
-    // The handlers read the tenant from TenantContext, which the JWT filter normally fills. This slice has no real login, so seed it
-    // (the same pattern LpClientControllerTest uses) and always clear it, or a leaked value would hide a missing one in other tests.
-    @BeforeEach
-    void seedTenantContext() {
-        TenantContext.setTenantId(UUID.randomUUID().toString());
-        TenantContext.setUserId(UUID.randomUUID().toString());
-    }
-
+    // The handlers read the tenant from TenantContext, which the JWT filter normally fills and then clears after every request. This slice has
+    // no real login, so TenantRequests seeds it right before each request; clearing it here keeps it from leaking into other test classes.
     @AfterEach
     void clearTenantContext() {
-        TenantContext.clear();
+        TenantRequests.clear();
     }
 
     private AgDashboardResponse emptyDashboard() {
@@ -63,7 +55,7 @@ class AgDashboardControllerTest {
     void returnsDashboard() throws Exception {
         when(dashboardService.getTenantDashboard(any())).thenReturn(emptyDashboard());
 
-        mvc.perform(get(URL))
+        TenantRequests.asTenant(mvc, get(URL))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totals.farmCount").value(2))
                 .andExpect(jsonPath("$.data.totals.totalHead").value(235))
@@ -76,7 +68,7 @@ class AgDashboardControllerTest {
     @WithMockUser(authorities = "AGRICULTURE_MANAGE")
     @DisplayName("GET /dashboard without AGRICULTURE_READ is forbidden")
     void requiresRead() throws Exception {
-        mvc.perform(get(URL)).andExpect(status().isForbidden());
+        TenantRequests.asTenant(mvc, get(URL)).andExpect(status().isForbidden());
         verifyNoInteractions(dashboardService);
     }
 }
