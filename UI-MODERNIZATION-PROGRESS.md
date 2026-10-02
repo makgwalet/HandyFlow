@@ -452,3 +452,30 @@ W2 is built. **W3 to W9 are not started.**
 **Verification:** same method as before. Pure and entity tests RUN (revenue rules 12, sales allocation 6), Mockito tests type-checked only (sales service, Invoicing facade),
 controller test, the new `@Query` methods and V307 never run. **Run `mvn test` (including `ArchitectureVerificationTest`), the context-load test, and apply V307.**
 Frontend: 301 scratch tests, tsc 246 (baseline 249), guards pass, not browser-tested.
+
+## Agriculture W3: labour costed from HR (ADR-001)
+
+W3 is built. **W4 to W9 are not started.**
+
+- **What it costs:** the `laborHours` on input applications and harvests (the only two places Agriculture records labour hours; livestock work has none). Each becomes a LABOUR
+  ledger entry against the crop cycle, with the date of the work, the hours, and the rate and amount SNAPSHOTTED. A later raise never rewrites a past cost.
+- **Rate:** HR gross salary / ordinary hours in the pay period (WEEKLY = 1 week, FORTNIGHTLY = 2, MONTHLY = 52/12 weeks; week defaults to 45 h), plus the tenant's employer on-cost %.
+  Amount = hours x the snapshotted loaded rate, to the cent, so it always reproduces from the two stored numbers. Casual workers: a typed-in rate. Unknown pay frequency or no
+  salary: no rate is guessed, a reason is shown, and a rate must be typed.
+- **Not included:** only gross salary is used. Overtime, leave, bonuses and benefits are not in the rate; employer contributions come in through the on-cost %, which DEFAULTS TO 0
+  until set (the screen says so). Cost reports, trends and the dashboard still do not include ledger costs (W5).
+- **Privacy:** no endpoint returns a salary, only the derived rate. HR rates are only computed for callers holding HR_READ, HR_MANAGE or USER_READ as well as AGRICULTURE_FINANCE.
+  A ledger entry's loaded rate is visible to every AGRICULTURE_FINANCE user: grant it accordingly.
+- **Integrity:** the V308 partial unique index (one ACTIVE HR_LABOUR entry per work record) holds under concurrent clicks; costing is all-or-nothing; work must belong to the farm.
+
+### Test run of 2026-10-02 (first full `mvn test`: 1150 tests, 140 failing before the fixes below)
+- `HandyFlowApplicationTests` PASSED: the whole application starts, every new `@Query` validates, V307 applied.
+- **Mine, fixed** (patch `agriculture-test-fixes`): JwtAuthFilter clears TenantContext after every request, so tests that seeded once and sent two requests failed on the second
+  (AgCostEntryControllerTest, AgSalesControllerTest). The older Agriculture controller tests never seeded a tenant at all (AgAnimal, AgCropCycle) and AgFarmControllerTest never mocked
+  AgDashboardService, so its context could not start. `TenantRequests.asTenant()` now seeds before every request. InvoicingFacadeImplTest built mocks inside an open `when(...)`.
+- **Not mine, not touched:** about 120 failures in other modules. Most are the same "No tenant in context" 409 in controller tests that never seed a tenant (bookkeeping, collections
+  agency, debt collection, facilities, facilities management, legal compliance, training, training provider, warehousing, clinic, HR); `BigDecimal` scale assertions (`expected 0 but
+  was 0.00`); date-dependent tests that expired (FacilityComplianceCertificateTest); TenderTest; Clinic Mockito strictness.
+- **ArchitectureVerificationTest fails project-wide, not because of W2.** The report lists dependencies on facades in `application` sub-packages for ~40 modules I never touched (for
+  example recruiter to hr, expenses to accounting); W2's three lines are the same kind. Confirm with a checkout of the branch before the Agriculture work.
+- **ClinicPatientRepositoryTest** (@DataJpaTest, H2, Flyway disabled): the cause is not visible in the paste. It cannot be my migrations (Flyway is off), but it loads every entity.

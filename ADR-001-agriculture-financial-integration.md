@@ -86,5 +86,13 @@ W7 supplier/SCM, W8 weather, W9 NDVI/satellite. W7 to W9 do not block a first pr
   (ex-VAT, issued onwards only, credit notes netted in proportion across the invoice's lines, apportioned across ALL allocations of a line to the exact cent), so a
   cancelled invoice or a later credit note is reflected. Needs AGRICULTURE_FINANCE **and** INVOICE_READ (it shows invoice data). It records attribution only: it does
   NOT mark animals sold or change a head count. Agriculture's allowed module dependencies now include `invoicing`.
-- W3 to W9: not started. W3 needs the hourly-rate derivation and on-cost setting; W4 needs the Fleet changes in decision 6 (hours meter, operating rate,
-  `FleetFacade`) and a Fuel facade; W5 combines costs and revenue (cost reports, trends and the dashboard do not include ledger costs or revenue yet).
+- **W3 (labour from HR): built.** Costs the `laborHours` already recorded on input applications and harvests into the ledger as LABOUR entries against the crop cycle
+  (`source_type` HR_LABOUR, `source_ref` the work record). Hourly rate = the employee's gross salary over the ordinary hours in their pay period (WEEKLY = the week,
+  FORTNIGHTLY = two weeks, MONTHLY = 52/12 weeks; the week defaults to 45 h), loaded with a tenant-set employer on-cost %, and SNAPSHOTTED into the entry. Casual workers with
+  no HR record are costed at a typed-in rate. Costing is an explicit finance action, not a side effect of recording the work. `ag_finance_settings` (V308) holds the two
+  settings; a partial unique index makes double-costing impossible even under a race, and reversing the ledger entry frees the work to be costed again.
+  **Privacy:** Agriculture never returns a salary, only the derived rate, and only reads HR for callers who also hold HR_READ, HR_MANAGE or USER_READ (HR's own rule).
+  Everyone with AGRICULTURE_FINANCE can still cost at a typed rate. Anyone with AGRICULTURE_FINANCE can see the loaded rate on a ledger entry, so grant it only to people who
+  may see payroll.
+- W4 to W9: not started. W4 needs the Fleet changes in decision 6 (hours meter, operating rate, `FleetFacade`) and a Fuel facade; W5 combines costs and revenue (cost
+  reports, trends and the dashboard do not include ledger costs or revenue yet).
