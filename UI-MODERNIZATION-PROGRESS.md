@@ -479,3 +479,17 @@ W3 is built. **W4 to W9 are not started.**
 - **ArchitectureVerificationTest fails project-wide, not because of W2.** The report lists dependencies on facades in `application` sub-packages for ~40 modules I never touched (for
   example recruiter to hr, expenses to accounting); W2's three lines are the same kind. Confirm with a checkout of the branch before the Agriculture work.
 - **ClinicPatientRepositoryTest** (@DataJpaTest, H2, Flyway disabled): the cause is not visible in the paste. It cannot be my migrations (Flyway is off), but it loads every entity.
+
+## Agriculture W4: equipment and fuel (ADR-001)
+
+W4 is built. **W5 to W9 are not started.**
+
+- **Fleet (V309):** `engine_hours` and `operating_rate_per_hour` on `fleet_vehicles`, both optional. The rate is service and repairs ONLY. New endpoints `GET /api/v1/fleet/equipment` (FLEET_READ)
+  and `PATCH /api/v1/fleet/vehicles/{id}/equipment` (FLEET_MANAGE); a read-only `FleetFacade`. No existing Fleet signature changed. New UI: Fleet > Equipment.
+- **Fuel:** a read-only `FuelFacade` offering only own-vehicle and own-asset dispatches (never customer sales), with the tank's cost per litre snapshotted on the dispatch.
+- **Agriculture:** Insights > Equipment & fuel. Machine use: hours x the rate (to four places), split across targets, source FLEET_USAGE. Fuel: a whole dispatch allocated once, source FUEL_DISPATCH.
+  The shared allocation lines were extracted into `AgAllocationLines` (with an accessible-name prefix so two forms on a page are distinguishable).
+- **Access:** equipment = AGRICULTURE_FINANCE + FLEET_READ; fuel = AGRICULTURE_FINANCE + FUEL_MARGIN_READ. Each panel explains when its permission is missing.
+- **Not verified:** `mvn test` for the new Mockito and controller tests, and V309 against a database. Run
+  `mvn test "-Dtest=Ag*Test,Fleet*Test,Fuel*Test,InvoicingFacadeImplTest,HandyFlowApplicationTests"`.
+- **Open:** tractor and harvester vehicle types (a CHECK constraint today); the residual same-dispatch race noted in ADR-001; ArchitectureVerificationTest (project-wide, pre-existing).

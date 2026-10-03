@@ -94,5 +94,14 @@ W7 supplier/SCM, W8 weather, W9 NDVI/satellite. W7 to W9 do not block a first pr
   **Privacy:** Agriculture never returns a salary, only the derived rate, and only reads HR for callers who also hold HR_READ, HR_MANAGE or USER_READ (HR's own rule).
   Everyone with AGRICULTURE_FINANCE can still cost at a typed rate. Anyone with AGRICULTURE_FINANCE can see the loaded rate on a ledger entry, so grant it only to people who
   may see payroll.
-- W4 to W9: not started. W4 needs the Fleet changes in decision 6 (hours meter, operating rate, `FleetFacade`) and a Fuel facade; W5 combines costs and revenue (cost
-  reports, trends and the dashboard do not include ledger costs or revenue yet).
+- **W4 (equipment and fuel): built.** Fleet gains `engine_hours` and `operating_rate_per_hour` on `fleet_vehicles` (V309; the rate is service and repairs ONLY, never fuel or
+  depreciation), a `PATCH /fleet/vehicles/{id}/equipment`, a `GET /fleet/equipment` and a read-only `FleetFacade`. Fuel gains a read-only `FuelFacade` that offers only the tenant's
+  OWN dispatches (to its own vehicles or assets, never customer sales). Agriculture costs a machine's day of use (hours x the snapshotted rate, source FLEET_USAGE, sourceRef the
+  vehicle) and allocates a fuel dispatch (litres x the tank's snapshotted cost per litre, source FUEL_DISPATCH, sourceRef the dispatch), each split across targets as one allocation
+  group. Fuel is never in the hourly rate, so it is never counted twice. **Access:** equipment needs AGRICULTURE_FINANCE + FLEET_READ; fuel needs AGRICULTURE_FINANCE +
+  FUEL_MARGIN_READ (the permission Fuel uses for cost data); FUEL_READ alone is not enough. **Integrity:** a dispatch already allocated is refused, and a unique index (V309) stops the
+  same dispatch going to the same target twice. Residual race: two people allocating the same dispatch to DIFFERENT targets at the same instant could both succeed, because a split
+  dispatch legitimately has several rows. Reversing the group frees the dispatch.
+- **Known limit:** Fleet's `vehicle_type` has a database CHECK (BAKKIE, SEDAN, SUV, TRUCK, VAN, BUS, MINIBUS, MOTORCYCLE, OTHER), so tractors and harvesters are filed as OTHER until
+  tractor and harvester types are added (a migration and a UI list; a decision for Fleet).
+- W5 to W9: not started. W5 combines costs and revenue (cost reports, trends and the dashboard do not include ledger costs or revenue yet).
