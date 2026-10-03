@@ -11,6 +11,7 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface FuelDispatchRepository extends JpaRepository<FuelDispatch, UUID> {
@@ -46,4 +47,22 @@ public interface FuelDispatchRepository extends JpaRepository<FuelDispatch, UUID
                         row -> (UUID) row[0],
                         row -> (java.math.BigDecimal) row[1]));
     }
+
+    // ADR-001 W4 (FuelFacade): the tenant's OWN fuel only, that is dispatches to its own vehicles or assets. A dispatch to a customer is a sale
+    // of fuel, not the tenant's own consumption, and must never be offered for allocation to production.
+    @Query("""
+        SELECT d FROM FuelDispatch d
+        WHERE d.tenantId = :tenantId AND d.deletedAt IS NULL AND d.customerId IS NULL
+        AND (d.vehicleId IS NOT NULL OR d.assetId IS NOT NULL)
+        AND d.dispatchedAt >= :from AND d.dispatchedAt < :to
+        ORDER BY d.dispatchedAt DESC
+        """)
+    List<FuelDispatch> findOwnBetween(TenantId tenantId, Instant from, Instant to, Pageable pageable);
+
+    @Query("""
+        SELECT d FROM FuelDispatch d
+        WHERE d.tenantId = :tenantId AND d.id = :id AND d.deletedAt IS NULL AND d.customerId IS NULL
+        AND (d.vehicleId IS NOT NULL OR d.assetId IS NOT NULL)
+        """)
+    Optional<FuelDispatch> findOwnById(TenantId tenantId, UUID id);
 }

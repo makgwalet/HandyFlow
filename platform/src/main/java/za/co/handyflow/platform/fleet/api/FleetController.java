@@ -267,4 +267,23 @@ public class FleetController {
                 .body(ApiResponse.success("Fuel logged",
                         fleetService.logFuel(TenantContext.getTenantIdAsObject(), id, request)));
     }
+
+    // ---- Equipment costing (ADR-001 W4): the machine's meter and what an hour of use costs to keep running ----
+
+    @GetMapping("/equipment")
+    @PreAuthorize("hasAuthority('FLEET_READ')")
+    @Operation(summary = "Vehicles as machines run by the hour: engine-hours meter and operating rate per hour (service and repairs only)")
+    public ResponseEntity<ApiResponse<List<EquipmentResponse>>> getEquipment() {
+        featureGuard.requireModule("fleet");
+        return ResponseEntity.ok(ApiResponse.success(fleetService.listEquipment(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PatchMapping("/vehicles/{id}/equipment")
+    @PreAuthorize("hasAuthority('FLEET_MANAGE')")
+    @Operation(summary = "Set the engine-hours meter and the operating rate per hour; a null clears it",
+            description = "The rate is service and repairs ONLY: never fuel (allocated from fuel dispatches) and never depreciation.")
+    public ResponseEntity<ApiResponse<EquipmentResponse>> updateEquipment(@PathVariable UUID id, @RequestBody UpdateEquipmentRequest request) {
+        featureGuard.requireModule("fleet");
+        return ResponseEntity.ok(ApiResponse.success("Equipment updated", fleetService.updateEquipment(TenantContext.getTenantIdAsObject(), id, request)));
+    }
 }

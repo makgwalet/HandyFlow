@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.fleet.domain.model.FuelFillup;
 import za.co.handyflow.platform.fleet.domain.model.Trip;
@@ -328,6 +329,30 @@ public class FleetService {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /** Active vehicles that are not retired, as machines run by the hour (ADR-001 W4). */
+    @Transactional(readOnly = true)
+    public List<EquipmentResponse> listEquipment(TenantId tenantId) {
+        return vehicleRepository.findAllActive(tenantId, PageRequest.of(0, 500)).getContent().stream()
+                .filter(v -> v.getStatus() != VehicleStatus.RETIRED)
+                .map(FleetService::toEquipment)
+                .toList();
+    }
+
+    /** Sets the engine-hours meter and the operating rate per hour (service and repairs only). Either may be cleared with null. */
+    @Transactional
+    public EquipmentResponse updateEquipment(TenantId tenantId, UUID id, UpdateEquipmentRequest req) {
+        Vehicle vehicle = findActive(tenantId, id);
+        vehicle.updateEquipment(req.engineHours(), req.operatingRatePerHour());
+        vehicleRepository.save(vehicle);
+        log.info("Vehicle equipment updated vehicle={} engineHours={} ratePerHour={}", id, req.engineHours(), req.operatingRatePerHour());
+        return toEquipment(vehicle);
+    }
+
+    private static EquipmentResponse toEquipment(Vehicle v) {
+        return new EquipmentResponse(v.getId(), v.getRegistration(), v.getMake(), v.getModel(), v.getVehicleType(),
+                v.getStatus() == null ? null : v.getStatus().name(), v.getEngineHours(), v.getOperatingRatePerHour());
+    }
 
     private Vehicle findActive(TenantId tenantId, UUID id) {
         return vehicleRepository.findActiveById(tenantId, id)

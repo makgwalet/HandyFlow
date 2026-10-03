@@ -105,6 +105,17 @@ public class Vehicle {
     @Column(name = "purchase_price", precision = 15, scale = 2)
     private BigDecimal purchasePrice;
 
+    /** Engine-hours meter reading, for machines run by hours (tractors, harvesters). Null until recorded. */
+    @Column(name = "engine_hours", precision = 10, scale = 1)
+    private BigDecimal engineHours;
+
+    /**
+     * What one hour of use costs to keep the machine running: service and repairs ONLY. Not fuel (allocated from fuel dispatches) and not
+     * depreciation, so equipment costing never counts either twice. Null until set; Agriculture will not cost the machine's use without it.
+     */
+    @Column(name = "operating_rate_per_hour", precision = 12, scale = 4)
+    private BigDecimal operatingRatePerHour;
+
     @Column(name = "photo_url")
     private String photoUrl;
 
@@ -175,6 +186,20 @@ public class Vehicle {
             throw new InvalidVehicleStatusTransitionException(status, target);
         }
         this.status = target;
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * Sets the engine-hours meter and the operating rate per hour (either may be cleared with null). A new method, so nothing that already
+     * creates or updates a vehicle changes.
+     *
+     * @throws IllegalArgumentException when either is negative
+     */
+    public void updateEquipment(BigDecimal engineHours, BigDecimal operatingRatePerHour) {
+        if (engineHours != null && engineHours.signum() < 0) throw new IllegalArgumentException("engine hours cannot be negative");
+        if (operatingRatePerHour != null && operatingRatePerHour.signum() < 0) throw new IllegalArgumentException("operating rate per hour cannot be negative");
+        this.engineHours = engineHours;
+        this.operatingRatePerHour = operatingRatePerHour;
         this.updatedAt = Instant.now();
     }
 
