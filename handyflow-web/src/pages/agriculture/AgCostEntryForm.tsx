@@ -4,12 +4,12 @@
 // server will save (same largest-remainder split), and the form only enables Save when the allocation is valid. Labour, equipment and
 // fuel are not entered here: they will be costed from HR, Fleet and Fuel.
 import { useState } from "react"
-import { Plus, X } from "lucide-react"
 import { todayISO } from "./agCrops.logic"
 import { Field, Warn } from "./agCropsUi"
+import AgAllocationLines from "./AgAllocationLines"
 import { useCreateCost, type TargetType } from "./agLedger.api"
 import type { TargetOption } from "./agTargets"
-import { TARGET_LABEL, TARGET_TYPES, evenShares, percentTotal, splitPreview, validateAllocation, type ShareInput } from "./agLedger.logic"
+import { splitPreview, validateAllocation, type ShareInput } from "./agLedger.logic"
 import { btnGhost, btnPrimary, fmtMoney, grid, inp, panel } from "./constants"
 
 export default function AgCostEntryForm({ farmId, options, initialTarget, onDone }: { farmId: string; options: TargetOption[]; initialTarget?: { type: TargetType; id: string } | null; onDone: () => void }) {
@@ -20,9 +20,7 @@ export default function AgCostEntryForm({ farmId, options, initialTarget, onDone
   const problem = validateAllocation(f.amount, f.description, f.date, shares, today)
   const amount = Number(f.amount.replace(",", "."))
   const preview = !problem ? splitPreview(amount, shares.map(s => Number(s.percentage.replace(",", ".")))) : null
-  const total = percentTotal(shares)
 
-  const setShare = (i: number, patch: Partial<ShareInput>) => setShares(prev => prev.map((s, k) => (k === i ? { ...s, ...patch } : s)))
   const labelOf = (s: ShareInput) => options.find(o => o.type === s.targetType && o.id === s.targetId)?.label ?? "—"
 
   const submit = () => create.mutate({
@@ -45,29 +43,7 @@ export default function AgCostEntryForm({ farmId, options, initialTarget, onDone
       </div>
 
       <p style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text)", margin: "16px 0 8px" }}>What is this cost for?</p>
-      {shares.map((s, i) => (
-        <div key={i} style={{ display: "grid", gridTemplateColumns: "150px 1fr 110px auto", gap: 8, alignItems: "end", marginBottom: 8 }}>
-          <Field label={i === 0 ? "Type" : ""} htmlFor={`cl-type-${i}`}>
-            <select id={`cl-type-${i}`} aria-label={`Target type ${i + 1}`} style={inp} value={s.targetType} onChange={e => setShare(i, { targetType: e.target.value as TargetType | "", targetId: "" })}>
-              <option value="">Select…</option>{TARGET_TYPES.map(t => <option key={t} value={t}>{TARGET_LABEL[t]}</option>)}
-            </select>
-          </Field>
-          <Field label={i === 0 ? "Target" : ""} htmlFor={`cl-target-${i}`}>
-            <select id={`cl-target-${i}`} aria-label={`Target ${i + 1}`} style={inp} value={s.targetId} disabled={!s.targetType} onChange={e => setShare(i, { targetId: e.target.value })}>
-              <option value="">Select…</option>{options.filter(o => o.type === s.targetType).map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-            </select>
-          </Field>
-          <Field label={i === 0 ? "Share (%)" : ""} htmlFor={`cl-pct-${i}`}>
-            <input id={`cl-pct-${i}`} aria-label={`Share ${i + 1} percent`} type="number" min="0" max="100" step="0.01" style={inp} value={s.percentage} onChange={e => setShare(i, { percentage: e.target.value })} />
-          </Field>
-          {shares.length > 1 ? <button type="button" aria-label={`Remove line ${i + 1}`} style={{ ...btnGhost, padding: "8px" }} onClick={() => setShares(prev => prev.filter((_, k) => k !== i))}><X size={14} /></button> : <span />}
-        </div>
-      ))}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
-        <button type="button" style={btnGhost} onClick={() => setShares(prev => [...prev, { targetType: "", targetId: "", percentage: "0" }])}><Plus size={13} />Add another target</button>
-        {shares.length > 1 && <button type="button" style={btnGhost} onClick={() => setShares(prev => evenShares(prev.length).map((p, k) => ({ ...prev[k], percentage: p })))}>Split evenly</button>}
-        <span role="status" aria-label="Allocation total" style={{ fontSize: 12, fontWeight: 700, color: Math.abs(total - 100) <= 0.005 ? "var(--hf-success-text-strong)" : "var(--hf-danger-text)" }}>Total {total}%</span>
-      </div>
+      <AgAllocationLines shares={shares} setShares={setShares} options={options} />
 
       {preview && (
         <div style={{ marginTop: 12, fontSize: 12.5 }} aria-label="Allocation preview">

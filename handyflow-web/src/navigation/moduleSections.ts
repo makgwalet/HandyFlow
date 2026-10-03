@@ -151,6 +151,7 @@ export const AGRICULTURE_SECTIONS: ModuleSections = {
         { id: 'ledger', label: 'Cost ledger', icon: Receipt },
         { id: 'sales', label: 'Sales', icon: Wallet },
         { id: 'labour', label: 'Labour', icon: Users },
+        { id: 'equipment', label: 'Equipment & fuel', icon: Tractor },
       ],
     },
   ],
@@ -199,6 +200,7 @@ export const FLEET_SECTIONS: ModuleSections = {
       sections: [
         { id: 'vehicles', label: 'Vehicles', icon: Car },
         { id: 'drivers', label: 'Drivers', icon: Users },
+        { id: 'equipment', label: 'Equipment', icon: Tractor },
       ],
     },
     {

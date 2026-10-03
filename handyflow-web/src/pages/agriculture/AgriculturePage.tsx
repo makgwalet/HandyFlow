@@ -23,6 +23,7 @@ import AgTrendsTab from "./AgTrendsTab"
 import AgCostLedgerTab from "./AgCostLedgerTab"
 import AgSalesTab from "./AgSalesTab"
 import AgLabourTab from "./AgLabourTab"
+import AgEquipmentFuelTab from "./AgEquipmentFuelTab"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { AGRICULTURE_SECTIONS, findSection } from "../../navigation/moduleSections"
 
@@ -63,6 +64,7 @@ export default function AgriculturePage() {
           {section.id === "seasons" && <AgFarmScope>{farm => <AgSeasonsTab farmId={farm.id} />}</AgFarmScope>}
           {section.id === "crop-types" && <AgCropTypesTab />}
           {section.id === "trends" && <AgTrendsTab />}
+          {section.id === "equipment" && <AgFarmScope>{farm => <AgEquipmentFuelTab farmId={farm.id} />}</AgFarmScope>}
           {section.id === "labour" && <AgFarmScope>{farm => <AgLabourTab farmId={farm.id} />}</AgFarmScope>}
           {section.id === "sales" && <AgFarmScope>{farm => <AgSalesTab farmId={farm.id} />}</AgFarmScope>}
           {section.id === "ledger" && <AgFarmScope>{farm => <AgCostLedgerTab farmId={farm.id} />}</AgFarmScope>}
