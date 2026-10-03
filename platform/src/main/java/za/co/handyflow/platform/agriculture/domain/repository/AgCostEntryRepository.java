@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.agriculture.domain.model.AgCostEntry;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,4 +36,8 @@ public interface AgCostEntryRepository extends JpaRepository<AgCostEntry, UUID> 
     // How many ACTIVE ledger entries of this source already point at this record (labour: at most one; the V308 unique index enforces it).
     @Query("SELECT COUNT(e) FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.sourceType = :sourceType AND e.sourceRef = :sourceRef AND e.status = 'ACTIVE'")
     long countActiveBySource(TenantId tenantId, String sourceType, UUID sourceRef);
+
+    // Of these source records, the ones that already have an ACTIVE ledger entry of this source type: one query for a whole list (ADR-001 W4).
+    @Query("SELECT DISTINCT e.sourceRef FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.sourceType = :sourceType AND e.sourceRef IN :refs AND e.status = 'ACTIVE'")
+    List<UUID> findActiveSourceRefs(TenantId tenantId, String sourceType, Collection<UUID> refs);
 }
