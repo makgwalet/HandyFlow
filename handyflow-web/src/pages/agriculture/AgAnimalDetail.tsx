@@ -15,6 +15,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, PawPrint, Pencil, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
+import { usePermission } from "../../hooks/usePermission"
 import { AG_ACCENT, AG_ACCENT_TEXT, fmtMoney, statusBadge } from "./constants"
 import type { AnimalResponse } from "./AgAnimalsTab"
 import AgWeightHistoryTab from "./AgWeightHistoryTab"
@@ -55,6 +56,13 @@ export default function AgAnimalDetail({ animal, onBack }: { animal: AnimalRespo
     mutationFn: (status: string) => apiClient.patch(`/api/v1/agriculture/animals/${animal.id}/status`, { status }),
     onSuccess: invalidate,
   })
+  const canManage = usePermission("AGRICULTURE_MANAGE")
+  const [breedingError, setBreedingError] = useState("")
+  const breedingMut = useMutation({
+    mutationFn: (breedingStock: boolean) => apiClient.patch(`/api/v1/agriculture/animals/${animal.id}/breeding-stock`, { breedingStock }),
+    onSuccess: () => { setBreedingError(""); invalidate(); qc.invalidateQueries({ queryKey: ["ag", "profitability"] }) },
+    onError: () => setBreedingError("Couldn't update breeding stock. Try again."),
+  })
   const deleteMut = useMutation({
     mutationFn: () => apiClient.delete(`/api/v1/agriculture/animals/${animal.id}`),
     onSuccess: onBack,
@@ -83,6 +91,16 @@ export default function AgAnimalDetail({ animal, onBack }: { animal: AnimalRespo
           <button onClick={() => setEditing(v => !v)} title="Edit" style={iconBtn}><Pencil size={13} /></button>
           <button onClick={() => { if (confirm(`Delete animal ${a.tagNumber}?`)) deleteMut.mutate() }} title="Delete" style={{ ...iconBtn, color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
         </div>
+      </div>
+
+      <div style={{ marginBottom: 14, fontSize: 12.5 }}>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 600, color: "var(--hf-text)", cursor: canManage ? "pointer" : "default" }}>
+          <input type="checkbox" checked={!!a.breedingStock} disabled={!canManage || breedingMut.isPending} onChange={e => { if (canManage) breedingMut.mutate(e.target.checked) }} />
+          Breeding stock
+        </label>
+        <span style={{ marginLeft: 10, color: "var(--hf-text-muted)" }}>Its purchase price is capital, not a cost of production, so margins leave it out. Its running costs and any sales still count.</span>
+        {!canManage && <span style={{ marginLeft: 10, color: "var(--hf-text-faint)" }}>You can see this but not change it.</span>}
+        {breedingError && <div role="alert" style={{ color: "var(--hf-danger-text)", marginTop: 4 }}>{breedingError}</div>}
       </div>
 
       {editing && (

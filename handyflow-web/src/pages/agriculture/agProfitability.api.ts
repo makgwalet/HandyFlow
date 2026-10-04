@@ -9,7 +9,9 @@ export type UnitType = "CROP_CYCLE" | "GROUP" | "ANIMAL" | "ENTERPRISE" | "UNLIS
 
 export interface UnitProfit {
   targetType: UnitType; targetId: string | null; label: string; status: string | null
-  state: "COMPLETE" | "IN_PROGRESS"          // COMPLETE: the margin is final. IN_PROGRESS: to date, unsold stock is not valued.
+  // COMPLETE: the margin is final. IN_PROGRESS: to date, unsold stock is not valued. BREEDING_STOCK: an animal flagged as breeding stock; its purchase
+  // price (capital) is not counted, and it is shown apart from the production margins.
+  state: "COMPLETE" | "IN_PROGRESS" | "BREEDING_STOCK"
   revenue: number
   recordedCost: number                        // feed, health, seed, inputs and an animal's purchase price (recorded where they happen)
   labour: number; equipment: number; fuel: number; otherDirect: number
@@ -21,7 +23,7 @@ export interface UnitProfit {
 export interface Totals { revenue: number; recordedCost: number; labour: number; equipment: number; fuel: number; otherDirect: number; directCost: number; grossMargin: number; marginPercent: number | null }
 export interface Subtotal { units: number; revenue: number; directCost: number; grossMargin: number; marginPercent: number | null }
 
-export interface Profitability { farmId: string; totals: Totals; complete: Subtotal; inProgress: Subtotal; units: UnitProfit[]; notes: string[] }
+export interface Profitability { farmId: string; totals: Totals; complete: Subtotal; inProgress: Subtotal; breedingStock: Subtotal; units: UnitProfit[]; notes: string[] }
 
 export function useProfitability(farmId: string, enabled = true) {
   return useQuery<Profitability>({

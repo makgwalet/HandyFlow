@@ -6,7 +6,7 @@ import type { UnitProfit, UnitType } from "./agProfitability.api"
 export const TYPE_LABEL: Record<UnitType, string> = { CROP_CYCLE: "Crop cycle", GROUP: "Group", ANIMAL: "Animal", ENTERPRISE: "Enterprise", UNLISTED: "Other" }
 
 export type TypeFilter = "ALL" | UnitType
-export type StateFilter = "ALL" | "COMPLETE" | "IN_PROGRESS"
+export type StateFilter = "ALL" | "COMPLETE" | "IN_PROGRESS" | "BREEDING_STOCK"
 
 export function filterUnits(units: UnitProfit[], type: TypeFilter, state: StateFilter): UnitProfit[] {
   return units.filter(u => (type === "ALL" || u.targetType === type) && (state === "ALL" || u.state === state))
@@ -35,4 +35,4 @@ export function costParts(u: UnitProfit): { label: string; amount: number }[] {
   ].filter(p => p.amount !== 0)
 }
 
-export const stateLabel = (s: UnitProfit["state"]) => (s === "COMPLETE" ? "Final" : "To date")
+export const stateLabel = (s: UnitProfit["state"]) => (s === "COMPLETE" ? "Final" : s === "BREEDING_STOCK" ? "Breeding stock" : "To date")

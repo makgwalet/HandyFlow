@@ -18,6 +18,7 @@ export interface AnimalResponse {
   sireId: string | null; damId: string | null
   acquisitionType: string; acquisitionDate: string; acquisitionCost: number | null
   currentWeightKg: number | null; status: string; notes: string | null
+  breedingStock: boolean   // capital, not a production cost: its purchase price is left out of margins (ADR-001 decision 7)
   createdAt: string; updatedAt: string
 }
 interface SpeciesOption { id: string; name: string }

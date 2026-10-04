@@ -115,6 +115,7 @@ export default function AgProfitabilityTab({ farmId }: { farmId: string }) {
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <SubtotalCard title="Finished" s={data.complete} hint="Harvested, closed or sold: these margins are final." />
         <SubtotalCard title="Still running" s={data.inProgress} hint="Costs and sales to date. Unsold stock isn't valued." />
+        {data.breedingStock.units > 0 && <SubtotalCard title="Breeding stock" s={data.breedingStock} hint="Running costs and any sales only. Purchase prices are capital and aren't counted. Not a production margin." />}
       </div>
 
       <div style={{ ...card, fontSize: 12.5 }} aria-label="Where the direct costs come from">
@@ -140,6 +141,7 @@ export default function AgProfitabilityTab({ farmId }: { farmId: string }) {
               <option value="ALL">Finished and running</option>
               <option value="COMPLETE">Finished only</option>
               <option value="IN_PROGRESS">Still running only</option>
+              {data.breedingStock.units > 0 && <option value="BREEDING_STOCK">Breeding stock only</option>}
             </select>
           </label>
         </div>
