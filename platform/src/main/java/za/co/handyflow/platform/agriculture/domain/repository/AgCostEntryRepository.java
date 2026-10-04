@@ -40,4 +40,8 @@ public interface AgCostEntryRepository extends JpaRepository<AgCostEntry, UUID> 
     // Of these source records, the ones that already have an ACTIVE ledger entry of this source type: one query for a whole list (ADR-001 W4).
     @Query("SELECT DISTINCT e.sourceRef FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.sourceType = :sourceType AND e.sourceRef IN :refs AND e.status = 'ACTIVE'")
     List<UUID> findActiveSourceRefs(TenantId tenantId, String sourceType, Collection<UUID> refs);
+
+    // Net cost (reversals included) of every target on a farm, by category, in one query (ADR-001 W5). Rows are [targetType, targetId, category, amount].
+    @Query("SELECT e.targetType, e.targetId, e.category, SUM(e.amount) FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.farmId = :farmId GROUP BY e.targetType, e.targetId, e.category")
+    List<Object[]> sumByTargetAndCategoryForFarm(TenantId tenantId, UUID farmId);
 }
