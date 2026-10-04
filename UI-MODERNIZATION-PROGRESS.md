@@ -491,7 +491,7 @@ W4 is built. **W5 to W9 are not started.**
   The shared allocation lines were extracted into `AgAllocationLines` (with an accessible-name prefix so two forms on a page are distinguishable).
 - **Access:** equipment = AGRICULTURE_FINANCE + FLEET_READ; fuel = AGRICULTURE_FINANCE + FUEL_MARGIN_READ. Each panel explains when its permission is missing.
 - **Not verified:** `mvn test` for the new Mockito and controller tests, and V309 against a database. Run
-  `mvn test "-Dtest=Ag*Test,Fleet*Test,Fuel*Test,InvoicingFacadeImplTest,HandyFlowApplicationTests"`.
+  `mvn test "-Dtest=Ag*Test,Fleet*Test,Fuel*Test,InvoicingFacadeImplTest,HandyFlowApplicationTests"` (V310 applies on the first run).
 - **Open:** tractor and harvester vehicle types (a CHECK constraint today); the residual same-dispatch race noted in ADR-001; ArchitectureVerificationTest (project-wide, pre-existing).
 
 ## Agriculture W5: profitability engine (ADR-001)
@@ -503,6 +503,8 @@ W5 is built. **W6 to W9 are not started.**
   (`sumByTargetAndCategoryForFarm`). No migration.
 - **UI:** Insights > Profitability: totals, finished (final) versus still running (to date), where the costs come from, notes, a filterable table with expandable cost breakdowns and caveats.
 - **Rules:** gross margin only; revenue ex-VAT net of credit notes; a unit's cost = recorded + ledger; farm total = exact sum of unit rows (plus a catch-all row); unsold stock is not valued.
-- **Open:** breeding-stock flag (no such flag exists); Cost reports, Trends and Dashboard do not yet use ledger costs or revenue (W6); season filter and export (W6); group purchase price is not recorded anywhere.
+- **Breeding stock (built after W5, before W6):** `ag_animals.breeding_stock` (V310), `PATCH /api/v1/agriculture/animals/{id}/breeding-stock` (AGRICULTURE_MANAGE), a tick on the animal screen. A flagged animal's
+  purchase price (capital) leaves its recorded cost; it is shown in its own row and subtotal, apart from the production margins, and stays in the farm totals. Reporting only: no cost, sale or price is edited.
+- **Open:** Cost reports, Trends and Dashboard do not yet use ledger costs or revenue (W6); season filter and export (W6); group purchase price is not recorded anywhere.
 - **Not verified:** `mvn test` for the new Mockito and controller tests. Run
-  `mvn test "-Dtest=Ag*Test,Fleet*Test,Fuel*Test,InvoicingFacadeImplTest,HandyFlowApplicationTests"`.
+  `mvn test "-Dtest=Ag*Test,Fleet*Test,Fuel*Test,InvoicingFacadeImplTest,HandyFlowApplicationTests"` (V310 applies on the first run).

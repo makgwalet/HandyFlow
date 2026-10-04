@@ -113,8 +113,14 @@ W7 supplier/SCM, W8 weather, W9 NDVI/satellite. W7 to W9 do not block a first pr
   and cycles' own margins are separate rows, so nothing is rolled up twice). **Honesty caveats:** a finished unit that would normally have been sold but has no sales attributed says
   so; a PURCHASED group warns its purchase price is not recorded anywhere (the existing cost service says the same), so its margin is overstated; the notes say how many labour entries
   are not costed yet and how many sale allocations are not counted. Unit lists and sales are capped at 1000 each and the report says when a cap is reached. Insights > Profitability.
-- **Not done in W5 (open):** (1) **Breeding stock.** Decision 7 assumed animals can be flagged as breeding stock, but no such flag exists, so a bought breeding animal's price counts as a
-  direct cost of that animal. Needs a flag (a migration, an endpoint and a toggle in the animal screen) and an exclusion rule. (2) The existing Cost reports, Trends and the Dashboard still
+- **Breeding stock (decision 7): built.** `ag_animals.breeding_stock` (V310, default false, so every existing animal is reported as before), `PATCH /animals/{id}/breeding-stock`
+  (AGRICULTURE_MANAGE; the body value is required, a missing one is a 400), `AnimalResponse.breedingStock`, and a "Breeding stock" tick on the animal screen. The flag changes how margins are
+  REPORTED only: it never edits a cost, a sale or the animal's purchase price. A flagged animal's purchase price (capital) is taken out of its recorded cost; its feed, health, ledger costs
+  and any sales stay. It appears as its own row (state BREEDING_STOCK, not expected to be sold so no "no sales" warning) and in its own Breeding stock subtotal, in NEITHER the finished nor
+  the running subtotal, but IN the farm totals (its running costs and sales are real), so the three subtotals still add up to the total and the total still equals the ledger plus sales.
+  Judgement call: a person with AGRICULTURE_MANAGE but not AGRICULTURE_FINANCE can flip the flag and so change the reported margins; the report is read-only for them and nothing is lost.
+  The existing animal Cost reports still include the purchase price (W6 decides how they treat breeding stock).
+- **Not done in W5 (open):** (1) The existing Cost reports, Trends and the Dashboard still
   do not include ledger costs or revenue (W6 brings them onto this report's numbers). (3) No season filter or CSV export yet (W6). (4) Unsold harvested stock is not quantified: sales
   quantities and harvest yields may be in different units, so Agriculture does not compare them.
 - W6 to W9: not started.
