@@ -142,10 +142,15 @@ export function distinctUnits(records: Pick<HarvestRecord, "unitOfMeasure">[]): 
 
 // -- Export -------------------------------------------------------------------------------------------------
 
-/** RFC 4180 style CSV: quotes fields containing a comma, quote or newline, doubles embedded quotes. */
+/**
+ * RFC 4180 style CSV: quotes fields containing a comma, quote or newline, doubles embedded quotes.
+ * A TEXT cell that starts with = + - @ (or a tab or return) is prefixed with an apostrophe, so a spreadsheet shows it as text instead of running it as a formula
+ * (CSV injection): names and tags are typed by users. Numbers are passed as numbers and are never altered, so a negative figure stays a figure.
+ */
 export function toCsv(rows: (string | number | null | undefined)[][]): string {
   const cell = (v: string | number | null | undefined) => {
-    const s = v == null ? "" : String(v)
+    let s = v == null ? "" : String(v)
+    if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`
     return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }
   return rows.map(r => r.map(cell).join(",")).join("\r\n")

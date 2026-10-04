@@ -92,16 +92,18 @@ export default function AgCostReportsTab({ farmId }: { farmId: string }) {
     const rows: AnimalCost[] = animals.data
     const total = sumBy(rows, r => r.totalCost)
     const head = ["Animal", "Acquisition", "Health", "Feed", "Total", "Weight (kg)", "Cost / kg"]
-    exportRows = [head, ...rows.map(a => [a.tagNumber, a.acquisitionCost, a.totalHealthCost, a.totalFeedCost, a.totalCost, a.currentWeightKg, a.costPerKgLiveweight])]
+    const tag = (a: AnimalCost) => (a.breedingStock ? `${a.tagNumber} (breeding)` : a.tagNumber)
+    exportRows = [[...head, "Breeding stock"], ...rows.map(a => [a.tagNumber, a.acquisitionCost, a.totalHealthCost, a.totalFeedCost, a.totalCost, a.currentWeightKg, a.costPerKgLiveweight, a.breedingStock ? "Yes" : "No"])]
     body = rows.length === 0 ? <Empty>No animals to report on yet.</Empty> : (
       <>
         <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "stretch", marginBottom: 14 }}>
           <Kpis items={[["Total animal cost", fmtMoney(total)], ["Animals", String(rows.length)], ["Average per animal", fmtMoney(round(total / rows.length, 2))]]} />
           <Split parts={[{ label: "Acquisition", value: sumBy(rows, r => r.acquisitionCost) }, { label: "Health", value: sumBy(rows, r => r.totalHealthCost) }, { label: "Feed", value: sumBy(rows, r => r.totalFeedCost) }]} />
         </div>
-        <Table head={head} rows={rows.map(a => [a.tagNumber, fmtMoney(a.acquisitionCost), fmtMoney(a.totalHealthCost), fmtMoney(a.totalFeedCost), fmtMoney(a.totalCost), num(a.currentWeightKg), fmtMoney(a.costPerKgLiveweight)])}
+        <Table head={head} rows={rows.map(a => [tag(a), fmtMoney(a.acquisitionCost), fmtMoney(a.totalHealthCost), fmtMoney(a.totalFeedCost), fmtMoney(a.totalCost), num(a.currentWeightKg), fmtMoney(a.costPerKgLiveweight)])}
           foot={["Total", fmtMoney(sumBy(rows, r => r.acquisitionCost)), fmtMoney(sumBy(rows, r => r.totalHealthCost)), fmtMoney(sumBy(rows, r => r.totalFeedCost)), fmtMoney(total), "", ""]} />
         <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", marginTop: 10 }}>A cost per kg of "—" means no weight has been recorded yet; it does not mean the animal is free to keep.</p>
+        {rows.some(a => a.breedingStock) && <p role="note" style={{ fontSize: 11.5, color: "var(--hf-text-faint)", marginTop: 6 }}>Breeding stock: a breeding animal's purchase price is capital. It is included in these cost totals, but Profitability leaves it out of margins.</p>}
       </>
     )
   } else if (kind === "groups" && groups.data) {
@@ -123,6 +125,9 @@ export default function AgCostReportsTab({ farmId }: { farmId: string }) {
 
   return (
     <div>
+      <p role="note" style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "0 0 12px" }}>
+        <strong>Recorded costs only:</strong> seed, inputs, feed, health and animal purchases. Labour, equipment, fuel and other direct costs, and revenue, are on the Profitability screen (it needs finance access).
+      </p>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <div role="tablist" aria-label="Cost report" style={{ display: "inline-flex", background: "var(--hf-surface-sunken)", borderRadius: 9, padding: 3 }}>
           {KINDS.map(k => (

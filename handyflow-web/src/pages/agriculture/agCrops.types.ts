@@ -56,7 +56,7 @@ export interface CropCycleCost {
   unconvertedYieldUnits?: number
 }
 export interface AnimalCost {
-  animalId: string; tagNumber: string; farmId: string; acquisitionCost: number; totalHealthCost: number
+  animalId: string; tagNumber: string; farmId: string; breedingStock: boolean; acquisitionCost: number; totalHealthCost: number
   totalFeedCost: number; totalCost: number; currentWeightKg: number | null; costPerKgLiveweight: number | null
 }
 export interface GroupCost {

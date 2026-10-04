@@ -4,10 +4,12 @@
 // enterprise. Gross margin only; overheads, finance costs, depreciation and tax belong to Accounting. Units whose life is over show a FINAL margin;
 // units still running show costs and sales to date, and unsold stock is not valued. Needs AGRICULTURE_FINANCE and INVOICE_READ (it shows revenue).
 import { Fragment, useState } from "react"
-import { AlertTriangle, Lock } from "lucide-react"
+import { AlertTriangle, Download, Lock } from "lucide-react"
 import { usePermission } from "../../hooks/usePermission"
+import { downloadCsv, useSeasons } from "./agCrops.api"
+import { toCsv, todayISO } from "./agCrops.logic"
 import { useProfitability, type Subtotal, type UnitProfit } from "./agProfitability.api"
-import { TYPE_LABEL, costParts, filterUnits, percentText, stateLabel, toneOf, typesPresent, type StateFilter, type TypeFilter } from "./agProfitability.logic"
+import { TYPE_LABEL, costParts, filterUnits, percentText, profitabilityCsvRows, profitabilityFileName, stateLabel, toneOf, typesPresent, type StateFilter, type TypeFilter } from "./agProfitability.logic"
 import { Empty, Th } from "./agCropsUi"
 import { btnGhost, card, fmtMoney, inp } from "./constants"
 
@@ -78,11 +80,13 @@ function Row({ u, open, onToggle }: { u: UnitProfit; open: boolean; onToggle: ()
   )
 }
 
-export default function AgProfitabilityTab({ farmId }: { farmId: string }) {
+export default function AgProfitabilityTab({ farmId, farmName = "Farm" }: { farmId: string; farmName?: string }) {
   const canFinance = usePermission("AGRICULTURE_FINANCE")
   const canInvoices = usePermission("INVOICE_READ")
   const allowed = canFinance && canInvoices
-  const { data, isLoading, isError, refetch } = useProfitability(farmId, allowed)
+  const [seasonId, setSeasonId] = useState("")
+  const seasons = useSeasons(allowed ? farmId : "")           // not asked for at all without access
+  const { data, isLoading, isError, refetch, isPlaceholderData } = useProfitability(farmId, seasonId || null, allowed)
   const [type, setType] = useState<TypeFilter>("ALL")
   const [state, setState] = useState<StateFilter>("ALL")
   const [openKey, setOpenKey] = useState<string | null>(null)
@@ -103,9 +107,26 @@ export default function AgProfitabilityTab({ farmId }: { farmId: string }) {
   const shown = filterUnits(data.units, type, state)
   const types = typesPresent(data.units)
   const key = (u: UnitProfit) => `${u.targetType}:${u.targetId ?? "none"}`
+  const seasonName = seasonId ? seasons.data?.find(x => x.id === seasonId)?.name ?? null : null
+  const exportCsv = () => {
+    const on = todayISO()
+    downloadCsv(profitabilityFileName(farmName, seasonName, on), toCsv(profitabilityCsvRows(data, { farm: farmName, season: seasonName, generatedOn: on })))
+  }
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div style={{ display: "grid", gap: 16 }} aria-busy={isPlaceholderData}>
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <label style={{ fontSize: 12, display: "grid", gap: 4 }}>Covers
+          <select aria-label="Season" style={{ ...inp, width: 220 }} value={seasonId} onChange={e => { setSeasonId(e.target.value); setOpenKey(null) }}>
+            <option value="">Whole farm</option>
+            {(seasons.data ?? []).map(x => <option key={x.id} value={x.id}>Season: {x.name}</option>)}
+          </select>
+        </label>
+        <div style={{ flex: 1 }} />
+        {isPlaceholderData && <span role="status" style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Updating…</span>}
+        <button type="button" style={{ ...btnGhost, opacity: isPlaceholderData ? 0.5 : 1 }} disabled={isPlaceholderData} onClick={exportCsv}><Download size={14} />Export CSV</button>
+      </div>
+      <div style={{ display: "grid", gap: 16, opacity: isPlaceholderData ? 0.5 : 1 }}>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <Stat label="Revenue" hint="Ex-VAT, net of credit notes">{fmtMoney(t.revenue)}</Stat>
         <Stat label="Direct costs" hint="Recorded costs, labour, equipment, fuel and other direct costs">{fmtMoney(t.directCost)}</Stat>
@@ -154,6 +175,7 @@ export default function AgProfitabilityTab({ farmId }: { farmId: string }) {
               </table>
             </div>
           )}
+      </div>
       </div>
     </div>
   )

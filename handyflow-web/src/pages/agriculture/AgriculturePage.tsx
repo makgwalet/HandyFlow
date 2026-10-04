@@ -65,7 +65,7 @@ export default function AgriculturePage() {
           {section.id === "seasons" && <AgFarmScope>{farm => <AgSeasonsTab farmId={farm.id} />}</AgFarmScope>}
           {section.id === "crop-types" && <AgCropTypesTab />}
           {section.id === "trends" && <AgTrendsTab />}
-          {section.id === "profitability" && <AgFarmScope>{farm => <AgProfitabilityTab farmId={farm.id} />}</AgFarmScope>}
+          {section.id === "profitability" && <AgFarmScope>{farm => <AgProfitabilityTab key={farm.id} farmId={farm.id} farmName={farm.name} />}</AgFarmScope>}
           {section.id === "equipment" && <AgFarmScope>{farm => <AgEquipmentFuelTab farmId={farm.id} />}</AgFarmScope>}
           {section.id === "labour" && <AgFarmScope>{farm => <AgLabourTab farmId={farm.id} />}</AgFarmScope>}
           {section.id === "sales" && <AgFarmScope>{farm => <AgSalesTab farmId={farm.id} />}</AgFarmScope>}

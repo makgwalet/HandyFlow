@@ -2,7 +2,7 @@
 //
 // The farm's gross-margin report (ADR-001, W5): revenue (ex-VAT, net of credit notes) minus DIRECT production costs, unit by unit. Computed live by
 // the server and never stored. Needs AGRICULTURE_FINANCE and INVOICE_READ because it shows revenue.
-import { useQuery } from "@tanstack/react-query"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 
 export type UnitType = "CROP_CYCLE" | "GROUP" | "ANIMAL" | "ENTERPRISE" | "UNLISTED"
@@ -25,9 +25,11 @@ export interface Subtotal { units: number; revenue: number; directCost: number; 
 
 export interface Profitability { farmId: string; totals: Totals; complete: Subtotal; inProgress: Subtotal; breedingStock: Subtotal; units: UnitProfit[]; notes: string[] }
 
-export function useProfitability(farmId: string, enabled = true) {
+/** The whole farm, or one season of it (that season's crop cycles only) when {@code seasonId} is given. */
+export function useProfitability(farmId: string, seasonId: string | null = null, enabled = true) {
   return useQuery<Profitability>({
-    queryKey: ["ag", "profitability", farmId], enabled: enabled && !!farmId,
-    queryFn: async () => (await apiClient.get(`/api/v1/agriculture/farms/${farmId}/profitability`)).data,
+    queryKey: ["ag", "profitability", farmId, seasonId ?? "all"], enabled: enabled && !!farmId,
+    placeholderData: keepPreviousData,   // keep the controls and the old figures on screen while a new season loads; the page marks them as updating
+    queryFn: async () => (await apiClient.get(`/api/v1/agriculture/farms/${farmId}/profitability`, { params: seasonId ? { seasonId } : undefined })).data,
   })
 }

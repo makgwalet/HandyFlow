@@ -1,7 +1,7 @@
 // src/pages/agriculture/agProfitability.logic.ts
 //
 // Pure presentation rules for the profitability screen. The numbers come from the server, already computed; this only filters, labels and explains them.
-import type { UnitProfit, UnitType } from "./agProfitability.api"
+import type { Profitability, UnitProfit, UnitType } from "./agProfitability.api"
 
 export const TYPE_LABEL: Record<UnitType, string> = { CROP_CYCLE: "Crop cycle", GROUP: "Group", ANIMAL: "Animal", ENTERPRISE: "Enterprise", UNLISTED: "Other" }
 
@@ -36,3 +36,33 @@ export function costParts(u: UnitProfit): { label: string; amount: number }[] {
 }
 
 export const stateLabel = (s: UnitProfit["state"]) => (s === "COMPLETE" ? "Final" : s === "BREEDING_STOCK" ? "Breeding stock" : "To date")
+
+// -- Export -------------------------------------------------------------------------------------------------------
+
+const STATE_TEXT = { COMPLETE: "Final", IN_PROGRESS: "To date", BREEDING_STOCK: "Breeding stock" } as const
+
+/**
+ * The report as rows for toCsv. Money is written as plain numbers to two decimals (no currency symbol, a dot for the decimal) so a spreadsheet can add it up;
+ * a loss is a negative number. Text cells are guarded against spreadsheet formulas by toCsv. The caveats and the report's notes travel with the numbers, so a file
+ * passed to an accountant carries its own warnings.
+ */
+export function profitabilityCsvRows(data: Profitability, ctx: { farm: string; season: string | null; generatedOn: string }): (string | number | null)[][] {
+  const m = (n: number) => Number(n.toFixed(2))
+  const head = ["Type", "Unit", "Status", "Margin is", "Revenue", "Recorded costs", "Labour", "Equipment", "Fuel", "Other direct costs", "Direct costs", "Gross margin", "Margin %", "Read with care"]
+  const t = data.totals
+  const rows: (string | number | null)[][] = [
+    ["Gross margin report"], ["Farm", ctx.farm], ["Covers", ctx.season ? `Season: ${ctx.season} (its crop cycles only)` : "Whole farm"], ["Generated", ctx.generatedOn],
+    ["Gross margin only: revenue (ex-VAT, net of credit notes) minus direct production costs. Not net profit."],
+    [], head,
+    ...data.units.map(u => [TYPE_LABEL[u.targetType], u.label, u.status ?? "", STATE_TEXT[u.state], m(u.revenue), m(u.recordedCost), m(u.labour), m(u.equipment), m(u.fuel), m(u.otherDirect), m(u.directCost), m(u.grossMargin), u.marginPercent, u.caveats.join(" | ")]),
+    ["Total", "", "", "", m(t.revenue), m(t.recordedCost), m(t.labour), m(t.equipment), m(t.fuel), m(t.otherDirect), m(t.directCost), m(t.grossMargin), t.marginPercent, ""],
+  ]
+  if (data.notes.length) rows.push([], ["Notes"], ...data.notes.map(n => [n]))
+  return rows
+}
+
+/** A safe file name: letters, digits and dashes only, so a farm or season name cannot break the path. */
+export function profitabilityFileName(farm: string, season: string | null, generatedOn: string): string {
+  const slug = (x: string) => x.normalize("NFKD").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() || "farm"
+  return `gross-margin-${slug(farm)}${season ? `-${slug(season)}` : ""}-${generatedOn}.csv`
+}
