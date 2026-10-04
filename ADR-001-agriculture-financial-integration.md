@@ -159,4 +159,4 @@ W7 supplier/SCM, W8 weather, W9 NDVI/satellite. W7 to W9 do not block a first pr
   history and a change of owner for stock valuation, and none of that is needed to link receipts to suppliers. It is therefore a standing, deliberate exception, revisited only if
   Supply Chain's inventory gains what farms need (batch/lot tracking, per-farm locations, withdrawal periods). Until then Agriculture records receipts and Supply Chain owns suppliers.
 - **Open after W7:** purchase orders and goods receipts are not linked to Agriculture receipts (so a PO raised in Supply Chain and received in Agriculture are two records); no supplier
-  performance view; no creating a supplier from Agriculture (done in Supply Chain). W8 and W9: not started.
+  performance view; no creating a supplier from Agriculture (done in Supply Chain). **W8 (weather) and W9 (satellite NDVI): researched and PROPOSED in ADR-002-agriculture-weather-and-satellite.md; nothing built or bought.**

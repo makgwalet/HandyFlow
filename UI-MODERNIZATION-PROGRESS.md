@@ -542,3 +542,10 @@ W5 is built. **W6 to W9 are not started.**
 - Profitability: **Print / PDF** (escaped, self-contained document in its own window; every unit; names the season; off while loading; blocked pop-up explained).
 - Dashboard margin card: **Export CSV** (all farms) and **farm names link to that farm's Profitability** (`?farm=<id>`; the farm was already URL-driven).
 - Frontend only; no backend change. Open (unchanged): W8 weather, W9 NDVI; POs and goods receipts are not linked to Agriculture receipts.
+
+## Agriculture W8 / W9: researched and proposed (ADR-002)
+
+- **PROPOSED, not built.** Recommends Open-Meteo (paid commercial plan; the free tier is non-commercial only) for weather and Sentinel-2 via the Copernicus Sentinel Hub Statistical API for NDVI, both behind
+  provider interfaces, storing statistics not imagery, with manual rain-gauge entries taking precedence over the model.
+- **Prerequisite found:** production areas have no boundary today, so NDVI needs field-boundary capture first (draw on the Leaflet map plus KML/GeoJSON import). No PostGIS, JTS or scheduler lock exists.
+- **Needs your decisions** (ADR-002 section 9) and several unverified items (section 8: exact prices, CDSE terms for a shared free account, commercial quotes).
