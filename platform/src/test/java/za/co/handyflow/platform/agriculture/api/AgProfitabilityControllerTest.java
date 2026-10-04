@@ -44,7 +44,7 @@ class AgProfitabilityControllerTest {
 
     private ProfitabilityResponse response() {
         return new ProfitabilityResponse(farmId, new Totals(new BigDecimal("5000.00"), Z, Z, Z, Z, Z, new BigDecimal("1500.00"), new BigDecimal("3500.00"), new BigDecimal("70.0")),
-                new Subtotal(1, new BigDecimal("5000.00"), new BigDecimal("1500.00"), new BigDecimal("3500.00"), new BigDecimal("70.0")), new Subtotal(0, Z, Z, Z, null), List.of(), List.of("Gross margin only."));
+                new Subtotal(1, new BigDecimal("5000.00"), new BigDecimal("1500.00"), new BigDecimal("3500.00"), new BigDecimal("70.0")), new Subtotal(0, Z, Z, Z, null), new Subtotal(0, Z, Z, Z, null), List.of(), List.of("Gross margin only."));
     }
 
     @Test

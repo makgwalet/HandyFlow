@@ -147,6 +147,46 @@ class AgProfitabilityServiceTest {
         assertTrue(batch.caveats().get(0).contains("purchase price"), batch.caveats().toString());
     }
 
+    private AgAnimal animal(UUID id, String tag, boolean breeding, String cost, String acquisition) {
+        AgAnimal a = mock(AgAnimal.class);
+        when(a.getId()).thenReturn(id); when(a.getTagNumber()).thenReturn(tag); when(a.getName()).thenReturn(null); when(a.getStatus()).thenReturn("ACTIVE"); when(a.isBreedingStock()).thenReturn(breeding);
+        AnimalCostSummaryResponse s = mock(AnimalCostSummaryResponse.class);
+        when(s.animalId()).thenReturn(id); when(s.totalCost()).thenReturn(bd(cost)); when(s.acquisitionCost()).thenReturn(acquisition == null ? null : bd(acquisition));
+        when(costReportingService.getFarmAnimalCostSummaries(eq(TENANT), eq(farmId))).thenReturn(List.of(s));
+        when(animalRepository.findAllActiveForFarm(eq(TENANT), eq(farmId), any())).thenReturn(new PageImpl<>(List.of(a)));
+        return a;
+    }
+
+    @Test
+    @DisplayName("breeding stock's purchase price (capital) is taken out of its recorded cost, and its feed and health stay in")
+    void breedingStockPriceRemoved() {
+        animal(animalId, "TAG 1", true, "45800", "45000");
+
+        UnitProfit u = unit(service().farm(TENANT, farmId), "ANIMAL");
+
+        num("800.00", u.recordedCost());
+        assertEquals("BREEDING_STOCK", u.state());
+    }
+
+    @Test
+    @DisplayName("an ordinary animal keeps its purchase price as a cost")
+    void ordinaryAnimalKeepsPrice() {
+        animal(animalId, "TAG 2", false, "45800", "45000");
+
+        UnitProfit u = unit(service().farm(TENANT, farmId), "ANIMAL");
+
+        num("45800.00", u.recordedCost());
+        assertEquals("IN_PROGRESS", u.state());
+    }
+
+    @Test
+    @DisplayName("breeding stock with no purchase price recorded loses nothing")
+    void breedingStockWithoutPrice() {
+        animal(animalId, "TAG 3", true, "800", null);
+
+        num("800.00", unit(service().farm(TENANT, farmId), "ANIMAL").recordedCost());
+    }
+
     @Test
     @DisplayName("an enterprise shows the costs allocated straight to it")
     void enterprise() {

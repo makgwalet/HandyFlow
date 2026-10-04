@@ -28,6 +28,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -59,7 +60,7 @@ class AgAnimalControllerTest {
     AnimalResponse animalResponse(UUID id) {
         return new AnimalResponse(id, UUID.randomUUID(), null, null, UUID.randomUUID(), "T-1042", "Bella",
                 "Bonsmara", "FEMALE", LocalDate.of(2023, 3, 1), false, null, null, "BORN_ON_FARM",
-                LocalDate.of(2023, 3, 1), null, null, "ACTIVE", null, Instant.now(), Instant.now());
+                LocalDate.of(2023, 3, 1), null, null, "ACTIVE", null, Instant.now(), Instant.now(), false);
     }
 
     HealthEventResponse healthEventResponse(UUID id) {
@@ -134,5 +135,46 @@ class AgAnimalControllerTest {
                 .andExpect(status().isForbidden());
 
         verify(animalService, never()).deleteAnimal(any(), any());
+    }
+
+    @Test
+    @WithMockUser(authorities = "AGRICULTURE_MANAGE")
+    @DisplayName("PATCH /animals/{id}/breeding-stock flags the animal and checks the module")
+    void setsBreedingStock() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(animalService.setBreedingStock(any(), eq(id), eq(true))).thenReturn(animalResponse(id));
+
+        TenantRequests.asTenant(mvc, patch(BASE + "/animals/" + id + "/breeding-stock").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"breedingStock\":true}"))
+                .andExpect(status().isOk());
+
+        verify(animalService).setBreedingStock(any(), eq(id), eq(true));
+        verify(featureGuard, atLeastOnce()).requireModule("agriculture");
+    }
+
+    @Test
+    @WithMockUser(authorities = "AGRICULTURE_READ")
+    @DisplayName("PATCH /animals/{id}/breeding-stock with only AGRICULTURE_READ returns 403 and changes nothing")
+    void breedingStockNeedsManage() throws Exception {
+        UUID id = UUID.randomUUID();
+
+        TenantRequests.asTenant(mvc, patch(BASE + "/animals/" + id + "/breeding-stock").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"breedingStock\":true}"))
+                .andExpect(status().isForbidden());
+
+        verify(animalService, never()).setBreedingStock(any(), any(), anyBoolean());
+    }
+
+    @Test
+    @WithMockUser(authorities = "AGRICULTURE_MANAGE")
+    @DisplayName("a body with no value is a 400: a missing flag is never read as false")
+    void breedingStockMissingValueIs400() throws Exception {
+        UUID id = UUID.randomUUID();
+
+        TenantRequests.asTenant(mvc, patch(BASE + "/animals/" + id + "/breeding-stock").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+
+        verify(animalService, never()).setBreedingStock(any(), any(), anyBoolean());
     }
 }

@@ -191,6 +191,79 @@ class AgProfitabilityAggregatorTest {
         assertEquals("Only the first 1000 animals are included.", notes.get(2));
     }
 
+    private UnitInput bull(String recorded) { return new UnitInput("ANIMAL", animal, "TAG 1 (Samson)", "ACTIVE", "PURCHASED", bd(recorded), true); }
+
+    @Test
+    @DisplayName("breeding stock is its own row and state, kept out of the finished and running subtotals")
+    void breedingStockIsSeparate() {
+        ProfitabilityResponse p = build(List.of(bull("800"), harvested(cycle, "100")), List.of(ledger("ANIMAL", animal, "FUEL", "50")), List.of(new RevenueRow("CROP_CYCLE", cycle, bd("1000"))));
+
+        UnitProfit b = p.units().stream().filter(u -> "ANIMAL".equals(u.targetType())).findFirst().orElseThrow();
+        assertEquals("BREEDING_STOCK", b.state());
+        num("850.00", b.directCost());
+        assertEquals(1, p.breedingStock().units());
+        num("850.00", p.breedingStock().directCost());
+        assertEquals(1, p.complete().units());
+        assertEquals(0, p.inProgress().units());
+        num("100.00", p.complete().directCost());
+    }
+
+    @Test
+    @DisplayName("breeding stock's running costs and sales are in the farm totals: the three subtotals add up to the total")
+    void breedingStockIsInTheTotals() {
+        UUID cow = UUID.randomUUID();
+        List<UnitInput> units = List.of(harvested(cycle, "100"), new UnitInput("CROP_CYCLE", cycle2, "Wheat", "GROWING", null, bd("400")), bull("800"));
+        List<LedgerRow> l = List.of(ledger("ANIMAL", animal, "FUEL", "50"), ledger("CROP_CYCLE", cycle, "LABOUR", "25"));
+        List<RevenueRow> r = List.of(new RevenueRow("CROP_CYCLE", cycle, bd("1000")), new RevenueRow("ANIMAL", animal, bd("300")));
+
+        ProfitabilityResponse p = build(units, l, r);
+
+        num("1300.00", p.totals().revenue());
+        num("1375.00", p.totals().directCost());
+        num(p.complete().directCost().add(p.inProgress().directCost()).add(p.breedingStock().directCost()).toPlainString(), p.totals().directCost());
+        num(p.complete().revenue().add(p.inProgress().revenue()).add(p.breedingStock().revenue()).toPlainString(), p.totals().revenue());
+        assertEquals(p.units().size(), p.complete().units() + p.inProgress().units() + p.breedingStock().units());
+    }
+
+    @Test
+    @DisplayName("breeding stock carries its explanation, and no 'no sales' warning even when its status is sold")
+    void breedingStockCaveats() {
+        UnitInput sold = new UnitInput("ANIMAL", animal, "TAG 9", "SOLD", "PURCHASED", bd("100"), true);
+
+        List<String> caveats = only(build(List.of(sold), List.of(), List.of())).caveats();
+
+        assertEquals(1, caveats.size());
+        assertTrue(caveats.get(0).contains("purchase price is capital"), caveats.get(0));
+    }
+
+    @Test
+    @DisplayName("breeding stock sorts after the finished and running units")
+    void breedingStockSortsLast() {
+        UnitInput running = new UnitInput("GROUP", group, "Batch", "ACTIVE", null, bd("1"));
+        UnitInput done = new UnitInput("ANIMAL", UUID.randomUUID(), "TAG 5", "SOLD", null, bd("1"));
+
+        List<String> labels = build(List.of(bull("5"), running, done), List.of(), List.of()).units().stream().map(UnitProfit::label).toList();
+
+        assertEquals(List.of("TAG 5", "Batch", "TAG 1 (Samson)"), labels);
+    }
+
+    @Test
+    @DisplayName("the breeding-stock note appears only when there is breeding stock")
+    void breedingStockNote() {
+        assertTrue(build(List.of(bull("5")), List.of(), List.of()).notes().stream().anyMatch(n -> n.contains("Breeding stock is shown apart")));
+        assertTrue(build(List.of(harvested(cycle, "5")), List.of(), List.of()).notes().stream().noneMatch(n -> n.contains("Breeding stock")));
+    }
+
+    @Test
+    @DisplayName("a unit that is not flagged is unchanged by the new field")
+    void notFlaggedUnchanged() {
+        UnitInput sold = new UnitInput("ANIMAL", animal, "TAG 1", "SOLD", null, bd("3000"));
+        UnitProfit u = only(build(List.of(sold), List.of(), List.of(new RevenueRow("ANIMAL", animal, bd("5000")))));
+        assertEquals("COMPLETE", u.state());
+        num("2000.00", u.grossMargin());
+        assertEquals(0, build(List.of(sold), List.of(), List.of()).breedingStock().units());
+    }
+
     @Test
     @DisplayName("an empty farm reports zeroes and no units")
     void emptyFarm() {

@@ -82,6 +82,23 @@ class AgProfitabilityRulesTest {
     }
 
     @Test
+    @DisplayName("breeding stock explains what its row includes, and gets no 'no sales' warning because it is not expected to be sold")
+    void breedingStockCaveat() {
+        List<String> c = AgProfitabilityRules.caveats("ANIMAL", "SOLD", "PURCHASED", BigDecimal.ZERO, true);
+        assertEquals(1, c.size());
+        assertTrue(c.get(0).contains("purchase price is capital") && c.get(0).contains("isn't a production margin"), c.get(0));
+        assertTrue(c.stream().noneMatch(x -> x.contains("No sales")));
+        assertEquals(1, AgProfitabilityRules.caveats("ANIMAL", "ACTIVE", null, bd("500"), true).size());
+    }
+
+    @Test
+    @DisplayName("not breeding stock behaves exactly as before, whichever overload is used")
+    void notBreedingStockIsUnchanged() {
+        assertEquals(AgProfitabilityRules.caveats("ANIMAL", "SOLD", null, BigDecimal.ZERO), AgProfitabilityRules.caveats("ANIMAL", "SOLD", null, BigDecimal.ZERO, false));
+        assertEquals("BREEDING_STOCK", AgProfitabilityRules.BREEDING_STOCK);
+    }
+
+    @Test
     @DisplayName("a purchased batch warns that its purchase price is not recorded; one born on the farm does not")
     void purchasedGroup() {
         List<String> c = AgProfitabilityRules.caveats("GROUP", "ACTIVE", "PURCHASED", bd("100"));
