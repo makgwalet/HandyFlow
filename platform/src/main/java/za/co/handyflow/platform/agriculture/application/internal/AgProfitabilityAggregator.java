@@ -31,6 +31,9 @@ public final class AgProfitabilityAggregator {
 
     public static final String UNLISTED = "UNLISTED";
 
+    /** Always the first note of a report; the overview leaves it out of the per-farm warnings because it applies to everything. */
+    public static final String STANDARD_NOTE = "Gross margin only: revenue (ex-VAT, net of credit notes) minus direct production costs. Overheads, finance costs, depreciation and tax are not included.";
+
     /** A unit as the service found it. {@code recordedCost} is what the existing reports already count (feed, health, seed, inputs, purchase price). */
     public record UnitInput(String targetType, UUID id, String label, String status, String acquisitionType, BigDecimal recordedCost, boolean breedingStock) {
         /** A unit that is not breeding stock. */
@@ -101,7 +104,7 @@ public final class AgProfitabilityAggregator {
                 .thenComparing(UnitProfit::targetType).thenComparing(r -> r.label() == null ? "" : r.label().toLowerCase()));
 
         List<String> notes = new ArrayList<>();
-        notes.add("Gross margin only: revenue (ex-VAT, net of credit notes) minus direct production costs. Overheads, finance costs, depreciation and tax are not included.");
+        notes.add(STANDARD_NOTE);
         if (uncostedLabour > 0) notes.add(uncostedLabour + " recorded labour entr" + (uncostedLabour == 1 ? "y isn't" : "ies aren't") + " costed yet, so labour is understated until " + (uncostedLabour == 1 ? "it is" : "they are") + " costed (Insights > Labour).");
         if (notCountedSales > 0) notes.add(notCountedSales + " sale allocation" + (notCountedSales == 1 ? " isn't" : "s aren't") + " counted (for example, the invoice was cancelled), so revenue excludes " + (notCountedSales == 1 ? "it" : "them") + ".");
 

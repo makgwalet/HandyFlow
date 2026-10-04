@@ -7,9 +7,11 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.agriculture.application.internal.AgProfitabilityAggregator.LedgerRow;
 import za.co.handyflow.platform.agriculture.application.internal.AgProfitabilityAggregator.RevenueRow;
 import za.co.handyflow.platform.agriculture.application.internal.AgProfitabilityAggregator.UnitInput;
+import za.co.handyflow.platform.agriculture.application.internal.AgProfitabilityOverviewAggregator.FarmReport;
 import za.co.handyflow.platform.agriculture.domain.model.AgAnimal;
 import za.co.handyflow.platform.agriculture.domain.model.AgCropCycle;
 import za.co.handyflow.platform.agriculture.domain.model.AgEnterprise;
+import za.co.handyflow.platform.agriculture.domain.model.AgFarm;
 import za.co.handyflow.platform.agriculture.domain.model.AgGroup;
 import za.co.handyflow.platform.agriculture.domain.model.AgHarvestRecord;
 import za.co.handyflow.platform.agriculture.domain.model.AgInputApplication;
@@ -25,6 +27,7 @@ import za.co.handyflow.platform.agriculture.domain.repository.AgSeasonRepository
 import za.co.handyflow.platform.agriculture.dto.AnimalCostSummaryResponse;
 import za.co.handyflow.platform.agriculture.dto.CropCycleCostSummaryResponse;
 import za.co.handyflow.platform.agriculture.dto.GroupCostSummaryResponse;
+import za.co.handyflow.platform.agriculture.dto.ProfitabilityDtos.ProfitabilityOverviewResponse;
 import za.co.handyflow.platform.agriculture.dto.ProfitabilityDtos.ProfitabilityResponse;
 import za.co.handyflow.platform.agriculture.dto.SalesDtos.SalesTotalsResponse;
 import za.co.handyflow.platform.agriculture.dto.SalesDtos.TargetRevenue;
@@ -57,6 +60,7 @@ public class AgProfitabilityService {
     private static final int UNIT_LIMIT = 1000;
     private static final int SALES_LIMIT = 1000;
     private static final int UNCOSTED_PEEK = 301;
+    private static final int MAX_FARMS = 50;
 
     private final AgFarmRepository farmRepository;
     private final AgSeasonRepository seasonRepository;
@@ -69,6 +73,20 @@ public class AgProfitabilityService {
     private final AgHarvestRecordRepository harvestRecordRepository;
     private final AgCostReportingService costReportingService;
     private final AgSalesAllocationService salesService;
+
+    /**
+     * Every active farm side by side (ADR-001, W6b). Each farm's figures are that farm's own whole-farm report, unchanged, so the overview is their exact sum and
+     * cannot disagree with a farm's Profitability screen. At most {@value #MAX_FARMS} farms; the overview says when more exist.
+     */
+    @Transactional(readOnly = true)
+    public ProfitabilityOverviewResponse overview(TenantId tenantId) {
+        List<AgFarm> farms = farmRepository.findAllActive(tenantId, Pageable.ofSize(MAX_FARMS)).getContent();
+        List<FarmReport> reports = new ArrayList<>();
+        for (AgFarm f : farms) reports.add(new FarmReport(f.getId(), f.getName(), farm(tenantId, f.getId())));
+        List<String> extra = new ArrayList<>();
+        if (farms.size() >= MAX_FARMS) extra.add("Only the first " + MAX_FARMS + " farms are included.");
+        return AgProfitabilityOverviewAggregator.build(reports, extra);
+    }
 
     /** The whole farm. */
     @Transactional(readOnly = true)

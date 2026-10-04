@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import za.co.handyflow.platform.agriculture.application.internal.AgProfitabilityService;
+import za.co.handyflow.platform.agriculture.dto.ProfitabilityDtos.ProfitabilityOverviewResponse;
 import za.co.handyflow.platform.agriculture.dto.ProfitabilityDtos.ProfitabilityResponse;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -30,6 +31,16 @@ public class AgProfitabilityController {
 
     private final AgProfitabilityService profitabilityService;
     private final FeatureGuard featureGuard;
+
+    @GetMapping("/profitability/overview")
+    @PreAuthorize("hasAuthority('AGRICULTURE_FINANCE') and hasAuthority('INVOICE_READ')")
+    @Operation(summary = "Every active farm's gross margin side by side: the exact sum of each farm's own report",
+            description = "Needs the same rights as one farm's report (it shows revenue). Gross margin only; computed live.")
+    public ResponseEntity<ApiResponse<ProfitabilityOverviewResponse>> overview() {
+        featureGuard.requireModule("agriculture");
+        featureGuard.requireModule("invoicing");
+        return ResponseEntity.ok(ApiResponse.success(profitabilityService.overview(TenantContext.getTenantIdAsObject())));
+    }
 
     @GetMapping("/farms/{farmId}/profitability")
     @PreAuthorize("hasAuthority('AGRICULTURE_FINANCE') and hasAuthority('INVOICE_READ')")

@@ -33,6 +33,22 @@ public final class ProfitabilityDtos {
     public record Subtotal(int units, BigDecimal revenue, BigDecimal directCost, BigDecimal grossMargin, BigDecimal marginPercent) {}
 
     /**
+     * One farm in the overview. The money is that farm's own Profitability totals, unchanged.
+     *
+     * @param cautions how many things to read with care on that farm: units with a caveat, plus the report's farm-specific notes (labour not yet costed, sales not counted...)
+     */
+    public record FarmMargin(UUID farmId, String farmName, BigDecimal revenue, BigDecimal directCost, BigDecimal grossMargin, BigDecimal marginPercent,
+                             int finishedUnits, int runningUnits, int breedingStockUnits, int cautions) {}
+
+    /**
+     * Every active farm side by side. {@code totals} and the three subtotals are the exact sums of the farms' own figures (so this can never disagree with a farm's
+     * Profitability screen); the percentages are recomputed from the sums, never averaged.
+     *
+     * @param notes the standard gross-margin note, then each farm's own warnings prefixed with the farm's name
+     */
+    public record ProfitabilityOverviewResponse(Totals totals, Subtotal complete, Subtotal inProgress, Subtotal breedingStock, List<FarmMargin> farms, List<String> notes) {}
+
+    /**
      * @param complete   units whose life is over: their margin is final
      * @param inProgress units still running: costs to date against revenue to date; unsold stock is not valued
      * @param breedingStock animals flagged as breeding stock: running costs and any sales only, and not a production margin. They are in {@code totals} (those costs and
