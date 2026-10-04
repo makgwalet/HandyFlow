@@ -8,6 +8,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import za.co.handyflow.platform.agriculture.application.internal.AgProfitabilityService;
 import za.co.handyflow.platform.agriculture.dto.ProfitabilityDtos.ProfitabilityResponse;
@@ -33,10 +34,10 @@ public class AgProfitabilityController {
     @GetMapping("/farms/{farmId}/profitability")
     @PreAuthorize("hasAuthority('AGRICULTURE_FINANCE') and hasAuthority('INVOICE_READ')")
     @Operation(summary = "Gross margin (revenue ex-VAT minus direct production costs) per unit, with finished units separate from those still running",
-            description = "Gross margin only: overheads, finance costs, depreciation and tax belong to Accounting. Revenue is computed live and never stored.")
-    public ResponseEntity<ApiResponse<ProfitabilityResponse>> profitability(@PathVariable UUID farmId) {
+            description = "Gross margin only: overheads, finance costs, depreciation and tax belong to Accounting. Revenue is computed live and never stored. Optional seasonId limits it to that season's crop cycles.")
+    public ResponseEntity<ApiResponse<ProfitabilityResponse>> profitability(@PathVariable UUID farmId, @RequestParam(required = false) UUID seasonId) {
         featureGuard.requireModule("agriculture");
         featureGuard.requireModule("invoicing");
-        return ResponseEntity.ok(ApiResponse.success(profitabilityService.farm(TenantContext.getTenantIdAsObject(), farmId)));
+        return ResponseEntity.ok(ApiResponse.success(profitabilityService.farm(TenantContext.getTenantIdAsObject(), farmId, seasonId)));
     }
 }

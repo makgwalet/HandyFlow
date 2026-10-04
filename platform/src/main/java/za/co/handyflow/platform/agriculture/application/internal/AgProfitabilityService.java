@@ -11,6 +11,8 @@ import za.co.handyflow.platform.agriculture.domain.model.AgAnimal;
 import za.co.handyflow.platform.agriculture.domain.model.AgCropCycle;
 import za.co.handyflow.platform.agriculture.domain.model.AgEnterprise;
 import za.co.handyflow.platform.agriculture.domain.model.AgGroup;
+import za.co.handyflow.platform.agriculture.domain.model.AgHarvestRecord;
+import za.co.handyflow.platform.agriculture.domain.model.AgInputApplication;
 import za.co.handyflow.platform.agriculture.domain.repository.AgAnimalRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgCostEntryRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgCropCycleRepository;
@@ -19,6 +21,7 @@ import za.co.handyflow.platform.agriculture.domain.repository.AgFarmRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgGroupRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgHarvestRecordRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgInputApplicationRepository;
+import za.co.handyflow.platform.agriculture.domain.repository.AgSeasonRepository;
 import za.co.handyflow.platform.agriculture.dto.AnimalCostSummaryResponse;
 import za.co.handyflow.platform.agriculture.dto.CropCycleCostSummaryResponse;
 import za.co.handyflow.platform.agriculture.dto.GroupCostSummaryResponse;
@@ -31,8 +34,10 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -54,6 +59,7 @@ public class AgProfitabilityService {
     private static final int UNCOSTED_PEEK = 301;
 
     private final AgFarmRepository farmRepository;
+    private final AgSeasonRepository seasonRepository;
     private final AgCropCycleRepository cropCycleRepository;
     private final AgGroupRepository groupRepository;
     private final AgAnimalRepository animalRepository;
@@ -64,25 +70,47 @@ public class AgProfitabilityService {
     private final AgCostReportingService costReportingService;
     private final AgSalesAllocationService salesService;
 
+    /** The whole farm. */
     @Transactional(readOnly = true)
     public ProfitabilityResponse farm(TenantId tenantId, UUID farmId) {
-        farmRepository.findActiveById(tenantId, farmId).orElseThrow(() -> new ResourceNotFoundException("Farm", farmId.toString()));
-        List<String> truncated = new ArrayList<>();
+        return farm(tenantId, farmId, null);
+    }
 
-        List<AgCropCycle> cycles = cropCycleRepository.findAllActiveForFarm(tenantId, farmId, Pageable.ofSize(UNIT_LIMIT)).getContent();
-        List<AgGroup> groups = groupRepository.findAllActiveForFarm(tenantId, farmId, Pageable.ofSize(UNIT_LIMIT)).getContent();
-        List<AgAnimal> animals = animalRepository.findAllActiveForFarm(tenantId, farmId, Pageable.ofSize(UNIT_LIMIT)).getContent();
-        List<AgEnterprise> enterprises = enterpriseRepository.findAllActiveForFarm(tenantId, farmId, Pageable.ofSize(UNIT_LIMIT)).getContent();
-        if (cycles.size() >= UNIT_LIMIT) truncated.add("Only the first " + UNIT_LIMIT + " crop cycles are included.");
-        if (groups.size() >= UNIT_LIMIT) truncated.add("Only the first " + UNIT_LIMIT + " groups are included.");
-        if (animals.size() >= UNIT_LIMIT) truncated.add("Only the first " + UNIT_LIMIT + " animals are included.");
+    /**
+     * The whole farm, or one SEASON of it. A season report covers that season's crop cycles only: livestock and enterprises are not tied to a season, so they are left
+     * out (and the report says so), and only the ledger rows and sales of those cycles are counted. It is a view of the same numbers, never a different calculation.
+     */
+    @Transactional(readOnly = true)
+    public ProfitabilityResponse farm(TenantId tenantId, UUID farmId, UUID seasonId) {
+        farmRepository.findActiveById(tenantId, farmId).orElseThrow(() -> new ResourceNotFoundException("Farm", farmId.toString()));
+        String seasonName = null;
+        if (seasonId != null) {
+            seasonName = seasonRepository.findActiveById(tenantId, seasonId).filter(x -> farmId.equals(x.getFarmId()))
+                    .orElseThrow(() -> new ResourceNotFoundException("Season", seasonId.toString())).getName();
+        }
+        boolean season = seasonId != null;
+        List<String> extra = new ArrayList<>();
+
+        List<AgCropCycle> cycles = season
+                ? cropCycleRepository.findAllActiveForSeason(tenantId, seasonId, Pageable.ofSize(UNIT_LIMIT)).getContent().stream().filter(c -> farmId.equals(c.getFarmId())).toList()
+                : cropCycleRepository.findAllActiveForFarm(tenantId, farmId, Pageable.ofSize(UNIT_LIMIT)).getContent();
+        List<AgGroup> groups = season ? List.of() : groupRepository.findAllActiveForFarm(tenantId, farmId, Pageable.ofSize(UNIT_LIMIT)).getContent();
+        List<AgAnimal> animals = season ? List.of() : animalRepository.findAllActiveForFarm(tenantId, farmId, Pageable.ofSize(UNIT_LIMIT)).getContent();
+        List<AgEnterprise> enterprises = season ? List.of() : enterpriseRepository.findAllActiveForFarm(tenantId, farmId, Pageable.ofSize(UNIT_LIMIT)).getContent();
+        if (cycles.size() >= UNIT_LIMIT) extra.add("Only the first " + UNIT_LIMIT + " crop cycles are included.");
+        if (groups.size() >= UNIT_LIMIT) extra.add("Only the first " + UNIT_LIMIT + " groups are included.");
+        if (animals.size() >= UNIT_LIMIT) extra.add("Only the first " + UNIT_LIMIT + " animals are included.");
+        Set<UUID> cycleIds = new HashSet<>();
+        for (AgCropCycle c : cycles) cycleIds.add(c.getId());
 
         // What the existing reports already count (feed, health, seed, inputs, an animal's purchase price). Labour hours are not money there.
         Map<UUID, BigDecimal> cycleCost = new HashMap<>(), groupCost = new HashMap<>();
         Map<UUID, AnimalCostSummaryResponse> animalCost = new HashMap<>();
         for (CropCycleCostSummaryResponse c : costReportingService.getFarmCropCycleCostSummaries(tenantId, farmId)) cycleCost.put(c.cropCycleId(), c.totalCost());
-        for (GroupCostSummaryResponse g : costReportingService.getFarmGroupCostSummaries(tenantId, farmId)) groupCost.put(g.groupId(), g.totalCost());
-        for (AnimalCostSummaryResponse a : costReportingService.getFarmAnimalCostSummaries(tenantId, farmId)) animalCost.put(a.animalId(), a);
+        if (!season) {
+            for (GroupCostSummaryResponse g : costReportingService.getFarmGroupCostSummaries(tenantId, farmId)) groupCost.put(g.groupId(), g.totalCost());
+            for (AnimalCostSummaryResponse a : costReportingService.getFarmAnimalCostSummaries(tenantId, farmId)) animalCost.put(a.animalId(), a);
+        }
 
         List<UnitInput> units = new ArrayList<>();
         for (AgCropCycle c : cycles) units.add(new UnitInput("CROP_CYCLE", c.getId(), c.getCycleName(), c.getStatus(), null, cycleCost.get(c.getId())));
@@ -99,17 +127,27 @@ public class AgProfitabilityService {
 
         List<LedgerRow> ledger = new ArrayList<>();
         for (Object[] row : costEntryRepository.sumByTargetAndCategoryForFarm(tenantId, farmId)) {
+            if (season && !("CROP_CYCLE".equals(row[0]) && cycleIds.contains((UUID) row[1]))) continue;
             ledger.add(new LedgerRow((String) row[0], (UUID) row[1], (String) row[2], (BigDecimal) row[3]));
         }
 
         SalesTotalsResponse sales = salesService.totals(tenantId, farmId, null, null);
         List<RevenueRow> revenue = new ArrayList<>();
-        for (TargetRevenue t : sales.byTarget()) revenue.add(new RevenueRow(t.targetType(), t.targetId(), t.revenue()));
-        if (sales.allocationCount() >= SALES_LIMIT) truncated.add("Revenue covers only the " + SALES_LIMIT + " most recent sale allocations on this farm; older ones aren't included.");
+        for (TargetRevenue t : sales.byTarget()) {
+            if (season && !("CROP_CYCLE".equals(t.targetType()) && cycleIds.contains(t.targetId()))) continue;
+            revenue.add(new RevenueRow(t.targetType(), t.targetId(), t.revenue()));
+        }
+        if (sales.allocationCount() >= SALES_LIMIT) extra.add("Revenue covers only the " + SALES_LIMIT + " most recent sale allocations on this farm; older ones aren't included.");
 
-        int uncostedLabour = inputApplicationRepository.findUncostedLabourForFarm(tenantId, farmId, Pageable.ofSize(UNCOSTED_PEEK)).size()
-                + harvestRecordRepository.findUncostedLabourForFarm(tenantId, farmId, Pageable.ofSize(UNCOSTED_PEEK)).size();
+        List<AgInputApplication> inputs = inputApplicationRepository.findUncostedLabourForFarm(tenantId, farmId, Pageable.ofSize(UNCOSTED_PEEK));
+        List<AgHarvestRecord> harvests = harvestRecordRepository.findUncostedLabourForFarm(tenantId, farmId, Pageable.ofSize(UNCOSTED_PEEK));
+        int uncostedLabour = season
+                ? (int) (inputs.stream().filter(i -> cycleIds.contains(i.getCropCycleId())).count() + harvests.stream().filter(h -> cycleIds.contains(h.getCropCycleId())).count())
+                : inputs.size() + harvests.size();
 
-        return AgProfitabilityAggregator.build(farmId, units, ledger, revenue, uncostedLabour, sales.notCountedCount(), truncated);
+        if (season) {
+            extra.add("Season report for " + seasonName + ": its crop cycles only. Livestock and enterprises aren't tied to a season, so they are left out; see the whole-farm report for them. Sales that aren't counted (for example a cancelled invoice) aren't broken down by season.");
+        }
+        return AgProfitabilityAggregator.build(farmId, units, ledger, revenue, uncostedLabour, season ? 0 : sales.notCountedCount(), extra);
     }
 }

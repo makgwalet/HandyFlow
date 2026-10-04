@@ -18,5 +18,6 @@ public record AnimalCostSummaryResponse(
         BigDecimal totalFeedCost,
         BigDecimal totalCost,
         BigDecimal currentWeightKg,
-        BigDecimal costPerKgLiveweight // null if currentWeightKg is unknown or zero — "no data yet", not "free"
+        BigDecimal costPerKgLiveweight, // null if currentWeightKg is unknown or zero — "no data yet", not "free"
+        boolean breedingStock // capital, not a production cost: acquisitionCost is in totalCost here, but is left out of margins (ADR-001 decision 7)
 ) {}

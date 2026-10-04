@@ -127,7 +127,7 @@ public class AgCostReportingService {
 
         return new AnimalCostSummaryResponse(
                 animal.getId(), animal.getTagNumber(), animal.getFarmId(),
-                acquisitionCost, healthCost, feedCost, totalCost, weight, costPerKg
+                acquisitionCost, healthCost, feedCost, totalCost, weight, costPerKg, animal.isBreedingStock()
         );
     }
 

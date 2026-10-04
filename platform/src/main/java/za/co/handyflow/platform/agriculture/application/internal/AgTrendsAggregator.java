@@ -158,7 +158,7 @@ public final class AgTrendsAggregator {
 
         List<String> limitations = new ArrayList<>();
         limitations.add("Herd size over time is not recorded, so livestock trends show births and deaths, not the number of animals.");
-        limitations.add("Revenue, labour cost and equipment cost are not recorded, so there is no margin trend.");
+        limitations.add("Costs here are recorded costs only: seed, inputs, feed, health and animal purchases (a breeding animal's purchase price is capital, but is still in this chart). Labour, equipment, fuel and other direct costs, and revenue, are on the Profitability screen, which needs finance access, so there is no margin trend yet.");
         if (excluded > 0) {
             limitations.add(excluded + " harvest record(s) are in a unit that is not a mass (for example bags), so they are not in the tonnes chart; they still appear under their own crop.");
         }
