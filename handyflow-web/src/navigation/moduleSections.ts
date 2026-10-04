@@ -146,6 +146,7 @@ export const AGRICULTURE_SECTIONS: ModuleSections = {
     {
       label: 'Insights',
       sections: [
+        { id: 'profitability', label: 'Profitability', icon: Scale },
         { id: 'trends', label: 'Trends', icon: TrendingUp },
         { id: 'costs', label: 'Cost reports', icon: BarChart2 },
         { id: 'ledger', label: 'Cost ledger', icon: Receipt },
