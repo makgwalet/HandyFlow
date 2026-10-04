@@ -369,4 +369,72 @@ class AgProfitabilityServiceTest {
 
         verifyNoInteractions(salesService, costEntryRepository, costReportingService);
     }
+
+    // ---- all-farms overview --------------------------------------------------------------------------------------------
+
+    private AgFarm farmNamed(UUID id, String name) {
+        AgFarm f = mock(AgFarm.class);
+        when(f.getId()).thenReturn(id); when(f.getName()).thenReturn(name);
+        return f;
+    }
+    private ProfitabilityResponse reportFor(UUID id, String recorded, String revenue) {
+        UUID c = UUID.randomUUID();
+        return AgProfitabilityAggregator.build(id, List.of(new AgProfitabilityAggregator.UnitInput("CROP_CYCLE", c, "Maize", "HARVESTED", null, bd(recorded))), List.of(),
+                List.of(new AgProfitabilityAggregator.RevenueRow("CROP_CYCLE", c, bd(revenue))), 0, 0, List.of());
+    }
+
+    @Test
+    @DisplayName("the overview is each farm's own whole-farm report, summed: it asks the service for every farm and adds what comes back")
+    void overviewSumsEachFarmsOwnReport() {
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID();
+        when(farmRepository.findAllActive(eq(TENANT), any())).thenReturn(new PageImpl<>(List.of(farmNamed(a, "Alpha"), farmNamed(b, "Beta"))));
+        AgProfitabilityService spy = spy(service());
+        doReturn(reportFor(a, "100", "500")).when(spy).farm(eq(TENANT), eq(a));
+        doReturn(reportFor(b, "200", "700")).when(spy).farm(eq(TENANT), eq(b));
+
+        var o = spy.overview(TENANT);
+
+        assertEquals(List.of("Alpha", "Beta"), o.farms().stream().map(f -> f.farmName()).toList());
+        num("1200.00", o.totals().revenue()); num("300.00", o.totals().directCost()); num("900.00", o.totals().grossMargin());
+        verify(spy).farm(eq(TENANT), eq(a)); verify(spy).farm(eq(TENANT), eq(b));
+    }
+
+    @Test
+    @DisplayName("no farms: an empty overview, and no farm report is built")
+    void overviewWithNoFarms() {
+        when(farmRepository.findAllActive(eq(TENANT), any())).thenReturn(new PageImpl<>(List.of()));
+        AgProfitabilityService spy = spy(service());
+
+        var o = spy.overview(TENANT);
+
+        assertTrue(o.farms().isEmpty());
+        num("0.00", o.totals().revenue());
+        verify(spy, never()).farm(any(), any());
+    }
+
+    @Test
+    @DisplayName("at most 50 farms are included, and the overview says so when the cap is reached")
+    void overviewIsCapped() {
+        List<AgFarm> many = new ArrayList<>();
+        for (int i = 0; i < 50; i++) many.add(farmNamed(UUID.randomUUID(), "Farm " + i));
+        when(farmRepository.findAllActive(eq(TENANT), eq(org.springframework.data.domain.Pageable.ofSize(50)))).thenReturn(new PageImpl<>(many));
+        AgProfitabilityService spy = spy(service());
+        doReturn(reportFor(UUID.randomUUID(), "1", "2")).when(spy).farm(eq(TENANT), any());
+
+        var o = spy.overview(TENANT);
+
+        assertEquals(50, o.farms().size());
+        assertTrue(o.notes().stream().anyMatch(n -> n.contains("Only the first 50 farms are included")), o.notes().toString());
+    }
+
+    @Test
+    @DisplayName("below the cap there is no cut-off note")
+    void overviewBelowTheCap() {
+        UUID a = UUID.randomUUID();
+        when(farmRepository.findAllActive(eq(TENANT), any())).thenReturn(new PageImpl<>(List.of(farmNamed(a, "Alpha"))));
+        AgProfitabilityService spy = spy(service());
+        doReturn(reportFor(a, "1", "2")).when(spy).farm(eq(TENANT), eq(a));
+
+        assertTrue(spy.overview(TENANT).notes().stream().noneMatch(n -> n.contains("Only the first")));
+    }
 }
