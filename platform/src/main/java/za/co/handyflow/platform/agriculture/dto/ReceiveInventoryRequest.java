@@ -9,5 +9,6 @@ public record ReceiveInventoryRequest(
         @NotNull BigDecimal quantity,
         BigDecimal newUnitCost,
         UUID performedBy,
-        String notes
+        String notes,
+        UUID supplierId   // optional: the Supply Chain supplier this was bought from; defaults to the item's usual supplier
 ) {}

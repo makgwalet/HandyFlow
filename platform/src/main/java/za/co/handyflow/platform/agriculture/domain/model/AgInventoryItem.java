@@ -69,6 +69,10 @@ public class AgInventoryItem {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    /** The item's usual Supply Chain supplier (a reference by id). A receipt with no supplier of its own takes this one. Null until set. The typed {@code supplier} text is kept for history. */
+    @Column(name = "supplier_id")
+    private UUID supplierId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -145,4 +149,10 @@ public class AgInventoryItem {
 
     @PreUpdate
     void onUpdate() { this.updatedAt = Instant.now(); }
+
+    /** Sets or clears (null) the item's usual supplier. The caller has already checked that the supplier exists and is usable. */
+    public void assignSupplier(UUID supplierId) {
+        this.supplierId = supplierId;
+        this.updatedAt = Instant.now();
+    }
 }

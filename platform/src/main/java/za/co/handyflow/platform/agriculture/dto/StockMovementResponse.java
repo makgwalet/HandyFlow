@@ -18,5 +18,7 @@ public record StockMovementResponse(
         UUID performedBy,
         String performedByName,
         String notes,
-        Instant createdAt
+        Instant createdAt,
+        UUID supplierId,       // the supplier a RECEIPT was bought from, if recorded
+        String supplierName
 ) {}

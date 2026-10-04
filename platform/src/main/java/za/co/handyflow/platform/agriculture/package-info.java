@@ -86,14 +86,14 @@
  * {@code earthmoving}'s own "tenant operates its own physical assets"
  * shape far more than it shares any provider module's shape.
  * <p>
- * allowedDependencies: {@code fleet} and {@code fuel} (read-only, via FleetFacade and FuelFacade, for equipment and fuel costing), {@code shared}, {@code billing} (FeatureGuard),
+ * allowedDependencies: {@code supplychain} (read-only, via SupplierFacade, so stock receipts refer to a real supplier), {@code fleet} and {@code fuel} (read-only, via FleetFacade and FuelFacade, for equipment and fuel costing), {@code shared}, {@code billing} (FeatureGuard),
  * {@code hr} (HrFacade — see above), {@code evidence} (scouting/
  * treatment/harvest photo attachments), {@code notifications} (daily
  * sweep for vaccinations/health follow-ups due), {@code invoicing}
  * (InvoicingFacade, read-only sale lines: ADR-001 W2 attributes revenue
  * to production without owning any sales data).
  */
-@ApplicationModule(allowedDependencies = {"shared", "billing", "hr", "evidence", "notifications", "invoicing", "fleet", "fuel"})
+@ApplicationModule(allowedDependencies = {"shared", "billing", "hr", "evidence", "notifications", "invoicing", "fleet", "fuel", "supplychain"})
 package za.co.handyflow.platform.agriculture;
 
 import org.springframework.modulith.ApplicationModule;

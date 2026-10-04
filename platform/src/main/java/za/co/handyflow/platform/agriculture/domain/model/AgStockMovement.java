@@ -68,6 +68,10 @@ public class AgStockMovement {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    /** The Supply Chain supplier a RECEIPT was bought from; null when none was recorded. A reference by id only (Supply Chain owns suppliers). Set at creation, never changed. */
+    @Column(name = "supplier_id")
+    private UUID supplierId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -75,6 +79,14 @@ public class AgStockMovement {
                                           LocalDate movementDate, BigDecimal quantity, BigDecimal unitCost,
                                           String referenceType, UUID referenceId,
                                           UUID performedBy, String performedByName, String notes) {
+        return create(tenantId, inventoryItemId, movementType, movementDate, quantity, unitCost, referenceType, referenceId, performedBy, performedByName, notes, null);
+    }
+
+    /** As above, for a movement with a supplier (a RECEIPT). The supplier is given here and never changed: this ledger is append-only. */
+    public static AgStockMovement create(TenantId tenantId, UUID inventoryItemId, String movementType,
+                                          LocalDate movementDate, BigDecimal quantity, BigDecimal unitCost,
+                                          String referenceType, UUID referenceId,
+                                          UUID performedBy, String performedByName, String notes, UUID supplierId) {
         if (tenantId == null) throw new IllegalArgumentException("tenantId is required");
         if (inventoryItemId == null) throw new IllegalArgumentException("inventoryItemId is required");
         if (movementType == null || movementType.isBlank()) throw new IllegalArgumentException("movementType is required");
@@ -94,6 +106,7 @@ public class AgStockMovement {
         m.performedBy = performedBy;
         m.performedByName = performedByName;
         m.notes = notes;
+        m.supplierId = supplierId;
         m.createdAt = Instant.now();
         return m;
     }

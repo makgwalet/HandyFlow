@@ -34,4 +34,15 @@ public interface AgStockMovementRepository extends JpaRepository<AgStockMovement
     // Trends: seed cost is the stock issued against a crop cycle (the cost reports' definition): [movementDate, totalCost, cropCycleId].
     @Query("SELECT m.movementDate, m.totalCost, m.referenceId FROM AgStockMovement m WHERE m.tenantId = :tenantId AND m.referenceType = 'AgCropCycle' AND m.movementDate >= :startDate AND m.movementDate <= :endDate AND m.totalCost IS NOT NULL")
     List<Object[]> findCropCycleCostsBetween(TenantId tenantId, LocalDate startDate, LocalDate endDate);
+
+    // ADR-001 W7: what a farm's stock RECEIPTS cost, by supplier, in a date range. Rows are [supplierId (null = none recorded), receipts, spend, receiptsWithNoCost].
+    // The spend is each receipt's own totalCost (quantity x unit cost when it was received), never recomputed from today's price.
+    @Query("""
+        SELECT m.supplierId, COUNT(m), COALESCE(SUM(m.totalCost), 0), SUM(CASE WHEN m.totalCost IS NULL THEN 1 ELSE 0 END)
+        FROM AgStockMovement m, AgInventoryItem i
+        WHERE m.tenantId = :tenantId AND i.tenantId = :tenantId AND m.inventoryItemId = i.id AND i.farmId = :farmId
+        AND m.movementType = 'RECEIPT' AND m.movementDate >= :from AND m.movementDate <= :to
+        GROUP BY m.supplierId
+        """)
+    List<Object[]> receiptSpendBySupplier(TenantId tenantId, UUID farmId, LocalDate from, LocalDate to);
 }
