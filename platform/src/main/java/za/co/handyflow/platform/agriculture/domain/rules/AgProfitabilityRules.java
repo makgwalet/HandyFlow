@@ -15,6 +15,8 @@ public final class AgProfitabilityRules {
 
     public static final String COMPLETE = "COMPLETE";
     public static final String IN_PROGRESS = "IN_PROGRESS";
+    /** An animal flagged as breeding stock: shown apart from the production margins, with its purchase price (capital) left out. */
+    public static final String BREEDING_STOCK = "BREEDING_STOCK";
 
     /**
      * Whether a unit's life is over, so its margin is final. A harvested, failed or abandoned crop cycle, a closed group, and an animal that was
@@ -51,7 +53,19 @@ public final class AgProfitabilityRules {
 
     /** Plain-language reasons this unit's margin should be read with care. */
     public static List<String> caveats(String targetType, String status, String acquisitionType, BigDecimal revenue) {
+        return caveats(targetType, status, acquisitionType, revenue, false);
+    }
+
+    /**
+     * As above, for a unit that may be breeding stock. Breeding stock is not expected to be sold, so it gets no "no sales" warning; it gets the
+     * explanation of what its row does and does not include instead.
+     */
+    public static List<String> caveats(String targetType, String status, String acquisitionType, BigDecimal revenue, boolean breedingStock) {
         List<String> out = new ArrayList<>();
+        if (breedingStock) {
+            out.add("Breeding stock: its purchase price is capital, so it isn't counted here. Only its running costs and any sales are shown, and this isn't a production margin.");
+            return out;
+        }
         if (expectsSales(targetType, status) && (revenue == null || revenue.signum() <= 0)) {
             out.add("No sales are attributed to this yet, so its margin shows a loss until they are.");
         }

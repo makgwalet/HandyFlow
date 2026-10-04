@@ -102,6 +102,15 @@ public class AgAnimalService {
         return toResponse(animal);
     }
 
+    /** Flags or unflags an animal as breeding stock. Only changes how margins are reported; nothing else about the animal changes. */
+    @Transactional
+    public AnimalResponse setBreedingStock(TenantId tenantId, UUID id, boolean breedingStock) {
+        AgAnimal animal = findActive(tenantId, id);
+        animal.markBreedingStock(breedingStock);
+        log.info("Animal breeding stock set id={} breedingStock={} tenant={}", id, breedingStock, tenantId.getValue());
+        return toResponse(animal);
+    }
+
     @Transactional
     public void deleteAnimal(TenantId tenantId, UUID id) {
         AgAnimal animal = findActive(tenantId, id);
@@ -128,7 +137,7 @@ public class AgAnimalService {
                 a.getId(), a.getFarmId(), a.getProductionAreaId(), a.getEnterpriseId(), a.getSpeciesId(),
                 a.getTagNumber(), a.getName(), a.getBreed(), a.getSex(), a.getDateOfBirth(), a.isEstimatedAge(),
                 a.getSireId(), a.getDamId(), a.getAcquisitionType(), a.getAcquisitionDate(), a.getAcquisitionCost(),
-                a.getCurrentWeightKg(), a.getStatus(), a.getNotes(), a.getCreatedAt(), a.getUpdatedAt()
+                a.getCurrentWeightKg(), a.getStatus(), a.getNotes(), a.getCreatedAt(), a.getUpdatedAt(), a.isBreedingStock()
         );
     }
 

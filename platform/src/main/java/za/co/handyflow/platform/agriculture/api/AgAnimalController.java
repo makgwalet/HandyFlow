@@ -124,6 +124,15 @@ public class AgAnimalController {
                 animalService.changeStatus(TenantContext.getTenantIdAsObject(), id, request)));
     }
 
+    @PatchMapping("/animals/{id}/breeding-stock")
+    @PreAuthorize("hasAuthority('AGRICULTURE_MANAGE')")
+    public ResponseEntity<ApiResponse<AnimalResponse>> setBreedingStock(
+            @PathVariable UUID id, @Valid @RequestBody SetBreedingStockRequest request) {
+        featureGuard.requireModule(SOURCE_MODULE);
+        return ResponseEntity.ok(ApiResponse.success("Breeding stock updated",
+                animalService.setBreedingStock(TenantContext.getTenantIdAsObject(), id, request.breedingStock())));
+    }
+
     @DeleteMapping("/animals/{id}")
     @PreAuthorize("hasAuthority('AGRICULTURE_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteAnimal(@PathVariable UUID id) {

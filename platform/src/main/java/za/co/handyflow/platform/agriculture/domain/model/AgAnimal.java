@@ -94,6 +94,14 @@ public class AgAnimal {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /**
+     * Breeding stock (a bull, a stud cow, a breeding sow): its purchase price is capital, not a direct cost of production, so the gross-margin report leaves
+     * the price out and shows the animal apart from the production margins (ADR-001 decision 7). Changes how margins are REPORTED only: no cost, sale or
+     * purchase price is edited.
+     */
+    @Column(name = "breeding_stock", nullable = false)
+    private boolean breedingStock = false;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -156,6 +164,12 @@ public class AgAnimal {
 
     public void moveTo(UUID productionAreaId) {
         this.productionAreaId = productionAreaId;
+    }
+
+    /** Flags or unflags the animal as breeding stock. A new method, so nothing that already creates or updates an animal changes. */
+    public void markBreedingStock(boolean breedingStock) {
+        this.breedingStock = breedingStock;
+        this.updatedAt = Instant.now();
     }
 
     public void changeStatus(String status) {

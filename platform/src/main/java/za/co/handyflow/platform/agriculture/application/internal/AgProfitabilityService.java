@@ -78,16 +78,23 @@ public class AgProfitabilityService {
         if (animals.size() >= UNIT_LIMIT) truncated.add("Only the first " + UNIT_LIMIT + " animals are included.");
 
         // What the existing reports already count (feed, health, seed, inputs, an animal's purchase price). Labour hours are not money there.
-        Map<UUID, BigDecimal> cycleCost = new HashMap<>(), groupCost = new HashMap<>(), animalCost = new HashMap<>();
+        Map<UUID, BigDecimal> cycleCost = new HashMap<>(), groupCost = new HashMap<>();
+        Map<UUID, AnimalCostSummaryResponse> animalCost = new HashMap<>();
         for (CropCycleCostSummaryResponse c : costReportingService.getFarmCropCycleCostSummaries(tenantId, farmId)) cycleCost.put(c.cropCycleId(), c.totalCost());
         for (GroupCostSummaryResponse g : costReportingService.getFarmGroupCostSummaries(tenantId, farmId)) groupCost.put(g.groupId(), g.totalCost());
-        for (AnimalCostSummaryResponse a : costReportingService.getFarmAnimalCostSummaries(tenantId, farmId)) animalCost.put(a.animalId(), a.totalCost());
+        for (AnimalCostSummaryResponse a : costReportingService.getFarmAnimalCostSummaries(tenantId, farmId)) animalCost.put(a.animalId(), a);
 
         List<UnitInput> units = new ArrayList<>();
         for (AgCropCycle c : cycles) units.add(new UnitInput("CROP_CYCLE", c.getId(), c.getCycleName(), c.getStatus(), null, cycleCost.get(c.getId())));
         for (AgGroup g : groups) units.add(new UnitInput("GROUP", g.getId(), g.getBatchNumber(), g.getStatus(), g.getAcquisitionType(), groupCost.get(g.getId())));
-        for (AgAnimal a : animals) units.add(new UnitInput("ANIMAL", a.getId(), a.getName() != null && !a.getName().isBlank() ? a.getTagNumber() + " (" + a.getName() + ")" : a.getTagNumber(),
-                a.getStatus(), a.getAcquisitionType(), animalCost.get(a.getId())));
+        for (AgAnimal a : animals) {
+            AnimalCostSummaryResponse s = animalCost.get(a.getId());
+            BigDecimal recorded = s == null ? null : s.totalCost();
+            // Breeding stock: the purchase price is capital, not a direct cost, so it comes out of the recorded cost (feed and health stay).
+            if (a.isBreedingStock() && recorded != null && s.acquisitionCost() != null) recorded = recorded.subtract(s.acquisitionCost());
+            units.add(new UnitInput("ANIMAL", a.getId(), a.getName() != null && !a.getName().isBlank() ? a.getTagNumber() + " (" + a.getName() + ")" : a.getTagNumber(),
+                    a.getStatus(), a.getAcquisitionType(), recorded, a.isBreedingStock()));
+        }
         for (AgEnterprise e : enterprises) units.add(new UnitInput("ENTERPRISE", e.getId(), e.getName(), e.getStatus(), null, BigDecimal.ZERO));
 
         List<LedgerRow> ledger = new ArrayList<>();

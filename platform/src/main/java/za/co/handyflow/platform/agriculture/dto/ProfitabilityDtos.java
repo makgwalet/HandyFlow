@@ -12,7 +12,8 @@ public final class ProfitabilityDtos {
     /**
      * One production unit: a crop cycle, a group (batch), an animal or an enterprise.
      *
-     * @param state        COMPLETE when the unit's life is over (a harvested cycle, a closed group, a sold animal), so its margin is final;
+     * @param state        BREEDING_STOCK for an animal flagged as breeding stock (its purchase price, being capital, is not in {@code recordedCost}; it is shown apart
+     *                     from the production margins); otherwise COMPLETE when the unit's life is over (a harvested cycle, a closed group, a sold animal), so its margin is final;
      *                     IN_PROGRESS when it is still running, so the margin is only what has happened to date and unsold stock is not valued
      * @param recordedCost the costs already recorded where they happen: feed, health, seed, inputs and an animal's purchase price
      * @param labour       the cost-ledger categories (W3 to W4 and manual): labour, equipment and fuel; {@code otherDirect} is everything else in the ledger
@@ -34,7 +35,9 @@ public final class ProfitabilityDtos {
     /**
      * @param complete   units whose life is over: their margin is final
      * @param inProgress units still running: costs to date against revenue to date; unsold stock is not valued
+     * @param breedingStock animals flagged as breeding stock: running costs and any sales only, and not a production margin. They are in {@code totals} (those costs and
+     *                   sales are real) but in neither {@code complete} nor {@code inProgress}
      * @param notes      farm-level reasons the report may be incomplete (labour not yet costed, sales not counted)
      */
-    public record ProfitabilityResponse(UUID farmId, Totals totals, Subtotal complete, Subtotal inProgress, List<UnitProfit> units, List<String> notes) {}
+    public record ProfitabilityResponse(UUID farmId, Totals totals, Subtotal complete, Subtotal inProgress, Subtotal breedingStock, List<UnitProfit> units, List<String> notes) {}
 }

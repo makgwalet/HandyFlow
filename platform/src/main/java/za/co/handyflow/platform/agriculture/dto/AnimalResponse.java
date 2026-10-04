@@ -26,5 +26,6 @@ public record AnimalResponse(
         String status,
         String notes,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        boolean breedingStock // capital, not a production cost: its purchase price is left out of margins (ADR-001 decision 7)
 ) {}

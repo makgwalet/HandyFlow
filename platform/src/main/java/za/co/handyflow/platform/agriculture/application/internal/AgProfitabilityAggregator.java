@@ -32,7 +32,12 @@ public final class AgProfitabilityAggregator {
     public static final String UNLISTED = "UNLISTED";
 
     /** A unit as the service found it. {@code recordedCost} is what the existing reports already count (feed, health, seed, inputs, purchase price). */
-    public record UnitInput(String targetType, UUID id, String label, String status, String acquisitionType, BigDecimal recordedCost) {}
+    public record UnitInput(String targetType, UUID id, String label, String status, String acquisitionType, BigDecimal recordedCost, boolean breedingStock) {
+        /** A unit that is not breeding stock. */
+        public UnitInput(String targetType, UUID id, String label, String status, String acquisitionType, BigDecimal recordedCost) {
+            this(targetType, id, label, status, acquisitionType, recordedCost, false);
+        }
+    }
 
     /** One net ledger total for a target and category (reversals already netted). */
     public record LedgerRow(String targetType, UUID targetId, String category, BigDecimal amount) {}
@@ -71,8 +76,9 @@ public final class AgProfitabilityAggregator {
             String k = key(u.targetType(), u.id());
             listed.add(k);
             Acc a = money.getOrDefault(k, new Acc());
-            UnitProfit row = row(u.targetType(), u.id(), u.label(), u.status(), AgProfitabilityRules.stateOf(u.targetType(), u.status()),
-                    nz(u.recordedCost()), a, AgProfitabilityRules.caveats(u.targetType(), u.status(), u.acquisitionType(), a.revenue));
+            String state = u.breedingStock() ? AgProfitabilityRules.BREEDING_STOCK : AgProfitabilityRules.stateOf(u.targetType(), u.status());
+            UnitProfit row = row(u.targetType(), u.id(), u.label(), u.status(), state, nz(u.recordedCost()), a,
+                    AgProfitabilityRules.caveats(u.targetType(), u.status(), u.acquisitionType(), a.revenue, u.breedingStock()));
             if (!isEmpty(row)) rows.add(row);                         // a unit with no money in or out is just noise
         }
 
@@ -91,7 +97,7 @@ public final class AgProfitabilityAggregator {
             if (!isEmpty(row)) rows.add(row);
         }
 
-        rows.sort(Comparator.comparing((UnitProfit r) -> AgProfitabilityRules.COMPLETE.equals(r.state()) ? 0 : 1)
+        rows.sort(Comparator.comparing((UnitProfit r) -> AgProfitabilityRules.COMPLETE.equals(r.state()) ? 0 : AgProfitabilityRules.IN_PROGRESS.equals(r.state()) ? 1 : 2)
                 .thenComparing(UnitProfit::targetType).thenComparing(r -> r.label() == null ? "" : r.label().toLowerCase()));
 
         List<String> notes = new ArrayList<>();
@@ -99,9 +105,12 @@ public final class AgProfitabilityAggregator {
         if (uncostedLabour > 0) notes.add(uncostedLabour + " recorded labour entr" + (uncostedLabour == 1 ? "y isn't" : "ies aren't") + " costed yet, so labour is understated until " + (uncostedLabour == 1 ? "it is" : "they are") + " costed (Insights > Labour).");
         if (notCountedSales > 0) notes.add(notCountedSales + " sale allocation" + (notCountedSales == 1 ? " isn't" : "s aren't") + " counted (for example, the invoice was cancelled), so revenue excludes " + (notCountedSales == 1 ? "it" : "them") + ".");
 
+        if (rows.stream().anyMatch(r -> AgProfitabilityRules.BREEDING_STOCK.equals(r.state()))) {
+            notes.add("Breeding stock is shown apart from the production margins. Its purchase prices are capital and aren't counted, but its running costs and any sales are in the farm totals.");
+        }
         notes.addAll(extraNotes);
 
-        return new ProfitabilityResponse(farmId, totals(rows), subtotal(rows, AgProfitabilityRules.COMPLETE), subtotal(rows, AgProfitabilityRules.IN_PROGRESS), List.copyOf(rows), List.copyOf(notes));
+        return new ProfitabilityResponse(farmId, totals(rows), subtotal(rows, AgProfitabilityRules.COMPLETE), subtotal(rows, AgProfitabilityRules.IN_PROGRESS), subtotal(rows, AgProfitabilityRules.BREEDING_STOCK), List.copyOf(rows), List.copyOf(notes));
     }
 
     private static UnitProfit row(String type, UUID id, String label, String status, String state, BigDecimal recorded, Acc a, List<String> caveats) {
