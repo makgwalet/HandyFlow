@@ -16,7 +16,7 @@ import { btnGhost, card, fmtMoney, inp } from "./constants"
 const TONE_COLOR = { gain: "var(--hf-success-text-strong)", loss: "var(--hf-danger-text)", even: "var(--hf-text-secondary)" } as const
 
 /** The sign is written out as well as coloured, so a loss never depends on colour alone. */
-function Margin({ value, percent, big }: { value: number; percent: number | null; big?: boolean }) {
+export function Margin({ value, percent, big }: { value: number; percent: number | null; big?: boolean }) {
   const tone = toneOf(value)
   return (
     <span style={{ color: TONE_COLOR[tone], fontWeight: 700, fontSize: big ? 20 : 12.5 }}>

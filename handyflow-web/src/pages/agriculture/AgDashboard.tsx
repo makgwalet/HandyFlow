@@ -1,8 +1,9 @@
 // src/pages/agriculture/AgDashboard.tsx
 //
 // All-farms overview from ONE call (GET /agriculture/dashboard): totals, what needs attention, farm types, livestock by species,
-// crops in production, farm locations and a per-farm table. Shows only what Agriculture records; there is no revenue, margin,
-// labour or equipment cost, weather or trend data yet, so none is shown.
+// crops in production, farm locations and a per-farm table. Counts and records are for anyone with AGRICULTURE_READ. The gross-margin card
+// (revenue, direct costs, margin per farm) is shown ONLY to people who also hold AGRICULTURE_FINANCE and INVOICE_READ, because it shows revenue
+// and, through it, labour cost; for everyone else it is absent. There is no weather data yet, so none is shown.
 import { Suspense, lazy } from "react"
 import { Link } from "react-router-dom"
 import { PieChart, Pie, Cell, Tooltip } from "recharts"
@@ -10,6 +11,7 @@ import { MapPin, Sprout, Tractor, Wheat } from "lucide-react"
 import { useAgDashboard, type AttentionItem } from "./agDashboard.api"
 import { useAgTrends } from "./agTrends.api"
 import { ComparisonCard } from "./AgTrendParts"
+import AgMarginOverview from "./AgMarginOverview"
 import { barPercent, dueLabel, fmtNum, percent, severityLabel, tidy, typeLabel } from "./agDashboard.logic"
 import { todayISO } from "./agCrops.logic"
 import { AG_ACCENT, AG_ACCENT_TEXT, btnGhost, card, kpiLabel, kpiValue, statusBadge } from "./constants"
@@ -102,6 +104,8 @@ export default function AgDashboard() {
         <Kpi label="Crop cycles in production" value={String(t.cropCyclesInProduction)} sub={`${t.plannedCropCycles} planned`} />
         <Kpi label="Livestock" value={fmtNum(t.totalHead, 0)} sub={`${fmtNum(t.animalCount, 0)} animals · ${fmtNum(t.groupHead, 0)} in ${t.groupCount} group${t.groupCount === 1 ? "" : "s"}`} />
       </div>
+
+      <AgMarginOverview />
 
       {trends && (
         <section aria-label="Last 30 days" style={{ marginBottom: 16 }}>

@@ -33,3 +33,21 @@ export function useProfitability(farmId: string, seasonId: string | null = null,
     queryFn: async () => (await apiClient.get(`/api/v1/agriculture/farms/${farmId}/profitability`, { params: seasonId ? { seasonId } : undefined })).data,
   })
 }
+
+/** One farm in the overview: that farm's own Profitability totals, unchanged. */
+export interface FarmMargin {
+  farmId: string; farmName: string
+  revenue: number; directCost: number; grossMargin: number; marginPercent: number | null
+  finishedUnits: number; runningUnits: number; breedingStockUnits: number
+  cautions: number                             // units with a caveat plus the farm's own warnings: things to read with care
+}
+
+/** Every active farm side by side. The totals are the exact sum of the farms' own figures, so this never disagrees with a farm's screen. */
+export interface ProfitabilityOverview { totals: Totals; complete: Subtotal; inProgress: Subtotal; breedingStock: Subtotal; farms: FarmMargin[]; notes: string[] }
+
+export function useProfitabilityOverview(enabled = true) {
+  return useQuery<ProfitabilityOverview>({
+    queryKey: ["ag", "profitability", "overview"], enabled,
+    queryFn: async () => (await apiClient.get("/api/v1/agriculture/profitability/overview")).data,
+  })
+}
