@@ -139,7 +139,12 @@ W7 supplier/SCM, W8 weather, W9 NDVI/satellite. W7 to W9 do not block a first pr
   yet costed, sales not counted, caveated units) are counted as "cautions" and listed with the farm's name, capped at 30 with a summary; at most 50 farms, and the overview says when it is
   cut off. The Dashboard shows a "Gross margin, all farms" card between the KPIs and the Trends strip ONLY to users who hold both rights; for everyone else it is absent and no request
   is made (no "access denied" noise on a page they may read). A farm with costs but no sales yet shows its loss; only a farm with neither shows "No activity yet".
-- **Open after W6:** a PDF/print view; an all-farms CSV; a Dashboard drill-down that opens a farm's Profitability pre-selected (farm choice is local state today).
+- **W6 leftovers: done.** (1) **Print / PDF** on Profitability: a self-contained HTML document opened in its own window and printed (the browser's print dialog also offers "Save as
+  PDF"), so it does not depend on hiding the app's menus. EVERY value a user typed (farm, season, unit and tag names, caveats, and notes that embed a season name) is HTML-escaped; a loss is
+  written as the word "Loss" so a black-and-white printout reads correctly; it always covers every unit whatever the screen's filters, names the season, and is disabled while a new season
+  loads. A blocked pop-up is explained. (2) **All-farms CSV** on the Dashboard card (the server's exact totals, plain numbers, notes, formula-injection guard from the shared `toCsv`).
+  (3) **Drill-down:** each farm name on the Dashboard card links to `/agriculture/profitability?farm=<id>` (URL-encoded). The selected farm was ALREADY kept in the URL (`AgFarmScope` reads
+  `?farm=`), so no change to it was needed; an earlier note here saying farm choice was local state was wrong.
 - **W7 (suppliers): built, as REFERENCES (the ADR's "Supply Chain / AP, references").** `ag_stock_movements.supplier_id` and `ag_inventory_items.supplier_id` (V311, by id, deliberately no
   foreign key into Supply Chain's tables). A read-only `SupplierFacade` in Supply Chain exposes IDENTITY ONLY (id, name, status): the supplier record also holds bank account, contact, VAT and
   BBBEE data, and none of it crosses the boundary. **Integrity:** a receipt takes the supplier chosen for it, else the item's usual one, and either must be an ACTIVE Supply Chain supplier;

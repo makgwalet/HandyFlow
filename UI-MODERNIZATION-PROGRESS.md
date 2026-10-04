@@ -536,3 +536,9 @@ W5 is built. **W6 to W9 are not started.**
 - **Decision:** the stock ledger stays in Agriculture (a deliberate, standing exception); not migrated into Supply Chain.
 - **Open:** POs and goods receipts are not linked to Agriculture receipts; no supplier performance view.
 - **Run:** `mvn test "-Dtest=Ag*Test,Fleet*Test,Fuel*Test,SupplierFacadeImplTest"`, then separately `mvn test "-Dtest=HandyFlowApplicationTests,InvoicingFacadeImplTest"` (V311 applies on that run).
+
+## Agriculture: W6 leftovers (ADR-001)
+
+- Profitability: **Print / PDF** (escaped, self-contained document in its own window; every unit; names the season; off while loading; blocked pop-up explained).
+- Dashboard margin card: **Export CSV** (all farms) and **farm names link to that farm's Profitability** (`?farm=<id>`; the farm was already URL-driven).
+- Frontend only; no backend change. Open (unchanged): W8 weather, W9 NDVI; POs and goods receipts are not linked to Agriculture receipts.
