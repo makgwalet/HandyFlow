@@ -517,3 +517,12 @@ W5 is built. **W6 to W9 are not started.**
 - Margins, labour and ledger costs are deliberately NOT added to Trends, Cost reports or the Dashboard (they are AGRICULTURE_READ; labour cost is salary-derived). They stay behind finance.
 - **Open (W6b):** an all-farms overview and a Dashboard margin card for finance users (needs a tenant-wide endpoint); print/PDF view.
 - **Run:** `mvn test "-Dtest=Ag*Test,Fleet*Test,Fuel*Test"` then, separately, `mvn test "-Dtest=HandyFlowApplicationTests,InvoicingFacadeImplTest"` (the last full run died from a Windows paging-file shortage, not a test failure).
+
+## Agriculture W6b: all-farms overview and Dashboard margin card (ADR-001)
+
+- `GET /api/v1/agriculture/profitability/overview` (AGRICULTURE_FINANCE + INVOICE_READ): every active farm's gross margin, as the exact sum of each farm's own report. Pure
+  `AgProfitabilityOverviewAggregator` (tested), thin service method (50 farms max, says so), controller.
+- Dashboard: "Gross margin, all farms" card for finance users only (absent and no request for anyone else); loss written as a word; one-sided farms (costs but no sales yet) shown honestly.
+- Fixed on the way: an existing lint-caught bug class (a hook called conditionally) in the new card, and test gaps found by mutation checks.
+- **Open:** print/PDF; all-farms CSV; drill-down pre-selecting a farm on Profitability.
+- **Run:** `mvn test "-Dtest=Ag*Test,Fleet*Test,Fuel*Test"`, then separately `mvn test "-Dtest=HandyFlowApplicationTests,InvoicingFacadeImplTest"` (Windows paging-file shortage killed the last combined run).

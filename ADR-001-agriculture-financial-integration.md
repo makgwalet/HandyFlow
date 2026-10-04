@@ -133,5 +133,10 @@ W7 supplier/SCM, W8 weather, W9 NDVI/satellite. W7 to W9 do not block a first pr
   = + - @ (or a tab or return) is prefixed with an apostrophe (numbers are untouched), which also protects the existing cost-report export.
   **Deliberately NOT done:** ledger costs, labour or margins are NOT added to Trends, Cost reports or the Dashboard, because they are open to AGRICULTURE_READ and labour cost is
   salary-derived (decision 5); margins stay behind AGRICULTURE_FINANCE + INVOICE_READ.
-- **W6b (open):** an all-farms overview and a Dashboard margin card for users who hold the finance permissions (needs a tenant-wide endpoint); a PDF/print view; a per-season total
-  across farms. W7 to W9: not started.
+- **W6b (all-farms overview and Dashboard margin card): built.** `GET /profitability/overview` (AGRICULTURE_FINANCE + INVOICE_READ, like one farm's report) returns every active farm's
+  gross margin side by side. It never calculates a margin itself: each farm's figures are that farm's own whole-farm report, and the overview is their EXACT SUM (so it cannot disagree
+  with a farm's Profitability screen), with percentages recomputed from the sums, never averaged (a small farm cannot drag them). Farms are listed by name; per-farm warnings (labour not
+  yet costed, sales not counted, caveated units) are counted as "cautions" and listed with the farm's name, capped at 30 with a summary; at most 50 farms, and the overview says when it is
+  cut off. The Dashboard shows a "Gross margin, all farms" card between the KPIs and the Trends strip ONLY to users who hold both rights; for everyone else it is absent and no request
+  is made (no "access denied" noise on a page they may read). A farm with costs but no sales yet shows its loss; only a farm with neither shows "No activity yet".
+- **Open after W6:** a PDF/print view; an all-farms CSV; a Dashboard drill-down that opens a farm's Profitability pre-selected (farm choice is local state today). W7 to W9: not started.
