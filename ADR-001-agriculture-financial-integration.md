@@ -123,4 +123,15 @@ W7 supplier/SCM, W8 weather, W9 NDVI/satellite. W7 to W9 do not block a first pr
 - **Not done in W5 (open):** (1) The existing Cost reports, Trends and the Dashboard still
   do not include ledger costs or revenue (W6 brings them onto this report's numbers). (3) No season filter or CSV export yet (W6). (4) Unsold harvested stock is not quantified: sales
   quantities and harvest yields may be in different units, so Agriculture does not compare them.
-- W6 to W9: not started.
+- **W6a (reports agree and say what they count): built.** (1) **Season filter** on Profitability (`?seasonId=`): a season report covers that season's crop cycles only, with only
+  their ledger rows and sales; livestock and enterprises are not tied to a season, so they are left out and the report says so; labour not yet costed is counted for those cycles only;
+  uncounted sales are not claimed by season. It is a view of the same numbers, not a second calculation. (2) **CSV export** of Profitability, client-side: plain numbers to two places
+  (a loss is negative), the not-net-profit warning, caveats and notes travel in the file, a safe file name, and Export is disabled while a new season is loading so a file can never
+  mix one season's label with another's figures. (3) **Cost reports** now say they are RECORDED COSTS ONLY and point to Profitability; a breeding animal is marked, with a note that its
+  purchase price is in those totals but left out of margins (`AnimalCostSummaryResponse.breedingStock`). (4) **Trends** wording corrected: it said labour, equipment and revenue "are not
+  recorded", which stopped being true in W2 to W4; it now says what the chart does and does not include. (5) **CSV injection guard** in the shared `toCsv`: a text cell starting with
+  = + - @ (or a tab or return) is prefixed with an apostrophe (numbers are untouched), which also protects the existing cost-report export.
+  **Deliberately NOT done:** ledger costs, labour or margins are NOT added to Trends, Cost reports or the Dashboard, because they are open to AGRICULTURE_READ and labour cost is
+  salary-derived (decision 5); margins stay behind AGRICULTURE_FINANCE + INVOICE_READ.
+- **W6b (open):** an all-farms overview and a Dashboard margin card for users who hold the finance permissions (needs a tenant-wide endpoint); a PDF/print view; a per-season total
+  across farms. W7 to W9: not started.

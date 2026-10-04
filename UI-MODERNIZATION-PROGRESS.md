@@ -508,3 +508,12 @@ W5 is built. **W6 to W9 are not started.**
 - **Open:** Cost reports, Trends and Dashboard do not yet use ledger costs or revenue (W6); season filter and export (W6); group purchase price is not recorded anywhere.
 - **Not verified:** `mvn test` for the new Mockito and controller tests. Run
   `mvn test "-Dtest=Ag*Test,Fleet*Test,Fuel*Test,InvoicingFacadeImplTest,HandyFlowApplicationTests"` (V310 applies on the first run).
+
+## Agriculture W6a: reports agree and say what they count (ADR-001)
+
+- Profitability: a **season filter** (`?seasonId=`, that season's crop cycles only) and a **CSV export** (client-side; plain numbers, caveats and notes included; disabled while a season loads).
+- Cost reports say "Recorded costs only" and point to Profitability; breeding animals are marked. Trends' limitation text was wrong since W2 and is corrected.
+- `toCsv` now guards text cells that start with = + - @ against spreadsheet formulas (CSV injection), for every export that uses it.
+- Margins, labour and ledger costs are deliberately NOT added to Trends, Cost reports or the Dashboard (they are AGRICULTURE_READ; labour cost is salary-derived). They stay behind finance.
+- **Open (W6b):** an all-farms overview and a Dashboard margin card for finance users (needs a tenant-wide endpoint); print/PDF view.
+- **Run:** `mvn test "-Dtest=Ag*Test,Fleet*Test,Fuel*Test"` then, separately, `mvn test "-Dtest=HandyFlowApplicationTests,InvoicingFacadeImplTest"` (the last full run died from a Windows paging-file shortage, not a test failure).
