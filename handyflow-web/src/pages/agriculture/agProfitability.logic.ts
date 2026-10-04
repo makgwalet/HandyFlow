@@ -1,7 +1,7 @@
 // src/pages/agriculture/agProfitability.logic.ts
 //
 // Pure presentation rules for the profitability screen. The numbers come from the server, already computed; this only filters, labels and explains them.
-import type { Profitability, UnitProfit, UnitType } from "./agProfitability.api"
+import type { Profitability, ProfitabilityOverview, UnitProfit, UnitType } from "./agProfitability.api"
 
 export const TYPE_LABEL: Record<UnitType, string> = { CROP_CYCLE: "Crop cycle", GROUP: "Group", ANIMAL: "Animal", ENTERPRISE: "Enterprise", UNLISTED: "Other" }
 
@@ -66,3 +66,23 @@ export function profitabilityFileName(farm: string, season: string | null, gener
   const slug = (x: string) => x.normalize("NFKD").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() || "farm"
   return `gross-margin-${slug(farm)}${season ? `-${slug(season)}` : ""}-${generatedOn}.csv`
 }
+
+/**
+ * The all-farms overview as rows for toCsv: each farm's own figures as plain numbers to two places, a total, and the notes. The total is the server's exact sum of the farms.
+ * Text cells are guarded against spreadsheet formulas by toCsv.
+ */
+export function overviewCsvRows(o: ProfitabilityOverview, ctx: { generatedOn: string }): (string | number | null)[][] {
+  const m = (n: number) => Number(n.toFixed(2))
+  const t = o.totals
+  return [
+    ["Gross margin, all farms"], ["Generated", ctx.generatedOn],
+    ["Gross margin only: revenue (ex-VAT, net of credit notes) minus direct production costs. Not net profit."],
+    [], ["Farm", "Revenue", "Direct costs", "Gross margin", "Margin %", "Finished units", "Running units", "Breeding stock units", "Read with care"],
+    ...o.farms.map(f => [f.farmName, m(f.revenue), m(f.directCost), m(f.grossMargin), f.marginPercent, f.finishedUnits, f.runningUnits, f.breedingStockUnits, f.cautions]),
+    ["Total", m(t.revenue), m(t.directCost), m(t.grossMargin), t.marginPercent, o.complete.units, o.inProgress.units, o.breedingStock.units, null],
+    ...(o.notes.length ? [[], ["Notes"], ...o.notes.map(n => [n])] : []),
+  ]
+}
+
+/** A safe file name for the overview export. */
+export function overviewFileName(generatedOn: string): string { return `gross-margin-all-farms-${generatedOn}.csv` }

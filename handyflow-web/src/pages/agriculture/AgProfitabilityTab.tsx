@@ -4,11 +4,12 @@
 // enterprise. Gross margin only; overheads, finance costs, depreciation and tax belong to Accounting. Units whose life is over show a FINAL margin;
 // units still running show costs and sales to date, and unsold stock is not valued. Needs AGRICULTURE_FINANCE and INVOICE_READ (it shows revenue).
 import { Fragment, useState } from "react"
-import { AlertTriangle, Download, Lock } from "lucide-react"
+import { AlertTriangle, Download, Lock, Printer } from "lucide-react"
 import { usePermission } from "../../hooks/usePermission"
 import { downloadCsv, useSeasons } from "./agCrops.api"
 import { toCsv, todayISO } from "./agCrops.logic"
 import { useProfitability, type Subtotal, type UnitProfit } from "./agProfitability.api"
+import { openPrintWindow, profitabilityPrintHtml } from "./agProfitability.print"
 import { TYPE_LABEL, costParts, filterUnits, percentText, profitabilityCsvRows, profitabilityFileName, stateLabel, toneOf, typesPresent, type StateFilter, type TypeFilter } from "./agProfitability.logic"
 import { Empty, Th } from "./agCropsUi"
 import { btnGhost, card, fmtMoney, inp } from "./constants"
@@ -90,6 +91,7 @@ export default function AgProfitabilityTab({ farmId, farmName = "Farm" }: { farm
   const [type, setType] = useState<TypeFilter>("ALL")
   const [state, setState] = useState<StateFilter>("ALL")
   const [openKey, setOpenKey] = useState<string | null>(null)
+  const [printBlocked, setPrintBlocked] = useState(false)
 
   if (!allowed) {
     return (
@@ -108,6 +110,8 @@ export default function AgProfitabilityTab({ farmId, farmName = "Farm" }: { farm
   const types = typesPresent(data.units)
   const key = (u: UnitProfit) => `${u.targetType}:${u.targetId ?? "none"}`
   const seasonName = seasonId ? seasons.data?.find(x => x.id === seasonId)?.name ?? null : null
+  // the printable view always covers every unit, whatever the screen's filters are
+  const printReport = () => setPrintBlocked(!openPrintWindow(profitabilityPrintHtml(data, { farm: farmName, season: seasonName, generatedOn: todayISO() })))
   const exportCsv = () => {
     const on = todayISO()
     downloadCsv(profitabilityFileName(farmName, seasonName, on), toCsv(profitabilityCsvRows(data, { farm: farmName, season: seasonName, generatedOn: on })))
@@ -124,8 +128,10 @@ export default function AgProfitabilityTab({ farmId, farmName = "Farm" }: { farm
         </label>
         <div style={{ flex: 1 }} />
         {isPlaceholderData && <span role="status" style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Updating…</span>}
+        <button type="button" style={{ ...btnGhost, opacity: isPlaceholderData ? 0.5 : 1 }} disabled={isPlaceholderData} onClick={printReport}><Printer size={14} />Print / PDF</button>
         <button type="button" style={{ ...btnGhost, opacity: isPlaceholderData ? 0.5 : 1 }} disabled={isPlaceholderData} onClick={exportCsv}><Download size={14} />Export CSV</button>
       </div>
+      {printBlocked && <p role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", margin: 0 }}>Your browser blocked the print window. Allow pop-ups for this site, then try again.</p>}
       <div style={{ display: "grid", gap: 16, opacity: isPlaceholderData ? 0.5 : 1 }}>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <Stat label="Revenue" hint="Ex-VAT, net of credit notes">{fmtMoney(t.revenue)}</Stat>

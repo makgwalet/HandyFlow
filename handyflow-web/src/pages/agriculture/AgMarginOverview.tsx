@@ -3,13 +3,16 @@
 // The Dashboard's gross-margin card (ADR-001, W6b): every active farm side by side. Margins show revenue, so the card exists only for people who hold
 // AGRICULTURE_FINANCE and INVOICE_READ; for everyone else it is simply absent (the Dashboard is theirs to read, so there is no "access denied" noise).
 // The figures are each farm's own Profitability totals, summed by the server, so this can never disagree with a farm's Profitability screen.
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, Download } from "lucide-react"
 import { Link } from "react-router-dom"
 import { usePermission } from "../../hooks/usePermission"
 import { Margin } from "./AgProfitabilityTab"
 import { useProfitabilityOverview, type FarmMargin } from "./agProfitability.api"
+import { downloadCsv } from "./agCrops.api"
+import { todayISO, toCsv } from "./agCrops.logic"
+import { overviewCsvRows, overviewFileName } from "./agProfitability.logic"
 import { Th } from "./agCropsUi"
-import { AG_ACCENT_TEXT, card, fmtMoney } from "./constants"
+import { AG_ACCENT_TEXT, btnGhost, card, fmtMoney } from "./constants"
 
 const hasActivity = (f: FarmMargin) => f.revenue !== 0 || f.directCost !== 0
 
@@ -43,7 +46,10 @@ export default function AgMarginOverview() {
     <section style={{ ...card, marginBottom: 16 }} aria-label="Gross margin, all farms">
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
         <h3 style={{ fontSize: 13, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>Gross margin <span style={{ fontWeight: 400, color: "var(--hf-text-muted)" }}>all farms</span></h3>
-        <Link to="/agriculture/profitability" style={{ fontSize: 12.5, fontWeight: 600, color: AG_ACCENT_TEXT }}>Open Profitability</Link>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <button type="button" style={{ ...btnGhost, padding: "5px 10px", fontSize: 12 }} onClick={() => { const on = todayISO(); downloadCsv(overviewFileName(on), toCsv(overviewCsvRows(data, { generatedOn: on }))) }}><Download size={13} />Export CSV</button>
+          <Link to="/agriculture/profitability" style={{ fontSize: 12.5, fontWeight: 600, color: AG_ACCENT_TEXT }}>Open Profitability</Link>
+        </div>
       </div>
       <div style={{ display: "flex", gap: 28, flexWrap: "wrap", marginBottom: 6 }}>
         <Figure label="Revenue">{fmtMoney(t.revenue)}</Figure>
@@ -59,7 +65,7 @@ export default function AgMarginOverview() {
           <tbody>
             {data.farms.map(f => (
               <tr key={f.farmId} aria-label={`Farm ${f.farmName}`} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
-                <td style={{ padding: "8px 10px", fontWeight: 600 }}>{f.farmName}</td>
+                <td style={{ padding: "8px 10px", fontWeight: 600 }}><Link to={`/agriculture/profitability?farm=${encodeURIComponent(f.farmId)}`} aria-label={`Open ${f.farmName} in Profitability`} style={{ color: "inherit", textDecoration: "underline", textDecorationColor: "var(--hf-border)", textUnderlineOffset: 3 }}>{f.farmName}</Link></td>
                 {hasActivity(f) ? (
                   <>
                     <td style={{ padding: "8px 10px" }}>{fmtMoney(f.revenue)}</td>
