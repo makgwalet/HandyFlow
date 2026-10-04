@@ -104,4 +104,17 @@ W7 supplier/SCM, W8 weather, W9 NDVI/satellite. W7 to W9 do not block a first pr
   dispatch legitimately has several rows. Reversing the group frees the dispatch.
 - **Known limit:** Fleet's `vehicle_type` has a database CHECK (BAKKIE, SEDAN, SUV, TRUCK, VAN, BUS, MINIBUS, MOTORCYCLE, OTHER), so tractors and harvesters are filed as OTHER until
   tractor and harvester types are added (a migration and a UI list; a decision for Fleet).
-- W5 to W9: not started. W5 combines costs and revenue (cost reports, trends and the dashboard do not include ledger costs or revenue yet).
+- **W5 (profitability engine): built.** `GET /farms/{id}/profitability` (AGRICULTURE_FINANCE + INVOICE_READ, like Sales) combines, per crop cycle, group, animal and enterprise: the
+  RECORDED costs the existing reports already count (feed, health, seed, inputs, an animal's purchase price), the cost-LEDGER totals by category (labour, equipment, fuel, other
+  direct; reversals netted) and the live revenue. **Nothing is counted twice** because every cost and every sale names exactly ONE target; the farm total is the exact sum of the unit
+  rows, and a cost or sale on a target that has since been removed goes into one catch-all "Removed or unlisted targets" row so the totals still equal the ledger and sales. Units
+  whose life is over (harvested, failed or abandoned cycle; closed group; sold, dead, culled or transferred-out animal) are COMPLETE and their margin is final; the rest are IN_PROGRESS
+  and show costs and sales TO DATE, with unsold stock not valued (decision 8). An enterprise is always ongoing and shows only what was allocated to it directly (its animals', groups'
+  and cycles' own margins are separate rows, so nothing is rolled up twice). **Honesty caveats:** a finished unit that would normally have been sold but has no sales attributed says
+  so; a PURCHASED group warns its purchase price is not recorded anywhere (the existing cost service says the same), so its margin is overstated; the notes say how many labour entries
+  are not costed yet and how many sale allocations are not counted. Unit lists and sales are capped at 1000 each and the report says when a cap is reached. Insights > Profitability.
+- **Not done in W5 (open):** (1) **Breeding stock.** Decision 7 assumed animals can be flagged as breeding stock, but no such flag exists, so a bought breeding animal's price counts as a
+  direct cost of that animal. Needs a flag (a migration, an endpoint and a toggle in the animal screen) and an exclusion rule. (2) The existing Cost reports, Trends and the Dashboard still
+  do not include ledger costs or revenue (W6 brings them onto this report's numbers). (3) No season filter or CSV export yet (W6). (4) Unsold harvested stock is not quantified: sales
+  quantities and harvest yields may be in different units, so Agriculture does not compare them.
+- W6 to W9: not started.

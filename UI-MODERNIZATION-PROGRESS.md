@@ -493,3 +493,16 @@ W4 is built. **W5 to W9 are not started.**
 - **Not verified:** `mvn test` for the new Mockito and controller tests, and V309 against a database. Run
   `mvn test "-Dtest=Ag*Test,Fleet*Test,Fuel*Test,InvoicingFacadeImplTest,HandyFlowApplicationTests"`.
 - **Open:** tractor and harvester vehicle types (a CHECK constraint today); the residual same-dispatch race noted in ADR-001; ArchitectureVerificationTest (project-wide, pre-existing).
+
+## Agriculture W5: profitability engine (ADR-001)
+
+W5 is built. **W6 to W9 are not started.**
+
+- **Backend:** `AgProfitabilityRules` (pure: complete or running, margin, margin percent, caveats), `AgProfitabilityAggregator` (pure: builds the report from loaded data), `AgProfitabilityService` (loads
+  recorded costs, ledger totals, live revenue, uncosted-labour counts), `GET /api/v1/agriculture/farms/{farmId}/profitability` (AGRICULTURE_FINANCE + INVOICE_READ), one new ledger query
+  (`sumByTargetAndCategoryForFarm`). No migration.
+- **UI:** Insights > Profitability: totals, finished (final) versus still running (to date), where the costs come from, notes, a filterable table with expandable cost breakdowns and caveats.
+- **Rules:** gross margin only; revenue ex-VAT net of credit notes; a unit's cost = recorded + ledger; farm total = exact sum of unit rows (plus a catch-all row); unsold stock is not valued.
+- **Open:** breeding-stock flag (no such flag exists); Cost reports, Trends and Dashboard do not yet use ledger costs or revenue (W6); season filter and export (W6); group purchase price is not recorded anywhere.
+- **Not verified:** `mvn test` for the new Mockito and controller tests. Run
+  `mvn test "-Dtest=Ag*Test,Fleet*Test,Fuel*Test,InvoicingFacadeImplTest,HandyFlowApplicationTests"`.
