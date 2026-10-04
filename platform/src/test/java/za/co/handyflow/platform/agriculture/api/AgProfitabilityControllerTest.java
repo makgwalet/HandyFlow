@@ -22,6 +22,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -51,7 +52,7 @@ class AgProfitabilityControllerTest {
     @WithMockUser(authorities = {"AGRICULTURE_FINANCE", "INVOICE_READ"})
     @DisplayName("the report is returned, and both modules are checked")
     void returnsReport() throws Exception {
-        when(profitabilityService.farm(any(), eq(farmId))).thenReturn(response());
+        when(profitabilityService.farm(any(), eq(farmId), any())).thenReturn(response());
 
         TenantRequests.asTenant(mvc, get("/api/v1/agriculture/farms/" + farmId + "/profitability"))
                 .andExpect(status().isOk())
@@ -60,6 +61,21 @@ class AgProfitabilityControllerTest {
 
         verify(featureGuard, atLeastOnce()).requireModule("agriculture");
         verify(featureGuard, atLeastOnce()).requireModule("invoicing");
+    }
+
+    @Test
+    @WithMockUser(authorities = {"AGRICULTURE_FINANCE", "INVOICE_READ"})
+    @DisplayName("an optional seasonId is passed through, and without one the whole farm is asked for")
+    void passesSeasonThrough() throws Exception {
+        UUID seasonId = UUID.randomUUID();
+        when(profitabilityService.farm(any(), eq(farmId), eq(seasonId))).thenReturn(response());
+        when(profitabilityService.farm(any(), eq(farmId), isNull())).thenReturn(response());
+
+        TenantRequests.asTenant(mvc, get("/api/v1/agriculture/farms/" + farmId + "/profitability").param("seasonId", seasonId.toString())).andExpect(status().isOk());
+        TenantRequests.asTenant(mvc, get("/api/v1/agriculture/farms/" + farmId + "/profitability")).andExpect(status().isOk());
+
+        verify(profitabilityService).farm(any(), eq(farmId), eq(seasonId));
+        verify(profitabilityService).farm(any(), eq(farmId), isNull());
     }
 
     @Test

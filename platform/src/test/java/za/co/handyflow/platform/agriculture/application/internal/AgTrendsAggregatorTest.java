@@ -251,7 +251,8 @@ class AgTrendsAggregatorTest {
         assertEquals(0, r.production().excludedRecords());
         assertEquals(2, r.limitations().size());
         assertTrue(r.limitations().get(0).contains("Herd size"));
-        assertTrue(r.limitations().get(1).contains("Revenue"));
+        assertTrue(r.limitations().get(1).contains("recorded costs only") && r.limitations().get(1).contains("Profitability") && r.limitations().get(1).contains("finance access"), r.limitations().get(1));
+        assertFalse(r.limitations().get(1).contains("are not recorded"), "labour, equipment and revenue ARE recorded now (W2 to W4); the text must not say otherwise");
         assertEquals(TODAY, r.asOf());
     }
 }

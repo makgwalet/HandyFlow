@@ -86,6 +86,36 @@ class AgCostReportingServiceTest {
         }
 
         @Test
+        @DisplayName("a breeding animal is flagged, and its purchase price is still in this report's total (margins leave it out, this report says so)")
+        void breedingStockIsFlagged() {
+            AgAnimal bull = AgAnimal.create(TENANT, UUID.randomUUID(), null, null, UUID.randomUUID(),
+                    "TAG-009", "Samson", "Bonsmara", "MALE", null, false, null, null,
+                    "PURCHASED", LocalDate.now(), new BigDecimal("45000.00"));
+            bull.markBreedingStock(true);
+            when(animalRepository.findActiveById(eq(TENANT), any())).thenReturn(Optional.of(bull));
+            when(healthEventRepository.sumCostByAnimal(eq(TENANT), any())).thenReturn(new BigDecimal("500.00"));
+            when(feedRecordRepository.sumTotalCostByAnimal(eq(TENANT), any())).thenReturn(new BigDecimal("300.00"));
+
+            AnimalCostSummaryResponse result = newService().getAnimalCostSummary(TENANT, UUID.randomUUID());
+
+            assertThat(result.breedingStock()).isTrue();
+            assertThat(result.totalCost()).isEqualByComparingTo("45800.00");
+        }
+
+        @Test
+        @DisplayName("an ordinary animal is not flagged")
+        void ordinaryAnimalIsNotFlagged() {
+            AgAnimal steer = AgAnimal.create(TENANT, UUID.randomUUID(), null, null, UUID.randomUUID(),
+                    "TAG-010", null, "Bonsmara", "CASTRATED", null, false, null, null,
+                    "PURCHASED", LocalDate.now(), new BigDecimal("9000.00"));
+            when(animalRepository.findActiveById(eq(TENANT), any())).thenReturn(Optional.of(steer));
+            when(healthEventRepository.sumCostByAnimal(eq(TENANT), any())).thenReturn(BigDecimal.ZERO);
+            when(feedRecordRepository.sumTotalCostByAnimal(eq(TENANT), any())).thenReturn(BigDecimal.ZERO);
+
+            assertThat(newService().getAnimalCostSummary(TENANT, UUID.randomUUID()).breedingStock()).isFalse();
+        }
+
+        @Test
         @DisplayName("returns null cost-per-kg, not zero, when no weight has been recorded")
         void nullCostPerKgWhenNoWeight() {
             AgAnimal animal = AgAnimal.create(TENANT, UUID.randomUUID(), null, null, UUID.randomUUID(),

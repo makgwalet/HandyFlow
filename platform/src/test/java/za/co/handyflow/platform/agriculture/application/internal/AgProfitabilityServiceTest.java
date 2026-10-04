@@ -16,6 +16,7 @@ import za.co.handyflow.platform.agriculture.domain.model.AgFarm;
 import za.co.handyflow.platform.agriculture.domain.model.AgGroup;
 import za.co.handyflow.platform.agriculture.domain.model.AgHarvestRecord;
 import za.co.handyflow.platform.agriculture.domain.model.AgInputApplication;
+import za.co.handyflow.platform.agriculture.domain.model.AgSeason;
 import za.co.handyflow.platform.agriculture.domain.repository.AgAnimalRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgCostEntryRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgCropCycleRepository;
@@ -24,6 +25,7 @@ import za.co.handyflow.platform.agriculture.domain.repository.AgFarmRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgGroupRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgHarvestRecordRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgInputApplicationRepository;
+import za.co.handyflow.platform.agriculture.domain.repository.AgSeasonRepository;
 import za.co.handyflow.platform.agriculture.dto.AnimalCostSummaryResponse;
 import za.co.handyflow.platform.agriculture.dto.CropCycleCostSummaryResponse;
 import za.co.handyflow.platform.agriculture.dto.GroupCostSummaryResponse;
@@ -51,6 +53,7 @@ import static org.mockito.Mockito.*;
 class AgProfitabilityServiceTest {
 
     @Mock AgFarmRepository farmRepository;
+    @Mock AgSeasonRepository seasonRepository;
     @Mock AgCropCycleRepository cropCycleRepository;
     @Mock AgGroupRepository groupRepository;
     @Mock AgAnimalRepository animalRepository;
@@ -65,7 +68,7 @@ class AgProfitabilityServiceTest {
     final UUID farmId = UUID.randomUUID(), cycleId = UUID.randomUUID(), groupId = UUID.randomUUID(), animalId = UUID.randomUUID(), entId = UUID.randomUUID();
 
     private AgProfitabilityService service() {
-        return new AgProfitabilityService(farmRepository, cropCycleRepository, groupRepository, animalRepository, enterpriseRepository, costEntryRepository,
+        return new AgProfitabilityService(farmRepository, seasonRepository, cropCycleRepository, groupRepository, animalRepository, enterpriseRepository, costEntryRepository,
                 inputApplicationRepository, harvestRecordRepository, costReportingService, salesService);
     }
     private static BigDecimal bd(String s) { return new BigDecimal(s); }
@@ -265,6 +268,104 @@ class AgProfitabilityServiceTest {
         when(farmRepository.findActiveById(eq(TENANT), eq(other))).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service().farm(TENANT, other));
+
+        verifyNoInteractions(salesService, costEntryRepository, costReportingService);
+    }
+
+    // ---- season filter -------------------------------------------------------------------------------------------------
+
+    final UUID seasonId = UUID.randomUUID(), otherCycleId = UUID.randomUUID();
+
+    private void seasonOfThisFarm(String name) {
+        AgSeason season = mock(AgSeason.class);
+        when(season.getFarmId()).thenReturn(farmId); when(season.getName()).thenReturn(name);
+        when(seasonRepository.findActiveById(eq(TENANT), eq(seasonId))).thenReturn(Optional.of(season));
+    }
+    private AgCropCycle seasonCycle(UUID id, String name, String status) {
+        AgCropCycle c = mock(AgCropCycle.class);
+        when(c.getId()).thenReturn(id); when(c.getCycleName()).thenReturn(name); when(c.getStatus()).thenReturn(status); when(c.getFarmId()).thenReturn(farmId);
+        return c;
+    }
+
+    @Test
+    @DisplayName("a season report covers that season's crop cycles only: the whole farm's cycles, groups, animals and enterprises are not loaded")
+    void seasonCoversItsCyclesOnly() {
+        seasonOfThisFarm("2026/27");
+        AgCropCycle mine = seasonCycle(cycleId, "Maize - Field 3", "HARVESTED");
+        when(cropCycleRepository.findAllActiveForSeason(eq(TENANT), eq(seasonId), any())).thenReturn(new PageImpl<>(List.of(mine)));
+        cycleCost("1000");
+
+        ProfitabilityResponse p = service().farm(TENANT, farmId, seasonId);
+
+        assertEquals(List.of("Maize - Field 3"), p.units().stream().map(UnitProfit::label).toList());
+        verify(cropCycleRepository, never()).findAllActiveForFarm(any(), any(), any());
+        verify(groupRepository, never()).findAllActiveForFarm(any(), any(), any());
+        verify(animalRepository, never()).findAllActiveForFarm(any(), any(), any());
+        verify(enterpriseRepository, never()).findAllActiveForFarm(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("only the ledger costs and sales of the season's cycles are counted; other targets do not leak into a catch-all row")
+    void seasonCountsOnlyItsOwnMoney() {
+        seasonOfThisFarm("2026/27");
+        when(cropCycleRepository.findAllActiveForSeason(eq(TENANT), eq(seasonId), any())).thenReturn(new PageImpl<>(List.of(seasonCycle(cycleId, "Maize", "HARVESTED"))));
+        cycleCost("1000");
+        ledger(ledgerRow("CROP_CYCLE", cycleId, "LABOUR", "200"), ledgerRow("CROP_CYCLE", otherCycleId, "LABOUR", "9999"), ledgerRow("GROUP", groupId, "FUEL", "7777"));
+        sales(3, 0, new TargetRevenue("CROP_CYCLE", cycleId, bd("10"), bd("5000")), new TargetRevenue("CROP_CYCLE", otherCycleId, bd("1"), bd("8888")), new TargetRevenue("ANIMAL", animalId, bd("1"), bd("6666")));
+
+        ProfitabilityResponse p = service().farm(TENANT, farmId, seasonId);
+
+        num("5000.00", p.totals().revenue());
+        num("1200.00", p.totals().directCost());
+        assertTrue(p.units().stream().noneMatch(u -> "UNLISTED".equals(u.targetType())), "other targets must not appear as a catch-all row");
+    }
+
+    @Test
+    @DisplayName("a season report says what it leaves out, by season name")
+    void seasonNote() {
+        seasonOfThisFarm("2026/27");
+        when(cropCycleRepository.findAllActiveForSeason(eq(TENANT), eq(seasonId), any())).thenReturn(new PageImpl<>(List.of()));
+
+        List<String> notes = service().farm(TENANT, farmId, seasonId).notes();
+
+        assertTrue(notes.stream().anyMatch(n -> n.contains("Season report for 2026/27") && n.contains("Livestock and enterprises aren't tied to a season")), notes.toString());
+    }
+
+    @Test
+    @DisplayName("a whole-farm report carries no season note")
+    void noSeasonNoteForWholeFarm() {
+        assertTrue(service().farm(TENANT, farmId).notes().stream().noneMatch(n -> n.contains("Season report")));
+    }
+
+    @Test
+    @DisplayName("uncosted labour in a season report counts only that season's cycles, and uncounted sales are not claimed")
+    void seasonLabourCountsOnlyItsCycles() {
+        seasonOfThisFarm("2026/27");
+        when(cropCycleRepository.findAllActiveForSeason(eq(TENANT), eq(seasonId), any())).thenReturn(new PageImpl<>(List.of(seasonCycle(cycleId, "Maize", "GROWING"))));
+        AgInputApplication mine = mock(AgInputApplication.class), elsewhere = mock(AgInputApplication.class);
+        when(mine.getCropCycleId()).thenReturn(cycleId); when(elsewhere.getCropCycleId()).thenReturn(otherCycleId);
+        AgHarvestRecord harvestElsewhere = mock(AgHarvestRecord.class);
+        when(harvestElsewhere.getCropCycleId()).thenReturn(otherCycleId);
+        when(inputApplicationRepository.findUncostedLabourForFarm(eq(TENANT), eq(farmId), any())).thenReturn(List.of(mine, elsewhere));
+        when(harvestRecordRepository.findUncostedLabourForFarm(eq(TENANT), eq(farmId), any())).thenReturn(List.of(harvestElsewhere));
+        sales(5, 4);
+
+        List<String> notes = service().farm(TENANT, farmId, seasonId).notes();
+
+        assertTrue(notes.stream().anyMatch(n -> n.contains("1 recorded labour entry isn't costed yet")), notes.toString());
+        assertTrue(notes.stream().noneMatch(n -> n.contains("sale allocations aren't counted") || n.contains("sale allocation isn't counted")), notes.toString());
+    }
+
+    @Test
+    @DisplayName("a season of another farm, or one that does not exist, is a 404 and nothing is loaded")
+    void unknownSeason() {
+        AgSeason elsewhere = mock(AgSeason.class);
+        when(elsewhere.getFarmId()).thenReturn(UUID.randomUUID());
+        UUID otherSeason = UUID.randomUUID();
+        when(seasonRepository.findActiveById(eq(TENANT), eq(otherSeason))).thenReturn(Optional.of(elsewhere));
+
+        assertThrows(ResourceNotFoundException.class, () -> service().farm(TENANT, farmId, otherSeason));
+        assertThrows(ResourceNotFoundException.class, () -> service().farm(TENANT, farmId, UUID.randomUUID()));
 
         verifyNoInteractions(salesService, costEntryRepository, costReportingService);
     }
