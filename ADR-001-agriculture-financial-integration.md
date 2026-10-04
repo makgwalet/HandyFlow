@@ -139,4 +139,19 @@ W7 supplier/SCM, W8 weather, W9 NDVI/satellite. W7 to W9 do not block a first pr
   yet costed, sales not counted, caveated units) are counted as "cautions" and listed with the farm's name, capped at 30 with a summary; at most 50 farms, and the overview says when it is
   cut off. The Dashboard shows a "Gross margin, all farms" card between the KPIs and the Trends strip ONLY to users who hold both rights; for everyone else it is absent and no request
   is made (no "access denied" noise on a page they may read). A farm with costs but no sales yet shows its loss; only a farm with neither shows "No activity yet".
-- **Open after W6:** a PDF/print view; an all-farms CSV; a Dashboard drill-down that opens a farm's Profitability pre-selected (farm choice is local state today). W7 to W9: not started.
+- **Open after W6:** a PDF/print view; an all-farms CSV; a Dashboard drill-down that opens a farm's Profitability pre-selected (farm choice is local state today).
+- **W7 (suppliers): built, as REFERENCES (the ADR's "Supply Chain / AP, references").** `ag_stock_movements.supplier_id` and `ag_inventory_items.supplier_id` (V311, by id, deliberately no
+  foreign key into Supply Chain's tables). A read-only `SupplierFacade` in Supply Chain exposes IDENTITY ONLY (id, name, status): the supplier record also holds bank account, contact, VAT and
+  BBBEE data, and none of it crosses the boundary. **Integrity:** a receipt takes the supplier chosen for it, else the item's usual one, and either must be an ACTIVE Supply Chain supplier;
+  nothing is received from a blacklisted or inactive supplier, and a usual supplier that has since been blacklisted is NOT silently used (the receipt is refused and says so). The movement
+  ledger stays append-only: the supplier is given when the receipt is created (a factory overload), never changed. **Access:** the picker needs AGRICULTURE_MANAGE + SCM_READ (Supply
+  Chain's own right to list suppliers); spend by supplier needs AGRICULTURE_FINANCE + SCM_READ. **Spend by supplier** (`GET /farms/{id}/purchases/by-supplier`, Insights > Purchases) is
+  the cost of stock RECEIVED into Agriculture inventory (each receipt's own recorded quantity x unit cost), grouped by supplier, with a "No supplier recorded" row and an "Unknown supplier
+  (removed)" row so the rows always add up to the total; it says plainly that it is NOT Supply Chain purchase orders or invoices. The receive form now lets the user enter the unit cost
+  actually paid (it was always the item's current cost), which spend depends on. Existing items keep their typed supplier name; nothing is migrated or guessed.
+- **DECISION (W7): the stock ledger stays in Agriculture.** The ADR called Agriculture's own inventory and stock-movement ledger an interim exception "until W7". W7 does NOT migrate it into
+  Supply Chain's inventory: the existing seed, input and feed costs, the cost reports and the profitability engine are all built on it, moving it means a data migration of live stock
+  history and a change of owner for stock valuation, and none of that is needed to link receipts to suppliers. It is therefore a standing, deliberate exception, revisited only if
+  Supply Chain's inventory gains what farms need (batch/lot tracking, per-farm locations, withdrawal periods). Until then Agriculture records receipts and Supply Chain owns suppliers.
+- **Open after W7:** purchase orders and goods receipts are not linked to Agriculture receipts (so a PO raised in Supply Chain and received in Agriculture are two records); no supplier
+  performance view; no creating a supplier from Agriculture (done in Supply Chain). W8 and W9: not started.

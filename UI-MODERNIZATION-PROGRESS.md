@@ -526,3 +526,13 @@ W5 is built. **W6 to W9 are not started.**
 - Fixed on the way: an existing lint-caught bug class (a hook called conditionally) in the new card, and test gaps found by mutation checks.
 - **Open:** print/PDF; all-farms CSV; drill-down pre-selecting a farm on Profitability.
 - **Run:** `mvn test "-Dtest=Ag*Test,Fleet*Test,Fuel*Test"`, then separately `mvn test "-Dtest=HandyFlowApplicationTests,InvoicingFacadeImplTest"` (Windows paging-file shortage killed the last combined run).
+
+## Agriculture W7: suppliers (ADR-001)
+
+- **Supply Chain:** a read-only `SupplierFacade` (id, name, status only; never banking or contact details). **Agriculture:** `supplier_id` on stock movements and inventory items (V311, by id, no
+  foreign key); receipts take the chosen supplier or the item's usual one, which must be ACTIVE (a blacklisted or inactive supplier is refused; a usual supplier that was blacklisted is not silently used).
+- **UI:** the receive form gains "Unit cost paid" and a Supply Chain supplier picker; the edit form gains "Usual supplier"; Insights > Purchases shows spend by supplier (date range, CSV).
+- **Access:** picker AGRICULTURE_MANAGE + SCM_READ; spend AGRICULTURE_FINANCE + SCM_READ.
+- **Decision:** the stock ledger stays in Agriculture (a deliberate, standing exception); not migrated into Supply Chain.
+- **Open:** POs and goods receipts are not linked to Agriculture receipts; no supplier performance view.
+- **Run:** `mvn test "-Dtest=Ag*Test,Fleet*Test,Fuel*Test,SupplierFacadeImplTest"`, then separately `mvn test "-Dtest=HandyFlowApplicationTests,InvoicingFacadeImplTest"` (V311 applies on that run).
