@@ -67,6 +67,15 @@ public class TenderController {
                 tenderService.create(TenantContext.getTenantIdAsObject(), request, TenantContext.getCurrentUserId())));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
+    @Operation(summary = "Correct a tender's details (not its number or status). Refused once the tender has a final outcome")
+    public ResponseEntity<ApiResponse<TenderResponse>> update(@PathVariable UUID id, @Valid @RequestBody UpdateTenderRequest request) {
+        featureGuard.requireModule("compliancetender");
+        return ResponseEntity.ok(ApiResponse.success("Tender updated",
+                tenderService.update(TenantContext.getTenantIdAsObject(), id, request, TenantContext.getCurrentUserId())));
+    }
+
     @PostMapping("/{id}/transition")
     @PreAuthorize("hasAnyAuthority('COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
     @Operation(summary = "Move a tender to the next lifecycle status (DRAFT -> ... -> SUBMITTED -> ...)")
@@ -114,6 +123,25 @@ public class TenderController {
         featureGuard.requireModule("compliancetender");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Requirement added",
                 tenderService.addRequirement(TenantContext.getTenantIdAsObject(), id, request, TenantContext.getCurrentUserId())));
+    }
+
+    @PutMapping("/requirements/{requirementId}")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
+    @Operation(summary = "Reword a custom requirement line while the tender is being prepared")
+    public ResponseEntity<ApiResponse<TenderRequirementResponse>> renameRequirement(
+            @PathVariable UUID requirementId, @Valid @RequestBody UpdateTenderRequirementRequest request) {
+        featureGuard.requireModule("compliancetender");
+        return ResponseEntity.ok(ApiResponse.success("Requirement updated",
+                tenderService.renameRequirement(TenantContext.getTenantIdAsObject(), requirementId, request, TenantContext.getCurrentUserId())));
+    }
+
+    @DeleteMapping("/requirements/{requirementId}")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
+    @Operation(summary = "Remove a requirement line while the tender is being prepared")
+    public ResponseEntity<ApiResponse<Void>> removeRequirement(@PathVariable UUID requirementId) {
+        featureGuard.requireModule("compliancetender");
+        tenderService.removeRequirement(TenantContext.getTenantIdAsObject(), requirementId);
+        return ResponseEntity.ok(ApiResponse.success("Requirement removed", null));
     }
 
     @PutMapping("/requirements/{requirementId}/status")

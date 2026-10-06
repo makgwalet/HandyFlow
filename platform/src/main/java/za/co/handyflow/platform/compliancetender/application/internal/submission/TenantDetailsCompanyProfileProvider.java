@@ -34,9 +34,11 @@ public class TenantDetailsCompanyProfileProvider implements CompanyProfileProvid
         if (d.address() != null && !d.address().isEmpty()) {
             add(lines, "Address", String.join(", ", d.address().values().stream().filter(v -> v != null && !v.isBlank()).toList()));
         }
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg"));
         List<String> regs = new ArrayList<>();
         for (ComplianceRegistration r : registrations.findAllForTenant(tenantId)) {
             if (!"ACTIVE".equals(r.getStatus())) continue; // only what is in force goes in front of an evaluator
+            if (r.getExpiryDate() != null && r.getExpiryDate().isBefore(today)) continue; // the nightly expiry job may not have run yet
             String number = r.getRegistrationNumber() == null || r.getRegistrationNumber().isBlank() ? "Registered" : r.getRegistrationNumber().trim();
             String valid = r.getExpiryDate() == null ? "" : "  (valid until " + r.getExpiryDate().format(DAY) + ")";
             regs.add(r.getAuthority() + " " + r.getRegistrationType() + ": " + number + valid);

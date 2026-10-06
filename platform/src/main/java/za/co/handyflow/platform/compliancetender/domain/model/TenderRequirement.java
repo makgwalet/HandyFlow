@@ -77,6 +77,13 @@ public class TenderRequirement {
         return r;
     }
 
+    public void rename(String description, UUID updatedBy) {
+        if (description == null || description.isBlank()) throw new IllegalArgumentException("description is required");
+        this.description = description.trim();
+        this.updatedAt = Instant.now();
+        this.updatedBy = updatedBy;
+    }
+
     public void setStatus(String status, UUID updatedBy) {
         this.status = status;
         this.updatedAt = Instant.now();

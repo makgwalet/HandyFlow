@@ -11,6 +11,10 @@ import za.co.handyflow.platform.compliancetender.domain.repository.TenderRequire
 import za.co.handyflow.platform.compliancetender.dto.CreateTenderRequest;
 import za.co.handyflow.platform.compliancetender.dto.CreateTenderRequirementRequest;
 import za.co.handyflow.platform.compliancetender.dto.TransitionTenderRequest;
+import za.co.handyflow.platform.compliancetender.dto.UpdateTenderRequest;
+import za.co.handyflow.platform.compliancetender.dto.UpdateTenderRequirementRequest;
+import za.co.handyflow.platform.compliancetender.domain.model.TenderRequirement;
+import java.util.List;
 import za.co.handyflow.platform.identity.TenantNumberingFacade;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
@@ -154,5 +158,100 @@ class TenderServiceTest {
 
         assertThat(response.complianceRequirementId()).isNull();
         verifyNoInteractions(catalogueRepository);
+    }
+
+    // ---- correcting a tender and its requirement matrix ---------------------------------------------------------------------
+
+    private Tender tenderWith(UUID tenderId, String... statusPath) {
+        Tender tender = Tender.create(TENANT, "TND-00001", "Test Tender", null, null, null, null, null, null, null, null, USER);
+        for (String s : statusPath) tender.transitionTo(s, USER);
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(tender));
+        return tender;
+    }
+
+    private static UpdateTenderRequest edit(String name) {
+        return new UpdateTenderRequest(name, " SANRAL ", "", java.time.LocalDate.of(2026, 12, 21), null, null, null, "Construction", null);
+    }
+
+    @Test
+    @DisplayName("update() corrects the details, trims text and turns blanks into nothing")
+    void update_changesDetails() {
+        UUID tenderId = UUID.randomUUID();
+        Tender tender = tenderWith(tenderId);
+
+        var response = service().update(TENANT, tenderId, edit("  New name "), USER);
+
+        assertThat(response.name()).isEqualTo("New name");
+        assertThat(tender.getTenderAuthority()).isEqualTo("SANRAL");
+        assertThat(tender.getAuthorityReferenceNumber()).isNull();
+        assertThat(tender.getClosingDate()).isEqualTo(java.time.LocalDate.of(2026, 12, 21));
+        assertThat(response.tenderNumber()).isEqualTo("TND-00001");
+        assertThat(response.status()).isEqualTo("DRAFT");
+    }
+
+    @Test
+    @DisplayName("update() is refused once the tender has a final outcome, and a blank name is refused")
+    void update_refusedWhenClosedOrNameBlank() {
+        UUID closed = UUID.randomUUID(), open = UUID.randomUUID();
+        tenderWith(closed, "WITHDRAWN");
+        tenderWith(open);
+
+        assertThatThrownBy(() -> service().update(TENANT, closed, edit("x"), USER)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service().update(TENANT, open, edit("  "), USER)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("addRequirement() refuses the same tracked requirement, or the same wording, twice")
+    void addRequirement_duplicateRefused() {
+        UUID tenderId = existingTender(), trackedId = UUID.randomUUID();
+        when(catalogueRepository.findByIdForTenant(TENANT, trackedId)).thenReturn(Optional.of(ComplianceRequirement.create(TENANT, "CIPC_REG", "CIPC", null, null, true, USER)));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(
+                TenderRequirement.create(TENANT, tenderId, trackedId, "Company registered with CIPC", "COMPLIANCE", USER),
+                TenderRequirement.create(TENANT, tenderId, null, "Attended briefing", "MANUAL", USER)));
+
+        assertThatThrownBy(() -> service().addRequirement(TENANT, tenderId, new CreateTenderRequirementRequest(trackedId, "Company registered with CIPC", "COMPLIANCE"), USER))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("already on this tender");
+        assertThatThrownBy(() -> service().addRequirement(TENANT, tenderId, new CreateTenderRequirementRequest(null, "  attended BRIEFING ", "MANUAL"), USER))
+                .isInstanceOf(IllegalStateException.class);
+        verify(requirementRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("removeRequirement() deletes while preparing and is refused after submission")
+    void removeRequirement_onlyWhilePreparing() {
+        UUID preparing = UUID.randomUUID(), submitted = UUID.randomUUID();
+        tenderWith(preparing, "IN_PREPARATION");
+        tenderWith(submitted, "IN_PREPARATION", "INTERNAL_REVIEW", "READY_TO_SUBMIT", "SUBMITTED");
+        TenderRequirement a = TenderRequirement.create(TENANT, preparing, null, "A", "MANUAL", USER);
+        TenderRequirement b = TenderRequirement.create(TENANT, submitted, null, "B", "MANUAL", USER);
+        when(requirementRepository.findByIdForTenant(TENANT, a.getId())).thenReturn(Optional.of(a));
+        when(requirementRepository.findByIdForTenant(TENANT, b.getId())).thenReturn(Optional.of(b));
+
+        service().removeRequirement(TENANT, a.getId());
+        verify(requirementRepository).delete(a);
+
+        assertThatThrownBy(() -> service().removeRequirement(TENANT, b.getId())).isInstanceOf(IllegalStateException.class);
+        verify(requirementRepository, never()).delete(b);
+    }
+
+    @Test
+    @DisplayName("renameRequirement() rewords a custom line, refuses a tracked one and a clash with another line")
+    void renameRequirement_rules() {
+        UUID tenderId = UUID.randomUUID();
+        tenderWith(tenderId);
+        TenderRequirement custom = TenderRequirement.create(TENANT, tenderId, null, "Old wording", "MANUAL", USER);
+        TenderRequirement other = TenderRequirement.create(TENANT, tenderId, null, "Other line", "MANUAL", USER);
+        TenderRequirement tracked = TenderRequirement.create(TENANT, tenderId, UUID.randomUUID(), "Tracked line", "COMPLIANCE", USER);
+        when(requirementRepository.findByIdForTenant(TENANT, custom.getId())).thenReturn(Optional.of(custom));
+        when(requirementRepository.findByIdForTenant(TENANT, tracked.getId())).thenReturn(Optional.of(tracked));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(custom, other));
+
+        assertThatThrownBy(() -> service().renameRequirement(TENANT, tracked.getId(), new UpdateTenderRequirementRequest("x"), USER))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("tracked requirements");
+        assertThatThrownBy(() -> service().renameRequirement(TENANT, custom.getId(), new UpdateTenderRequirementRequest("other LINE"), USER))
+                .isInstanceOf(IllegalStateException.class);
+
+        var response = service().renameRequirement(TENANT, custom.getId(), new UpdateTenderRequirementRequest("  New wording "), USER);
+        assertThat(response.description()).isEqualTo("New wording");
     }
 }

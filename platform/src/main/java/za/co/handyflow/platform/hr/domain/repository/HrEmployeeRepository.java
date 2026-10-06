@@ -20,6 +20,7 @@ public interface HrEmployeeRepository extends JpaRepository<HrEmployee, UUID> {
     AND (CAST(:search AS string) IS NULL
          OR LOWER(e.firstName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
          OR LOWER(e.lastName)  LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+         OR LOWER(CONCAT(e.firstName, ' ', e.lastName)) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
          OR e.employeeNumber   LIKE CONCAT('%', CAST(:search AS string), '%'))
     ORDER BY e.lastName, e.firstName
     """)

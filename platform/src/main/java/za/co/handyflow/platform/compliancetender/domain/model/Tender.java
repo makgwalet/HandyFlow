@@ -164,6 +164,33 @@ public class Tender {
         this.awardedValue = awardedValue;
     }
 
+    private static final java.util.Set<String> CLOSED = java.util.Set.of("AWARDED", "UNSUCCESSFUL", "WITHDRAWN");
+    private static final java.util.Set<String> PREPARING = java.util.Set.of("DRAFT", "IN_PREPARATION", "INTERNAL_REVIEW", "READY_TO_SUBMIT");
+
+    /** Details can be corrected until the tender has reached a final outcome. The tender number and status are never changed here. */
+    public void updateDetails(String name, String tenderAuthority, String authorityReferenceNumber, LocalDate closingDate,
+                              LocalDate briefingDate, LocalDate siteInspectionDate, BigDecimal estimatedValue, String industry,
+                              String requiredClassOfWork, UUID updatedBy) {
+        if (CLOSED.contains(status)) throw new IllegalStateException("A " + status.toLowerCase() + " tender can no longer be edited.");
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("name is required");
+        this.name = name.trim();
+        this.tenderAuthority = blankToNull(tenderAuthority);
+        this.authorityReferenceNumber = blankToNull(authorityReferenceNumber);
+        this.closingDate = closingDate;
+        this.briefingDate = briefingDate;
+        this.siteInspectionDate = siteInspectionDate;
+        this.estimatedValue = estimatedValue;
+        this.industry = blankToNull(industry);
+        this.requiredClassOfWork = blankToNull(requiredClassOfWork);
+        this.updatedAt = Instant.now();
+        this.updatedBy = updatedBy;
+    }
+
+    /** The requirement matrix is changed only while the tender is still being prepared; after that it is the record of what was submitted. */
+    public boolean isPreparing() { return PREPARING.contains(status); }
+
+    private static String blankToNull(String s) { return s == null || s.isBlank() ? null : s.trim(); }
+
     public boolean isSubmitted() { return submittedAt != null; }
 
     @PreUpdate

@@ -57,6 +57,16 @@ public class TenderService {
     }
 
     @Transactional
+    public TenderResponse update(TenantId tenantId, UUID id, UpdateTenderRequest req, UUID updatedBy) {
+        Tender tender = find(tenantId, id);
+        tender.updateDetails(req.name(), req.tenderAuthority(), req.authorityReferenceNumber(), req.closingDate(), req.briefingDate(),
+                req.siteInspectionDate(), req.estimatedValue(), req.industry(), req.requiredClassOfWork(), updatedBy);
+        tenderRepository.save(tender);
+        log.info("Tender updated id={} tenant={}", id, tenantId);
+        return toResponse(tender);
+    }
+
+    @Transactional
     public TenderResponse transition(TenantId tenantId, UUID id, TransitionTenderRequest req, UUID updatedBy) {
         Tender tender = find(tenantId, id);
         tender.transitionTo(req.newStatus(), updatedBy);
@@ -100,6 +110,12 @@ public class TenderService {
             catalogueRepository.findByIdForTenant(tenantId, req.complianceRequirementId())
                     .orElseThrow(() -> new IllegalArgumentException("That requirement is not one of your tracked requirements"));
         }
+        for (TenderRequirement existing : requirementRepository.findByTender(tenantId, tenderId)) {
+            boolean sameTracked = req.complianceRequirementId() != null && req.complianceRequirementId().equals(existing.getComplianceRequirementId());
+            boolean sameText = existing.getDescription() != null && req.description() != null
+                    && existing.getDescription().trim().equalsIgnoreCase(req.description().trim());
+            if (sameTracked || sameText) throw new IllegalStateException("\"" + existing.getDescription() + "\" is already on this tender.");
+        }
         TenderRequirement requirement = TenderRequirement.create(tenantId, tenderId, req.complianceRequirementId(),
                 req.description(), req.source(), createdBy);
         requirementRepository.save(requirement);
@@ -114,6 +130,40 @@ public class TenderService {
         requirement.setStatus(req.status(), updatedBy);
         requirementRepository.save(requirement);
         return toResponse(requirement);
+    }
+
+    @Transactional
+    public TenderRequirementResponse renameRequirement(TenantId tenantId, UUID requirementId, UpdateTenderRequirementRequest req, UUID updatedBy) {
+        TenderRequirement requirement = requirementFor(tenantId, requirementId);
+        if (requirement.getComplianceRequirementId() != null) {
+            throw new IllegalStateException("This line comes from your tracked requirements. Change its wording under Requirements, or remove it and add a custom line.");
+        }
+        for (TenderRequirement other : requirementRepository.findByTender(tenantId, requirement.getTenderId())) {
+            if (!other.getId().equals(requirement.getId()) && other.getDescription() != null
+                    && other.getDescription().trim().equalsIgnoreCase(req.description().trim())) {
+                throw new IllegalStateException("\"" + other.getDescription() + "\" is already on this tender.");
+            }
+        }
+        requirement.rename(req.description(), updatedBy);
+        requirementRepository.save(requirement);
+        return toResponse(requirement);
+    }
+
+    @Transactional
+    public void removeRequirement(TenantId tenantId, UUID requirementId) {
+        TenderRequirement requirement = requirementFor(tenantId, requirementId);
+        requirementRepository.delete(requirement);
+        log.info("Tender requirement removed id={} tender={} tenant={}", requirementId, requirement.getTenderId(), tenantId);
+    }
+
+    /** The requirement, only if its tender is still being prepared: once submitted the matrix is the record of what was submitted. */
+    private TenderRequirement requirementFor(TenantId tenantId, UUID requirementId) {
+        TenderRequirement requirement = requirementRepository.findByIdForTenant(tenantId, requirementId)
+                .orElseThrow(() -> new ResourceNotFoundException("TenderRequirement", requirementId.toString()));
+        if (!find(tenantId, requirement.getTenderId()).isPreparing()) {
+            throw new IllegalStateException("The requirement matrix can only be changed while the tender is being prepared.");
+        }
+        return requirement;
     }
 
     private Tender find(TenantId tenantId, UUID id) {
