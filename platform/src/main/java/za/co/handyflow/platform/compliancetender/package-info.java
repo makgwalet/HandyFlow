@@ -66,8 +66,11 @@
  * P&amp;L summary, which is what a tender's financial-requirements
  * section would actually need. Its existence doesn't mean the reference
  * is ready; what it exposes matters more than whether it exists.
+ *
+ * <p>{@code businessreadiness} (added ADR-003) is a PURE logic module (no entities, no repositories): the shared evaluator that judges a requirement against the
+ * registrations and documents a business holds. This module maps its own entities to its neutral facts and calls it. The client side (complianceservices) calls the same evaluator, so the tenant and a client are judged identically.
  */
-@ApplicationModule(allowedDependencies = {"shared", "identity", "evidence", "billing", "notifications", "hr"})
+@ApplicationModule(allowedDependencies = {"shared", "identity", "evidence", "billing", "notifications", "hr", "businessreadiness"})
 package za.co.handyflow.platform.compliancetender;
 
 import org.springframework.modulith.ApplicationModule;

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.compliancetender.domain.model.Tender;
@@ -73,7 +74,13 @@ public class TenderSnapshotService {
 
         TenderSubmissionSnapshot snapshot = TenderSubmissionSnapshot.create(
                 tenantId, tenderId, snapshotNumber, json, submittedBy);
-        snapshotRepository.save(snapshot);
+        try {
+            snapshotRepository.saveAndFlush(snapshot);
+        } catch (DataIntegrityViolationException e) {
+            // Another request captured snapshot #N for this tender between our count and our insert, and the unique index (tender_id, snapshot_number) refused
+            // the duplicate. The submission is rolled back with it (it all happens in one transaction), so nothing is half done: say so as a conflict (409), not a 500.
+            throw new IllegalStateException("This tender was submitted by someone else at the same moment. Reload it to see its current status.", e);
+        }
 
         log.info("Tender submission snapshot captured tender={} snapshotNumber={} requirements={} personnel={} tenant={}",
                 tenderId, snapshotNumber, requirements.size(), personnel.size(), tenantId);

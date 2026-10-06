@@ -12,6 +12,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.businessreadiness.ReadinessAssessment;
+import za.co.handyflow.platform.compliancetender.application.internal.TenderReadinessService;
 import za.co.handyflow.platform.compliancetender.application.internal.TenderService;
 import za.co.handyflow.platform.compliancetender.application.internal.TenderPersonnelService;
 import za.co.handyflow.platform.compliancetender.application.internal.TenderSnapshotService;
@@ -33,6 +35,7 @@ public class TenderController {
     private final TenderPersonnelService personnelService;
     private final TenderSnapshotService snapshotService;
     private final TenderPdfService pdfService;
+    private final TenderReadinessService readinessService;
     private final FeatureGuard featureGuard;
 
     @GetMapping
@@ -90,6 +93,16 @@ public class TenderController {
         featureGuard.requireModule("compliancetender");
         return ResponseEntity.ok(ApiResponse.success(
                 tenderService.getRequirements(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/{id}/readiness")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_READ','COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
+    @Operation(summary = "Judge this tender's requirements against the registrations and documents the business holds",
+            description = "Read-only. Compares each requirement's evidence rule with the business's own records as of the closing date (or today if none) and reports "
+                    + "met, missing, expired, pending or not evaluated, plus where the evidence disagrees with the status you set. It never changes a requirement's status.")
+    public ResponseEntity<ApiResponse<ReadinessAssessment>> getReadiness(@PathVariable UUID id) {
+        featureGuard.requireModule("compliancetender");
+        return ResponseEntity.ok(ApiResponse.success(readinessService.assess(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @PostMapping("/{id}/requirements")

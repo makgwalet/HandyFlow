@@ -17,6 +17,8 @@ import za.co.handyflow.platform.complianceservices.application.internal.ClientTe
 import za.co.handyflow.platform.complianceservices.application.internal.ClientTenderPersonnelService;
 import za.co.handyflow.platform.complianceservices.application.internal.ClientTenderPdfService;
 import za.co.handyflow.platform.complianceservices.dto.*;
+import za.co.handyflow.platform.businessreadiness.ReadinessAssessment;
+import za.co.handyflow.platform.complianceservices.application.internal.ClientTenderReadinessService;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
@@ -33,6 +35,7 @@ public class ClientTenderController {
     private final ClientTenderSnapshotService snapshotService;
     private final ClientTenderPersonnelService personnelService;
     private final ClientTenderPdfService pdfService;
+    private final ClientTenderReadinessService readinessService;
     private final FeatureGuard featureGuard;
 
     @GetMapping("/clients/{clientId}/tenders")
@@ -87,6 +90,16 @@ public class ClientTenderController {
         featureGuard.requireModule("complianceservices");
         return ResponseEntity.ok(ApiResponse.success(
                 tenderService.getRequirements(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/tenders/{id}/readiness")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_SERVICES_READ','COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')")
+    @Operation(summary = "Judge this client tender's requirements against the registrations and documents the CLIENT holds",
+            description = "Read-only. The same rules as for your own tenders, applied to the client's own records as of the closing date (or today if none). "
+                    + "It never changes a requirement's status.")
+    public ResponseEntity<ApiResponse<ReadinessAssessment>> getReadiness(@PathVariable UUID id) {
+        featureGuard.requireModule("complianceservices");
+        return ResponseEntity.ok(ApiResponse.success(readinessService.assess(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @PostMapping("/tenders/{id}/requirements")

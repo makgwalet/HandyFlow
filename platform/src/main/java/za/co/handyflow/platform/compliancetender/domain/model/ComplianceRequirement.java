@@ -46,6 +46,14 @@ public class ComplianceRequirement {
     @Column(name = "evidence_type")
     private String evidenceType; // expected ComplianceDocument.documentType this requirement is satisfied by
 
+    /** The registration authority that satisfies this requirement (blank = any). Matched case-insensitively against the business's registrations. */
+    @Column(name = "satisfied_by_authority")
+    private String satisfiedByAuthority;
+
+    /** The registration type that satisfies this requirement (blank = any). */
+    @Column(name = "satisfied_by_registration_type")
+    private String satisfiedByRegistrationType;
+
     @Column(nullable = false)
     private boolean required = true;
 
@@ -66,7 +74,16 @@ public class ComplianceRequirement {
 
     public static ComplianceRequirement create(TenantId tenantId, String code, String name, String appliesTo,
                                                 String evidenceType, boolean required, UUID createdBy) {
+        return create(tenantId, code, name, appliesTo, evidenceType, required, null, null, createdBy);
+    }
+
+    /** As above, with the registration that satisfies the requirement. */
+    public static ComplianceRequirement create(TenantId tenantId, String code, String name, String appliesTo,
+                                                String evidenceType, boolean required,
+                                                String satisfiedByAuthority, String satisfiedByRegistrationType, UUID createdBy) {
         ComplianceRequirement r = new ComplianceRequirement();
+        r.satisfiedByAuthority = clean(satisfiedByAuthority);
+        r.satisfiedByRegistrationType = clean(satisfiedByRegistrationType);
         r.tenantId = tenantId;
         r.code = code != null ? code.toUpperCase() : null;
         r.name = name;
@@ -91,7 +108,15 @@ public class ComplianceRequirement {
      */
     public ComplianceRequirement newVersion(String name, String appliesTo, String evidenceType,
                                             boolean required, UUID createdBy) {
+        return newVersion(name, appliesTo, evidenceType, required, this.satisfiedByAuthority, this.satisfiedByRegistrationType, createdBy);   // keeps the existing rule
+    }
+
+    /** As above, with the registration rule given explicitly (null clears it). */
+    public ComplianceRequirement newVersion(String name, String appliesTo, String evidenceType, boolean required,
+                                            String satisfiedByAuthority, String satisfiedByRegistrationType, UUID createdBy) {
         ComplianceRequirement next = new ComplianceRequirement();
+        next.satisfiedByAuthority = clean(satisfiedByAuthority);
+        next.satisfiedByRegistrationType = clean(satisfiedByRegistrationType);
         next.tenantId = this.tenantId;
         next.code = this.code;
         next.name = name;
@@ -108,4 +133,6 @@ public class ComplianceRequirement {
 
     @PreUpdate
     void onUpdate() { this.updatedAt = Instant.now(); }
+
+    private static String clean(String s) { return s == null || s.isBlank() ? null : s.trim(); }
 }

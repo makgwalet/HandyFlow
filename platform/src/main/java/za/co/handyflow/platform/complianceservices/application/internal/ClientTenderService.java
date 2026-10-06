@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.complianceservices.domain.model.ClientTender;
 import za.co.handyflow.platform.complianceservices.domain.model.ClientTenderRequirement;
+import za.co.handyflow.platform.complianceservices.domain.repository.ClientComplianceRequirementRepository;
 import za.co.handyflow.platform.complianceservices.domain.repository.ClientTenderRepository;
 import za.co.handyflow.platform.complianceservices.domain.repository.ClientTenderRequirementRepository;
 import za.co.handyflow.platform.complianceservices.domain.repository.ComplianceClientRepository;
@@ -43,6 +44,7 @@ public class ClientTenderService {
     private final ComplianceClientRepository clientRepository;
     private final TenantNumberingFacade numberingFacade;
     private final ClientTenderSnapshotService snapshotService;
+    private final ClientComplianceRequirementRepository catalogueRepository;
 
     @Transactional(readOnly = true)
     public Page<ClientTenderResponse> getTenders(TenantId tenantId, UUID clientId, String status, Pageable pageable) {
@@ -99,7 +101,13 @@ public class ClientTenderService {
     @Transactional
     public ClientTenderRequirementResponse addRequirement(TenantId tenantId, UUID clientTenderId,
                                                            CreateClientTenderRequirementRequest req, UUID createdBy) {
-        find(tenantId, clientTenderId);
+        ClientTender tender = find(tenantId, clientTenderId);
+        // the foreign key only proves the row exists: check it is a tracked requirement of THIS client (same tenant, same client) before attaching it
+        if (req.clientRequirementId() != null) {
+            catalogueRepository.findByIdForTenant(tenantId, req.clientRequirementId())
+                    .filter(c -> tender.getClientId().equals(c.getClientId()))
+                    .orElseThrow(() -> new IllegalArgumentException("That requirement is not one of this client's tracked requirements"));
+        }
         ClientTenderRequirement requirement = ClientTenderRequirement.create(tenantId, clientTenderId,
                 req.clientRequirementId(), req.description(), req.source(), createdBy);
         requirementRepository.save(requirement);

@@ -67,7 +67,8 @@ public class ClientComplianceRequirementService {
                     HttpStatus.CONFLICT, "REQUIREMENT_CODE_ALREADY_EXISTS");
         });
         ClientComplianceRequirement requirement = ClientComplianceRequirement.create(tenantId, clientId, req.code(),
-                req.name(), req.appliesTo(), req.evidenceType(), req.required(), createdBy);
+                req.name(), req.appliesTo(), req.evidenceType(), req.required(),
+                req.satisfiedByAuthority(), req.satisfiedByRegistrationType(), createdBy);
         requirementRepository.save(requirement);
         log.info("Client compliance requirement created id={} client={} code={} tenant={}",
                 requirement.getId(), clientId, requirement.getCode(), tenantId);
@@ -86,7 +87,10 @@ public class ClientComplianceRequirementService {
                             + " is now the latest — refresh and create the new version from the current one",
                     HttpStatus.CONFLICT, "NOT_LATEST_VERSION");
         }
-        ClientComplianceRequirement next = current.newVersion(req.name(), req.appliesTo(), req.evidenceType(), req.required(), createdBy);
+        // a request that leaves the rule fields out (null) KEEPS the existing rule, so an older client cannot wipe it by accident; a blank value clears it
+        ClientComplianceRequirement next = current.newVersion(req.name(), req.appliesTo(), req.evidenceType(), req.required(),
+                req.satisfiedByAuthority() != null ? req.satisfiedByAuthority() : current.getSatisfiedByAuthority(),
+                req.satisfiedByRegistrationType() != null ? req.satisfiedByRegistrationType() : current.getSatisfiedByRegistrationType(), createdBy);
         requirementRepository.save(next);
         log.info("Client compliance requirement new version created code={} version={} tenant={}",
                 next.getCode(), next.getRequirementVersion(), tenantId);
@@ -105,6 +109,7 @@ public class ClientComplianceRequirementService {
 
     private ClientComplianceRequirementResponse toResponse(ClientComplianceRequirement r) {
         return new ClientComplianceRequirementResponse(r.getId(), r.getClientId(), r.getCode(), r.getName(),
-                r.getAppliesTo(), r.getEvidenceType(), r.isRequired(), r.getRequirementVersion(), r.getCreatedAt());
+                r.getAppliesTo(), r.getEvidenceType(), r.isRequired(), r.getRequirementVersion(), r.getCreatedAt(),
+                r.getSatisfiedByAuthority(), r.getSatisfiedByRegistrationType());
     }
 }

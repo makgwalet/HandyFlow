@@ -5,5 +5,6 @@ import java.util.UUID;
 
 public record ComplianceRequirementResponse(
         UUID id, String code, String name, String appliesTo, String evidenceType,
-        boolean required, int requirementVersion, Instant createdAt
+        boolean required, int requirementVersion, Instant createdAt,
+        String satisfiedByAuthority, String satisfiedByRegistrationType    // the registration that satisfies it; the document that satisfies it is evidenceType
 ) {}

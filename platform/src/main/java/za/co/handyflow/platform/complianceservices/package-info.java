@@ -74,8 +74,11 @@
  * the actual data-model decision was made, and the dependency is
  * correctly never declared rather than added speculatively to match a
  * plan that didn't hold up.
+ *
+ * <p>{@code businessreadiness} (added ADR-003) is a PURE logic module (no entities, no repositories): the shared evaluator that judges a requirement against the
+ * registrations and documents a business holds. This module maps its own entities to its neutral facts and calls it. It does not change the parallel-entity decision below: {@code ClientTender} and the rest stay their own entities, and this module still never references {@code compliancetender}'s Java code; only the RULES are shared.
  */
-@ApplicationModule(allowedDependencies = {"shared", "crm", "evidence", "identity", "hr"})
+@ApplicationModule(allowedDependencies = {"shared", "crm", "evidence", "identity", "hr", "businessreadiness"})
 package za.co.handyflow.platform.complianceservices;
 
 import org.springframework.modulith.ApplicationModule;

@@ -48,6 +48,14 @@ public class ClientComplianceRequirement {
     @Column(name = "evidence_type")
     private String evidenceType;
 
+    /** The registration authority that satisfies this requirement (blank = any). Matched case-insensitively against the business's registrations. */
+    @Column(name = "satisfied_by_authority")
+    private String satisfiedByAuthority;
+
+    /** The registration type that satisfies this requirement (blank = any). */
+    @Column(name = "satisfied_by_registration_type")
+    private String satisfiedByRegistrationType;
+
     @Column(nullable = false)
     private boolean required = true;
 
@@ -69,7 +77,16 @@ public class ClientComplianceRequirement {
     public static ClientComplianceRequirement create(TenantId tenantId, UUID clientId, String code, String name,
                                                       String appliesTo, String evidenceType, boolean required,
                                                       UUID createdBy) {
+        return create(tenantId, clientId, code, name, appliesTo, evidenceType, required, null, null, createdBy);
+    }
+
+    /** As above, with the registration that satisfies the requirement. */
+    public static ClientComplianceRequirement create(TenantId tenantId, UUID clientId, String code, String name,
+                                                      String appliesTo, String evidenceType, boolean required,
+                                                      String satisfiedByAuthority, String satisfiedByRegistrationType, UUID createdBy) {
         ClientComplianceRequirement r = new ClientComplianceRequirement();
+        r.satisfiedByAuthority = clean(satisfiedByAuthority);
+        r.satisfiedByRegistrationType = clean(satisfiedByRegistrationType);
         r.tenantId = tenantId;
         r.clientId = clientId;
         r.code = code != null ? code.toUpperCase() : null;
@@ -87,7 +104,15 @@ public class ClientComplianceRequirement {
 
     public ClientComplianceRequirement newVersion(String name, String appliesTo, String evidenceType,
                                                    boolean required, UUID createdBy) {
+        return newVersion(name, appliesTo, evidenceType, required, this.satisfiedByAuthority, this.satisfiedByRegistrationType, createdBy);   // keeps the existing rule
+    }
+
+    /** As above, with the registration rule given explicitly (null clears it). */
+    public ClientComplianceRequirement newVersion(String name, String appliesTo, String evidenceType, boolean required,
+                                                   String satisfiedByAuthority, String satisfiedByRegistrationType, UUID createdBy) {
         ClientComplianceRequirement next = new ClientComplianceRequirement();
+        next.satisfiedByAuthority = clean(satisfiedByAuthority);
+        next.satisfiedByRegistrationType = clean(satisfiedByRegistrationType);
         next.tenantId = this.tenantId;
         next.clientId = this.clientId;
         next.code = this.code;
@@ -105,4 +130,6 @@ public class ClientComplianceRequirement {
 
     @PreUpdate
     void onUpdate() { this.updatedAt = Instant.now(); }
+
+    private static String clean(String s) { return s == null || s.isBlank() ? null : s.trim(); }
 }

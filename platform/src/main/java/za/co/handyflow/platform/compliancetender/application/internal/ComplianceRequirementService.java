@@ -78,7 +78,7 @@ public class ComplianceRequirementService {
                     HttpStatus.CONFLICT, "REQUIREMENT_CODE_ALREADY_EXISTS");
         });
         ComplianceRequirement requirement = ComplianceRequirement.create(tenantId, req.code(), req.name(),
-                req.appliesTo(), req.evidenceType(), req.required(), createdBy);
+                req.appliesTo(), req.evidenceType(), req.required(), req.satisfiedByAuthority(), req.satisfiedByRegistrationType(), createdBy);
         requirementRepository.save(requirement);
         log.info("Compliance requirement created id={} code={} tenant={}", requirement.getId(), requirement.getCode(), tenantId);
         return toResponse(requirement);
@@ -97,7 +97,10 @@ public class ComplianceRequirementService {
                             + " is now the latest — refresh and create the new version from the current one",
                     HttpStatus.CONFLICT, "NOT_LATEST_VERSION");
         }
-        ComplianceRequirement next = current.newVersion(req.name(), req.appliesTo(), req.evidenceType(), req.required(), createdBy);
+        // a request that leaves the rule fields out (null) KEEPS the existing rule, so an older client cannot wipe it by accident; a blank value clears it
+        ComplianceRequirement next = current.newVersion(req.name(), req.appliesTo(), req.evidenceType(), req.required(),
+                req.satisfiedByAuthority() != null ? req.satisfiedByAuthority() : current.getSatisfiedByAuthority(),
+                req.satisfiedByRegistrationType() != null ? req.satisfiedByRegistrationType() : current.getSatisfiedByRegistrationType(), createdBy);
         requirementRepository.save(next);
         log.info("Compliance requirement new version created code={} version={} tenant={}", next.getCode(), next.getRequirementVersion(), tenantId);
         return toResponse(next);
@@ -110,6 +113,7 @@ public class ComplianceRequirementService {
 
     private ComplianceRequirementResponse toResponse(ComplianceRequirement r) {
         return new ComplianceRequirementResponse(r.getId(), r.getCode(), r.getName(), r.getAppliesTo(),
-                r.getEvidenceType(), r.isRequired(), r.getRequirementVersion(), r.getCreatedAt());
+                r.getEvidenceType(), r.isRequired(), r.getRequirementVersion(), r.getCreatedAt(),
+                r.getSatisfiedByAuthority(), r.getSatisfiedByRegistrationType());
     }
 }

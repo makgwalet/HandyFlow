@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.compliancetender.domain.model.Tender;
 import za.co.handyflow.platform.compliancetender.domain.model.TenderRequirement;
+import za.co.handyflow.platform.compliancetender.domain.repository.ComplianceRequirementRepository;
 import za.co.handyflow.platform.compliancetender.domain.repository.TenderRepository;
 import za.co.handyflow.platform.compliancetender.domain.repository.TenderRequirementRepository;
 import za.co.handyflow.platform.compliancetender.dto.*;
@@ -32,6 +33,7 @@ public class TenderService {
     private final TenderRequirementRepository requirementRepository;
     private final TenantNumberingFacade numberingFacade;
     private final TenderSnapshotService snapshotService;
+    private final ComplianceRequirementRepository catalogueRepository;
 
     @Transactional(readOnly = true)
     public Page<TenderResponse> getTenders(TenantId tenantId, String status, Pageable pageable) {
@@ -93,6 +95,11 @@ public class TenderService {
     public TenderRequirementResponse addRequirement(TenantId tenantId, UUID tenderId,
                                                      CreateTenderRequirementRequest req, UUID createdBy) {
         find(tenantId, tenderId);
+        // the foreign key only proves the row exists, not that it is THIS tenant's: check it is one of your own tracked requirements before attaching it
+        if (req.complianceRequirementId() != null) {
+            catalogueRepository.findByIdForTenant(tenantId, req.complianceRequirementId())
+                    .orElseThrow(() -> new IllegalArgumentException("That requirement is not one of your tracked requirements"));
+        }
         TenderRequirement requirement = TenderRequirement.create(tenantId, tenderId, req.complianceRequirementId(),
                 req.description(), req.source(), createdBy);
         requirementRepository.save(requirement);

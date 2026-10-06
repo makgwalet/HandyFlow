@@ -33,7 +33,6 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.net.URL;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
@@ -161,15 +160,18 @@ public class TenderPdfService {
 
     // Confirmed gotcha (see the PDF generation skill): logoUrl is a data:
     // URI, not a real HTTP(S) URL — loading it as a URL directly fails.
-    private byte[] decodeLogoBytes(String logoUrl) throws Exception {
+    /**
+     * The tenant's logo is stored as a {@code data:} URI by TenantService.uploadLogo, which is the only way it is written. Only that is decoded. A stored http(s) URL is
+     * deliberately NOT fetched: the server must not make a network request to an address held in data (that is how server-side request forgery starts). The caller
+     * already treats any failure here as "no logo".
+     */
+    byte[] decodeLogoBytes(String logoUrl) throws Exception {
         if (logoUrl.startsWith("data:")) {
             int commaIdx = logoUrl.indexOf(',');
             if (commaIdx < 0) throw new IllegalArgumentException("Malformed data URI");
             return java.util.Base64.getDecoder().decode(logoUrl.substring(commaIdx + 1));
         }
-        try (var in = new URL(logoUrl).openStream()) {
-            return in.readAllBytes();
-        }
+        throw new IllegalArgumentException("Only an uploaded logo is supported; a logo URL is never fetched");
     }
 
     private void addTenderDetails(Document doc, Tender tender, PdfFont regular, PdfFont bold) {
