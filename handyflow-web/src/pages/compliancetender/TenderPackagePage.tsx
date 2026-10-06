@@ -16,7 +16,7 @@ import {
   type PackagePlan, type TenderPackage,
 } from "./package.api"
 import {
-  DEFAULT_REQUEST, EMPTY_LIMITS, INITIAL_DRAFT, SECTIONS, blocking, closingText, documentState, feed, fmtSize, fmtWhen, headline, moveSection, sectionTone, sectionsReady, shortHash, sourceText,
+  COVER_LETTER_TEMPLATE, DEFAULT_REQUEST, EMPTY_LIMITS, INITIAL_DRAFT, SECTIONS, blocking, closingText, documentState, feed, fmtSize, fmtWhen, headline, moveSection, sectionTone, sectionsReady, shortHash, sourceText,
   toRequest, toggleDocument, toggleSection, warnings, type LimitsDraft, type PackageDraft,
 } from "./package.logic"
 
@@ -237,7 +237,13 @@ function Contents({ draft, set, plan, mayPrice, docs, docsLoading, closingIso, t
 
               {on && s.key === "COVER_LETTER" && (
                 <div style={{ padding: "0 12px 12px 40px" }}>
-                  <label htmlFor="cover-letter" style={label}>Cover letter text</label>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <label htmlFor="cover-letter" style={label}>Cover letter text</label>
+                    {draft.coverLetter.trim() === "" && (
+                      <button type="button" onClick={() => set({ coverLetter: COVER_LETTER_TEMPLATE })}
+                        style={{ background: "none", border: "none", color: "var(--hf-accent-text)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Start from a template</button>
+                    )}
+                  </div>
                   <textarea id="cover-letter" value={draft.coverLetter} onChange={e => set({ coverLetter: e.target.value })} rows={6} maxLength={20000} placeholder="Dear Sir/Madam…" style={{ ...input, resize: "vertical" }} />
                 </div>
               )}

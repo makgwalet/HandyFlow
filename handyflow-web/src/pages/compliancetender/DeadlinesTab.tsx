@@ -9,6 +9,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { Plus, CalendarClock, CheckCircle2, Trash2, AlertCircle, X } from "lucide-react"
+import LookupInput from "../../components/ui/LookupInput"
+import { DEADLINE_TYPES } from "../../lookups/southAfrica"
 
 interface Deadline {
   id: string; registrationId: string | null; deadlineType: string; description: string | null
@@ -137,7 +139,7 @@ export default function DeadlinesTab() {
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Deadline type *</label>
-              <input value={form.deadlineType} onChange={e => { setForm(f => ({ ...f, deadlineType: e.target.value })); setFieldErrors(f => { const n = { ...f }; delete n.deadlineType; return n }) }} placeholder="e.g. ANNUAL_RETURN" style={inp("deadlineType")} />
+              <LookupInput value={form.deadlineType} options={DEADLINE_TYPES} onChange={v => { setForm(f => ({ ...f, deadlineType: v })); setFieldErrors(f => { const n = { ...f }; delete n.deadlineType; return n }) }} placeholder="e.g. ANNUAL_RETURN" style={inp("deadlineType")} />
               <FErr k="deadlineType" />
             </div>
             <div style={{ marginBottom: 14 }}>

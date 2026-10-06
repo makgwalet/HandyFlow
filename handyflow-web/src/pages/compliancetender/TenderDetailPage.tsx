@@ -22,6 +22,8 @@ import {
   ArrowLeft, Briefcase, Download, Plus, Trash2, X, AlertCircle,
   Users, ClipboardCheck, History, ChevronDown, ChevronUp,
 } from "lucide-react"
+import LookupInput from "../../components/ui/LookupInput"
+import { PERSONNEL_ROLES } from "../../lookups/southAfrica"
 
 interface Tender {
   id: string; tenderNumber: string; name: string; tenderAuthority: string | null
@@ -328,7 +330,7 @@ export default function TenderDetailPage() {
             <div style={{ flex: 2 }}>
               <EmployeePicker value={pickedEmployee} onChange={setPickedEmployee} />
             </div>
-            <input value={personnelRole} onChange={e => setPersonnelRole(e.target.value)} placeholder="Role on tender, e.g. Project Manager" style={{ ...inp, flex: 1 }} />
+            <LookupInput value={personnelRole} options={PERSONNEL_ROLES} onChange={setPersonnelRole} placeholder="Role on tender, e.g. Project Manager" style={{ ...inp, flex: 1 }} />
             <button onClick={() => pickedEmployee && personnelRole.trim() && addPersonnel.mutate()}
               disabled={!pickedEmployee || !personnelRole.trim() || addPersonnel.isPending}
               style={{ display: "flex", alignItems: "center", gap: 5, padding: "9px 14px", background: (!pickedEmployee || !personnelRole.trim()) ? "var(--hf-border-strong)" : "var(--hf-sky-solid-strong)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (!pickedEmployee || !personnelRole.trim()) ? "not-allowed" : "pointer" }}>

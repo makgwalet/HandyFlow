@@ -13,6 +13,8 @@ import {
   EMPTY_LINE, basisText, buildCsv, fmtZar, groupLines, lineToDraft, lockedText, marginText, parseLine, parseSettings, settingsChanged, settingsToDraft,
   type LineDraft, type SettingsDraft,
 } from "./pricing.logic"
+import LookupInput from "../../components/ui/LookupInput"
+import { UNITS } from "../../lookups/southAfrica"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 20, marginBottom: 16 }
 const input: React.CSSProperties = { width: "100%", padding: "7px 9px", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text)", boxSizing: "border-box" }
@@ -246,7 +248,9 @@ function LineForm({ title, submitLabel, initial, sections, busy, resetOnSuccess,
   const f = (key: keyof LineDraft, label: string, extra?: React.InputHTMLAttributes<HTMLInputElement>) => (
     <div>
       <label htmlFor={`${listId}-${key}`} style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }}>{label}</label>
-      <input id={`${listId}-${key}`} value={d[key]} onChange={e => set({ [key]: e.target.value })} aria-invalid={!!errors[key]} style={input} {...extra} />
+      {key === "unit"
+        ? <LookupInput id={`${listId}-${key}`} value={d[key]} options={UNITS} onChange={v => set({ [key]: v })} aria-invalid={!!errors[key]} style={input} placeholder={extra?.placeholder} />
+        : <input id={`${listId}-${key}`} value={d[key]} onChange={e => set({ [key]: e.target.value })} aria-invalid={!!errors[key]} style={input} {...extra} />}
       {errors[key] && <div role="alert" style={errText}>{errors[key]}</div>}
     </div>
   )

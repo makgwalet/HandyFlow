@@ -11,6 +11,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { Plus, Briefcase, X, AlertCircle } from "lucide-react"
+import LookupInput from "../../components/ui/LookupInput"
+import { TENDER_AUTHORITIES, INDUSTRIES, CLASS_OF_WORK } from "../../lookups/southAfrica"
 
 interface Tender {
   id: string; tenderNumber: string; name: string; tenderAuthority: string | null
@@ -153,7 +155,7 @@ export default function TendersTab() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
               <div>
                 <label style={lbl}>Tender authority</label>
-                <input value={form.tenderAuthority} onChange={e => setForm(f => ({ ...f, tenderAuthority: e.target.value }))} placeholder="City of Cape Town" style={inp("tenderAuthority")} />
+                <LookupInput value={form.tenderAuthority} options={TENDER_AUTHORITIES} onChange={v => setForm(f => ({ ...f, tenderAuthority: v }))} placeholder="City of Cape Town" style={inp("tenderAuthority")} />
               </div>
               <div>
                 <label style={lbl}>Authority reference</label>
@@ -181,11 +183,11 @@ export default function TendersTab() {
               </div>
               <div>
                 <label style={lbl}>Industry</label>
-                <input value={form.industry} onChange={e => setForm(f => ({ ...f, industry: e.target.value }))} placeholder="Construction" style={inp("industry")} />
+                <LookupInput value={form.industry} options={INDUSTRIES} onChange={v => setForm(f => ({ ...f, industry: v }))} placeholder="Construction" style={inp("industry")} />
               </div>
               <div>
                 <label style={lbl}>Required class of work</label>
-                <input value={form.requiredClassOfWork} onChange={e => setForm(f => ({ ...f, requiredClassOfWork: e.target.value }))} placeholder="cidb Grade 6GB" style={inp("requiredClassOfWork")} />
+                <LookupInput value={form.requiredClassOfWork} options={CLASS_OF_WORK} onChange={v => setForm(f => ({ ...f, requiredClassOfWork: v }))} placeholder="cidb Grade 6GB" style={inp("requiredClassOfWork")} />
               </div>
             </div>
             {apiError && <div style={{ marginBottom: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{apiError}</div>}

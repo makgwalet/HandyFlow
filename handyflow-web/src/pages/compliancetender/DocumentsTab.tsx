@@ -9,6 +9,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { Upload, FileText, CheckCircle2, Trash2, AlertCircle, BadgeCheck } from "lucide-react"
+import LookupInput from "../../components/ui/LookupInput"
+import { DOCUMENT_TYPES } from "../../lookups/southAfrica"
 
 interface Doc {
   id: string; registrationId: string | null; documentType: string; evidenceId: string
@@ -85,7 +87,7 @@ export default function DocumentsTab() {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
             <div>
               <label style={lbl}>Document type *</label>
-              <input value={documentType} onChange={e => setDocumentType(e.target.value)} placeholder="e.g. Tax Clearance Certificate" style={{ ...inp, width: 220 }} />
+              <LookupInput value={documentType} options={DOCUMENT_TYPES} onChange={setDocumentType} placeholder="e.g. Tax Clearance Certificate" style={{ ...inp, width: 220 }} />
             </div>
             <div>
               <label style={lbl}>Linked registration</label>

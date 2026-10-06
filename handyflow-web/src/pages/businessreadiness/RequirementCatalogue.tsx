@@ -10,6 +10,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useTrackedRequirements, type TrackedRequirement } from "./readiness.api"
 import { createBody, emptyForm, errorText, formFrom, formProblem, newVersionBody, ruleText, type RequirementForm } from "./readiness.logic"
+import LookupInput from "../../components/ui/LookupInput"
+import { APPLIES_TO, REGISTRATION_AUTHORITIES, DOCUMENT_TYPES, registrationTypesFor } from "../../lookups/southAfrica"
 
 const lbl: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 700, color: "var(--hf-text-muted)", marginBottom: 3 }
 const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--hf-border-strong)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text)", boxSizing: "border-box" }
@@ -58,14 +60,14 @@ export default function RequirementCatalogue({ listUrl, createUrl, newVersionUrl
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
             <div><label style={lbl} htmlFor="rq-code">Code</label><input id="rq-code" style={inp} value={form.code} disabled={!!editing} onChange={e => set({ code: e.target.value })} placeholder="CSD_ACTIVE" /></div>
             <div><label style={lbl} htmlFor="rq-name">Name</label><input id="rq-name" style={inp} value={form.name} onChange={e => set({ name: e.target.value })} placeholder="Valid CSD registration" /></div>
-            <div><label style={lbl} htmlFor="rq-applies">Applies to</label><input id="rq-applies" style={inp} value={form.appliesTo} onChange={e => set({ appliesTo: e.target.value })} placeholder="Government tender" /></div>
+            <div><label style={lbl} htmlFor="rq-applies">Applies to</label><LookupInput id="rq-applies" style={inp} value={form.appliesTo} options={APPLIES_TO} onChange={v => set({ appliesTo: v })} placeholder="Government tender" /></div>
           </div>
           <fieldset style={{ border: "1px solid var(--hf-border-subtle)", borderRadius: 8, margin: "14px 0 0", padding: "10px 12px" }}>
             <legend style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-secondary)", padding: "0 6px" }}>What satisfies it (leave blank if it can't be checked automatically)</legend>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
-              <div><label style={lbl} htmlFor="rq-auth">Registration authority</label><input id="rq-auth" style={inp} value={form.authority} onChange={e => set({ authority: e.target.value })} placeholder="CSD, CIDB, SARS…" /></div>
-              <div><label style={lbl} htmlFor="rq-type">Registration type</label><input id="rq-type" style={inp} value={form.registrationType} onChange={e => set({ registrationType: e.target.value })} placeholder="Optional, e.g. Supplier" /></div>
-              <div><label style={lbl} htmlFor="rq-doc">Document type</label><input id="rq-doc" style={inp} value={form.evidenceType} onChange={e => set({ evidenceType: e.target.value })} placeholder="e.g. BBBEE Certificate" /></div>
+              <div><label style={lbl} htmlFor="rq-auth">Registration authority</label><LookupInput id="rq-auth" style={inp} value={form.authority} options={REGISTRATION_AUTHORITIES.map(value => ({ value }))} onChange={v => set({ authority: v })} placeholder="CSD, CIDB, SARS…" /></div>
+              <div><label style={lbl} htmlFor="rq-type">Registration type</label><LookupInput id="rq-type" style={inp} value={form.registrationType} options={registrationTypesFor(form.authority)} onChange={v => set({ registrationType: v })} placeholder="Optional, e.g. Supplier" /></div>
+              <div><label style={lbl} htmlFor="rq-doc">Document type</label><LookupInput id="rq-doc" style={inp} value={form.evidenceType} options={DOCUMENT_TYPES} onChange={v => set({ evidenceType: v })} placeholder="e.g. BBBEE Certificate" /></div>
             </div>
             <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: "8px 0 0" }}>A registration must be active and not expired on the tender's closing date. A document must be unexpired on that date and verified. If you set both, both must hold.</p>
           </fieldset>

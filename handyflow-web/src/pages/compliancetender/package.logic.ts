@@ -191,3 +191,19 @@ export function fmtWhen(iso: string): string {
   if (Number.isNaN(d.getTime())) return ""
   return d.toLocaleString("en-ZA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" })
 }
+
+/** A starting cover letter. The page adds the letterhead, date, addressee and the "Re:" line itself, so this is only the body. */
+export const COVER_LETTER_TEMPLATE = [
+  "Dear Sir/Madam,",
+  "",
+  "We submit our tender for the above, together with the documents listed in this submission package.",
+  "",
+  "We confirm that:",
+  "- our tender is valid for the period stated in the tender document;",
+  "- we have read and accept the conditions of tender; and",
+  "- the information supplied is true and correct.",
+  "",
+  "Please contact us if you need any clarification.",
+  "",
+  "Yours faithfully",
+].join("\n")

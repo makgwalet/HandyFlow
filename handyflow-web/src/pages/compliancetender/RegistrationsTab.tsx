@@ -13,6 +13,8 @@ import { usePermission } from "../../hooks/usePermission"
 import {
   Plus, ShieldCheck, ChevronDown, ChevronUp, X, Edit2, Trash2, AlertCircle, Clock,
 } from "lucide-react"
+import LookupInput from "../../components/ui/LookupInput"
+import { REGISTRATION_AUTHORITIES, registrationTypesFor } from "../../lookups/southAfrica"
 
 interface Registration {
   id: string; authority: string; registrationType: string; registrationNumber: string | null
@@ -20,7 +22,7 @@ interface Registration {
   expiringSoon: boolean; createdAt: string
 }
 
-const AUTHORITIES = ["CIPC", "SARS", "UIF", "PSIRA", "CSD", "CIDB", "NHBRC", "OTHER"]
+const AUTHORITIES = REGISTRATION_AUTHORITIES
 const STATUSES = ["ACTIVE", "EXPIRED", "LAPSED", "PENDING", "NOT_APPLICABLE"]
 
 const STATUS_CFG: Record<string, { color: string; bg: string; border: string; label: string }> = {
@@ -234,7 +236,7 @@ export default function RegistrationsTab() {
             </div>
             <div>
               <label style={lbl}>Registration type *</label>
-              <input value={form.registrationType} onChange={e => { setForm(f => ({ ...f, registrationType: e.target.value })); setFieldErrors(f => omit(f, "registrationType")) }} placeholder="e.g. Business Registration" style={inp("registrationType")} disabled={!!editing} />
+              <LookupInput value={form.registrationType} options={registrationTypesFor(form.authority)} onChange={v => { setForm(f => ({ ...f, registrationType: v })); setFieldErrors(f => omit(f, "registrationType")) }} placeholder="e.g. Business Registration" style={inp("registrationType")} disabled={!!editing} />
               <FErr k="registrationType" />
               {editing && <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 3 }}>Type can't be changed after creation</div>}
             </div>
