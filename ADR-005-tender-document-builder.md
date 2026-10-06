@@ -111,3 +111,14 @@ The owner supplied a decision matrix with recommended answers. Recorded here as 
 **Build sequence for the first slice:** section architecture and catalogue; `TenderPackageStorage` over `EvidenceFacade`; submission profile entity and pure validator; manifest with SHA-256 and package hash; PDF merge spike on real sample PDFs (encrypted, scanned, oversized) before the merge is relied on; images placed into PDF; Office originals retained; immutable package once submitted; then the UI.
 
 **Later phases (design when reached):** package optimisation, client review and approval, acknowledgement tracking, reporting.
+
+## 10. Build status: first foundations (2026-10-06)
+
+Built under `compliancetender/application/internal/submission/`: `SectionType`, `SectionCatalogue` (the six V1 sections), `SectionSource` and `SectionRenderer` (interfaces, no implementations yet), `SubmissionProfile` and `SubmissionProfileResolver` (global, tenant, tender override, then the system ceiling), `PackageValidator` and `PackageIssue`, `PackageManifest` (SHA-256 per file and a package hash), `TenderPackageStorage` with `EvidenceTenderPackageStorage`, and `PdfPackageMerger`. No entities, endpoints, migration or UI yet.
+
+**Verified:** the pure classes compile and their 21 tests pass in the authoring session, and deliberately broken copies of the boundary checks were caught by the tests.
+**Not verified (could not run):** `PdfPackageMerger`, `EvidenceTenderPackageStorage` and their tests. Maven Central was unreachable from the authoring session, so iText and Spring could not be compiled. `PdfPackageMergerTest` is the PDF spike; its first Maven run is the real answer. It generates its own PDFs (plain, user-password, owner-password-only, truncated, image) so no samples are needed, but it cannot cover real scanned or oddly produced tender PDFs. The owner-password-only case is not asserted to a result because iText's behaviour there was not certain.
+
+**Finding that affects decision 4/5:** `EvidenceService` rejects any single file over 20 MB. Packages stored through `EvidenceTenderPackageStorage` therefore cannot exceed 20 MB, which is below the sizes decision 5 expects (hundreds of MB). The storage interface exists so this is a swap, not a rewrite, but a storage without that ceiling is needed before large packages work. Options: raise or parameterise Evidence's cap (changes a shared module), or store packages through `FileStorageService` with a package table of its own. Not decided here.
+
+**Next:** package and section tables (migration V314), `TenderPackageService` (collect sections, validate, merge, store, manifest), endpoints, then the UI.
