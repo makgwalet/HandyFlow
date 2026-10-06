@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import TenderReadinessPanel from "../businessreadiness/TenderReadinessPanel"
+import TenderPricingCard from "./TenderPricingCard"
 import EmployeePicker, { type EmployeeOption } from "../training/EmployeePicker"
 import {
   ArrowLeft, Briefcase, Download, Plus, Trash2, X, AlertCircle,
@@ -241,6 +242,8 @@ export default function TenderDetailPage() {
       </Section>
 
       <TenderReadinessPanel url={`/api/v1/compliance/tenders/${id}/readiness`} catalogueHref="/compliancetender/requirements" />
+
+      <TenderPricingCard tenderId={tender.id} />
 
       <Section title="Requirement Matrix" icon={<ClipboardCheck size={15} style={{ color: 'var(--hf-sky-text-strong)' }} />}>
         {requirements.length === 0 ? (

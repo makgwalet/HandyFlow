@@ -98,6 +98,7 @@ import { AuditorPortalTenantDetailPage } from "./pages/auditor-portal/AuditorPor
 import { LegalCompliancePage } from "./pages/legalcompliance/LegalCompliancePage"
 import CompliancePage from "./pages/compliancetender/CompliancePage"
 import TenderDetailPage from "./pages/compliancetender/TenderDetailPage"
+import TenderPricingPage from "./pages/compliancetender/TenderPricingPage"
 import ComplianceServicesPage from "./pages/complianceservices/ComplianceServicesPage"
 import ClientDetailPage from "./pages/complianceservices/ClientDetailPage"
 import ClientTenderDetailPage from "./pages/complianceservices/ClientTenderDetailPage"
@@ -312,6 +313,7 @@ export default function App() {
             <Route path="/legalcompliance/:section?" element={<LegalCompliancePage />} />
             <Route path="/compliancetender/:section?" element={<CompliancePage />} />
             <Route path="/compliancetender/tenders/:id"  element={<TenderDetailPage />} />
+            <Route path="/compliancetender/tenders/:id/pricing" element={<TenderPricingPage />} />
             <Route path="/complianceservices/:section?" element={<ComplianceServicesPage />} />
             <Route path="/complianceservices/clients/:clientId"        element={<ClientDetailPage />} />
             <Route path="/complianceservices/tenders/:id"              element={<ClientTenderDetailPage />} />
