@@ -18,9 +18,15 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.util.Optional;
 import java.util.UUID;
 
+import za.co.handyflow.platform.compliancetender.domain.model.ComplianceRequirement;
+import za.co.handyflow.platform.compliancetender.domain.repository.ComplianceRequirementRepository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class TenderServiceTest {
@@ -29,9 +35,10 @@ class TenderServiceTest {
     @Mock private TenderRequirementRepository requirementRepository;
     @Mock private TenantNumberingFacade numberingFacade;
     @Mock private TenderSnapshotService snapshotService;
+    @Mock private ComplianceRequirementRepository catalogueRepository;
 
     private TenderService service() {
-        return new TenderService(tenderRepository, requirementRepository, numberingFacade, snapshotService);
+        return new TenderService(tenderRepository, requirementRepository, numberingFacade, snapshotService, catalogueRepository);
     }
 
     private static final TenantId TENANT = TenantId.generate();
@@ -105,5 +112,47 @@ class TenderServiceTest {
         service().transition(TENANT, tenderId, new TransitionTenderRequest("IN_PREPARATION"), USER);
 
         org.mockito.Mockito.verifyNoInteractions(snapshotService);
+    }
+
+    // ---- the requirement reference must be one of THIS tenant's own tracked requirements -------------------------------------
+
+    private UUID existingTender() {
+        UUID tenderId = UUID.randomUUID();
+        Tender tender = Tender.create(TENANT, "TND-00001", "Test Tender", null, null, null, null, null, null, null, null, USER);
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(tender));
+        return tenderId;
+    }
+
+    @Test
+    @DisplayName("addRequirement() attaches a requirement that is one of your own tracked requirements")
+    void addRequirement_ownTrackedRequirement_isAttached() {
+        UUID tenderId = existingTender(), trackedId = UUID.randomUUID();
+        when(catalogueRepository.findByIdForTenant(TENANT, trackedId)).thenReturn(Optional.of(ComplianceRequirement.create(TENANT, "CSD_ACTIVE", "CSD", null, null, true, USER)));
+
+        var response = service().addRequirement(TENANT, tenderId, new CreateTenderRequirementRequest(trackedId, "Valid CSD registration", "COMPLIANCE"), USER);
+
+        assertThat(response.complianceRequirementId()).isEqualTo(trackedId);
+    }
+
+    @Test
+    @DisplayName("addRequirement() refuses a tracked-requirement id that is not one of this tenant's (another tenant's, or unknown), and saves nothing")
+    void addRequirement_notYourTrackedRequirement_isRefused() {
+        UUID tenderId = existingTender(), foreignId = UUID.randomUUID();
+        when(catalogueRepository.findByIdForTenant(TENANT, foreignId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service().addRequirement(TENANT, tenderId, new CreateTenderRequirementRequest(foreignId, "Valid CSD registration", "COMPLIANCE"), USER))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("not one of your tracked requirements");
+        verify(requirementRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("addRequirement() without a link does not look anything up in the catalogue")
+    void addRequirement_withoutLink_doesNotTouchTheCatalogue() {
+        UUID tenderId = existingTender();
+
+        var response = service().addRequirement(TENANT, tenderId, new CreateTenderRequirementRequest(null, "Typed by hand", "MANUAL"), USER);
+
+        assertThat(response.complianceRequirementId()).isNull();
+        verifyNoInteractions(catalogueRepository);
     }
 }

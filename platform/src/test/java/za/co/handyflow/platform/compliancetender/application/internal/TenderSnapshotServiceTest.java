@@ -22,8 +22,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 
 /**
  * Regression test for TenderSnapshotService — confirms the actual
@@ -125,5 +129,36 @@ class TenderSnapshotServiceTest {
 
         assertThat(response.data().personnel().get(0).employeeFullName())
                 .isEqualTo("(employee record no longer available)");
+    }
+
+    @Test
+    @DisplayName("two submissions racing for the same snapshot number: the loser gets a clear conflict, not a raw database error, and nothing is half done")
+    void captureSnapshot_collision_isAClearConflict() {
+        UUID tenderId = UUID.randomUUID();
+        Tender tender = Tender.create(TENANT, "TND-00001", "Test Tender", null, null, null, null, null, null, null, null, USER);
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(tender));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(personnelRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(snapshotRepository.countByTender(TENANT, tenderId)).thenReturn(0L);
+        when(snapshotRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint"));
+
+        assertThatThrownBy(() -> service().captureSnapshot(TENANT, tenderId, USER))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("at the same moment")
+                .hasCauseInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("the snapshot is written and flushed inside the transaction, so a collision surfaces here and not later at commit")
+    void captureSnapshot_flushesTheSnapshot() {
+        UUID tenderId = UUID.randomUUID();
+        Tender tender = Tender.create(TENANT, "TND-00001", "Test Tender", null, null, null, null, null, null, null, null, USER);
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(tender));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(personnelRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(snapshotRepository.countByTender(TENANT, tenderId)).thenReturn(0L);
+
+        service().captureSnapshot(TENANT, tenderId, USER);
+
+        verify(snapshotRepository).saveAndFlush(any());
     }
 }

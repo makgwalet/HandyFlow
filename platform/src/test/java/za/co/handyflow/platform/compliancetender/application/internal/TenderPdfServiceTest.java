@@ -122,4 +122,26 @@ class TenderPdfServiceTest {
         assertThatThrownBy(() -> service().generateTenderSummaryPdf(TENANT, tenderId))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
+
+    @Test
+    @DisplayName("a logo stored as a data: URI (the only way the app stores one) is decoded")
+    void decodeLogo_dataUri_isDecoded() throws Exception {
+        byte[] bytes = service().decodeLogoBytes("data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(new byte[] {1, 2, 3}));
+
+        assertThat(bytes).containsExactly(1, 2, 3);
+    }
+
+    @Test
+    @DisplayName("a logo URL is NEVER fetched by the server: http, https, file and internal metadata addresses are all refused without any network call")
+    void decodeLogo_urls_areRefused() {
+        for (String url : new String[] {"http://169.254.169.254/latest/meta-data/", "https://example.com/logo.png", "file:///etc/passwd", "ftp://example.com/logo.png", "//example.com/logo.png"}) {
+            assertThatThrownBy(() -> service().decodeLogoBytes(url)).as(url).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("never fetched");
+        }
+    }
+
+    @Test
+    @DisplayName("a malformed data: URI is refused")
+    void decodeLogo_malformedDataUri_isRefused() {
+        assertThatThrownBy(() -> service().decodeLogoBytes("data:image/png;base64")).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Malformed");
+    }
 }

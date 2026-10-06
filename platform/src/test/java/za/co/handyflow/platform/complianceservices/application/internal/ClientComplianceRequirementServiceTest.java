@@ -110,4 +110,61 @@ class ClientComplianceRequirementServiceTest {
                 .isInstanceOf(HandyFlowException.class)
                 .hasMessageContaining("latest");
     }
+
+    // ---- the registration rule (business readiness) --------------------------------------------------------------------------
+
+    private ClientComplianceRequirement v1WithRule(UUID clientId) {
+        ClientComplianceRequirement v1 = ClientComplianceRequirement.create(TENANT, clientId, "CSD_ACTIVE", "Valid CSD Registration", null, "CSD Report", true, "CSD", "Supplier", USER);
+        when(requirementRepository.findByIdForTenant(TENANT, v1.getId())).thenReturn(Optional.of(v1));
+        when(requirementRepository.findLatestByCode(TENANT, clientId, "CSD_ACTIVE")).thenReturn(Optional.of(v1));
+        return v1;
+    }
+
+    @Test
+    @DisplayName("create() stores the registration that satisfies the requirement, and returns it")
+    void create_storesTheRegistrationRule() {
+        UUID clientId = UUID.randomUUID();
+        realClient(clientId);
+        when(requirementRepository.findLatestByCode(TENANT, clientId, "CSD_ACTIVE")).thenReturn(Optional.empty());
+
+        var response = service().create(TENANT, clientId, new CreateClientComplianceRequirementRequest("csd_active", "Valid CSD", null, "CSD Report", true, "CSD", " Supplier "), USER);
+
+        assertThat(response.satisfiedByAuthority()).isEqualTo("CSD");
+        assertThat(response.satisfiedByRegistrationType()).isEqualTo("Supplier");
+        assertThat(response.evidenceType()).isEqualTo("CSD Report");
+    }
+
+    @Test
+    @DisplayName("a new version that leaves the rule fields out KEEPS the existing rule")
+    void createNewVersion_withoutRuleFields_keepsTheRule() {
+        ClientComplianceRequirement v1 = v1WithRule(UUID.randomUUID());
+
+        var response = service().createNewVersion(TENANT, v1.getId(), new UpdateClientComplianceRequirementRequest("Valid CSD (2026 rules)", null, "CSD Report", true), USER);
+
+        assertThat(response.requirementVersion()).isEqualTo(2);
+        assertThat(response.satisfiedByAuthority()).isEqualTo("CSD");
+        assertThat(response.satisfiedByRegistrationType()).isEqualTo("Supplier");
+    }
+
+    @Test
+    @DisplayName("a new version can replace the rule, and the original is untouched")
+    void createNewVersion_replacesTheRule() {
+        ClientComplianceRequirement v1 = v1WithRule(UUID.randomUUID());
+
+        var response = service().createNewVersion(TENANT, v1.getId(), new UpdateClientComplianceRequirementRequest("Valid CIDB", null, null, true, "CIDB", "Contractor"), USER);
+
+        assertThat(response.satisfiedByAuthority()).isEqualTo("CIDB");
+        assertThat(v1.getSatisfiedByAuthority()).isEqualTo("CSD");
+    }
+
+    @Test
+    @DisplayName("a blank rule value on a new version CLEARS the rule")
+    void createNewVersion_blankClearsTheRule() {
+        ClientComplianceRequirement v1 = v1WithRule(UUID.randomUUID());
+
+        var response = service().createNewVersion(TENANT, v1.getId(), new UpdateClientComplianceRequirementRequest("No longer checked", null, null, true, "", " "), USER);
+
+        assertThat(response.satisfiedByAuthority()).isNull();
+        assertThat(response.satisfiedByRegistrationType()).isNull();
+    }
 }
