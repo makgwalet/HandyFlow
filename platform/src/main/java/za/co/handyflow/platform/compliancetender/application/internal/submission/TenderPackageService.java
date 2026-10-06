@@ -148,13 +148,14 @@ public class TenderPackageService {
         TenderPackage pkg = TenderPackage.create(packageId, tenantId, tenderId, version, ready, includesPricing, p.effective.profile().name(),
                 ProfileJson.of(p.effective.profile()), ProfileJson.issues(issues), manifest.packageHash(), combinedName, combined.sha256(), CONTENT_TYPE,
                 stored.sizeBytes(), merged.pages(), stored.storageKey(), userId, userName);
+        List<TenderPackageFile> savedFiles = new ArrayList<>();
         try {
             packageRepository.save(pkg);
             int seq = 1;
             for (PackageManifest.Entry e : manifest.entries()) {
                 PackageFile source = manifestFiles.get(e.position() - 1);
-                fileRepository.save(TenderPackageFile.create(tenantId, packageId, seq++, e.sectionKey(), e.fileName(),
-                        sourceOf(source, p.generated), e.sizeBytes(), e.sha256(), e.pages(), source.evidenceId()));
+                savedFiles.add(fileRepository.save(TenderPackageFile.create(tenantId, packageId, seq++, e.sectionKey(), e.fileName(),
+                        sourceOf(source, p.generated), e.sizeBytes(), e.sha256(), e.pages(), source.evidenceId())));
             }
         } catch (RuntimeException e) {
             // the record could not be written, so the stored bytes would be an orphan nobody can find
@@ -162,7 +163,7 @@ public class TenderPackageService {
             throw e;
         }
         log.info("Tender package built tender={} version={} ready={} files={} tenant={}", tenderId, version, ready, manifest.entries().size(), tenantId);
-        return response(p, true, ready, issues, toResponse(pkg, fileRepository.findByPackage(tenantId, packageId)));
+        return response(p, true, ready, issues, toResponse(pkg, savedFiles));
     }
 
     @Transactional(readOnly = true)
