@@ -93,7 +93,7 @@ class TenderPackageServiceTest {
     }
 
     private TenderPackageService serviceWith(SectionSource... sources) {
-        return new TenderPackageService(tenders, packages, files, List.of(sources), new TextSectionRenderer(), storage, profiles, 100, 250);
+        return new TenderPackageService(tenders, packages, files, List.of(sources), new TextSectionRenderer(), (tenantId, t) -> new Letterhead("Zeta Civils (Pty) Ltd", List.of("Tel: 012 000 0000"), null, "TND-1", "Road", "SANRAL", null, "21 December 2026"), storage, profiles, 100, 250);
     }
 
     private static BuildTenderPackageRequest request(List<String> keys, boolean pricingRequired) {

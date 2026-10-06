@@ -51,6 +51,7 @@ public class TenderPackageService {
     private final TenderPackageFileRepository fileRepository;
     private final Map<String, SectionSource> sources = new HashMap<>();
     private final SectionRenderer renderer;
+    private final LetterheadProvider letterheads;
     private final TenderPackageStorage storage;
     private final SubmissionProfileService profiles;
     private final SectionCatalogue catalogue = SectionCatalogue.v1();
@@ -59,7 +60,7 @@ public class TenderPackageService {
 
     public TenderPackageService(TenderRepository tenderRepository, TenderPackageRepository packageRepository,
                                 TenderPackageFileRepository fileRepository, List<SectionSource> sectionSources,
-                                SectionRenderer renderer, TenderPackageStorage storage, SubmissionProfileService profiles,
+                                SectionRenderer renderer, LetterheadProvider letterheads, TenderPackageStorage storage, SubmissionProfileService profiles,
                                 @Value("${handyflow.tender.package.system-max-file-mb:100}") long systemMaxFileMb,
                                 @Value("${handyflow.tender.package.system-max-total-mb:250}") long systemMaxTotalMb) {
         this.tenderRepository = tenderRepository;
@@ -67,6 +68,7 @@ public class TenderPackageService {
         this.fileRepository = fileRepository;
         for (SectionSource s : sectionSources) sources.put(s.type().key(), s);
         this.renderer = renderer;
+        this.letterheads = letterheads;
         this.storage = storage;
         this.profiles = profiles;
         this.systemMaxFileBytes = systemMaxFileMb * 1024 * 1024;
@@ -202,6 +204,7 @@ public class TenderPackageService {
         if (new HashSet<>(keys).size() != keys.size()) throw new IllegalArgumentException("A section can only be chosen once.");
 
         BuildContext ctx = new BuildContext(tenantId, tenderId, mayIncludePricing, request.coverLetterText(), request.companyProfileText(), request.documentIds());
+        Letterhead letterhead = letterheads.forTender(tenantId, tender);
         List<PlannedSection> planned = new ArrayList<>();
         Set<PackageFile> generated = new HashSet<>();
         int position = 0;
@@ -212,7 +215,7 @@ public class TenderPackageService {
             position++;
             SectionContent content = source.load(ctx);
             if (content.available() && content.hasText()) {
-                byte[] pdf = renderer.render(tender.getName(), type, content.text());
+                byte[] pdf = renderer.render(letterhead, type, content.text());
                 PdfPackageMerger.Inspection inspection = PdfPackageMerger.inspect(pdf);
                 PackageFile file = new PackageFile(key, PackageNaming.sectionFileName(position, type), pdf.length, PackageManifest.sha256Hex(pdf),
                         null, inspection.health(), inspection.pages());

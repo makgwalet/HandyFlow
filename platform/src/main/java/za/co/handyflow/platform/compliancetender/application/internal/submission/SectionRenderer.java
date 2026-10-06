@@ -6,5 +6,5 @@ package za.co.handyflow.platform.compliancetender.application.internal.submissio
  */
 public interface SectionRenderer {
 
-    byte[] render(String tenderTitle, SectionType section, String text);
+    byte[] render(Letterhead letterhead, SectionType section, String text);
 }
