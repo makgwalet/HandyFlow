@@ -573,3 +573,9 @@ W5 is built. **W6 to W9 are not started.**
   - **Mockito "unfinished stubbing"** in `TenderReadinessServiceTest`, `ClientTenderReadinessServiceTest`, `AgProfitabilityServiceTest` and `SupplierFacadeImplTest`: a helper that stubs a mock was called inside `when(...).thenReturn(...)`. The helper's result is now built first. Test-only change.
   - **`ArchitectureVerificationTest`** fails on ~90 module pairs across the whole project (the same project-wide pre-existing failure noted under W2); none involve `businessreadiness`, pricing or the new classes.
 - Not re-run since the fixes; re-run `mvn test "-Dtest=*Tender*Test,Compliance*Test,Client*Test,RequirementReadinessEvaluatorTest,Ag*Test,SupplierFacadeImplTest"`.
+
+## Submission package screen (ADR-005)
+
+New page `/compliancetender/tenders/:id/package` (`TenderPackagePage`), a summary card on the tender page (`TenderPackageCard`) and a reusable `ProgressRing`. Designed after the Bid Hub, compliance-readiness and Zyno references: a status banner with the one primary action, KPI tiles with icon badges and a progress ring (a count, never a score), the section list as a pipeline with a coloured left edge per state, a "blocking submission" feed (blocking first, then warnings), submission rules, and a version history. The page asks the server for a debounced preview whenever a choice changes; the server does all planning and validation.
+
+Checked: 28 vitest scratch tests (copy in `tasks-scratch-tests/package.test.tsx`), lint clean on the new files, and screenshots in a real browser at 1440 px and 390 px (no horizontal page scroll on a phone). Not checked: dark mode (the screenshot did not switch theme; the page uses only theme tokens), and nothing has run against the real backend yet.

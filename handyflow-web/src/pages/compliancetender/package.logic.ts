@@ -1,0 +1,193 @@
+// src/pages/compliancetender/package.logic.ts
+//
+// Pure helpers for the submission package screen (ADR-005): turning what the person typed into a request, and turning what the server answered into words. No React, no network.
+import type { BuildRequest, ComplianceDoc, LimitsRequest, PackagePlan, PlanIssue, SectionStatus } from "./package.api"
+
+export interface SectionInfo { key: string; title: string; hint: string }
+
+/** The sections this version knows, in default order. The server owns the catalogue; these labels are only for choosing and ordering before a preview exists. */
+export const SECTIONS: SectionInfo[] = [
+  { key: "COVER_LETTER", title: "Cover letter", hint: "Written for this tender" },
+  { key: "COMPANY_PROFILE", title: "Company profile", hint: "From your company details, or customised" },
+  { key: "COMPLIANCE", title: "Compliance response", hint: "Where you stand on each requirement" },
+  { key: "KEY_PERSONNEL", title: "Key personnel", hint: "The people added to this tender" },
+  { key: "PRICING", title: "Pricing schedule", hint: "Needs manage permission" },
+  { key: "SUPPORTING_DOCUMENTS", title: "Supporting documents", hint: "Certificates and documents you choose" },
+]
+
+export interface LimitsDraft {
+  name: string; allowed: string; maxFileMb: string; maxTotalMb: string; maxFiles: string; maxNameLength: string; zip: "" | "yes" | "no"
+}
+export const EMPTY_LIMITS: LimitsDraft = { name: "", allowed: "", maxFileMb: "", maxTotalMb: "", maxFiles: "", maxNameLength: "", zip: "" }
+
+export interface PackageDraft {
+  included: string[]                       // section keys, in package order
+  coverLetter: string
+  companyMode: "CURRENT" | "CUSTOM"
+  companyText: string
+  documentIds: string[]
+  profileId: string | null
+  limits: LimitsDraft
+  pricingRequired: boolean
+}
+
+export const INITIAL_DRAFT: PackageDraft = {
+  included: SECTIONS.map(s => s.key), coverLetter: "", companyMode: "CURRENT", companyText: "", documentIds: [],
+  profileId: null, limits: EMPTY_LIMITS, pricingRequired: false,
+}
+
+const MB = 1024 * 1024
+
+/** A positive number typed as "12", "12.5" or "12,5"; null when blank, undefined when it is not a usable positive number. */
+export function parsePositive(text: string): number | null | undefined {
+  const t = text.trim().replace(",", ".")
+  if (t === "") return null
+  if (!/^\d+(\.\d+)?$/.test(t)) return undefined
+  const n = Number(t)
+  return n > 0 ? n : undefined
+}
+
+export type LimitsResult = { ok: true; value: LimitsRequest | null } | { ok: false; error: string }
+
+/** Tender-specific limits as typed. Blank everywhere means no override; a half-valid entry is refused with a reason, never quietly dropped. */
+export function parseLimits(d: LimitsDraft): LimitsResult {
+  const anything = d.name.trim() || d.allowed.trim() || d.maxFileMb.trim() || d.maxTotalMb.trim() || d.maxFiles.trim() || d.maxNameLength.trim() || d.zip
+  if (!anything) return { ok: true, value: null }
+  const fileMb = parsePositive(d.maxFileMb), totalMb = parsePositive(d.maxTotalMb), files = parsePositive(d.maxFiles), nameLen = parsePositive(d.maxNameLength)
+  if (fileMb === undefined) return { ok: false, error: "Maximum file size must be a number above zero." }
+  if (totalMb === undefined) return { ok: false, error: "Maximum total size must be a number above zero." }
+  if (files === undefined || (files !== null && !Number.isInteger(files))) return { ok: false, error: "Maximum number of files must be a whole number above zero." }
+  if (nameLen === undefined || (nameLen !== null && !Number.isInteger(nameLen))) return { ok: false, error: "Maximum file name length must be a whole number above zero." }
+  const extensions = d.allowed.split(/[,\s]+/).map(e => e.trim().toLowerCase().replace(/^\./, "")).filter(Boolean)
+  return {
+    ok: true,
+    value: {
+      name: d.name.trim() || "This tender",
+      allowedExtensions: extensions.length ? Array.from(new Set(extensions)) : null,
+      maxFileBytes: fileMb === null ? null : Math.round(fileMb * MB),
+      maxTotalBytes: totalMb === null ? null : Math.round(totalMb * MB),
+      maxFileCount: files, zipAllowed: d.zip === "" ? null : d.zip === "yes", maxFileNameLength: nameLen,
+    },
+  }
+}
+
+export type RequestResult = { ok: true; request: BuildRequest } | { ok: false; error: string }
+
+export function toRequest(d: PackageDraft): RequestResult {
+  const limits = parseLimits(d.limits)
+  if (!limits.ok) return limits
+  return {
+    ok: true,
+    request: {
+      sectionKeys: d.included,
+      coverLetterText: d.coverLetter.trim() || null,
+      companyProfileText: d.companyMode === "CUSTOM" && d.companyText.trim() ? d.companyText.trim() : null,
+      documentIds: d.documentIds,
+      submissionProfileId: d.profileId,
+      limits: limits.value,
+      pricingRequired: d.pricingRequired,
+    },
+  }
+}
+
+/** The request for a screen that has not been touched; used only to give the preview query something to hold while the real one is being debounced. */
+export const DEFAULT_REQUEST: BuildRequest = {
+  sectionKeys: INITIAL_DRAFT.included, coverLetterText: null, companyProfileText: null, documentIds: [], submissionProfileId: null, limits: null, pricingRequired: false,
+}
+
+// ---- section choice and order
+
+export function toggleSection(included: string[], key: string): string[] {
+  if (included.includes(key)) return included.filter(k => k !== key)
+  // switched back on, a section returns to its default place among the chosen ones rather than the end
+  const rank = (k: string) => SECTIONS.findIndex(s => s.key === k)
+  const next = [...included, key]
+  return next.sort((a, b) => rank(a) - rank(b))
+}
+
+export function moveSection(included: string[], key: string, by: -1 | 1): string[] {
+  const i = included.indexOf(key), j = i + by
+  if (i < 0 || j < 0 || j >= included.length) return included
+  const next = [...included]
+  ;[next[i], next[j]] = [next[j], next[i]]
+  return next
+}
+
+export function toggleDocument(ids: string[], id: string): string[] { return ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id] }
+
+// ---- reading the server's answer
+
+export const blocking = (issues: PlanIssue[]): PlanIssue[] => issues.filter(i => i.severity === "BLOCKING")
+export const warnings = (issues: PlanIssue[]): PlanIssue[] => issues.filter(i => i.severity === "WARNING")
+
+/** Blocking issues first, then warnings, each in the order the server gave them. */
+export function feed(issues: PlanIssue[]): PlanIssue[] { return [...blocking(issues), ...warnings(issues)] }
+
+/** Chosen sections that produced something, out of those chosen. Counts, not a score: nothing here is weighted. */
+export function sectionsReady(plan: PackagePlan): { ready: number; chosen: number } {
+  return { ready: plan.sections.filter(s => s.available).length, chosen: plan.sections.length }
+}
+
+export function headline(plan: PackagePlan): { tone: "ready" | "draft" | "blocked"; title: string; detail: string } {
+  const b = blocking(plan.issues).length
+  if (!plan.canBuild) return { tone: "blocked", title: "Not ready to build", detail: b === 1 ? "1 problem has to be fixed first." : `${b} problems have to be fixed first.` }
+  if (plan.submissionReady) return { tone: "ready", title: "Ready to submit", detail: "Everything chosen is in and nothing is blocking." }
+  const missing = plan.sections.filter(s => !s.available).length
+  const reasons = plan.issues.some(i => i.code === "PRICING_REQUIRED") ? "pricing is required but missing" : missing === 1 ? "1 section is missing" : `${missing} sections are missing`
+  return { tone: "draft", title: "Draft only", detail: `A draft can be built, but it is not ready to submit: ${reasons}.` }
+}
+
+export function sectionTone(s: SectionStatus | undefined): "ok" | "missing" | "unknown" { return !s ? "unknown" : s.available ? "ok" : "missing" }
+
+export function fmtSize(bytes: number): string {
+  if (bytes >= 1024 * MB) return `${(bytes / (1024 * MB)).toFixed(1)} GB`
+  if (bytes >= MB) return `${(bytes / MB).toFixed(1)} MB`
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${bytes} B`
+}
+
+export const shortHash = (h: string): string => (h.length > 12 ? `${h.slice(0, 8)}…${h.slice(-4)}` : h)
+
+export function sourceText(source: "GENERATED" | "ATTACHED" | "ORIGINAL"): string {
+  return source === "GENERATED" ? "Generated" : source === "ATTACHED" ? "Merged in" : "Original kept"
+}
+
+// ---- dates
+
+const DAY = 86_400_000
+const startOfDay = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())
+
+/** Whole calendar days from `today` to an ISO date (yyyy-mm-dd); negative once it has passed; null with no date. */
+export function daysUntil(iso: string | null | undefined, today: Date): number | null {
+  if (!iso) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
+  if (!m) return null
+  return Math.round((Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) - startOfDay(today)) / DAY)
+}
+
+export function closingText(iso: string | null | undefined, today: Date): { text: string; tone: "ok" | "soon" | "late" | "none" } {
+  const n = daysUntil(iso, today)
+  if (n === null) return { text: "No closing date set", tone: "none" }
+  if (n < 0) return { text: n === -1 ? "Closed yesterday" : `Closed ${-n} days ago`, tone: "late" }
+  if (n === 0) return { text: "Closes today", tone: "late" }
+  if (n === 1) return { text: "Closes tomorrow", tone: "soon" }
+  return { text: `${n} days remaining`, tone: n <= 7 ? "soon" : "ok" }
+}
+
+/** Whether a document will still be valid when the tender closes. The server's compliance section judges this too; this is the quick signal beside each document. */
+export function documentState(doc: Pick<ComplianceDoc, "expiryDate">, closingIso: string | null | undefined, today: Date): { text: string; tone: "ok" | "warn" | "bad" | "none" } {
+  const untilExpiry = daysUntil(doc.expiryDate, today)
+  if (untilExpiry === null) return { text: "No expiry date", tone: "none" }
+  if (untilExpiry < 0) return { text: "Expired", tone: "bad" }
+  const untilClosing = daysUntil(closingIso, today)
+  if (untilClosing !== null && untilExpiry < untilClosing) return { text: "Expires before closing", tone: "bad" }
+  if (untilExpiry <= 30) return { text: `Expires in ${untilExpiry} days`, tone: "warn" }
+  return { text: "Valid", tone: "ok" }
+}
+
+/** "12 Oct 2026, 14:05" in South African time; empty text for a bad value. */
+export function fmtWhen(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  return d.toLocaleString("en-ZA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" })
+}
