@@ -126,3 +126,20 @@ Built under `compliancetender/application/internal/submission/`: `SectionType`, 
 **Added after the foundations:** `PackagePlanner` (pure) decides what a build holds and whether it is buildable and `submissionReady`: a draft without pricing can be built but is never ready, and a tender that requires pricing is not ready without it (decision 2). A chosen section that cannot be produced is reported, never dropped. 8 tests pass; four deliberately broken copies of its rules were each caught.
 
 **Storage resolved (2026-10-06):** packages use a dedicated `TenderPackageStorage` (adapter over the existing `FileStorageService` port) and V314 tables `tender_packages` and `tender_package_files`, immutable once written. `EvidenceTenderPackageStorage` was removed. Unrun in the authoring session: the storage adapter test, the entities and the migration (no database or Spring available there).
+
+## 11. Build status: backend of the first slice (2026-10-06)
+
+Added: the six section sources, `TextSectionRenderer`, `TenderPackageService` (preview, build, list, get, download), saved submission profiles (`SubmissionProfileService`, V315), a file hash on the package record (V316), and `TenderPackageController` (`/api/v1/compliance/tenders/{id}/packages[/preview]`, `/tender-packages/{id}[/download]`, `/submission-profiles`).
+
+How a build works: each chosen section is loaded, text sections are drawn to a PDF, the plan and input checks run, PDFs and images are merged into one combined PDF, Word/Excel/other files are kept as originals, and the output (combined PDF plus originals) is checked against the effective profile (size, count, names, formats). Only then is it stored, with a manifest and package hash, as the next version. Nothing is stored when anything blocks.
+
+Decisions made while building, to confirm or change:
+- **Inputs are checked differently from outputs.** PDFs and images are merged, so their individual names, sizes and count do not count against the portal's limits; the combined PDF and the originals do. Encrypted, unreadable and empty inputs always block.
+- **Build inputs are not saved on the tender.** Cover letter text, the company-profile override, the chosen documents and the limits override go in the build request and are frozen into that package version. A saved draft per tender is a later addition when the screen needs it.
+- **"The tender requires pricing" is a flag on the build request**, not data on the tender: nothing in the platform records it yet.
+- **Supporting documents are chosen by the person** (compliance documents by id). Automatic selection from the requirement matrix is not built.
+- **Output is one combined PDF plus originals.** Numbered separate PDFs and ZIP are not built.
+- **Package size ceiling:** `handyflow.tender.package.system-max-file-mb` (default 100) and `system-max-total-mb` (default 250). The storage port takes whole byte arrays, so this is also a memory limit.
+- A build is refused once the tender is SUBMITTED or WITHDRAWN (same statuses as pricing); existing versions stay downloadable. Linking a package to the submission snapshot is not built.
+
+Unrun in the authoring session: everything that needs Spring, iText or a database (service, controller, entities, migrations V314-V316, renderer, merger and their tests). Run: `mvn test "-Dtest=SubmissionPackageLogicTest,PackagePlannerTest,PdfPackageMergerTest,FileStoreTenderPackageStorageTest,SubmissionProfileServiceTest,TenderPackageServiceTest"` and then `HandyFlowApplicationTests` to apply the migrations and wire the beans.

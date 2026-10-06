@@ -54,6 +54,9 @@ public class TenderPackage {
     @Column(name = "file_name", nullable = false, updatable = false)
     private String fileName;
 
+    @Column(name = "file_sha256", nullable = false, updatable = false, length = 64)
+    private String fileSha256;
+
     @Column(name = "content_type", nullable = false, updatable = false)
     private String contentType;
 
@@ -77,7 +80,7 @@ public class TenderPackage {
 
     public static TenderPackage create(UUID id, TenantId tenantId, UUID tenderId, int versionNo, boolean submissionReady,
                                        boolean includesPricing, String profileName, String profileSnapshot, String issuesSnapshot,
-                                       String packageHash, String fileName, String contentType, long sizeBytes, Integer pageCount,
+                                       String packageHash, String fileName, String fileSha256, String contentType, long sizeBytes, Integer pageCount,
                                        String storageKey, UUID createdBy, String createdByName) {
         if (versionNo < 1) throw new IllegalArgumentException("versionNo must be 1 or more");
         if (packageHash == null || packageHash.length() != 64) throw new IllegalArgumentException("packageHash must be a SHA-256 hex digest");
@@ -94,6 +97,7 @@ public class TenderPackage {
         p.issuesSnapshot = issuesSnapshot;
         p.packageHash = packageHash;
         p.fileName = fileName;
+        p.fileSha256 = fileSha256;
         p.contentType = contentType;
         p.sizeBytes = sizeBytes;
         p.pageCount = pageCount;

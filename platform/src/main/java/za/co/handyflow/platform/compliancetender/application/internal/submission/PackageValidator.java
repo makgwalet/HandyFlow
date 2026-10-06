@@ -50,6 +50,37 @@ public final class PackageValidator {
         return List.copyOf(issues);
     }
 
+    /**
+     * The checks that apply to what goes IN, before anything is merged. PDFs and images are merged into one
+     * combined PDF, so their individual names, sizes and the number of them say nothing about what the portal
+     * receives; only whether they can be used at all matters (empty, password protected, unreadable) and
+     * whether the same content is in twice. Word, Excel and other originals are delivered as they are, so they
+     * get the full per-file checks. Size, count and names of what is delivered are checked by
+     * {@link #validate} on the output, after the merge.
+     */
+    public static List<PackageIssue> validateInputs(SubmissionProfile profile, List<PackageFile> files) {
+        List<PackageIssue> issues = new ArrayList<>();
+        Map<String, PackageFile> byHash = new HashMap<>();
+        Set<String> originalNames = new HashSet<>();
+        for (PackageFile file : files) {
+            FileKind kind = file.kind();
+            if (kind == FileKind.PDF || kind == FileKind.IMAGE) {
+                if (file.sizeBytes() <= 0) issues.add(blocking("EMPTY_FILE", file.fileName() + " is empty.", file.fileName()));
+                checkPdfHealth(file, issues);
+            } else {
+                checkFile(profile, file, issues);
+                if (!originalNames.add(file.fileName().toLowerCase(Locale.ROOT))) {
+                    issues.add(blocking("DUPLICATE_NAME", file.fileName() + " appears more than once. File names must be unique in a package.", file.fileName()));
+                }
+            }
+            PackageFile first = file.sha256() == null ? null : byHash.putIfAbsent(file.sha256(), file);
+            if (first != null) {
+                issues.add(warning("DUPLICATE_CONTENT", file.fileName() + " has the same content as " + first.fileName() + ".", file.fileName()));
+            }
+        }
+        return List.copyOf(issues);
+    }
+
     public static boolean canBuild(List<PackageIssue> issues) { return issues.stream().noneMatch(PackageIssue::blocking); }
 
     private static void checkFile(SubmissionProfile profile, PackageFile file, List<PackageIssue> issues) {
@@ -74,6 +105,11 @@ public final class PackageValidator {
                 break;
             }
         }
+        checkPdfHealth(file, issues);
+    }
+
+    private static void checkPdfHealth(PackageFile file, List<PackageIssue> issues) {
+        String name = file.fileName();
         if (file.pdfHealth() == PdfHealth.ENCRYPTED) {
             issues.add(blocking("PDF_ENCRYPTED", name + " is password protected and cannot be merged. Upload an unprotected copy.", name));
         } else if (file.pdfHealth() == PdfHealth.UNREADABLE) {

@@ -18,7 +18,8 @@ class PackagePlannerTest {
     }
 
     private static PlannedSection produced(SectionType type, PackageFile... files) {
-        return new PlannedSection(type, SectionContent.of("text", List.of(files)));
+        List<SectionContent.Attachment> attachments = java.util.Arrays.stream(files).map(f -> new SectionContent.Attachment(f, new byte[0])).toList();
+        return new PlannedSection(type, SectionContent.of("text", attachments));
     }
 
     private static PlannedSection missing(SectionType type, String why) {

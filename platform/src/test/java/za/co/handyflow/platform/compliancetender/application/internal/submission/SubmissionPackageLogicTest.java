@@ -202,6 +202,49 @@ class SubmissionPackageLogicTest {
         assertThat(e.ceilingNotes().size()).isEqualTo(1);
     }
 
+    // ---------- input checks and naming
+
+    @Test
+    @DisplayName("many PDFs and images going into one combined PDF are not blocked by count, size or name limits")
+    void inputsMergedAreNotCounted() {
+        SubmissionProfile p = new SubmissionProfile("p", Set.of("pdf"), 1L, 1L, 1, false, 5);
+        List<PackageIssue> issues = PackageValidator.validateInputs(p, List.of(
+                pdf("a-very-long-name.pdf", 50 * MB, "h1", PdfHealth.OK), pdf("b.pdf", 50 * MB, "h2", PdfHealth.OK), file("scan.jpg", MB, "h3")));
+        assertThat(issues.size()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("inputs: encrypted, unreadable and empty PDFs still block; same content twice warns")
+    void inputsHealth() {
+        List<PackageIssue> issues = PackageValidator.validateInputs(SubmissionProfile.unstated("p"), List.of(
+                pdf("locked.pdf", MB, "h1", PdfHealth.ENCRYPTED), pdf("broken.pdf", MB, "h2", PdfHealth.UNREADABLE),
+                file("empty.pdf", 0, "h3"), file("x.pdf", MB, "h9"), file("y.pdf", MB, "h9")));
+        assertThat(has(issues, "PDF_ENCRYPTED")).isEqualTo(true);
+        assertThat(has(issues, "PDF_UNREADABLE")).isEqualTo(true);
+        assertThat(has(issues, "EMPTY_FILE")).isEqualTo(true);
+        assertThat(has(issues, "DUPLICATE_CONTENT")).isEqualTo(true);
+    }
+
+    @Test
+    @DisplayName("inputs: Word/Excel originals are delivered as they are, so format, size and name rules apply to them")
+    void inputsOriginals() {
+        SubmissionProfile p = new SubmissionProfile("p", Set.of("pdf", "xlsx"), 5 * MB, null, null, null, null);
+        assertThat(PackageValidator.validateInputs(p, List.of(file("a.docx", MB, "h1"))).stream().anyMatch(i -> i.code().equals("FORMAT_NOT_ALLOWED"))).isEqualTo(true);
+        assertThat(PackageValidator.validateInputs(p, List.of(file("a.xlsx", 6 * MB, "h1"))).stream().anyMatch(i -> i.code().equals("FILE_TOO_LARGE"))).isEqualTo(true);
+        assertThat(PackageValidator.validateInputs(p, List.of(file("a.xlsx", MB, "h1"), file("A.XLSX", MB, "h2"))).stream().anyMatch(i -> i.code().equals("DUPLICATE_NAME"))).isEqualTo(true);
+        assertThat(PackageValidator.validateInputs(p, List.of(file("a.xlsx", MB, "h1"))).size()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("generated file names are numbered, lower-case and clean")
+    void naming() {
+        assertThat(PackageNaming.sectionFileName(1, SectionCatalogue.COVER_LETTER)).isEqualTo("01-cover-letter.pdf");
+        assertThat(PackageNaming.sectionFileName(12, SectionCatalogue.PRICING)).isEqualTo("12-pricing-schedule.pdf");
+        assertThat(PackageNaming.combinedFileName("TND/2026:0042", 3)).isEqualTo("tnd-2026-0042-submission-v3.pdf");
+        assertThat(PackageNaming.combinedFileName("  ", 1)).isEqualTo("tender-submission-v1.pdf");
+        assertThat(PackageNaming.combinedFileName("***", 2)).isEqualTo("file-submission-v2.pdf");
+    }
+
     // ---------- file kinds
 
     @Test

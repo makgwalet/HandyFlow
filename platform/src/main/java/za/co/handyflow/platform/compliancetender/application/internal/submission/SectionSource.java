@@ -1,18 +1,14 @@
 package za.co.handyflow.platform.compliancetender.application.internal.submission;
 
-import za.co.handyflow.platform.shared.TenantId;
-
-import java.util.UUID;
-
 /**
- * Where a section's content comes from (readiness, pricing, personnel, evidence, typed text...). One
- * implementation per section type, registered in the {@link SectionCatalogue}'s service wiring. A source
- * reads through the module's own services and facades; the builder never reaches into repositories.
+ * Where a section's content comes from (readiness, pricing, personnel, documents, typed text...). One
+ * implementation per section type. A source reads through the module's own services and facades; the
+ * builder never reaches into repositories. A source that cannot produce its section returns
+ * {@link SectionContent#unavailable} with the reason in words, it does not throw for an empty section.
  */
 public interface SectionSource {
 
     SectionType type();
 
-    /** @param mayIncludePricing whether the caller has COMPLIANCE_MANAGE/ADMIN (ADR-005 decision 2) */
-    SectionContent load(TenantId tenantId, UUID tenderId, boolean mayIncludePricing);
+    SectionContent load(BuildContext context);
 }
