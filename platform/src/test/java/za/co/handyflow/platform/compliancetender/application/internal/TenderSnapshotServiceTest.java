@@ -48,12 +48,13 @@ class TenderSnapshotServiceTest {
     @Mock private TenderPersonnelRepository personnelRepository;
     @Mock private TenderSubmissionSnapshotRepository snapshotRepository;
     @Mock private HrFacade hrFacade;
+    @Mock private TenderPricingService pricingService;
 
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     private TenderSnapshotService service() {
         return new TenderSnapshotService(tenderRepository, requirementRepository, personnelRepository,
-                snapshotRepository, hrFacade, objectMapper);
+                snapshotRepository, hrFacade, pricingService, objectMapper);
     }
 
     private static final TenantId TENANT = TenantId.generate();
@@ -91,6 +92,53 @@ class TenderSnapshotServiceTest {
         assertThat(response.data().requirements().get(0).description()).isEqualTo("Valid CSD registration");
         assertThat(response.data().personnel()).hasSize(1);
         assertThat(response.data().personnel().get(0).employeeFullName()).isEqualTo("Thabo Mokoena");
+    }
+
+    @Test
+    @DisplayName("the price schedule is frozen into the snapshot and survives the JSON round trip with its amounts")
+    void captureSnapshot_includesPricing() {
+        UUID tenderId = UUID.randomUUID();
+        Tender tender = Tender.create(TENANT, "TND-00001", "Test Tender", null, null, null, null, null, null, null, null, USER);
+        var pricing = new za.co.handyflow.platform.compliancetender.dto.TenderPricingResponse(
+                tenderId, "READY_TO_SUBMIT", true, true, null,
+                new za.co.handyflow.platform.compliancetender.dto.TenderPricingResponse.Settings(
+                        new java.math.BigDecimal("10.00"), java.math.BigDecimal.ZERO, new java.math.BigDecimal("5.00"), true, new java.math.BigDecimal("15.00"), "n"),
+                List.of(new za.co.handyflow.platform.compliancetender.dto.TenderPricingResponse.LineResponse(
+                        UUID.randomUUID(), "Roadworks", "1.1", "Kerbing", "m", new java.math.BigDecimal("10.000"), new java.math.BigDecimal("25.50"), new java.math.BigDecimal("255.00"), 1)),
+                new za.co.handyflow.platform.compliancetender.dto.TenderPricingResponse.Breakdown(
+                        new java.math.BigDecimal("255.00"), new java.math.BigDecimal("25.50"), java.math.BigDecimal.ZERO.setScale(2), new java.math.BigDecimal("14.03"),
+                        new java.math.BigDecimal("294.53"), new java.math.BigDecimal("44.18"), new java.math.BigDecimal("338.71"), new java.math.BigDecimal("4.76"), List.of()));
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(tender));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(personnelRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(snapshotRepository.countByTender(TENANT, tenderId)).thenReturn(0L);
+        when(pricingService.snapshotOf(TENANT, tenderId)).thenReturn(pricing);
+
+        var response = service().captureSnapshot(TENANT, tenderId, USER);
+
+        assertThat(response.data().pricing()).isNotNull();
+        assertThat(response.data().pricing().breakdown().priceInclVat()).isEqualByComparingTo("338.71");
+        assertThat(response.data().pricing().lines()).hasSize(1);
+        assertThat(response.data().pricing().settings().vatRatePct()).isEqualByComparingTo("15.00");
+    }
+
+    @Test
+    @DisplayName("a tender that was never priced snapshots with no pricing, and an old snapshot without the pricing field still reads")
+    void captureSnapshot_withoutPricing() throws Exception {
+        UUID tenderId = UUID.randomUUID();
+        Tender tender = Tender.create(TENANT, "TND-00001", "Test Tender", null, null, null, null, null, null, null, null, USER);
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(tender));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(personnelRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(snapshotRepository.countByTender(TENANT, tenderId)).thenReturn(0L);
+        when(pricingService.snapshotOf(TENANT, tenderId)).thenReturn(null);
+
+        assertThat(service().captureSnapshot(TENANT, tenderId, USER).data().pricing()).isNull();
+
+        String old = "{\"tenderId\":\"" + tenderId + "\",\"tenderNumber\":\"T\",\"name\":\"N\",\"requirements\":[],\"personnel\":[]}";
+        var parsed = objectMapper.readValue(old, za.co.handyflow.platform.compliancetender.dto.TenderSnapshotData.class);
+        assertThat(parsed.pricing()).isNull();
+        assertThat(parsed.name()).isEqualTo("N");
     }
 
     @Test

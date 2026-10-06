@@ -17,6 +17,7 @@ import za.co.handyflow.platform.businessreadiness.ReadinessResult;
 import za.co.handyflow.platform.businessreadiness.ReadinessSummary;
 import za.co.handyflow.platform.compliancetender.application.internal.TenderPdfService;
 import za.co.handyflow.platform.compliancetender.application.internal.TenderPersonnelService;
+import za.co.handyflow.platform.compliancetender.application.internal.TenderPricingService;
 import za.co.handyflow.platform.compliancetender.application.internal.TenderReadinessService;
 import za.co.handyflow.platform.compliancetender.application.internal.TenderService;
 import za.co.handyflow.platform.compliancetender.application.internal.TenderSnapshotService;
@@ -50,6 +51,7 @@ class TenderControllerReadinessTest {
     @MockitoBean TenderSnapshotService snapshotService;
     @MockitoBean TenderPdfService pdfService;
     @MockitoBean TenderReadinessService readinessService;
+    @MockitoBean TenderPricingService pricingService;
     @MockitoBean FeatureGuard featureGuard;
 
     final UUID tenderId = UUID.randomUUID();
