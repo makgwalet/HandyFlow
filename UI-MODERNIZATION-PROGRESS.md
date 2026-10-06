@@ -549,3 +549,11 @@ W5 is built. **W6 to W9 are not started.**
   provider interfaces, storing statistics not imagery, with manual rain-gauge entries taking precedence over the model.
 - **Prerequisite found:** production areas have no boundary today, so NDVI needs field-boundary capture first (draw on the Leaflet map plus KML/GeoJSON import). No PostGIS, JTS or scheduler lock exists.
 - **Needs your decisions** (ADR-002 section 9) and several unverified items (section 8: exact prices, CDSE terms for a shared free account, commercial quotes).
+
+## Business readiness (ADR-003): automatic requirement checking for tenders
+
+- New pure module `businessreadiness` (shared evaluator, no entities); `compliancetender` and `complianceservices` keep their own entities (Part 8) and call it. V312 adds the registration rule to both requirement tables; the document rule reuses `evidence_type`.
+- `GET .../readiness` on both sides; a shared Readiness check panel on both tender pages; a shared requirement catalogue screen (Compliance > Requirements, and a client Requirements tab, `?tab=requirements`). The catalogue had no screen before.
+- Fixed on the way: snapshot-number collision is a clean 409; a tender requirement must link to the owner's own tracked requirement; the tender PDFs no longer fetch logo URLs.
+- **Open:** pricing, the document builder, the submission package; the readiness assessment is not yet in the submission snapshot; eight other PDF services keep the logo-URL fallback.
+- **Run:** `mvn test "-Dtest=Ag*Test,Fleet*Test,Fuel*Test,SupplierFacadeImplTest,*Tender*Test,Compliance*Test,Client*Test,RequirementReadinessEvaluatorTest"`, then separately `mvn test "-Dtest=HandyFlowApplicationTests,InvoicingFacadeImplTest"` (V312 applies on that run), and `ArchitectureVerificationTest`.
