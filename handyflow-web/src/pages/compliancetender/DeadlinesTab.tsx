@@ -8,9 +8,12 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
-import { Plus, CalendarClock, CheckCircle2, Trash2, AlertCircle, X } from "lucide-react"
+import { Plus, CalendarClock, CheckCircle2, Trash2, AlertCircle, X, AlarmClock, CalendarCheck } from "lucide-react"
 import LookupInput from "../../components/ui/LookupInput"
 import { DEADLINE_TYPES } from "../../lookups/southAfrica"
+import Chip from "../../components/ui/Chip"
+import StatTile from "../../components/ui/StatTile"
+import { deadlineChip } from "./registration.logic"
 
 interface Deadline {
   id: string; registrationId: string | null; deadlineType: string; description: string | null
@@ -80,6 +83,11 @@ export default function DeadlinesTab() {
 
   return (
     <div>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
+        <StatTile label="Overdue" value={overdue.length} icon={<AlarmClock size={18} />} tone={overdue.length > 0 ? "bad" : "neutral"} />
+        <StatTile label="Due within 14 days" value={dueSoon.length} icon={<CalendarClock size={18} />} tone={dueSoon.length > 0 ? "warn" : "neutral"} />
+        <StatTile label="Upcoming" value={upcoming.length} icon={<CalendarCheck size={18} />} tone="info" />
+      </div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
         {canManage && (
           <button onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") }}
@@ -114,7 +122,8 @@ export default function DeadlinesTab() {
                         Due {fmtDate(d.dueDate)}{d.description ? ` · ${d.description}` : ""}
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
+                      {(() => { const c = deadlineChip(d.dueDate, new Date()); return <Chip tone={c.tone}>{c.text}</Chip> })()}
                       {canManage && (
                         <button onClick={() => markDone.mutate(d.id)} title="Mark done" style={{ background: "var(--hf-success-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-success-text-strong)" }}><CheckCircle2 size={13} /></button>
                       )}

@@ -11,11 +11,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import {
-  Plus, ShieldCheck, ChevronDown, ChevronUp, X, Edit2, Trash2, AlertCircle, Clock,
+  Plus, ShieldCheck, ChevronDown, ChevronUp, X, Edit2, Trash2, AlertCircle, Clock, ShieldAlert, ShieldX, Layers,
 } from "lucide-react"
 import LookupInput from "../../components/ui/LookupInput"
 import { REGISTRATION_AUTHORITIES, registrationTypesFor } from "../../lookups/southAfrica"
-import { effectiveStatus } from "./registration.logic"
+import { effectiveStatus, expiryChip } from "./registration.logic"
+import Chip from "../../components/ui/Chip"
+import StatTile from "../../components/ui/StatTile"
 
 interface Registration {
   id: string; authority: string; registrationType: string; registrationNumber: string | null
@@ -101,7 +103,7 @@ export default function RegistrationsTab() {
 
   const stats = [
     { label: "Total",    value: registrations.length,                                          color: "var(--hf-sky-text-strong)" },
-    { label: "Active",   value: registrations.filter(r => r.status === "ACTIVE").length,        color: "var(--hf-success-text-strong)" },
+    { label: "Active",   value: registrations.filter(r => effectiveStatus(r, new Date()) === "ACTIVE").length,        color: "var(--hf-success-text-strong)" },
     { label: "Expiring Soon", value: registrations.filter(r => r.expiringSoon && effectiveStatus(r, new Date()) === "ACTIVE").length,           color: "var(--hf-warning-text)" },
     { label: "Expired",  value: registrations.filter(r => effectiveStatus(r, new Date()) === "EXPIRED").length,        color: "var(--hf-danger-text)" },
   ]
@@ -127,13 +129,11 @@ export default function RegistrationsTab() {
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
-        {stats.map(s => (
-          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
-          </div>
-        ))}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 22 }}>
+        <StatTile label="Total registrations" value={stats[0].value} icon={<Layers size={18} />} tone="info" />
+        <StatTile label="Active" value={stats[1].value} icon={<ShieldCheck size={18} />} tone="ok" />
+        <StatTile label="Expiring soon" value={stats[2].value} icon={<ShieldAlert size={18} />} tone={stats[2].value > 0 ? "warn" : "neutral"} />
+        <StatTile label="Expired" value={stats[3].value} icon={<ShieldX size={18} />} tone={stats[3].value > 0 ? "bad" : "neutral"} />
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
@@ -166,7 +166,7 @@ export default function RegistrationsTab() {
           {filtered.map(r => {
             const isOpen = expanded === r.id
             return (
-              <div key={r.id} style={{ border: `1px solid ${r.status === "EXPIRED" ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 12, overflow: "hidden" }}>
+              <div key={r.id} style={{ border: `1px solid ${effectiveStatus(r, new Date()) === "EXPIRED" ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 12, overflow: "hidden" }}>
                 <div style={{ padding: "16px 20px", background: "var(--hf-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                     <div style={{ width: 44, height: 44, borderRadius: 10, background: "var(--hf-info-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -183,6 +183,7 @@ export default function RegistrationsTab() {
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                    {r.expiryDate && effectiveStatus(r, new Date()) !== "NOT_APPLICABLE" && (() => { const c = expiryChip(r.expiryDate, new Date()); return <Chip tone={c.tone}>{c.text}</Chip> })()}
                     <StatusBadge status={effectiveStatus(r, new Date())} expiringSoon={r.expiringSoon} />
                     {canManage && (
                       <div style={{ display: "flex", gap: 5 }}>

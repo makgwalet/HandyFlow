@@ -26,6 +26,8 @@ import {
 import EditTenderModal from "./EditTenderModal"
 import { canEditDetails, canEditMatrix } from "./tender.logic"
 import LookupInput from "../../components/ui/LookupInput"
+import Chip from "../../components/ui/Chip"
+import { countdown, stepper } from "./tendersView.logic"
 import { PERSONNEL_ROLES } from "../../lookups/southAfrica"
 
 interface Tender {
@@ -236,6 +238,34 @@ export default function TenderDetailPage() {
         </div>
       </div>
 
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "stretch", marginBottom: 20 }}>
+        <div aria-label="Tender progress" style={{ flex: "2 1 420px", display: "flex", alignItems: "center", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "14px 18px", gap: 6 }}>
+          {stepper(tender.status).map((st, i, arr) => (
+            <div key={st.label} style={{ display: "flex", alignItems: "center", flex: i < arr.length - 1 ? "1 1 0" : "0 0 auto", gap: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 22, height: 22, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800,
+                  background: st.state === "todo" ? "var(--hf-surface-sunken)" : st.state === "current" ? "var(--hf-sky-solid-strong)" : "var(--hf-success-soft-strong)",
+                  color: st.state === "todo" ? "var(--hf-text-faint)" : st.state === "current" ? "var(--hf-text-on-solid)" : "var(--hf-success-text-strong)" }}>
+                  {st.state === "done" ? "✓" : i + 1}
+                </span>
+                <span style={{ fontSize: 12, fontWeight: st.state === "current" ? 700 : 500, color: st.state === "todo" ? "var(--hf-text-faint)" : "var(--hf-text)" }}>{st.label}</span>
+              </div>
+              {i < arr.length - 1 && <div style={{ flex: 1, height: 2, minWidth: 12, background: st.state === "done" ? "var(--hf-success-text-strong)" : "var(--hf-border)" }} />}
+            </div>
+          ))}
+        </div>
+        {(() => {
+          const cd = countdown(tender, new Date())
+          return (
+            <div style={{ flex: "1 1 200px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "12px 18px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 6 }}>
+              <div style={{ fontSize: 11, color: "var(--hf-text-faint)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Closing</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "var(--hf-text)" }}>{fmtDate(tender.closingDate)}</div>
+              {cd && <div><Chip tone={cd.tone}>{cd.text}</Chip></div>}
+            </div>
+          )
+        })()}
+      </div>
+
       {canManage && nextStates.length > 0 && (
         <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
           {nextStates.map(s => {
@@ -261,7 +291,7 @@ export default function TenderDetailPage() {
       )}
 
       <Section title="Tender Details">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 16 }}>
           <Field l="Tender Authority" v={tender.tenderAuthority || "—"} />
           <Field l="Authority Reference" v={tender.authorityReferenceNumber || "—"} />
           <Field l="Estimated Value" v={fmtZar(tender.estimatedValue)} />

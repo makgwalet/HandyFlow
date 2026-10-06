@@ -11,6 +11,8 @@ import { usePermission } from "../../hooks/usePermission"
 import { Upload, FileText, CheckCircle2, Trash2, AlertCircle, BadgeCheck } from "lucide-react"
 import LookupInput from "../../components/ui/LookupInput"
 import { DOCUMENT_TYPES } from "../../lookups/southAfrica"
+import Chip from "../../components/ui/Chip"
+import { documentState } from "./registration.logic"
 
 interface Doc {
   id: string; registrationId: string | null; documentType: string; evidenceId: string
@@ -82,7 +84,7 @@ export default function DocumentsTab() {
   return (
     <div>
       {canManage && (
-        <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 18, marginBottom: 22 }}>
+        <div style={{ background: "var(--hf-surface)", border: "1.5px dashed var(--hf-border-strong)", borderRadius: 14, padding: 20, marginBottom: 22 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 12 }}>Upload a document</div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
             <div>
@@ -165,17 +167,9 @@ export default function DocumentsTab() {
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                {d.verified ? (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: "1px solid var(--hf-success-border)" }}>
-                    <BadgeCheck size={12} /> Verified
-                  </span>
-                ) : (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "var(--hf-warning-soft)", color: "var(--hf-warning-text)", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: "1px solid var(--hf-warning-border)" }}>
-                    Not verified
-                  </span>
-                )}
+                {(() => { const st = documentState(d, new Date()); return <Chip tone={st.tone} icon={d.verified && st.tone === "ok" ? <BadgeCheck size={12} /> : undefined}>{st.text}</Chip> })()}
                 {canManage && !d.verified && (
-                  <button onClick={() => verify.mutate(d.id)} title="Mark verified" style={{ background: "var(--hf-success-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-success-text-strong)" }}><CheckCircle2 size={13} /></button>
+                  <button onClick={() => verify.mutate(d.id)} title="Confirm this document is genuine and current. Only verified documents count towards tender requirements." style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "var(--hf-success-soft-strong)", border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "var(--hf-success-text-strong)" }}><CheckCircle2 size={13} /> Verify</button>
                 )}
                 {canAdmin && (
                   <button onClick={() => { if (confirm(`Delete "${d.documentType}"?`)) remove.mutate(d.id) }} title="Delete" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
