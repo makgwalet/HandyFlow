@@ -14,6 +14,9 @@ public interface TenderPackageStorage {
     /** @param storageKey opaque; persist it and pass it back unchanged, never build or parse one */
     record Stored(String storageKey, long sizeBytes, String sha256) {}
 
+    /** A stored package read back for download, with the name and type it should be served under. */
+    record Loaded(byte[] content, String fileName, String contentType) {}
+
     Stored store(TenantId tenantId, UUID tenderId, UUID packageId, String fileName, String contentType, byte[] content);
 
     byte[] load(String storageKey);
