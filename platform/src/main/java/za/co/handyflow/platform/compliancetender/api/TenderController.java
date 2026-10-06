@@ -16,6 +16,7 @@ import za.co.handyflow.platform.businessreadiness.ReadinessAssessment;
 import za.co.handyflow.platform.compliancetender.application.internal.TenderReadinessService;
 import za.co.handyflow.platform.compliancetender.application.internal.TenderService;
 import za.co.handyflow.platform.compliancetender.application.internal.TenderPersonnelService;
+import za.co.handyflow.platform.compliancetender.application.internal.TenderPricingService;
 import za.co.handyflow.platform.compliancetender.application.internal.TenderSnapshotService;
 import za.co.handyflow.platform.compliancetender.application.internal.TenderPdfService;
 import za.co.handyflow.platform.compliancetender.dto.*;
@@ -36,6 +37,7 @@ public class TenderController {
     private final TenderSnapshotService snapshotService;
     private final TenderPdfService pdfService;
     private final TenderReadinessService readinessService;
+    private final TenderPricingService pricingService;
     private final FeatureGuard featureGuard;
 
     @GetMapping
@@ -154,8 +156,57 @@ public class TenderController {
         return ResponseEntity.ok(ApiResponse.success("Personnel removed", null));
     }
 
-    // ── Submission snapshots — frozen at the moment a tender is SUBMITTED ───
 
+    // ---- Pricing (ADR-004). Commercially sensitive, so even reading it needs MANAGE or ADMIN, not just READ. ----
+
+    @GetMapping("/{id}/pricing")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
+    @Operation(summary = "The tender's price schedule and computed breakdown")
+    public ResponseEntity<ApiResponse<TenderPricingResponse>> getPricing(@PathVariable UUID id) {
+        featureGuard.requireModule("compliancetender");
+        return ResponseEntity.ok(ApiResponse.success(pricingService.getPricing(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PutMapping("/{id}/pricing/settings")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
+    @Operation(summary = "Set overhead, contingency, profit and VAT treatment (locked once submitted)")
+    public ResponseEntity<ApiResponse<TenderPricingResponse>> saveSettings(
+            @PathVariable UUID id, @Valid @RequestBody SaveTenderPricingSettingsRequest request) {
+        featureGuard.requireModule("compliancetender");
+        return ResponseEntity.ok(ApiResponse.success("Pricing settings saved",
+                pricingService.saveSettings(TenantContext.getTenantIdAsObject(), id, request, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/{id}/pricing/lines")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
+    @Operation(summary = "Add a line to the price schedule (locked once submitted)")
+    public ResponseEntity<ApiResponse<TenderPricingResponse>> addPricingLine(
+            @PathVariable UUID id, @Valid @RequestBody SaveTenderPricingLineRequest request) {
+        featureGuard.requireModule("compliancetender");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Line added",
+                pricingService.addLine(TenantContext.getTenantIdAsObject(), id, request, TenantContext.getCurrentUserId())));
+    }
+
+    @PutMapping("/pricing/lines/{lineId}")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
+    @Operation(summary = "Change a price schedule line (locked once submitted)")
+    public ResponseEntity<ApiResponse<TenderPricingResponse>> updatePricingLine(
+            @PathVariable UUID lineId, @Valid @RequestBody SaveTenderPricingLineRequest request) {
+        featureGuard.requireModule("compliancetender");
+        return ResponseEntity.ok(ApiResponse.success("Line updated",
+                pricingService.updateLine(TenantContext.getTenantIdAsObject(), lineId, request, TenantContext.getCurrentUserId())));
+    }
+
+    @DeleteMapping("/pricing/lines/{lineId}")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
+    @Operation(summary = "Remove a price schedule line (locked once submitted)")
+    public ResponseEntity<ApiResponse<TenderPricingResponse>> deletePricingLine(@PathVariable UUID lineId) {
+        featureGuard.requireModule("compliancetender");
+        return ResponseEntity.ok(ApiResponse.success("Line removed",
+                pricingService.deleteLine(TenantContext.getTenantIdAsObject(), lineId)));
+    }
+
+    // ── Submission snapshots — frozen at the moment a tender is SUBMITTED ───
     @GetMapping("/{id}/snapshots")
     @PreAuthorize("hasAnyAuthority('COMPLIANCE_READ','COMPLIANCE_MANAGE','COMPLIANCE_ADMIN')")
     @Operation(summary = "Every frozen submission record for this tender, most recent first")

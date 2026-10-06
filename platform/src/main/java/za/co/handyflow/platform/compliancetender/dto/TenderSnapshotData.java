@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
+ * {@code pricing} is the price schedule exactly as it stood at submission: null for a tender never priced, and for snapshots taken before pricing existed.
  * The actual frozen shape captured into TenderSubmissionSnapshot.snapshotJson.
  * A plain data record, not a JPA entity — it only ever exists in memory
  * long enough to be serialized once, at submission time.
@@ -15,7 +16,8 @@ public record TenderSnapshotData(
         UUID tenderId, String tenderNumber, String name, String tenderAuthority,
         String authorityReferenceNumber, LocalDate closingDate, BigDecimal estimatedValue,
         String industry, String requiredClassOfWork, String status,
-        List<RequirementSnapshot> requirements, List<PersonnelSnapshot> personnel, Instant capturedAt
+        List<RequirementSnapshot> requirements, List<PersonnelSnapshot> personnel, Instant capturedAt,
+        TenderPricingResponse pricing
 ) {
     /** description/source/status copied as they were at capture time — NOT a live reference. */
     public record RequirementSnapshot(String description, String source, String status) {}
