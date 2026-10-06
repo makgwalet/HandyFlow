@@ -557,3 +557,11 @@ W5 is built. **W6 to W9 are not started.**
 - Fixed on the way: snapshot-number collision is a clean 409; a tender requirement must link to the owner's own tracked requirement; the tender PDFs no longer fetch logo URLs.
 - **Open:** pricing, the document builder, the submission package; the readiness assessment is not yet in the submission snapshot; eight other PDF services keep the logo-URL fallback.
 - **Run:** `mvn test "-Dtest=Ag*Test,Fleet*Test,Fuel*Test,SupplierFacadeImplTest,*Tender*Test,Compliance*Test,Client*Test,RequirementReadinessEvaluatorTest"`, then separately `mvn test "-Dtest=HandyFlowApplicationTests,InvoicingFacadeImplTest"` (V312 applies on that run), and `ArchitectureVerificationTest`.
+
+## Tender pricing (ADR-004)
+
+- Cost-based price schedule per tender: sections and items (quantity x unit cost), overhead / contingency / profit markups, VAT switch (rate captured from `VatRateProvider` when pricing is created). Pure `TenderPriceCalculator`; amounts are never stored.
+- Editable up to READY_TO_SUBMIT, locked from SUBMITTED (409 with the status named); frozen into the submission snapshot (`pricing`, nullable so old snapshots still read). CSV export.
+- Endpoints need `COMPLIANCE_MANAGE` or `COMPLIANCE_ADMIN`, even to read. V313 adds `tender_pricing` and `tender_pricing_lines`. New screen `/compliancetender/tenders/:id/pricing` and a summary card on the tender page.
+- **Open:** client-side pricing, supplier-rate import, rates library, pricing in the tender PDF, per-line VAT. The tender-page layout, AI response builder and document builder in the mock-up are not built.
+- **Run:** `mvn test "-Dtest=*Tender*Test,Compliance*Test,Client*Test,RequirementReadinessEvaluatorTest"`, then separately `mvn test "-Dtest=HandyFlowApplicationTests,InvoicingFacadeImplTest"` (V313 applies on that run), and `ArchitectureVerificationTest`.
