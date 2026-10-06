@@ -5,19 +5,19 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.util.UUID;
 
 /**
- * Where a built package is kept. The package service depends on this, not on EvidenceFacade, so the
- * storage can change (a dedicated document store, large-file storage) without touching the builder
- * (ADR-005 decision 4). A stored package is never edited: a rebuild is a new version.
+ * Where a built package's bytes are kept (ADR-005 decision 4). The package service and the rest of the
+ * tender code depend on this, never on a file system, a database or an object store. A package is never
+ * edited: a rebuild is a new version with a new key.
  */
 public interface TenderPackageStorage {
 
-    /** What was stored. {@code sha256} is of the stored bytes. */
-    record Stored(UUID storageId, String fileName, long sizeBytes, String sha256) {}
+    /** @param storageKey opaque; persist it and pass it back unchanged, never build or parse one */
+    record Stored(String storageKey, long sizeBytes, String sha256) {}
 
-    record Loaded(byte[] content, String fileName, String contentType) {}
+    Stored store(TenantId tenantId, UUID tenderId, UUID packageId, String fileName, String contentType, byte[] content);
 
-    Stored store(TenantId tenantId, UUID packageId, String fileName, String contentType, byte[] content,
-                 UUID storedBy, String storedByName);
+    byte[] load(String storageKey);
 
-    Loaded load(TenantId tenantId, UUID storageId);
+    /** Idempotent: a key that is already gone is not an error. */
+    void delete(String storageKey);
 }
