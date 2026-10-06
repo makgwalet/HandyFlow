@@ -40,7 +40,7 @@ function displayName(e: EmployeeOption): string {
   return e.fullName || composed || e.employeeNumber || e.id.slice(0, 8)
 }
 
-export default function EmployeePicker({ value, onChange }: { value: EmployeeOption | null; onChange: (e: EmployeeOption | null) => void }) {
+export default function EmployeePicker({ value, onChange, emptyHint = "No employees found." }: { value: EmployeeOption | null; onChange: (e: EmployeeOption | null) => void; emptyHint?: string }) {
   const [query, setQuery] = useState("")
   const [open, setOpen] = useState(false)
   const [results, setResults] = useState<EmployeeOption[]>([])
@@ -109,7 +109,7 @@ export default function EmployeePicker({ value, onChange }: { value: EmployeeOpt
           ) : error ? (
             <p style={{ fontSize: 11.5, color: "var(--hf-danger-text)", padding: "10px 12px", margin: 0 }}>{error}</p>
           ) : results.length === 0 ? (
-            <p style={{ fontSize: 12, color: "var(--hf-text-faint)", padding: "10px 12px", margin: 0 }}>No employees found.</p>
+            <p style={{ fontSize: 12, color: "var(--hf-text-faint)", padding: "10px 12px", margin: 0 }}>{emptyHint}</p>
           ) : (
             results.map(emp => (
               <button key={emp.id} onClick={() => { onChange(emp); setOpen(false); setQuery("") }}

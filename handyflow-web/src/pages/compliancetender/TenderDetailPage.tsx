@@ -21,7 +21,10 @@ import EmployeePicker, { type EmployeeOption } from "../training/EmployeePicker"
 import {
   ArrowLeft, Briefcase, Download, Plus, Trash2, X, AlertCircle,
   Users, ClipboardCheck, History, ChevronDown, ChevronUp,
+  Pencil,
 } from "lucide-react"
+import EditTenderModal from "./EditTenderModal"
+import { canEditDetails, canEditMatrix } from "./tender.logic"
 import LookupInput from "../../components/ui/LookupInput"
 import { PERSONNEL_ROLES } from "../../lookups/southAfrica"
 
@@ -32,7 +35,7 @@ interface Tender {
   requiredClassOfWork: string | null; status: string; outcomeReason: string | null
   awardedValue: number | null; submittedAt: string | null
 }
-interface Requirement { id: string; description: string; source: string; status: string }
+interface Requirement { id: string; description: string; source: string; status: string; complianceRequirementId: string | null }
 interface TrackedRequirement { id: string; code: string; name: string; evidenceType: string | null }
 interface Personnel { id: string; employeeId: string; role: string; employeeFound: boolean; employeeFullName: string | null; employeeNumber: string | null }
 interface Snapshot { id: string; snapshotNumber: number; submittedAt: string; data: any }
@@ -98,6 +101,8 @@ export default function TenderDetailPage() {
   const [snapshotsOpen, setSnapshotsOpen] = useState(false)
   const [expandedSnapshot, setExpandedSnapshot] = useState<string | null>(null)
   const [apiError, setApiError] = useState("")
+  const [showEdit, setShowEdit] = useState(false)
+  const [editingReq, setEditingReq] = useState<{ id: string; text: string } | null>(null)
 
   const { data: tender, isLoading } = useQuery<Tender>({
     queryKey: ["ct-tender", id],
@@ -154,13 +159,29 @@ export default function TenderDetailPage() {
       description: newRequirement, source: newRequirementSource,
       complianceRequirementId: pickedRequirementId || null,
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ct-tender-requirements", id] }); qc.invalidateQueries({ queryKey: ["readiness"] }); setNewRequirement(""); setPickedRequirementId(""); setNewRequirementSource("MANUAL") },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ct-tender-requirements", id] }); qc.invalidateQueries({ queryKey: ["readiness"] }); setNewRequirement(""); setPickedRequirementId(""); setNewRequirementSource("MANUAL"); setApiError("") },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onError: (e: any) => setApiError(e.response?.data?.message ?? "The requirement could not be added"),
+  })
+
+  const afterMatrixChange = () => { qc.invalidateQueries({ queryKey: ["ct-tender-requirements", id] }); qc.invalidateQueries({ queryKey: ["readiness"] }); setApiError("") }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const matrixError = (fallback: string) => (e: any) => setApiError(e.response?.data?.message ?? fallback)
+
+  const removeRequirement = useMutation({
+    mutationFn: (reqId: string) => apiClient.delete(`/api/v1/compliance/tenders/requirements/${reqId}`),
+    onSuccess: afterMatrixChange, onError: matrixError("The requirement could not be removed"),
+  })
+
+  const renameRequirement = useMutation({
+    mutationFn: ({ reqId, description }: { reqId: string; description: string }) => apiClient.put(`/api/v1/compliance/tenders/requirements/${reqId}`, { description }),
+    onSuccess: () => { afterMatrixChange(); setEditingReq(null) }, onError: matrixError("The requirement could not be changed"),
   })
 
   const updateRequirementStatus = useMutation({
     mutationFn: ({ reqId, status }: { reqId: string; status: string }) =>
       apiClient.put(`/api/v1/compliance/tenders/requirements/${reqId}/status`, { status }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ct-tender-requirements", id] }); qc.invalidateQueries({ queryKey: ["readiness"] }) },
+    onSuccess: afterMatrixChange, onError: matrixError("The status could not be changed"),
   })
 
   const addPersonnel = useMutation({
@@ -201,10 +222,18 @@ export default function TenderDetailPage() {
             <div style={{ fontSize: 13, color: "var(--hf-text-faint)", marginTop: 3 }}>{tender.tenderNumber}</div>
           </div>
         </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {canManage && canEditDetails(tender.status) && (
+          <button onClick={() => setShowEdit(true)}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-surface)", color: "var(--hf-text)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            <Pencil size={14} /> Edit details
+          </button>
+        )}
         <button onClick={() => downloadPdf(tender.id, tender.tenderNumber)}
           style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-surface)", color: "var(--hf-sky-text-strong)", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Download size={14} /> Export PDF
         </button>
+        </div>
       </div>
 
       {canManage && nextStates.length > 0 && (
@@ -256,28 +285,53 @@ export default function TenderDetailPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: canManage ? 16 : 0 }}>
             {requirements.map(r => {
               const rcfg = REQ_STATUS_CFG[r.status] ?? REQ_STATUS_CFG.PENDING_REVIEW
+              const editing = editingReq?.id === r.id
               return (
                 <div key={r.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 14px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8 }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{r.description}</div>
-                    <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{r.source}</div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    {editing ? (
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <input autoFocus aria-label="Requirement wording" value={editingReq.text} onChange={e => setEditingReq({ id: r.id, text: e.target.value })}
+                          onKeyDown={e => { if (e.key === "Enter" && editingReq.text.trim()) renameRequirement.mutate({ reqId: r.id, description: editingReq.text }); if (e.key === "Escape") setEditingReq(null) }}
+                          style={{ ...inp, flex: 1 }} />
+                        <button onClick={() => editingReq.text.trim() && renameRequirement.mutate({ reqId: r.id, description: editingReq.text })} disabled={renameRequirement.isPending}
+                          style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "var(--hf-sky-solid-strong)", color: "var(--hf-text-on-solid)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Save</button>
+                        <button onClick={() => setEditingReq(null)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 12, cursor: "pointer" }}>Cancel</button>
+                      </div>
+                    ) : (<>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-text)" }}>{r.description}</div>
+                      <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{r.source}{r.complianceRequirementId ? " · from your tracked requirements" : ""}</div>
+                    </>)}
                   </div>
                   {canManage ? (
-                    <select value={r.status} onChange={e => updateRequirementStatus.mutate({ reqId: r.id, status: e.target.value })}
+                    <select aria-label={`Status of ${r.description}`} value={r.status} onChange={e => updateRequirementStatus.mutate({ reqId: r.id, status: e.target.value })}
                       style={{ ...inp, fontSize: 11, fontWeight: 700, color: rcfg.color, background: rcfg.bg, border: "none", padding: "5px 10px" }}>
                       {REQUIREMENT_STATUSES.map(s => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
                     </select>
                   ) : (
                     <span style={{ fontSize: 11, fontWeight: 700, color: rcfg.color, background: rcfg.bg, padding: "5px 10px", borderRadius: 6 }}>{r.status.replace("_", " ")}</span>
                   )}
+                  {canManage && canEditMatrix(tender.status) && !editing && (
+                    <div style={{ display: "flex", gap: 4 }}>
+                      {!r.complianceRequirementId && (
+                        <button onClick={() => setEditingReq({ id: r.id, text: r.description })} title="Reword" aria-label={`Reword ${r.description}`}
+                          style={{ background: "var(--hf-surface-sunken)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-text-muted)" }}><Pencil size={13} /></button>
+                      )}
+                      <button onClick={() => { if (confirm(`Remove "${r.description}" from this tender?`)) removeRequirement.mutate(r.id) }} title="Remove" aria-label={`Remove ${r.description}`}
+                        style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
+                    </div>
+                  )}
                 </div>
               )
             })}
           </div>
         )}
-        {canManage && (
+        {canManage && !canEditMatrix(tender.status) && requirements.length > 0 && (
+          <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginBottom: 8 }}>The matrix is locked once the tender is submitted: it is the record of what was submitted.</div>
+        )}
+        {canManage && canEditMatrix(tender.status) && (
           <div>
-            {trackedRequirements.length > 0 && (
+            {trackedRequirements.some(t => !requirements.some(r => r.complianceRequirementId === t.id)) && (
               <div style={{ marginBottom: 8 }}>
                 <select value={pickedRequirementId} onChange={e => {
                   const reqId = e.target.value
@@ -286,7 +340,7 @@ export default function TenderDetailPage() {
                   if (tracked) { setNewRequirement(tracked.name); setNewRequirementSource("COMPLIANCE") }
                 }} style={{ ...inp, width: "100%", background: "var(--hf-surface)" }}>
                   <option value="">— Add from tracked requirements, or type a custom one below —</option>
-                  {trackedRequirements.map(t => <option key={t.id} value={t.id}>{t.code} — {t.name}</option>)}
+                  {trackedRequirements.filter(t => !requirements.some(r => r.complianceRequirementId === t.id)).map(t => <option key={t.id} value={t.id}>{t.code} — {t.name}</option>)}
                 </select>
               </div>
             )}
@@ -328,7 +382,7 @@ export default function TenderDetailPage() {
         {canManage && (
           <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
             <div style={{ flex: 2 }}>
-              <EmployeePicker value={pickedEmployee} onChange={setPickedEmployee} />
+              <EmployeePicker value={pickedEmployee} onChange={setPickedEmployee} emptyHint="No employee matches. Key personnel come from HR, so add the person under HR first." />
             </div>
             <LookupInput value={personnelRole} options={PERSONNEL_ROLES} onChange={setPersonnelRole} placeholder="Role on tender, e.g. Project Manager" style={{ ...inp, flex: 1 }} />
             <button onClick={() => pickedEmployee && personnelRole.trim() && addPersonnel.mutate()}
@@ -401,6 +455,7 @@ export default function TenderDetailPage() {
           </div>
         </div>
       )}
+      {showEdit && <EditTenderModal tender={tender} onClose={() => setShowEdit(false)} onSaved={() => { invalidateTender(); qc.invalidateQueries({ queryKey: ["ct-tenders"] }); qc.invalidateQueries({ queryKey: ["ct-dashboard"] }) }} />}
     </div>
   )
 }

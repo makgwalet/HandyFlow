@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import LookupInput from "../../components/ui/LookupInput"
 import { REGISTRATION_AUTHORITIES, registrationTypesFor } from "../../lookups/southAfrica"
+import { effectiveStatus } from "./registration.logic"
 
 interface Registration {
   id: string; authority: string; registrationType: string; registrationNumber: string | null
@@ -101,8 +102,8 @@ export default function RegistrationsTab() {
   const stats = [
     { label: "Total",    value: registrations.length,                                          color: "var(--hf-sky-text-strong)" },
     { label: "Active",   value: registrations.filter(r => r.status === "ACTIVE").length,        color: "var(--hf-success-text-strong)" },
-    { label: "Expiring Soon", value: registrations.filter(r => r.expiringSoon).length,           color: "var(--hf-warning-text)" },
-    { label: "Expired",  value: registrations.filter(r => r.status === "EXPIRED").length,        color: "var(--hf-danger-text)" },
+    { label: "Expiring Soon", value: registrations.filter(r => r.expiringSoon && effectiveStatus(r, new Date()) === "ACTIVE").length,           color: "var(--hf-warning-text)" },
+    { label: "Expired",  value: registrations.filter(r => effectiveStatus(r, new Date()) === "EXPIRED").length,        color: "var(--hf-danger-text)" },
   ]
 
   const inp = (k: string): React.CSSProperties => ({
@@ -182,7 +183,7 @@ export default function RegistrationsTab() {
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                    <StatusBadge status={r.status} expiringSoon={r.expiringSoon} />
+                    <StatusBadge status={effectiveStatus(r, new Date())} expiringSoon={r.expiringSoon} />
                     {canManage && (
                       <div style={{ display: "flex", gap: 5 }}>
                         <button onClick={() => openEdit(r)} title="Edit" style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-info-text)" }}><Edit2 size={13} /></button>

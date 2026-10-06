@@ -2,6 +2,7 @@
 //
 // Pure helpers for the Compliance & Tender dashboard: what to count, what is urgent, and how to say it. No React, no network.
 import { daysUntil } from "./package.logic"
+import { effectiveStatus } from "./registration.logic"
 
 export interface DashRegistration { id: string; authority: string; registrationType: string; status: string; expiryDate: string | null; expiringSoon: boolean }
 export interface DashDeadline { id: string; deadlineType: string; description: string | null; dueDate: string; status: string; dueSoon: boolean }
@@ -48,12 +49,13 @@ export function nextClosing(tenders: DashTender[], today: Date): DashTender | nu
 
 export interface RegistrationHealth { valid: number; expiringSoon: number; expired: number; other: number; total: number }
 
-export function registrationHealth(regs: DashRegistration[]): RegistrationHealth {
+export function registrationHealth(regs: DashRegistration[], today: Date = new Date()): RegistrationHealth {
   let valid = 0, expiringSoon = 0, expired = 0, other = 0
   for (const r of regs) {
-    if (r.status === "EXPIRED" || r.status === "LAPSED") expired++
-    else if (r.status === "ACTIVE" && r.expiringSoon) expiringSoon++
-    else if (r.status === "ACTIVE") valid++
+    const status = effectiveStatus(r, today)
+    if (status === "EXPIRED" || status === "LAPSED") expired++
+    else if (status === "ACTIVE" && r.expiringSoon) expiringSoon++
+    else if (status === "ACTIVE") valid++
     else other++
   }
   return { valid, expiringSoon, expired, other, total: regs.length }

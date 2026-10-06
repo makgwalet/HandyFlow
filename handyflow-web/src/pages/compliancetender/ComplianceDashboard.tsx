@@ -35,7 +35,7 @@ export default function ComplianceDashboard({ onNavigate }: { onNavigate: (tab: 
     queryFn: async () => unwrap(await apiClient.get("/api/v1/compliance/tenders?size=200")),
   })
 
-  const health = registrationHealth(registrations)
+  const health = registrationHealth(registrations, today)
   const stages = pipeline(tenders)
   const maxStage = Math.max(1, ...stages.map(s => s.count))
   const next = nextClosing(tenders, today)
