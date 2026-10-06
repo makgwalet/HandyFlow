@@ -47,7 +47,8 @@ class SupplierFacadeImplTest {
     @DisplayName("active suppliers are listed with identity only, asking Supply Chain for ACTIVE ones")
     void listsActive() {
         UUID id = UUID.randomUUID();
-        when(repository.findByTenantIdAndStatus(eq(TENANT_ID), eq(SupplierStatus.ACTIVE), any())).thenReturn(new PageImpl<>(List.of(supplier(id, "AgriSupplies", SupplierStatus.ACTIVE, TENANT_ID, null))));
+        var stub1 = new PageImpl<>(List.of(supplier(id, "AgriSupplies", SupplierStatus.ACTIVE, TENANT_ID, null)));
+        when(repository.findByTenantIdAndStatus(eq(TENANT_ID), eq(SupplierStatus.ACTIVE), any())).thenReturn(stub1);
 
         List<SupplierSummary> out = facade().listActive(TENANT, 100);
 
@@ -73,7 +74,8 @@ class SupplierFacadeImplTest {
     @DisplayName("one supplier is found whatever its status, and a blacklisted one says so and is not active")
     void findsAnyStatus() {
         UUID id = UUID.randomUUID();
-        when(repository.findByTenantIdAndId(eq(TENANT_ID), eq(id))).thenReturn(Optional.of(supplier(id, "Dodgy Ltd", SupplierStatus.BLACKLISTED, TENANT_ID, null)));
+        var stub2 = Optional.of(supplier(id, "Dodgy Ltd", SupplierStatus.BLACKLISTED, TENANT_ID, null));
+        when(repository.findByTenantIdAndId(eq(TENANT_ID), eq(id))).thenReturn(stub2);
 
         SupplierSummary s = facade().find(TENANT, id).orElseThrow();
 
@@ -92,7 +94,8 @@ class SupplierFacadeImplTest {
     @DisplayName("a supplier with no status is not active, never assumed to be")
     void nullStatus() {
         UUID id = UUID.randomUUID();
-        when(repository.findByTenantIdAndId(eq(TENANT_ID), eq(id))).thenReturn(Optional.of(supplier(id, "Odd", null, TENANT_ID, null)));
+        var stub3 = Optional.of(supplier(id, "Odd", null, TENANT_ID, null));
+        when(repository.findByTenantIdAndId(eq(TENANT_ID), eq(id))).thenReturn(stub3);
 
         assertFalse(facade().find(TENANT, id).orElseThrow().isActive());
     }
@@ -101,7 +104,8 @@ class SupplierFacadeImplTest {
     @DisplayName("looking up several suppliers is one call, returned by id")
     void findsSeveral() {
         UUID a = UUID.randomUUID(), b = UUID.randomUUID();
-        when(repository.findAllById(any())).thenReturn(List.of(supplier(a, "A", SupplierStatus.ACTIVE, TENANT_ID, null), supplier(b, "B", SupplierStatus.INACTIVE, TENANT_ID, null)));
+        var stub4 = List.of(supplier(a, "A", SupplierStatus.ACTIVE, TENANT_ID, null), supplier(b, "B", SupplierStatus.INACTIVE, TENANT_ID, null));
+        when(repository.findAllById(any())).thenReturn(stub4);
 
         Map<UUID, SupplierSummary> out = facade().findAll(TENANT, Set.of(a, b));
 
@@ -114,8 +118,9 @@ class SupplierFacadeImplTest {
     @DisplayName("another tenant's supplier and a deleted one are never returned, even though the repository lookup by id is not tenant-scoped")
     void findAllIsTenantSafe() {
         UUID mine = UUID.randomUUID(), theirs = UUID.randomUUID(), deleted = UUID.randomUUID();
-        when(repository.findAllById(any())).thenReturn(List.of(supplier(mine, "Mine", SupplierStatus.ACTIVE, TENANT_ID, null),
-                supplier(theirs, "Theirs", SupplierStatus.ACTIVE, UUID.randomUUID(), null), supplier(deleted, "Gone", SupplierStatus.ACTIVE, TENANT_ID, Instant.now())));
+        var stub5 = List.of(supplier(mine, "Mine", SupplierStatus.ACTIVE, TENANT_ID, null),
+                supplier(theirs, "Theirs", SupplierStatus.ACTIVE, UUID.randomUUID(), null), supplier(deleted, "Gone", SupplierStatus.ACTIVE, TENANT_ID, Instant.now()));
+        when(repository.findAllById(any())).thenReturn(stub5);
 
         Map<UUID, SupplierSummary> out = facade().findAll(TENANT, Set.of(mine, theirs, deleted));
 

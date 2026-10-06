@@ -1,5 +1,9 @@
 package za.co.handyflow.platform.complianceservices.api;
 
+import org.junit.jupiter.api.AfterEach;
+import org.springframework.test.web.servlet.RequestBuilder;
+import org.springframework.test.web.servlet.ResultActions;
+import za.co.handyflow.platform.shared.TenantContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +49,17 @@ class ClientTenderControllerReadinessTest {
 
     @Autowired MockMvc mvc;
 
+    /** Performs a request as a tenant user. The tenant is seeded before EACH request because JwtAuthFilter clears TenantContext when a request finishes (same reason as the agriculture tests' TenantRequests). */
+    private ResultActions asTenant(RequestBuilder request) throws Exception {
+        TenantContext.setTenantId(UUID.randomUUID().toString());
+        TenantContext.setUserId(UUID.randomUUID().toString());
+        return mvc.perform(request);
+    }
+
+    @AfterEach
+    void clearTenant() { TenantContext.clear(); }
+
+
     @MockitoBean ClientTenderService tenderService;
     @MockitoBean ClientTenderPersonnelService personnelService;
     @MockitoBean ClientTenderSnapshotService snapshotService;
@@ -66,7 +81,7 @@ class ClientTenderControllerReadinessTest {
     void readReturnsTheAssessment() throws Exception {
         when(readinessService.assess(any(), eq(tenderId))).thenReturn(assessment());
 
-        mvc.perform(get(url))
+        asTenant(get(url))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.asOf").value("2026-11-15"))
                 .andExpect(jsonPath("$.data.asOfBasis").value("CLOSING_DATE"))
@@ -84,7 +99,7 @@ class ClientTenderControllerReadinessTest {
         when(readinessService.assess(any(), eq(tenderId))).thenReturn(assessment());
 
         for (String authority : new String[] {"COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"}) {
-            mvc.perform(get(url).with(user("u").authorities(new SimpleGrantedAuthority(authority)))).andExpect(status().isOk());
+            asTenant(get(url).with(user("u").authorities(new SimpleGrantedAuthority(authority)))).andExpect(status().isOk());
         }
     }
 
@@ -92,7 +107,7 @@ class ClientTenderControllerReadinessTest {
     @WithMockUser(authorities = {"COMPLIANCE_READ", "COMPLIANCE_MANAGE", "COMPLIANCE_ADMIN", "INVOICE_READ", "AGRICULTURE_ADMIN"})
     @DisplayName("rights from other modules, including the tenant's OWN compliance rights, do not open a client's tender readiness")
     void otherModulesRightsAreNotEnough() throws Exception {
-        mvc.perform(get(url)).andExpect(status().isForbidden());
+        asTenant(get(url)).andExpect(status().isForbidden());
 
         verify(readinessService, never()).assess(any(), any());
     }
@@ -103,6 +118,6 @@ class ClientTenderControllerReadinessTest {
     void unknownTenderIs404() throws Exception {
         when(readinessService.assess(any(), eq(tenderId))).thenThrow(new ResourceNotFoundException("ClientTender", tenderId.toString()));
 
-        mvc.perform(get(url)).andExpect(status().isNotFound());
+        asTenant(get(url)).andExpect(status().isNotFound());
     }
 }

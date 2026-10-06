@@ -120,7 +120,8 @@ class TenderReadinessServiceTest {
     @DisplayName("a registration rule is met by a valid registration of that authority")
     void registrationRule_met() {
         UUID tenderId = tender(CLOSING);
-        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(linked(tenderId, "CSD_ACTIVE", "CSD", "Supplier", null, null)));
+        var stub1 = List.of(linked(tenderId, "CSD_ACTIVE", "CSD", "Supplier", null, null));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(stub1);
         when(registrationRepository.findAllForTenant(TENANT)).thenReturn(List.of(registration("csd", "supplier", "ACTIVE", null)));
 
         assertThat(only(service().assess(TENANT, tenderId, TODAY)).result()).isEqualTo(ReadinessResult.MET);
@@ -130,7 +131,8 @@ class TenderReadinessServiceTest {
     @DisplayName("the document that satisfies a requirement is its evidenceType: verified is MET, unverified is PENDING")
     void documentRule_usesEvidenceType() {
         UUID tenderId = tender(CLOSING);
-        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(linked(tenderId, "BBBEE_CERT", null, null, "BBBEE Certificate", null)));
+        var stub2 = List.of(linked(tenderId, "BBBEE_CERT", null, null, "BBBEE Certificate", null));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(stub2);
         when(documentRepository.findAllForTenant(TENANT)).thenReturn(List.of(document("BBBEE Certificate", LocalDate.of(2027, 6, 1), true)));
 
         assertThat(only(service().assess(TENANT, tenderId, TODAY)).result()).isEqualTo(ReadinessResult.MET);
@@ -140,7 +142,8 @@ class TenderReadinessServiceTest {
     @DisplayName("an uploaded but unverified document is PENDING")
     void documentRule_unverifiedIsPending() {
         UUID tenderId = tender(CLOSING);
-        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(linked(tenderId, "BBBEE_CERT", null, null, "BBBEE Certificate", null)));
+        var stub3 = List.of(linked(tenderId, "BBBEE_CERT", null, null, "BBBEE Certificate", null));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(stub3);
         when(documentRepository.findAllForTenant(TENANT)).thenReturn(List.of(document("BBBEE Certificate", LocalDate.of(2027, 6, 1), false)));
 
         assertThat(only(service().assess(TENANT, tenderId, TODAY)).result()).isEqualTo(ReadinessResult.PENDING);
@@ -177,7 +180,8 @@ class TenderReadinessServiceTest {
     @DisplayName("a tracked requirement with no rule is not evaluated and says no rule is set")
     void noRule_notEvaluated() {
         UUID tenderId = tender(CLOSING);
-        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(linked(tenderId, "BEE_PLAN", null, null, null, null)));
+        var stub4 = List.of(linked(tenderId, "BEE_PLAN", null, null, null, null));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(stub4);
 
         ReadinessItem item = only(service().assess(TENANT, tenderId, TODAY));
 
@@ -202,7 +206,8 @@ class TenderReadinessServiceTest {
     @DisplayName("when the linked version is the latest there is no newer-version flag")
     void noNewerVersion() {
         UUID tenderId = tender(CLOSING);
-        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(linked(tenderId, "CSD_ACTIVE", "CSD", null, null, null)));
+        var stub5 = List.of(linked(tenderId, "CSD_ACTIVE", "CSD", null, null, null));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(stub5);
 
         assertThat(only(service().assess(TENANT, tenderId, TODAY)).newerVersionAvailable()).isFalse();
     }
@@ -228,7 +233,8 @@ class TenderReadinessServiceTest {
     @DisplayName("ticked MET with no evidence is flagged as differing, and the tick itself is left alone")
     void tickedMetButMissing_flagged() {
         UUID tenderId = tender(CLOSING);
-        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(linked(tenderId, "CSD_ACTIVE", "CSD", null, null, "MET")));
+        var stub6 = List.of(linked(tenderId, "CSD_ACTIVE", "CSD", null, null, "MET"));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(stub6);
 
         ReadinessAssessment a = service().assess(TENANT, tenderId, TODAY);
 
@@ -242,7 +248,8 @@ class TenderReadinessServiceTest {
     @DisplayName("a requirement ticked NOT_APPLICABLE is not evaluated")
     void notApplicableTick() {
         UUID tenderId = tender(CLOSING);
-        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(linked(tenderId, "NHBRC", "NHBRC", null, null, "NOT_APPLICABLE")));
+        var stub7 = List.of(linked(tenderId, "NHBRC", "NHBRC", null, null, "NOT_APPLICABLE"));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(stub7);
 
         assertThat(only(service().assess(TENANT, tenderId, TODAY)).result()).isEqualTo(ReadinessResult.NOT_APPLICABLE);
     }
@@ -275,7 +282,8 @@ class TenderReadinessServiceTest {
     @DisplayName("a registration's own status is what is judged: a PENDING registration is PENDING, an EXPIRED one is EXPIRED")
     void registrationStatusIsPassedThrough() {
         UUID tenderId = tender(CLOSING);
-        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(linked(tenderId, "CIDB", "CIDB", null, null, null)));
+        var stub8 = List.of(linked(tenderId, "CIDB", "CIDB", null, null, null));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(stub8);
         when(registrationRepository.findAllForTenant(TENANT)).thenReturn(List.of(registration("CIDB", "Contractor", "PENDING", null)));
 
         assertThat(only(service().assess(TENANT, tenderId, TODAY)).result()).isEqualTo(ReadinessResult.PENDING);
@@ -285,7 +293,8 @@ class TenderReadinessServiceTest {
     @DisplayName("a document's expiry date is what is judged: an expired verified document is EXPIRED")
     void documentExpiryIsPassedThrough() {
         UUID tenderId = tender(CLOSING);
-        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of(linked(tenderId, "INSURANCE", null, null, "Insurance", null)));
+        var stub9 = List.of(linked(tenderId, "INSURANCE", null, null, "Insurance", null));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(stub9);
         when(documentRepository.findAllForTenant(TENANT)).thenReturn(List.of(document("Insurance", TODAY.minusDays(3), true)));
 
         assertThat(only(service().assess(TENANT, tenderId, TODAY)).result()).isEqualTo(ReadinessResult.EXPIRED);

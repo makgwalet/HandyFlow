@@ -308,7 +308,8 @@ class AgProfitabilityServiceTest {
     @DisplayName("only the ledger costs and sales of the season's cycles are counted; other targets do not leak into a catch-all row")
     void seasonCountsOnlyItsOwnMoney() {
         seasonOfThisFarm("2026/27");
-        when(cropCycleRepository.findAllActiveForSeason(eq(TENANT), eq(seasonId), any())).thenReturn(new PageImpl<>(List.of(seasonCycle(cycleId, "Maize", "HARVESTED"))));
+        var stub1 = new PageImpl<>(List.of(seasonCycle(cycleId, "Maize", "HARVESTED")));
+        when(cropCycleRepository.findAllActiveForSeason(eq(TENANT), eq(seasonId), any())).thenReturn(stub1);
         cycleCost("1000");
         ledger(ledgerRow("CROP_CYCLE", cycleId, "LABOUR", "200"), ledgerRow("CROP_CYCLE", otherCycleId, "LABOUR", "9999"), ledgerRow("GROUP", groupId, "FUEL", "7777"));
         sales(3, 0, new TargetRevenue("CROP_CYCLE", cycleId, bd("10"), bd("5000")), new TargetRevenue("CROP_CYCLE", otherCycleId, bd("1"), bd("8888")), new TargetRevenue("ANIMAL", animalId, bd("1"), bd("6666")));
@@ -341,7 +342,8 @@ class AgProfitabilityServiceTest {
     @DisplayName("uncosted labour in a season report counts only that season's cycles, and uncounted sales are not claimed")
     void seasonLabourCountsOnlyItsCycles() {
         seasonOfThisFarm("2026/27");
-        when(cropCycleRepository.findAllActiveForSeason(eq(TENANT), eq(seasonId), any())).thenReturn(new PageImpl<>(List.of(seasonCycle(cycleId, "Maize", "GROWING"))));
+        var stub2 = new PageImpl<>(List.of(seasonCycle(cycleId, "Maize", "GROWING")));
+        when(cropCycleRepository.findAllActiveForSeason(eq(TENANT), eq(seasonId), any())).thenReturn(stub2);
         AgInputApplication mine = mock(AgInputApplication.class), elsewhere = mock(AgInputApplication.class);
         when(mine.getCropCycleId()).thenReturn(cycleId); when(elsewhere.getCropCycleId()).thenReturn(otherCycleId);
         AgHarvestRecord harvestElsewhere = mock(AgHarvestRecord.class);
@@ -387,7 +389,8 @@ class AgProfitabilityServiceTest {
     @DisplayName("the overview is each farm's own whole-farm report, summed: it asks the service for every farm and adds what comes back")
     void overviewSumsEachFarmsOwnReport() {
         UUID a = UUID.randomUUID(), b = UUID.randomUUID();
-        when(farmRepository.findAllActive(eq(TENANT), any())).thenReturn(new PageImpl<>(List.of(farmNamed(a, "Alpha"), farmNamed(b, "Beta"))));
+        var stub3 = new PageImpl<>(List.of(farmNamed(a, "Alpha"), farmNamed(b, "Beta")));
+        when(farmRepository.findAllActive(eq(TENANT), any())).thenReturn(stub3);
         AgProfitabilityService spy = spy(service());
         doReturn(reportFor(a, "100", "500")).when(spy).farm(eq(TENANT), eq(a));
         doReturn(reportFor(b, "200", "700")).when(spy).farm(eq(TENANT), eq(b));
@@ -431,7 +434,8 @@ class AgProfitabilityServiceTest {
     @DisplayName("below the cap there is no cut-off note")
     void overviewBelowTheCap() {
         UUID a = UUID.randomUUID();
-        when(farmRepository.findAllActive(eq(TENANT), any())).thenReturn(new PageImpl<>(List.of(farmNamed(a, "Alpha"))));
+        var stub4 = new PageImpl<>(List.of(farmNamed(a, "Alpha")));
+        when(farmRepository.findAllActive(eq(TENANT), any())).thenReturn(stub4);
         AgProfitabilityService spy = spy(service());
         doReturn(reportFor(a, "1", "2")).when(spy).farm(eq(TENANT), eq(a));
 

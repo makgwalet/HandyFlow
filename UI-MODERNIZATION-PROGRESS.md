@@ -565,3 +565,11 @@ W5 is built. **W6 to W9 are not started.**
 - Endpoints need `COMPLIANCE_MANAGE` or `COMPLIANCE_ADMIN`, even to read. V313 adds `tender_pricing` and `tender_pricing_lines`. New screen `/compliancetender/tenders/:id/pricing` and a summary card on the tender page.
 - **Open:** client-side pricing, supplier-rate import, rates library, pricing in the tender PDF, per-line VAT. The tender-page layout, AI response builder and document builder in the mock-up are not built.
 - **Run:** `mvn test "-Dtest=*Tender*Test,Compliance*Test,Client*Test,RequirementReadinessEvaluatorTest"`, then separately `mvn test "-Dtest=HandyFlowApplicationTests,InvoicingFacadeImplTest"` (V313 applies on that run), and `ArchitectureVerificationTest`.
+
+## Test fixes after the first Maven runs (readiness, pricing)
+
+- Maven results received: `HandyFlowApplicationTests` and `InvoicingFacadeImplTest` pass (V312 applied). The tender/compliance, agriculture/supplier and architecture runs reported failures, diagnosed from the logs:
+  - **Web tests had no tenant** (409 "No tenant in context"): the readiness controller tests, and the pricing ones written after them, now seed the tenant before each request. The pricing 409 test could previously have passed for the wrong reason.
+  - **Mockito "unfinished stubbing"** in `TenderReadinessServiceTest`, `ClientTenderReadinessServiceTest`, `AgProfitabilityServiceTest` and `SupplierFacadeImplTest`: a helper that stubs a mock was called inside `when(...).thenReturn(...)`. The helper's result is now built first. Test-only change.
+  - **`ArchitectureVerificationTest`** fails on ~90 module pairs across the whole project (the same project-wide pre-existing failure noted under W2); none involve `businessreadiness`, pricing or the new classes.
+- Not re-run since the fixes; re-run `mvn test "-Dtest=*Tender*Test,Compliance*Test,Client*Test,RequirementReadinessEvaluatorTest,Ag*Test,SupplierFacadeImplTest"`.
