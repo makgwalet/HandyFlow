@@ -4,14 +4,15 @@
 // once here and passes clientId down to each tab, matching
 // CompliancePage.tsx's own tab-shell convention.
 import { useState } from "react"
-import { useParams, useNavigate } from "react-router-dom"
+import { useParams, useNavigate, useSearchParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { ArrowLeft, Building2, ShieldCheck, FileText, CalendarClock, Briefcase } from "lucide-react"
+import { ArrowLeft, Building2, ShieldCheck, FileText, CalendarClock, Briefcase, ListChecks } from "lucide-react"
 import ClientRegistrationsTab from "./ClientRegistrationsTab"
 import ClientDocumentsTab from "./ClientDocumentsTab"
 import ClientDeadlinesTab from "./ClientDeadlinesTab"
 import ClientTendersTab from "./ClientTendersTab"
+import ClientRequirementsTab from "./ClientRequirementsTab"
 
 interface Client {
   id: string; name: string; crmCustomerId: string | null; crmCustomerFound: boolean
@@ -19,13 +20,14 @@ interface Client {
   mandateNotes: string | null; status: string
 }
 
-type Tab = "registrations" | "documents" | "deadlines" | "tenders"
+type Tab = "registrations" | "documents" | "deadlines" | "tenders" | "requirements"
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "registrations", label: "Registrations", icon: ShieldCheck   },
   { id: "documents",     label: "Documents",     icon: FileText      },
   { id: "deadlines",     label: "Deadlines",     icon: CalendarClock },
   { id: "tenders",       label: "Tenders",       icon: Briefcase     },
+  { id: "requirements",  label: "Requirements",  icon: ListChecks    },
 ]
 
 const ACCENT = "var(--hf-success-solid-strong)"
@@ -35,7 +37,10 @@ const unwrap = (r: any) => r.data?.data ?? r.data
 export default function ClientDetailPage() {
   const { clientId } = useParams<{ clientId: string }>()
   const nav = useNavigate()
-  const [tab, setTab] = useState<Tab>("registrations")
+  // a link can open a tab directly (?tab=requirements), for example from a client tender's readiness check
+  const [searchParams] = useSearchParams()
+  const wanted = searchParams.get("tab")
+  const [tab, setTab] = useState<Tab>(TABS.some(t => t.id === wanted) ? (wanted as Tab) : "registrations")
 
   const { data: client, isLoading } = useQuery<Client>({
     queryKey: ["cs-client", clientId],
@@ -100,6 +105,7 @@ export default function ClientDetailPage() {
         {tab === "documents"     && <ClientDocumentsTab clientId={clientId} />}
         {tab === "deadlines"     && <ClientDeadlinesTab clientId={clientId} />}
         {tab === "tenders"       && <ClientTendersTab clientId={clientId} />}
+        {tab === "requirements"  && <ClientRequirementsTab clientId={clientId} />}
       </div>
     </div>
   )

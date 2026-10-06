@@ -11,6 +11,7 @@ import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
+import TenderReadinessPanel from "../businessreadiness/TenderReadinessPanel"
 import EmployeePicker, { type EmployeeOption } from "../training/EmployeePicker"
 import {
   ArrowLeft, Briefcase, Download, Plus, Trash2, X, AlertCircle,
@@ -149,13 +150,13 @@ export default function ClientTenderDetailPage() {
       description: newRequirement, source: newRequirementSource,
       clientRequirementId: pickedRequirementId || null,
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cs-tender-requirements", id] }); setNewRequirement(""); setPickedRequirementId(""); setNewRequirementSource("MANUAL") },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cs-tender-requirements", id] }); qc.invalidateQueries({ queryKey: ["readiness"] }); setNewRequirement(""); setPickedRequirementId(""); setNewRequirementSource("MANUAL") },
   })
 
   const updateRequirementStatus = useMutation({
     mutationFn: ({ reqId, status }: { reqId: string; status: string }) =>
       apiClient.put(`/api/v1/compliance-services/tenders/requirements/${reqId}/status`, { status }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["cs-tender-requirements", id] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cs-tender-requirements", id] }); qc.invalidateQueries({ queryKey: ["readiness"] }) },
   })
 
   const addPersonnel = useMutation({
@@ -238,6 +239,8 @@ export default function ClientTenderDetailPage() {
           <Field l="Required Class of Work" v={tender.requiredClassOfWork || "—"} />
         </div>
       </Section>
+
+      <TenderReadinessPanel url={`/api/v1/compliance-services/tenders/${id}/readiness`} catalogueHref={`/complianceservices/clients/${tender.clientId}?tab=requirements`} />
 
       <Section title="Requirement Matrix" icon={<ClipboardCheck size={15} style={{ color: ACCENT_TEXT }} />}>
         {requirements.length === 0 ? (

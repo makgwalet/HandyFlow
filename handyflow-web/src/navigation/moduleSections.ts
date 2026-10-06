@@ -440,6 +440,7 @@ export const COMPLIANCE_TENDER_SECTIONS: ModuleSections = {
         { id: 'registrations', label: 'Registrations', icon: ShieldCheck },
         { id: 'documents', label: 'Documents', icon: FileText },
         { id: 'deadlines', label: 'Deadlines', icon: CalendarClock },
+        { id: 'requirements', label: 'Requirements', icon: ListChecks },
       ],
     },
     { label: 'Tenders', sections: [{ id: 'tenders', label: 'Tenders', icon: Briefcase }] },

@@ -14,6 +14,7 @@ import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
+import TenderReadinessPanel from "../businessreadiness/TenderReadinessPanel"
 import EmployeePicker, { type EmployeeOption } from "../training/EmployeePicker"
 import {
   ArrowLeft, Briefcase, Download, Plus, Trash2, X, AlertCircle,
@@ -149,13 +150,13 @@ export default function TenderDetailPage() {
       description: newRequirement, source: newRequirementSource,
       complianceRequirementId: pickedRequirementId || null,
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ct-tender-requirements", id] }); setNewRequirement(""); setPickedRequirementId(""); setNewRequirementSource("MANUAL") },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ct-tender-requirements", id] }); qc.invalidateQueries({ queryKey: ["readiness"] }); setNewRequirement(""); setPickedRequirementId(""); setNewRequirementSource("MANUAL") },
   })
 
   const updateRequirementStatus = useMutation({
     mutationFn: ({ reqId, status }: { reqId: string; status: string }) =>
       apiClient.put(`/api/v1/compliance/tenders/requirements/${reqId}/status`, { status }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["ct-tender-requirements", id] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ct-tender-requirements", id] }); qc.invalidateQueries({ queryKey: ["readiness"] }) },
   })
 
   const addPersonnel = useMutation({
@@ -238,6 +239,8 @@ export default function TenderDetailPage() {
           <Field l="Required Class of Work" v={tender.requiredClassOfWork || "—"} />
         </div>
       </Section>
+
+      <TenderReadinessPanel url={`/api/v1/compliance/tenders/${id}/readiness`} catalogueHref="/compliancetender/requirements" />
 
       <Section title="Requirement Matrix" icon={<ClipboardCheck size={15} style={{ color: 'var(--hf-sky-text-strong)' }} />}>
         {requirements.length === 0 ? (

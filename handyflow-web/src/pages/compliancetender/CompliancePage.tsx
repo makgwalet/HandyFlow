@@ -9,6 +9,7 @@ import RegistrationsTab from "./RegistrationsTab"
 import DocumentsTab from "./DocumentsTab"
 import DeadlinesTab from "./DeadlinesTab"
 import TendersTab from "./TendersTab"
+import RequirementsTab from "./RequirementsTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { COMPLIANCE_TENDER_SECTIONS } from "../../navigation/moduleSections"
 
@@ -22,6 +23,7 @@ export default function CompliancePage() {
           case "registrations": return <RegistrationsTab />
           case "documents":     return <DocumentsTab />
           case "deadlines":     return <DeadlinesTab />
+          case "requirements":  return <RequirementsTab />
           case "tenders":       return <TendersTab />
           default:              return null
         }
