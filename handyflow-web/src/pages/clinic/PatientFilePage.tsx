@@ -6,6 +6,7 @@ import { LabsTabEnhanced } from "./LabsTab"
 import ConsentTab from "./ConsentTab"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import RxFillControl from "./RxFillControl"
 import { AllergyWarning, missingReasons, useAllergyChecks } from "./PrescriptionAllergyCheck"
 import { useAuthStore } from "../../store/auth.store"
 import {
@@ -46,6 +47,7 @@ interface Prescription {
   id: string; medicationName: string; dosage: string; frequency: string
   duration: string; quantity: number; repeats: number; instructions: string
   dispensed: boolean; prescribedAt: string; practitionerName?: string
+  fillsUsed?: number; fillsRemaining?: number
 }
 interface Practitioner { id: string; fullName: string; specialty: string }
 interface BillLine {
@@ -1195,6 +1197,7 @@ function RunningBillTab({ billLines, onRemove, patient }:
 
 function PrescriptionsTab({ patient, consultations }:
   {patient:Patient; consultations:Consultation[]}) {
+  const qc = useQueryClient()
   const [filter, setFilter] = useState<"active"|"all">("active")
   const { data: allRx=[], isLoading } = useQuery({
     queryKey:["pf-all-rx",patient.id,consultations.length],
@@ -1231,6 +1234,7 @@ function PrescriptionsTab({ patient, consultations }:
                   <div style={{ fontSize:13, color:GRAY, marginBottom:4 }}>{[rx.dosage,rx.frequency,rx.duration].filter(Boolean).join(" · ")}{rx.quantity?` · Qty: ${rx.quantity}`:""}{rx.repeats>0?` · Repeats: ${rx.repeats}`:""}</div>
                   {rx.instructions&&<div style={{ fontSize:12, color:"var(--hf-text-tertiary)", fontStyle:"italic", marginBottom:4 }}>{rx.instructions}</div>}
                   <div style={{ fontSize:11, color:GRAY }}>Prescribed {fmtDT(rx.prescribedAt)}{rx.practitionerName&&` · Dr. ${rx.practitionerName}`}</div>
+                  <RxFillControl rx={rx} onRecorded={()=>qc.invalidateQueries({queryKey:["pf-all-rx",patient.id]})} />
                 </div>
                 <div style={{ flexShrink:0, marginLeft:12 }}>
                   {rx.dispensed?<span style={{ background:"var(--hf-success-soft-strong)",color:GREEN_TEXT,padding:"3px 10px",borderRadius:20,fontSize:12,fontWeight:700 }}>DISPENSED</span>:<span style={{ background:"var(--hf-orange-soft)",color:AMBER,padding:"3px 10px",borderRadius:20,fontSize:12,fontWeight:700 }}>ACTIVE</span>}

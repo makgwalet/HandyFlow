@@ -38,6 +38,7 @@ import java.util.UUID;
 public class ClinicController {
 
     private final ClinicService                      clinicService;
+    private final za.co.handyflow.platform.clinic.application.internal.ClinicDispensingService dispensingService;
     private final ClinicPatientIdentityService       patientIdentityService;
     private final ClinicAppointmentReminderService    appointmentReminderService;
     private final ClinicTelehealthService              telehealthService;
@@ -307,6 +308,23 @@ public class ClinicController {
             @PathVariable UUID consultationId) {
         return ResponseEntity.ok(ApiResponse.success("Success",
                 clinicService.getConsultationPrescriptions(TenantContext.getTenantIdAsObject(), consultationId)));
+    }
+
+    @PostMapping("/prescriptions/{id}/fills")
+    @PreAuthorize("hasAuthority('CLINIC_PRESCRIPTION_WRITE')")
+    @Operation(summary = "Record a fill (the original supply or one authorised repeat); refused when all fills are used")
+    public ResponseEntity<ApiResponse<FillDtos.FillResponse>> recordFill(
+            @PathVariable UUID id, @RequestBody(required = false) FillDtos.FillRequest body) {
+        return ResponseEntity.status(201).body(ApiResponse.success("Fill recorded",
+                dispensingService.recordFill(TenantContext.getTenantIdAsObject(), id, body)));
+    }
+
+    @GetMapping("/prescriptions/{id}/fills")
+    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @Operation(summary = "Fills recorded against a prescription")
+    public ResponseEntity<ApiResponse<List<FillDtos.FillResponse>>> fills(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                dispensingService.fills(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @PostMapping("/consultations/{consultationId}/prescriptions/allergy-check")

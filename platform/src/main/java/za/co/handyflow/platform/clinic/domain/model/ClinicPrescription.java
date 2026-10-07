@@ -31,6 +31,7 @@ public class ClinicPrescription {
     Integer schedule;
     @Column(name = "allergy_override_reason") String allergyOverrideReason;
     @Column(name = "allergy_alert_summary")   String allergyAlertSummary;
+    @Column(name = "fills_used") int fillsUsed = 0;
     boolean dispensed = false;
     @Column(name = "dispensed_at") Instant dispensedAt;
     @Column(name = "created_at")   Instant createdAt;
@@ -86,9 +87,28 @@ public class ClinicPrescription {
         this.updatedAt = Instant.now();
     }
 
+    /** One original fill plus the authorised repeats. */
+    public int totalFills() { return 1 + Math.max(0, repeats); }
+    public int fillsRemaining() { return Math.max(0, totalFills() - fillsUsed); }
+
+    /**
+     * Records one fill and returns its number (1 = original). {@code dispensed} turns true only when the last
+     * authorised fill is used, and {@code dispensedAt} is the time of the first fill.
+     */
+    public int recordFill() {
+        if (fillsRemaining() == 0) {
+            throw new IllegalStateException("All " + totalFills() + " authorised fills of this prescription have been used.");
+        }
+        fillsUsed++;
+        Instant now = Instant.now();
+        if (dispensedAt == null) dispensedAt = now;
+        if (fillsRemaining() == 0) dispensed = true;
+        updatedAt = now;
+        return fillsUsed;
+    }
+
+    /** Marks the whole prescription as fully dispensed in one step (the old behaviour). */
     public void markDispensed() {
-        this.dispensed   = true;
-        this.dispensedAt = Instant.now();
-        this.updatedAt   = Instant.now();
+        while (fillsRemaining() > 0) recordFill();
     }
 }

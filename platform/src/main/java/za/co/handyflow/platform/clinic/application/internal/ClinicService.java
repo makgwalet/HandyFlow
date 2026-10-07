@@ -896,6 +896,6 @@ public class ClinicService {
                 p.getMedicationName(), p.getDosage(), p.getFrequency(), p.getDuration(),
                 p.getQuantity(), p.getRepeats(), p.getInstructions(),
                 p.isDispensed(), p.getPrescribedAt(), p.getNappiCode(), p.getSchedule(),
-                p.getAllergyOverrideReason(), p.getAllergyAlertSummary());
+                p.getAllergyOverrideReason(), p.getAllergyAlertSummary(), p.getFillsUsed(), p.fillsRemaining());
     }
 }

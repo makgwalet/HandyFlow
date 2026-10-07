@@ -38,6 +38,7 @@ class ClinicControllerTest {
     @Autowired ObjectMapper mapper;
 
     @MockitoBean ClinicService                      clinicService;
+    @MockitoBean za.co.handyflow.platform.clinic.application.internal.ClinicDispensingService dispensingService;
     @MockitoBean ClinicPdfService                   clinicPdfService;
     @MockitoBean za.co.handyflow.platform.clinic.application.internal.ClinicPatientIdentityService patientIdentityService;
     @MockitoBean ClinicMedicationCatalogueRepository medicationRepo;

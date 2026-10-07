@@ -1,11 +1,14 @@
 package za.co.handyflow.platform.clinic.domain.repository;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.clinic.domain.model.ClinicPrescription;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface ClinicPrescriptionRepository extends JpaRepository<ClinicPrescription, UUID> {
@@ -15,4 +18,9 @@ public interface ClinicPrescriptionRepository extends JpaRepository<ClinicPrescr
 
     @Query("SELECT p FROM ClinicPrescription p WHERE p.tenantId = :#{#tenantId.value} AND p.patientId = :patientId ORDER BY p.prescribedAt DESC")
     List<ClinicPrescription> findByPatient(TenantId tenantId, UUID patientId);
+
+    /** Row-locked, so two people filling the same prescription at once cannot use more fills than were authorised. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM ClinicPrescription p WHERE p.tenantId = :#{#tenantId.value} AND p.id = :id")
+    Optional<ClinicPrescription> findForUpdate(TenantId tenantId, UUID id);
 }
