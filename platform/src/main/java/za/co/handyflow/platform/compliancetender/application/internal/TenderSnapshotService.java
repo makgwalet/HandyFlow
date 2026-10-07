@@ -52,6 +52,7 @@ public class TenderSnapshotService {
     private final TenderPricingService pricingService;
     private final TenderPackageRepository packageRepository;
     private final PackageInputsProvider packageInputs;
+    private final TenderReadinessService readinessService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -74,7 +75,7 @@ public class TenderSnapshotService {
                 tender.getAuthorityReferenceNumber(), tender.getClosingDate(), tender.getEstimatedValue(),
                 tender.getIndustry(), tender.getRequiredClassOfWork(), tender.getStatus(),
                 requirements, personnel, Instant.now(), pricingService.snapshotOf(tenantId, tenderId),
-                packageReference(tenantId, tenderId, tender));
+                packageReference(tenantId, tenderId, tender), readinessService.assess(tenantId, tenderId));
 
         String json = serialize(data);
         int snapshotNumber = (int) snapshotRepository.countByTender(tenantId, tenderId) + 1;

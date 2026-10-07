@@ -45,12 +45,13 @@ class ClientTenderSnapshotServiceTest {
     @Mock private ClientTenderPersonnelRepository personnelRepository;
     @Mock private ClientTenderSubmissionSnapshotRepository snapshotRepository;
     @Mock private HrFacade hrFacade;
+    @Mock private ClientTenderReadinessService readinessService;
 
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     private ClientTenderSnapshotService service() {
         return new ClientTenderSnapshotService(tenderRepository, requirementRepository, personnelRepository,
-                snapshotRepository, hrFacade, objectMapper);
+                snapshotRepository, hrFacade, readinessService, objectMapper);
     }
 
     private static final TenantId TENANT = TenantId.generate();
@@ -78,6 +79,27 @@ class ClientTenderSnapshotServiceTest {
         assertThat(response.data().clientId()).isEqualTo(clientId);
         assertThat(response.data().requirements()).hasSize(1);
         assertThat(response.data().requirements().get(0).description()).isEqualTo("Valid CSD registration");
+    }
+
+    @Test
+    @DisplayName("the readiness check as it stood at submission is frozen into the snapshot")
+    void captureSnapshot_storesReadiness() {
+        UUID clientId = UUID.randomUUID();
+        UUID tenderId = UUID.randomUUID();
+        ClientTender tender = ClientTender.create(TENANT, clientId, "CTND-00001", "Test Tender", null, null, null, null, null, null, null, null, USER);
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(tender));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(snapshotRepository.countByTender(TENANT, tenderId)).thenReturn(0L);
+        when(readinessService.assess(TENANT, tenderId)).thenReturn(new za.co.handyflow.platform.businessreadiness.ReadinessAssessment(java.time.LocalDate.of(2026, 12, 21), "CLOSING_DATE",
+                List.of(new za.co.handyflow.platform.businessreadiness.ReadinessItem(null, "Tax clearance", "MET", za.co.handyflow.platform.businessreadiness.ReadinessResult.MISSING,
+                        "No Tax Clearance document is uploaded", null, false, true, false)),
+                new za.co.handyflow.platform.businessreadiness.ReadinessSummary(1, 0, 1, 0, 0, 0, 0, 0, 1)));
+
+        var data = service().captureSnapshot(TENANT, tenderId, USER).data();
+
+        assertThat(data.readiness().asOfBasis()).isEqualTo("CLOSING_DATE");
+        assertThat(data.readiness().summary().missing()).isEqualTo(1);
+        assertThat(data.readiness().items().get(0).label()).isEqualTo("Tax clearance");
     }
 
     @Test

@@ -28,6 +28,7 @@ import { canEditDetails, canEditMatrix, EXTERNAL_TYPES, personTypeLabel, personn
 import { usePackages } from "./package.api"
 import LookupInput from "../../components/ui/LookupInput"
 import Chip from "../../components/ui/Chip"
+import { SnapshotReadiness } from "../businessreadiness/SnapshotReadiness"
 import { countdown, stepper } from "./tendersView.logic"
 import { PERSONNEL_ROLES } from "../../lookups/southAfrica"
 
@@ -489,6 +490,7 @@ export default function TenderDetailPage() {
                       {s.data.personnel?.map((p: any, i: number) => (
                         <div key={i} style={{ color: "var(--hf-text-muted)" }}>· {p.employeeFullName} — {p.role}{p.personType && p.personType !== "EMPLOYEE" ? ` (${personTypeLabel(p.personType)}${p.externalOrganisation ? `, ${p.externalOrganisation}` : ""})` : ""}</div>
                       ))}
+                      <SnapshotReadiness readiness={s.data.readiness} />
                       <div style={{ marginTop: 8, color: s.data.submittedPackage?.outOfDate ? "var(--hf-warning-text)" : "var(--hf-text-muted)" }}>
                         {s.data.submittedPackage
                           ? <>Package: version {s.data.submittedPackage.versionNo} · {s.data.submittedPackage.fileName} · fingerprint {String(s.data.submittedPackage.packageHash).slice(0, 12)}{s.data.submittedPackage.outOfDate ? ` · was out of date when submitted (${(s.data.submittedPackage.outOfDateReasons ?? []).join(", ").toLowerCase()})` : ""}</>

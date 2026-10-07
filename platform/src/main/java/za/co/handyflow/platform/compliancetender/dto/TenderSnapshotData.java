@@ -1,5 +1,7 @@
 package za.co.handyflow.platform.compliancetender.dto;
 
+import za.co.handyflow.platform.businessreadiness.ReadinessAssessment;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -8,6 +10,7 @@ import java.util.UUID;
 
 /**
  * {@code pricing} is the price schedule exactly as it stood at submission: null for a tender never priced, and for snapshots taken before pricing existed.
+ * {@code readiness} is the evidence check as it stood at submission, judged against the closing date: null for snapshots taken before it was stored.
  * The actual frozen shape captured into TenderSubmissionSnapshot.snapshotJson.
  * A plain data record, not a JPA entity — it only ever exists in memory
  * long enough to be serialized once, at submission time.
@@ -18,7 +21,8 @@ public record TenderSnapshotData(
         String industry, String requiredClassOfWork, String status,
         List<RequirementSnapshot> requirements, List<PersonnelSnapshot> personnel, Instant capturedAt,
         TenderPricingResponse pricing,
-        PackageReference submittedPackage
+        PackageReference submittedPackage,
+        ReadinessAssessment readiness
 ) {
     /**
      * The package that was current when the tender was submitted: which version, what it was called, its hash, and whether the tender had

@@ -1,5 +1,7 @@
 package za.co.handyflow.platform.complianceservices.dto;
 
+import za.co.handyflow.platform.businessreadiness.ReadinessAssessment;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -16,7 +18,8 @@ public record ClientTenderSnapshotData(
         UUID clientTenderId, UUID clientId, String tenderNumber, String name, String tenderAuthority,
         String authorityReferenceNumber, LocalDate closingDate, BigDecimal estimatedValue,
         String industry, String requiredClassOfWork, String status,
-        List<RequirementSnapshot> requirements, List<PersonnelSnapshot> personnel, Instant capturedAt
+        List<RequirementSnapshot> requirements, List<PersonnelSnapshot> personnel, Instant capturedAt,
+        ReadinessAssessment readiness
 ) {
     public record RequirementSnapshot(String description, String source, String status) {}
 

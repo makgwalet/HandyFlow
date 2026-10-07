@@ -16,6 +16,7 @@ import Chip from "../../components/ui/Chip"
 import LookupInput from "../../components/ui/LookupInput"
 import { PERSONNEL_ROLES } from "../../lookups/southAfrica"
 import { countdown, stepper } from "../compliancetender/tendersView.logic"
+import { SnapshotReadiness } from "../businessreadiness/SnapshotReadiness"
 import EmployeePicker, { type EmployeeOption } from "../training/EmployeePicker"
 import {
   ArrowLeft, Briefcase, Download, Plus, Trash2, X, AlertCircle,
@@ -388,6 +389,7 @@ export default function ClientTenderDetailPage() {
                       {s.data.personnel?.map((p: any, i: number) => (
                         <div key={i} style={{ color: "var(--hf-text-muted)" }}>· {p.employeeFullName} — {p.role}</div>
                       ))}
+                      <SnapshotReadiness readiness={s.data.readiness} />
                     </div>
                   )}
                 </div>

@@ -49,6 +49,7 @@ class TenderSnapshotServiceTest {
     @Mock private TenderSubmissionSnapshotRepository snapshotRepository;
     @Mock private HrFacade hrFacade;
     @Mock private TenderPricingService pricingService;
+    @Mock private TenderReadinessService readinessService;
     @Mock private za.co.handyflow.platform.compliancetender.domain.repository.TenderPackageRepository packageRepository;
     @Mock private za.co.handyflow.platform.compliancetender.application.internal.submission.PackageInputsProvider packageInputs;
 
@@ -56,7 +57,7 @@ class TenderSnapshotServiceTest {
 
     private TenderSnapshotService service() {
         return new TenderSnapshotService(tenderRepository, requirementRepository, personnelRepository,
-                snapshotRepository, hrFacade, pricingService, packageRepository, packageInputs, objectMapper);
+                snapshotRepository, hrFacade, pricingService, packageRepository, packageInputs, readinessService, objectMapper);
     }
 
     private static final TenantId TENANT = TenantId.generate();
@@ -141,6 +142,33 @@ class TenderSnapshotServiceTest {
         var parsed = objectMapper.readValue(old, za.co.handyflow.platform.compliancetender.dto.TenderSnapshotData.class);
         assertThat(parsed.pricing()).isNull();
         assertThat(parsed.name()).isEqualTo("N");
+    }
+
+    private static final za.co.handyflow.platform.businessreadiness.ReadinessAssessment RA = new za.co.handyflow.platform.businessreadiness.ReadinessAssessment(java.time.LocalDate.of(2026, 12, 21), "CLOSING_DATE",
+                List.of(new za.co.handyflow.platform.businessreadiness.ReadinessItem(null, "Tax clearance", "MET", za.co.handyflow.platform.businessreadiness.ReadinessResult.MISSING,
+                        "No Tax Clearance document is uploaded", null, false, true, false)),
+                new za.co.handyflow.platform.businessreadiness.ReadinessSummary(1, 0, 1, 0, 0, 0, 0, 0, 1));
+
+    @Test
+    @DisplayName("the readiness check as it stood at submission is frozen into the snapshot, and an old snapshot without it still reads")
+    void captureSnapshot_storesReadiness() throws Exception {
+        UUID tenderId = UUID.randomUUID();
+        Tender tender = Tender.create(TENANT, "TND-00001", "Test Tender", null, null, null, null, null, null, null, null, USER);
+        when(tenderRepository.findByIdForTenant(TENANT, tenderId)).thenReturn(Optional.of(tender));
+        when(requirementRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(personnelRepository.findByTender(TENANT, tenderId)).thenReturn(List.of());
+        when(snapshotRepository.countByTender(TENANT, tenderId)).thenReturn(0L);
+        when(readinessService.assess(TENANT, tenderId)).thenReturn(RA);
+
+        var data = service().captureSnapshot(TENANT, tenderId, USER).data();
+
+        assertThat(data.readiness().asOf()).isEqualTo(java.time.LocalDate.of(2026, 12, 21));
+        assertThat(data.readiness().summary().missing()).isEqualTo(1);
+        assertThat(data.readiness().items()).hasSize(1);
+        assertThat(data.readiness().items().get(0).detail()).contains("Tax Clearance");
+
+        String old = "{\"tenderId\":\"" + tenderId + "\",\"name\":\"N\",\"requirements\":[],\"personnel\":[]}";
+        assertThat(objectMapper.readValue(old, za.co.handyflow.platform.compliancetender.dto.TenderSnapshotData.class).readiness()).isNull();
     }
 
     @Test
