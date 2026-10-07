@@ -87,6 +87,18 @@ public class ClinicService {
         return page.map(p -> toPatientResponse(p, principalMap));
     }
 
+    /** Patients for the given ids, in the same order (ids that no longer exist are skipped). */
+    @Transactional(readOnly = true)
+    public List<PatientResponse> getPatientsByIds(TenantId tenantId, List<UUID> orderedIds) {
+        if (orderedIds.isEmpty()) return List.of();
+        Map<UUID, ClinicPatient> byId = patientRepo.findAllByIds(tenantId, orderedIds).stream()
+                .collect(Collectors.toMap(ClinicPatient::getId, p -> p));
+        Set<UUID> principalIds = byId.values().stream().map(ClinicPatient::getPrincipalId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<UUID, String> principalMap = principalIds.isEmpty() ? Collections.emptyMap()
+                : patientRepo.findAllByIds(tenantId, principalIds).stream().collect(Collectors.toMap(ClinicPatient::getId, ClinicPatient::getFullName));
+        return orderedIds.stream().map(byId::get).filter(Objects::nonNull).map(p -> toPatientResponse(p, principalMap)).toList();
+    }
+
     @Transactional(readOnly = true)
     public PatientResponse getPatient(TenantId tenantId, UUID id) {
         return patientRepo.findActiveById(tenantId, id)

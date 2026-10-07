@@ -2,6 +2,9 @@
 // Paginated patient list — server search, family account registration,
 // dependant search, account type badges, no medical columns for reception
 import { saId, saIdDob, saIdParts } from "./patientFile.shared"
+import { myPractitionerId } from "./currentPractitioner"
+import { useAuthStore } from "../../store/auth.store"
+import { availableViews, directoryUrl, toRow, visitsLabel, type DirectoryPage, type PatientView } from "./patients"
 import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -22,6 +25,7 @@ interface Patient {
   accountType: "INDIVIDUAL" | "PRINCIPAL" | "DEPENDANT"
   principalId?: string; principalName?: string
   relationship?: string; lastVisitAt?: string; archivedAt?: string
+  visitCount?: number; nextAppointmentAt?: string; sameNameCount?: number; followUpDue?: boolean
 }
 interface Props { onOpenPatient: (p: Patient) => void }
 
@@ -47,7 +51,6 @@ const ACCOUNT_BADGE: Record<string,{label:string;bg:string;color:string}> = {
 
 const GENDERS = ["MALE","FEMALE","NON_BINARY","PREFER_NOT_TO_SAY"]
 const RELATIONSHIPS = ["CHILD","PARENT","GRANDPARENT","SPOUSE","SIBLING","OTHER"]
-const PAGE_SIZE = 20
 
 interface PersonForm {
   firstName: string; lastName: string; idNumber: string; dateOfBirth: string
@@ -70,6 +73,8 @@ export default function PatientsTab({ onOpenPatient }: Props) {
   const [debouncedSearch, setDS]    = useState("")
   const [page, setPage]             = useState(0)
   const [showArchived, setShowArchived] = useState(false)
+  const [view, setView]             = useState<PatientView>("ALL")
+  const userEmail = useAuthStore(st => st.user?.email)
   const [showCreate, setShowCreate] = useState(false)
   const [regType, setRegType]       = useState<"individual"|"family">("individual")
   const [form, setForm]             = useState<PersonForm>({...EMPTY})
@@ -107,13 +112,16 @@ export default function PatientsTab({ onOpenPatient }: Props) {
     return Object.keys(errs).length === 0
   }
 
-  const { data, isLoading, isPlaceholderData } = useQuery<any>({
-    queryKey: ["clinic-patients", debouncedSearch, page, showArchived],
+  const { data: practitioners = [] } = useQuery<any[]>({
+    queryKey: ["clinic-practitioners-list"],
+    queryFn: async () => { const r = await apiClient.get("/api/v1/clinic/practitioners/list"); const p = r.data?.data ?? r.data; return Array.isArray(p) ? p : (p?.content ?? []) },
+  })
+  const myDoctorId = myPractitionerId(practitioners as any[], userEmail)
+
+  const { data, isLoading, isPlaceholderData } = useQuery<DirectoryPage>({
+    queryKey: ["clinic-patients", view, debouncedSearch, page, showArchived, myDoctorId],
     queryFn: async () => {
-      const p = new URLSearchParams({ size:String(PAGE_SIZE), page:String(page) })
-      if (debouncedSearch.trim()) p.set("search", debouncedSearch.trim())
-      if (showArchived) p.set("includeArchived","true")
-      const r = await apiClient.get(`/api/v1/clinic/patients?${p}`)
+      const r = await apiClient.get(directoryUrl({ view, search: debouncedSearch, includeArchived: showArchived, practitionerId: myDoctorId, page }))
       return r.data?.data ?? r.data
     },
     placeholderData: keepPreviousData,
@@ -166,9 +174,9 @@ export default function PatientsTab({ onOpenPatient }: Props) {
     } catch { /* errors handled by mutation */ }
   }
 
-  const patients: Patient[] = data?.content ?? []
-  const totalPages   = data?.totalPages ?? 0
-  const totalElements = data?.totalElements ?? patients.length
+  const patients: Patient[] = (data?.content ?? []).map(toRow) as Patient[]
+  const totalElements = data?.total ?? patients.length
+  const totalPages   = Math.ceil(totalElements / (data?.size || 25))
   const idInfo = saIdInfo(form.idNumber)
 
   // Existing patient with the same ID, or the same name and date of birth (S1-7).
@@ -223,20 +231,22 @@ export default function PatientsTab({ onOpenPatient }: Props) {
         </div>
       </div>
 
-      {/* ── Stats ───────────────────────────────────────────────────────── */}
-      <div style={{ display:"flex", gap:12, marginBottom:16 }}>
-        <div style={{ background:"var(--hf-surface-muted)", border:"1px solid var(--hf-border)", borderRadius:10, padding:"8px 18px" }}>
-          <div style={{ fontSize:18, fontWeight:700, color:"var(--hf-primary-text)" }}>{totalElements}</div>
-          <div style={{ fontSize:11, color:"var(--hf-text-muted)" }}>Total patients</div>
-        </div>
-        <div style={{ background:"var(--hf-surface-muted)", border:"1px solid var(--hf-border)", borderRadius:10, padding:"8px 18px" }}>
-          <div style={{ fontSize:18, fontWeight:700, color:"var(--hf-accent-text)" }}>{patients.length}</div>
-          <div style={{ fontSize:11, color:"var(--hf-text-muted)" }}>This page</div>
-        </div>
-        <div style={{ flex:1 }}/>
-        <div style={{ fontSize:12, color:"var(--hf-text-faint)", alignSelf:"center" }}>
-          Click any row to open patient file
-        </div>
+      {/* ── Views ───────────────────────────────────────────────────────── */}
+      <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:12 }}>
+        {availableViews(myDoctorId).map(v => {
+          const on = view === v.id
+          return (
+            <button key={v.id} title={v.hint} aria-pressed={on} onClick={() => { setView(v.id); setPage(0) }}
+              style={{ padding:"6px 14px", borderRadius:20, fontSize:13, fontWeight:600, cursor:"pointer",
+                border:"1px solid var(--hf-border)", background:on?"var(--hf-primary-text)":"var(--hf-surface)", color:on?"var(--hf-surface)":"var(--hf-text)" }}>
+              {v.label}
+            </button>
+          )
+        })}
+      </div>
+      <div style={{ display:"flex", gap:12, marginBottom:12, fontSize:12, color:"var(--hf-text-muted)" }}>
+        <span>{totalElements} {totalElements === 1 ? "patient" : "patients"}{debouncedSearch ? ` matching "${debouncedSearch}"` : ""}</span>
+        <span style={{ marginLeft:"auto", color:"var(--hf-text-faint)" }}>Click a row to open the patient file</span>
       </div>
 
       {/* ── Table ───────────────────────────────────────────────────────── */}
@@ -247,7 +257,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
           border:"1px dashed var(--hf-border)", borderRadius:12 }}>
           <User size={36} style={{ marginBottom:12, opacity:0.4 }}/>
           <div style={{ fontWeight:600, color:"var(--hf-text-tertiary)" }}>
-            {debouncedSearch ? `No patients matching "${debouncedSearch}"` : "No patients registered yet"}
+            {debouncedSearch ? `No patients matching "${debouncedSearch}"` : view === "ALL" ? "No patients registered yet" : "No patients in this view"}
           </div>
         </div>
       ) : (
@@ -256,7 +266,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
           <table style={{ width:"100%", borderCollapse:"collapse" }}>
             <thead>
               <tr style={{ background:"var(--hf-surface-muted)", borderBottom:"1px solid var(--hf-border)" }}>
-                {["Patient","DOB / Age","Contact","Account","Last visit",""].map(h => (
+                {["Patient","DOB / Age","Contact","Account","Last visit","Next appointment",""].map(h => (
                   <th key={h} style={{ padding:"10px 16px", textAlign:"left", fontSize:11,
                     fontWeight:700, color:"var(--hf-text-muted)", letterSpacing:"0.05em" }}>{h}</th>
                 ))}
@@ -328,7 +338,17 @@ export default function PatientsTab({ onOpenPatient }: Props) {
 
                     {/* Last visit */}
                     <td style={{ padding:"11px 16px", fontSize:12, color:"var(--hf-text-muted)" }}>
-                      {p.lastVisitAt ? fmtDT(p.lastVisitAt) : <span style={{ color:"var(--hf-text-disabled)" }}>No visits</span>}
+                      {p.lastVisitAt ? fmtDT(p.lastVisitAt) : <span style={{ color:"var(--hf-text-disabled)" }}>Never seen</span>}
+                      <div style={{ fontSize:11, color:"var(--hf-text-faint)" }}>{visitsLabel(p.visitCount ?? 0)}</div>
+                    </td>
+
+                    {/* Next appointment + flags */}
+                    <td style={{ padding:"11px 16px", fontSize:12, color:"var(--hf-text-muted)" }}>
+                      {p.nextAppointmentAt ? fmtDT(p.nextAppointmentAt) : <span style={{ color:"var(--hf-text-disabled)" }}>—</span>}
+                      <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginTop:2 }}>
+                        {p.followUpDue && <span style={{ fontSize:10, fontWeight:700, background:"var(--hf-warning-soft)", color:"var(--hf-warning-text)", padding:"1px 7px", borderRadius:20 }}>Follow-up due</span>}
+                        {(p.sameNameCount ?? 1) > 1 && <span title="Another patient has the same first and last name" style={{ fontSize:10, fontWeight:700, background:"var(--hf-danger-soft)", color:"var(--hf-danger-text)", padding:"1px 7px", borderRadius:20 }}>Same name ×{p.sameNameCount}</span>}
+                      </div>
                     </td>
 
                     <td style={{ padding:"11px 16px" }}><ChevronRight size={16} style={{ color: 'var(--hf-text-disabled)' }}/></td>
