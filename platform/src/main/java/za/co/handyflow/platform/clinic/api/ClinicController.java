@@ -169,6 +169,15 @@ public class ClinicController {
                 clinicService.getAppointments(TenantContext.getTenantIdAsObject(), status, pageable)));
     }
 
+    @GetMapping("/appointments/range")
+    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @Operation(summary = "Appointments starting within [from, to) — for calendar views")
+    public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getAppointmentsInRange(
+            @RequestParam java.time.Instant from, @RequestParam java.time.Instant to) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                clinicService.getAppointmentsInRange(TenantContext.getTenantIdAsObject(), from, to)));
+    }
+
     @GetMapping("/patients/{patientId}/appointments")
     @PreAuthorize("hasAuthority('CLINIC_READ')")
     @Operation(summary = "Get all appointments for a specific patient")

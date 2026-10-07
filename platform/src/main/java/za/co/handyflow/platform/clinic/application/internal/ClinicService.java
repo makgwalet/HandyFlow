@@ -309,6 +309,15 @@ public class ClinicService {
         return mapAppointmentsPage(page, tenantId);
     }
 
+    /** Appointments starting in [from, to) — what a calendar week/day view needs. */
+    @Transactional(readOnly = true)
+    public List<AppointmentResponse> getAppointmentsInRange(TenantId tenantId, java.time.Instant from, java.time.Instant to) {
+        if (from == null || to == null || !to.isAfter(from)) {
+            throw new IllegalArgumentException("from and to are required and to must be after from");
+        }
+        return mapAppointmentsList(appointmentRepo.findByDateRange(tenantId, from, to), tenantId);
+    }
+
     @Transactional(readOnly = true)
     public List<AppointmentResponse> getPatientAppointments(TenantId tenantId, UUID patientId) {
         return mapAppointmentsList(appointmentRepo.findByPatient(tenantId, patientId), tenantId);

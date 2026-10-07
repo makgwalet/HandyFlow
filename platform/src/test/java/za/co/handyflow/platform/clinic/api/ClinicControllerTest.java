@@ -124,6 +124,19 @@ class ClinicControllerTest {
     // ── POST /patients ────────────────────────────────────────────────────────
 
     @Test
+    @WithMockUser(authorities = "CLINIC_READ")
+    @DisplayName("GET /appointments/range returns 200")
+    void getAppointmentsInRangeReturns200() throws Exception {
+        when(clinicService.getAppointmentsInRange(any(), any(), any()))
+                .thenReturn(java.util.List.of());
+
+        mvc.perform(get(BASE + "/appointments/range")
+                        .param("from", "2026-10-04T22:00:00Z")
+                        .param("to", "2026-10-11T22:00:00Z"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     @WithMockUser(authorities = "CLINIC_WRITE")
     @DisplayName("POST /patients returns 201 with created patient")
     void createPatientReturns201() throws Exception {

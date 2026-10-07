@@ -139,8 +139,10 @@ export default function ScheduleTab({ onStartSession, prefill, onPrefillUsed }: 
   const { data: appointments=[] } = useQuery<Appointment[]>({
     queryKey: ["schedule-appts", rangeStart.toISOString(), rangeEnd.toISOString()],
     queryFn: async () => {
-      const p = new URLSearchParams({ size:"200" })
-      return unwrap(await apiClient.get(`/api/v1/clinic/appointments?${p}`))
+      // Only the visible range — the plain list returns the newest 200 overall,
+      // which hides past weeks (and anything beyond the 200th).
+      const p = new URLSearchParams({ from: rangeStart.toISOString(), to: rangeEnd.toISOString() })
+      return unwrap(await apiClient.get(`/api/v1/clinic/appointments/range?${p}`))
     },
     refetchInterval: 60_000,
   })
