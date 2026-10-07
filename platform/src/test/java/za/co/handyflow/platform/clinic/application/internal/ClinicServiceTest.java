@@ -34,6 +34,7 @@ class ClinicServiceTest {
     @Mock ClinicAppointmentRepository  appointmentRepo;
     @Mock ClinicConsultationRepository consultationRepo;
     @Mock ClinicConsultationEditRepository consultationEditRepo;
+    @Mock ClinicPatientClinicalService     patientClinicalService;
     @Mock ClinicPrescriptionRepository prescriptionRepo;
 
     @InjectMocks ClinicService service;

@@ -32,6 +32,7 @@ public class ClinicService {
     private final ClinicAppointmentRepository  appointmentRepo;
     private final ClinicConsultationRepository consultationRepo;
     private final ClinicConsultationEditRepository consultationEditRepo;
+    private final ClinicPatientClinicalService     patientClinicalService;
     private final ClinicPrescriptionRepository prescriptionRepo;
     private final EmailService                 emailService;
     private final ClinicConsultationSummaryPdfService consultationSummaryPdfService;
@@ -149,6 +150,11 @@ public class ClinicService {
         }
 
         var saved = patientRepo.save(patient);
+        // Keep the structured allergy/condition rows (V339) in step with the plain lists.
+        if (updates.containsKey("allergies") || updates.containsKey("chronicConditions")) {
+            patientClinicalService.syncFromLegacyLists(tenantId, saved,
+                    optStringList(updates, "allergies"), optStringList(updates, "chronicConditions"));
+        }
         return toPatientResponse(saved, Collections.emptyMap());
     }
 
