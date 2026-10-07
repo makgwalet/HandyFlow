@@ -53,6 +53,15 @@ public class ClinicAppointmentReminderService {
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH);
 
     /**
+     * Claims the automatic reminder for an appointment: true for exactly one caller, even across instances,
+     * because the check and the update are one statement. Committed on its own before anything is sent.
+     */
+    public boolean claimReminder(UUID appointmentId) {
+        return jdbc.update("UPDATE clinic_appointments SET reminder_sent_at = NOW() "
+                + "WHERE id = ? AND reminder_sent_at IS NULL AND deleted_at IS NULL", appointmentId) == 1;
+    }
+
+    /**
      * Sends (or re-sends, for the manual trigger) a reminder for one
      * appointment. Mark-before-send: a send failure should not cause a
      * retry loop on the next scheduler run — an occasional missed
