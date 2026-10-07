@@ -22,6 +22,8 @@ export interface BuildRequest {
   submissionProfileId: string | null
   limits: LimitsRequest | null          // tender-specific overrides on top of the saved profile
   pricingRequired: boolean
+  pageNumbers: boolean
+  compress: boolean
 }
 
 export interface SectionStatus { key: string; title: string; available: boolean; unavailableReason: string | null; fileCount: number }

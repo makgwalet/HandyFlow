@@ -113,7 +113,7 @@ public class TenderPackageService {
 
         PdfPackageMerger.Merged merged;
         try {
-            merged = PdfPackageMerger.merge(toMerge);
+            merged = PdfPackageMerger.merge(toMerge, new PdfPackageMerger.Options(request.pageNumbers(), request.compress()));
         } catch (PackageMergeException e) {
             throw new BusinessException("The package could not be built: " + e.getMessage());
         }

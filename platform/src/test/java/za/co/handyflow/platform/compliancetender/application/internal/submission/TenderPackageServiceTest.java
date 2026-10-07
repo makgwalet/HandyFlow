@@ -100,7 +100,7 @@ class TenderPackageServiceTest {
     }
 
     private static BuildTenderPackageRequest request(List<String> keys, boolean pricingRequired) {
-        return new BuildTenderPackageRequest(keys, null, null, List.of(), null, null, pricingRequired);
+        return new BuildTenderPackageRequest(keys, null, null, List.of(), null, null, pricingRequired, false, false);
     }
 
     @BeforeEach

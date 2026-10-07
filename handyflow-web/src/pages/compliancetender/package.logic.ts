@@ -29,11 +29,13 @@ export interface PackageDraft {
   profileId: string | null
   limits: LimitsDraft
   pricingRequired: boolean
+  pageNumbers: boolean                     // stamp "Page X of N" across the combined PDF
+  compress: boolean                        // write the combined PDF with full compression
 }
 
 export const INITIAL_DRAFT: PackageDraft = {
   included: SECTIONS.map(s => s.key), coverLetter: "", companyMode: "CURRENT", companyText: "", documentIds: [],
-  profileId: null, limits: EMPTY_LIMITS, pricingRequired: false,
+  profileId: null, limits: EMPTY_LIMITS, pricingRequired: false, pageNumbers: false, compress: false,
 }
 
 const MB = 1024 * 1024
@@ -86,13 +88,15 @@ export function toRequest(d: PackageDraft): RequestResult {
       submissionProfileId: d.profileId,
       limits: limits.value,
       pricingRequired: d.pricingRequired,
+      pageNumbers: d.pageNumbers,
+      compress: d.compress,
     },
   }
 }
 
 /** The request for a screen that has not been touched; used only to give the preview query something to hold while the real one is being debounced. */
 export const DEFAULT_REQUEST: BuildRequest = {
-  sectionKeys: INITIAL_DRAFT.included, coverLetterText: null, companyProfileText: null, documentIds: [], submissionProfileId: null, limits: null, pricingRequired: false,
+  sectionKeys: INITIAL_DRAFT.included, coverLetterText: null, companyProfileText: null, documentIds: [], submissionProfileId: null, limits: null, pricingRequired: false, pageNumbers: false, compress: false,
 }
 
 // ---- section choice and order
@@ -242,6 +246,8 @@ export function hydrateDraft(stored: unknown): PackageDraft {
     profileId: typeof s.profileId === "string" ? s.profileId : null,
     limits,
     pricingRequired: s.pricingRequired === true,
+    pageNumbers: s.pageNumbers === true,
+    compress: s.compress === true,
   }
 }
 

@@ -428,6 +428,17 @@ function Rules({ draft, set, saved, notes }: { draft: PackageDraft; set: (p: Par
         <option value="">None chosen</option>
         {saved.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
       </select>
+      <fieldset style={{ border: "none", padding: 0, margin: "14px 0 0" }}>
+        <legend style={{ ...label, padding: 0 }}>Output options</legend>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--hf-text)", marginTop: 6 }}>
+          <input type="checkbox" checked={draft.pageNumbers} onChange={e => set({ pageNumbers: e.target.checked })} />
+          Number the pages (Page X of N across the whole PDF)
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--hf-text)", marginTop: 6 }}>
+          <input type="checkbox" checked={draft.compress} onChange={e => set({ compress: e.target.checked })} />
+          Make the PDF smaller (lossless compression)
+        </label>
+      </fieldset>
       <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} style={{ ...btn, marginTop: 12, padding: "6px 12px", fontSize: 12.5 }}>{open ? "Hide" : "Customise for this tender"}</button>
       {open && (
         <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 10 }}>

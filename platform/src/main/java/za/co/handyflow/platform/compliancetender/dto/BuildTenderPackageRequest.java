@@ -16,6 +16,8 @@ import java.util.UUID;
  * @param submissionProfileId a saved profile, or null
  * @param limits              tender-specific overrides on top of the saved profile, or null
  * @param pricingRequired     the tender requires a price, so a package without it can be built as a draft but is not ready to submit
+ * @param pageNumbers         stamp "Page X of N" on every page of the combined PDF
+ * @param compress            write the combined PDF with full compression (smaller, same content)
  */
 public record BuildTenderPackageRequest(
         List<String> sectionKeys,
@@ -24,5 +26,7 @@ public record BuildTenderPackageRequest(
         List<UUID> documentIds,
         UUID submissionProfileId,
         @Valid SubmissionProfileRequest limits,
-        boolean pricingRequired
+        boolean pricingRequired,
+        boolean pageNumbers,
+        boolean compress
 ) {}

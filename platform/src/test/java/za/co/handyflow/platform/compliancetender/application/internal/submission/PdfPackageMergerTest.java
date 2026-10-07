@@ -115,6 +115,38 @@ class PdfPackageMergerTest {
     }
 
     @Test
+    @DisplayName("page numbers run across the whole combined PDF, not per input")
+    void pageNumbers() throws Exception {
+        PdfPackageMerger.Merged merged = PdfPackageMerger.merge(
+                List.of(new Input("a.pdf", plainPdf(2)), new Input("b.pdf", plainPdf(1))), new PdfPackageMerger.Options(true, false));
+        try (PdfDocument doc = new PdfDocument(new com.itextpdf.kernel.pdf.PdfReader(new java.io.ByteArrayInputStream(merged.pdf())))) {
+            assertThat(com.itextpdf.kernel.pdf.canvas.parser.PdfTextExtractor.getTextFromPage(doc.getPage(1))).contains("Page 1 of 3");
+            assertThat(com.itextpdf.kernel.pdf.canvas.parser.PdfTextExtractor.getTextFromPage(doc.getPage(3))).contains("Page 3 of 3");
+        }
+        assertThat(merged.pages()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("without the option no page numbers are added")
+    void noPageNumbersByDefault() throws Exception {
+        PdfPackageMerger.Merged merged = PdfPackageMerger.merge(List.of(new Input("a.pdf", plainPdf(1))));
+        try (PdfDocument doc = new PdfDocument(new com.itextpdf.kernel.pdf.PdfReader(new java.io.ByteArrayInputStream(merged.pdf())))) {
+            assertThat(com.itextpdf.kernel.pdf.canvas.parser.PdfTextExtractor.getTextFromPage(doc.getPage(1))).doesNotContain("Page 1 of");
+        }
+    }
+
+    @Test
+    @DisplayName("compression keeps every page and is never larger than the uncompressed merge")
+    void compressionKeepsPages() {
+        List<Input> in = List.of(new Input("a.pdf", plainPdf(20)), new Input("b.pdf", plainPdf(20)));
+        PdfPackageMerger.Merged plain = PdfPackageMerger.merge(in);
+        PdfPackageMerger.Merged small = PdfPackageMerger.merge(in, new PdfPackageMerger.Options(false, true));
+        assertThat(small.pages()).isEqualTo(40);
+        assertThat(PdfPackageMerger.inspect(small.pdf()).pages()).isEqualTo(40);
+        assertThat(small.pdf().length).isLessThanOrEqualTo(plain.pdf().length);
+    }
+
+    @Test
     @DisplayName("a password-protected input fails the merge and names the file")
     void mergeEncryptedNamesFile() {
         assertThatThrownBy(() -> PdfPackageMerger.merge(List.of(new Input("ok.pdf", plainPdf(1)), new Input("locked.pdf", userPasswordPdf(1)))))
