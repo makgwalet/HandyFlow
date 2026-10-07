@@ -69,8 +69,10 @@
  *
  * <p>{@code businessreadiness} (added ADR-003) is a PURE logic module (no entities, no repositories): the shared evaluator that judges a requirement against the
  * registrations and documents a business holds. This module maps its own entities to its neutral facts and calls it. The client side (complianceservices) calls the same evaluator, so the tenant and a client are judged identically.
+ *
+ * <p>{@code tenderpricing} (ADR-004) is a PURE arithmetic module: the shared price calculator. Both this module and its client-side counterpart call it, so the price of a tender for the company and for the other side is worked out by the same tested rules.
  */
-@ApplicationModule(allowedDependencies = {"shared", "identity", "evidence", "billing", "notifications", "hr", "businessreadiness"})
+@ApplicationModule(allowedDependencies = {"shared", "identity", "evidence", "billing", "notifications", "hr", "businessreadiness", "tenderpricing"})
 package za.co.handyflow.platform.compliancetender;
 
 import org.springframework.modulith.ApplicationModule;

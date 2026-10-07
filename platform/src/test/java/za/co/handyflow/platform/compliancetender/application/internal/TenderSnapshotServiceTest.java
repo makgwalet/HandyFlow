@@ -172,6 +172,21 @@ class TenderSnapshotServiceTest {
     }
 
     @Test
+    @DisplayName("withoutPricing drops only the price schedule, so a read-only user still sees the rest of the frozen record")
+    void withoutPricing() {
+        UUID tenderId = UUID.randomUUID();
+        var data = new za.co.handyflow.platform.compliancetender.dto.TenderSnapshotData(tenderId, "T-1", "Road", "SANRAL", "X/1", null, null, null, null, "SUBMITTED",
+                List.of(), List.of(), java.time.Instant.now(), org.mockito.Mockito.mock(za.co.handyflow.platform.compliancetender.dto.TenderPricingResponse.class), null, RA);
+        var response = new za.co.handyflow.platform.compliancetender.dto.TenderSnapshotResponse(UUID.randomUUID(), tenderId, 1, data, java.time.Instant.now());
+        var trimmed = response.withoutPricing();
+        assertThat(trimmed.data().pricing()).isNull();
+        assertThat(trimmed.data().readiness()).isSameAs(RA);
+        assertThat(trimmed.data().name()).isEqualTo("Road");
+        assertThat(trimmed.snapshotNumber()).isEqualTo(1);
+        assertThat(response.data().pricing()).isNotNull();   // the original is untouched
+    }
+
+    @Test
     @DisplayName("a second submission of the same tender gets snapshotNumber 2, not overwriting the first")
     void captureSnapshot_secondSubmission_incrementsNumber() {
         UUID tenderId = UUID.randomUUID();

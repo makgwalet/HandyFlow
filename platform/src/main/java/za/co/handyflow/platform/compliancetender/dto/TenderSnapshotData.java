@@ -24,6 +24,12 @@ public record TenderSnapshotData(
         PackageReference submittedPackage,
         ReadinessAssessment readiness
 ) {
+    /** The same record with the price schedule left out, for people who may read tenders but not their pricing. */
+    public TenderSnapshotData withoutPricing() {
+        return new TenderSnapshotData(tenderId, tenderNumber, name, tenderAuthority, authorityReferenceNumber, closingDate, estimatedValue, industry, requiredClassOfWork,
+                status, requirements, personnel, capturedAt, null, submittedPackage, readiness);
+    }
+
     /**
      * The package that was current when the tender was submitted: which version, what it was called, its hash, and whether the tender had
      * changed since it was built. Null when no package had been built, and for snapshots taken before packages were linked.

@@ -16,7 +16,9 @@ import Chip from "../../components/ui/Chip"
 import LookupInput from "../../components/ui/LookupInput"
 import { PERSONNEL_ROLES } from "../../lookups/southAfrica"
 import { countdown, stepper } from "../compliancetender/tendersView.logic"
-import { SnapshotReadiness } from "../businessreadiness/SnapshotReadiness"
+import { SnapshotPrice, SnapshotReadiness } from "../businessreadiness/SnapshotReadiness"
+import TenderPricingCard from "../compliancetender/TenderPricingCard"
+import { CLIENT_SCOPE } from "../compliancetender/pricing.api"
 import EmployeePicker, { type EmployeeOption } from "../training/EmployeePicker"
 import {
   ArrowLeft, Briefcase, Download, Plus, Trash2, X, AlertCircle,
@@ -73,11 +75,11 @@ const fmtDateTime = (d: string) => new Date(d).toLocaleString("en-ZA", { day: "n
 const fmtZar = (v: number | null) => v == null ? "—" : `R ${v.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const unwrap = (r: any) => r.data?.data ?? r.data
 
-async function downloadPdf(tenderId: string, tenderNumber: string) {
-  const res = await apiClient.get(`/api/v1/compliance-services/tenders/${tenderId}/export`, { responseType: "blob" })
+async function downloadPdf(tenderId: string, tenderNumber: string, includePricing = false) {
+  const res = await apiClient.get(`/api/v1/compliance-services/tenders/${tenderId}/export`, { responseType: "blob", params: includePricing ? { includePricing: true } : undefined })
   const url = URL.createObjectURL(new Blob([res.data]))
   const a = document.createElement("a")
-  a.href = url; a.download = `client-tender-summary-${tenderNumber}.pdf`
+  a.href = url; a.download = `client-tender-summary-${tenderNumber}${includePricing ? "-with-pricing" : ""}.pdf`
   document.body.appendChild(a); a.click(); a.remove()
   URL.revokeObjectURL(url)
 }
@@ -206,6 +208,12 @@ export default function ClientTenderDetailPage() {
           style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-surface)", color: ACCENT_TEXT, border: "1px solid var(--hf-border)", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           <Download size={14} /> Export PDF
         </button>
+        {canManage && (
+          <button onClick={() => downloadPdf(tender.id, tender.tenderNumber, true)} title="Includes costs and margins: for internal use only"
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--hf-surface)", color: ACCENT_TEXT, border: "1px solid var(--hf-border)", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            <Download size={14} /> Export PDF with pricing
+          </button>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "stretch", marginBottom: 20 }}>
@@ -330,6 +338,8 @@ export default function ClientTenderDetailPage() {
         )}
       </Section>
 
+      <TenderPricingCard tenderId={tender.id} scope={CLIENT_SCOPE} />
+
       <Section title="Key Personnel" icon={<Users size={15} style={{ color: ACCENT_TEXT }} />}>
         {personnel.length === 0 ? (
           <div style={{ fontSize: 13, color: "var(--hf-text-faint)", padding: "8px 0" }}>No personnel added yet.</div>
@@ -390,6 +400,7 @@ export default function ClientTenderDetailPage() {
                         <div key={i} style={{ color: "var(--hf-text-muted)" }}>· {p.employeeFullName} — {p.role}</div>
                       ))}
                       <SnapshotReadiness readiness={s.data.readiness} />
+                      <SnapshotPrice pricing={s.data.pricing} />
                     </div>
                   )}
                 </div>

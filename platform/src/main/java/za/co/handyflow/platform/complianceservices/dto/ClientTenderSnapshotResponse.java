@@ -5,4 +5,6 @@ import java.util.UUID;
 
 public record ClientTenderSnapshotResponse(
         UUID id, UUID clientTenderId, int snapshotNumber, ClientTenderSnapshotData data, Instant submittedAt
-) {}
+) {
+    public ClientTenderSnapshotResponse withoutPricing() { return new ClientTenderSnapshotResponse(id, clientTenderId, snapshotNumber, data.withoutPricing(), submittedAt); }
+}

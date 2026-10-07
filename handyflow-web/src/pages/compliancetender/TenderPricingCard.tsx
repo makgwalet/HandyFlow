@@ -4,14 +4,14 @@
 import { Link } from "react-router-dom"
 import { Calculator, Lock } from "lucide-react"
 import { usePermission } from "../../hooks/usePermission"
-import { usePricing } from "./pricing.api"
+import { COMPANY_SCOPE, usePricing, type PricingScope } from "./pricing.api"
 import { fmtZar, marginText } from "./pricing.logic"
 
-export default function TenderPricingCard({ tenderId }: { tenderId: string }) {
-  const canManage = usePermission("COMPLIANCE_MANAGE")
-  const canAdmin = usePermission("COMPLIANCE_ADMIN")
+export default function TenderPricingCard({ tenderId, scope = COMPANY_SCOPE }: { tenderId: string; scope?: PricingScope }) {
+  const canManage = usePermission(scope.manage)
+  const canAdmin = usePermission(scope.admin)
   const allowed = canManage || canAdmin
-  const { data, isError } = usePricing(tenderId, allowed)
+  const { data, isError } = usePricing(tenderId, allowed, scope)
   if (!allowed) return null
 
   const priced = !!data && (data.configured || data.lines.length > 0)
@@ -21,7 +21,7 @@ export default function TenderPricingCard({ tenderId }: { tenderId: string }) {
         <h3 style={{ fontSize: 14, fontWeight: 800, color: "var(--hf-text)", margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
           <Calculator size={15} aria-hidden="true" /> Pricing {data && !data.editable && <Lock size={13} aria-label="Locked" />}
         </h3>
-        <Link to={`/compliancetender/tenders/${tenderId}/pricing`} style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-sky-text-strong)" }}>
+        <Link to={scope.pricingPage(tenderId)} style={{ fontSize: 13, fontWeight: 600, color: "var(--hf-sky-text-strong)" }}>
           {data && !data.editable ? "View pricing" : priced ? "Open pricing" : "Start pricing"}
         </Link>
       </div>

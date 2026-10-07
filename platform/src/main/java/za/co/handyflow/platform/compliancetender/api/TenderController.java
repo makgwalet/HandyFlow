@@ -241,8 +241,10 @@ public class TenderController {
     @Operation(summary = "Every frozen submission record for this tender, most recent first")
     public ResponseEntity<ApiResponse<List<TenderSnapshotResponse>>> getSnapshots(@PathVariable UUID id) {
         featureGuard.requireModule("compliancetender");
-        return ResponseEntity.ok(ApiResponse.success(
-                snapshotService.getSnapshots(TenantContext.getTenantIdAsObject(), id)));
+        // the frozen record includes the price schedule; pricing is for MANAGE/ADMIN only, so everyone else gets the record without it
+        boolean pricing = mayViewPricing();
+        return ResponseEntity.ok(ApiResponse.success(snapshotService.getSnapshots(TenantContext.getTenantIdAsObject(), id).stream()
+                .map(s -> pricing ? s : s.withoutPricing()).toList()));
     }
 
     @GetMapping("/snapshots/{snapshotId}")
@@ -250,8 +252,8 @@ public class TenderController {
     @Operation(summary = "Exactly what was submitted — a frozen record, never affected by later changes")
     public ResponseEntity<ApiResponse<TenderSnapshotResponse>> getSnapshot(@PathVariable UUID snapshotId) {
         featureGuard.requireModule("compliancetender");
-        return ResponseEntity.ok(ApiResponse.success(
-                snapshotService.getSnapshot(TenantContext.getTenantIdAsObject(), snapshotId)));
+        TenderSnapshotResponse snapshot = snapshotService.getSnapshot(TenantContext.getTenantIdAsObject(), snapshotId);
+        return ResponseEntity.ok(ApiResponse.success(mayViewPricing() ? snapshot : snapshot.withoutPricing()));
     }
 
     // ── PDF export ────────────────────────────────────────────────────────────

@@ -99,7 +99,7 @@ import { LegalCompliancePage } from "./pages/legalcompliance/LegalCompliancePage
 import CompliancePage from "./pages/compliancetender/CompliancePage"
 import TenderDetailPage from "./pages/compliancetender/TenderDetailPage"
 import TenderPackagePage from "./pages/compliancetender/TenderPackagePage"
-import TenderPricingPage from "./pages/compliancetender/TenderPricingPage"
+import TenderPricingPage, { ClientTenderPricingPage } from "./pages/compliancetender/TenderPricingPage"
 import ComplianceServicesPage from "./pages/complianceservices/ComplianceServicesPage"
 import ClientDetailPage from "./pages/complianceservices/ClientDetailPage"
 import ClientTenderDetailPage from "./pages/complianceservices/ClientTenderDetailPage"
@@ -319,6 +319,7 @@ export default function App() {
             <Route path="/complianceservices/:section?" element={<ComplianceServicesPage />} />
             <Route path="/complianceservices/clients/:clientId"        element={<ClientDetailPage />} />
             <Route path="/complianceservices/tenders/:id"              element={<ClientTenderDetailPage />} />
+            <Route path="/complianceservices/tenders/:id/pricing"      element={<ClientTenderPricingPage />} />
             <Route path="/debtcollection/:section?" element={<DebtCollectionPage />} />
             <Route path="/recruitment-agency" element={<RecruitmentAgencyPage />} />
             <Route path="/collections-agency/:section?" element={<CollectionsAgencyPage />} />

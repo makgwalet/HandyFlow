@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import za.co.handyflow.platform.compliancetender.application.internal.TenderPriceCalculator.Breakdown;
+import za.co.handyflow.platform.tenderpricing.TenderPriceCalculator.Breakdown;
 import za.co.handyflow.platform.compliancetender.domain.model.Tender;
 import za.co.handyflow.platform.compliancetender.domain.model.TenderPricing;
 import za.co.handyflow.platform.compliancetender.domain.model.TenderPricingLine;
@@ -18,6 +18,7 @@ import za.co.handyflow.platform.compliancetender.dto.TenderPricingResponse;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.shared.VatRateProvider;
+import za.co.handyflow.platform.tenderpricing.TenderPriceCalculator;
 
 import java.math.BigDecimal;
 import java.util.List;

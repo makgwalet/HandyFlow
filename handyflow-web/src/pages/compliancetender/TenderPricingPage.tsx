@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query"
 import { ArrowLeft, Calculator, Download, Lock, Pencil, Plus, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
-import { usePricing, usePricingMutations, type LineRequest, type PricingLine, type SettingsRequest, type TenderPricing } from "./pricing.api"
+import { COMPANY_SCOPE, CLIENT_SCOPE, usePricing, usePricingMutations, type PricingScope, type LineRequest, type PricingLine, type SettingsRequest, type TenderPricing } from "./pricing.api"
 import {
   EMPTY_LINE, basisText, priceSegments, buildCsv, fmtZar, groupLines, lineToDraft, lockedText, marginText, parseLine, parseSettings, settingsChanged, settingsToDraft,
   type LineDraft, type SettingsDraft,
@@ -32,16 +32,22 @@ const apiMessage = (e: unknown): string => {
   return x?.response?.data?.message ?? x?.message ?? "Something went wrong"
 }
 
-export default function TenderPricingPage() {
+/** The company's own tenders. */
+export default function TenderPricingPage() { return <PricingScreen scope={COMPANY_SCOPE} /> }
+
+/** A client's tenders (complianceservices): the same screen on that module's addresses and permissions. */
+export function ClientTenderPricingPage() { return <PricingScreen scope={CLIENT_SCOPE} /> }
+
+function PricingScreen({ scope }: { scope: PricingScope }) {
   const { id } = useParams<{ id: string }>()
-  const canManage = usePermission("COMPLIANCE_MANAGE")
-  const canAdmin = usePermission("COMPLIANCE_ADMIN")
+  const canManage = usePermission(scope.manage)
+  const canAdmin = usePermission(scope.admin)
   const allowed = canManage || canAdmin
   const { data: tender } = useQuery<{ name: string; tenderNumber: string }>({
-    queryKey: ["ct-tender", id], enabled: !!id,
-    queryFn: async () => (await apiClient.get(`/api/v1/compliance/tenders/${id}`)).data,
+    queryKey: [scope === COMPANY_SCOPE ? "ct-tender" : "cs-tender", id], enabled: !!id,
+    queryFn: async () => (await apiClient.get(`${scope.apiBase}/tenders/${id}`)).data,
   })
-  const { data, isLoading, isError, refetch } = usePricing(id, allowed)
+  const { data, isLoading, isError, refetch } = usePricing(id, allowed, scope)
 
   if (!allowed) {
     return <div style={{ maxWidth: 960, margin: "0 auto" }}><p role="alert" style={{ fontSize: 14, color: "var(--hf-text-muted)" }}>Pricing is only available to people who can manage tenders.</p></div>
@@ -49,7 +55,7 @@ export default function TenderPricingPage() {
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-      <Link to={`/compliancetender/tenders/${id}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--hf-text-muted)", fontSize: 13, marginBottom: 18, textDecoration: "none" }}>
+      <Link to={scope.tenderPage(id ?? "")} style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--hf-text-muted)", fontSize: 13, marginBottom: 18, textDecoration: "none" }}>
         <ArrowLeft size={15} /> Back to tender
       </Link>
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
@@ -68,14 +74,14 @@ export default function TenderPricingPage() {
           We couldn't load the pricing. <button type="button" onClick={() => refetch()} style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "inherit", fontWeight: 700 }}>Try again</button>
         </p>
       )}
-      {data && id && <PricingBody tenderId={id} pricing={data} tenderNumber={tender?.tenderNumber ?? "tender"} />}
+      {data && id && <PricingBody scope={scope} tenderId={id} pricing={data} tenderNumber={tender?.tenderNumber ?? "tender"} />}
     </div>
   )
 }
 
-function PricingBody({ tenderId, pricing, tenderNumber }: { tenderId: string; pricing: TenderPricing; tenderNumber: string }) {
+function PricingBody({ scope, tenderId, pricing, tenderNumber }: { scope: PricingScope; tenderId: string; pricing: TenderPricing; tenderNumber: string }) {
   const b = pricing.breakdown
-  const m = usePricingMutations(tenderId)
+  const m = usePricingMutations(tenderId, scope)
   const [error, setError] = useState("")
   const fail = (e: unknown) => setError(apiMessage(e))
 
@@ -134,7 +140,7 @@ function PricingBody({ tenderId, pricing, tenderNumber }: { tenderId: string; pr
             </div>
           </div>
         ))}
-        {pricing.editable && <RatePicker sections={[...new Set(pricing.lines.map(l => l.section))]} busy={m.addLine.isPending}
+        {pricing.editable && scope.rates && <RatePicker sections={[...new Set(pricing.lines.map(l => l.section))]} busy={m.addLine.isPending}
           onAdd={req => new Promise<boolean>(res => { setError(""); m.addLine.mutate(req, { onSuccess: () => res(true), onError: e => { fail(e); res(false) } }) })} />}
         {pricing.editable && <LineForm title="Add an item" submitLabel="Add item" sections={[...new Set(pricing.lines.map(l => l.section))]}
           busy={m.addLine.isPending} resetOnSuccess

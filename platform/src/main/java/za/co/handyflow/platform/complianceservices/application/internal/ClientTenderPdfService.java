@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.complianceservices.domain.model.ClientTender;
+import za.co.handyflow.platform.complianceservices.dto.ClientTenderPricingResponse;
 import za.co.handyflow.platform.complianceservices.domain.model.ClientTenderPersonnel;
 import za.co.handyflow.platform.complianceservices.domain.model.ClientTenderRequirement;
 import za.co.handyflow.platform.complianceservices.domain.model.ComplianceClient;
@@ -72,9 +73,16 @@ public class ClientTenderPdfService {
     private final ComplianceClientRepository clientRepository;
     private final TenantFacade tenantFacade;
     private final HrFacade hrFacade;
+    private final ClientTenderPricingService pricingService;
 
-    @Transactional(readOnly = true)
+    /** The summary without pricing: what anyone who can read client tenders may download. */
     public byte[] generateTenderSummaryPdf(TenantId tenantId, UUID clientTenderId) {
+        return generateTenderSummaryPdf(tenantId, clientTenderId, false);
+    }
+
+    /** With {@code includePricing}, adds the price schedule and how the price is built. The caller decides whether this person may have it (see ClientTenderController). */
+    @Transactional(readOnly = true)
+    public byte[] generateTenderSummaryPdf(TenantId tenantId, UUID clientTenderId, boolean includePricing) {
         ClientTender tender = tenderRepository.findByIdForTenant(tenantId, clientTenderId)
                 .orElseThrow(() -> new ResourceNotFoundException("ClientTender", clientTenderId.toString()));
         ComplianceClient client = clientRepository.findByIdForTenant(tenantId, tender.getClientId())
@@ -96,7 +104,8 @@ public class ClientTenderPdfService {
             addTenderDetails(doc, tender, regular, bold);
             addRequirementMatrix(doc, requirements, regular, bold);
             addPersonnel(doc, tenantId, personnel, regular, bold);
-            addFooter(doc, client, regular);
+            if (includePricing) addPricing(doc, pricingService.getPricing(tenantId, clientTenderId), regular, bold);
+            addFooter(doc, client, regular, includePricing);
 
             doc.close();
             log.info("Client tender summary PDF generated tender={} client={} requirements={} personnel={} tenant={}",
@@ -238,6 +247,59 @@ public class ClientTenderPdfService {
         doc.add(table);
     }
 
+    private void addPricing(Document doc, ClientTenderPricingResponse pricing, PdfFont regular, PdfFont bold) {
+        doc.add(new Paragraph("Price Schedule").setFont(bold).setFontSize(13).setFontColor(NAVY).setMarginTop(24));
+        if (pricing.lines().isEmpty()) {
+            doc.add(new Paragraph("No pricing has been entered yet.").setFont(regular).setFontSize(10).setFontColor(TEXT_GRAY));
+            return;
+        }
+        Table table = new Table(new float[]{1, 4, 1, 1.4f, 1.8f, 2}).setWidth(UnitValue.createPercentValue(100)).setMarginTop(8);
+        for (String h : new String[]{"Ref", "Description", "Unit", "Qty", "Unit cost", "Total"}) table.addHeaderCell(headerCell(h, bold));
+        String section = null;
+        for (ClientTenderPricingResponse.LineResponse l : pricing.lines()) {
+            if (!l.section().equals(section)) {
+                section = l.section();
+                table.addCell(new Cell(1, 6).setBackgroundColor(LIGHT_GRAY).setBorder(new SolidBorder(MID_GRAY, 0.5f)).setPadding(6)
+                        .add(new Paragraph(section).setFont(bold).setFontSize(10).setFontColor(NAVY)));
+            }
+            table.addCell(bodyCell(l.itemRef(), regular));
+            table.addCell(bodyCell(l.description(), regular));
+            table.addCell(bodyCell(l.unit(), regular));
+            table.addCell(numberCell(l.quantity().stripTrailingZeros().toPlainString(), regular));
+            table.addCell(numberCell(formatZar(l.unitCost()), regular));
+            table.addCell(numberCell(formatZar(l.lineTotal()), regular));
+        }
+        doc.add(table);
+
+        ClientTenderPricingResponse.Settings st = pricing.settings();
+        ClientTenderPricingResponse.Breakdown b = pricing.breakdown();
+        doc.add(new Paragraph("How the price is built").setFont(bold).setFontSize(11).setFontColor(NAVY).setMarginTop(16));
+        Table sum = new Table(new float[]{4, 2}).setWidth(UnitValue.createPercentValue(60)).setMarginTop(6).setKeepTogether(true);
+        summaryRow(sum, "Direct cost", formatZar(b.directCost()), false, regular, bold);
+        summaryRow(sum, "Overhead " + pct(st.overheadPct()), formatZar(b.overhead()), false, regular, bold);
+        summaryRow(sum, "Contingency " + pct(st.contingencyPct()), formatZar(b.contingency()), false, regular, bold);
+        summaryRow(sum, "Profit " + pct(st.profitPct()), formatZar(b.profit()), false, regular, bold);
+        summaryRow(sum, "Price excluding VAT", formatZar(b.priceExVat()), true, regular, bold);
+        summaryRow(sum, st.vatApplies() ? "VAT " + pct(st.vatRatePct()) : "VAT (not added)", formatZar(b.vat()), false, regular, bold);
+        summaryRow(sum, "Price including VAT", formatZar(b.priceInclVat()), true, regular, bold);
+        doc.add(sum);
+    }
+
+    private void summaryRow(Table t, String label, String value, boolean strong, PdfFont regular, PdfFont bold) {
+        PdfFont f = strong ? bold : regular;
+        t.addCell(new Cell().setBorder(new SolidBorder(MID_GRAY, 0.5f)).setPadding(6).add(new Paragraph(label).setFont(f).setFontSize(10).setFontColor(TEXT_DARK)));
+        t.addCell(new Cell().setBorder(new SolidBorder(MID_GRAY, 0.5f)).setPadding(6).setTextAlignment(com.itextpdf.layout.properties.TextAlignment.RIGHT)
+                .add(new Paragraph(value).setFont(f).setFontSize(10).setFontColor(TEXT_DARK)));
+    }
+
+    private Cell numberCell(String text, PdfFont regular) {
+        return bodyCell(text, regular).setTextAlignment(com.itextpdf.layout.properties.TextAlignment.RIGHT);
+    }
+
+    private static String pct(BigDecimal v) {
+        return (v == null ? "0" : v.stripTrailingZeros().toPlainString()) + "%";
+    }
+
     private Cell headerCell(String text, PdfFont bold) {
         return new Cell().setBackgroundColor(LIGHT_GRAY).setBorder(new SolidBorder(MID_GRAY, 0.5f)).setPadding(8)
                 .add(new Paragraph(text.toUpperCase()).setFont(bold).setFontSize(8).setFontColor(TEXT_GRAY).setCharacterSpacing(0.3f));
@@ -248,7 +310,7 @@ public class ClientTenderPdfService {
                 .add(new Paragraph(nvl(text)).setFont(regular).setFontSize(10).setFontColor(TEXT_DARK));
     }
 
-    private void addFooter(Document doc, ComplianceClient client, PdfFont regular) {
+    private void addFooter(Document doc, ComplianceClient client, PdfFont regular, boolean includesPricing) {
         doc.add(new Paragraph().setMarginTop(24));
         addFullWidthLine(doc);
         doc.add(new Paragraph(
@@ -256,6 +318,10 @@ public class ClientTenderPdfService {
                         + "prepared on behalf of " + client.getName() + ". It is a document/compliance readiness "
                         + "indicator, not a legal guarantee of tender eligibility.")
                 .setFont(regular).setFontSize(8).setFontColor(TEXT_GRAY).setMarginTop(8));
+        if (includesPricing) {
+            doc.add(new Paragraph("This copy contains costs and margins. It is for internal use: do not send it to the client or the tender authority.")
+                    .setFont(regular).setFontSize(8).setFontColor(RED).setMarginTop(4));
+        }
     }
 
     private void addFullWidthLine(Document doc) {

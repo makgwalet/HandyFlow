@@ -1,6 +1,0 @@
--proc:none
--d
-/x3
-main/java/za/co/handyflow/platform/compliancetender/application/internal/TenderPdfService.java
-main/java/za/co/handyflow/platform/compliancetender/api/TenderController.java
-test/java/za/co/handyflow/platform/compliancetender/application/internal/TenderPdfServiceTest.java

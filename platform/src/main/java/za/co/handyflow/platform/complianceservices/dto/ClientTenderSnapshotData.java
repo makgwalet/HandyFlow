@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
+ * {@code pricing} is the price schedule exactly as it stood at submission: null for a tender never priced, and for snapshots taken before pricing existed.
  * The frozen shape captured into ClientTenderSubmissionSnapshot.snapshotJson.
  * Now includes a personnel section — added once the personnel-reference
  * design question was resolved (see ClientTenderPersonnel's own
@@ -19,8 +20,15 @@ public record ClientTenderSnapshotData(
         String authorityReferenceNumber, LocalDate closingDate, BigDecimal estimatedValue,
         String industry, String requiredClassOfWork, String status,
         List<RequirementSnapshot> requirements, List<PersonnelSnapshot> personnel, Instant capturedAt,
-        ReadinessAssessment readiness
+        ReadinessAssessment readiness,
+        ClientTenderPricingResponse pricing
 ) {
+    /** The same record with the price schedule left out, for people who may read client tenders but not their pricing. */
+    public ClientTenderSnapshotData withoutPricing() {
+        return new ClientTenderSnapshotData(clientTenderId, clientId, tenderNumber, name, tenderAuthority, authorityReferenceNumber, closingDate, estimatedValue, industry,
+                requiredClassOfWork, status, requirements, personnel, capturedAt, readiness, null);
+    }
+
     public record RequirementSnapshot(String description, String source, String status) {}
 
     /**

@@ -1,10 +1,10 @@
-package za.co.handyflow.platform.compliancetender.application.internal;
+package za.co.handyflow.platform.tenderpricing;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import za.co.handyflow.platform.compliancetender.application.internal.TenderPriceCalculator.Breakdown;
-import za.co.handyflow.platform.compliancetender.application.internal.TenderPriceCalculator.Line;
-import za.co.handyflow.platform.compliancetender.application.internal.TenderPriceCalculator.Settings;
+import za.co.handyflow.platform.tenderpricing.TenderPriceCalculator.Breakdown;
+import za.co.handyflow.platform.tenderpricing.TenderPriceCalculator.Line;
+import za.co.handyflow.platform.tenderpricing.TenderPriceCalculator.Settings;
 
 import java.math.BigDecimal;
 import java.util.List;

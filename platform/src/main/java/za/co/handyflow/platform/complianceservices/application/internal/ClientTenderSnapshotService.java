@@ -50,6 +50,7 @@ public class ClientTenderSnapshotService {
     private final ClientTenderSubmissionSnapshotRepository snapshotRepository;
     private final HrFacade hrFacade;
     private final ClientTenderReadinessService readinessService;
+    private final ClientTenderPricingService pricingService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -71,7 +72,8 @@ public class ClientTenderSnapshotService {
                 tender.getId(), tender.getClientId(), tender.getTenderNumber(), tender.getName(),
                 tender.getTenderAuthority(), tender.getAuthorityReferenceNumber(), tender.getClosingDate(),
                 tender.getEstimatedValue(), tender.getIndustry(), tender.getRequiredClassOfWork(),
-                tender.getStatus(), requirements, personnel, Instant.now(), readinessService.assess(tenantId, clientTenderId));
+                tender.getStatus(), requirements, personnel, Instant.now(), readinessService.assess(tenantId, clientTenderId),
+                pricingService.snapshotOf(tenantId, clientTenderId));
 
         String json = serialize(data);
         int snapshotNumber = (int) snapshotRepository.countByTender(tenantId, clientTenderId) + 1;

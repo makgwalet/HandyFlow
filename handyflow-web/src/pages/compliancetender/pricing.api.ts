@@ -36,25 +36,46 @@ export interface TenderPricing {
 export interface LineRequest { section: string; itemRef: string; description: string; unit: string; quantity: number; unitCost: number }
 export interface SettingsRequest { overheadPct: number; contingencyPct: number; profitPct: number; vatApplies: boolean; notes: string }
 
-const base = (tenderId: string) => `/api/v1/compliance/tenders/${tenderId}/pricing`
-const lineUrl = (lineId: string) => `/api/v1/compliance/tenders/pricing/lines/${lineId}`
+/**
+ * Where a tender's pricing lives. The company's own tenders and a client's tenders (complianceservices) have the same screen and the same shapes; only the addresses, the
+ * permissions and the cache key differ.
+ */
+export interface PricingScope {
+  key: string                                  // cache key prefix
+  apiBase: string                              // e.g. /api/v1/compliance
+  manage: string; admin: string                // the permissions that allow pricing (it is commercially sensitive, so READ alone is not enough)
+  tenderPage: (id: string) => string           // the tender's own page, for links back
+  pricingPage: (id: string) => string
+  rates: boolean                               // whether the rates library can be used here
+}
+export const COMPANY_SCOPE: PricingScope = {
+  key: "ct-tender-pricing", apiBase: "/api/v1/compliance", manage: "COMPLIANCE_MANAGE", admin: "COMPLIANCE_ADMIN",
+  tenderPage: id => `/compliancetender/tenders/${id}`, pricingPage: id => `/compliancetender/tenders/${id}/pricing`, rates: true,
+}
+export const CLIENT_SCOPE: PricingScope = {
+  key: "cs-tender-pricing", apiBase: "/api/v1/compliance-services", manage: "COMPLIANCE_SERVICES_MANAGE", admin: "COMPLIANCE_SERVICES_ADMIN",
+  tenderPage: id => `/complianceservices/tenders/${id}`, pricingPage: id => `/complianceservices/tenders/${id}/pricing`, rates: false,
+}
 
-export function usePricing(tenderId: string | undefined, enabled = true) {
+const base = (scope: PricingScope, tenderId: string) => `${scope.apiBase}/tenders/${tenderId}/pricing`
+const lineUrl = (scope: PricingScope, lineId: string) => `${scope.apiBase}/tenders/pricing/lines/${lineId}`
+
+export function usePricing(tenderId: string | undefined, enabled = true, scope: PricingScope = COMPANY_SCOPE) {
   return useQuery<TenderPricing>({
-    queryKey: ["ct-tender-pricing", tenderId], enabled: !!tenderId && enabled,
-    queryFn: async () => (await apiClient.get(base(tenderId!))).data,
+    queryKey: [scope.key, tenderId], enabled: !!tenderId && enabled,
+    queryFn: async () => (await apiClient.get(base(scope, tenderId!))).data,
   })
 }
 
 /** Every pricing write returns the re-priced schedule, which replaces what is cached, so the totals on screen can never lag behind the server. */
-export function usePricingMutations(tenderId: string) {
+export function usePricingMutations(tenderId: string, scope: PricingScope = COMPANY_SCOPE) {
   const qc = useQueryClient()
-  const key = ["ct-tender-pricing", tenderId]
+  const key = [scope.key, tenderId]
   const store = (p: TenderPricing) => qc.setQueryData(key, p)
   return {
-    saveSettings: useMutation({ mutationFn: async (r: SettingsRequest) => (await apiClient.put(`${base(tenderId)}/settings`, r)).data as TenderPricing, onSuccess: store }),
-    addLine: useMutation({ mutationFn: async (r: LineRequest) => (await apiClient.post(`${base(tenderId)}/lines`, r)).data as TenderPricing, onSuccess: store }),
-    updateLine: useMutation({ mutationFn: async (a: { id: string; req: LineRequest }) => (await apiClient.put(lineUrl(a.id), a.req)).data as TenderPricing, onSuccess: store }),
-    deleteLine: useMutation({ mutationFn: async (id: string) => (await apiClient.delete(lineUrl(id))).data as TenderPricing, onSuccess: store }),
+    saveSettings: useMutation({ mutationFn: async (r: SettingsRequest) => (await apiClient.put(`${base(scope, tenderId)}/settings`, r)).data as TenderPricing, onSuccess: store }),
+    addLine: useMutation({ mutationFn: async (r: LineRequest) => (await apiClient.post(`${base(scope, tenderId)}/lines`, r)).data as TenderPricing, onSuccess: store }),
+    updateLine: useMutation({ mutationFn: async (a: { id: string; req: LineRequest }) => (await apiClient.put(lineUrl(scope, a.id), a.req)).data as TenderPricing, onSuccess: store }),
+    deleteLine: useMutation({ mutationFn: async (id: string) => (await apiClient.delete(lineUrl(scope, id))).data as TenderPricing, onSuccess: store }),
   }
 }

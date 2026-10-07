@@ -22,3 +22,14 @@ export function SnapshotReadiness({ readiness }: { readiness?: ReadinessAssessme
     </div>
   )
 }
+
+/** The price as it stood at submission, from the frozen snapshot. Absent when the tender was never priced, or when the viewer may not see pricing (the server leaves it out). */
+export function SnapshotPrice({ pricing }: { pricing?: { breakdown: { priceInclVat: number; priceExVat: number }; lines: unknown[] } | null }) {
+  if (!pricing) return null
+  const zar = (v: number) => `R ${v.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return (
+    <div style={{ marginTop: 8, color: "var(--hf-text-muted)" }}>
+      Price at submission: <strong style={{ color: "var(--hf-text)" }}>{zar(pricing.breakdown.priceInclVat)}</strong> including VAT ({zar(pricing.breakdown.priceExVat)} excluding) · {pricing.lines.length} {pricing.lines.length === 1 ? "item" : "items"}
+    </div>
+  )
+}

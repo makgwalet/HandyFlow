@@ -1,4 +1,4 @@
-package za.co.handyflow.platform.compliancetender.application.internal;
+package za.co.handyflow.platform.tenderpricing;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
