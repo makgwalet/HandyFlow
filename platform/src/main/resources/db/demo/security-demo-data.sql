@@ -550,6 +550,25 @@ SELECT pg_temp.did(20, r.n), pg_temp.t(), pg_temp.did(3, r.guard), pg_temp.did(2
        pg_temp.did(3, 1), 'DEMO Thabo Mokoena', now() - (r.i * 28 + r.guard) * interval '1 day'
 FROM _rate r;
 
+-- ── Supervisor reviews ─────────────────────────────────────────────────────────────────────────
+-- Five reviews so each state shows: recent (guard 4), a follow-up date that has arrived (guard 8), overdue at over 90 days
+-- (guard 5), comfortably in date (guards 1 and 13). Guards without a review show "never reviewed". These reviews have no
+-- matching rating row: the demo ratings above already stand in for them.
+INSERT INTO security_guard_reviews (id, tenant_id, guard_id, site_id, review_date, period_from, period_to, reviewer_name, overall,
+                                    punctuality, professionalism, appearance, communication, alertness, incident_handling,
+                                    strengths, improvements, training_needs, actions_agreed, follow_up_date, created_by, created_by_name, created_at)
+SELECT pg_temp.did(61, v.n), pg_temp.t(), pg_temp.did(3, v.guard), pg_temp.did(2, v.site), current_date - v.ago, current_date - v.ago - 90, current_date - v.ago - 1,
+       'DEMO Thabo Mokoena', v.overall, v.sc, v.sc, LEAST(5, v.sc + 1), v.sc, GREATEST(1, v.sc - 1), v.sc,
+       v.strengths, v.improvements, v.training, v.actions, CASE WHEN v.fu IS NULL THEN NULL ELSE current_date + v.fu END,
+       pg_temp.did(3, 1), 'DEMO Thabo Mokoena', now() - v.ago * interval '1 day'
+FROM (VALUES
+  (1, 4, 1, 15, 'EXCEEDS', 5, 'DEMO: reliable, calm under pressure and well liked by tenants.', NULL, NULL, 'Mentor a new guard.', 75),
+  (2, 8, 1, 40, 'BELOW',   2, NULL, 'DEMO: late four times and logs are thin.', 'Report writing', 'Arrive 15 minutes early; log checked weekly.', -5),
+  (3, 5, 3, 120, 'BELOW',  2, NULL, 'DEMO: poor patrol discipline on night shifts.', 'Patrol procedures', 'Retrain and shadow a senior guard.', NULL),
+  (4, 1, 4, 20, 'MEETS',   4, 'DEMO: steady, follows post orders.', NULL, 'First aid refresher', 'Complete first aid renewal.', 70),
+  (5, 13, 2, 70, 'MEETS',  4, 'DEMO: good with visitors at the gate.', 'DEMO: could be quicker at incident reports.', NULL, NULL, NULL)
+) AS v(n, guard, site, ago, overall, sc, strengths, improvements, training, actions, fu);
+
 -- ── Complaints and their timelines ─────────────────────────────────────────────────────────────
 -- A complaint in every state of the workflow.
 CREATE TEMP TABLE _cmpl (n int, guard int, site int, ago int, category text, severity text, ctype text, status text,

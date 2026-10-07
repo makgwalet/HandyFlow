@@ -10,6 +10,7 @@ import { apiClient } from "../../api/client"
 import Chip from "../../components/ui/Chip"
 import { toneColor } from "../../components/ui/Chip"
 import { todayIso } from "./guard360.logic"
+import GuardReviewsCard from "./GuardReviewsCard"
 import { BAND_LABEL, BAND_TONE, DIMENSIONS, chartGeometry, trendSummary, trendText, type HistoryPoint, LEVEL_TONE, RATING_SOURCES, percentTone, ratingFormError, sourceLabel, type Performance } from "./performance.logic"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16 }
@@ -197,6 +198,8 @@ export default function GuardPerformancePanel({ guardId, canManage }: { guardId:
               ))}
             </ul>}
       </div>
+
+      <GuardReviewsCard guardId={guardId} canManage={canManage} />
     </div>
   )
 }

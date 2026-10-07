@@ -197,6 +197,11 @@ Load the demo, sign in as a user with `SECURITY_READ` and `SECURITY_MANAGE` (adm
 - [ ] Guard 360, Performance tab: a **Score trend** chart (30 or 90 days) with a one-line summary ("Up 12 points since 20 Sep"). With the demo data it shows 30 illustrative days; they are seeded, not calculated, and the nightly job adds real ones from the day it first runs.
 - [ ] Checkpoint compliance now has data: completed demo shifts carry scans, and about 85 per cent meet their minimum (guards 3 and 5 about half).
 
+### Supervisor reviews
+- [ ] Guard 360, Performance tab: **Supervisor reviews** with a due notice. Demo data: guard 4 reviewed recently, guard 8 has a follow-up date that has arrived, guard 5 is overdue (over 90 days), guards 1 and 13 are in date, and the rest show "not been reviewed yet".
+- [ ] **New review**: period, review date, overall (exceeds, meets, below), six 1 to 5 scores, what went well, what to improve, training needs, actions agreed and an optional follow-up date. Either "went well" or "to improve" must be filled. A review cannot be dated in the future, cannot be dated before the end of its period, and cannot be edited after saving.
+- [ ] Saving a review also records a supervisor rating with the same scores, so the Ratings figure and the operational score move. (The five demo reviews have no matching rating: the demo ratings stand in for them.)
+
 ### Risk Rules and Ratings
 - [ ] Risk Rules shows the seeded thresholds.
 - [ ] Ratings on the guard profile show an operational score; guards with poor ratings or open complaints sit in a higher risk band.
@@ -516,6 +521,8 @@ Generated from the controllers. Paths are under the host root. A blank permissio
 | DELETE | `/api/v1/security/guards/{guardId}/hr-link` | SECURITY_MANAGE |
 
 ### GuardPerformanceController
+
+`GET /api/v1/security/guards/{guardId}/reviews` (SECURITY_READ) lists supervisor reviews with the due state; `POST` (SECURITY_MANAGE) records one and the matching supervisor rating.
 
 `GET /api/v1/security/guards/{guardId}/performance/history?days=90` (SECURITY_READ) returns the daily snapshots, oldest first (1 to 365 days).
 

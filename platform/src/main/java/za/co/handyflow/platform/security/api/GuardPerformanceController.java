@@ -14,7 +14,9 @@ import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.security.application.internal.GuardPerformanceService;
 import za.co.handyflow.platform.security.application.internal.GuardRatingService;
 import za.co.handyflow.platform.security.application.internal.GuardRiskSettingsService;
+import za.co.handyflow.platform.security.application.internal.GuardReviewService;
 import za.co.handyflow.platform.security.application.internal.GuardScoreTrendService;
+import za.co.handyflow.platform.security.dto.GuardReviewDtos;
 import za.co.handyflow.platform.security.dto.GuardPerformanceDtos.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -34,6 +36,7 @@ public class GuardPerformanceController {
 
     private final GuardPerformanceService performanceService;
     private final GuardScoreTrendService trendService;
+    private final GuardReviewService reviewService;
     private final GuardRatingService ratingService;
     private final GuardRiskSettingsService settingsService;
     private final FeatureGuard featureGuard;
@@ -52,6 +55,23 @@ public class GuardPerformanceController {
     public ResponseEntity<ApiResponse<java.util.List<HistoryPoint>>> history(@PathVariable UUID guardId, @RequestParam(required = false) Integer days) {
         featureGuard.requireModule("security");
         return ResponseEntity.ok(ApiResponse.success(trendService.history(TenantContext.getTenantIdAsObject(), guardId, days)));
+    }
+
+    @GetMapping("/guards/{guardId}/reviews")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
+    @Operation(summary = "Supervisor reviews of the guard, newest first, with whether the next one is due")
+    public ResponseEntity<ApiResponse<GuardReviewDtos.ReviewList>> reviews(@PathVariable UUID guardId) {
+        featureGuard.requireModule("security");
+        return ResponseEntity.ok(ApiResponse.success(reviewService.list(TenantContext.getTenantIdAsObject(), guardId)));
+    }
+
+    @PostMapping("/guards/{guardId}/reviews")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @Operation(summary = "Record a supervisor review; it also counts as a supervisor rating in the operational score")
+    public ResponseEntity<ApiResponse<GuardReviewDtos.ReviewItem>> addReview(@PathVariable UUID guardId, @Valid @RequestBody GuardReviewDtos.SaveReviewRequest req) {
+        featureGuard.requireModule("security");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Review recorded",
+                reviewService.add(TenantContext.getTenantIdAsObject(), guardId, req, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
     }
 
     @PostMapping("/guards/{guardId}/ratings")

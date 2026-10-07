@@ -68,6 +68,7 @@ BEGIN
   'security_grade_rates',
   'security_branch_assignments',
   'security_guard_score_history',
+  'security_guard_reviews',
   'security_guards',
   'security_posts',
   'security_contacts',
