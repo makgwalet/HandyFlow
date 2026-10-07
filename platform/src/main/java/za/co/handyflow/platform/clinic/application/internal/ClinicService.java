@@ -45,6 +45,7 @@ public class ClinicService {
     private final JdbcTemplate                 jdbc;
     private final ClinicSchedulingService      schedulingService;
     private final ClinicTimeOffService         timeOffService;
+    private final ClinicWorkingHoursService    workingHoursService;
 
     // ── Patients ──────────────────────────────────────────────────────────────
 
@@ -450,11 +451,13 @@ public class ClinicService {
     private void requirePractitionerFree(TenantId tenantId, UUID practitionerId, Instant start, int minutes, UUID ignoreAppointmentId) {
         var clashes = schedulingService.findClashes(tenantId, practitionerId, start, minutes, ignoreAppointmentId);
         var away = timeOffService.overlapping(tenantId, practitionerId, start, start.plusSeconds(minutes * 60L));
-        if (clashes.isEmpty() && away.isEmpty()) return;
+        var hours = workingHoursService.windows(tenantId, practitionerId);
+        boolean outside = WorkingHoursRules.outsideHours(null, hours, start, minutes, AppointmentRules.CLINIC_ZONE) != null;
+        if (clashes.isEmpty() && away.isEmpty() && !outside) return;
         String name = practitionerRepo.findActiveById(tenantId, practitionerId).map(ClinicPractitioner::getFullName).orElse(null);
-        throw new ConflictException(!away.isEmpty()
-                ? TimeOffRules.message(name, away, AppointmentRules.CLINIC_ZONE)
-                : AppointmentRules.conflictMessage(name, clashes, AppointmentRules.CLINIC_ZONE));
+        if (!away.isEmpty()) throw new ConflictException(TimeOffRules.message(name, away, AppointmentRules.CLINIC_ZONE));
+        if (outside) throw new ConflictException(WorkingHoursRules.outsideHours(name, hours, start, minutes, AppointmentRules.CLINIC_ZONE));
+        throw new ConflictException(AppointmentRules.conflictMessage(name, clashes, AppointmentRules.CLINIC_ZONE));
     }
 
     /** Moves a not-yet-started appointment; refuses a clash for the practitioner unless allowOverlap. */

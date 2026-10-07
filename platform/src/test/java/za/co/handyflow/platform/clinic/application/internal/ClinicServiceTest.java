@@ -43,6 +43,7 @@ class ClinicServiceTest {
     @Mock ClinicAllergySnapshotService allergySnapshot;
     @Mock ClinicSchedulingService schedulingService;
     @Mock ClinicTimeOffService timeOffService;
+    @Mock ClinicWorkingHoursService workingHoursService;
 
     @InjectMocks ClinicService service;
 
@@ -428,6 +429,28 @@ class ClinicServiceTest {
                     .isInstanceOf(za.co.handyflow.platform.shared.ConflictException.class)
                     .hasMessageContaining("is away")
                     .hasMessageContaining("Annual leave");
+            verify(appointmentRepo, never()).save(any(ClinicAppointment.class));
+        }
+
+        @Test
+        @DisplayName("refuses a booking outside the practitioner's working hours")
+        void refusesOutsideWorkingHours() {
+            var patientId = UUID.randomUUID();
+            var practitionerId = UUID.randomUUID();
+            when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patientWithId("Jane","Dlamini")));
+            // Works Mondays only, so any other weekday is refused; pick the next Wednesday at 09:00 clinic time
+            var start = java.time.ZonedDateTime.now(java.time.ZoneId.of("Africa/Johannesburg"))
+                    .plusDays(7).with(java.time.temporal.TemporalAdjusters.nextOrSame(java.time.DayOfWeek.WEDNESDAY))
+                    .withHour(9).withMinute(0).withSecond(0).withNano(0).toInstant();
+            when(workingHoursService.windows(TENANT, practitionerId)).thenReturn(List.of(
+                    new WorkingHoursRules.Window(1, java.time.LocalTime.of(8, 0), java.time.LocalTime.of(16, 0))));
+            when(practitionerRepo.findActiveById(TENANT, practitionerId)).thenReturn(Optional.empty());
+
+            var req = new CreateAppointmentRequest(patientId, practitionerId, start, 30, "CONSULTATION", null);
+
+            assertThatThrownBy(() -> service.createAppointment(TENANT, req))
+                    .isInstanceOf(za.co.handyflow.platform.shared.ConflictException.class)
+                    .hasMessageContaining("does not work on Wednesdays");
             verify(appointmentRepo, never()).save(any(ClinicAppointment.class));
         }
 
