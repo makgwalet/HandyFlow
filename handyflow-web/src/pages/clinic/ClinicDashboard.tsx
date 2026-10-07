@@ -10,6 +10,8 @@ const today   = new Date().toISOString().split("T")[0]
 const STATUS_CFG: Record<string, { color: string; bg: string; label: string }> = {
   SCHEDULED:   { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", label: "Scheduled" },
   CONFIRMED:   { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", label: "Confirmed" },
+  CHECKED_IN:  { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", label: "Checked in" },
+  TRIAGED:     { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", label: "Triaged" },
   IN_PROGRESS: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", label: "In Progress" },
   COMPLETED:   { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", label: "Completed" },
   CANCELLED:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", label: "Cancelled" },

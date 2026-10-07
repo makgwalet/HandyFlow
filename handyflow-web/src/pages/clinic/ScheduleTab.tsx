@@ -31,6 +31,8 @@ const GRAY="var(--hf-text-muted)"; const BORDER="var(--hf-border)"; const LIGHT=
 const STATUS_CFG: Record<string,{color:string;bg:string;border:string;label:string}> = {
   SCHEDULED:   {color:"var(--hf-info-text)",bg:"var(--hf-info-soft)",border:"var(--hf-info-border)",label:"Scheduled"},
   CONFIRMED:   {color:PURPLE_TEXT,   bg:"var(--hf-violet-soft)",border:"var(--hf-violet-border)",label:"Confirmed"},
+  CHECKED_IN:  {color:"var(--hf-info-text)",bg:"var(--hf-info-soft)",border:"var(--hf-info-border)",label:"Checked in"},
+  TRIAGED:     {color:PURPLE_TEXT,   bg:"var(--hf-violet-soft)",border:"var(--hf-violet-border)",label:"Triaged"},
   IN_PROGRESS: {color:AMBER,    bg:"var(--hf-warning-soft)",border:"var(--hf-warning-border)",label:"In Progress"},
   COMPLETED:   {color:GREEN,    bg:"var(--hf-success-soft-strong)",border:"var(--hf-success-border)",label:"Completed"},
   CANCELLED:   {color:RED_TEXT,      bg:"var(--hf-danger-soft)",border:"var(--hf-danger-border)",label:"Cancelled"},
@@ -38,8 +40,10 @@ const STATUS_CFG: Record<string,{color:string;bg:string;border:string;label:stri
 }
 
 const STATUS_FLOW: Record<string,{action:string;label:string;color:string}[]> = {
-  SCHEDULED:   [{action:"confirm",label:"Confirm",color:PURPLE_TEXT},{action:"cancel",label:"Cancel",color:RED_TEXT}],
-  CONFIRMED:   [{action:"start",label:"Start",color:AMBER},{action:"no_show",label:"No Show",color:GRAY},{action:"cancel",label:"Cancel",color:RED_TEXT}],
+  SCHEDULED:   [{action:"check_in",label:"Check in",color:"var(--hf-info-text)"},{action:"confirm",label:"Confirm",color:PURPLE_TEXT},{action:"cancel",label:"Cancel",color:RED_TEXT}],
+  CONFIRMED:   [{action:"check_in",label:"Check in",color:"var(--hf-info-text)"},{action:"start",label:"Start",color:AMBER},{action:"no_show",label:"No Show",color:GRAY},{action:"cancel",label:"Cancel",color:RED_TEXT}],
+  CHECKED_IN:  [{action:"triage",label:"Triage",color:"var(--hf-violet-text)"},{action:"start",label:"Start",color:"var(--hf-warning-text)"},{action:"cancel",label:"Cancel",color:"var(--hf-danger-text)"}],
+  TRIAGED:     [{action:"start",label:"Start",color:"var(--hf-warning-text)"},{action:"cancel",label:"Cancel",color:"var(--hf-danger-text)"}],
   IN_PROGRESS: [{action:"complete",label:"Complete",color:GREEN}],
 }
 

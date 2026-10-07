@@ -67,14 +67,18 @@ const GRAY="var(--hf-text-muted)"; const BORDER="var(--hf-border)"; const LIGHT=
 const STATUS_CFG: Record<string,{color:string;bg:string;label:string;icon:any}> = {
   SCHEDULED:   {color:"var(--hf-info-text)",bg:"var(--hf-info-soft)",label:"Scheduled",  icon:Calendar},
   CONFIRMED:   {color:PURPLE_TEXT,   bg:"var(--hf-violet-soft)",label:"Confirmed",  icon:CheckCircle},
+  CHECKED_IN:  {color:"var(--hf-info-text)",bg:"var(--hf-info-soft)",label:"Checked in", icon:CheckCircle},
+  TRIAGED:     {color:PURPLE_TEXT,   bg:"var(--hf-violet-soft)",label:"Triaged",    icon:CheckCircle},
   IN_PROGRESS: {color:AMBER,    bg:"var(--hf-warning-soft)",label:"In Progress",icon:PlayCircle},
   COMPLETED:   {color:GREEN_TEXT,    bg:"var(--hf-success-soft-strong)",label:"Completed",  icon:CheckCircle},
   CANCELLED:   {color:RED_TEXT,      bg:"var(--hf-danger-soft)",label:"Cancelled",  icon:XCircle},
   NO_SHOW:     {color:GRAY,     bg:LIGHT,    label:"No Show",    icon:User},
 }
 const STATUS_FLOW: Record<string,{action:string;label:string;color:string}[]> = {
-  SCHEDULED:   [{action:"confirm",label:"Confirm",color:PURPLE_TEXT},{action:"cancel",label:"Cancel",color:RED_TEXT}],
-  CONFIRMED:   [{action:"start",label:"Start",color:AMBER},{action:"no_show",label:"No Show",color:GRAY},{action:"cancel",label:"Cancel",color:RED_TEXT}],
+  SCHEDULED:   [{action:"check_in",label:"Check in",color:"var(--hf-info-text)"},{action:"confirm",label:"Confirm",color:PURPLE_TEXT},{action:"cancel",label:"Cancel",color:RED_TEXT}],
+  CONFIRMED:   [{action:"check_in",label:"Check in",color:"var(--hf-info-text)"},{action:"start",label:"Start",color:AMBER},{action:"no_show",label:"No Show",color:GRAY},{action:"cancel",label:"Cancel",color:RED_TEXT}],
+  CHECKED_IN:  [{action:"triage",label:"Triage",color:"var(--hf-violet-text)"},{action:"start",label:"Start",color:"var(--hf-warning-text)"},{action:"cancel",label:"Cancel",color:"var(--hf-danger-text)"}],
+  TRIAGED:     [{action:"start",label:"Start",color:"var(--hf-warning-text)"},{action:"cancel",label:"Cancel",color:"var(--hf-danger-text)"}],
   IN_PROGRESS: [{action:"complete",label:"Complete",color:GREEN_TEXT}],
 }
 const ACCOUNT_CFG: Record<string,{label:string;bg:string;color:string}> = {
@@ -171,7 +175,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
     onSuccess: ()=>{ qc.invalidateQueries({queryKey:["clinic-patients"]}); qc.invalidateQueries({queryKey:["pf-family",pid]}); setShowActions(false) },
   })
 
-  const pendingAppts = (appointments as Appointment[]).filter(a=>["SCHEDULED","CONFIRMED","IN_PROGRESS"].includes(a.status)).length
+  const pendingAppts = (appointments as Appointment[]).filter(a=>["SCHEDULED","CONFIRMED","CHECKED_IN","TRIAGED","IN_PROGRESS"].includes(a.status)).length
 
   const TABS: {id:TabId;label:string;icon:React.ElementType;badge?:number}[] = [
     {id:"overview",     label:"Overview",     icon:User},

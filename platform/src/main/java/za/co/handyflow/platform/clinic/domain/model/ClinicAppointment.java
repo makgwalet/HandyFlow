@@ -36,6 +36,9 @@ public class ClinicAppointment {
     // room has been created for this appointment (see
     // ClinicTelehealthService). Null for any in-person appointment.
     @Column(name = "video_room_url") String videoRoomUrl;
+    // S1-8: front-desk / nurse progress through the clinic, for waiting-time reporting.
+    @Column(name = "checked_in_at") Instant checkedInAt;
+    @Column(name = "triaged_at")    Instant triagedAt;
     @Version long version;
 
     // ── Factory ───────────────────────────────────────────────────────────────
@@ -70,15 +73,38 @@ public class ClinicAppointment {
         this.updatedAt = Instant.now();
     }
 
+    /** Patient has arrived. */
+    public void checkIn() {
+        if (!"SCHEDULED".equals(status) && !"CONFIRMED".equals(status)) {
+            throw new IllegalStateException("Check-in is only valid for SCHEDULED or CONFIRMED appointments (is " + status + ").");
+        }
+        this.status      = "CHECKED_IN";
+        this.checkedInAt = Instant.now();
+        this.updatedAt   = this.checkedInAt;
+    }
+
+    /** Nurse has done the initial assessment. */
+    public void triage() {
+        requireStatus("CHECKED_IN");
+        this.status    = "TRIAGED";
+        this.triagedAt = Instant.now();
+        this.updatedAt = this.triagedAt;
+    }
+
+    /** IN_PROGRESS is the in-consultation state. A patient may be seen straight from CONFIRMED, CHECKED_IN or TRIAGED. */
     public void start() {
-        requireStatus("CONFIRMED");
+        if (!"CONFIRMED".equals(status) && !"CHECKED_IN".equals(status) && !"TRIAGED".equals(status)) {
+            throw new IllegalStateException(
+                    "An appointment can only be started from CONFIRMED, CHECKED_IN or TRIAGED (is " + status + ").");
+        }
         this.status    = "IN_PROGRESS";
         this.updatedAt = Instant.now();
     }
 
     public void complete() {
         if (!"IN_PROGRESS".equals(this.status) && !"CONFIRMED".equals(this.status)
-                && !"SCHEDULED".equals(this.status)) {
+                && !"SCHEDULED".equals(this.status) && !"CHECKED_IN".equals(this.status)
+                && !"TRIAGED".equals(this.status)) {
             throw new IllegalStateException(
                     "Cannot complete appointment in status: " + this.status);
         }
@@ -95,7 +121,7 @@ public class ClinicAppointment {
 
     public void noShow() {
         if (!"SCHEDULED".equals(this.status) && !"CONFIRMED".equals(this.status))
-            throw new IllegalStateException("No-show only valid for SCHEDULED or CONFIRMED");
+            throw new IllegalStateException("No-show only valid for SCHEDULED or CONFIRMED (a patient who has arrived is not a no-show)");
         this.status    = "NO_SHOW";
         this.updatedAt = Instant.now();
     }

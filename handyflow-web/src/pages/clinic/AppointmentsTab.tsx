@@ -16,6 +16,8 @@ interface Practitioner { id: string; fullName: string; specialty: string }
 const STATUS_CFG: Record<string, { color: string; bg: string; border: string; label: string; icon: React.ElementType }> = {
   SCHEDULED:   { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", border: "var(--hf-info-border)", label: "Scheduled",   icon: Calendar },
   CONFIRMED:   { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", border: "var(--hf-violet-border)", label: "Confirmed",   icon: CheckCircle },
+  CHECKED_IN:  { color: "var(--hf-info-text)", bg: "var(--hf-info-soft)", border: "var(--hf-info-border)", label: "Checked in", icon: CheckCircle },
+  TRIAGED:     { color: "var(--hf-violet-text)", bg: "var(--hf-violet-soft)", border: "var(--hf-violet-border)", label: "Triaged", icon: CheckCircle },
   IN_PROGRESS: { color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)", border: "var(--hf-warning-border)", label: "In Progress", icon: PlayCircle },
   COMPLETED:   { color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)", border: "var(--hf-success-border)", label: "Completed",   icon: CheckCircle },
   CANCELLED:   { color: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)", border: "var(--hf-danger-border)", label: "Cancelled",   icon: XCircle },
@@ -24,8 +26,10 @@ const STATUS_CFG: Record<string, { color: string; bg: string; border: string; la
 
 const APPT_TYPES  = ["CONSULTATION","FOLLOW_UP","PROCEDURE","EMERGENCY","CHECK_UP"]
 const STATUS_FLOW: Record<string, { action: string; label: string; color: string }[]> = {
-  SCHEDULED:   [{ action: "confirm",  label: "Confirm",  color: "var(--hf-violet-text)" }, { action: "cancel", label: "Cancel", color: "var(--hf-danger-text)" }],
-  CONFIRMED:   [{ action: "start",    label: "Start",    color: "var(--hf-warning-text)" }, { action: "no_show", label: "No Show", color: "var(--hf-text-muted)" }, { action: "cancel", label: "Cancel", color: "var(--hf-danger-text)" }],
+  SCHEDULED:   [{action:"check_in",label:"Check in",color:"var(--hf-info-text)"},{ action: "confirm",  label: "Confirm",  color: "var(--hf-violet-text)" }, { action: "cancel", label: "Cancel", color: "var(--hf-danger-text)" }],
+  CONFIRMED:   [{action:"check_in",label:"Check in",color:"var(--hf-info-text)"},{ action: "start",    label: "Start",    color: "var(--hf-warning-text)" }, { action: "no_show", label: "No Show", color: "var(--hf-text-muted)" }, { action: "cancel", label: "Cancel", color: "var(--hf-danger-text)" }],
+  CHECKED_IN:  [{action:"triage",label:"Triage",color:"var(--hf-violet-text)"},{action:"start",label:"Start",color:"var(--hf-warning-text)"},{action:"cancel",label:"Cancel",color:"var(--hf-danger-text)"}],
+  TRIAGED:     [{action:"start",label:"Start",color:"var(--hf-warning-text)"},{action:"cancel",label:"Cancel",color:"var(--hf-danger-text)"}],
   IN_PROGRESS: [{ action: "complete", label: "Complete", color: "var(--hf-success-text-strong)" }],
 }
 

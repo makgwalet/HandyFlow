@@ -412,8 +412,10 @@ public class ClinicService {
     public AppointmentResponse updateAppointmentStatus(TenantId tenantId, UUID id, String action) {
         ClinicAppointment appt = appointmentRepo.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment", id.toString()));
-        switch (action.toUpperCase()) {
+        switch (action.toUpperCase().replace('-', '_')) {
             case "CONFIRM"  -> appt.confirm();
+            case "CHECK_IN" -> appt.checkIn();
+            case "TRIAGE"   -> appt.triage();
             case "START"    -> appt.start();
             case "COMPLETE" -> appt.complete();
             case "CANCEL"   -> appt.cancel();
