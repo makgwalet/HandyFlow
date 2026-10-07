@@ -3,6 +3,7 @@
 package za.co.handyflow.platform.security.application.internal;
 
 import lombok.RequiredArgsConstructor;
+import java.time.Instant;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -58,6 +59,21 @@ public class ShiftService {
     @Transactional(readOnly = true)
     public Page<ShiftResponse> getShifts(TenantId tenantId, Pageable pageable) {
         return shiftRepository.findAllActive(tenantId, pageable).map(this::toResponse);
+    }
+
+    /** Longest window the scheduler may ask for in one call. */
+    public static final java.time.Duration MAX_RANGE = java.time.Duration.ofDays(35);
+
+    /** Shifts that start in [from, to), for the scheduler grid. A bad window is a 400, never a silent truncation. */
+    @Transactional(readOnly = true)
+    public java.util.List<ShiftResponse> getRange(TenantId tenantId, Instant from, Instant to) {
+        if (from == null || to == null || !to.isAfter(from)) {
+            throw new HandyFlowException("'to' must be after 'from'", HttpStatus.BAD_REQUEST, "INVALID_RANGE");
+        }
+        if (java.time.Duration.between(from, to).compareTo(MAX_RANGE) > 0) {
+            throw new HandyFlowException("Ask for at most " + MAX_RANGE.toDays() + " days at a time", HttpStatus.BAD_REQUEST, "RANGE_TOO_LONG");
+        }
+        return shiftRepository.findByTenantInRange(tenantId, from, to).stream().map(this::toResponse).toList();
     }
 
     // ── Commands ──────────────────────────────────────────────────────────────

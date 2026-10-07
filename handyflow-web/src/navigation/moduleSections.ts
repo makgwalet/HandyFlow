@@ -78,6 +78,7 @@ export const SECURITY_SECTIONS: ModuleSections = {
       label: 'Operations',
       sections: [
         { id: 'shifts', label: 'Shifts', icon: Clock },
+        { id: 'scheduler', label: 'Scheduler', icon: CalendarDays },
         { id: 'incidents', label: 'Incidents', icon: AlertTriangle },
         { id: 'patrol-routes', label: 'Patrol Routes', icon: Route },
         { id: 'post-orders', label: 'Post Orders', icon: ClipboardList },

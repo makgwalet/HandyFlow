@@ -13,6 +13,7 @@ import GuardScreeningTab  from "./GuardScreeningTab"
 import ComplaintsTab       from "./ComplaintsTab"
 import RiskRulesTab        from "./RiskRulesTab"
 import ShiftsTab          from "./ShiftsTab"
+import SchedulerTab       from "./SchedulerTab"
 import IncidentsTab       from "./IncidentsTab"
 import LiveMapTab         from "./LiveMapTab"
 import ArmouryTab         from "./ArmouryTab"
@@ -54,6 +55,7 @@ export function SecurityPage() {
     "control-room":      <ControlRoomTab />,
     "live":              <LiveMapTab />,
     "shifts":            <ShiftsTab />,
+    "scheduler":         <SchedulerTab />,
     "incidents":         <IncidentsTab />,
     "patrol-routes":     <PatrolRoutesTab />,
     "post-orders":       <PostOrdersTab />,

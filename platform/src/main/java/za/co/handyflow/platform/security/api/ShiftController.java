@@ -47,6 +47,16 @@ public class ShiftController {
                 shiftService.getShifts(TenantContext.getTenantIdAsObject(), pageable)));
     }
 
+    @GetMapping("/range")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
+    @Operation(summary = "Shifts starting in [from, to), at most 35 days; used by the scheduler grid")
+    public ResponseEntity<ApiResponse<java.util.List<ShiftResponse>>> getRange(
+            @RequestParam java.time.Instant from, @RequestParam java.time.Instant to) {
+        featureGuard.requireModule("security");
+        return ResponseEntity.ok(ApiResponse.success(
+                shiftService.getRange(TenantContext.getTenantIdAsObject(), from, to)));
+    }
+
     @PostMapping
     @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
