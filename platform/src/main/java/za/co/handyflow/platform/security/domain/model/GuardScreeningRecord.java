@@ -72,6 +72,28 @@ public class GuardScreeningRecord {
     @Column
     private String notes;
 
+    @Column(length = 200)
+    private String provider;
+
+    @Column(name = "requested_at")
+    private LocalDate requestedAt;
+
+    /** CLEARED | NOT_CLEARED. Set by a reviewer after a result exists; cleared again if the result is re-recorded. */
+    @Column(length = 20)
+    private String decision;
+
+    @Column(name = "decision_note", columnDefinition = "text")
+    private String decisionNote;
+
+    @Column(name = "decided_by")
+    private UUID decidedBy;
+
+    @Column(name = "decided_by_name", length = 200)
+    private String decidedByName;
+
+    @Column(name = "decided_at")
+    private Instant decidedAt;
+
     @Column(name = "created_by")
     private UUID createdBy;
 
@@ -109,20 +131,50 @@ public class GuardScreeningRecord {
         this.nextDueAt   = nextDueAt;
         this.reportRef   = reportRef;
         this.notes       = notes;
+        // A new result invalidates any earlier sign-off: the reviewer approved a different result.
+        this.decision      = null;
+        this.decisionNote  = null;
+        this.decidedBy     = null;
+        this.decidedByName = null;
+        this.decidedAt     = null;
         this.updatedAt   = Instant.now();
+    }
+
+    /** Request details captured when the screening is ordered. */
+    public void setRequestDetails(String provider, LocalDate requestedAt) {
+        this.provider    = provider == null || provider.isBlank() ? null : provider.trim();
+        this.requestedAt = requestedAt;
+        this.updatedAt   = Instant.now();
+    }
+
+    /** Reviewer sign-off. Only possible once a result has been recorded. */
+    public void decide(String decision, String note, UUID by, String byName) {
+        if (result == ScreeningResult.PENDING) {
+            throw new IllegalStateException("A decision needs a recorded result first");
+        }
+        if (!"CLEARED".equals(decision) && !"NOT_CLEARED".equals(decision)) {
+            throw new IllegalArgumentException("Decision must be CLEARED or NOT_CLEARED");
+        }
+        this.decision      = decision;
+        this.decisionNote  = note == null || note.isBlank() ? null : note.trim();
+        this.decidedBy     = by;
+        this.decidedByName = byName;
+        this.decidedAt     = Instant.now();
+        this.updatedAt     = Instant.now();
     }
 
     // ── Queries ────────────────────────────────────────────────────────────────
 
     public boolean isPending() { return result == ScreeningResult.PENDING; }
-    public boolean isFailed()  { return result == ScreeningResult.FAIL; }
+    public boolean isFailed()  { return result == ScreeningResult.FAIL || "NOT_CLEARED".equals(decision); }
     public boolean isPassed()  { return result == ScreeningResult.PASS; }
 
     // ── Enums ──────────────────────────────────────────────────────────────────
 
     public enum ScreeningType {
         POLYGRAPH, CRIMINAL_RECORD_CHECK, REFERENCE_CHECK,
-        DRUG_TEST, PSYCHOMETRIC, CREDIT_CHECK, OTHER
+        DRUG_TEST, PSYCHOMETRIC, CREDIT_CHECK,
+        ID_VERIFICATION, QUALIFICATION_VERIFICATION, OTHER
     }
 
     public enum ScreeningReason {

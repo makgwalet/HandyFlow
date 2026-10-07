@@ -6,11 +6,20 @@
 
 export type Tone = "ok" | "warn" | "bad" | "info" | "neutral"
 
+export interface EvidenceItem { id: string; fileName: string; label: string | null; sizeBytes: number; uploadedByName: string | null; createdAt: string }
 export interface ScreeningItem {
   id: string; screeningType: string; reason: string; result: string
   conductedBy: string | null; conductedAt: string | null; nextDueAt: string | null
   reportRef: string | null; createdAt: string
+  provider: string | null; requestedAt: string | null
+  decision: string | null; decisionNote: string | null; decidedByName: string | null; decidedAt: string | null
+  evidence: EvidenceItem[]
 }
+export interface ReadinessItem {
+  key: string; label: string; required: boolean; state: string; detail: string
+  validUntil: string | null; evidenceCount: number; met: boolean; screeningId: string | null
+}
+export interface Readiness { percent: number; ready: boolean; items: ReadinessItem[]; reasons: string[] }
 export interface DocumentItem { id: string; category: string; fileUrl: string; fileName: string | null; notes: string | null; createdAt: string }
 export interface ShiftItem { id: string; siteId: string; siteName: string | null; startAt: string; endAt: string; status: string }
 
@@ -41,51 +50,35 @@ export function expiryState(expiry: string | null | undefined, today: string): E
 }
 
 export const SCREENING_TYPES: { value: string; label: string }[] = [
+  { value: "ID_VERIFICATION", label: "ID verification" },
   { value: "CRIMINAL_RECORD_CHECK", label: "Criminal record check" },
   { value: "REFERENCE_CHECK", label: "Reference check" },
   { value: "DRUG_TEST", label: "Drug test" },
   { value: "POLYGRAPH", label: "Polygraph" },
   { value: "PSYCHOMETRIC", label: "Psychometric" },
   { value: "CREDIT_CHECK", label: "Credit check" },
+  { value: "QUALIFICATION_VERIFICATION", label: "Qualification verification" },
+  { value: "OTHER", label: "Other" },
+]
+export const screeningLabel = (t: string) => SCREENING_TYPES.find(x => x.value === t)?.label ?? t.replace(/_/g, " ").toLowerCase()
+
+export const SCREENING_REASONS: { value: string; label: string }[] = [
+  { value: "ONBOARDING", label: "Onboarding" }, { value: "PERIODIC", label: "Periodic renewal" }, { value: "POST_INCIDENT", label: "After an incident" },
+  { value: "RANDOM", label: "Random" }, { value: "CLIENT_REQUESTED", label: "Client requested" },
 ]
 
-export interface ScreeningRow {
-  type: string; label: string
-  record: ScreeningItem | null
-  tone: Tone; state: string
+/** Server states for a readiness row, as a tone and a short label. */
+export const READINESS_STATE: Record<string, { tone: Tone; label: string }> = {
+  MET: { tone: "ok", label: "Met" }, EXPIRING: { tone: "warn", label: "Expiring" }, PENDING: { tone: "warn", label: "Pending" },
+  INCOMPLETE: { tone: "warn", label: "Incomplete" }, EXPIRED: { tone: "bad", label: "Expired" }, FAILED: { tone: "bad", label: "Failed" },
+  MISSING: { tone: "neutral", label: "Missing" },
 }
+export const readinessState = (s: string) => READINESS_STATE[s] ?? { tone: "neutral" as Tone, label: s.toLowerCase() }
 
-/** The newest record of each type, with a plain state. "Other" only appears when a record exists. */
-export function screeningMatrix(items: ScreeningItem[], today: string): ScreeningRow[] {
-  const latest = new Map<string, ScreeningItem>()
-  for (const it of items) {
-    const cur = latest.get(it.screeningType)
-    if (!cur || it.createdAt > cur.createdAt) latest.set(it.screeningType, it)
-  }
-  const types = [...SCREENING_TYPES]
-  if (latest.has("OTHER")) types.push({ value: "OTHER", label: "Other" })
-  return types.map(t => {
-    const record = latest.get(t.value) ?? null
-    if (!record) return { type: t.value, label: t.label, record, tone: "neutral" as Tone, state: "Not on file" }
-    const { tone, state } = screeningState(record, today)
-    return { type: t.value, label: t.label, record, tone, state }
-  })
-}
-
-export function screeningState(r: ScreeningItem, today: string): { tone: Tone; state: string } {
-  switch (r.result) {
-    case "FAIL": return { tone: "bad", state: "Failed" }
-    case "PENDING": return { tone: "warn", state: "Pending" }
-    case "INCONCLUSIVE": return { tone: "warn", state: "Inconclusive" }
-    case "PASS": {
-      if (!r.nextDueAt) return { tone: "ok", state: "Passed" }
-      const days = daysBetween(today, r.nextDueAt.slice(0, 10))
-      if (days < 0) return { tone: "bad", state: `Renewal overdue by ${-days} day${-days === 1 ? "" : "s"}` }
-      if (days <= DUE_SOON_DAYS) return { tone: "warn", state: `Passed, renewal due in ${days} day${days === 1 ? "" : "s"}` }
-      return { tone: "ok", state: "Passed" }
-    }
-    default: return { tone: "neutral", state: r.result }
-  }
+/** Colour of the readiness ring: ready is green, high but blocked is amber, low is red. */
+export function readinessTone(r: { percent: number; ready: boolean }): Tone {
+  if (r.ready) return "ok"
+  return r.percent >= 60 ? "warn" : "bad"
 }
 
 /** The standard guard file. This is a default list, not a legal requirement for every client. */
@@ -122,22 +115,6 @@ export function fileChecklist(docs: DocumentItem[]): { category: string; label: 
     const count = docs.filter(d => d.category === f.category).length
     return { ...f, present: count > 0, count }
   })
-}
-
-/** Things worth the supervisor's attention, worst first. Describes what is on file; it is not a deployment verdict. */
-export function attentionItems(args: { psiraExpiry: string | null; psiraNumber: string | null; screening: ScreeningRow[]; docs: DocumentItem[]; gate: string | null; today: string }): { tone: Tone; text: string }[] {
-  const out: { tone: Tone; text: string }[] = []
-  if (!args.psiraNumber) out.push({ tone: "bad", text: "No PSiRA number on file" })
-  const ps = expiryState(args.psiraExpiry, args.today)
-  if (args.psiraNumber && ps.tone !== "ok") out.push({ tone: ps.tone, text: `PSiRA: ${ps.label.toLowerCase()}` })
-  for (const r of args.screening) {
-    if (r.tone === "bad" || r.tone === "warn") out.push({ tone: r.tone, text: `${r.label}: ${r.state.toLowerCase()}` })
-  }
-  const missing = fileChecklist(args.docs).filter(f => !f.present).map(f => f.label)
-  if (missing.length) out.push({ tone: "warn", text: `Not in the guard file: ${missing.join(", ")}` })
-  if (args.gate) out.push({ tone: "warn", text: args.gate })
-  const rank: Record<Tone, number> = { bad: 0, warn: 1, info: 2, neutral: 3, ok: 4 }
-  return out.sort((a, b) => rank[a.tone] - rank[b.tone])
 }
 
 /** Share of started shifts that were completed, as a whole percent. Null when none have started. */

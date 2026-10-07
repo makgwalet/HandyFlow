@@ -12,7 +12,12 @@ import za.co.handyflow.platform.security.domain.repository.IncidentRepository;
 import za.co.handyflow.platform.security.domain.repository.ShiftRepository;
 import za.co.handyflow.platform.security.domain.repository.SiteRepository;
 import za.co.handyflow.platform.security.dto.GuardOverviewResponse;
+import za.co.handyflow.platform.security.application.internal.GuardReadinessCalculator.ScreeningFacts;
 import za.co.handyflow.platform.security.dto.GuardOverviewResponse.Counts;
+import za.co.handyflow.platform.security.dto.GuardOverviewResponse.EvidenceItem;
+import za.co.handyflow.platform.security.dto.GuardOverviewResponse.Readiness;
+import za.co.handyflow.platform.security.dto.GuardOverviewResponse.ReadinessItem;
+import za.co.handyflow.platform.security.dto.GuardDocumentResponse;
 import za.co.handyflow.platform.security.dto.GuardOverviewResponse.IncidentItem;
 import za.co.handyflow.platform.security.dto.GuardOverviewResponse.ScreeningItem;
 import za.co.handyflow.platform.security.dto.GuardOverviewResponse.ShiftItem;
@@ -41,6 +46,7 @@ public class GuardOverviewService {
 
     private final GuardService guardService;
     private final GuardScreeningService screeningService;
+    private final GuardScreeningEvidenceService evidenceService;
     private final GuardScreeningRepository screeningRepository;
     private final ShiftRepository shiftRepository;
     private final IncidentRepository incidentRepository;
@@ -57,9 +63,17 @@ public class GuardOverviewService {
         var guard = guardService.getGuard(tenantId, guardId);
         var documents = guardService.getDocuments(tenantId, guardId);
 
-        List<ScreeningItem> screening = screeningRepository.findByGuard(tenantId, guardId).stream()
-                .map(GuardOverviewService::toItem)
+        List<GuardScreeningRecord> records = screeningRepository.findByGuard(tenantId, guardId);
+        Map<UUID, List<EvidenceItem>> evidence = new HashMap<>();
+        for (GuardScreeningRecord r : records) {
+            evidence.put(r.getId(), evidenceService.filesFor(tenantId, r.getId()).stream()
+                    .map(e -> new EvidenceItem(e.id(), e.fileName(), e.evidenceType(), e.fileSizeBytes(), e.uploadedByName(), e.createdAt()))
+                    .toList());
+        }
+        List<ScreeningItem> screening = records.stream()
+                .map(r -> toItem(r, evidence.get(r.getId())))
                 .toList();
+        Readiness readiness = readiness(guard.psiraNumber(), guard.psiraExpiryDate(), records, evidence, documents, now);
 
         Instant shiftFrom = now.minus(Duration.ofDays(SHIFT_BACK_DAYS));
         Instant shiftTo = now.plus(Duration.ofDays(SHIFT_FORWARD_DAYS));
@@ -98,14 +112,44 @@ public class GuardOverviewService {
                 screeningService.checkScreeningGate(guardId),
                 documents,
                 screening,
+                readiness,
                 shiftItems,
                 incidentItems,
                 new Counts((int) past90, (int) completed, incidents.size(), (int) open));
     }
 
-    private static ScreeningItem toItem(GuardScreeningRecord r) {
+    /** Readiness is judged in South African time, like every other date rule in the product. */
+    static Readiness readiness(String psiraNumber, java.time.LocalDate psiraExpiry, List<GuardScreeningRecord> records,
+                               Map<UUID, List<EvidenceItem>> evidence, List<GuardDocumentResponse> documents, Instant now) {
+        java.time.LocalDate today = now.atZone(java.time.ZoneId.of("Africa/Johannesburg")).toLocalDate();
+        List<ScreeningFacts> facts = records.stream()
+                .map(r -> new ScreeningFacts(r.getScreeningType().name(), r.getResult().name(), r.getConductedAt(),
+                        r.getNextDueAt(), r.getCreatedAt(), evidence.getOrDefault(r.getId(), List.of()).size(), r.getDecision()))
+                .toList();
+        var categories = documents.stream().map(GuardDocumentResponse::category).collect(java.util.stream.Collectors.toSet());
+        var result = GuardReadinessCalculator.calculate(
+                new GuardReadinessCalculator.Input(today, psiraNumber, psiraExpiry, facts, categories));
+
+        // Link each screening row to its newest record so the page can open it.
+        Map<String, UUID> newestId = new HashMap<>();
+        Map<String, Instant> newestAt = new HashMap<>();
+        for (GuardScreeningRecord r : records) {
+            String t = r.getScreeningType().name();
+            if (newestAt.get(t) == null || r.getCreatedAt().isAfter(newestAt.get(t))) { newestAt.put(t, r.getCreatedAt()); newestId.put(t, r.getId()); }
+        }
+        List<ReadinessItem> items = result.items().stream()
+                .map(i -> new ReadinessItem(i.key(), i.label(), i.required(), i.state().name(), i.detail(), i.validUntil(),
+                        i.evidenceCount(), i.met(), newestId.get(i.key())))
+                .toList();
+        return new Readiness(result.percent(), result.ready(), items, result.reasons());
+    }
+
+    private static ScreeningItem toItem(GuardScreeningRecord r, List<EvidenceItem> evidence) {
         return new ScreeningItem(r.getId(), r.getScreeningType().name(), r.getReason().name(),
                 r.getResult().name(), r.getConductedBy(), r.getConductedAt(), r.getNextDueAt(),
-                r.getReportRef(), r.getCreatedAt());
+                r.getReportRef(), r.getCreatedAt(),
+                r.getProvider(), r.getRequestedAt(),
+                r.getDecision(), r.getDecisionNote(), r.getDecidedByName(), r.getDecidedAt(),
+                evidence);
     }
 }

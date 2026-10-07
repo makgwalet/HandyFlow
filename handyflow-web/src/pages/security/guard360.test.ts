@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest"
-import { attentionItems, completionRate, daysBetween, expiryState, fileChecklist, screeningMatrix, todayIso, type ScreeningItem } from "./guard360.logic"
+import { completionRate, daysBetween, expiryState, fileChecklist, readinessState, readinessTone, screeningLabel, todayIso } from "./guard360.logic"
 
 const TODAY = "2026-10-07"
-const rec = (o: Partial<ScreeningItem>): ScreeningItem => ({ id: "r", screeningType: "CRIMINAL_RECORD_CHECK", reason: "ONBOARDING", result: "PASS", conductedBy: null, conductedAt: null, nextDueAt: null, reportRef: null, createdAt: "2026-01-01T00:00:00Z", ...o })
 
 describe("dates", () => {
   it("counts whole days across month ends", () => { expect(daysBetween("2026-10-07", "2026-10-15")).toBe(8); expect(daysBetween("2026-10-07", "2026-09-30")).toBe(-7) })
@@ -23,45 +22,30 @@ describe("expiryState", () => {
   })
 })
 
-describe("screeningMatrix", () => {
-  it("uses the newest record of each type", () => {
-    const m = screeningMatrix([rec({ id: "old", result: "FAIL", createdAt: "2026-01-01T00:00:00Z" }), rec({ id: "new", result: "PASS", createdAt: "2026-06-01T00:00:00Z" })], TODAY)
-    expect(m.find(r => r.type === "CRIMINAL_RECORD_CHECK")?.record?.id).toBe("new")
-    expect(m.find(r => r.type === "CRIMINAL_RECORD_CHECK")?.state).toBe("Passed")
+describe("readiness display", () => {
+  it("maps every server state to a tone", () => {
+    expect(readinessState("MET").tone).toBe("ok"); expect(readinessState("EXPIRING").tone).toBe("warn")
+    expect(readinessState("EXPIRED").tone).toBe("bad"); expect(readinessState("FAILED").tone).toBe("bad")
+    expect(readinessState("MISSING").tone).toBe("neutral"); expect(readinessState("SOMETHING_NEW").label).toBe("something_new")
   })
-  it("shows types with no record as not on file, and Other only when present", () => {
-    const m = screeningMatrix([], TODAY)
-    expect(m).toHaveLength(6)
-    expect(m.every(r => r.state === "Not on file")).toBe(true)
-    expect(screeningMatrix([rec({ screeningType: "OTHER" })], TODAY)).toHaveLength(7)
+  it("ring colour: ready is ok, 60% or more but blocked is warn, below that is bad", () => {
+    expect(readinessTone({ percent: 100, ready: true })).toBe("ok")
+    expect(readinessTone({ percent: 80, ready: false })).toBe("warn")
+    expect(readinessTone({ percent: 60, ready: false })).toBe("warn")
+    expect(readinessTone({ percent: 40, ready: false })).toBe("bad")
   })
-  it("marks a pass whose renewal date has gone as overdue", () => {
-    const r = screeningMatrix([rec({ nextDueAt: "2026-09-29" })], TODAY)[0]
-    expect(r.tone).toBe("bad"); expect(r.state).toBe("Renewal overdue by 8 days")
-  })
-  it("warns for pending, inconclusive and renewals within 30 days; fails are bad", () => {
-    const t = (o: Partial<ScreeningItem>) => screeningMatrix([rec(o)], TODAY)[0].tone
-    expect(t({ result: "PENDING" })).toBe("warn"); expect(t({ result: "INCONCLUSIVE" })).toBe("warn")
-    expect(t({ nextDueAt: "2026-10-20" })).toBe("warn"); expect(t({ result: "FAIL" })).toBe("bad")
+  it("labels screening types, including the new verification types", () => {
+    expect(screeningLabel("ID_VERIFICATION")).toBe("ID verification")
+    expect(screeningLabel("QUALIFICATION_VERIFICATION")).toBe("Qualification verification")
   })
 })
 
-describe("fileChecklist and attentionItems", () => {
+describe("fileChecklist", () => {
   const docs = [{ id: "d", category: "ID_COPY", fileUrl: "x", fileName: null, notes: null, createdAt: "2026-01-01T00:00:00Z" }]
   it("ticks only categories that have a document", () => {
     const c = fileChecklist(docs)
     expect(c.find(x => x.category === "ID_COPY")?.present).toBe(true)
     expect(c.filter(x => !x.present)).toHaveLength(4)
-  })
-  it("lists the worst items first and includes the gate warning", () => {
-    const items = attentionItems({ psiraExpiry: "2026-09-29", psiraNumber: "123", screening: screeningMatrix([rec({ result: "FAIL" })], TODAY), docs, gate: "Guard has a FAILED screening", today: TODAY })
-    expect(items[0].tone).toBe("bad")
-    expect(items.some(i => i.text.startsWith("PSiRA: expired 8 days ago"))).toBe(true)
-    expect(items.some(i => i.text === "Guard has a FAILED screening")).toBe(true)
-    expect(items.some(i => i.text.startsWith("Not in the guard file:"))).toBe(true)
-  })
-  it("reports a missing PSiRA number as a problem", () => {
-    expect(attentionItems({ psiraExpiry: null, psiraNumber: null, screening: [], docs, gate: null, today: TODAY })[0].text).toBe("No PSiRA number on file")
   })
 })
 

@@ -33,6 +33,7 @@ class GuardOverviewServiceTest {
 
     @Mock private GuardService guardService;
     @Mock private GuardScreeningService screeningService;
+    @Mock private GuardScreeningEvidenceService evidenceService;
     @Mock private GuardScreeningRepository screeningRepository;
     @Mock private ShiftRepository shiftRepository;
     @Mock private IncidentRepository incidentRepository;
@@ -44,7 +45,7 @@ class GuardOverviewServiceTest {
     private final UUID siteId = UUID.randomUUID();
 
     private GuardOverviewService service() {
-        return new GuardOverviewService(guardService, screeningService, screeningRepository,
+        return new GuardOverviewService(guardService, screeningService, evidenceService, screeningRepository,
                 shiftRepository, incidentRepository, siteRepository);
     }
 
@@ -133,5 +134,28 @@ class GuardOverviewServiceTest {
         when(screeningService.checkScreeningGate(guardId)).thenReturn("Guard has a FAILED screening");
 
         assertThat(service().overview(TENANT, guardId, NOW).screeningGate()).isEqualTo("Guard has a FAILED screening");
+    }
+
+    @Test
+    @DisplayName("Readiness counts a screening's evidence files and links each row to its newest record")
+    void readinessFromEvidence() {
+        guardExists();
+        var rec = za.co.handyflow.platform.security.domain.model.GuardScreeningRecord.create(TENANT, guardId,
+                za.co.handyflow.platform.security.domain.model.GuardScreeningRecord.ScreeningType.DRUG_TEST,
+                za.co.handyflow.platform.security.domain.model.GuardScreeningRecord.ScreeningReason.ONBOARDING, null);
+        rec.recordResult(za.co.handyflow.platform.security.domain.model.GuardScreeningRecord.ScreeningResult.PASS,
+                "LabCo", java.time.LocalDate.of(2026, 9, 1), java.time.LocalDate.of(2027, 9, 1), null, null);
+        when(screeningRepository.findByGuard(TENANT, guardId)).thenReturn(List.of(rec));
+        when(evidenceService.filesFor(TENANT, rec.getId())).thenReturn(List.of(
+                new za.co.handyflow.platform.evidence.dto.EvidenceResponse(UUID.randomUUID(), "lab.pdf", "application/pdf", 10L, "Lab report", "ACTIVE", "Sam", NOW)));
+
+        var out = service().overview(TENANT, guardId, NOW);
+
+        var drug = out.readiness().items().stream().filter(i -> i.key().equals("DRUG_TEST")).findFirst().orElseThrow();
+        assertThat(drug.state()).isEqualTo("MET");
+        assertThat(drug.evidenceCount()).isEqualTo(1);
+        assertThat(drug.screeningId()).isEqualTo(rec.getId());
+        assertThat(out.screening().get(0).evidence()).hasSize(1);
+        assertThat(out.readiness().ready()).isFalse(); // PSiRA, ID copy and two other checks are still missing
     }
 }

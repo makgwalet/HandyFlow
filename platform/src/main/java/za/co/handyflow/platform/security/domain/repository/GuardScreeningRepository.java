@@ -24,7 +24,7 @@ public interface GuardScreeningRepository extends JpaRepository<GuardScreeningRe
     @Query("""
         SELECT COUNT(r) > 0 FROM GuardScreeningRecord r
         WHERE r.guardId = :guardId
-        AND r.result = 'FAIL'
+        AND (r.result = 'FAIL' OR r.decision = 'NOT_CLEARED')
         """)
     boolean hasFailedScreening(UUID guardId);
 

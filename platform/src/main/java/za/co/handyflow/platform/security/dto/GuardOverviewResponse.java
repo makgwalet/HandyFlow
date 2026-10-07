@@ -17,6 +17,7 @@ public record GuardOverviewResponse(
         String screeningGate,
         List<GuardDocumentResponse> documents,
         List<ScreeningItem> screening,
+        Readiness readiness,
         List<ShiftItem> shifts,
         List<IncidentItem> incidents,
         Counts counts
@@ -24,7 +25,19 @@ public record GuardOverviewResponse(
     public record ScreeningItem(
             UUID id, String screeningType, String reason, String result,
             String conductedBy, LocalDate conductedAt, LocalDate nextDueAt,
-            String reportRef, Instant createdAt) {}
+            String reportRef, Instant createdAt,
+            String provider, LocalDate requestedAt,
+            String decision, String decisionNote, String decidedByName, Instant decidedAt,
+            List<EvidenceItem> evidence) {}
+
+    public record EvidenceItem(UUID id, String fileName, String label, long sizeBytes, String uploadedByName, Instant createdAt) {}
+
+    /** Deployment readiness: percent of required checks met, a ready flag, every row, and the reasons it is not ready. */
+    public record Readiness(int percent, boolean ready, List<ReadinessItem> items, List<String> reasons) {}
+
+    public record ReadinessItem(String key, String label, boolean required, String state, String detail,
+                                LocalDate validUntil, int evidenceCount, boolean met,
+                                UUID screeningId) {}
 
     public record ShiftItem(
             UUID id, UUID siteId, String siteName, Instant startAt, Instant endAt,

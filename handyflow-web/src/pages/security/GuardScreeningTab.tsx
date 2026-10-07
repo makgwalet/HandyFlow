@@ -1,5 +1,6 @@
 // src/pages/security/GuardScreeningTab.tsx
 //
+// Evidence files, sign-off and renewal for a screening are on the guard's own page (Guard 360, Compliance tab).
 // FIX (P1 backlog): confirmed via direct source read before building —
 // GuardScreeningController has a full screening workflow (create,
 // record result, full history, a pre-shift gate check) with zero
@@ -15,7 +16,7 @@ interface Guard { id: string; fullName: string }
 
 interface ScreeningRecord {
   id: string; guardId: string
-  screeningType: "POLYGRAPH" | "CRIMINAL_RECORD_CHECK" | "REFERENCE_CHECK" | "DRUG_TEST" | "PSYCHOMETRIC" | "CREDIT_CHECK" | "OTHER"
+  screeningType: "POLYGRAPH" | "CRIMINAL_RECORD_CHECK" | "REFERENCE_CHECK" | "DRUG_TEST" | "PSYCHOMETRIC" | "CREDIT_CHECK" | "ID_VERIFICATION" | "QUALIFICATION_VERIFICATION" | "OTHER"
   reason: "ONBOARDING" | "PERIODIC" | "POST_INCIDENT" | "RANDOM" | "CLIENT_REQUESTED"
   result: "PASS" | "FAIL" | "INCONCLUSIVE" | "PENDING"
   conductedBy: string | null; conductedAt: string | null; nextDueAt: string | null
@@ -181,6 +182,8 @@ export default function GuardScreeningTab() {
                 <option value="DRUG_TEST">Drug Test</option>
                 <option value="PSYCHOMETRIC">Psychometric</option>
                 <option value="CREDIT_CHECK">Credit Check</option>
+                <option value="ID_VERIFICATION">ID Verification</option>
+                <option value="QUALIFICATION_VERIFICATION">Qualification Verification</option>
                 <option value="OTHER">Other</option>
               </select>
             </div>

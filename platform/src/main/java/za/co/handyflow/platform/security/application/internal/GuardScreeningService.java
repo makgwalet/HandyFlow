@@ -65,6 +65,7 @@ public class GuardScreeningService {
                 GuardScreeningRecord.ScreeningType.valueOf(req.screeningType()),
                 GuardScreeningRecord.ScreeningReason.valueOf(req.reason()),
                 createdBy);
+        record.setRequestDetails(req.provider(), req.requestedAt() != null ? req.requestedAt() : java.time.LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg")));
         record = screeningRepository.save(record);
 
         // Rollup: guard now has at least one PENDING → status = PENDING
@@ -102,6 +103,44 @@ public class GuardScreeningService {
         log.info("[Security] Screening result recorded screeningId={} result={}",
                 screeningId, req.result());
         return record;
+    }
+
+    /**
+     * Reviewer sign-off on a screening that already has a result. Not clearing needs a written reason.
+     * A NOT_CLEARED decision counts as a failed screening for the guard's rollup and the pre-shift gate.
+     */
+    @Transactional
+    public GuardScreeningRecord decide(TenantId tenantId, UUID guardId, UUID screeningId,
+                                       DecideScreeningRequest req, UUID by, String byName) {
+        GuardScreeningRecord record = findForGuard(tenantId, guardId, screeningId);
+        String decision = req.decision() == null ? "" : req.decision().trim().toUpperCase();
+        if (!"CLEARED".equals(decision) && !"NOT_CLEARED".equals(decision)) {
+            throw new za.co.handyflow.platform.shared.HandyFlowException("Decision must be CLEARED or NOT_CLEARED",
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "INVALID_DECISION");
+        }
+        if (record.isPending()) {
+            throw new za.co.handyflow.platform.shared.HandyFlowException(
+                    "Record the result before signing off this screening",
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "SCREENING_RESULT_REQUIRED");
+        }
+        if ("NOT_CLEARED".equals(decision) && (req.note() == null || req.note().isBlank())) {
+            throw new za.co.handyflow.platform.shared.HandyFlowException(
+                    "Give a reason when the guard is not cleared",
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "DECISION_NOTE_REQUIRED");
+        }
+        record.decide(decision, req.note(), by, byName);
+        screeningRepository.save(record);
+        updateScreeningStatus(tenantId, guardId);
+        log.info("[Security] Screening decision screeningId={} decision={} by={}", screeningId, decision, by);
+        return record;
+    }
+
+    /** A screening record that belongs to this tenant and this guard, or not found. */
+    @Transactional(readOnly = true)
+    public GuardScreeningRecord findForGuard(TenantId tenantId, UUID guardId, UUID screeningId) {
+        return screeningRepository.findById(screeningId)
+                .filter(r -> r.getTenantId().equals(tenantId) && r.getGuardId().equals(guardId))
+                .orElseThrow(() -> new ResourceNotFoundException("GuardScreeningRecord", screeningId.toString()));
     }
 
     @Transactional(readOnly = true)

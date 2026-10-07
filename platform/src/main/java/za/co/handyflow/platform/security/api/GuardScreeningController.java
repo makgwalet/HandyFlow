@@ -82,6 +82,23 @@ public class GuardScreeningController {
                 screeningService.recordResult(tenantId, screeningId, req)));
     }
 
+    @PostMapping("/{screeningId}/decision")
+    @Operation(
+            summary = "Sign off a screening that has a result",
+            description = """
+            CLEARED or NOT_CLEARED, with a note (required when not cleared). Needs a recorded
+            result first. NOT_CLEARED counts as a failed screening for the guard's rollup and
+            the pre-shift gate. Recording a new result clears the earlier sign-off.
+            """)
+    public ResponseEntity<ApiResponse<GuardScreeningRecord>> decide(
+            @PathVariable UUID guardId,
+            @PathVariable UUID screeningId,
+            @Valid @RequestBody DecideScreeningRequest req) {
+        return ResponseEntity.ok(ApiResponse.success(screeningService.decide(
+                TenantContext.getTenantIdAsObject(), guardId, screeningId, req,
+                TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
+    }
+
     @GetMapping("/gate")
     @Operation(
             summary = "Check the screening gate before assigning a shift",

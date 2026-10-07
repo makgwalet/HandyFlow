@@ -12,10 +12,11 @@ import { usePermission } from "../../hooks/usePermission"
 import Chip from "../../components/ui/Chip"
 import StatTile from "../../components/ui/StatTile"
 import { PageHeader } from "../../components/ui/PageHeader"
+import GuardScreeningPanel, { RequestScreening } from "./GuardScreeningPanel"
 import {
-  DOCUMENT_CATEGORIES, SEVERITY_TONE, SHIFT_TONE, attentionItems, categoryLabel, completionRate, expiryState,
-  fileChecklist, isUpcoming, screeningMatrix, todayIso,
-  type DocumentItem, type ScreeningItem, type ShiftItem,
+  DOCUMENT_CATEGORIES, SEVERITY_TONE, SHIFT_TONE, categoryLabel, completionRate, expiryState,
+  fileChecklist, isUpcoming, readinessState, readinessTone, screeningLabel, todayIso,
+  type DocumentItem, type Readiness, type ScreeningItem, type ShiftItem,
 } from "./guard360.logic"
 
 interface Overview {
@@ -29,6 +30,7 @@ interface Overview {
   screeningGate: string | null
   documents: DocumentItem[]
   screening: ScreeningItem[]
+  readiness: Readiness
   shifts: ShiftItem[]
   incidents: { id: string; siteName: string | null; title: string; severity: string; status: string; reportedAt: string }[]
   counts: { shiftsLast90Days: number; completedLast90Days: number; incidentsLast180Days: number; openIncidents: number }
@@ -78,8 +80,7 @@ export default function GuardProfilePage() {
   const { guard } = data
   const today = todayIso()
   const psira = expiryState(guard.psiraExpiryDate, today)
-  const matrix = screeningMatrix(data.screening, today)
-  const attention = attentionItems({ psiraExpiry: guard.psiraExpiryDate, psiraNumber: guard.psiraNumber, screening: matrix, docs: data.documents, gate: data.screeningGate, today })
+  const readiness = data.readiness
   const rate = completionRate(data.counts.shiftsLast90Days, data.counts.completedLast90Days)
   const upcoming = data.shifts.filter(s => isUpcoming(s, new Date()))
   const hasPhoto = guard.photoUrl && guard.photoUrl !== "PENDING_UPLOAD"
@@ -98,8 +99,9 @@ export default function GuardProfilePage() {
             <Chip tone={STATUS_TONE[guard.status] ?? "neutral"}>{guard.status.replace(/_/g, " ").toLowerCase()}</Chip>
             {guard.psiraNumber && <Chip tone={psira.tone} title={psira.label}>PSiRA {psira.tone === "ok" ? "valid" : psira.label.toLowerCase()}</Chip>}
             {guard.cpVettingTier && <Chip tone="accent">Close protection {guard.cpVettingTier.toLowerCase()}</Chip>}
-            {attention.length === 0 ? <Chip tone="ok" icon={<ShieldCheck size={12} />}>Nothing needs attention</Chip>
-              : <Chip tone={attention[0].tone === "bad" ? "bad" : "warn"} icon={<ShieldAlert size={12} />}>{attention.length} item{attention.length === 1 ? "" : "s"} need attention</Chip>}
+            <Chip tone={readinessTone(readiness)} icon={readiness.ready ? <ShieldCheck size={12} /> : <ShieldAlert size={12} />}>
+              {readiness.ready ? `Ready to deploy, ${readiness.percent}%` : `Not ready, ${readiness.percent}%`}
+            </Chip>
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -127,12 +129,16 @@ export default function GuardProfilePage() {
             <StatTile label="Incidents, last 180 days" value={data.counts.incidentsLast180Days} hint={`${data.counts.openIncidents} open`} tone={data.counts.openIncidents > 0 ? "warn" : "neutral"} icon={<ShieldAlert size={18} />} />
             <StatTile label="Documents on file" value={data.documents.length} icon={<FileText size={18} />} />
           </div>
-          <div style={card}>
-            <div style={{ fontWeight: 800, marginBottom: 8 }}>Needs attention</div>
-            {attention.length === 0 ? <div style={{ color: "var(--hf-text-muted)", fontSize: 13 }}>Nothing found. This describes what is on file; it is not a deployment decision.</div> :
-              <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 6 }}>
-                {attention.map((a, i) => <li key={i} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}><Chip tone={a.tone}>{a.tone === "bad" ? "Act" : "Check"}</Chip>{a.text}</li>)}
-              </ul>}
+          <div style={{ ...card, display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
+            <ReadinessRing readiness={readiness} />
+            <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>Deployment readiness</div>
+              {readiness.reasons.length === 0 ? <div style={{ color: "var(--hf-text-muted)", fontSize: 13 }}>Every required check is met. Open the Compliance tab for the detail.</div> :
+                <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 6 }}>
+                  {readiness.reasons.map((r, i) => <li key={i} style={{ fontSize: 13 }}>{r}</li>)}
+                </ul>}
+              <button onClick={() => setTab("Compliance")} style={{ ...linkBtn, marginTop: 10 }}>Open compliance</button>
+            </div>
           </div>
           <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
             <div style={card}>
@@ -165,37 +171,7 @@ export default function GuardProfilePage() {
         </div>
       )}
 
-      {tab === "Compliance" && (
-        <div style={{ display: "grid", gap: 16 }}>
-          <div style={card}>
-            <div style={{ fontWeight: 800, marginBottom: 8 }}>Screening</div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr><th style={th}>Check</th><th style={th}>Status</th><th style={th}>Conducted</th><th style={th}>Next due</th><th style={th}>Report ref</th></tr></thead>
-                <tbody>
-                  {matrix.map(r => (
-                    <tr key={r.type}>
-                      <td style={td}>{r.label}</td>
-                      <td style={td}><Chip tone={r.tone}>{r.state}</Chip></td>
-                      <td style={td}>{fmtDate(r.record?.conductedAt)}{r.record?.conductedBy ? ` by ${r.record.conductedBy}` : ""}</td>
-                      <td style={td}>{fmtDate(r.record?.nextDueAt)}</td>
-                      <td style={td}>{r.record?.reportRef ?? "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 10 }}>
-              Record or update a screening on the <Link to="/security/guard-screening" style={{ color: "var(--hf-accent-text)" }}>Guard screening</Link> page. Evidence files per screening arrive with the evidence vault.
-            </div>
-          </div>
-          <div style={card}>
-            <div style={{ fontWeight: 800, marginBottom: 8 }}>Screening history ({data.screening.length})</div>
-            {data.screening.length === 0 ? <div style={{ color: "var(--hf-text-muted)", fontSize: 13 }}>No screening records yet.</div> :
-              data.screening.map(s => <div key={s.id} style={{ fontSize: 13, padding: "4px 0" }}>{fmtDate(s.createdAt)} · {s.screeningType.replace(/_/g, " ").toLowerCase()} · {s.reason.replace(/_/g, " ").toLowerCase()} · {s.result.toLowerCase()}</div>)}
-          </div>
-        </div>
-      )}
+      {tab === "Compliance" && <ComplianceTab guardId={guard.id} readiness={readiness} screening={data.screening} />}
 
       {tab === "Documents" && <DocumentsTab guardId={guard.id} docs={data.documents} />}
 
@@ -231,6 +207,77 @@ export default function GuardProfilePage() {
 }
 
 const linkBtn: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", color: "var(--hf-text-secondary)", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none" }
+
+function ReadinessRing({ readiness }: { readiness: Readiness }) {
+  const tone = readinessTone(readiness)
+  const color = tone === "ok" ? "var(--hf-success-text-strong)" : tone === "warn" ? "var(--hf-warning-text)" : "var(--hf-danger-text)"
+  const r = 44, c = 2 * Math.PI * r
+  return (
+    <div role="img" aria-label={`Deployment readiness ${readiness.percent} percent, ${readiness.ready ? "ready" : "not ready"}`} style={{ position: "relative", width: 112, height: 112, flexShrink: 0 }}>
+      <svg width="112" height="112" viewBox="0 0 112 112">
+        <circle cx="56" cy="56" r={r} fill="none" stroke="var(--hf-surface-sunken)" strokeWidth="10" />
+        <circle cx="56" cy="56" r={r} fill="none" stroke={color} strokeWidth="10" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - readiness.percent / 100)} transform="rotate(-90 56 56)" />
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontSize: 24, fontWeight: 800, color }}>{readiness.percent}%</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color }}>{readiness.ready ? "READY" : "NOT READY"}</div>
+      </div>
+    </div>
+  )
+}
+
+function ComplianceTab({ guardId, readiness, screening }: { guardId: string; readiness: Readiness; screening: ScreeningItem[] }) {
+  const canManage = usePermission("SECURITY_MANAGE") || usePermission("SECURITY_ADMIN")
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [requesting, setRequesting] = useState(false)
+  const open = screening.find(s => s.id === openId) ?? null
+  return (
+    <div style={{ display: "grid", gap: 16 }}>
+      <div style={card}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+          <div style={{ fontWeight: 800 }}>Compliance matrix</div>
+          {canManage && <button onClick={() => setRequesting(true)} style={{ ...linkBtn, background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", border: "none" }}><Plus size={14} /> Request screening</button>}
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr><th style={th}>Check</th><th style={th}>Evidence</th><th style={th}>Valid until</th><th style={th}>Status</th><th style={th}></th></tr></thead>
+            <tbody>
+              {readiness.items.map(i => {
+                const st = readinessState(i.state)
+                return (
+                  <tr key={i.key}>
+                    <td style={td}>{i.label}{i.required ? "" : <span style={{ color: "var(--hf-text-muted)", fontSize: 11 }}> (not required)</span>}</td>
+                    <td style={td}>{i.screeningId ? (i.evidenceCount > 0 ? `${i.evidenceCount} file${i.evidenceCount === 1 ? "" : "s"}` : "None") : "-"}</td>
+                    <td style={td}>{fmtDate(i.validUntil)}</td>
+                    <td style={td}><Chip tone={st.tone}>{st.label}</Chip> <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{i.detail}</span></td>
+                    <td style={td}>{i.screeningId && <button onClick={() => setOpenId(i.screeningId)} style={{ ...linkBtn, padding: "4px 10px" }}>Open</button>}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 10 }}>
+          Required for readiness: PSiRA registration, ID copy, criminal record check, reference check and drug test, each passed, with an evidence file, and in date. Others are shown, and only a failed or expired one blocks readiness.
+        </div>
+      </div>
+
+      {requesting && <RequestScreening guardId={guardId} onClose={() => setRequesting(false)} />}
+      {open && <GuardScreeningPanel key={open.id} guardId={guardId} record={open} canManage={canManage} onClose={() => setOpenId(null)} />}
+
+      <div style={card}>
+        <div style={{ fontWeight: 800, marginBottom: 8 }}>Screening history ({screening.length})</div>
+        {screening.length === 0 ? <div style={{ color: "var(--hf-text-muted)", fontSize: 13 }}>No screening records yet.</div> :
+          screening.map(s => (
+            <div key={s.id} style={{ fontSize: 13, padding: "5px 0", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <span>{fmtDate(s.createdAt)} · {screeningLabel(s.screeningType)} · {s.reason.replace(/_/g, " ").toLowerCase()} · {s.result.toLowerCase()}{s.decision ? ` · ${s.decision === "CLEARED" ? "cleared" : "not cleared"}` : ""}</span>
+              <button onClick={() => setOpenId(s.id)} style={{ ...linkBtn, padding: "3px 9px" }}>Open</button>
+            </div>
+          ))}
+      </div>
+    </div>
+  )
+}
 
 function DocumentsTab({ guardId, docs }: { guardId: string; docs: DocumentItem[] }) {
   const qc = useQueryClient()
