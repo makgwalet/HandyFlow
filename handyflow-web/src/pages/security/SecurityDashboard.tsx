@@ -1,227 +1,176 @@
 // src/pages/security/SecurityDashboard.tsx
-// Changes from original:
-//   - Replace size=100 all-at-once fetches with targeted queries
-//   - Active shifts list shows guard fullName via guard lookup
-//   - Open incidents list links through to incidents tab
-//   - Guards on duty shows fullName from the guards query
-
+//
+// The Security landing page. One request (GET /api/v1/security/dashboard) returns the figures, a ranked "needs attention"
+// list and short lists of who is on duty and which incidents are open. It refreshes itself every minute. The old page
+// fetched up to 100 guards and 50 shifts and counted them in the browser.
 import { useQuery } from "@tanstack/react-query"
+import { AlertTriangle, ArrowRight, Radio, RefreshCw, Shield, MapPin, DoorOpen, MessageSquareWarning, CheckCircle2 } from "lucide-react"
+import type { ReactNode } from "react"
 import { apiClient } from "../../api/client"
-import { Shield, MapPin, Clock, AlertTriangle, ArrowRight, Radio } from "lucide-react"
+import Chip, { toneColor, type ChipTone } from "../../components/ui/Chip"
+import {
+  LEVEL_LABEL, LEVEL_TONE, SEVERITY_TONE, greeting, headline, isLate, punctualityLabel, shiftProgress, toneForCount,
+  type SecurityDashboard as Data,
+} from "./dashboard.logic"
 
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })
-const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-ZA",  { day: "numeric", month: "short" })
+const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long" })
+const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })
+
+const panel: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16 }
+const linkBtn: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-accent-text)", background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0 }
+
+function Tile({ label, value, hint, tone, icon, onClick }: { label: string; value: ReactNode; hint?: string; tone: ChipTone; icon: ReactNode; onClick: () => void }) {
+  const c = tone === "neutral" ? "var(--hf-text-secondary)" : toneColor(tone)
+  return (
+    <button type="button" onClick={onClick} aria-label={`${label}: ${value}`}
+      style={{ ...panel, textAlign: "left", cursor: "pointer", display: "flex", gap: 12, alignItems: "center", font: "inherit", color: "inherit" }}>
+      <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--hf-surface-sunken)", color: c, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{icon}</div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 24, fontWeight: 800, color: c, lineHeight: 1.1 }}>{value}</div>
+        <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 3 }}>{label}</div>
+        {hint && <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 1 }}>{hint}</div>}
+      </div>
+    </button>
+  )
+}
 
 export default function SecurityDashboard({ onNavigate }: { onNavigate: (section: string) => void }) {
-
-  // WHY targeted queries instead of size=100 everything?
-  // The original fetched all guards, all shifts, all sites, all incidents on
-  // every dashboard load.  For a tenant with 200 guards and 1000+ shifts that's
-  // a massive payload for stats that only need counts.
-  // New approach: use size=1 to get totalElements for counts (same pattern as
-  // BookingsDashboard), and only fetch full data where the UI actually renders
-  // individual rows (active shifts list, open incidents list).
-
-  // Counts — size=1 gives us totalElements without loading full data
-  const { data: guardStats } = useQuery({
-    queryKey: ["guard-count"],
-    queryFn: async () => {
-      const r = await apiClient.get("/api/v1/security/guards?size=1")
-      const p = r.data?.data ?? r.data
-      return { total: p?.totalElements ?? 0, active: 0 } // active counted from full list below
-    },
+  const { data, isLoading, error, refetch, isFetching } = useQuery<Data>({
+    queryKey: ["security-dashboard"],
+    refetchInterval: 60_000,
+    queryFn: async () => { const r = await apiClient.get("/api/v1/security/dashboard"); return r.data?.data ?? r.data },
   })
 
-  const { data: siteStats } = useQuery({
-    queryKey: ["site-count"],
-    queryFn: async () => {
-      const r = await apiClient.get("/api/v1/security/sites?size=1")
-      const p = r.data?.data ?? r.data
-      return p?.totalElements ?? 0
-    },
-  })
+  if (isLoading) return <div style={{ color: "var(--hf-text-muted)" }}>Loading the dashboard...</div>
+  if (error || !data) return <div role="alert" style={{ color: "var(--hf-danger-text)" }}>The dashboard could not be loaded. <button style={linkBtn} onClick={() => refetch()}>Try again</button></div>
 
-  const { data: openIncidentCount } = useQuery({
-    queryKey: ["incident-open-count"],
-    queryFn: async () => {
-      const r = await apiClient.get("/api/v1/security/incidents?status=OPEN&size=1")
-      const p = r.data?.data ?? r.data
-      return p?.totalElements ?? 0
-    },
-  })
-
-  const { data: criticalIncidentCount } = useQuery({
-    queryKey: ["incident-critical-count"],
-    queryFn: async () => {
-      const r = await apiClient.get("/api/v1/security/incidents?severity=CRITICAL&size=1")
-      const p = r.data?.data ?? r.data
-      return p?.totalElements ?? 0
-    },
-  })
-
-  // Full data — only for rows we actually render on screen (max 6 items each)
-  const { data: guards = [] } = useQuery<any[]>({
-    queryKey: ["guards"],
-    queryFn: async () => {
-      const r = await apiClient.get("/api/v1/security/guards?size=100")
-      const p = r.data?.data ?? r.data
-      return p?.content ?? []
-    },
-  })
-
-  const { data: shifts = [] } = useQuery<any[]>({
-    queryKey: ["shifts"],
-    queryFn: async () => {
-      const r = await apiClient.get("/api/v1/security/shifts?size=50")
-      const p = r.data?.data ?? r.data
-      return p?.content ?? []
-    },
-  })
-
-  const { data: openIncidents = [] } = useQuery<any[]>({
-    queryKey: ["open-incidents"],
-    queryFn: async () => {
-      const r = await apiClient.get("/api/v1/security/incidents?status=OPEN&size=10")
-      const p = r.data?.data ?? r.data
-      return p?.content ?? []
-    },
-  })
-
-  const activeShifts  = shifts.filter((s: any) => s.status === "ACTIVE")
-  const activeGuards  = guards.filter((g: any) => (g.status ?? "ACTIVE") === "ACTIVE").length
-  const totalGuards   = guardStats?.total ?? guards.length
-
-  const guardName = (guardId: string) =>
-    guards.find((g: any) => g.id === guardId)?.fullName ?? guardId.slice(0, 8) + "…"
-
-  const kpis = [
-    { label: "Guards on duty",  value: activeShifts.length, sub: `${activeGuards} active / ${totalGuards} total`, color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft)", icon: Shield,        tab: "shifts" },
-    { label: "Active sites",    value: siteStats ?? 0,       color: "var(--hf-primary-text)", bg: "var(--hf-info-soft)", icon: MapPin,        tab: "sites" },
-    { label: "Open incidents",  value: openIncidentCount ?? openIncidents.length,
-      color: (openIncidentCount ?? openIncidents.length) > 0 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)",
-      bg: (openIncidentCount ?? openIncidents.length) > 0 ? "var(--hf-danger-soft)" : "var(--hf-success-soft)",
-      icon: AlertTriangle, tab: "incidents" },
-    { label: "Critical alerts", value: criticalIncidentCount ?? 0,
-      color: (criticalIncidentCount ?? 0) > 0 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)",
-      bg: (criticalIncidentCount ?? 0) > 0 ? "var(--hf-danger-soft)" : "var(--hf-success-soft)",
-      icon: Radio, tab: "incidents" },
-  ]
-
-  const todayShifts = shifts.filter((s: any) =>
-    new Date(s.startAt).toDateString() === new Date().toDateString())
+  const { shifts, workforce, incidents, complaints, gate } = data
+  const head = headline(data.attention)
 
   return (
-    <div>
-      {/* KPI grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 28 }}>
-        {kpis.map(k => (
-          <div key={k.label} onClick={() => onNavigate(k.tab)}
-            style={{ background: k.bg, borderRadius: 12, padding: "18px 20px", cursor: "pointer", border: "1px solid transparent" }}
-            onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)")}
-            onMouseLeave={e => (e.currentTarget.style.boxShadow = "none")}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: k.color, textTransform: "uppercase" as const }}>{k.label}</div>
-              <k.icon size={16} style={{ color: k.color }} />
-            </div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: k.color }}>{k.value}</div>
-            {"sub" in k && k.sub && <div style={{ fontSize: 11, color: k.color, opacity: 0.7, marginTop: 2 }}>{k.sub}</div>}
-          </div>
-        ))}
+    <div style={{ display: "grid", gap: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: "var(--hf-text-primary)" }}>{greeting()}</div>
+          <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{fmtDay(data.asOf)} · updated {fmtTime(data.asOf)}</div>
+        </div>
+        <button type="button" onClick={() => refetch()} disabled={isFetching} style={linkBtn} aria-label="Refresh">
+          <RefreshCw size={13} /> {isFetching ? "Refreshing..." : "Refresh"}
+        </button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16 }}>
-
-        {/* Active shifts */}
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Active Shifts</span>
-            <button onClick={() => onNavigate("shifts")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-accent-text)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
-              View all <ArrowRight size={13} />
-            </button>
+      <section aria-label="Needs attention" style={panel}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>Needs attention</span>
+          <Chip tone={head.tone}>{head.text}</Chip>
+        </div>
+        {data.attention.length === 0 ? (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", color: "var(--hf-success-text-strong)", fontSize: 13 }}>
+            <CheckCircle2 size={16} /> Nothing needs attention right now.
           </div>
+        ) : (
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+            {data.attention.map(a => (
+              <li key={a.code} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", border: "1px solid var(--hf-border)", borderLeft: `3px solid ${toneColor(LEVEL_TONE[a.level] ?? "neutral")}`, borderRadius: 10 }}>
+                <Chip tone={LEVEL_TONE[a.level] ?? "neutral"}>{LEVEL_LABEL[a.level] ?? a.level}</Chip>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{a.title}</div>
+                  <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{a.detail}</div>
+                </div>
+                <button type="button" style={linkBtn} onClick={() => onNavigate(a.section)} aria-label={`Open: ${a.title}`}>Open <ArrowRight size={13} /></button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
-          {activeShifts.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed var(--hf-border)", borderRadius: 12, color: "var(--hf-text-faint)" }}>
-              <Shield size={32} style={{ color: 'var(--hf-text-disabled)', marginBottom: 10 }} />
-              <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No active shifts</div>
-            </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12 }}>
+        <Tile label="Guards on duty" value={shifts.onDuty} hint={shiftProgress(shifts)} tone={shifts.onDuty > 0 ? "ok" : "neutral"} icon={<Shield size={18} />} onClick={() => onNavigate("live")} />
+        <Tile label="Open incidents" value={incidents.open} hint={incidents.criticalOpen > 0 ? `${incidents.criticalOpen} critical` : `${incidents.last7Days} in the last 7 days`} tone={toneForCount(incidents.criticalOpen, "bad")} icon={<AlertTriangle size={18} />} onClick={() => onNavigate("incidents")} />
+        <Tile label="Control room queue" value={data.openAlarms} hint="alarms not yet resolved" tone={toneForCount(data.openAlarms, "warn")} icon={<Radio size={18} />} onClick={() => onNavigate("control-room")} />
+        <Tile label="On site now" value={gate.onSite} hint={gate.overstayed > 0 ? `${gate.overstayed} overstayed` : `${gate.enteredToday} entered today`} tone={toneForCount(gate.overstayed, "warn")} icon={<DoorOpen size={18} />} onClick={() => onNavigate("gate-dashboard")} />
+        <Tile label="Open complaints" value={complaints.open} hint={complaints.urgent > 0 ? `${complaints.urgent} urgent` : undefined} tone={toneForCount(complaints.urgent, "bad")} icon={<MessageSquareWarning size={18} />} onClick={() => onNavigate("complaints")} />
+        <Tile label="Active sites" value={data.activeSites} tone="neutral" icon={<MapPin size={18} />} onClick={() => onNavigate("sites")} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
+        <section aria-label="On duty now" style={panel}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>On duty now</span>
+            <button type="button" style={linkBtn} onClick={() => onNavigate("shifts")}>All shifts <ArrowRight size={13} /></button>
+          </div>
+          {data.activeShifts.length === 0 ? (
+            <div style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No guards are on duty.</div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {activeShifts.slice(0, 6).map((shift: any) => (
-                <div key={shift.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", border: "1px solid var(--hf-border)", borderRadius: 10, background: "var(--hf-surface)" }}>
-                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--hf-success)", flexShrink: 0, boxShadow: "0 0 0 3px var(--hf-success-border-subtle)" }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14, color: "var(--hf-text)" }}>{guardName(shift.guardId)}</div>
-                    <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>Since {fmtTime(shift.startAt)} · ends {fmtTime(shift.endAt)}</div>
+            <div style={{ display: "grid", gap: 8 }}>
+              {data.activeShifts.map(s => (
+                <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{s.guardName ?? "Unknown guard"}</div>
+                    <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{s.siteName ?? "No site"} · {fmtTime(s.startAt)} to {fmtTime(s.endAt)}</div>
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 600, background: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)", padding: "2px 8px", borderRadius: 20 }}>ACTIVE</span>
+                  <Chip tone={!s.actualStartAt ? "neutral" : isLate(s.minutesLate) ? "warn" : "ok"}>{punctualityLabel(s.minutesLate, s.actualStartAt)}</Chip>
+                </div>
+              ))}
+              {shifts.onDuty > data.activeShifts.length && <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>and {shifts.onDuty - data.activeShifts.length} more</div>}
+            </div>
+          )}
+        </section>
+
+        <section aria-label="Open incidents" style={panel}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>Open incidents</span>
+            <button type="button" style={linkBtn} onClick={() => onNavigate("incidents")}>All incidents <ArrowRight size={13} /></button>
+          </div>
+          {data.openIncidents.length === 0 ? (
+            <div style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No open incidents.</div>
+          ) : (
+            <div style={{ display: "grid", gap: 8 }}>
+              {data.openIncidents.map(i => (
+                <div key={i.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{i.title}</div>
+                    <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{fmtDate(i.createdAt)}{i.siteName ? ` · ${i.siteName}` : ""}{i.status === "OPEN" ? " · not acknowledged" : ""}</div>
+                  </div>
+                  <Chip tone={SEVERITY_TONE[i.severity?.toUpperCase()] ?? "neutral"}>{i.severity}</Chip>
                 </div>
               ))}
             </div>
           )}
+        </section>
 
-          {/* Open incidents */}
-          {openIncidents.length > 0 && (
-            <div style={{ marginTop: 20 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Open Incidents</span>
-                <button onClick={() => onNavigate("incidents")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
-                  View all <ArrowRight size={13} />
-                </button>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {openIncidents.slice(0, 3).map((inc: any) => {
-                  const sevColor = ({ CRITICAL: "var(--hf-danger-text)", HIGH: "var(--hf-orange-text)", MEDIUM: "var(--hf-warning-text)", LOW: "var(--hf-text-muted)" } as Record<string, string>)[inc.severity] ?? "var(--hf-text-muted)"
-                  return (
-                    <div key={inc.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `1px solid color-mix(in srgb, ${sevColor} 19%, transparent)`, borderLeft: `3px solid ${sevColor}`, borderRadius: 10, background: "var(--hf-surface)" }}>
-                      <AlertTriangle size={16} style={{ color: sevColor }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: "var(--hf-text)" }}>{inc.title}</div>
-                        <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{fmtDate(inc.reportedAt)}{inc.siteName && ` · ${inc.siteName}`}</div>
-                      </div>
-                      <span style={{ fontSize: 10, fontWeight: 700, background: `color-mix(in srgb, ${sevColor} 9%, transparent)`, color: sevColor, padding: "2px 8px", borderRadius: 20 }}>{inc.severity}</span>
-                    </div>
-                  )
-                })}
-              </div>
+        <section aria-label="Workforce" style={panel}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>Workforce</span>
+            <button type="button" style={linkBtn} onClick={() => onNavigate("guards")}>All guards <ArrowRight size={13} /></button>
+          </div>
+          {[
+            { label: "Active guards", value: `${workforce.activeGuards} of ${workforce.totalGuards}`, tone: "neutral" as ChipTone },
+            { label: "PSiRA expired", value: workforce.psiraExpired, tone: toneForCount(workforce.psiraExpired, "bad") },
+            { label: "PSiRA expiring in 30 days", value: workforce.psiraExpiring, tone: toneForCount(workforce.psiraExpiring, "warn") },
+            { label: "Required competencies expired", value: workforce.competenciesExpired, tone: toneForCount(workforce.competenciesExpired, "warn") },
+            { label: "Required competencies expiring", value: workforce.competenciesExpiring, tone: toneForCount(workforce.competenciesExpiring, "info") },
+          ].map(r => (
+            <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: "1px solid var(--hf-border)", fontSize: 13 }}>
+              <span style={{ color: "var(--hf-text-secondary)" }}>{r.label}</span>
+              <Chip tone={r.tone}>{r.value}</Chip>
             </div>
-          )}
-        </div>
+          ))}
+        </section>
 
-        {/* Sidebar */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {/* Operations summary */}
-          <div style={{ background: "var(--hf-primary)", borderRadius: 12, padding: 20, color: "var(--hf-text-on-solid)" }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.6)", marginBottom: 14, textTransform: "uppercase" as const }}>Operations Summary</div>
-            {[
-              { label: "Total guards",   value: totalGuards },
-              { label: "Active guards",  value: activeGuards },
-              { label: "Sites secured",  value: siteStats ?? 0 },
-              { label: "Shifts today",   value: todayShifts.length },
-            ].map(s => (
-              <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-                <span style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>{s.label}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text-on-solid)" }}>{s.value}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Quick actions */}
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 10 }}>Quick actions</div>
-            {[
-              { label: "Schedule a shift", tab: "shifts",    color: "var(--hf-primary-text)" },
-              { label: "Report incident",  tab: "incidents", color: "var(--hf-danger-text)" },
-              { label: "Add guard",        tab: "guards",    color: "var(--hf-accent-text)" },
-              { label: "View live map",    tab: "live",      color: "var(--hf-violet-text)" },
-            ].map(a => (
-              <button key={a.label} onClick={() => onNavigate(a.tab)}
-                style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left" as const, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                {a.label} <ArrowRight size={13} />
-              </button>
-            ))}
-          </div>
-        </div>
+        <section aria-label="Quick actions" style={panel}>
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>Quick actions</div>
+          {[
+            { label: "Schedule a shift", tab: "shifts" }, { label: "Report an incident", tab: "incidents" },
+            { label: "Add a guard", tab: "guards" }, { label: "Open the live map", tab: "live" },
+          ].map(a => (
+            <button key={a.label} type="button" onClick={() => onNavigate(a.tab)}
+              style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "var(--hf-text-primary)", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              {a.label} <ArrowRight size={13} />
+            </button>
+          ))}
+        </section>
       </div>
     </div>
   )

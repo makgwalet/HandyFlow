@@ -20,7 +20,7 @@ The module opens at `/security`. The sidebar is grouped; each item is a section 
 
 | Group | Screen | Section id | Use it to |
 |---|---|---|---|
-| Overview | Dashboard | `dashboard` | See headline numbers for guards, shifts, incidents and compliance |
+| Overview | Dashboard | `dashboard` | See what needs attention now, who is on duty, open incidents and workforce compliance |
 | | Control Room | `control-room` | Watch alarms and incidents live, dispatch, handle duress |
 | | Live Operations | `live` | See every guard on shift with last scan and last position, on a map |
 | Operations | Shifts | `shifts` | List, create, start and end shifts |
@@ -136,7 +136,7 @@ It needs no arguments, prints how many rows it removed, and is safe to run twice
 Load the demo, sign in as a user with `SECURITY_READ` and `SECURITY_MANAGE` (admin is simplest), open `/security`. Tick each line as you confirm it. Counts that depend on the clock say "about".
 
 ### Dashboard and Live Operations
-- [ ] Dashboard shows guards, shifts and incident numbers that agree with the sections below (14 guards, 12 incidents).
+- [ ] Dashboard: see "Security dashboard (patch 0053)" at the end of this guide for what each block shows and how to check it.
 - [ ] Live Operations lists the guards on an active shift (about 8). Some have a fresh position, some a stale position flagged as stale, some none.
 - [ ] A site selector narrows the list to that site.
 - [ ] The map renders markers for guards with positions. Fourways Estate has no map position and must not break the map.
@@ -406,6 +406,14 @@ Generated from the controllers. Paths are under the host root. A blank permissio
 | GET | `/api/v1/security/sites/{siteId}/gate-log` | SECURITY_READ |
 | GET | `/api/v1/security/reports/site-access` | SECURITY_READ |
 | GET | `/api/v1/security/reports/site-access/pdf` | SECURITY_READ |
+
+### SecurityDashboardController
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/api/v1/security/dashboard` | SECURITY_READ |
+
+One call returns every figure, the ranked attention list, up to 6 guards on duty and up to 6 open incidents (most serious first).
 
 ### GateDashboardController
 
@@ -812,3 +820,37 @@ What counts towards a guard's Deployment Readiness is now a company setting. **W
 - [ ] Upload a POPIA consent document on that guard's Documents tab: that line turns met.
 - [ ] Untick Drug test and save: Drug test stays in the matrix but no longer counts towards the percentage.
 - [ ] As a user without SECURITY_ADMIN the boxes are greyed out and there is no Save button.
+
+
+## Security dashboard (patch 0053, apply after 0052)
+
+The landing page (Overview > Dashboard) is rebuilt around one server call that counts in the database. The old page fetched up to 100 guards and 50 shifts and counted them in the browser, so anything beyond those caps was missed. It refreshes itself every minute, and has a Refresh button.
+
+**Needs attention** is a ranked list. Urgent (red) comes first, then Check (amber), then Soon (blue); within a level the larger count comes first. Zero counts are not listed. Each row has an Open button that goes to the section that deals with it.
+
+| Item | Level | Rule |
+|---|---|---|
+| Critical incidents open | Urgent | Severity critical and not resolved |
+| Control room queue | Urgent if any alarm is still NEW, otherwise Check | Alarms NEW, TRIAGED or DISPATCHED |
+| Expired PSiRA | Urgent | Active guards with a PSiRA expiry before today |
+| Urgent complaints open | Urgent | Open complaints that are critical, or theft, excessive force, harassment or firearm violation |
+| Shifts with no clock-in | Check | Scheduled, more than 15 minutes past the start and not yet ended |
+| Missed today | Check | Shifts marked missed that started today (South African time) |
+| Incidents not acknowledged | Check | Status still OPEN |
+| Overstayed visitors | Check | Gate register entries marked overstayed |
+| PSiRA expiring | Check | Within 30 days |
+| Required competencies expired / expiring | Check / Soon | Only competencies marked required, on active guards |
+
+**Tiles** (click to open the section): Guards on duty (with "x on duty, y of z done today"), Open incidents (critical count or last-7-day count), Control room queue, On site now (overstayed or entered today), Open complaints (urgent count) and Active sites.
+
+**On duty now** lists up to 6 active shifts with the guard's name, the site and a punctuality chip (On time, Late by n min, or Not clocked in), using the clock-in time from 0051. **Open incidents** lists up to 6, critical first. **Workforce** shows active guards and the PSiRA and competency counts. **Quick actions** are unchanged.
+
+"Today" is South African time. Shift and incident times are stored in UTC and compared as such.
+
+**Check it** (demo data loaded):
+- [ ] Needs attention lists 2 critical incidents, 3 alarms (1 not triaged, so red), 1 expired PSiRA and 1 overstayed visitor, with the red items first.
+- [ ] Open incidents tile reads 7 with "2 critical"; On site now reads 7 with "1 overstayed".
+- [ ] On duty now shows Lerato Dlamini as "Late by 22 min" and Sipho Ndlovu as "On time".
+- [ ] Resolve both critical incidents: the next refresh drops the red incident row and the tile hint changes to "n in the last 7 days".
+- [ ] A tenant with no data shows "Nothing needs attention right now." and "All clear".
+- [ ] The page works at phone width: tiles and panels wrap rather than scroll sideways.
