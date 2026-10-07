@@ -16,7 +16,7 @@ public interface PatrolRoundRepository extends JpaRepository<PatrolRound, UUID> 
     @Query("""
         SELECT r FROM PatrolRound r
         WHERE r.shiftId = :shiftId
-        ORDER BY r.roundNumber
+        ORDER BY r.expectedStartAt, r.roundNumber
         """)
     List<PatrolRound> findByShift(UUID shiftId);
 
@@ -29,7 +29,7 @@ public interface PatrolRoundRepository extends JpaRepository<PatrolRound, UUID> 
         SELECT r FROM PatrolRound r
         WHERE r.shiftId = :shiftId
         AND r.status IN ('EXPECTED', 'IN_PROGRESS')
-        ORDER BY r.roundNumber
+        ORDER BY r.expectedStartAt, r.roundNumber
         LIMIT 1
         """)
     Optional<PatrolRound> findCurrentRound(UUID shiftId);

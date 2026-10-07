@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-/** All checkpoints across sites with their 30-day scan counts, and edits to a checkpoint's details and active flag. */
+/** All checkpoints across sites with their 30-day scan counts, and edits to a checkpoint's details and active flag. Switching one off or on also adjusts the open patrol rounds that use it. */
 @Service
 @RequiredArgsConstructor
 public class CheckpointAdminService {
@@ -70,10 +70,38 @@ public class CheckpointAdminService {
             if (ble != null) checkpoints.findByBleBeaconId(tenantId, ble).filter(o -> !o.getId().equals(id))
                     .ifPresent(o -> { throw new HandyFlowException("That Bluetooth beacon is already used by " + o.getName(), HttpStatus.CONFLICT, "BLE_IN_USE"); });
         }
+        boolean wasActive = c.isActive();
         c.updateDetails(req.name(), req.description(), nfc, ble, req.active());
         checkpoints.saveAndFlush(c);
+        if (wasActive != req.active()) adjustOpenRounds(tenantId, id, req.active() ? 1 : -1);
         return list(tenantId, c.getSite().getId(), true).stream().filter(r -> r.id().equals(id)).findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Checkpoint", id.toString()));
+    }
+
+    /**
+     * Keeps patrol rounds that are still open honest when a checkpoint is switched off or back on. A round needs one scan
+     * per checkpoint on its route; a switched-off checkpoint cannot be scanned, so without this the round could never
+     * complete. Only open rounds (expected or in progress) whose route includes the checkpoint, and that have not already
+     * scanned it, change by one. Switching it back on reverses the same rounds. A round that now has every remaining
+     * scan is completed.
+     */
+    void adjustOpenRounds(TenantId tenantId, UUID checkpointId, int delta) {
+        jdbc.update("""
+                UPDATE security_patrol_rounds r
+                   SET checkpoints_expected = GREATEST(0, r.checkpoints_expected + ?), updated_at = NOW()
+                 WHERE r.tenant_id = ? AND r.status IN ('EXPECTED', 'IN_PROGRESS')
+                   AND r.route_id IN (SELECT rc.route_id FROM security_patrol_route_checkpoints rc WHERE rc.checkpoint_id = ?)
+                   AND NOT EXISTS (SELECT 1 FROM security_checkpoint_logs l WHERE l.round_id = r.id AND l.checkpoint_id = ?)""",
+                delta, tenantId.getValue(), checkpointId, checkpointId);
+        if (delta < 0) {
+            jdbc.update("""
+                    UPDATE security_patrol_rounds r
+                       SET status = 'COMPLETE', completed_at = NOW(), updated_at = NOW()
+                     WHERE r.tenant_id = ? AND r.status = 'IN_PROGRESS'
+                       AND r.checkpoints_expected > 0 AND r.checkpoints_scanned >= r.checkpoints_expected
+                       AND r.route_id IN (SELECT rc.route_id FROM security_patrol_route_checkpoints rc WHERE rc.checkpoint_id = ?)""",
+                    tenantId.getValue(), checkpointId);
+        }
     }
 
     private static String blankToNull(String s) { return s == null || s.isBlank() ? null : s.trim(); }

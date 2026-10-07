@@ -29,7 +29,8 @@ class CheckpointAdminServiceTest {
 
     private static final TenantId TENANT = TenantId.generate();
     private final CheckpointRepository repo = mock(CheckpointRepository.class);
-    private final CheckpointAdminService service = spy(new CheckpointAdminService(mock(JdbcTemplate.class), repo));
+    private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
+    private final CheckpointAdminService service = spy(new CheckpointAdminService(jdbc, repo));
     private final Site site = mock(Site.class);
 
     private Checkpoint checkpoint(TenantId tenant, String name) {
@@ -99,5 +100,29 @@ class CheckpointAdminServiceTest {
         assertThatThrownBy(() -> service.update(TENANT, c.getId(), new UpdateRequest("  ", null, null, null, true))).hasMessageContaining("needs a name");
         Checkpoint theirs = checkpoint(TenantId.generate(), "Theirs");
         assertThatThrownBy(() -> service.update(TENANT, theirs.getId(), new UpdateRequest("x", null, null, null, true))).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void switchingOffAnActiveCheckpointAdjustsAndCompletesOpenRounds() {
+        Checkpoint c = checkpoint(TENANT, "Gate"); stubList(c);
+        service.update(TENANT, c.getId(), new UpdateRequest("Gate", null, null, null, false));
+        // one update lowering the expected count, one completing rounds that now have every remaining scan
+        verify(jdbc).update(org.mockito.ArgumentMatchers.contains("checkpoints_expected = GREATEST"), org.mockito.ArgumentMatchers.any(Object[].class));
+        verify(jdbc).update(org.mockito.ArgumentMatchers.contains("status = 'COMPLETE'"), org.mockito.ArgumentMatchers.any(Object[].class));
+    }
+
+    @Test
+    void switchingBackOnRestoresTheCountButNeverCompletesRounds() {
+        Checkpoint c = checkpoint(TENANT, "Gate"); c.updateDetails("Gate", null, null, null, false); stubList(c);
+        service.update(TENANT, c.getId(), new UpdateRequest("Gate", null, null, null, true));
+        verify(jdbc).update(org.mockito.ArgumentMatchers.contains("checkpoints_expected = GREATEST"), org.mockito.ArgumentMatchers.any(Object[].class));
+        verify(jdbc, never()).update(org.mockito.ArgumentMatchers.contains("status = 'COMPLETE'"), org.mockito.ArgumentMatchers.any(Object[].class));
+    }
+
+    @Test
+    void editingWithoutChangingTheActiveFlagLeavesRoundsAlone() {
+        Checkpoint c = checkpoint(TENANT, "Gate"); stubList(c);
+        service.update(TENANT, c.getId(), new UpdateRequest("Gate 2", null, null, null, true));
+        verify(jdbc, never()).update(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(Object[].class));
     }
 }

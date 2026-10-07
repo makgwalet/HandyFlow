@@ -98,7 +98,7 @@ It needs no arguments, prints how many rows it removed, and is safe to run twice
 * Everything is fake and labelled: names start with `DEMO`, ID numbers are `DEMO-ID...`, PSiRA numbers `DEMO-PSR...`, phone numbers are `082 000 00xx`, bank details are not real.
 * Times are relative to the moment you load it. "On duty now", "last Tuesday", "contract ends in 20 days" are all computed then. Load it the day you demo it.
 * Shifts cover two weeks back and two weeks ahead of this week's Monday, in 06:00 to 14:00, 14:00 to 22:00 and 22:00 to 06:00 slots (South African time).
-* One active patrol route per site (see known issue 1).
+* One active patrol route per site.
 * Evidence files are tiny generated PDFs stored in the database.
 * Webhooks and API keys are deliberately not seeded, because they hold secrets.
 
@@ -167,7 +167,7 @@ Load the demo, sign in as a user with `SECURITY_READ` and `SECURITY_MANAGE` (adm
 ### Guards and Guard 360
 - [ ] Guards lists 14. Filter by grade and by status; the terminated guard is hidden or flagged as your filter dictates.
 - [ ] Open a guard: the profile shows screening, competencies, documents, ratings and complaints.
-- [ ] On a guard's Documents tab the "Guard file checklist" can say police clearance or POPIA consent is missing while Deployment Readiness is 100%. They are different lists (see backlog, pending C1).
+- [ ] On a guard's Documents tab the "Guard file checklist" can say police clearance or POPIA consent is missing while Deployment Readiness is 100%. They are different lists, and the panel now says so.
 - [ ] PSiRA badges: some valid, two expiring within 30 days (about 15 and 25 days), one expired about 10 days ago.
 - [ ] Screening panel states: Cleared, Pending, Flagged, Unscreened across different guards.
 - [ ] A guard with a firearm competency shows it on the profile and in Armoury.
@@ -740,10 +740,13 @@ Generated from the controllers. Paths are under the host root. A blank permissio
 
 ## 7. Known issues and findings
 
-1. **Two active routes at one site break shift start.** `security_patrol_rounds` is unique on `(shift_id, round_number)`, but rounds are generated per active route, so a second active route at the same site would produce a duplicate round number when a shift starts. The demo data keeps one active route per site to avoid it. Fix by numbering rounds per route, or by widening the unique key to include the route.
-2. **Rotation assignments** are unique on `(guard_id, ends_at)` with nulls treated as equal, so a guard can have only one open-ended assignment.
+1. **Fixed in 0044: two active patrol routes at one site.** Round numbers now run per route (migration V331), so two active routes at a site each get rounds 1, 2, 3 and a shift starts normally. The demo data still uses one active route per site, which is fine; add a second active route to a site to see both.
+2. **Rotation assignments** are unique on `(guard_id, ends_at)` with nulls treated as equal, so a guard can have only one open-ended assignment. This is intended: a guard cannot be on two open-ended rotations at once.
 3. **Evidence storage.** With local file storage instead of database storage, seeded evidence rows will list but cannot be downloaded because the files only exist in the database. Use database storage when demoing.
 4. **Complaint numbers.** The app generates them through the numbering service. Demo ones are `CMP-DEMO-nn` so they never collide with real numbers.
 5. **Document links** are capped at 500 characters, which is why the seeded documents are tiny PDFs.
 6. **Existing test data.** Migrations V105, V106, V119 and V120 already seed the Zeta Earthmoving tenant. The demo script is separate and works on any tenant.
 7. **Backend tests not yet run here.** The services added across slice 7 (shift range, patrol rounds, patrol overview, checkpoint admin, gate dashboard, report runs) have unit tests, and the site overview has none. Run the module tests and `ArchitectureVerificationTest` before release.
+8. **Switching off a checkpoint on an active route** (fixed in 0044). Open rounds that use it stop waiting for it, and rounds generated later leave it out; switching it back on restores both. Rounds that already finished are not changed.
+9. **Screening gate** (fixed in 0044). The pre-shift gate and the guard's screening status now look at the newest record of each screening type, the same rule as Deployment Readiness, so a passed renewal clears an older failure.
+10. **NFC tags and Bluetooth beacons** (fixed in 0044) only have to be unique within a tenant, not across all tenants.

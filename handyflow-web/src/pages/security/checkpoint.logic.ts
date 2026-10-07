@@ -31,7 +31,7 @@ export function summarise(list: CheckpointRow[]) {
 export function deactivateWarning(c: CheckpointRow): string | null {
   if (!c.active) return null
   return c.activeRoutes > 0
-    ? `${c.name} is on ${c.activeRoutes} active patrol route${c.activeRoutes === 1 ? "" : "s"}. Once it is switched off it cannot be scanned, so rounds on those routes cannot be completed until it is switched back on or the routes are changed.`
+    ? `${c.name} is on ${c.activeRoutes} active patrol route${c.activeRoutes === 1 ? "" : "s"}. Once it is switched off it cannot be scanned, so rounds on those routes that are still open stop waiting for it and later rounds leave it out. Switching it back on puts it back.`
     : `${c.name} will no longer be scannable. Its scan history is kept.`
 }
 

@@ -21,19 +21,13 @@ public interface GuardScreeningRepository extends JpaRepository<GuardScreeningRe
         """)
     List<GuardScreeningRecord> findByGuard(TenantId tenantId, UUID guardId);
 
+    /** Every record for a guard, newest first, without a tenant (the pre-shift gate only has the guard id). */
     @Query("""
-        SELECT COUNT(r) > 0 FROM GuardScreeningRecord r
+        SELECT r FROM GuardScreeningRecord r
         WHERE r.guardId = :guardId
-        AND (r.result = 'FAIL' OR r.decision = 'NOT_CLEARED')
+        ORDER BY r.createdAt DESC
         """)
-    boolean hasFailedScreening(UUID guardId);
-
-    @Query("""
-        SELECT COUNT(r) > 0 FROM GuardScreeningRecord r
-        WHERE r.guardId = :guardId
-        AND r.result = 'PENDING'
-        """)
-    boolean hasPendingScreening(UUID guardId);
+    List<GuardScreeningRecord> findAllForGuard(UUID guardId);
 
     /** Records due for renewal within the warning window. */
     @Query("""

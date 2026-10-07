@@ -324,7 +324,8 @@ function DocumentsTab({ guardId, docs }: { guardId: string; docs: DocumentItem[]
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <div style={card}>
-        <div style={{ fontWeight: 800, marginBottom: 8 }}>Guard file checklist</div>
+        <div style={{ fontWeight: 800, marginBottom: 2 }}>Guard file checklist</div>
+        <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 8 }}>Paperwork held on the guard's file. It is separate from Deployment Readiness, which uses the required checks on the Compliance tab.</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {checklist.map(c => <Chip key={c.category} tone={c.present ? "ok" : "warn"}>{c.label}{c.present ? "" : " missing"}</Chip>)}
         </div>

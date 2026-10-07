@@ -165,13 +165,25 @@ public class GuardScreeningService {
      */
     @Transactional(readOnly = true)
     public String checkScreeningGate(UUID guardId) {
-        if (screeningRepository.hasFailedScreening(guardId)) {
+        // Newest record per screening type, the same rule Deployment Readiness uses, so a passed renewal clears an old
+        // failure instead of the gate and the readiness percentage disagreeing.
+        List<GuardScreeningRecord> current = newestPerType(screeningRepository.findAllForGuard(guardId));
+        if (current.stream().anyMatch(GuardScreeningRecord::isFailed)) {
             return "Guard has a FAILED screening record. Review before assigning.";
         }
-        if (screeningRepository.hasPendingScreening(guardId)) {
+        if (current.stream().anyMatch(GuardScreeningRecord::isPending)) {
             return "Guard has a PENDING screening. Results not yet received.";
         }
         return null;  // clear
+    }
+
+    /** The newest record of each screening type. Input is newest first (as the repository returns it); ties keep the first. */
+    static List<GuardScreeningRecord> newestPerType(List<GuardScreeningRecord> newestFirst) {
+        java.util.Map<GuardScreeningRecord.ScreeningType, GuardScreeningRecord> byType = new java.util.LinkedHashMap<>();
+        for (GuardScreeningRecord r : newestFirst) {
+            byType.merge(r.getScreeningType(), r, (a, b) -> b.getCreatedAt().isAfter(a.getCreatedAt()) ? b : a);
+        }
+        return new java.util.ArrayList<>(byType.values());
     }
 
     // ── Status Rollup ─────────────────────────────────────────────────────────
@@ -180,7 +192,7 @@ public class GuardScreeningService {
      * Recomputes and persists the guard's screening_status rollup column.
      * Called after every create/update to a screening record.
      *
-     * Logic:
+     * Logic, over the newest record of each screening type (a passed renewal replaces an old failure):
      *   FAIL in any record   → FLAGGED
      *   PENDING in any record → PENDING
      *   All PASS/INCONCLUSIVE → CLEARED
@@ -193,8 +205,9 @@ public class GuardScreeningService {
             setStatus(tenantId, guardId, "UNSCREENED");
             return;
         }
-        boolean hasFail    = records.stream().anyMatch(GuardScreeningRecord::isFailed);
-        boolean hasPending = records.stream().anyMatch(GuardScreeningRecord::isPending);
+        List<GuardScreeningRecord> current = newestPerType(records);
+        boolean hasFail    = current.stream().anyMatch(GuardScreeningRecord::isFailed);
+        boolean hasPending = current.stream().anyMatch(GuardScreeningRecord::isPending);
 
         if (hasFail)    setStatus(tenantId, guardId, "FLAGGED");
         else if (hasPending) setStatus(tenantId, guardId, "PENDING");

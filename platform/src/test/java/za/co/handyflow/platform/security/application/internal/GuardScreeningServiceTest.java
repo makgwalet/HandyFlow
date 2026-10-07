@@ -17,6 +17,7 @@ import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -104,5 +105,46 @@ class GuardScreeningServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
         assertThatThrownBy(() -> service().decide(TenantId.generate(), guardId, r.getId(), new DecideScreeningRequest("CLEARED", null), USER, "x"))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // ── Pre-shift gate uses the newest record per type, like Deployment Readiness ──────────────────────
+
+    private GuardScreeningRecord recordAt(ScreeningType type, ScreeningResult result, Instant createdAt) {
+        var r = GuardScreeningRecord.create(TENANT, guardId, type, ScreeningReason.ONBOARDING, USER);
+        if (result != ScreeningResult.PENDING) r.recordResult(result, "ABC", LocalDate.of(2026, 10, 5), null, null, null);
+        org.springframework.test.util.ReflectionTestUtils.setField(r, "createdAt", createdAt);
+        return r;
+    }
+
+    @Test @DisplayName("A passed renewal clears an older failure of the same type at the gate")
+    void passedRenewalClearsTheGate() {
+        var oldFail = recordAt(ScreeningType.DRUG_TEST, ScreeningResult.FAIL, Instant.parse("2026-01-01T08:00:00Z"));
+        var newPass = recordAt(ScreeningType.DRUG_TEST, ScreeningResult.PASS, Instant.parse("2026-06-01T08:00:00Z"));
+        when(screeningRepository.findAllForGuard(guardId)).thenReturn(List.of(newPass, oldFail));
+        assertThat(service().checkScreeningGate(guardId)).isNull();
+    }
+
+    @Test @DisplayName("A newer failure still stops the gate even when an older pass exists")
+    void newerFailureStopsTheGate() {
+        var oldPass = recordAt(ScreeningType.DRUG_TEST, ScreeningResult.PASS, Instant.parse("2026-01-01T08:00:00Z"));
+        var newFail = recordAt(ScreeningType.DRUG_TEST, ScreeningResult.FAIL, Instant.parse("2026-06-01T08:00:00Z"));
+        when(screeningRepository.findAllForGuard(guardId)).thenReturn(List.of(newFail, oldPass));
+        assertThat(service().checkScreeningGate(guardId)).contains("FAILED");
+    }
+
+    @Test @DisplayName("A failure of one type is not cleared by a pass of another type")
+    void failureOfAnotherTypeStays() {
+        var fail = recordAt(ScreeningType.CRIMINAL_RECORD_CHECK, ScreeningResult.FAIL, Instant.parse("2026-01-01T08:00:00Z"));
+        var pass = recordAt(ScreeningType.DRUG_TEST, ScreeningResult.PASS, Instant.parse("2026-06-01T08:00:00Z"));
+        when(screeningRepository.findAllForGuard(guardId)).thenReturn(List.of(pass, fail));
+        assertThat(service().checkScreeningGate(guardId)).contains("FAILED");
+    }
+
+    @Test @DisplayName("A pending renewal of a type whose latest pass is on file is reported as pending")
+    void pendingRenewalIsReported() {
+        var oldPass = recordAt(ScreeningType.DRUG_TEST, ScreeningResult.PASS, Instant.parse("2026-01-01T08:00:00Z"));
+        var newPending = recordAt(ScreeningType.DRUG_TEST, ScreeningResult.PENDING, Instant.parse("2026-06-01T08:00:00Z"));
+        when(screeningRepository.findAllForGuard(guardId)).thenReturn(List.of(newPending, oldPass));
+        assertThat(service().checkScreeningGate(guardId)).contains("PENDING");
     }
 }

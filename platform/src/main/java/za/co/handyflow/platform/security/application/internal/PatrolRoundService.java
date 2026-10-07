@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -49,10 +50,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PatrolRoundService {
 
+    /** Used only when a round's route cannot be found. */
+    private static final int DEFAULT_TOLERANCE_MINUTES = 20;
+
     private final PatrolRouteRepository    routeRepository;
     private final PatrolRoundRepository    roundRepository;
     private final CheckpointLogRepository  logRepository;
     private final SiteRepository           siteRepository;
+    private final CheckpointRepository     checkpointRepository;
 
     // ── Round Generation ───────────────────────────────────────────────────────
 
@@ -78,7 +83,12 @@ public class PatrolRoundService {
             int expectedRounds = route.expectedRoundsForShift(shiftMinutes);
             if (expectedRounds <= 0) continue;
 
-            int checkpointCount = route.getCheckpoints().size();
+            // Only checkpoints that are switched on can be scanned, so only they count towards completing a round.
+            int checkpointCount = activeCheckpointCount(route);
+            if (checkpointCount == 0) {
+                log.warn("[Security] Route={} has no active checkpoints — no rounds generated for shift={}", route.getId(), shift.getId());
+                continue;
+            }
 
             for (int i = 1; i <= expectedRounds; i++) {
                 Instant expectedStart = shift.getStartAt()
@@ -99,6 +109,12 @@ public class PatrolRoundService {
         }
 
         return generated;
+    }
+
+    private int activeCheckpointCount(PatrolRoute route) {
+        List<UUID> ids = route.getCheckpoints().stream().map(PatrolRouteCheckpoint::getCheckpointId).toList();
+        if (ids.isEmpty()) return 0;
+        return (int) checkpointRepository.findAllById(ids).stream().filter(Checkpoint::isActive).count();
     }
 
     // ── Scan Routing ───────────────────────────────────────────────────────────
@@ -134,9 +150,10 @@ public class PatrolRoundService {
         String offScheduleReason = null;
 
         if (round.getRoundNumber() > 1) {
-            // Find previous round completion time
-            List<PatrolRound> allRounds = roundRepository.findByShift(shiftId);
-            Optional<PatrolRound> prevRound = allRounds.stream()
+            // The previous round of the SAME route: round numbers run per route, so two routes at one site each have a
+            // round 2 and comparing across routes would mix them up.
+            Optional<PatrolRound> prevRound = roundRepository.findByShift(shiftId).stream()
+                    .filter(r -> Objects.equals(r.getRouteId(), round.getRouteId()))
                     .filter(r -> r.getRoundNumber() == round.getRoundNumber() - 1)
                     .findFirst();
 
@@ -144,11 +161,12 @@ public class PatrolRoundService {
                 long minutesSincePrev = ChronoUnit.MINUTES.between(
                         prevRound.get().getCompletedAt(), Instant.now());
 
-                // Fetch route interval — approximated from expectedStartAt diff
+                // Interval approximated from the two rounds' expected starts; the allowed early margin is the route's own
+                // tolerance (20 minutes only when the route cannot be found).
                 long expectedInterval = ChronoUnit.MINUTES.between(
                         prevRound.get().getExpectedStartAt(),
                         round.getExpectedStartAt());
-                long minimumInterval = expectedInterval - 20; // tolerance
+                long minimumInterval = minimumIntervalMinutes(expectedInterval, toleranceFor(round.getRouteId()));
 
                 if (minutesSincePrev < minimumInterval) {
                     isOffSchedule = true;
@@ -166,6 +184,16 @@ public class PatrolRoundService {
         roundRepository.save(round);
 
         return Optional.of(round.getId());
+    }
+
+    private int toleranceFor(UUID routeId) {
+        if (routeId == null) return DEFAULT_TOLERANCE_MINUTES;
+        return routeRepository.findById(routeId).map(PatrolRoute::getToleranceMinutes).orElse(DEFAULT_TOLERANCE_MINUTES);
+    }
+
+    /** The shortest gap allowed between two rounds of a route: its interval less its tolerance, never below zero. */
+    static long minimumIntervalMinutes(long expectedIntervalMinutes, int toleranceMinutes) {
+        return Math.max(0, expectedIntervalMinutes - toleranceMinutes);
     }
 
     /**
