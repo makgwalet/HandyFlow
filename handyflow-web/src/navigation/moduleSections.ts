@@ -71,7 +71,7 @@ export const SECURITY_SECTIONS: ModuleSections = {
       sections: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'control-room', label: 'Control Room', icon: Siren, badge: 'LIVE' },
-        { id: 'live', label: 'Live Map', icon: Radio },
+        { id: 'live', label: 'Live Operations', icon: Radio },
       ],
     },
     {

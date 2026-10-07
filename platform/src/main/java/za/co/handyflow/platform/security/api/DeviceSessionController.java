@@ -192,27 +192,8 @@ public class DeviceSessionController {
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
-    // FIX: the "current locations" read the Live Map has been missing —
-    // real data via GuardLocationService.getCurrentLocationsForSite(),
-    // replacing the frontend's own fabricated, fixed-position
-    // placeholder. Supervisor-facing (SECURITY_READ), unlike the ping
-    // endpoint above which is guard-facing — this is genuinely a
-    // different controller's-worth of concern living here only because
-    // GuardLocationService was already injected; absolute path since
-    // it doesn't fit this controller's own /sessions-scoped mapping.
-    @GetMapping("/api/v1/security/sites/{siteId}/guards/locations")
-    @PreAuthorize("hasAuthority('SECURITY_READ')")
-    @Operation(
-            summary = "Current live positions of every guard at a site — the live map's real data source",
-            description = "Every guard with a stored position for this site, each carrying its own " +
-                    "stale flag (older than 5 minutes since their last ping) so the caller can choose " +
-                    "how to present a guard who's gone quiet rather than having them silently vanish.")
-    public ResponseEntity<ApiResponse<java.util.List<za.co.handyflow.platform.security.dto.CurrentLocationResponse>>> getCurrentLocations(
-            @PathVariable UUID siteId) {
-        TenantId tenantId = TenantContext.getTenantIdAsObject();
-        return ResponseEntity.ok(ApiResponse.success(
-                guardLocationService.getCurrentLocationsForSite(tenantId, siteId)));
-    }
+    // The site "current locations" read now lives in LiveOperationsController: a full path here was
+    // appended to this class's /sessions prefix, so it was never reachable at its intended URL.
 
     // ── Resource Custody ───────────────────────────────────────────────────────
 
