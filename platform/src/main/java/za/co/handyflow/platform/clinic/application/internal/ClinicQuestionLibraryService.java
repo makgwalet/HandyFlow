@@ -122,6 +122,32 @@ public class ClinicQuestionLibraryService {
         return readFormData(tenantId, consultationId);
     }
 
+    /**
+     * Questionnaires the clinician started on this consultation that still lack required answers, as readable
+     * lines ("Group name: question, question"). Groups no longer served are skipped: they cannot be finished.
+     */
+    @Transactional(readOnly = true)
+    public List<String> incompleteGroups(TenantId tenantId, ClinicConsultation c) {
+        Map<String, Object> formData = readFormData(tenantId, c.getId());
+        Object groups = formData.get("groups");
+        if (!(groups instanceof Map<?, ?> started) || started.isEmpty()) return List.of();
+        PatientFacts facts = patientFacts(tenantId, c.getPatientId());
+        List<String> out = new ArrayList<>();
+        for (Object codeObj : started.keySet()) {
+            String code = String.valueOf(codeObj);
+            GroupView g;
+            try { g = servedGroup(tenantId, code); } catch (ResourceNotFoundException e) { continue; }
+            EvaluationView ev = evaluateView(g, FormData.answersOf(formData, code), facts, null);
+            if (!ev.missingRequired().isEmpty()) {
+                Map<String, String> labels = g.questions().stream()
+                        .collect(Collectors.toMap(QuestionView::code, QuestionView::label, (a, b) -> a));
+                out.add(g.name() + ": " + ev.missingRequired().stream().map(q -> labels.getOrDefault(q, q))
+                        .collect(Collectors.joining(", ")));
+            }
+        }
+        return out;
+    }
+
     // ── Internals ────────────────────────────────────────────────────────────
 
     EvaluationView evaluateView(GroupView g, Map<String, Object> answers, PatientFacts facts, String visitType) {

@@ -6,6 +6,7 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
+import QuestionAnswersReadOnly from "./QuestionAnswersReadOnly"
 
 interface QueueItem {
   id: string; patientName: string; practitionerName?: string; chiefComplaint?: string
@@ -116,8 +117,11 @@ export default function HandoffQueueTab() {
                 onClick={() => { setReturning(item); setReason("MISSING_OBSERVATIONS"); setComment(""); setError("") }}>
                 Return to nurse</button>}
               <button style={btn()} onClick={() => setHistoryFor(historyFor === item.id ? null : item.id)}>
-                {historyFor === item.id ? "Hide history" : "History"}</button>
+                {historyFor === item.id ? "Hide details" : "Answers & history"}</button>
             </div>
+            {historyFor === item.id && (
+              <div style={{ flexBasis: "100%" }}><QuestionAnswersReadOnly consultationId={item.id} /></div>
+            )}
             {historyFor === item.id && (
               <ol style={{ flexBasis: "100%", margin: "8px 0 0", paddingLeft: 18, fontSize: 12, color: "var(--hf-text-muted)" }}>
                 {history.map(t => (

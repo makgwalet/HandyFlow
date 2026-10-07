@@ -64,3 +64,20 @@ export function scaleRange(min: number | null | undefined, max: number | null | 
   for (let i = Math.ceil(lo); i <= Math.floor(hi) && out.length <= 101; i++) out.push(i)
   return out
 }
+
+/** Human-readable form of a stored answer, for read-only views. Option values are shown by their label. */
+export function formatAnswer(answerType: string, value: AnswerValue, options: QuestionOption[] = []): string {
+  if (value === null || value === undefined) return ""
+  const labelOf = (v: string) => options.find(o => o.value === v)?.label ?? v
+  if (typeof value === "boolean") return value ? "Yes" : "No"
+  if (Array.isArray(value)) {
+    if (answerType === "BODY") return value.map(v => BODY_REGIONS.find(r => r.value === v)?.label ?? v).join(", ")
+    return value.map(labelOf).join(", ")
+  }
+  if (typeof value === "object") {
+    const unit = answerType === "DURATION" ? value.unit.toLowerCase() : value.unit
+    return `${value.value} ${unit}`
+  }
+  if (typeof value === "number") return String(value)
+  return answerType === "SINGLE_SELECT" || answerType === "RADIO_GROUP" ? labelOf(value) : value
+}

@@ -35,6 +35,7 @@ public class ClinicService {
     private final ClinicPatientClinicalService     patientClinicalService;
     private final ClinicObservationService         observationService;
     private final ClinicPatientIdentityService     patientIdentityService;
+    private final ClinicQuestionLibraryService     questionLibraryService;
     private final ClinicPrescriptionRepository prescriptionRepo;
     private final EmailService                 emailService;
     private final ClinicConsultationSummaryPdfService consultationSummaryPdfService;
@@ -570,6 +571,10 @@ public class ClinicService {
         if (!c.isSignable()) {
             throw new IllegalStateException("Only a DRAFT consultation, or one the doctor has completed, can be signed (is "
                     + c.getStatus() + ").");
+        }
+        List<String> unfinished = questionLibraryService.incompleteGroups(tenantId, c);
+        if (!unfinished.isEmpty()) {
+            throw new IllegalStateException("Finish the questionnaire before signing. Missing: " + String.join("; ", unfinished) + ".");
         }
         c.sign();
         consultationRepo.save(c);

@@ -36,6 +36,7 @@ class ClinicServiceTest {
     @Mock ClinicConsultationEditRepository consultationEditRepo;
     @Mock ClinicPatientClinicalService     patientClinicalService;
     @Mock ClinicPatientIdentityService patientIdentityService;
+    @Mock ClinicQuestionLibraryService questionLibraryService;
     @Mock ClinicObservationService         observationService;
     @Mock ClinicPrescriptionRepository prescriptionRepo;
 
@@ -635,6 +636,20 @@ class ClinicServiceTest {
             verify(observationService).syncConsultationVitals(TENANT, draft);
             verify(appointmentRepo).save(argThat(a -> "COMPLETED".equals(a.getStatus())));
             verify(patientRepo).save(argThat(p -> p.getLastVisitAt() != null));
+        }
+
+        @Test
+        @DisplayName("signConsultation is refused while a started questionnaire still lacks required answers")
+        void signRefusedWithUnfinishedQuestionnaire() {
+            var draft = ClinicConsultation.createDraft(TENANT, UUID.randomUUID(), null, null, "Cough");
+            when(consultationRepo.findActiveById(TENANT, draft.getId())).thenReturn(Optional.of(draft));
+            when(questionLibraryService.incompleteGroups(TENANT, draft)).thenReturn(List.of("Intake: Reason for visit"));
+
+            assertThatThrownBy(() -> service.signConsultation(TENANT, draft.getId()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Intake: Reason for visit");
+            assertThat(draft.getStatus()).isEqualTo("DRAFT");
+            verify(consultationRepo, never()).save(any());
         }
 
         @Test

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { cleanAnswers, scaleRange, toggleInList, toNumber, unitOptions, withUnit } from "./questionForm.logic"
+import { cleanAnswers, formatAnswer, scaleRange, toggleInList, toNumber, unitOptions, withUnit } from "./questionForm.logic"
 
 describe("questionForm.logic", () => {
   it("parses numbers and treats blanks and junk as no answer", () => {
@@ -35,5 +35,19 @@ describe("questionForm.logic", () => {
   it("scale defaults to 0 to 10 and honours min and max", () => {
     expect(scaleRange(null, null)).toHaveLength(11)
     expect(scaleRange(1, 5)).toEqual([1, 2, 3, 4, 5])
+  })
+
+  it("formats stored answers for reading", () => {
+    const opts = [{ value: "ILLNESS", label: "Feeling unwell" }, { value: "ROUTINE", label: "Routine" }]
+    expect(formatAnswer("YES_NO", true)).toBe("Yes")
+    expect(formatAnswer("YES_NO", false)).toBe("No")
+    expect(formatAnswer("SINGLE_SELECT", "ILLNESS", opts)).toBe("Feeling unwell")
+    expect(formatAnswer("MULTI_SELECT", ["ILLNESS", "ROUTINE"], opts)).toBe("Feeling unwell, Routine")
+    expect(formatAnswer("DURATION", { value: 3, unit: "DAYS" })).toBe("3 days")
+    expect(formatAnswer("MEASUREMENT", { value: 70, unit: "kg" })).toBe("70 kg")
+    expect(formatAnswer("BODY", ["LEFT_ARM", "CHEST"])).toBe("Left arm, Chest")
+    expect(formatAnswer("SCALE", 7)).toBe("7")
+    expect(formatAnswer("TEXT", "free text")).toBe("free text")
+    expect(formatAnswer("TEXT", null)).toBe("")
   })
 })
