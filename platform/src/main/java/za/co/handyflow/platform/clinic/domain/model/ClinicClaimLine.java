@@ -57,6 +57,12 @@ public class ClinicClaimLine {
         return l;
     }
 
+    /** Scheme claim before any remittance: scheme owes the gross, patient owes nothing yet. */
+    public void expectSchemeToCover() {
+        this.schemePortion  = this.grossAmount;
+        this.patientPortion = BigDecimal.ZERO;
+    }
+
     public void applySchemePayment(BigDecimal schemePays) {
         this.schemePortion  = schemePays;
         this.patientPortion = this.grossAmount.subtract(schemePays);

@@ -78,25 +78,19 @@ public class ClinicBillingService {
         String dependentCode = req.dependentCode();
 
         if (schemeName == null || memberNumber == null) {
-            // Try patient's own record first, then principal's (for dependants)
+            // Patient's own record first; a dependant falls back to their principal's.
             var aidRecords = medicalAidRepo.findActiveByPatient(tenantId, c.getPatientId());
             if (aidRecords.isEmpty()) {
-                // Check if patient is a dependant — look up principal's record
-                patientRepo.findActiveById(tenantId, c.getPatientId())
-                        .filter(p -> p.getPrincipalId() != null)
-                        .ifPresent(p -> {
-                            var principalAids = medicalAidRepo.findActiveByPatient(
-                                    tenantId, p.getPrincipalId());
-                            if (!principalAids.isEmpty()) {
-                                var aid = principalAids.get(0);
-                                // Override nulls only — request values take precedence
-                            }
-                        });
+                var patient = patientRepo.findActiveById(tenantId, c.getPatientId()).orElse(null);
+                if (patient != null && patient.getPrincipalId() != null) {
+                    aidRecords = medicalAidRepo.findActiveByPatient(tenantId, patient.getPrincipalId());
+                }
             }
             if (!aidRecords.isEmpty()) {
                 var aid = aidRecords.get(0);
-                if (schemeName   == null) schemeName   = aid.getSchemeName();
-                if (memberNumber == null) memberNumber = aid.getMemberNumber();
+                // Request values take precedence; only fill the gaps.
+                if (schemeName    == null) schemeName    = aid.getSchemeName();
+                if (memberNumber  == null) memberNumber  = aid.getMemberNumber();
                 if (dependentCode == null) dependentCode = aid.getDependentCode();
             }
         }
@@ -149,6 +143,12 @@ public class ClinicBillingService {
             medicineOrder += 10;
         }
 
+        // Scheme claims: the scheme is expected to pay, so the patient is not billed the
+        // gross up front. Real splits arrive via markPaid/markPartial (audit F-09).
+        if (schemeName != null && !schemeName.isBlank()
+                && memberNumber != null && !memberNumber.isBlank()) {
+            claim.expectSchemeToCover();
+        }
         claim.recalculate();
         claimRepo.save(claim);
 

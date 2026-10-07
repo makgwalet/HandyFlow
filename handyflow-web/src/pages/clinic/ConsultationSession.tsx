@@ -114,66 +114,11 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
   const stopRec = () => { recRef.current?.stop(); setIsRecording(false) }
 
   const extractSOAP = async () => {
-    if (!transcript.trim()) return
-    setExtracting(true)
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages",{
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1200,messages:[{role:"user",
-          content:`You are a medical scribe. Extract a SOAP note and any procedures/medications mentioned.
-Return ONLY valid JSON:
-{
-  "chiefComplaint": "string",
-  "history": "string",
-  "examination": "string", 
-  "diagnosis": "string",
-  "icd10Codes": "comma-separated string",
-  "treatmentPlan": "string",
-  "followUpDays": number or null,
-  "procedures": [{"description": "string", "tariffCode": "string or null"}],
-  "medications": [{"name": "string", "dosage": "string", "frequency": "string", "duration": "string"}]
-}
-
-Transcript: ${transcript}`}]})
-      })
-      const data = await res.json()
-      const text = data.content?.[0]?.text??""
-      const parsed = JSON.parse(text.replace(/```json|```/g,"").trim())
-
-      setSoap(p=>({...p,
-        chiefComplaint: parsed.chiefComplaint||p.chiefComplaint,
-        history:        parsed.history||p.history,
-        examination:    parsed.examination||p.examination,
-        diagnosis:      parsed.diagnosis||p.diagnosis,
-        icd10Codes:     parsed.icd10Codes||p.icd10Codes,
-        treatmentPlan:  parsed.treatmentPlan||p.treatmentPlan,
-        followUpDays:   parsed.followUpDays!=null?String(parsed.followUpDays):p.followUpDays,
-      }))
-
-      // Auto-add extracted procedures to bill
-      if (parsed.procedures?.length) {
-        parsed.procedures.forEach((proc:any) => {
-          addBillLine({
-            type:"PROCEDURE", description:proc.description,
-            tariffCode:proc.tariffCode||undefined,
-            quantity:1, unitPrice:0, gross:0
-          })
-        })
-      }
-      // Auto-add extracted medications to bill + Rx
-      if (parsed.medications?.length) {
-        parsed.medications.forEach((med:any) => {
-          addMedicationToBillAndRx({
-            medicationName: med.name,
-            dosage: med.dosage||"",
-            frequency: med.frequency||"",
-            duration: med.duration||"",
-            unitPrice: 0
-          })
-        })
-      }
-    } catch(e){ console.error("SOAP extraction failed",e) }
-    setExtracting(false)
+    // DISABLED (audit F-03): this used to POST the transcript (patient health information)
+    // straight from the browser to a third-party API with no auth, consent or audit.
+    // It returns once a backend scribe endpoint exists (consent gate, then draft, then
+    // clinician review, then sign). Nothing is sent anywhere from here.
+    window.alert("AI note extraction is switched off until the secure, consent-gated scribe is available. Your transcript was not sent anywhere.")
   }
 
   // ── Bill lines ────────────────────────────────────────────────────────────

@@ -825,18 +825,11 @@ function ConsultationTab({ patient, consultations, practitioners, qc, addToBill,
   const stopRecording=()=>{ recognitionRef.current?.stop(); setIsRecording(false) }
 
   const extractSOAP=async()=>{
-    if (!transcript.trim()) return; setExtracting(true)
-    try {
-      const res=await fetch("https://api.anthropic.com/v1/messages",{
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,messages:[{role:"user",content:`You are a medical scribe. Extract a SOAP note from this consultation transcript. Return ONLY valid JSON with these fields: chiefComplaint, history, examination, diagnosis, icd10Codes (comma-separated), treatmentPlan, followUpDays (number or null).\n\nTranscript:\n${transcript}`}]})
-      })
-      const data=await res.json()
-      const text=data.content?.[0]?.text??""
-      const parsed=JSON.parse(text.replace(/```json|```/g,"").trim())
-      setForm(p=>({...p,...Object.fromEntries(Object.entries(parsed).filter(([,v])=>v!=null).map(([k,v])=>[k,String(v)]))}))
-    } catch(e){console.error("SOAP extraction failed",e)}
-    setExtracting(false)
+    // DISABLED (audit F-03): this used to POST the transcript (patient health information)
+    // straight from the browser to a third-party API with no auth, consent or audit.
+    // It returns once a backend scribe endpoint exists (consent gate, then draft, then
+    // clinician review, then sign). Nothing is sent anywhere from here.
+    window.alert("AI note extraction is switched off until the secure, consent-gated scribe is available. Your transcript was not sent anywhere.")
   }
 
   const sorted=[...consultations].sort((a,b)=>b.consultedAt.localeCompare(a.consultedAt))

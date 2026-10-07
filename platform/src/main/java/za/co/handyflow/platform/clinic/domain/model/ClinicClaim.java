@@ -78,6 +78,11 @@ public class ClinicClaim {
         this.updatedAt      = Instant.now();
     }
 
+    public void expectSchemeToCover() {
+        lines.forEach(ClinicClaimLine::expectSchemeToCover);
+        recalculate();
+    }
+
     public void submit(String referenceNumber) {
         if (!"DRAFT".equals(this.status))
             throw new IllegalStateException("Only DRAFT claims can be submitted");

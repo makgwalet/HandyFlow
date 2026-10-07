@@ -113,7 +113,14 @@ public class ClinicService {
             patient.setAccountType((String) updates.get("accountType"));
         if (updates.containsKey("principalId")) {
             var pidStr = updates.get("principalId");
-            patient.setPrincipalId(pidStr != null ? UUID.fromString(pidStr.toString()) : null);
+            UUID newPrincipal;
+            try {
+                newPrincipal = pidStr != null ? UUID.fromString(pidStr.toString()) : null;
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("principalId is not a valid id");
+            }
+            validatePrincipal(tenantId, id, newPrincipal);
+            patient.setPrincipalId(newPrincipal);
         }
         if (updates.containsKey("relationship"))
             patient.setRelationship((String) updates.get("relationship"));
@@ -124,8 +131,58 @@ public class ClinicService {
         if (updates.containsKey("lastVisitAt") && updates.get("lastVisitAt") != null)
             patient.setLastVisitAt(Instant.parse(updates.get("lastVisitAt").toString()));
 
+        // Clinical / contact fields (audit F-01). Absent key = unchanged; an empty list clears.
+        if (updates.containsKey("allergies") || updates.containsKey("chronicConditions")
+                || updates.containsKey("bloodType") || updates.containsKey("notes")
+                || updates.containsKey("phone") || updates.containsKey("email")
+                || updates.containsKey("emergencyContactName")
+                || updates.containsKey("emergencyContactPhone")) {
+            patient.update(
+                    optString(updates, "phone"), optString(updates, "email"),
+                    optString(updates, "emergencyContactName"),
+                    optString(updates, "emergencyContactPhone"),
+                    optString(updates, "bloodType"),
+                    optStringList(updates, "allergies"),
+                    optStringList(updates, "chronicConditions"),
+                    optString(updates, "notes"));
+        }
+
         var saved = patientRepo.save(patient);
         return toPatientResponse(saved, Collections.emptyMap());
+    }
+
+    private static String optString(Map<String, Object> m, String key) {
+        Object v = m.get(key);
+        return v == null ? null : v.toString().trim();
+    }
+
+    /** Null when the key is absent or null (leave unchanged); otherwise a cleaned list. */
+    private static List<String> optStringList(Map<String, Object> m, String key) {
+        Object v = m.get(key);
+        if (v == null) return null;
+        if (!(v instanceof Collection<?> c)) {
+            throw new IllegalArgumentException(key + " must be a list of strings");
+        }
+        List<String> out = new ArrayList<>();
+        for (Object o : c) {
+            if (o == null) continue;
+            String t = o.toString().trim();
+            if (!t.isEmpty()) out.add(t);
+        }
+        return out;
+    }
+
+    /** principalId must exist in this tenant, not be the patient itself, and not be a dependant itself. */
+    private void validatePrincipal(TenantId tenantId, UUID patientId, UUID principalId) {
+        if (principalId == null) return;
+        if (principalId.equals(patientId)) {
+            throw new IllegalArgumentException("A patient cannot be their own principal");
+        }
+        var principal = patientRepo.findByTenantIdAndId(tenantId, principalId)
+                .orElseThrow(() -> new ResourceNotFoundException("Principal patient", principalId.toString()));
+        if (principal.getPrincipalId() != null) {
+            throw new IllegalArgumentException("The chosen principal is itself a dependant");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -568,7 +625,8 @@ public class ClinicService {
         ClinicPrescription p = ClinicPrescription.create(
                 tenantId, consultationId, c.getPatientId(), c.getPractitionerId(),
                 req.medicationName(), req.dosage(), req.frequency(), req.duration(),
-                req.quantity(), req.repeats() != null ? req.repeats() : 0, req.instructions()
+                req.quantity(), req.repeats() != null ? req.repeats() : 0, req.instructions(),
+                req.nappiCode(), req.schedule()
         );
         prescriptionRepo.save(p);
         return toPrescriptionResponse(p);
@@ -705,6 +763,6 @@ public class ClinicService {
         return new PrescriptionResponse(p.getId(), p.getConsultationId(), p.getPatientId(),
                 p.getMedicationName(), p.getDosage(), p.getFrequency(), p.getDuration(),
                 p.getQuantity(), p.getRepeats(), p.getInstructions(),
-                p.isDispensed(), p.getPrescribedAt());
+                p.isDispensed(), p.getPrescribedAt(), p.getNappiCode(), p.getSchedule());
     }
 }

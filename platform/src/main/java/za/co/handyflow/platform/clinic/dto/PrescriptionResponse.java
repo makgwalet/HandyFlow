@@ -15,5 +15,16 @@ public record PrescriptionResponse(
         int repeats,
         String instructions,
         boolean dispensed,
-        Instant prescribedAt
-) {}
+        Instant prescribedAt,
+        String nappiCode,
+        Integer schedule
+) {
+    /** Pre-NAPPI constructor kept so existing callers compile. */
+    public PrescriptionResponse(UUID id, UUID consultationId, UUID patientId, String medicationName,
+                                String dosage, String frequency, String duration, Integer quantity,
+                                int repeats, String instructions, boolean dispensed,
+                                Instant prescribedAt) {
+        this(id, consultationId, patientId, medicationName, dosage, frequency, duration, quantity,
+                repeats, instructions, dispensed, prescribedAt, null, null);
+    }
+}

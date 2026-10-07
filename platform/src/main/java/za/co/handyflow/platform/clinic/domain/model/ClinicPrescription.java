@@ -61,6 +61,22 @@ public class ClinicPrescription {
         return p;
     }
 
+    /** Overload that also records the NAPPI code and SA medicine schedule (0-8). */
+    public static ClinicPrescription create(TenantId tenantId,
+                                            UUID consultationId, UUID patientId,
+                                            UUID practitionerId,
+                                            String medicationName, String dosage,
+                                            String frequency, String duration,
+                                            Integer quantity, int repeats,
+                                            String instructions,
+                                            String nappiCode, Integer schedule) {
+        ClinicPrescription p = create(tenantId, consultationId, patientId, practitionerId,
+                medicationName, dosage, frequency, duration, quantity, repeats, instructions);
+        p.nappiCode = (nappiCode == null || nappiCode.isBlank()) ? null : nappiCode.trim();
+        p.schedule  = schedule;
+        return p;
+    }
+
     public void markDispensed() {
         this.dispensed   = true;
         this.dispensedAt = Instant.now();
