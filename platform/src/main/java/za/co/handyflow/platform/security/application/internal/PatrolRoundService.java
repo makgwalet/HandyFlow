@@ -118,10 +118,16 @@ public class PatrolRoundService {
      */
     @Transactional
     public Optional<UUID> routeScanToRound(UUID shiftId, UUID checkpointId) {
-        Optional<PatrolRound> currentRound = roundRepository.findCurrentRound(shiftId);
+        Optional<PatrolRound> currentRound = currentRoundFor(shiftId, checkpointId);
         if (currentRound.isEmpty()) return Optional.empty();
 
         PatrolRound round = currentRound.get();
+
+        // A repeat scan of the same checkpoint in the same round is linked to it but does not count again, so one
+        // checkpoint scanned many times cannot complete a round.
+        if (logRepository.existsByRoundIdAndCheckpointId(round.getId(), checkpointId)) {
+            return Optional.of(round.getId());
+        }
 
         // OFF_SCHEDULE check: did this round start too soon after the previous one?
         boolean isOffSchedule = false;
@@ -162,6 +168,22 @@ public class PatrolRoundService {
         return Optional.of(round.getId());
     }
 
+    /**
+     * The earliest unfinished round of this shift whose route includes the checkpoint. A scan of a checkpoint that is on
+     * none of the shift's open routes belongs to no round. (Rounds generated without a route accept any checkpoint.)
+     */
+    Optional<PatrolRound> currentRoundFor(UUID shiftId, UUID checkpointId) {
+        for (PatrolRound r : roundRepository.findByShift(shiftId)) {
+            if (r.getStatus() != PatrolRound.RoundStatus.EXPECTED && r.getStatus() != PatrolRound.RoundStatus.IN_PROGRESS) continue;
+            if (r.getRouteId() == null) return Optional.of(r);
+            Optional<PatrolRoute> route = routeRepository.findById(r.getRouteId());
+            if (route.isEmpty() || route.get().getCheckpoints().stream().anyMatch(c -> checkpointId.equals(c.getCheckpointId()))) {
+                return Optional.of(r);
+            }
+        }
+        return Optional.empty();
+    }
+
     // ── Missed Round Detection (scheduler) ─────────────────────────────────────
 
     /**
@@ -189,6 +211,19 @@ public class PatrolRoundService {
 
         if (totalMissed > 0) {
             log.info("[Security] Marked {} rounds as MISSED", totalMissed);
+        }
+
+        // Started but not finished by the end of their window: PARTIAL.
+        int totalPartial = 0;
+        for (UUID tenantId : tenantIds) {
+            for (PatrolRound round : roundRepository.findOverdueInProgress(TenantId.of(tenantId))) {
+                round.markPartial();
+                roundRepository.save(round);
+                totalPartial++;
+            }
+        }
+        if (totalPartial > 0) {
+            log.info("[Security] Marked {} rounds as PARTIAL", totalPartial);
         }
     }
 

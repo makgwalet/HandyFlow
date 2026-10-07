@@ -16,6 +16,9 @@ import java.util.UUID;
 
 public interface CheckpointLogRepository extends JpaRepository<CheckpointLog, UUID> {
 
+    /** True when this checkpoint has already been scanned in this round (a repeat scan does not count twice). */
+    boolean existsByRoundIdAndCheckpointId(UUID roundId, UUID checkpointId);
+
     @Query("""
         SELECT l FROM CheckpointLog l
         WHERE l.tenantId = :tenantId

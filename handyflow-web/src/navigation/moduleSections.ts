@@ -12,7 +12,7 @@ import type { ElementType } from 'react'
 import {
   AlertTriangle, Coins, Camera, ClipboardList, Clock, Crosshair, DoorOpen, FileBarChart,
   GitBranch, Key, LayoutDashboard, Lock, MapPin, Radio, RefreshCw, Repeat, Route,
-  Gauge, Shield, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
+  Footprints, Gauge, Shield, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
   Droplets, ArrowDownToLine, Fuel, Truck, Users, TrendingUp, Car, Wrench,
   Calculator, BookOpen, GitBranch as JournalIcon, Landmark, BarChart2, FileText,
   Briefcase, Calendar, FolderOpen, AlertOctagon, CalendarCheck, Settings,
@@ -80,6 +80,7 @@ export const SECURITY_SECTIONS: ModuleSections = {
         { id: 'shifts', label: 'Shifts', icon: Clock },
         { id: 'scheduler', label: 'Scheduler', icon: CalendarDays },
         { id: 'incidents', label: 'Incidents', icon: AlertTriangle },
+        { id: 'patrols', label: 'Patrols', icon: Footprints },
         { id: 'patrol-routes', label: 'Patrol Routes', icon: Route },
         { id: 'post-orders', label: 'Post Orders', icon: ClipboardList },
         { id: 'gate-access', label: 'Gate Access', icon: DoorOpen },

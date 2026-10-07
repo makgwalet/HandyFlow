@@ -48,6 +48,12 @@ public class CheckpointLog {
     @Column(name = "scan_type")
     private String scanType;
 
+    /** The patrol round this scan counted towards (V111 column); null when it was not part of a round. */
+    @Column(name = "round_id")
+    private UUID roundId;
+
+    public void attachRound(UUID roundId) { this.roundId = roundId; }
+
     public static CheckpointLog create(TenantId tenantId, UUID checkpointId,
                                        UUID guardId, UUID shiftId,
                                        BigDecimal latitude, BigDecimal longitude,

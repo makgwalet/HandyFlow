@@ -45,4 +45,13 @@ public interface PatrolRoundRepository extends JpaRepository<PatrolRound, UUID> 
         AND r.expectedEndAt < CURRENT_TIMESTAMP
         """)
     List<PatrolRound> findOverdueExpected(TenantId tenantId);
+
+    /** Rounds that were started but whose window has passed without every checkpoint scanned. */
+    @Query("""
+        SELECT r FROM PatrolRound r
+        WHERE r.tenantId = :tenantId
+        AND r.status = 'IN_PROGRESS'
+        AND r.expectedEndAt < CURRENT_TIMESTAMP
+        """)
+    List<PatrolRound> findOverdueInProgress(TenantId tenantId);
 }

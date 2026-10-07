@@ -52,6 +52,7 @@ public class CheckpointScanService {
     private final CheckpointRepository    checkpointRepository;
     private final CheckpointLogRepository logRepository;
     private final ShiftRepository         shiftRepository;
+    private final PatrolRoundService      patrolRoundService;
 
     /**
      * @param authenticatedGuardId Resolved from HTTP session by the controller.
@@ -82,6 +83,11 @@ public class CheckpointScanService {
                 req.longitude(),
                 scanType                // persisted for audit trail
         );
+        // Count the scan towards the shift's current patrol round (this was never wired in before, so rounds could not
+        // progress and were all marked MISSED). Must run before the save so a repeat scan is recognised as a repeat.
+        if (req.shiftId() != null) {
+            patrolRoundService.routeScanToRound(req.shiftId(), checkpoint.getId()).ifPresent(entry::attachRound);
+        }
         logRepository.save(entry);
 
         log.info("[Security] Checkpoint scanned type={} checkpoint='{}' guard={} shift={}",
