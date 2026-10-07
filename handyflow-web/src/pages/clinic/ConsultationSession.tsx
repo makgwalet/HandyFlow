@@ -10,6 +10,8 @@ import QuestionForm from "./QuestionForm"
 import { VitalsPanel, SoapFields } from "./ConsultationNotesPanels"
 import LiveBillPanel from "./LiveBillPanel"
 import RxDraftsPanel from "./RxDraftsPanel"
+import ConsultationStepper from "./ConsultationStepper"
+import { consultSteps } from "./consultSteps"
 import { PatientAlertBanner } from "./PatientNotes"
 import { missingReasons, useAllergyChecks } from "./PrescriptionAllergyCheck"
 import {
@@ -476,6 +478,8 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
       )}
 
       <PatientAlertBanner patientId={patient.id}/>
+
+      <ConsultationStepper steps={consultSteps(soap, rxDrafts)}/>
 
       {/* ── Panel tabs (mobile) ────────────────────────────────────────── */}
       <div style={{ display:"flex", gap:4, marginBottom:12 }}>
