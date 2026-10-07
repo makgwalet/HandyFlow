@@ -32,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Tests that routes exist, security annotations fire, and JSON is mapped correctly.
  */
 @WebMvcTest(ClinicController.class)
+@Import(za.co.handyflow.platform.WebMvcTestSecuritySupport.class)
 class ClinicControllerTest {
 
     @Autowired MockMvc mvc;
@@ -43,6 +44,12 @@ class ClinicControllerTest {
     @MockitoBean ClinicPdfService                   clinicPdfService;
     @MockitoBean za.co.handyflow.platform.clinic.application.internal.ClinicPatientIdentityService patientIdentityService;
     @MockitoBean ClinicMedicationCatalogueRepository medicationRepo;
+    // The controller also needs these; a @WebMvcTest slice does not create services, so each is mocked.
+    @MockitoBean ClinicAppointmentReminderService      appointmentReminderService;
+    @MockitoBean ClinicTelehealthService               telehealthService;
+    @MockitoBean ClinicReferralPdfService              referralPdfService;
+    @MockitoBean ClinicConsultationSummaryPdfService   consultationSummaryPdfService;
+    @MockitoBean za.co.handyflow.platform.clinic.domain.repository.ClinicProcedureCatalogueRepository procedureRepo;
 
     static final String BASE = "/api/v1/clinic";
 
