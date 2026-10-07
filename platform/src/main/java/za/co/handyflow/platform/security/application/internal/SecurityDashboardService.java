@@ -107,7 +107,7 @@ public class SecurityDashboardService {
                 LEFT JOIN security_guards g ON g.id = s.guard_id
                 LEFT JOIN security_sites st ON st.id = s.site_id
                 WHERE s.tenant_id = ? AND s.deleted_at IS NULL AND s.status = 'ACTIVE'
-                ORDER BY s.start_at, s.id LIMIT """ + ROW_LIMIT,
+                ORDER BY s.start_at, s.id LIMIT ?""",
                 (rs, i) -> {
                     Instant start = rs.getTimestamp("start_at").toLocalDateTime().toInstant(ZoneOffset.UTC);
                     Timestamp actual = rs.getTimestamp("actual_start_at");
@@ -116,17 +116,17 @@ public class SecurityDashboardService {
                             (UUID) rs.getObject("site_id"), rs.getString("site_name"), start,
                             rs.getTimestamp("end_at").toLocalDateTime().toInstant(ZoneOffset.UTC), actualAt,
                             ShiftPunctuality.minutesLate(start, actualAt));
-                }, tenant);
+                }, tenant, ROW_LIMIT);
 
         List<OpenIncidentRow> openRows = jdbc.query("""
                 SELECT i.id, i.title, i.severity, i.status, i.site_id, st.name AS site_name, i.created_at
                 FROM security_incidents i LEFT JOIN security_sites st ON st.id = i.site_id
                 WHERE i.tenant_id = ? AND i.deleted_at IS NULL AND i.status <> 'RESOLVED'
                 ORDER BY CASE UPPER(i.severity) WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END, i.created_at DESC, i.id
-                LIMIT """ + ROW_LIMIT,
+                LIMIT ?""",
                 (rs, i) -> new OpenIncidentRow((UUID) rs.getObject("id"), rs.getString("title"), rs.getString("severity"), rs.getString("status"),
                         (UUID) rs.getObject("site_id"), rs.getString("site_name"),
-                        rs.getTimestamp("created_at").toLocalDateTime().toInstant(ZoneOffset.UTC)), tenant);
+                        rs.getTimestamp("created_at").toLocalDateTime().toInstant(ZoneOffset.UTC)), tenant, ROW_LIMIT);
 
         int openAlarms = n(alarmRow, "open");
         var attention = DashboardAttention.build(openAlarms, n(alarmRow, "new_alarms"), shifts, workforce, incidents, complaints, gate);
