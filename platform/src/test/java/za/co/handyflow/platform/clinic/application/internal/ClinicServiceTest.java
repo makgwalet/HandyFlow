@@ -45,6 +45,7 @@ class ClinicServiceTest {
     @Mock ClinicTimeOffService timeOffService;
     @Mock ClinicWorkingHoursService workingHoursService;
     @Mock ClinicClosureService closureService;
+    @Mock za.co.handyflow.platform.shared.EmailService emailService;
 
     @InjectMocks ClinicService service;
 
@@ -559,6 +560,52 @@ class ClinicServiceTest {
         private ClinicAppointment existing(UUID practitionerId) {
             return ClinicAppointment.create(TENANT, UUID.randomUUID(), practitionerId,
                     Instant.now().plusSeconds(7200), 30, "CONSULTATION", null);
+        }
+
+        @Test
+        @DisplayName("emails the patient when their appointment is moved")
+        void emailsThePatient() {
+            var appt = existing(null);
+            var patient = patientWithId("Jane", "Dlamini");
+            org.springframework.test.util.ReflectionTestUtils.setField(patient, "email", "jane@example.com");
+            when(appointmentRepo.findActiveById(TENANT, appt.getId())).thenReturn(Optional.of(appt));
+            when(patientRepo.findActiveById(TENANT, appt.getPatientId())).thenReturn(Optional.of(patient));
+            when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+
+            service.rescheduleAppointment(TENANT, appt.getId(), new RescheduleRequest(Instant.now().plusSeconds(86400), null, null), false);
+
+            verify(emailService).send(eq("jane@example.com"), startsWith("Appointment moved"), contains("has been moved"));
+        }
+
+        @Test
+        @DisplayName("a failing email does not undo the move")
+        void emailFailureDoesNotUndoTheMove() {
+            var appt = existing(null);
+            var patient = patientWithId("Jane", "Dlamini");
+            org.springframework.test.util.ReflectionTestUtils.setField(patient, "email", "jane@example.com");
+            when(appointmentRepo.findActiveById(TENANT, appt.getId())).thenReturn(Optional.of(appt));
+            when(patientRepo.findActiveById(TENANT, appt.getPatientId())).thenReturn(Optional.of(patient));
+            when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+            doThrow(new RuntimeException("smtp down")).when(emailService).send(any(), any(), any());
+            var newTime = Instant.now().plusSeconds(86400);
+
+            service.rescheduleAppointment(TENANT, appt.getId(), new RescheduleRequest(newTime, null, null), false);
+
+            assertThat(appt.getScheduledAt()).isEqualTo(newTime);
+            verify(appointmentRepo).save(appt);
+        }
+
+        @Test
+        @DisplayName("sends nothing when the patient has no email address")
+        void noEmailAddress() {
+            var appt = existing(null);
+            when(appointmentRepo.findActiveById(TENANT, appt.getId())).thenReturn(Optional.of(appt));
+            when(patientRepo.findActiveById(TENANT, appt.getPatientId())).thenReturn(Optional.of(patientWithId("Jane", "Dlamini")));
+            when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+
+            service.rescheduleAppointment(TENANT, appt.getId(), new RescheduleRequest(Instant.now().plusSeconds(86400), null, null), false);
+
+            verifyNoInteractions(emailService);
         }
 
         @Test

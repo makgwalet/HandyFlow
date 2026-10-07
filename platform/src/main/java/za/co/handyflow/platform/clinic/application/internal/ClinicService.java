@@ -386,6 +386,23 @@ public class ClinicService {
         }
     }
 
+    /** Tells the patient their appointment moved. Never lets an email problem undo the move. */
+    private void sendRescheduleNotice(TenantId tenantId, ClinicAppointment appt, Instant oldTime) {
+        try {
+            ClinicPatient patient = patientRepo.findActiveById(tenantId, appt.getPatientId()).orElse(null);
+            if (patient == null || patient.getEmail() == null || patient.getEmail().isBlank()) return;
+            ClinicPractitioner practitioner = appt.getPractitionerId() != null
+                    ? practitionerRepo.findActiveById(tenantId, appt.getPractitionerId()).orElse(null) : null;
+            var msg = RescheduleEmail.build(patient.getFirstName(), resolveTenantName(appt.getTenantId()),
+                    practitioner != null ? drName(practitioner.getFullName()) : null,
+                    oldTime, appt.getScheduledAt(), ZoneId.of("Africa/Johannesburg"));
+            emailService.send(patient.getEmail(), msg.subject(), msg.html());
+            log.info("Sent reschedule notice patient={} appointment={}", patient.getId(), appt.getId());
+        } catch (Exception e) {
+            log.warn("Reschedule notice not sent for appointment={}: {}", appt.getId(), e.getMessage());
+        }
+    }
+
     /**
      * DEC-CLINIC-002: signing a consultation does NOT email the visit summary. Email is a
      * deliberate, consent-gated delivery action (not built yet), so this stays off unless
@@ -497,9 +514,14 @@ public class ClinicService {
             String patientName = patientRepo.findActiveById(tenantId, appt.getPatientId()).map(ClinicPatient::getFullName).orElse(null);
             requirePatientFree(tenantId, appt.getPatientId(), patientName, req.scheduledAt(), minutes, appt.getId());
         }
+        Instant oldTime = appt.getScheduledAt();
+        UUID oldPractitioner = appt.getPractitionerId();
         appt.reschedule(req.scheduledAt(), minutes, req.practitionerId());
         appointmentRepo.save(appt);
         log.info("Rescheduled appointment={} to {}", appt.getId(), req.scheduledAt());
+        if (RescheduleEmail.worthSending(oldTime, oldPractitioner, appt.getScheduledAt(), appt.getPractitionerId())) {
+            sendRescheduleNotice(tenantId, appt, oldTime);
+        }
         return toAppointmentResponse(appt,
                 loadPatientNames(tenantId, List.of(appt)),
                 loadPractitionerNames(tenantId, List.of(appt)));
