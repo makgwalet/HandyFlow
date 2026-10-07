@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.clinic.application.internal.ClinicPatientIdentityService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicPdfService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicReferralPdfService;
 import za.co.handyflow.platform.clinic.application.internal.ClinicConsultationSummaryPdfService;
@@ -37,6 +38,7 @@ import java.util.UUID;
 public class ClinicController {
 
     private final ClinicService                      clinicService;
+    private final ClinicPatientIdentityService       patientIdentityService;
     private final ClinicAppointmentReminderService    appointmentReminderService;
     private final ClinicTelehealthService              telehealthService;
     private final ClinicPdfService                   clinicPdfService;
@@ -60,6 +62,36 @@ public class ClinicController {
         var tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success("Success",
                 clinicService.getPatients(tenantId, search, principalId, includeArchived, pageable)));
+    }
+
+    @GetMapping("/patients/duplicate-check")
+    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @Operation(summary = "Possible existing patients (same ID number, or same name and date of birth) to show before creating one")
+    public ResponseEntity<ApiResponse<List<ClinicPatientIdentityService.Candidate>>> duplicateCheck(
+            @RequestParam(required = false) String idNumber,
+            @RequestParam(required = false) String firstName,
+            @RequestParam(required = false) String lastName,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate dateOfBirth) {
+        return ResponseEntity.ok(ApiResponse.success("Success", patientIdentityService.findCandidates(
+                TenantContext.getTenantIdAsObject(), idNumber, firstName, lastName, dateOfBirth)));
+    }
+
+    @GetMapping("/patients/id-number/validate")
+    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @Operation(summary = "Check an SA ID number; returns date of birth and sex digit when valid (a hint, not a record)")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> validateIdNumber(@RequestParam String value) {
+        String problem = za.co.handyflow.platform.clinic.domain.model.SaIdNumber.problem(value);
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("valid", problem == null);
+        out.put("applicable", za.co.handyflow.platform.clinic.domain.model.SaIdNumber.looksLikeSaId(value));
+        if (problem != null) out.put("problem", problem);
+        else {
+            var id = za.co.handyflow.platform.clinic.domain.model.SaIdNumber.parseOrNull(value);
+            out.put("dateOfBirth", id.dateOfBirth().toString());
+            out.put("sexDigits", id.male() ? "MALE" : "FEMALE");
+            out.put("citizen", id.citizen());
+        }
+        return ResponseEntity.ok(ApiResponse.success("Success", out));
     }
 
     @GetMapping("/patients/{id}")

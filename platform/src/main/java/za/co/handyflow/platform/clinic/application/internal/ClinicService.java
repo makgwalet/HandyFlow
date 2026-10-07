@@ -34,6 +34,7 @@ public class ClinicService {
     private final ClinicConsultationEditRepository consultationEditRepo;
     private final ClinicPatientClinicalService     patientClinicalService;
     private final ClinicObservationService         observationService;
+    private final ClinicPatientIdentityService     patientIdentityService;
     private final ClinicPrescriptionRepository prescriptionRepo;
     private final EmailService                 emailService;
     private final ClinicConsultationSummaryPdfService consultationSummaryPdfService;
@@ -87,10 +88,14 @@ public class ClinicService {
 
     @Transactional
     public PatientResponse createPatient(TenantId tenantId, CreatePatientRequest req) {
+        // S1-7: structure check, DOB agreement, and exact-ID duplicate block.
+        patientIdentityService.assertCanRegister(tenantId, req.idNumber(), req.dateOfBirth());
+        java.time.LocalDate dob = req.dateOfBirth() != null ? req.dateOfBirth()
+                : Optional.ofNullable(SaIdNumber.parseOrNull(req.idNumber())).map(SaIdNumber::dateOfBirth).orElse(null);
         ClinicPatient patient = ClinicPatient.create(
                 tenantId,
                 req.firstName(), req.lastName(),
-                req.idNumber(), req.dateOfBirth(), req.gender(),
+                req.idNumber(), dob, req.gender(),
                 req.phone(), req.email(),
                 req.emergencyContactName(), req.emergencyContactPhone()
         );
@@ -99,6 +104,7 @@ public class ClinicService {
         if (req.principalId() != null)   patient.setPrincipalId(req.principalId());
         if (req.relationship() != null)  patient.setRelationship(req.relationship());
 
+        patient.setPatientNumber(patientIdentityService.nextPatientNumber(tenantId));
         patientRepo.save(patient);
         log.info("Created patient={} tenant={}", patient.getId(), tenantId);
         // FIX #6 — use enriched 2-arg mapper
@@ -805,7 +811,8 @@ public class ClinicService {
                 p.getArchivedAt(),
                 p.getSexAtBirth(),
                 p.getPregnancyStatus(),
-                p.getExpectedDeliveryDate()
+                p.getExpectedDeliveryDate(),
+                p.getPatientNumber()
         );
     }
 

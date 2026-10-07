@@ -47,8 +47,26 @@ public record PatientResponse(
         // ── Sprint 1: reproductive context (drives sex-specific question visibility) ──
         String sexAtBirth,                   // MALE | FEMALE | INTERSEX | UNKNOWN; null = not recorded
         String pregnancyStatus,              // NOT_PREGNANT | PREGNANT | UNKNOWN; null = not recorded
-        LocalDate expectedDeliveryDate
+        LocalDate expectedDeliveryDate,
+        String patientNumber                 // per-tenant, e.g. P000123
 ) {
+    /** Pre-patient-number constructor kept so existing callers compile. */
+    public PatientResponse(UUID id, String firstName, String lastName, String fullName,
+                           String idNumber, LocalDate dateOfBirth, String gender, String phone,
+                           String email, String bloodType, List<String> allergies,
+                           List<String> chronicConditions, String emergencyContactName,
+                           String emergencyContactPhone, String notes, boolean active,
+                           Instant createdAt, String accountType, UUID principalId,
+                           String principalName, String relationship, Instant lastVisitAt,
+                           Instant archivedAt, String sexAtBirth, String pregnancyStatus,
+                           LocalDate expectedDeliveryDate) {
+        this(id, firstName, lastName, fullName, idNumber, dateOfBirth, gender, phone, email,
+                bloodType, allergies, chronicConditions, emergencyContactName,
+                emergencyContactPhone, notes, active, createdAt, accountType, principalId,
+                principalName, relationship, lastVisitAt, archivedAt, sexAtBirth, pregnancyStatus,
+                expectedDeliveryDate, null);
+    }
+
     /** Pre-Sprint-1 constructor kept so existing callers compile. */
     public PatientResponse(UUID id, String firstName, String lastName, String fullName,
                            String idNumber, LocalDate dateOfBirth, String gender, String phone,
@@ -61,6 +79,6 @@ public record PatientResponse(
         this(id, firstName, lastName, fullName, idNumber, dateOfBirth, gender, phone, email,
                 bloodType, allergies, chronicConditions, emergencyContactName,
                 emergencyContactPhone, notes, active, createdAt, accountType, principalId,
-                principalName, relationship, lastVisitAt, archivedAt, null, null, null);
+                principalName, relationship, lastVisitAt, archivedAt, null, null, null, null);
     }
 }

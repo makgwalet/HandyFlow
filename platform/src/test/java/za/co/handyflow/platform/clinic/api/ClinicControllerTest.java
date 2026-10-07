@@ -39,6 +39,7 @@ class ClinicControllerTest {
 
     @MockitoBean ClinicService                      clinicService;
     @MockitoBean ClinicPdfService                   clinicPdfService;
+    @MockitoBean za.co.handyflow.platform.clinic.application.internal.ClinicPatientIdentityService patientIdentityService;
     @MockitoBean ClinicMedicationCatalogueRepository medicationRepo;
 
     static final String BASE = "/api/v1/clinic";

@@ -35,6 +35,7 @@ class ClinicServiceTest {
     @Mock ClinicConsultationRepository consultationRepo;
     @Mock ClinicConsultationEditRepository consultationEditRepo;
     @Mock ClinicPatientClinicalService     patientClinicalService;
+    @Mock ClinicPatientIdentityService patientIdentityService;
     @Mock ClinicObservationService         observationService;
     @Mock ClinicPrescriptionRepository prescriptionRepo;
 
@@ -225,6 +226,22 @@ class ClinicServiceTest {
                     principalId.equals(p.getPrincipalId()) &&
                             "CHILD".equals(p.getRelationship()) &&
                             "DEPENDANT".equals(p.getAccountType())));
+        }
+        @Test
+        @DisplayName("derives date of birth from a valid SA ID, checks identity and assigns a patient number")
+        void derivesDobAndAssignsNumber() {
+            when(patientIdentityService.nextPatientNumber(TENANT)).thenReturn("P000007");
+            var req = new CreatePatientRequest(
+                    "Sipho", "Nkosi", "6405037113086", null,
+                    "MALE", "+27821112233", null, null, null,
+                    "INDIVIDUAL", null, null);
+
+            var result = service.createPatient(TENANT, req);
+
+            verify(patientIdentityService).assertCanRegister(TENANT, "6405037113086", null);
+            verify(patientRepo).save(argThat(p -> p.getDateOfBirth() != null
+                    && p.getDateOfBirth().getYear() == 1964 && "P000007".equals(p.getPatientNumber())));
+            assertThat(result.patientNumber()).isEqualTo("P000007");
         }
     }
 

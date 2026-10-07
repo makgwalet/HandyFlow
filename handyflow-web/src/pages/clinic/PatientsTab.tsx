@@ -13,7 +13,7 @@ import {
 
 interface Patient {
   id: string; firstName: string; lastName: string; fullName: string
-  idNumber: string; dateOfBirth: string; gender: string
+  idNumber: string; dateOfBirth: string; gender: string; patientNumber?: string
   phone: string; email: string; bloodType: string
   allergies: string[]; chronicConditions: string[]
   emergencyContactName: string; emergencyContactPhone: string
@@ -183,6 +183,21 @@ export default function PatientsTab({ onOpenPatient }: Props) {
   const totalElements = data?.totalElements ?? patients.length
   const idInfo = saIdInfo(form.idNumber)
 
+  // Existing patient with the same ID, or the same name and date of birth (S1-7).
+  const dupQuery = useQuery<any[]>({
+    queryKey: ["clinic-duplicate-check", form.idNumber, form.firstName, form.lastName, form.dateOfBirth],
+    enabled: form.idNumber.length === 13 || (!!form.firstName && !!form.lastName && !!form.dateOfBirth),
+    queryFn: async () => {
+      const r = await apiClient.get("/api/v1/clinic/patients/duplicate-check", { params: {
+        idNumber: form.idNumber.length === 13 ? form.idNumber : undefined,
+        firstName: form.firstName || undefined, lastName: form.lastName || undefined,
+        dateOfBirth: form.dateOfBirth || undefined } })
+      const d = r.data?.data ?? r.data
+      return Array.isArray(d) ? d : []
+    },
+  })
+  const duplicates = dupQuery.data ?? []
+
   const inp = (key: string): React.CSSProperties => ({
     width:"100%", padding:"9px 12px", boxSizing:"border-box" as const,
     border:`1.5px solid ${fieldErrors[key]?"var(--hf-danger)":"var(--hf-border)"}`,
@@ -295,8 +310,10 @@ export default function PatientsTab({ onOpenPatient }: Props) {
                               {p.relationship?.toLowerCase()||"dependant"} of {p.principalName}
                             </div>
                           )}
-                          {p.idNumber && (
-                            <div style={{ fontSize:11, color:"var(--hf-text-faint)" }}>{p.idNumber}</div>
+                          {(p.patientNumber || p.idNumber) && (
+                            <div style={{ fontSize:11, color:"var(--hf-text-faint)" }}>
+                              {[p.patientNumber, p.idNumber].filter(Boolean).join(" · ")}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -412,6 +429,13 @@ export default function PatientsTab({ onOpenPatient }: Props) {
             <div style={{ padding:"20px 28px" }}>
               {/* Principal form */}
               <Sect title={regType==="family" ? "Principal member" : "Personal information"}>
+                {duplicates.length > 0 && (
+                  <div role="alert" style={{ marginBottom:12, padding:"10px 12px", borderRadius:8,
+                    background:"var(--hf-warning-soft)", color:"var(--hf-warning-text)", fontSize:13 }}>
+                    <strong>Possible existing patient:</strong>{" "}
+                    {duplicates.map((c:any) => `${c.fullName}${c.patientNumber ? ` (${c.patientNumber})` : ""}, ${c.matchReason.toLowerCase()}`).join("; ")}
+                  </div>
+                )}
                 <PersonForm form={form} onChange={f} errors={fieldErrors} idInfo={idInfo} FErr={FErr} inp={inp}/>
               </Sect>
 

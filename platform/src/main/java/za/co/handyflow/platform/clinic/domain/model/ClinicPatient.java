@@ -82,6 +82,9 @@ public class ClinicPatient {
     @Setter @Column(name = "expected_delivery_date")
     java.time.LocalDate expectedDeliveryDate;
 
+    @Setter @Column(name = "patient_number")
+    String patientNumber;   // per-tenant, e.g. P000123
+
     @Setter @Column(name = "last_visit_at")
     Instant lastVisitAt;    // denormalised — updated on each createConsultation()
 

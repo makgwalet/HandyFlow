@@ -32,6 +32,17 @@ public interface ClinicPatientRepository extends JpaRepository<ClinicPatient, UU
         """)
     Page<ClinicPatient> searchActive(TenantId tenantId, String search, Pageable pageable);
 
+    @Query("SELECT p FROM ClinicPatient p WHERE p.tenantId = :#{#tenantId.value} AND p.idNumber = :idNumber AND p.deletedAt IS NULL")
+    List<ClinicPatient> findActiveByIdNumber(TenantId tenantId, String idNumber);
+
+    @Query("""
+        SELECT p FROM ClinicPatient p
+        WHERE p.tenantId = :#{#tenantId.value} AND p.deletedAt IS NULL
+          AND LOWER(p.firstName) = LOWER(:firstName) AND LOWER(p.lastName) = LOWER(:lastName)
+          AND p.dateOfBirth = :dateOfBirth
+        """)
+    List<ClinicPatient> findActiveByNameAndDob(TenantId tenantId, String firstName, String lastName, java.time.LocalDate dateOfBirth);
+
     @Query("SELECT p FROM ClinicPatient p WHERE p.tenantId = :#{#tenantId.value} AND p.id = :id AND p.deletedAt IS NULL")
     Optional<ClinicPatient> findActiveById(TenantId tenantId, UUID id);
 
