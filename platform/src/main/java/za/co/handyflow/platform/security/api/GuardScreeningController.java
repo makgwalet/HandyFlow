@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.security.application.internal.GuardScreeningService;
 import za.co.handyflow.platform.security.domain.model.GuardScreeningRecord;
 import za.co.handyflow.platform.security.dto.CreateScreeningRequest;
+import za.co.handyflow.platform.security.dto.DecideScreeningRequest;
 import za.co.handyflow.platform.security.dto.RecordScreeningResultRequest;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
