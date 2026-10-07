@@ -53,6 +53,14 @@ class ClinicControllerTest {
 
     static final String BASE = "/api/v1/clinic";
 
+    // The controller reads the tenant from TenantContext (normally set by JwtAuthFilter, which a
+    // MockMvc request with @WithMockUser bypasses); without it every call answers 409 "No tenant in context".
+    @BeforeEach
+    void setTenant() { za.co.handyflow.platform.shared.TenantContext.setTenantId("9ecb3dc7-75d4-4e56-b0a2-c95d3c7c584f"); }
+
+    @AfterEach
+    void clearTenant() { za.co.handyflow.platform.shared.TenantContext.clear(); }
+
     PatientResponse patientResponse(UUID id, String first, String last) {
         return new PatientResponse(id, first, last, first+" "+last,
                 null, null, null, "+27820000001", null, null,
@@ -220,7 +228,7 @@ class ClinicControllerTest {
     }
 
     @Test
-    @WithMockUser(authorities = "CLINIC_WRITE")
+    @WithMockUser(authorities = "CLINIC_CLINICAL_WRITE")
     @DisplayName("POST /patients/{id}/consultations returns 201")
     void createConsultationReturns201() throws Exception {
         var patientId = UUID.randomUUID();
