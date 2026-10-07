@@ -42,6 +42,8 @@ export interface ModuleSection {
    * own check to avoid showing a section that would 403; it does not replace it.
    */
   permission?: string
+  /** Alternative to `permission`: visible when the user holds at least one of these. */
+  anyPermission?: string[]
 }
 
 export interface ModuleSectionGroup {
@@ -570,6 +572,7 @@ export const CLINIC_SECTIONS: ModuleSections = {
         { id: 'claims', label: 'Claims', icon: CreditCard },
         { id: 'billing', label: 'Billing', icon: BarChart2 },
         { id: 'access-log', label: 'Access log', icon: ShieldCheck, permission: 'CLINIC_ADMIN' },
+        { id: 'question-library', label: 'Question library', icon: ListChecks, anyPermission: ['CLINIC_CONTENT_ADMIN', 'CLINIC_CONTENT_APPROVE'] },
       ],
     },
   ],
@@ -820,7 +823,7 @@ const REGISTRY: ModuleSections[] = [
 /** Groups with sections the user may not see removed (and empty groups dropped). */
 export function visibleGroups(config: ModuleSections, permissions: readonly string[]): ModuleSectionGroup[] {
   return config.groups
-    .map(g => ({ ...g, sections: g.sections.filter(s => !s.permission || permissions.includes(s.permission)) }))
+    .map(g => ({ ...g, sections: g.sections.filter(s => (!s.permission || permissions.includes(s.permission)) && (!s.anyPermission || s.anyPermission.some(p => permissions.includes(p)))) }))
     .filter(g => g.sections.length > 0)
 }
 
