@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import QuestionForm from "./QuestionForm"
+import { PatientAlertBanner } from "./PatientNotes"
 import { AllergyWarning, missingReasons, useAllergyChecks } from "./PrescriptionAllergyCheck"
 import {
   Mic, MicOff, Plus, X, Clock, Stethoscope, CreditCard, Pill,
@@ -498,6 +499,8 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
             style={{ background:"none", border:"none", cursor:"pointer", color:"inherit" }}>×</button>
         </div>
       )}
+
+      <PatientAlertBanner patientId={patient.id}/>
 
       {/* ── Panel tabs (mobile) ────────────────────────────────────────── */}
       <div style={{ display:"flex", gap:4, marginBottom:12 }}>
