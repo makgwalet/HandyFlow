@@ -36,6 +36,11 @@ public class ClinicLabResult {
 
     String interpretation;
     boolean notified = false;
+    // Worked out from the lab's own reference ranges and critical limits when markers are entered (see LabMarkerRules).
+    @Column(name = "has_abnormal")       boolean hasAbnormal = false;
+    @Column(name = "has_critical")       boolean hasCritical = false;
+    @Column(name = "markers_entered_by") UUID    markersEnteredBy;
+    @Column(name = "markers_entered_at") Instant markersEnteredAt;
     @Column(name = "created_at") Instant createdAt;
     @Column(name = "updated_at") Instant updatedAt;
 
@@ -98,5 +103,17 @@ public class ClinicLabResult {
     public void markNotified() {
         this.notified  = true;
         this.updatedAt = Instant.now();
+    }
+
+    /** Replaces the markers with ones typed in from the lab report. Only a result nobody has reviewed yet can change. */
+    public void recordMarkers(String markersJson, boolean hasAbnormal, boolean hasCritical, UUID enteredBy) {
+        if (!"UNREVIEWED".equals(this.status))
+            throw new IllegalStateException("A result that has been " + this.status.toLowerCase() + " can no longer be changed");
+        this.parsedMarkersJson = markersJson;
+        this.hasAbnormal       = hasAbnormal;
+        this.hasCritical       = hasCritical;
+        this.markersEnteredBy  = enteredBy;
+        this.markersEnteredAt  = Instant.now();
+        this.updatedAt         = Instant.now();
     }
 }

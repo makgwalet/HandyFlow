@@ -294,6 +294,6 @@ public class ClinicLabService {
                 r.getSource(), r.getLabReference(), r.getCollectedAt(), r.getReceivedAt(),
                 r.getPdfUrl(), r.getPdfFilename(), r.getStatus(),
                 r.getPatientNameRaw(), r.getParsedMarkersJson(), r.getInterpretation(),
-                r.isNotified(), r.getCreatedAt());
+                r.isNotified(), r.getCreatedAt(), r.isHasAbnormal(), r.isHasCritical());
     }
 }
