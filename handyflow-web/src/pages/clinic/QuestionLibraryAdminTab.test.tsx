@@ -15,7 +15,9 @@ const rows = [
 const show = () => render(<QueryClientProvider client={new QueryClient()}><QuestionLibraryAdminTab /></QueryClientProvider>)
 beforeEach(() => {
   get.mockReset(); post.mockReset(); put.mockReset(); perms = { CLINIC_CONTENT_ADMIN: true, CLINIC_CONTENT_APPROVE: true }
-  get.mockImplementation((u: string) => Promise.resolve({ data: { data: u.endsWith("/admin") ? rows : { definition: { name: "Intake", questions: [] } } } }))
+  get.mockImplementation((u: string) => Promise.resolve({ data: { data: u.endsWith("/admin") ? rows
+    : u.includes("/visit-types/") ? { visitType: "CONSULTATION", source: "PLATFORM", groups: [] }
+    : { definition: { name: "Intake", questions: [] } } } }))
   post.mockResolvedValue({ data: {} }); put.mockResolvedValue({ data: {} })
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })

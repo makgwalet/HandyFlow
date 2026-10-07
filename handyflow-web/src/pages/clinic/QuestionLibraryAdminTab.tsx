@@ -7,6 +7,7 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
+import VisitTypeGroupsPanel from "./VisitTypeGroupsPanel"
 
 export interface GroupRow {
   id: string; code: string; version: number; name: string; category?: string; status: string; demo?: boolean; clinicalSource?: string | null
@@ -110,6 +111,7 @@ export default function QuestionLibraryAdminTab() {
           </tbody>
         </table>
       )}
+      <VisitTypeGroupsPanel groupCodes={[...new Set(rows.map(g => g.code))]} />
       {editor && (
         <div style={{ marginTop: 16, border: "1px solid var(--hf-border)", borderRadius: 8, padding: 12 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>{editor.title}</div>
