@@ -854,3 +854,15 @@ The landing page (Overview > Dashboard) is rebuilt around one server call that c
 - [ ] Resolve both critical incidents: the next refresh drops the red incident row and the tile hint changes to "n in the last 7 days".
 - [ ] A tenant with no data shows "Nothing needs attention right now." and "All clear".
 - [ ] The page works at phone width: tiles and panels wrap rather than scroll sideways.
+
+## First-run fixes (patches 0055 and 0056, apply after 0054)
+
+Two faults showed only when the app was first started with this work.
+
+- **App would not start (0055, V337).** The six scores on a supervisor review were stored as SMALLINT, but the application expects INTEGER, so schema validation stopped startup. Migration V337 converts them. Nothing changes on screen.
+- **Dashboard returned an error (0056).** A query lost the space before its row limit. The limit is now passed as a parameter.
+
+**Check it:**
+- [ ] The app starts with `mvn spring-boot:run` and no schema validation error.
+- [ ] Security > Dashboard loads, with On duty now and Open incidents lists showing.
+- [ ] Guard 360 > Performance: saving a supervisor review works and the scores show.
