@@ -5,12 +5,12 @@
 import { useState } from "react"
 import { useParams, Link } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeft, Download, Lock, Pencil, Plus, Trash2 } from "lucide-react"
+import { ArrowLeft, Calculator, Download, Lock, Pencil, Plus, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { usePricing, usePricingMutations, type LineRequest, type PricingLine, type SettingsRequest, type TenderPricing } from "./pricing.api"
 import {
-  EMPTY_LINE, basisText, buildCsv, fmtZar, groupLines, lineToDraft, lockedText, marginText, parseLine, parseSettings, settingsChanged, settingsToDraft,
+  EMPTY_LINE, basisText, priceSegments, buildCsv, fmtZar, groupLines, lineToDraft, lockedText, marginText, parseLine, parseSettings, settingsChanged, settingsToDraft,
   type LineDraft, type SettingsDraft,
 } from "./pricing.logic"
 import LookupInput from "../../components/ui/LookupInput"
@@ -46,12 +46,19 @@ export default function TenderPricingPage() {
   }
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
+    <div style={{ maxWidth: 1100, margin: "0 auto" }}>
       <Link to={`/compliancetender/tenders/${id}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--hf-text-muted)", fontSize: 13, marginBottom: 18, textDecoration: "none" }}>
         <ArrowLeft size={15} /> Back to tender
       </Link>
-      <h1 style={{ margin: "0 0 2px", fontSize: 20, fontWeight: 700, color: "var(--hf-text)" }}>Pricing</h1>
-      <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--hf-text-faint)" }}>{tender ? `${tender.tenderNumber} · ${tender.name}` : " "}</p>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
+        <div style={{ width: 46, height: 46, borderRadius: 12, background: "var(--hf-info-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Calculator size={21} style={{ color: "var(--hf-sky-text-strong)" }} aria-hidden="true" />
+        </div>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "var(--hf-text)" }}>Pricing</h1>
+          <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--hf-text-faint)" }}>{tender ? `${tender.tenderNumber} · ${tender.name}` : " "}</p>
+        </div>
+      </div>
 
       {isLoading && <p style={{ fontSize: 13, color: "var(--hf-text-faint)" }}>Loading pricing…</p>}
       {isError && (
@@ -85,12 +92,13 @@ function PricingBody({ tenderId, pricing, tenderNumber }: { tenderId: string; pr
       {error && <p role="alert" style={{ margin: "0 0 16px", padding: "10px 14px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</p>}
 
       <section aria-label="Price summary" style={card}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
           <Tile label="Direct cost" value={fmtZar(b.directCost)} />
           <Tile label="Price excluding VAT" value={fmtZar(b.priceExVat)} />
           <Tile label={pricing.settings.vatApplies ? `VAT ${pricing.settings.vatRatePct}%` : "VAT"} value={pricing.settings.vatApplies ? fmtZar(b.vat) : "Not added"} />
           <Tile label="Price including VAT" value={fmtZar(b.priceInclVat)} strong />
         </div>
+        <PriceBar breakdown={b} />
         <p style={{ margin: "14px 0 0", fontSize: 12.5, color: "var(--hf-text-secondary)" }}>{marginText(b.marginPct)}.</p>
         {pricing.estimatedValue != null && (
           <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--hf-text-secondary)" }}>
@@ -148,11 +156,35 @@ function PricingBody({ tenderId, pricing, tenderNumber }: { tenderId: string; pr
   )
 }
 
+const SEGMENT_COLOURS: Record<string, string> = {
+  direct: "var(--hf-sky-solid-strong)", overhead: "var(--hf-info-text, var(--hf-sky-text-strong))", contingency: "var(--hf-warning-text)", profit: "var(--hf-success-text-strong)", vat: "var(--hf-text-faint)",
+}
+
+/** One bar showing what the price is made of; the legend carries the numbers so colour is never the only signal. */
+function PriceBar({ breakdown }: { breakdown: TenderPricing["breakdown"] }) {
+  const segs = priceSegments(breakdown)
+  if (segs.length === 0) return null
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div aria-hidden="true" style={{ display: "flex", height: 10, borderRadius: 999, overflow: "hidden", background: "var(--hf-surface-sunken)" }}>
+        {segs.map(g => <div key={g.key} style={{ width: `${g.pct}%`, background: SEGMENT_COLOURS[g.key] }} />)}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px", marginTop: 8 }}>
+        {segs.map(g => (
+          <span key={g.key} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--hf-text-secondary)" }}>
+            <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: 3, background: SEGMENT_COLOURS[g.key] }} />{g.label} {g.pct}%
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function Tile({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div>
+    <div style={{ background: strong ? "var(--hf-info-soft)" : "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 14px" }}>
       <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--hf-text-faint)", marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: strong ? 22 : 18, fontWeight: 800, color: "var(--hf-text)", fontVariantNumeric: "tabular-nums" }}>{value}</div>
+      <div style={{ fontSize: strong ? 22 : 18, fontWeight: 800, color: strong ? "var(--hf-sky-text-strong)" : "var(--hf-text)", fontVariantNumeric: "tabular-nums" }}>{value}</div>
     </div>
   )
 }

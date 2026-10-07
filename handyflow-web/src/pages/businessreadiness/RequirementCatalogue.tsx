@@ -5,17 +5,19 @@
 // One screen serves a tenant's own catalogue and a client's; only the URLs differ. Requirements are versioned: saving an edit creates a NEW version, and tenders already linked to
 // the old one keep being judged on it (and are told a newer version exists).
 import { useState } from "react"
-import { Plus, Pencil, X } from "lucide-react"
+import { Plus, Pencil, X, Search, ListChecks, ShieldCheck, Hand, CircleDashed } from "lucide-react"
+import Chip from "../../components/ui/Chip"
+import StatTile from "../../components/ui/StatTile"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useTrackedRequirements, type TrackedRequirement } from "./readiness.api"
-import { createBody, emptyForm, errorText, formFrom, formProblem, newVersionBody, ruleText, type RequirementForm } from "./readiness.logic"
+import { catalogueStats, createBody, emptyForm, errorText, formFrom, formProblem, newVersionBody, ruleKind, ruleText, searchRequirements, type RequirementForm } from "./readiness.logic"
 import LookupInput from "../../components/ui/LookupInput"
 import { APPLIES_TO, REGISTRATION_AUTHORITIES, DOCUMENT_TYPES, registrationTypesFor } from "../../lookups/southAfrica"
 
 const lbl: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 700, color: "var(--hf-text-muted)", marginBottom: 3 }
 const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--hf-border-strong)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text)", boxSizing: "border-box" }
-const btn: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 5, padding: "8px 14px", borderRadius: 8, border: "none", background: "var(--hf-sky-solid, var(--hf-sky-text-strong))", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }
+const btn: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 5, padding: "8px 14px", borderRadius: 8, border: "none", background: "var(--hf-sky-solid-strong)", color: "var(--hf-text-on-solid)", fontSize: 13, fontWeight: 700, cursor: "pointer" }
 const ghost: React.CSSProperties = { ...btn, background: "transparent", color: "var(--hf-text-secondary)", border: "1px solid var(--hf-border-strong)" }
 
 export default function RequirementCatalogue({ listUrl, createUrl, newVersionUrl, canManage, scope }: {
@@ -27,6 +29,7 @@ export default function RequirementCatalogue({ listUrl, createUrl, newVersionUrl
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState<RequirementForm>(emptyForm())
   const [problem, setProblem] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
 
   const done = () => {
     qc.invalidateQueries({ queryKey: ["readiness-catalogue"] }); qc.invalidateQueries({ queryKey: ["readiness"] })
@@ -48,7 +51,26 @@ export default function RequirementCatalogue({ listUrl, createUrl, newVersionUrl
       <p style={{ fontSize: 13, color: "var(--hf-text-secondary)", margin: 0 }}>
         Requirements {scope} is checked against. For each one, say what satisfies it (a registration, a document, or both) and tenders that use it are checked automatically. A requirement with no rule can still be ticked by hand, but is not checked.
       </p>
-      {canManage && !formOpen && <div><button type="button" style={btn} onClick={() => open(null)}><Plus size={14} />Add requirement</button></div>}
+      {items.length > 0 && (() => {
+        const st = catalogueStats(items)
+        return (
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <StatTile label="Requirements" value={st.total} icon={<ListChecks size={18} />} tone="info" />
+            <StatTile label="Checked automatically" value={st.checked} icon={<ShieldCheck size={18} />} tone="ok" />
+            <StatTile label="Ticked by hand" value={st.manual} icon={<Hand size={18} />} tone={st.manual > 0 ? "warn" : "neutral"} hint={st.manual > 0 ? "No rule set" : undefined} />
+            <StatTile label="Optional" value={st.optional} icon={<CircleDashed size={18} />} />
+          </div>
+        )
+      })()}
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        {items.length > 0 && (
+          <div style={{ position: "relative", flex: "1 1 220px", maxWidth: 340 }}>
+            <Search size={14} aria-hidden="true" style={{ position: "absolute", left: 11, top: 10, color: "var(--hf-text-faint)" }} />
+            <input aria-label="Search requirements" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search code, name or what satisfies it" style={{ ...inp, paddingLeft: 32 }} />
+          </div>
+        )}
+        {canManage && !formOpen && <button type="button" style={btn} onClick={() => open(null)}><Plus size={14} />Add requirement</button>}
+      </div>
 
       {formOpen && (
         <form onSubmit={e => { e.preventDefault(); submit() }} aria-label={editing ? `Edit ${editing.code}` : "Add requirement"} style={{ border: "1px solid var(--hf-border)", borderRadius: 10, padding: 16, background: "var(--hf-surface)" }}>
@@ -91,12 +113,15 @@ export default function RequirementCatalogue({ listUrl, createUrl, newVersionUrl
           <table aria-label="Tracked requirements" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
             <thead><tr style={{ textAlign: "left" }}>{["Code", "Requirement", "Satisfied by", "Version", ""].map(h => <th key={h} scope="col" style={{ padding: "8px 10px", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, color: "var(--hf-text-faint)", borderBottom: "1px solid var(--hf-border)" }}>{h}</th>)}</tr></thead>
             <tbody>
-              {[...items].sort((a, b) => a.code.localeCompare(b.code)).map(r => (
+              {searchRequirements([...items].sort((a, b) => a.code.localeCompare(b.code)), search).map(r => (
                 <tr key={r.id} aria-label={`Requirement ${r.code}`} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
                   <td style={{ padding: "9px 10px", fontFamily: "monospace", fontWeight: 600 }}>{r.code}</td>
                   <td style={{ padding: "9px 10px" }}><div style={{ fontWeight: 600, color: "var(--hf-text)" }}>{r.name}</div>{(r.appliesTo || !r.required) && <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{[r.appliesTo, r.required ? null : "not required"].filter(Boolean).join(" · ")}</div>}</td>
-                  <td style={{ padding: "9px 10px", color: ruleText(r).startsWith("No rule") ? "var(--hf-text-faint)" : "var(--hf-text-secondary)" }}>{ruleText(r)}</td>
-                  <td style={{ padding: "9px 10px" }}>v{r.requirementVersion}</td>
+                  <td style={{ padding: "9px 10px" }}>
+                    {(() => { const k = ruleKind(r); return <Chip tone={k === "NONE" ? "warn" : "ok"}>{k === "NONE" ? "Ticked by hand" : k === "BOTH" ? "Registration and document" : k === "REGISTRATION" ? "Registration" : "Document"}</Chip> })()}
+                    <div style={{ fontSize: 12, marginTop: 4, color: ruleKind(r) === "NONE" ? "var(--hf-text-faint)" : "var(--hf-text-secondary)" }}>{ruleText(r)}</div>
+                  </td>
+                  <td style={{ padding: "9px 10px" }}><Chip tone="neutral">v{r.requirementVersion}</Chip></td>
                   <td style={{ padding: "9px 10px", textAlign: "right" }}>{canManage && <button type="button" style={{ ...ghost, padding: "4px 10px", fontSize: 12 }} aria-label={`Edit ${r.code}`} onClick={() => open(r)}><Pencil size={12} />Edit</button>}</td>
                 </tr>
               ))}

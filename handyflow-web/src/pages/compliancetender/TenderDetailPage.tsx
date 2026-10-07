@@ -538,13 +538,13 @@ export default function TenderDetailPage() {
 
 function Section({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 24 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+    <section aria-label={title} style={{ marginBottom: 16, background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
         {icon}
         <span style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>{title}</span>
       </div>
       {children}
-    </div>
+    </section>
   )
 }
 function Field({ l, v }: { l: string; v: string }) {

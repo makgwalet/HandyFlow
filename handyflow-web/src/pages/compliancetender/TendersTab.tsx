@@ -167,9 +167,9 @@ export default function TendersTab() {
                     </div>
                   </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   {cd && <Chip tone={cd.tone}>{cd.text}</Chip>}
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text-secondary)", minWidth: 96, textAlign: "right" }}>{fmtZar(t.estimatedValue)}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text-secondary)", minWidth: 96, textAlign: "right", marginLeft: "auto" }}>{fmtZar(t.estimatedValue)}</div>
                   <span style={{ background: cfg.bg, color: cfg.color, padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{cfg.label}</span>
                   <ChevronRight size={16} style={{ color: "var(--hf-text-faint)" }} />
                 </div>

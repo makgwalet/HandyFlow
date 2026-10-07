@@ -117,3 +117,24 @@ export function errorText(e: unknown): string {
   const m = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
   return m || "Couldn't save. Try again."
 }
+
+export type RuleKind = "REGISTRATION" | "DOCUMENT" | "BOTH" | "NONE"
+
+/** What kind of evidence satisfies a requirement; NONE means it can only be ticked by hand. */
+export function ruleKind(r: Pick<TrackedRequirement, "satisfiedByAuthority" | "satisfiedByRegistrationType" | "evidenceType">): RuleKind {
+  const reg = !!((r.satisfiedByAuthority && r.satisfiedByAuthority.trim()) || (r.satisfiedByRegistrationType && r.satisfiedByRegistrationType.trim()))
+  const doc = !!(r.evidenceType && r.evidenceType.trim())
+  return reg && doc ? "BOTH" : reg ? "REGISTRATION" : doc ? "DOCUMENT" : "NONE"
+}
+
+export function catalogueStats(items: Pick<TrackedRequirement, "satisfiedByAuthority" | "satisfiedByRegistrationType" | "evidenceType" | "required">[]) {
+  const checked = items.filter(r => ruleKind(r) !== "NONE").length
+  return { total: items.length, checked, manual: items.length - checked, optional: items.filter(r => !r.required).length }
+}
+
+/** Case-insensitive search over code, name, what it applies to and what satisfies it. */
+export function searchRequirements<T extends Pick<TrackedRequirement, "code" | "name" | "appliesTo" | "satisfiedByAuthority" | "satisfiedByRegistrationType" | "evidenceType">>(items: T[], q: string): T[] {
+  const needle = q.trim().toLowerCase()
+  if (!needle) return items
+  return items.filter(r => [r.code, r.name, r.appliesTo ?? "", ruleText(r)].some(s => s.toLowerCase().includes(needle)))
+}

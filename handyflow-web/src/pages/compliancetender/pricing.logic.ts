@@ -139,3 +139,21 @@ export function buildCsv(p: TenderPricing, tenderNumber: string): string {
     ["Price including VAT", "", "", "", "", "", num(b.priceInclVat)])
   return rows.map(r => r.map(csvCell).join(",")).join("\r\n")
 }
+
+export interface PriceSegment { key: string; label: string; value: number; pct: number }
+
+/** The parts of the final price, as shares of the price including VAT, for the bar on the pricing page. Empty when there is no price yet. Shares are rounded to whole percents and sum to 100. */
+export function priceSegments(b: { directCost: number; overhead: number; contingency: number; profit: number; vat: number; priceInclVat: number }): PriceSegment[] {
+  const total = b.priceInclVat
+  if (!(total > 0)) return []
+  const parts = [
+    { key: "direct", label: "Direct cost", value: b.directCost }, { key: "overhead", label: "Overhead", value: b.overhead },
+    { key: "contingency", label: "Contingency", value: b.contingency }, { key: "profit", label: "Profit", value: b.profit }, { key: "vat", label: "VAT", value: b.vat },
+  ].filter(p => p.value > 0)
+  const raw = parts.map(p => (p.value / total) * 100)
+  const floors = raw.map(Math.floor)
+  let left = 100 - floors.reduce((a, c) => a + c, 0)
+  const order = raw.map((r, i) => ({ i, frac: r - floors[i] })).sort((a, c) => c.frac - a.frac)
+  for (const o of order) { if (left <= 0) break; floors[o.i]++; left-- }
+  return parts.map((p, i) => ({ ...p, pct: floors[i] }))
+}
