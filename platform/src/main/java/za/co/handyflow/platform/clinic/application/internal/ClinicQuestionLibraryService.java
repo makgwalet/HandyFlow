@@ -16,6 +16,7 @@ import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -144,6 +145,48 @@ public class ClinicQuestionLibraryService {
                 out.add(g.name() + ": " + ev.missingRequired().stream().map(q -> labels.getOrDefault(q, q))
                         .collect(Collectors.joining(", ")));
             }
+        }
+        return out;
+    }
+
+    /** A measurable answer that maps to an observation type. */
+    public record MeasuredAnswer(String observationCode, BigDecimal value) {}
+
+    /**
+     * Answers on this consultation whose question names an observation type, ready to be stored as observations.
+     * Uses the group version the answers were saved against, so a later edit still finds them. MEASUREMENT answers
+     * are mirrored only when their unit is the observation's canonical unit (no conversion is done); NUMBER and
+     * DECIMAL answers carry no unit and are taken as the canonical unit.
+     */
+    @Transactional(readOnly = true)
+    public List<MeasuredAnswer> measuredAnswers(TenantId tenantId, UUID consultationId, java.util.function.Function<String, String> canonicalUnit) {
+        Map<String, Object> formData = readFormData(tenantId, consultationId);
+        if (!(formData.get("groups") instanceof Map<?, ?> groups) || groups.isEmpty()) return List.of();
+        List<MeasuredAnswer> out = new ArrayList<>();
+        for (Map.Entry<?, ?> e : groups.entrySet()) {
+            String code = String.valueOf(e.getKey());
+            if (!(e.getValue() instanceof Map<?, ?> stored)) continue;
+            Object ver = stored.get("version");
+            if (!(ver instanceof Number v)) continue;
+            Map<String, Object> answers = FormData.answersOf(formData, code);
+            jdbc.query("""
+                SELECT q.code, q.observation_code, q.answer_type
+                FROM clinic_question q JOIN clinic_question_group g ON g.id = q.group_id
+                WHERE g.code = ? AND g.version = ? AND (g.tenant_id = ? OR g.tenant_id IS NULL)
+                  AND q.observation_code IS NOT NULL""", rs -> {
+                    Object a = answers.get(rs.getString(1));
+                    if (a == null) return;
+                    String obs = rs.getString(2);
+                    Object raw = a; 
+                    if (a instanceof Map<?, ?> m) {
+                        String unit = canonicalUnit.apply(obs);
+                        Object u = m.get("unit");
+                        if (unit == null || !(u instanceof String us) || !unit.equalsIgnoreCase(us.trim())) return;
+                        raw = m.get("value");
+                    }
+                    if (!(raw instanceof Number n)) return;
+                    out.add(new MeasuredAnswer(obs, new BigDecimal(String.valueOf(n))));
+                }, code, v.intValue(), tenantId.getValue());
         }
         return out;
     }

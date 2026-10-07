@@ -35,6 +35,7 @@ public class ClinicObservationService {
     private final ClinicObservationRepository  observationRepo;
     private final ClinicPatientRepository      patientRepo;
     private final ClinicConsultationRepository consultationRepo;
+    private final ClinicQuestionLibraryService questionLibrary;
 
     @Transactional
     public List<ObservationResponse> record(TenantId t, UUID patientId, List<ObservationRequest> reqs) {
@@ -135,6 +136,15 @@ public class ClinicObservationService {
             rows.add(derived(t, c, ObservationCode.HEIGHT, c.getHeightCm(), at));
         BigDecimal bmi = bmi(c.getWeightKg(), c.getHeightCm());
         if (bmi != null) rows.add(derived(t, c, ObservationCode.BMI, bmi, at));
+
+        // Measurable questionnaire answers. A value from the vitals fields wins; the form only fills what is missing.
+        java.util.Set<String> have = rows.stream().map(ClinicObservation::getCode).collect(java.util.stream.Collectors.toSet());
+        for (var m : questionLibrary.measuredAnswers(t, c.getId(),
+                code -> ObservationCode.parse(code).map(ObservationCode::unit).orElse(null))) {
+            ObservationCode oc = ObservationCode.parse(m.observationCode()).orElse(null);
+            if (oc == null || !have.add(oc.name())) continue;
+            rows.add(derived(t, c, oc, m.value(), at));
+        }
 
         if (!rows.isEmpty()) observationRepo.saveAll(rows);
     }

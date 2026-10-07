@@ -32,6 +32,7 @@ class ClinicObservationServiceTest {
     @Mock ClinicObservationRepository  observationRepo;
     @Mock ClinicPatientRepository      patientRepo;
     @Mock ClinicConsultationRepository consultationRepo;
+    @Mock ClinicQuestionLibraryService questionLibrary;
 
     @InjectMocks ClinicObservationService service;
 
@@ -172,6 +173,27 @@ class ClinicObservationServiceTest {
         assertThat(sys.getValueNumeric()).isEqualByComparingTo("132");
         var bmi = rows.stream().filter(o -> o.getCode().equals("BMI")).findFirst().orElseThrow();
         assertThat(bmi.getValueNumeric()).isEqualByComparingTo("24.7");   // 80 / 1.8^2
+    }
+
+    @Test
+    @DisplayName("syncConsultationVitals adds questionnaire measurements; a vitals field wins over the form")
+    @SuppressWarnings("unchecked")
+    void syncMirrorsQuestionnaireMeasurements() {
+        var c = ClinicConsultation.create(TENANT, UUID.randomUUID(), null, null, "Check");
+        c.recordVitals(new BigDecimal("80"), null, null, null, null, null);
+        when(questionLibrary.measuredAnswers(eq(TENANT), eq(c.getId()), any())).thenReturn(List.of(
+                new ClinicQuestionLibraryService.MeasuredAnswer("WEIGHT", new BigDecimal("99")),
+                new ClinicQuestionLibraryService.MeasuredAnswer("GLUCOSE", new BigDecimal("6.2")),
+                new ClinicQuestionLibraryService.MeasuredAnswer("NOT_A_CODE", new BigDecimal("1"))));
+
+        service.syncConsultationVitals(TENANT, c);
+
+        ArgumentCaptor<List<ClinicObservation>> cap = ArgumentCaptor.forClass(List.class);
+        verify(observationRepo).saveAll(cap.capture());
+        var rows = cap.getValue();
+        assertThat(rows).extracting(ClinicObservation::getCode).containsExactlyInAnyOrder("WEIGHT", "GLUCOSE");
+        var w = rows.stream().filter(o -> o.getCode().equals("WEIGHT")).findFirst().orElseThrow();
+        assertThat(w.getValueNumeric()).isEqualByComparingTo("80");
     }
 
     @Test
