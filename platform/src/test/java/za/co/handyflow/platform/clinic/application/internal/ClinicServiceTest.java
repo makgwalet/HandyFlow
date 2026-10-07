@@ -39,6 +39,7 @@ class ClinicServiceTest {
     @Mock ClinicQuestionLibraryService questionLibraryService;
     @Mock ClinicObservationService         observationService;
     @Mock ClinicPrescriptionRepository prescriptionRepo;
+    @Mock ClinicPrescribingSafetyService prescribingSafety;
 
     @InjectMocks ClinicService service;
 
@@ -784,6 +785,86 @@ class ClinicServiceTest {
                     "700000".equals(p.getNappiCode()) && Integer.valueOf(2).equals(p.getSchedule())));
             assertThat(result.nappiCode()).isEqualTo("700000");
             assertThat(result.schedule()).isEqualTo(2);
+        }
+    }
+
+    @Nested
+    @DisplayName("addPrescription: allergy name match")
+    class PrescribingAllergyMatch {
+
+        private final za.co.handyflow.platform.clinic.dto.AllergyCheckResponse.Alert hit =
+                new za.co.handyflow.platform.clinic.dto.AllergyCheckResponse.Alert("Penicillin", "SEVERE", "Rash");
+
+        private UUID consultation() {
+            var consultId = UUID.randomUUID();
+            var consult   = ClinicConsultation.create(TENANT, UUID.randomUUID(), null, null, "Infection");
+            when(consultationRepo.findActiveById(TENANT, consultId)).thenReturn(Optional.of(consult));
+            return consultId;
+        }
+
+        @Test
+        @DisplayName("a matching allergy refuses the prescription until a reason is given")
+        void refusedWithoutReason() {
+            var id = consultation();
+            when(prescribingSafety.allergyAlerts(eq(TENANT), any(), eq("Penicillin V"))).thenReturn(List.of(hit));
+
+            var req = new AddPrescriptionRequest("Penicillin V", "250mg", "QID", "5 days", 20, 0, null);
+
+            assertThatThrownBy(() -> service.addPrescription(TENANT, id, req))
+                    .isInstanceOf(za.co.handyflow.platform.shared.ConflictException.class)
+                    .hasMessageContaining("Penicillin (severe)");
+            verify(prescriptionRepo, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("a blank reason is treated as no reason")
+        void blankReasonRefused() {
+            var id = consultation();
+            when(prescribingSafety.allergyAlerts(eq(TENANT), any(), any())).thenReturn(List.of(hit));
+
+            var req = new AddPrescriptionRequest("Penicillin V", "250mg", "QID", "5 days", 20, 0, null, null, null, "   ");
+
+            assertThatThrownBy(() -> service.addPrescription(TENANT, id, req))
+                    .isInstanceOf(za.co.handyflow.platform.shared.ConflictException.class);
+        }
+
+        @Test
+        @DisplayName("with a reason it saves, and the reason and what matched stay on the prescription")
+        void savedWithReason() {
+            var id = consultation();
+            when(prescribingSafety.allergyAlerts(eq(TENANT), any(), any())).thenReturn(List.of(hit));
+
+            var req = new AddPrescriptionRequest("Penicillin V", "250mg", "QID", "5 days", 20, 0, null, null, null,
+                    " Tolerated before, specialist advice ");
+            var result = service.addPrescription(TENANT, id, req);
+
+            verify(prescriptionRepo).save(argThat(p ->
+                    "Tolerated before, specialist advice".equals(p.getAllergyOverrideReason())
+                            && p.getAllergyAlertSummary().contains("Penicillin")));
+            assertThat(result.allergyOverrideReason()).isEqualTo("Tolerated before, specialist advice");
+        }
+
+        @Test
+        @DisplayName("no match saves as before and records no override")
+        void noMatch() {
+            var id = consultation();
+            var result = service.addPrescription(TENANT, id,
+                    new AddPrescriptionRequest("Paracetamol", "500mg", "QID", "3 days", 12, 0, null));
+
+            assertThat(result.allergyOverrideReason()).isNull();
+            verify(prescriptionRepo).save(any());
+        }
+
+        @Test
+        @DisplayName("checkAllergies returns the matches with the standing note")
+        void checkReturnsNote() {
+            var id = consultation();
+            when(prescribingSafety.allergyAlerts(eq(TENANT), any(), eq("Penicillin V"))).thenReturn(List.of(hit));
+
+            var r = service.checkAllergies(TENANT, id, "Penicillin V");
+
+            assertThat(r.alerts()).hasSize(1);
+            assertThat(r.note()).contains("name only");
         }
     }
 

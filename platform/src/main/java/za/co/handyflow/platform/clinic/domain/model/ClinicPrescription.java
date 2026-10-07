@@ -29,6 +29,8 @@ public class ClinicPrescription {
     String instructions;
     String nappiCode;
     Integer schedule;
+    @Column(name = "allergy_override_reason") String allergyOverrideReason;
+    @Column(name = "allergy_alert_summary")   String allergyAlertSummary;
     boolean dispensed = false;
     @Column(name = "dispensed_at") Instant dispensedAt;
     @Column(name = "created_at")   Instant createdAt;
@@ -75,6 +77,13 @@ public class ClinicPrescription {
         p.nappiCode = (nappiCode == null || nappiCode.isBlank()) ? null : nappiCode.trim();
         p.schedule  = schedule;
         return p;
+    }
+
+    /** Keeps the prescriber's reason for prescribing despite a recorded-allergy name match. */
+    public void recordAllergyOverride(String reason, String alertSummary) {
+        this.allergyOverrideReason = reason;
+        this.allergyAlertSummary   = alertSummary;
+        this.updatedAt = Instant.now();
     }
 
     public void markDispensed() {

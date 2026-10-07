@@ -309,6 +309,15 @@ public class ClinicController {
                 clinicService.getConsultationPrescriptions(TenantContext.getTenantIdAsObject(), consultationId)));
     }
 
+    @PostMapping("/consultations/{consultationId}/prescriptions/allergy-check")
+    @PreAuthorize("hasAuthority('CLINIC_PRESCRIPTION_WRITE')")
+    @Operation(summary = "Compare a medicine name with the patient's recorded allergies (name match only; a prompt, not clearance)")
+    public ResponseEntity<ApiResponse<AllergyCheckResponse>> checkAllergies(
+            @PathVariable UUID consultationId, @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                clinicService.checkAllergies(TenantContext.getTenantIdAsObject(), consultationId, body.get("medicationName"))));
+    }
+
     @PostMapping("/consultations/{consultationId}/prescriptions")
     @PreAuthorize("hasAuthority('CLINIC_PRESCRIPTION_WRITE')")
     @Operation(summary = "Add a prescription to a consultation")

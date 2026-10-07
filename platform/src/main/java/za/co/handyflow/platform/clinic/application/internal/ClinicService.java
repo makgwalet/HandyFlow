@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.clinic.domain.model.*;
 import za.co.handyflow.platform.clinic.domain.repository.*;
 import za.co.handyflow.platform.clinic.dto.*;
+import za.co.handyflow.platform.shared.ConflictException;
 import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
@@ -37,6 +38,7 @@ public class ClinicService {
     private final ClinicPatientIdentityService     patientIdentityService;
     private final ClinicQuestionLibraryService     questionLibraryService;
     private final ClinicPrescriptionRepository prescriptionRepo;
+    private final ClinicPrescribingSafetyService prescribingSafety;
     private final EmailService                 emailService;
     private final ClinicConsultationSummaryPdfService consultationSummaryPdfService;
     private final JdbcTemplate                 jdbc;
@@ -730,8 +732,26 @@ public class ClinicService {
                 req.quantity(), req.repeats() != null ? req.repeats() : 0, req.instructions(),
                 req.nappiCode(), req.schedule()
         );
+        var alerts = prescribingSafety.allergyAlerts(tenantId, c.getPatientId(), req.medicationName());
+        if (!alerts.isEmpty()) {
+            String summary = ClinicPrescribingSafetyService.summary(alerts);
+            String reason = req.allergyOverrideReason() == null ? "" : req.allergyOverrideReason().trim();
+            if (reason.isEmpty()) {
+                throw new ConflictException("Recorded allergy matches this medicine: " + summary
+                        + ". Give a reason to prescribe it anyway.");
+            }
+            p.recordAllergyOverride(reason, summary);
+        }
         prescriptionRepo.save(p);
         return toPrescriptionResponse(p);
+    }
+
+    /** What a medicine name matches among the patient's recorded allergies (a prompt, not a safety clearance). */
+    @Transactional(readOnly = true)
+    public AllergyCheckResponse checkAllergies(TenantId tenantId, UUID consultationId, String medicineName) {
+        ClinicConsultation c = consultationRepo.findActiveById(tenantId, consultationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Consultation", consultationId.toString()));
+        return AllergyCheckResponse.of(prescribingSafety.allergyAlerts(tenantId, c.getPatientId(), medicineName));
     }
 
     // ── N+1 fix helpers ───────────────────────────────────────────────────────
@@ -875,6 +895,7 @@ public class ClinicService {
         return new PrescriptionResponse(p.getId(), p.getConsultationId(), p.getPatientId(),
                 p.getMedicationName(), p.getDosage(), p.getFrequency(), p.getDuration(),
                 p.getQuantity(), p.getRepeats(), p.getInstructions(),
-                p.isDispensed(), p.getPrescribedAt(), p.getNappiCode(), p.getSchedule());
+                p.isDispensed(), p.getPrescribedAt(), p.getNappiCode(), p.getSchedule(),
+                p.getAllergyOverrideReason(), p.getAllergyAlertSummary());
     }
 }

@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import QuestionForm from "./QuestionForm"
+import { AllergyWarning, missingReasons, useAllergyChecks } from "./PrescriptionAllergyCheck"
 import {
   Mic, MicOff, Plus, X, Clock, Stethoscope, CreditCard, Pill,
   Syringe, FlaskConical, Scissors, ChevronDown, CheckCircle,
@@ -30,6 +31,7 @@ interface RxDraft {
   id: string; medicationName: string; nappiCode?: string
   dosage: string; frequency: string; duration: string
   quantity: number; instructions: string; fromBill: boolean
+  allergyReason?: string
 }
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
@@ -262,6 +264,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
   const updateRx = (id: string, k: keyof RxDraft, v: any) =>
     setRxDrafts(d=>d.map(x=>x.id===id?{...x,[k]:v}:x))
   const removeRx = (id: string) => setRxDrafts(d=>d.filter(x=>x.id!==id))
+  const allergyResults = useAllergyChecks(draftReady ? (draftIdRef.current ?? null) : null, rxDrafts)
 
   // ── Med search + dual add ─────────────────────────────────────────────────
   const [medSearch, setMedSearch]   = useState("")
@@ -314,6 +317,8 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
 
   const complete = useMutation({
     mutationFn: async () => {
+      const needReason = missingReasons(rxDrafts.filter(r=>!savedRxRef.current.has(r.id)), allergyResults)
+      if (needReason.length) throw new Error("Give a reason to prescribe despite the recorded allergy: " + needReason.join(", ") + ".")
       // 1. Save consultation: finalise the draft (PATCH) or, if the draft could not be
       //    created, fall back to creating it in one shot as before.
       let consultId: string
@@ -361,6 +366,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
           quantity:       rx.quantity||30,
           repeats:        0,
           instructions:   rx.instructions||null,
+          allergyOverrideReason: rx.allergyReason?.trim() || null,
         })
         savedRxRef.current.add(rx.id)
       }
@@ -381,7 +387,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
       qc.invalidateQueries({queryKey:["clinic-patients"]})
       onComplete(consultationId)
     },
-    onError: (e:any) => setCompleteError(e.response?.data?.message??"Failed to complete consultation"),
+    onError: (e:any) => setCompleteError(e.response?.data?.message ?? e.message ?? "Failed to complete consultation"),
   })
 
   // ── Active panel toggle (mobile-friendly) ─────────────────────────────────
@@ -806,6 +812,8 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
                       placeholder="Take with food" style={{...sinp,padding:"5px 8px",fontSize:12}}/>
                   </div>
                 </div>
+                <AllergyWarning result={allergyResults[rx.id]} reason={rx.allergyReason??""}
+                  onReason={v=>updateRx(rx.id,"allergyReason",v)} />
                 <button onClick={()=>removeRx(rx.id)}
                   style={{position:"absolute",bottom:8,right:8,background:"none",border:"none",
                     cursor:"pointer",color:RED_TEXT,fontSize:11,display:"flex",alignItems:"center",gap:3}}>
