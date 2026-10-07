@@ -13,6 +13,7 @@ import { BillingPage }                  from "./pages/billing/BillingPage"
 import { SecurityPage }                 from "./pages/security/SecurityPage"
 import GuardProfilePage                 from "./pages/security/GuardProfilePage"
 import ComplaintDetailPage              from "./pages/security/ComplaintDetailPage"
+import IncidentDetailPage               from "./pages/security/IncidentDetailPage"
 import { AppShell }                     from "./components/shell/AppShell"
 import { useAuthStore }                 from "./store/auth.store"
 // NEW: closes "not added to App.tsx, redirects to saas".
@@ -284,6 +285,7 @@ export default function App() {
             <Route path="/billing"     element={<BillingPage />} />
             <Route path="/security/guards/:guardId" element={<GuardProfilePage />} />
             <Route path="/security/complaints/:id" element={<ComplaintDetailPage />} />
+            <Route path="/security/incidents/:id" element={<IncidentDetailPage />} />
             <Route path="/security/:section?" element={<SecurityPage />} />
             <Route path="/fuel/:section?" element={<FuelPage />} />
             <Route path="/internal-audit/:section?" element={<InternalAuditPage />} />

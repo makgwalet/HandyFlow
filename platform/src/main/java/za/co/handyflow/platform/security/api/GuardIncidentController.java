@@ -58,6 +58,6 @@ public class GuardIncidentController {
     public ResponseEntity<ApiResponse<IncidentResponse>> createIncident(
             @Valid @RequestBody CreateIncidentRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
-                incidentService.createIncident(TenantContext.getTenantIdAsObject(), req)));
+                incidentService.createIncident(TenantContext.getTenantIdAsObject(), req, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
     }
 }

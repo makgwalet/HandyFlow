@@ -15,6 +15,7 @@
 
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { Link } from "react-router-dom"
 import { apiClient } from "../../api/client"
 import { Plus, X, AlertTriangle, AlertCircle, FileText } from "lucide-react"
 
@@ -178,7 +179,7 @@ export default function IncidentsTab() {
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{inc.title}</span>
+                      <Link to={`/security/incidents/${inc.id}`} style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)", textDecoration: "none" }}>{inc.title}</Link>
                       <span style={{ fontSize: 10, fontWeight: 700, background: sev.bg, color: sev.color, padding: "2px 8px", borderRadius: 20, border: `1px solid ${sev.border}` }}>{inc.severity}</span>
                       <span style={{ fontSize: 11, fontWeight: 600, background: sts.bg, color: sts.color, padding: "2px 8px", borderRadius: 20 }}>{sts.label}</span>
                       {/* Incident type badge — was silently broken (see file header), now fixed backend-side */}

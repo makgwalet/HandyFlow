@@ -72,6 +72,12 @@ public class Incident {
     @Column(name = "resolved_at")
     private Instant resolvedAt;
 
+    @Column(name = "assignee_name", length = 200)
+    private String assigneeName;
+
+    @Column(name = "assigned_at")
+    private Instant assignedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -116,6 +122,30 @@ public class Incident {
     public void resolve() {
         this.status     = "RESOLVED";
         this.resolvedAt = Instant.now();
+        this.updatedAt  = Instant.now();
+    }
+
+    /** Who is dealing with this incident. A name, not a user account, so an outside party can be named. */
+    public void assign(String name) {
+        this.assigneeName = name.trim();
+        this.assignedAt   = Instant.now();
+        this.updatedAt    = Instant.now();
+    }
+
+    /** Raise the severity. The rules for what is allowed are in IncidentWorkflow. */
+    public void escalateTo(String newSeverity) {
+        validateSeverity(newSeverity);
+        this.severity  = newSeverity.toUpperCase();
+        this.updatedAt = Instant.now();
+    }
+
+    /** Resolved incidents only: back to ACKNOWLEDGED, with the resolution time cleared. */
+    public void reopen() {
+        if (!"RESOLVED".equals(this.status)) {
+            throw new HandyFlowException("Only a resolved incident can be reopened", HttpStatus.BAD_REQUEST, "INVALID_TRANSITION");
+        }
+        this.status     = "ACKNOWLEDGED";
+        this.resolvedAt = null;
         this.updatedAt  = Instant.now();
     }
 

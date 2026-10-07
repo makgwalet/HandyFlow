@@ -18,10 +18,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import za.co.handyflow.platform.identity.TenantDetails;
+import za.co.handyflow.platform.security.dto.IncidentCaseDtos.EventItem;
 import za.co.handyflow.platform.security.dto.IncidentResponse;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.io.ByteArrayOutputStream;
+import java.util.List;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
@@ -50,6 +52,11 @@ public class IncidentPdfService {
     private final SecurityPdfBrandingHelper brandingHelper;
 
     public byte[] incidentPdf(IncidentResponse incident, TenantId tenantId) {
+        return incidentPdf(incident, null, List.of(), List.of(), tenantId);
+    }
+
+    /** The full report: details, description, who is dealing with it, evidence files on record and the timeline. */
+    public byte[] incidentPdf(IncidentResponse incident, String assignee, List<EventItem> events, List<String> evidenceNames, TenantId tenantId) {
         TenantDetails tenant = brandingHelper.resolveTenant(tenantId);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (PdfDocument pdf = new PdfDocument(new PdfWriter(baos));
@@ -63,6 +70,11 @@ public class IncidentPdfService {
 
             addDetailsTable(doc, incident);
             addDescriptionSection(doc, incident);
+            if (assignee != null && !assignee.isBlank()) {
+                doc.add(new Paragraph("Assigned to: " + assignee).setFontSize(10).setBold().setMarginBottom(12));
+            }
+            addEvidenceSection(doc, evidenceNames);
+            addTimelineSection(doc, events);
 
             brandingHelper.addBrandedFooter(doc, tenant);
         } catch (Exception e) {
@@ -113,5 +125,33 @@ public class IncidentPdfService {
                 ? i.description() : "No description recorded.")
                 .setFontSize(10)
                 .setMarginBottom(16));
+    }
+
+    private void addEvidenceSection(Document doc, List<String> names) {
+        if (names == null || names.isEmpty()) return;
+        doc.add(new Paragraph("Evidence on file").setFontSize(11).setBold().setFontColor(BRAND_RED).setMarginTop(4).setMarginBottom(4));
+        for (String n : names) doc.add(new Paragraph("• " + n).setFontSize(10).setMarginBottom(2));
+        doc.add(new Paragraph(" ").setMarginBottom(8));
+    }
+
+    private void addTimelineSection(Document doc, List<EventItem> events) {
+        if (events == null || events.isEmpty()) return;
+        doc.add(new Paragraph("Timeline").setFontSize(11).setBold().setFontColor(BRAND_RED).setMarginTop(4).setMarginBottom(4));
+        Table table = new Table(UnitValue.createPercentArray(new float[]{3, 3, 2, 6})).useAllAvailableWidth().setMarginBottom(16);
+        for (String h : new String[]{"When", "What", "By", "Note"}) {
+            table.addHeaderCell(new Cell().add(new Paragraph(h).setFontSize(9).setBold())
+                    .setBackgroundColor(LIGHT_GREY).setBorder(new SolidBorder(MID_GREY, 0.5f)).setPadding(4));
+        }
+        for (EventItem e : events) {
+            table.addCell(cell(e.at() != null ? TS_FMT.format(e.at()) : "—"));
+            table.addCell(cell(e.eventType().replace('_', ' ').toLowerCase()));
+            table.addCell(cell(e.byName() != null ? e.byName() : "—"));
+            table.addCell(cell(e.note() != null ? e.note() : ""));
+        }
+        doc.add(table);
+    }
+
+    private Cell cell(String text) {
+        return new Cell().add(new Paragraph(text).setFontSize(9)).setBorder(new SolidBorder(MID_GREY, 0.5f)).setPadding(4);
     }
 }

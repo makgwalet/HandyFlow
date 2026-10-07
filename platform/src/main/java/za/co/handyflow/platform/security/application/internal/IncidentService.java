@@ -12,6 +12,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.security.domain.model.Incident;
+import za.co.handyflow.platform.security.domain.model.IncidentEvent;
+import za.co.handyflow.platform.security.domain.repository.IncidentEventRepository;
 import za.co.handyflow.platform.security.application.internal.CheckpointScanService;
 import za.co.handyflow.platform.security.domain.repository.IncidentRepository;
 import za.co.handyflow.platform.security.domain.repository.GuardRepository;
@@ -49,6 +51,7 @@ import java.util.UUID;
 public class IncidentService {
 
     private final IncidentRepository incidentRepo;
+    private final IncidentEventRepository eventRepo;
     private final GuardRepository    guardRepo;
     private final SiteRepository     siteRepo;
     private final JdbcTemplate       jdbc;
@@ -127,8 +130,12 @@ public class IncidentService {
 
     // ── Commands ──────────────────────────────────────────────────────────────
 
-    @Transactional
     public IncidentResponse createIncident(TenantId tenantId, CreateIncidentRequest req) {
+        return createIncident(tenantId, req, null, null);
+    }
+
+    @Transactional
+    public IncidentResponse createIncident(TenantId tenantId, CreateIncidentRequest req, UUID by, String byName) {
         siteRepo.findActiveById(tenantId, req.siteId())
                 .orElseThrow(() -> new ResourceNotFoundException("Site", req.siteId().toString()));
 
@@ -163,20 +170,26 @@ public class IncidentService {
             });
         }
 
-        incidentRepo.save(incident);
+        incidentRepo.saveAndFlush(incident);
 
         String incidentType = (req.type() != null && !req.type().isBlank())
                 ? req.type().toUpperCase() : "GENERAL";
         jdbc.update("UPDATE security_incidents SET type = ? WHERE id = ?",
                 incidentType, incident.getId());
 
+        record(tenantId, incident.getId(), "REPORTED", "OPEN", null, by, byName);
+
         log.info("[Security] Incident created id={} type={} severity={} site={}",
                 incident.getId(), incidentType, req.severity(), req.siteId());
         return getIncidentById(tenantId, incident.getId());
     }
 
-    @Transactional
     public IncidentResponse acknowledge(TenantId tenantId, UUID incidentId, UUID acknowledgedBy) {
+        return acknowledge(tenantId, incidentId, acknowledgedBy, null);
+    }
+
+    @Transactional
+    public IncidentResponse acknowledge(TenantId tenantId, UUID incidentId, UUID acknowledgedBy, String byName) {
         Incident incident = findIncident(tenantId, incidentId);
         if ("RESOLVED".equalsIgnoreCase(incident.getStatus())) {
             throw new HandyFlowException(
@@ -184,19 +197,25 @@ public class IncidentService {
                     HttpStatus.BAD_REQUEST, "ALREADY_RESOLVED");
         }
         incident.acknowledge();
-        incidentRepo.save(incident);
+        incidentRepo.saveAndFlush(incident);
 
         if (acknowledgedBy != null) {
             jdbc.update("UPDATE security_incidents SET acknowledged_by = ? WHERE id = ?",
                     acknowledgedBy, incidentId);
         }
 
+        record(tenantId, incidentId, "ACKNOWLEDGED", "ACKNOWLEDGED", null, acknowledgedBy, byName);
         log.info("[Security] Incident acknowledged id={} by={}", incidentId, acknowledgedBy);
         return getIncidentById(tenantId, incidentId);
     }
 
-    @Transactional
     public IncidentResponse resolve(TenantId tenantId, UUID incidentId, UUID resolvedBy) {
+        return resolve(tenantId, incidentId, resolvedBy, null, null);
+    }
+
+    /** `note` says how it was dealt with; it goes on the timeline. */
+    @Transactional
+    public IncidentResponse resolve(TenantId tenantId, UUID incidentId, UUID resolvedBy, String byName, String note) {
         Incident incident = findIncident(tenantId, incidentId);
         if ("RESOLVED".equalsIgnoreCase(incident.getStatus())) {
             throw new HandyFlowException(
@@ -204,18 +223,23 @@ public class IncidentService {
                     HttpStatus.BAD_REQUEST, "ALREADY_RESOLVED");
         }
         incident.resolve();
-        incidentRepo.save(incident);
+        incidentRepo.saveAndFlush(incident);
 
         if (resolvedBy != null) {
             jdbc.update("UPDATE security_incidents SET resolved_by = ? WHERE id = ?",
                     resolvedBy, incidentId);
         }
 
+        record(tenantId, incidentId, "RESOLVED", "RESOLVED", note, resolvedBy, byName);
         log.info("[Security] Incident resolved id={} by={}", incidentId, resolvedBy);
         return getIncidentById(tenantId, incidentId);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private void record(TenantId tenantId, UUID incidentId, String type, String toStatus, String note, UUID by, String byName) {
+        eventRepo.save(IncidentEvent.of(tenantId, incidentId, type, toStatus, note, by, byName));
+    }
 
     private Incident findIncident(TenantId tenantId, UUID id) {
         return incidentRepo.findByIdAndTenantId(id, tenantId)
