@@ -455,6 +455,24 @@ class ClinicServiceTest {
         }
 
         @Test
+        @DisplayName("refuses a booking when the patient already has one at that time, with anyone")
+        void refusesPatientDoubleBooking() {
+            var patientId = UUID.randomUUID();
+            when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patientWithId("Jane","Dlamini")));
+            var start = Instant.now().plusSeconds(3600);
+            when(schedulingService.findPatientClashes(TENANT, patientId, start, 30, null))
+                    .thenReturn(List.of(new AppointmentRules.Clash("Dr Lee", start, 30)));
+
+            var req = new CreateAppointmentRequest(patientId, null, start, 30, "CONSULTATION", null);
+
+            assertThatThrownBy(() -> service.createAppointment(TENANT, req))
+                    .isInstanceOf(za.co.handyflow.platform.shared.ConflictException.class)
+                    .hasMessageContaining("already has an appointment")
+                    .hasMessageContaining("with Dr Lee");
+            verify(appointmentRepo, never()).save(any(ClinicAppointment.class));
+        }
+
+        @Test
         @DisplayName("books anyway when the user chose to allow the overlap")
         void allowsOverlapWhenAsked() {
             var patientId = UUID.randomUUID();
@@ -521,6 +539,21 @@ class ClinicServiceTest {
         private ClinicAppointment existing(UUID practitionerId) {
             return ClinicAppointment.create(TENANT, UUID.randomUUID(), practitionerId,
                     Instant.now().plusSeconds(7200), 30, "CONSULTATION", null);
+        }
+
+        @Test
+        @DisplayName("refuses a move onto another appointment of the same patient")
+        void refusesPatientClash() {
+            var appt = existing(null);
+            when(appointmentRepo.findActiveById(TENANT, appt.getId())).thenReturn(Optional.of(appt));
+            var newTime = Instant.now().plusSeconds(86400);
+            when(schedulingService.findPatientClashes(TENANT, appt.getPatientId(), newTime, 30, appt.getId()))
+                    .thenReturn(List.of(new AppointmentRules.Clash(null, newTime, 30)));
+
+            assertThatThrownBy(() -> service.rescheduleAppointment(TENANT, appt.getId(), new RescheduleRequest(newTime, null, null), false))
+                    .isInstanceOf(za.co.handyflow.platform.shared.ConflictException.class)
+                    .hasMessageContaining("This patient already has an appointment");
+            verify(appointmentRepo, never()).save(any(ClinicAppointment.class));
         }
 
         @Test

@@ -327,6 +327,9 @@ public class ClinicService {
         if (!allowOverlap && req.practitionerId() != null) {
             requirePractitionerFree(tenantId, req.practitionerId(), req.scheduledAt(), minutes, null);
         }
+        if (!allowOverlap) {
+            requirePatientFree(tenantId, req.patientId(), patient.getFullName(), req.scheduledAt(), minutes, null);
+        }
         ClinicAppointment appt = ClinicAppointment.create(
                 tenantId, req.patientId(), req.practitionerId(),
                 req.scheduledAt(), minutes,
@@ -460,6 +463,13 @@ public class ClinicService {
         throw new ConflictException(AppointmentRules.conflictMessage(name, clashes, AppointmentRules.CLINIC_ZONE));
     }
 
+    /** Throws a 409 when the patient already has a live booking at that time (even with another practitioner). */
+    private void requirePatientFree(TenantId tenantId, UUID patientId, String patientName, Instant start, int minutes, UUID ignoreAppointmentId) {
+        var clashes = schedulingService.findPatientClashes(tenantId, patientId, start, minutes, ignoreAppointmentId);
+        if (clashes.isEmpty()) return;
+        throw new ConflictException(AppointmentRules.patientConflictMessage(patientName, clashes, AppointmentRules.CLINIC_ZONE));
+    }
+
     /** Moves a not-yet-started appointment; refuses a clash for the practitioner unless allowOverlap. */
     @Transactional
     public AppointmentResponse rescheduleAppointment(TenantId tenantId, UUID id, RescheduleRequest req, boolean allowOverlap) {
@@ -472,6 +482,10 @@ public class ClinicService {
         UUID practitionerId = req.practitionerId() != null ? req.practitionerId() : appt.getPractitionerId();
         if (!allowOverlap && practitionerId != null) {
             requirePractitionerFree(tenantId, practitionerId, req.scheduledAt(), minutes, appt.getId());
+        }
+        if (!allowOverlap) {
+            String patientName = patientRepo.findActiveById(tenantId, appt.getPatientId()).map(ClinicPatient::getFullName).orElse(null);
+            requirePatientFree(tenantId, appt.getPatientId(), patientName, req.scheduledAt(), minutes, appt.getId());
         }
         appt.reschedule(req.scheduledAt(), minutes, req.practitionerId());
         appointmentRepo.save(appt);

@@ -50,4 +50,14 @@ final class AppointmentRules {
         String more = clashes.size() > 1 ? " (and " + (clashes.size() - 1) + " more)" : "";
         return who + " already has an appointment " + when + " with " + c.patientName() + more + ".";
     }
+
+    /** The patient already has a booking at that time. Each clash carries the practitioner's name (may be null). */
+    static String patientConflictMessage(String patientName, List<Clash> clashes, ZoneId zone) {
+        Clash c = clashes.get(0);
+        String when = HM.format(c.start().atZone(zone)) + "–" + HM.format(c.start().plus(Duration.ofMinutes(c.minutes())).atZone(zone));
+        String who = patientName == null || patientName.isBlank() ? "This patient" : patientName;
+        String with = c.patientName() == null || c.patientName().isBlank() ? "" : " with " + c.patientName();
+        String more = clashes.size() > 1 ? " (and " + (clashes.size() - 1) + " more)" : "";
+        return who + " already has an appointment " + when + with + more + ".";
+    }
 }

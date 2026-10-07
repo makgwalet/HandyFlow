@@ -51,4 +51,14 @@ class AppointmentRulesTest {
         assertEquals("This practitioner already has an appointment 10:00–10:30 with Sam Nkosi (and 1 more).",
                 AppointmentRules.conflictMessage(null, two, AppointmentRules.CLINIC_ZONE));
     }
+
+    @Test
+    void patientConflictMessageNamesThePractitionerWhenThereIsOne() {
+        var one = List.of(new AppointmentRules.Clash("Dr Lee", TEN, 30));
+        assertEquals("Jane Dlamini already has an appointment 10:00–10:30 with Dr Lee.",
+                AppointmentRules.patientConflictMessage("Jane Dlamini", one, AppointmentRules.CLINIC_ZONE));
+        var none = List.of(new AppointmentRules.Clash(null, TEN, 30), new AppointmentRules.Clash("Dr Lee", TEN.plusSeconds(1800), 30));
+        assertEquals("This patient already has an appointment 10:00–10:30 (and 1 more).",
+                AppointmentRules.patientConflictMessage(null, none, AppointmentRules.CLINIC_ZONE));
+    }
 }
