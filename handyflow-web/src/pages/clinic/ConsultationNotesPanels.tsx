@@ -23,7 +23,7 @@ interface PanelProps { soap: NotesState; sf: (k: keyof NotesState, v: string) =>
 export function VitalsPanel({ soap, sf }: PanelProps) {
   const bmiText = bmi(soap.weightKg, soap.heightCm)
   return (
-          <div style={{ padding:"12px 14px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:10 }}>
+          <div id="consult-vitals" style={{ padding:"12px 14px", background:"var(--hf-surface)", border:`1px solid ${BORDER}`, borderRadius:10 }}>
             <div style={sectionLabel}>Vitals</div>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8 }}>
               {[
@@ -64,9 +64,9 @@ export function SoapFields({ soap, sf }: PanelProps) {
               <div key={f.k}>
                 <label style={lbl}>{f.label}</label>
                 {f.rows===1
-                  ? <input value={(soap as any)[f.k]} onChange={e=>sf(f.k as keyof NotesState,e.target.value)}
+                  ? <input id={"soap-"+f.k} value={(soap as any)[f.k]} onChange={e=>sf(f.k as keyof NotesState,e.target.value)}
                       placeholder={f.ph} style={sinp}/>
-                  : <textarea value={(soap as any)[f.k]} onChange={e=>sf(f.k as keyof NotesState,e.target.value)}
+                  : <textarea id={"soap-"+f.k} value={(soap as any)[f.k]} onChange={e=>sf(f.k as keyof NotesState,e.target.value)}
                       rows={f.rows} placeholder={f.ph}
                       style={{...sinp,resize:"vertical" as const}}/>
                 }

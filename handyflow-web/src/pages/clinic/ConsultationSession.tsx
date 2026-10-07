@@ -369,6 +369,12 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
   })
 
   // ── Active panel toggle (mobile-friendly) ─────────────────────────────────
+  const jumpTo = (id: string) => {
+    const el = document.getElementById(id)
+    if (!el) return
+    el.scrollIntoView?.({ behavior: "smooth", block: "center" })
+    ;(el as HTMLElement).focus?.()
+  }
   const [activePanel, setActivePanel] = useState<"soap"|"bill"|"rx">("soap")
 
   return (
@@ -443,7 +449,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
               fontSize:13, fontWeight:700, cursor:"pointer" }}>
             {handoffBusy ? "Sending…" : "Send to doctor"}
           </button>}
-          <button onClick={() => { setShowComplete(true); setCompleteError("") }}
+          <button id="consult-complete" onClick={() => { setShowComplete(true); setCompleteError("") }}
             style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 20px",
               background:TEAL, color:"var(--hf-text-on-solid)", border:"none", borderRadius:10,
               fontSize:14, fontWeight:700, cursor:"pointer" }}>
@@ -479,7 +485,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
 
       <PatientAlertBanner patientId={patient.id}/>
 
-      <ConsultationStepper steps={consultSteps(soap, rxDrafts)}/>
+      <ConsultationStepper steps={consultSteps(soap, rxDrafts)} onJump={jumpTo}/>
 
       {/* ── Panel tabs (mobile) ────────────────────────────────────────── */}
       <div style={{ display:"flex", gap:4, marginBottom:12 }}>

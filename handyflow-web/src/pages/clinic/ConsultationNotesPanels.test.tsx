@@ -43,3 +43,11 @@ describe("SoapFields", () => {
     expect(sf).toHaveBeenCalledWith("icd10Codes", "J06.9")
   })
 })
+
+describe("jump targets used by the steps strip", () => {
+  it("exist on the panels", () => {
+    const { container } = render(<><VitalsPanel soap={blank} sf={vi.fn()} /><SoapFields soap={blank} sf={vi.fn()} /></>)
+    for (const id of ["consult-vitals", "soap-chiefComplaint", "soap-diagnosis", "soap-treatmentPlan"])
+      expect(container.querySelector("#" + id), id).not.toBeNull()
+  })
+})

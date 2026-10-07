@@ -13,6 +13,15 @@ export interface StepRx { medicationName: string; dosage: string; frequency: str
 export type StepState = "done" | "todo" | "attention"
 export interface ConsultStep { id: "symptoms" | "examination" | "diagnose" | "plan" | "sign"; label: string; state: StepState; hint: string }
 
+/** The element on the session screen each step jumps to. */
+export const STEP_TARGET: Record<ConsultStep["id"], string> = {
+  symptoms: "soap-chiefComplaint",
+  examination: "consult-vitals",
+  diagnose: "soap-diagnosis",
+  plan: "soap-treatmentPlan",
+  sign: "consult-complete",
+}
+
 const has = (s: string) => s.trim().length > 0
 
 /** What is missing from one prescription draft (empty list = complete). */
