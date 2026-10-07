@@ -389,7 +389,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
                   </button>
                 )}
                 {["SCHEDULED","CONFIRMED"].includes(selected.status) && (
-                  <RescheduleBox key={selected.id + selected.scheduledAt} appointment={selected}
+                  <RescheduleBox key={selected.id + selected.scheduledAt} appointment={selected} rooms={rooms}
                     onMoved={(u:Appointment)=>{
                       qc.invalidateQueries({queryKey:["schedule-appts"]})
                       qc.invalidateQueries({queryKey:["clinic-dashboard-summary"]})

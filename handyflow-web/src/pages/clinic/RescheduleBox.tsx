@@ -3,7 +3,15 @@ import { useMutation } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { clashMessage, WALK_IN_GRACE_MS } from "./bookingRules"
 
-export interface Movable { id: string; scheduledAt: string; durationMinutes: number }
+export interface Movable { id: string; scheduledAt: string; durationMinutes: number; roomId?: string | null }
+export interface RoomOption { id: string; name: string }
+
+/** The body of the reschedule call: the room is only sent when the user picked a different one. */
+export function moveBody(when: string, roomId: string, currentRoomId?: string | null) {
+  const body: { scheduledAt: string; roomId?: string } = { scheduledAt: new Date(when).toISOString() }
+  if (roomId && roomId !== (currentRoomId ?? "")) body.roomId = roomId
+  return body
+}
 
 /** Local "yyyy-mm-ddThh:mm" for a datetime-local input. */
 export const toLocalInput = (iso: string) => {
@@ -26,15 +34,16 @@ const btn = { padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 60
  * "Reschedule" for an appointment that has not started: pick a new time, and if the practitioner is busy
  * then, the server's warning is shown with a "Move anyway" button.
  */
-export default function RescheduleBox({ appointment, onMoved }: { appointment: Movable; onMoved: (updated: any) => void }) {
+export default function RescheduleBox({ appointment, onMoved, rooms = [] }: { appointment: Movable; onMoved: (updated: any) => void; rooms?: RoomOption[] }) {
   const [open, setOpen] = useState(false)
   const [when, setWhen] = useState(toLocalInput(appointment.scheduledAt))
+  const [roomId, setRoomId] = useState(appointment.roomId ?? "")
   const [error, setError] = useState("")
   const [clash, setClash] = useState("")
 
   const move = useMutation({
     mutationFn: (allowOverlap: boolean) => apiClient.post(`/api/v1/clinic/appointments/${appointment.id}/reschedule`,
-      { scheduledAt: new Date(when).toISOString() }, allowOverlap ? { params: { allowOverlap: true } } : undefined),
+      moveBody(when, roomId, appointment.roomId), allowOverlap ? { params: { allowOverlap: true } } : undefined),
     onSuccess: (res: any) => { setOpen(false); setClash(""); setError(""); onMoved(res.data?.data ?? res.data) },
     onError: (e: any) => {
       const c = clashMessage(e)
@@ -55,6 +64,16 @@ export default function RescheduleBox({ appointment, onMoved }: { appointment: M
           onChange={e => { setWhen(e.target.value); setClash(""); setError("") }}
           style={{ display: "block", marginTop: 4, padding: "7px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, width: "100%" }} />
       </label>
+      {rooms.length > 0 && (
+        <label style={{ fontSize: 12, fontWeight: 600, color: "var(--hf-text-muted)" }}>
+          Room
+          <select aria-label="Room" value={roomId} onChange={e => { setRoomId(e.target.value); setClash(""); setError("") }}
+            style={{ display: "block", marginTop: 4, padding: "7px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, width: "100%" }}>
+            <option value="">{appointment.roomId ? "(keep current)" : "No room"}</option>
+            {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+        </label>
+      )}
       {error && <div role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>{error}</div>}
       {clash && (
         <div role="alert" style={{ padding: "8px 10px", background: "var(--hf-warning-soft)", borderRadius: 8, fontSize: 13, color: "var(--hf-warning-text)" }}>

@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
 const post = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { post: (...a: any[]) => post(...a) } }))
-import RescheduleBox, { moveProblem, toLocalInput } from "./RescheduleBox"
+import RescheduleBox, { moveBody, moveProblem, toLocalInput } from "./RescheduleBox"
 
 const appt = { id: "a1", scheduledAt: "2026-10-20T08:00:00Z", durationMinutes: 30 }
 const show = (onMoved = vi.fn()) => ({ onMoved, ...render(
@@ -76,5 +76,30 @@ describe("RescheduleBox", () => {
     fireEvent.click(screen.getByText("Reschedule"))
     fireEvent.click(screen.getByText("Cancel"))
     expect(screen.queryByLabelText("New date and time")).toBeNull()
+  })
+})
+
+describe("room on reschedule", () => {
+  it("sends the room only when a different one is picked", () => {
+    expect(moveBody(FUTURE, "", null).roomId).toBeUndefined()
+    expect(moveBody(FUTURE, "r1", "r1").roomId).toBeUndefined()
+    expect(moveBody(FUTURE, "r2", "r1").roomId).toBe("r2")
+    expect(moveBody(FUTURE, "r2", null).roomId).toBe("r2")
+  })
+  it("shows the room choice only when rooms exist and sends the pick", async () => {
+    post.mockResolvedValue({ data: { data: { id: "a1" } } })
+    const rooms = [{ id: "r1", name: "Room 1" }, { id: "r2", name: "Room 2" }]
+    render(<QueryClientProvider client={new QueryClient()}>
+      <RescheduleBox appointment={{ ...appt, roomId: "r1" }} onMoved={vi.fn()} rooms={rooms} /></QueryClientProvider>)
+    fireEvent.click(screen.getByText("Reschedule"))
+    fireEvent.change(screen.getByLabelText("New date and time"), { target: { value: FUTURE } })
+    fireEvent.change(screen.getByLabelText("Room"), { target: { value: "r2" } })
+    fireEvent.click(screen.getByText("Move appointment"))
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0][1].roomId).toBe("r2")
+  })
+  it("hides the room select when there are no rooms", () => {
+    show(); fireEvent.click(screen.getByText("Reschedule"))
+    expect(screen.queryByLabelText("Room")).toBeNull()
   })
 })
