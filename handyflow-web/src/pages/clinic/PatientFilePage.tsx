@@ -1,5 +1,7 @@
 // src/pages/clinic/PatientFilePage.tsx
 // Full-page patient file — 8 tabs + family management + account lifecycle
+import { myPractitionerId } from "./currentPractitioner"
+import { useAuthStore } from "../../store/auth.store"
 import { useDialogs } from "./dialogs"
 import { useEffect, useState } from "react"
 import ConsultationSession from "./ConsultationSession"
@@ -31,6 +33,7 @@ interface Props {
 export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPatient, initialSession, onSessionClear }: Props) {
   const qc = useQueryClient()
   const { confirm, prompt, dialogs } = useDialogs()
+  const userEmail = useAuthStore(st => st.user?.email)
   const [activeTab, setActiveTab] = useState<TabId>("overview")
   const [billLines, setBillLines] = useState<BillLine[]>([])
   const [showActions, setShowActions] = useState(false)
@@ -250,6 +253,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
                 setActiveTab("running-bill")
                 qc.invalidateQueries({queryKey:["pf-appointments",pid]})
                 qc.invalidateQueries({queryKey:["pf-consultations",pid]})
+                qc.invalidateQueries({queryKey:["pf-briefing",pid]})
               }}
               onCancel={()=>{ setActiveSession(null); setSessionMinimised(false) }}
             />
@@ -286,7 +290,9 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
 
       {/* ── Tab content ─────────────────────────────────────────────────── */}
       <PatientAlertBanner patientId={patient.id}/>
-      {activeTab==="overview"     && <OverviewTab patient={patient} idInfo={idInfo} familyMembers={familyMembers as Patient[]} onOpenPatient={onOpenPatient} qc={qc}/>}
+      {activeTab==="overview"     && <OverviewTab patient={patient} idInfo={idInfo} familyMembers={familyMembers as Patient[]} onOpenPatient={onOpenPatient} qc={qc}
+        appointments={appointments as any[]} defaultPractitionerId={myPractitionerId(practitioners as any[], userEmail)}
+        onStartSession={setActiveSession} onOpenTab={setActiveTab}/>}
       {activeTab==="appointments" && <AppointmentsTab patient={patient} appointments={appointments as Appointment[]} practitioners={practitioners as Practitioner[]} qc={qc} onStartSession={setActiveSession}/>}
       {activeTab==="consultation" && <ConsultationTab patient={patient} consultations={consultations as Consultation[]} practitioners={practitioners as Practitioner[]} qc={qc} addToBill={addToBill} onSwitchTab={setActiveTab}/>}
       {activeTab==="running-bill" && <RunningBillTab billLines={billLines} onRemove={removeBillLine} patient={patient}/>}

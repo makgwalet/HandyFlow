@@ -1,6 +1,7 @@
 // src/pages/clinic/PatientsTab.tsx
 // Paginated patient list — server search, family account registration,
 // dependant search, account type badges, no medical columns for reception
+import { saId, saIdDob, saIdParts } from "./patientFile.shared"
 import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -26,25 +27,12 @@ interface Props { onOpenPatient: (p: Patient) => void }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function saIdInfo(id?: string) {
-  const c = (id ?? "").replace(/\D/g, "")
-  if (c.length !== 13) return null
-  const yy=+c.slice(0,2), mm=+c.slice(2,4), dd=+c.slice(4,6)
-  const yr = yy <= (new Date().getFullYear()%100) ? 2000+yy : 1900+yy
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-  const age = Math.floor((Date.now()-new Date(yr,mm-1,dd).getTime())/(365.25*24*3600*1000))
-  return { dob:`${String(dd).padStart(2,"0")} ${months[mm-1]} ${yr}`, age, gender:+c[6]>=5?"Male":"Female" }
-}
+const saIdInfo = saId
 
 function autofillFromId(idNumber: string) {
-  const c = idNumber.replace(/\D/g,"")
-  if (c.length !== 13) return null
-  const yy=+c.slice(0,2), mm=+c.slice(2,4), dd=+c.slice(4,6)
-  const yr = yy <= (new Date().getFullYear()%100) ? 2000+yy : 1900+yy
-  return {
-    dateOfBirth: `${yr}-${String(mm).padStart(2,"0")}-${String(dd).padStart(2,"0")}`,
-    gender: +c[6]>=5?"MALE":"FEMALE"
-  }
+  const dob = saIdDob(idNumber)
+  const p = saIdParts(idNumber)
+  return dob && p ? { dateOfBirth: dob, gender: p.male ? "MALE" : "FEMALE" } : null
 }
 
 const fmtDT = (iso?: string) => iso
@@ -321,7 +309,7 @@ export default function PatientsTab({ onOpenPatient }: Props) {
 
                     {/* DOB */}
                     <td style={{ padding:"11px 16px", fontSize:13 }}>
-                      <div style={{ color:"var(--hf-text-tertiary)" }}>{info?.dob ?? (p.dateOfBirth ?? "—")}</div>
+                      <div style={{ color:"var(--hf-text-tertiary)" }}>{p.dateOfBirth ? fmtDT(p.dateOfBirth) : (info?.dob ?? "—")}</div>
                       {info && <div style={{ fontSize:11, color:"var(--hf-text-faint)" }}>{info.age} yrs · {info.gender}</div>}
                     </td>
 

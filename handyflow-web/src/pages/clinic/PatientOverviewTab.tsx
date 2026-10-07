@@ -7,14 +7,17 @@ import PatientSummaryPrint from "./PatientSummaryPrint"
 import { useMutation } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import ClinicalSummaryPanel from "./ClinicalSummaryPanel"
+import PatientBriefingPanel from "./PatientBriefingPanel"
 import type { Patient } from "./patientFile.shared"
 import { BORDER, GRAY, GREEN_TEXT, LIGHT, Modal, ModalFooter, RED_TEXT, TEAL_TEXT, lbl, sinp } from "./patientFile.shared"
 import { ArrowRight, Plus } from "lucide-react"
 
 // ── OVERVIEW TAB ──────────────────────────────────────────────────────────────
 
-export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc }: {
+export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc, appointments = [], defaultPractitionerId, onStartSession, onOpenTab }: {
   patient:Patient; idInfo:any; familyMembers:Patient[]; onOpenPatient?:(p:Patient)=>void; qc:any
+  appointments?: any[]; defaultPractitionerId?: string; onStartSession?: (appt:any)=>void
+  onOpenTab?: (tab:"history"|"labs"|"appointments"|"rx")=>void
 }) {
   const [showAddDep, setShowAddDep] = useState(false)
   const [depForm, setDepForm] = useState({ firstName:"", lastName:"", idNumber:"", dateOfBirth:"", gender:"", phone:"", relationship:"CHILD" })
@@ -33,6 +36,11 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
 
 
   return (
+    <div>
+    {onStartSession && (
+      <PatientBriefingPanel patientId={patient.id} appointments={appointments} defaultPractitionerId={defaultPractitionerId}
+        onStartSession={onStartSession} onOpenTab={onOpenTab} />
+    )}
     <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:20 }}>
       {/* Left — demographics */}
       <div>
@@ -215,6 +223,7 @@ export default function OverviewTab({ patient, idInfo, familyMembers, onOpenPati
             confirmLabel={addDependant.isPending?"Adding...":"Add dependant"} loading={addDependant.isPending}/>
         </Modal>
       )}
+    </div>
     </div>
   )
 }

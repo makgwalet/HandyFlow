@@ -83,14 +83,26 @@ export const ACCOUNT_CFG: Record<string,{label:string;bg:string;color:string}> =
   DEPENDANT:  {label:"Dependant", bg:"var(--hf-violet-soft)",color:PURPLE_TEXT},
 }
 
-export const saId = (id?: string) => {
+/** The birth date encoded in a South African ID (YYMMDD), or null when the digits are not a real calendar date. */
+export function saIdParts(id?: string): { year: number; month: number; day: number; male: boolean } | null {
   const c=(id??"").replace(/\D/g,""); if (c.length!==13) return null
-  const yy=+c.slice(0,2),mm=+c.slice(2,4),dd=+c.slice(4,6)
-  const yr=yy<=(new Date().getFullYear()%100)?2000+yy:1900+yy
+  const yy=+c.slice(0,2), month=+c.slice(2,4), day=+c.slice(4,6)
+  const year=yy<=(new Date().getFullYear()%100)?2000+yy:1900+yy
+  const d=new Date(year,month-1,day)
+  // new Date rolls over impossible dates (month 19, 31 Feb), so compare back.
+  if (d.getFullYear()!==year || d.getMonth()!==month-1 || d.getDate()!==day) return null
+  return { year, month, day, male:+c[6]>=5 }
+}
+/** "1990-04-02" from an ID number, or null when the ID is not usable. */
+export const saIdDob = (id?: string): string | null => {
+  const p=saIdParts(id); return p ? `${p.year}-${String(p.month).padStart(2,"0")}-${String(p.day).padStart(2,"0")}` : null
+}
+export const saId = (id?: string) => {
+  const p=saIdParts(id); if (!p) return null
   const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-  return { dob:`${String(dd).padStart(2,"0")} ${months[mm-1]} ${yr}`,
-    age:Math.floor((Date.now()-new Date(yr,mm-1,dd).getTime())/(365.25*24*3600*1000)),
-    gender:+c[6]>=5?"Male":"Female" }
+  return { dob:`${String(p.day).padStart(2,"0")} ${months[p.month-1]} ${p.year}`,
+    age:Math.floor((Date.now()-new Date(p.year,p.month-1,p.day).getTime())/(365.25*24*3600*1000)),
+    gender:p.male?"Male":"Female" }
 }
 export const fmtDT  = (iso:string) => new Date(iso).toLocaleDateString("en-ZA",{day:"numeric",month:"short",year:"numeric"})
 export const fmtTime= (iso:string) => new Date(iso).toLocaleTimeString("en-ZA",{hour:"2-digit",minute:"2-digit"})
