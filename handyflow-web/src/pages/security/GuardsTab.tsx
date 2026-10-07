@@ -21,6 +21,7 @@
 // All other behavior/logic is unchanged from the original file.
 
 import { useState, useRef } from "react"
+import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Plus, Search, Shield, Phone, BadgeCheck, Trash2, X, Edit2, Eye, AlertCircle, Fingerprint, Upload, CheckCircle, AlertTriangle, Clock, Ban, HelpCircle, Calendar, ShieldCheck } from "lucide-react"
@@ -307,6 +308,7 @@ function GuardFormFields({
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function GuardsTab() {
+  const navigate = useNavigate()
   const qc = useQueryClient()
   const videoRef  = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -579,7 +581,7 @@ export default function GuardsTab() {
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <GuardAvatar guard={g} size={36} />
                         <div>
-                          <div style={{ fontWeight: 600, color: unavail ? "var(--hf-text-faint)" : "var(--hf-text)" }}>{g.fullName}</div>
+                          <div onClick={() => navigate(`/security/guards/${g.id}`)} style={{ fontWeight: 600, cursor: "pointer", color: unavail ? "var(--hf-text-faint)" : "var(--hf-text)" }}>{g.fullName}</div>
                           <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>
                             ID: {g.idNumber || "—"}
                             {g.employeeCode && <span style={{ marginLeft: 8, fontFamily: "monospace", color: "var(--hf-violet-text)", fontWeight: 600 }}>{g.employeeCode}</span>}
@@ -606,7 +608,7 @@ export default function GuardsTab() {
                     <td style={{ padding: "13px 16px" }}><StatusBadge status={gStatus} /></td>
                     <td style={{ padding: "13px 16px" }}>
                       <div style={{ display: "flex", gap: 6 }}>
-                        <button onClick={() => setViewing(g)} title="View" style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-info-text)" }}><Eye size={13} /></button>
+                        <button onClick={() => navigate(`/security/guards/${g.id}`)} title="Open guard profile" style={{ background: "var(--hf-info-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-info-text)" }}><Eye size={13} /></button>
                         <button onClick={() => openEdit(g)} title="Edit" style={{ background: "var(--hf-success-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-success-text-strong)" }}><Edit2 size={13} /></button>
                         <button onClick={() => { setChangingStatus(g); setNewStatus(gStatus); setStatusNote(""); setApiError("") }} title="Change status" style={{ background: "var(--hf-warning-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-warning-text)" }}><AlertTriangle size={13} /></button>
                         <button onClick={() => setDeleting(g)} title="Remove" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>

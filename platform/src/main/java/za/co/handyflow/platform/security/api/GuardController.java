@@ -53,6 +53,7 @@ public class GuardController {
 
     private final GuardService guardService;
     private final FeatureGuard featureGuard;
+    private final za.co.handyflow.platform.security.application.internal.GuardOverviewService overviewService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('SECURITY_READ')")
@@ -75,6 +76,15 @@ public class GuardController {
         featureGuard.requireModule("security");
         return ResponseEntity.ok(ApiResponse.success(
                 guardService.getGuard(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/{id}/overview")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
+    @Operation(summary = "Guard 360: guard, documents, screening history, shifts and incidents in one call")
+    public ResponseEntity<ApiResponse<GuardOverviewResponse>> getOverview(@PathVariable UUID id) {
+        featureGuard.requireModule("security");
+        return ResponseEntity.ok(ApiResponse.success(
+                overviewService.overview(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @PostMapping

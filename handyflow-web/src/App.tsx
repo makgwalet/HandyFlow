@@ -11,6 +11,7 @@ import { QuoteDetailPage }              from "./pages/quotes/QuoteDetailPage"
 import { CataloguePage }                from "./pages/catalogue/CataloguePage"
 import { BillingPage }                  from "./pages/billing/BillingPage"
 import { SecurityPage }                 from "./pages/security/SecurityPage"
+import GuardProfilePage                 from "./pages/security/GuardProfilePage"
 import { AppShell }                     from "./components/shell/AppShell"
 import { useAuthStore }                 from "./store/auth.store"
 // NEW: closes "not added to App.tsx, redirects to saas".
@@ -280,6 +281,7 @@ export default function App() {
             <Route path="/quotes/:id"  element={<QuoteDetailPage />} />
             <Route path="/catalogue/:section?" element={<CataloguePage />} />
             <Route path="/billing"     element={<BillingPage />} />
+            <Route path="/security/guards/:guardId" element={<GuardProfilePage />} />
             <Route path="/security/:section?" element={<SecurityPage />} />
             <Route path="/fuel/:section?" element={<FuelPage />} />
             <Route path="/internal-audit/:section?" element={<InternalAuditPage />} />
