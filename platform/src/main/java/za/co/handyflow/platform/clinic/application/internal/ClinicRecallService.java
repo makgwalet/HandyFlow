@@ -8,7 +8,10 @@ import za.co.handyflow.platform.clinic.domain.model.ClinicPatient;
 import za.co.handyflow.platform.clinic.domain.model.ClinicPractitioner;
 import za.co.handyflow.platform.clinic.domain.repository.ClinicPatientRepository;
 import za.co.handyflow.platform.clinic.domain.repository.ClinicPractitionerRepository;
+import za.co.handyflow.platform.clinic.dto.RecallActionRequest;
+import za.co.handyflow.platform.clinic.dto.RecallPage;
 import za.co.handyflow.platform.clinic.dto.RecallResponse;
+import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.LocalDate;
@@ -52,6 +55,35 @@ public class ClinicRecallService {
     private final ClinicPatientRepository patientRepo;
     private final ClinicPractitionerRepository practitionerRepo;
 
+    /** The worklist: filtered by search text, tab and doctor, paged; counts cover the whole list. */
+    @Transactional(readOnly = true)
+    public RecallPage worklist(TenantId tenantId, String q, String filter, UUID practitionerId, int page, int size) {
+        return worklist(tenantId, q, filter, practitionerId, page, size, Instant.now());
+    }
+
+    @Transactional(readOnly = true)
+    public RecallPage worklist(TenantId tenantId, String q, String filter, UUID practitionerId, int page, int size, Instant now) {
+        List<RecallResponse> all = getDueRecalls(tenantId, now);
+        return RecallWorklist.page(RecallWorklist.filter(all, q, filter, practitionerId), page, size, RecallWorklist.counts(all));
+    }
+
+    /** Records a call, snooze, dismissal or reopen against the recall's consultation. */
+    @Transactional
+    public void act(TenantId tenantId, UUID consultationId, RecallActionRequest req, UUID userId, Instant now) {
+        LocalDate today = now.atZone(RecallRules.CLINIC_ZONE).toLocalDate();
+        RecallWorklist.validate(req.type(), req.outcome(), req.note(), req.snoozeUntil(), today);
+        List<UUID> patient = jdbc.query(
+                "SELECT patient_id FROM clinic_consultations WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL",
+                (rs, i) -> rs.getObject("patient_id", UUID.class), consultationId, tenantId.getValue());
+        if (patient.isEmpty()) throw new ResourceNotFoundException("Consultation", consultationId.toString());
+        String note = req.note() == null || req.note().isBlank() ? null : req.note().trim();
+        jdbc.update("INSERT INTO clinic_recall_actions (id, tenant_id, consultation_id, patient_id, action_type, outcome, note, snooze_until, created_by, created_at)"
+                        + " VALUES (?,?,?,?,?,?,?,?,?,?)",
+                UUID.randomUUID(), tenantId.getValue(), consultationId, patient.get(0), req.type(),
+                "CONTACT".equals(req.type()) ? req.outcome() : null, note,
+                "SNOOZE".equals(req.type()) ? req.snoozeUntil() : null, userId, java.sql.Timestamp.from(now));
+    }
+
     @Transactional(readOnly = true)
     public List<RecallResponse> getDueRecalls(TenantId tenantId) {
         return getDueRecalls(tenantId, Instant.now());
@@ -81,8 +113,21 @@ public class ClinicRecallService {
                 : practitionerRepo.findAllByIds(tenantId, practIds).stream()
                 .collect(Collectors.toMap(ClinicPractitioner::getId, ClinicPractitioner::getFullName));
 
+        Map<UUID, List<RecallWorklist.Action>> history = new HashMap<>();
+        if (!due.isEmpty()) {
+            jdbc.query("SELECT consultation_id, action_type, outcome, snooze_until, created_at FROM clinic_recall_actions"
+                            + " WHERE tenant_id = ? ORDER BY created_at DESC, id",
+                    rs -> {
+                        java.sql.Date until = rs.getDate("snooze_until");
+                        history.computeIfAbsent(rs.getObject("consultation_id", UUID.class), k -> new ArrayList<>())
+                                .add(new RecallWorklist.Action(rs.getString("action_type"), rs.getString("outcome"),
+                                        until == null ? null : until.toLocalDate(), rs.getTimestamp("created_at").toInstant()));
+                    }, tenantId.getValue());
+        }
+
         return due.stream()
                 .map(c -> {
+                    RecallWorklist.State st = RecallWorklist.stateOf(history.getOrDefault(c.id(), List.of()), today);
                     LocalDate dd = RecallRules.dueDate(c.consultedAt(), c.followUpDays(), RecallRules.CLINIC_ZONE);
                     return new RecallResponse(
                             c.id(), c.patientId(),
@@ -91,7 +136,7 @@ public class ClinicRecallService {
                             c.practitionerId(),
                             c.practitionerId() != null ? practNames.get(c.practitionerId()) : null,
                             c.consultedAt(), c.followUpDays(), dd, RecallRules.overdueDays(dd, today),
-                            c.diagnosis());
+                            c.diagnosis(), st.status(), st.snoozedUntil(), st.attempts(), st.lastContactAt(), st.lastContactOutcome());
                 })
                 .toList();
     }

@@ -15,5 +15,11 @@ public record RecallResponse(
         int followUpDays,
         LocalDate dueDate,
         int overdueDays,
-        String diagnosis
+        String diagnosis,
+        /** OPEN, SNOOZED or DISMISSED. */
+        String status,
+        LocalDate snoozedUntil,
+        int contactAttempts,
+        Instant lastContactAt,
+        String lastContactOutcome
 ) {}

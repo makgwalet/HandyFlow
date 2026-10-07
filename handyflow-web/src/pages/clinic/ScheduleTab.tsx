@@ -91,8 +91,13 @@ const unwrap = (r:any) => { const p=r.data?.data??r.data; return Array.isArray(p
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-interface ScheduleTabProps { onStartSession?: (appointment: any, patient: any) => void }
-export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
+interface ScheduleTabProps {
+  onStartSession?: (appointment: any, patient: any) => void
+  /** Open the booking form with this patient (and doctor, reason) filled in, then call onPrefillUsed. */
+  prefill?: { patientId: string; patientName: string; practitionerId?: string | null; reason?: string } | null
+  onPrefillUsed?: () => void
+}
+export default function ScheduleTab({ onStartSession, prefill, onPrefillUsed }: ScheduleTabProps = {}) {
   const qc = useQueryClient()
   const [view, setView]                 = useState<"day"|"week">("week")
   const [anchor, setAnchor]             = useState(() => { const d=new Date(); d.setHours(0,0,0,0); return d })
@@ -106,6 +111,15 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
   const nowRef = useRef<HTMLDivElement>(null)
   const [bookPatient, setBookPatient] = useState<PickerPatient | null>(null)
   const userEmail = useAuthStore(st => st.user?.email)
+
+  useEffect(() => {
+    if (!prefill) return
+    setBookPatient({ id: prefill.patientId, fullName: prefill.patientName })
+    setBookForm(f => ({ ...f, patientId: prefill.patientId, practitionerId: prefill.practitionerId ?? f.practitionerId, reason: prefill.reason ?? f.reason, scheduledAt: "" }))
+    setShowBook(true)
+    setApiError("")
+    onPrefillUsed?.()
+  }, [prefill]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Book form
   const [bookForm, setBookForm] = useState({

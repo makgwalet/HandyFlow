@@ -12,6 +12,7 @@
 // "Start session" from the Schedule opens the patient's file with an
 // appointment to begin; that is a ONE-SHOT: the file clears it from the
 // history entry as soon as it has consumed it, so a refresh cannot restart it.
+import { useState } from "react"
 import { useLocation, useNavigate, useParams } from "react-router-dom"
 import ClinicDashboard   from "./ClinicDashboard"
 import PatientsTab       from "./PatientsTab"
@@ -21,7 +22,7 @@ import PractitionersTab  from "./PractitionersTab"
 import ClaimsTab         from "./ClaimsTab"
 import BillingTab        from "./BillingTab"
 import PatientFilePage   from "./PatientFilePage"
-import RecallsTab        from "./RecallsTab"
+import RecallsTab, { type RecallBookRequest } from "./RecallsTab"
 import WaitlistTab       from "./WaitlistTab"
 import HandoffQueueTab   from "./HandoffQueueTab"
 import DraftsTab         from "./DraftsTab"
@@ -46,6 +47,8 @@ export function ClinicPage() {
   const navigate = useNavigate()
   const { section } = useParams<{ section?: string }>()
   const base = CLINIC_SECTIONS.basePath
+  // A booking asked for from another screen (Recalls); the Schedule opens its form with it filled in.
+  const [bookRequest, setBookRequest] = useState<RecallBookRequest | null>(null)
 
   const state = (location.state ?? {}) as FileState
   // The file only ever belongs to the Patients section.
@@ -87,9 +90,9 @@ export function ClinicPage() {
         switch (id) {
           case "dashboard":     return <ClinicDashboard onNavigate={goTo} />
           case "patients":      return <PatientsTab onOpenPatient={p => openFile(p)} />
-          case "schedule":      return <ScheduleTab onStartSession={(appt: unknown, pat: Patient) => openFile(pat, appt)} />
+          case "schedule":      return <ScheduleTab onStartSession={(appt: unknown, pat: Patient) => openFile(pat, appt)} prefill={bookRequest} onPrefillUsed={() => setBookRequest(null)} />
           case "consultations": return <ConsultationsTab />
-          case "recalls":       return <RecallsTab />
+          case "recalls":       return <RecallsTab onBook={r => { setBookRequest(r); goTo("schedule") }} />
           case "waitlist":      return <WaitlistTab />
           case "handoff":       return <HandoffQueueTab />
           case "drafts":        return <DraftsTab onResume={(pat: Patient, appt: unknown) => openFile(pat, appt)} />

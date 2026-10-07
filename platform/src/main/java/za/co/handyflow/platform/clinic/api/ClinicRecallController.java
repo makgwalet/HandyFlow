@@ -5,29 +5,43 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.clinic.application.internal.ClinicRecallService;
-import za.co.handyflow.platform.clinic.dto.RecallResponse;
+import za.co.handyflow.platform.clinic.dto.RecallActionRequest;
+import za.co.handyflow.platform.clinic.dto.RecallPage;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
+import za.co.handyflow.platform.shared.UserContext;
 
-import java.util.List;
+import java.time.Instant;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/clinic/recalls")
 @RequiredArgsConstructor
-@Tag(name = "Clinic Recalls", description = "Patients currently due for a follow-up, derived from consultation followUpDays")
+@Tag(name = "Clinic Recalls", description = "Patients due for a follow-up, derived from consultation followUpDays, with a call/snooze/dismiss log")
 public class ClinicRecallController {
 
     private final ClinicRecallService recallService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('CLINIC_READ')")
-    @Operation(summary = "List patients currently due (or overdue) for a follow-up")
-    public ResponseEntity<ApiResponse<List<RecallResponse>>> getDueRecalls() {
+    @Operation(summary = "Recall worklist: search, filter (ALL, OVERDUE, TODAY, NOT_CONTACTED, SNOOZED, DISMISSED), doctor, paging")
+    public ResponseEntity<ApiResponse<RecallPage>> worklist(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String filter,
+            @RequestParam(required = false) UUID practitionerId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
         return ResponseEntity.ok(ApiResponse.success("Success",
-                recallService.getDueRecalls(TenantContext.getTenantIdAsObject())));
+                recallService.worklist(TenantContext.getTenantIdAsObject(), q, filter, practitionerId, page, size)));
+    }
+
+    @PostMapping("/{consultationId}/actions")
+    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @Operation(summary = "Log a call, snooze, dismiss (with reason) or reopen a recall")
+    public ResponseEntity<ApiResponse<Void>> act(@PathVariable UUID consultationId, @RequestBody RecallActionRequest body) {
+        recallService.act(TenantContext.getTenantIdAsObject(), consultationId, body, UserContext.getCurrentUserId(), Instant.now());
+        return ResponseEntity.ok(ApiResponse.success("Recall updated", null));
     }
 }
