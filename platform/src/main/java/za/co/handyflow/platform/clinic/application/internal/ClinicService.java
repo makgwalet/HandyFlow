@@ -44,6 +44,7 @@ public class ClinicService {
     private final ClinicConsultationSummaryPdfService consultationSummaryPdfService;
     private final JdbcTemplate                 jdbc;
     private final ClinicSchedulingService      schedulingService;
+    private final ClinicTimeOffService         timeOffService;
 
     // ── Patients ──────────────────────────────────────────────────────────────
 
@@ -323,12 +324,7 @@ public class ClinicService {
         }
         int minutes = AppointmentRules.minutes(req.durationMinutes());
         if (!allowOverlap && req.practitionerId() != null) {
-            var clashes = schedulingService.findClashes(tenantId, req.practitionerId(), req.scheduledAt(), minutes, null);
-            if (!clashes.isEmpty()) {
-                String name = practitionerRepo.findActiveById(tenantId, req.practitionerId())
-                        .map(ClinicPractitioner::getFullName).orElse(null);
-                throw new ConflictException(AppointmentRules.conflictMessage(name, clashes, AppointmentRules.CLINIC_ZONE));
-            }
+            requirePractitionerFree(tenantId, req.practitionerId(), req.scheduledAt(), minutes, null);
         }
         ClinicAppointment appt = ClinicAppointment.create(
                 tenantId, req.patientId(), req.practitionerId(),
@@ -450,6 +446,17 @@ public class ClinicService {
                 loadPractitionerNames(tenantId, List.of(appt)));
     }
 
+    /** Throws a 409 when the practitioner is already booked, or away, at that time. */
+    private void requirePractitionerFree(TenantId tenantId, UUID practitionerId, Instant start, int minutes, UUID ignoreAppointmentId) {
+        var clashes = schedulingService.findClashes(tenantId, practitionerId, start, minutes, ignoreAppointmentId);
+        var away = timeOffService.overlapping(tenantId, practitionerId, start, start.plusSeconds(minutes * 60L));
+        if (clashes.isEmpty() && away.isEmpty()) return;
+        String name = practitionerRepo.findActiveById(tenantId, practitionerId).map(ClinicPractitioner::getFullName).orElse(null);
+        throw new ConflictException(!away.isEmpty()
+                ? TimeOffRules.message(name, away, AppointmentRules.CLINIC_ZONE)
+                : AppointmentRules.conflictMessage(name, clashes, AppointmentRules.CLINIC_ZONE));
+    }
+
     /** Moves a not-yet-started appointment; refuses a clash for the practitioner unless allowOverlap. */
     @Transactional
     public AppointmentResponse rescheduleAppointment(TenantId tenantId, UUID id, RescheduleRequest req, boolean allowOverlap) {
@@ -461,12 +468,7 @@ public class ClinicService {
         int minutes = req.durationMinutes() != null ? AppointmentRules.minutes(req.durationMinutes()) : appt.getDurationMinutes();
         UUID practitionerId = req.practitionerId() != null ? req.practitionerId() : appt.getPractitionerId();
         if (!allowOverlap && practitionerId != null) {
-            var clashes = schedulingService.findClashes(tenantId, practitionerId, req.scheduledAt(), minutes, appt.getId());
-            if (!clashes.isEmpty()) {
-                String name = practitionerRepo.findActiveById(tenantId, practitionerId)
-                        .map(ClinicPractitioner::getFullName).orElse(null);
-                throw new ConflictException(AppointmentRules.conflictMessage(name, clashes, AppointmentRules.CLINIC_ZONE));
-            }
+            requirePractitionerFree(tenantId, practitionerId, req.scheduledAt(), minutes, appt.getId());
         }
         appt.reschedule(req.scheduledAt(), minutes, req.practitionerId());
         appointmentRepo.save(appt);

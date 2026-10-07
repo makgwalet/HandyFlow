@@ -42,6 +42,7 @@ class ClinicServiceTest {
     @Mock ClinicPrescribingSafetyService prescribingSafety;
     @Mock ClinicAllergySnapshotService allergySnapshot;
     @Mock ClinicSchedulingService schedulingService;
+    @Mock ClinicTimeOffService timeOffService;
 
     @InjectMocks ClinicService service;
 
@@ -406,6 +407,26 @@ class ClinicServiceTest {
             assertThatThrownBy(() -> service.createAppointment(TENANT, req))
                     .isInstanceOf(za.co.handyflow.platform.shared.ConflictException.class)
                     .hasMessageContaining("Sam Nkosi");
+            verify(appointmentRepo, never()).save(any(ClinicAppointment.class));
+        }
+
+        @Test
+        @DisplayName("refuses a booking while the practitioner is away")
+        void refusesWhileAway() {
+            var patientId = UUID.randomUUID();
+            var practitionerId = UUID.randomUUID();
+            when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patientWithId("Jane","Dlamini")));
+            var start = Instant.now().plusSeconds(3600);
+            when(timeOffService.overlapping(TENANT, practitionerId, start, start.plusSeconds(1800)))
+                    .thenReturn(List.of(new TimeOffRules.Block(start.minusSeconds(3600), start.plusSeconds(36000), "Annual leave")));
+            when(practitionerRepo.findActiveById(TENANT, practitionerId)).thenReturn(Optional.empty());
+
+            var req = new CreateAppointmentRequest(patientId, practitionerId, start, 30, "CONSULTATION", null);
+
+            assertThatThrownBy(() -> service.createAppointment(TENANT, req))
+                    .isInstanceOf(za.co.handyflow.platform.shared.ConflictException.class)
+                    .hasMessageContaining("is away")
+                    .hasMessageContaining("Annual leave");
             verify(appointmentRepo, never()).save(any(ClinicAppointment.class));
         }
 
