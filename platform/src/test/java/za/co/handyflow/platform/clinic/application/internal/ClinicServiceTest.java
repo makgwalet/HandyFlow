@@ -871,4 +871,47 @@ class ClinicServiceTest {
                     .isInstanceOf(IllegalArgumentException.class);
         }
     }
+
+    @Nested
+    @DisplayName("drafts tray")
+    class DraftTray {
+
+        private ClinicConsultation draftBy(UUID author) {
+            var c = ClinicConsultation.createDraft(TENANT, UUID.randomUUID(), null, null, "Cough");
+            c.startedBy(author);
+            return c;
+        }
+
+        private void signedInAs(UUID user) {
+            org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                    new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                            user.toString(), null, List.of()));
+        }
+
+        @AfterEach
+        void clear() { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
+
+        @Test
+        @DisplayName("mine=true returns only drafts this user started; mine=false returns all")
+        void mineFiltersByAuthor() {
+            var me = UUID.randomUUID();
+            var mine = draftBy(me);
+            var theirs = draftBy(UUID.randomUUID());
+            var legacy = draftBy(null);
+            when(consultationRepo.findDrafts(TENANT)).thenReturn(List.of(mine, theirs, legacy));
+            signedInAs(me);
+
+            assertThat(service.getDraftConsultations(TENANT, true)).extracting(ConsultationResponse::id)
+                    .containsExactly(mine.getId());
+            assertThat(service.getDraftConsultations(TENANT, false)).hasSize(3);
+            assertThat(service.getDraftConsultations(TENANT)).hasSize(3);
+        }
+
+        @Test
+        @DisplayName("mine=true with no signed-in user returns nothing rather than everything")
+        void mineWithoutUserIsEmpty() {
+            when(consultationRepo.findDrafts(TENANT)).thenReturn(List.of(draftBy(UUID.randomUUID())));
+            assertThat(service.getDraftConsultations(TENANT, true)).isEmpty();
+        }
+    }
 }

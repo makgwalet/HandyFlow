@@ -57,6 +57,7 @@ public class ClinicConsultation {
     @Column(name = "billing_code")   String     billingCode;
     @Column(name = "billing_amount") BigDecimal billingAmount;
 
+    @Column(name = "created_by") UUID createdBy;
     @Column(name = "created_at") Instant createdAt;
     @Column(name = "updated_at") Instant updatedAt;
     @Column(name = "deleted_at") Instant deletedAt;
@@ -81,6 +82,9 @@ public class ClinicConsultation {
         c.updatedAt      = Instant.now();
         return c;
     }
+
+    /** Records who started this consultation (null when unknown). */
+    public void startedBy(UUID userId) { this.createdBy = userId; }
 
     public static ClinicConsultation createDraft(TenantId tenantId,
                                                  UUID patientId, UUID appointmentId,

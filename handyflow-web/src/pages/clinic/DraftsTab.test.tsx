@@ -58,9 +58,19 @@ describe("DraftsTab", () => {
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clinic/consultations/d1/abandon"))
   })
 
+  it("asks for only the user's own drafts by default, and for all of them when unticked", async () => {
+    show()
+    await screen.findByText("Thandi Mokoena")
+    expect(get.mock.calls.find(c => String(c[0]).endsWith("/drafts"))![1]).toEqual({ params: { mine: true } })
+    fireEvent.click(screen.getByLabelText("Only drafts I started"))
+    await waitFor(() => expect(get.mock.calls.some(c => String(c[0]).endsWith("/drafts") && c[1]?.params?.mine === false)).toBe(true))
+  })
+
   it("says so when there are no drafts", async () => {
     get.mockImplementation(() => ok([]))
     show()
+    expect(await screen.findByText(/You have no open drafts/)).toBeTruthy()
+    fireEvent.click(screen.getByLabelText("Only drafts I started"))
     expect(await screen.findByText("No open drafts.")).toBeTruthy()
   })
 })

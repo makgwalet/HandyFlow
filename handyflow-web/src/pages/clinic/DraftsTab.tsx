@@ -10,7 +10,7 @@ import { usePermission } from "../../hooks/usePermission"
 
 interface Draft {
   id: string; patientId: string; patientName: string; appointmentId?: string | null
-  chiefComplaint?: string; status: string; createdAt: string
+  chiefComplaint?: string; status: string; createdAt: string; updatedAt?: string
 }
 interface Props { onResume: (patient: any, appointment: any) => void }
 
@@ -23,10 +23,11 @@ export default function DraftsTab({ onResume }: Props) {
   const canWrite = usePermission("CLINIC_CLINICAL_WRITE")
   const [error, setError] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
+  const [mine, setMine] = useState(true)
 
   const { data: drafts = [], isLoading } = useQuery<Draft[]>({
-    queryKey: ["clinic-drafts"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/clinic/consultations/drafts")) ?? [],
+    queryKey: ["clinic-drafts", mine],
+    queryFn: async () => unwrap(await apiClient.get("/api/v1/clinic/consultations/drafts", { params: { mine } })) ?? [],
   })
 
   const discard = useMutation({
@@ -59,13 +60,19 @@ export default function DraftsTab({ onResume }: Props) {
   return (
     <div>
       <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: "0 0 12px" }}>
-        Open consultations in this clinic that have not handed over or signed. Nothing here is lost: drafts autosave as you work.
+        Consultations that have not been handed over or signed. Nothing here is lost: drafts autosave as you work.
       </p>
+      <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13, color: "var(--hf-text)", marginBottom: 10 }}>
+        <input type="checkbox" checked={mine} onChange={e => setMine(e.target.checked)} />
+        Only drafts I started
+      </label>
       {error && <div role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
       {isLoading && <div style={{ color: "var(--hf-text-muted)" }}>Loading drafts…</div>}
       {!isLoading && drafts.length === 0 && (
         <div style={{ padding: 32, textAlign: "center", color: "var(--hf-text-muted)",
-          border: "1px dashed var(--hf-border)", borderRadius: 12 }}>No open drafts.</div>
+          border: "1px dashed var(--hf-border)", borderRadius: 12 }}>
+          {mine ? "You have no open drafts. Drafts from before authors were recorded only show when the box above is unticked." : "No open drafts."}
+        </div>
       )}
       <div style={{ display: "grid", gap: 10 }}>
         {drafts.map(d => (
@@ -74,7 +81,7 @@ export default function DraftsTab({ onResume }: Props) {
             <div style={{ flex: "1 1 220px", minWidth: 0 }}>
               <div style={{ fontWeight: 700, color: "var(--hf-text)" }}>{d.patientName}</div>
               <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>
-                {d.chiefComplaint || "No complaint recorded"} · started {fmt(d.createdAt)}
+                {d.chiefComplaint || "No complaint recorded"} · last saved {fmt(d.updatedAt ?? d.createdAt)}
               </div>
               <div style={{ fontSize: 12, marginTop: 4, color: "var(--hf-accent-text)", fontWeight: 600 }}>
                 {STATUS[d.status] ?? d.status}

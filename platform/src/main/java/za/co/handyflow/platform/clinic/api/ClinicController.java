@@ -267,9 +267,10 @@ public class ClinicController {
     @GetMapping("/consultations/drafts")
     @PreAuthorize("hasAuthority('CLINIC_READ')")
     @Operation(summary = "Open DRAFT consultations for the tenant (drafts tray)")
-    public ResponseEntity<ApiResponse<List<ConsultationResponse>>> getDraftConsultations() {
+    public ResponseEntity<ApiResponse<List<ConsultationResponse>>> getDraftConsultations(
+            @RequestParam(defaultValue = "false") boolean mine) {
         return ResponseEntity.ok(ApiResponse.success("Success",
-                clinicService.getDraftConsultations(TenantContext.getTenantIdAsObject())));
+                clinicService.getDraftConsultations(TenantContext.getTenantIdAsObject(), mine)));
     }
 
     @GetMapping("/consultations/{id}/edits")

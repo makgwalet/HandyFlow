@@ -543,6 +543,7 @@ public class ClinicService {
         }
         ClinicConsultation c = ClinicConsultation.createDraft(
                 tenantId, patientId, req.appointmentId(), req.practitionerId(), req.chiefComplaint());
+        c.startedBy(currentUserIdOrNull());
         c.recordVitals(req.weightKg(), req.heightCm(), req.bloodPressure(),
                 req.pulseBpm(), req.temperatureC(), req.oxygenSatPct());
         c.recordClinical(req.history(), req.examination(), req.diagnosis(),
@@ -560,8 +561,19 @@ public class ClinicService {
 
     @Transactional(readOnly = true)
     public List<ConsultationResponse> getDraftConsultations(TenantId tenantId) {
-        return mapConsultationsList(consultationRepo.findDrafts(tenantId), tenantId);
+        return getDraftConsultations(tenantId, false);
     }
+
+    /** With {@code mine}, only drafts this user started; drafts from before authors were recorded are not "mine". */
+    public List<ConsultationResponse> getDraftConsultations(TenantId tenantId, boolean mine) {
+        List<ClinicConsultation> drafts = consultationRepo.findDrafts(tenantId);
+        if (mine) {
+            UUID me = currentUserIdOrNull();
+            drafts = drafts.stream().filter(d -> me != null && me.equals(d.getCreatedBy())).toList();
+        }
+        return mapConsultationsList(drafts, tenantId);
+    }
+
 
     /** DRAFT -> SIGNED. Completes the appointment, stamps lastVisitAt, emails the summary. */
     @Transactional
@@ -856,7 +868,7 @@ public class ClinicService {
                 c.getTemperatureC(), c.getOxygenSatPct(), c.getChiefComplaint(),
                 c.getHistory(), c.getExamination(), c.getDiagnosis(), c.getIcd10Codes(),
                 c.getTreatmentPlan(), c.getFollowUpDays(), c.isBilled(), c.getBillingAmount(),
-                c.getCreatedAt(), c.getStatus());
+                c.getCreatedAt(), c.getStatus(), c.getUpdatedAt());
     }
 
     private PrescriptionResponse toPrescriptionResponse(ClinicPrescription p) {
