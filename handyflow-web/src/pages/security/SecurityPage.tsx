@@ -15,6 +15,7 @@ import RiskRulesTab        from "./RiskRulesTab"
 import ShiftsTab          from "./ShiftsTab"
 import SchedulerTab       from "./SchedulerTab"
 import PatrolsTab         from "./PatrolsTab"
+import CheckpointsTab     from "./CheckpointsTab"
 import IncidentsTab       from "./IncidentsTab"
 import LiveMapTab         from "./LiveMapTab"
 import ArmouryTab         from "./ArmouryTab"
@@ -58,6 +59,7 @@ export function SecurityPage() {
     "shifts":            <ShiftsTab />,
     "scheduler":         <SchedulerTab />,
     "patrols":           <PatrolsTab />,
+    "checkpoints":       <CheckpointsTab />,
     "incidents":         <IncidentsTab />,
     "patrol-routes":     <PatrolRoutesTab />,
     "post-orders":       <PostOrdersTab />,

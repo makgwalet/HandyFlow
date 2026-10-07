@@ -123,6 +123,16 @@ public class Checkpoint {
         this.updatedAt = Instant.now();
     }
 
+    /** Edits the details an administrator may change. Blank NFC and BLE identifiers clear them. QR codes are not touched here. */
+    public void updateDetails(String name, String description, String nfcTagUid, String bleBeaconId, boolean active) {
+        this.name        = name.trim();
+        this.description = description == null || description.isBlank() ? null : description.trim();
+        this.nfcTagUid   = nfcTagUid == null || nfcTagUid.isBlank() ? null : nfcTagUid.trim();
+        this.bleBeaconId = bleBeaconId == null || bleBeaconId.isBlank() ? null : bleBeaconId.trim();
+        this.active      = active;
+        this.updatedAt   = Instant.now();
+    }
+
     @PreUpdate
     void onUpdate() { this.updatedAt = Instant.now(); }
 }
