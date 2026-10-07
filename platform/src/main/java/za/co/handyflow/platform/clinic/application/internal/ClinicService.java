@@ -46,6 +46,7 @@ public class ClinicService {
     private final ClinicSchedulingService      schedulingService;
     private final ClinicTimeOffService         timeOffService;
     private final ClinicWorkingHoursService    workingHoursService;
+    private final ClinicClosureService         closureService;
 
     // ── Patients ──────────────────────────────────────────────────────────────
 
@@ -324,6 +325,7 @@ public class ClinicService {
             throw new IllegalArgumentException("Cannot book an appointment in the past");
         }
         int minutes = AppointmentRules.minutes(req.durationMinutes());
+        if (!allowOverlap) requireClinicOpen(tenantId, req.scheduledAt(), minutes);
         if (!allowOverlap && req.practitionerId() != null) {
             requirePractitionerFree(tenantId, req.practitionerId(), req.scheduledAt(), minutes, null);
         }
@@ -463,6 +465,13 @@ public class ClinicService {
         throw new ConflictException(AppointmentRules.conflictMessage(name, clashes, AppointmentRules.CLINIC_ZONE));
     }
 
+    /** Throws a 409 when the clinic is closed on any day the booking touches. */
+    private void requireClinicOpen(TenantId tenantId, Instant start, int minutes) {
+        var days = ClosureRules.daysTouched(start, minutes, AppointmentRules.CLINIC_ZONE);
+        var closed = closureService.overlapping(tenantId, days[0], days[1]);
+        if (!closed.isEmpty()) throw new ConflictException(ClosureRules.message(closed, AppointmentRules.CLINIC_ZONE));
+    }
+
     /** Throws a 409 when the patient already has a live booking at that time (even with another practitioner). */
     private void requirePatientFree(TenantId tenantId, UUID patientId, String patientName, Instant start, int minutes, UUID ignoreAppointmentId) {
         var clashes = schedulingService.findPatientClashes(tenantId, patientId, start, minutes, ignoreAppointmentId);
@@ -480,6 +489,7 @@ public class ClinicService {
         }
         int minutes = req.durationMinutes() != null ? AppointmentRules.minutes(req.durationMinutes()) : appt.getDurationMinutes();
         UUID practitionerId = req.practitionerId() != null ? req.practitionerId() : appt.getPractitionerId();
+        if (!allowOverlap) requireClinicOpen(tenantId, req.scheduledAt(), minutes);
         if (!allowOverlap && practitionerId != null) {
             requirePractitionerFree(tenantId, practitionerId, req.scheduledAt(), minutes, appt.getId());
         }

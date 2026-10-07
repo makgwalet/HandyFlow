@@ -44,6 +44,7 @@ class ClinicServiceTest {
     @Mock ClinicSchedulingService schedulingService;
     @Mock ClinicTimeOffService timeOffService;
     @Mock ClinicWorkingHoursService workingHoursService;
+    @Mock ClinicClosureService closureService;
 
     @InjectMocks ClinicService service;
 
@@ -429,6 +430,25 @@ class ClinicServiceTest {
                     .isInstanceOf(za.co.handyflow.platform.shared.ConflictException.class)
                     .hasMessageContaining("is away")
                     .hasMessageContaining("Annual leave");
+            verify(appointmentRepo, never()).save(any(ClinicAppointment.class));
+        }
+
+        @Test
+        @DisplayName("refuses a booking on a day the clinic is closed, even with no practitioner")
+        void refusesWhenClinicClosed() {
+            var patientId = UUID.randomUUID();
+            when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patientWithId("Jane","Dlamini")));
+            var start = Instant.now().plusSeconds(86400);
+            var day = start.atZone(java.time.ZoneId.of("Africa/Johannesburg")).toLocalDate();
+            when(closureService.overlapping(eq(TENANT), any(), any()))
+                    .thenReturn(List.of(new ClosureRules.Closure(day, day, "Public holiday")));
+
+            var req = new CreateAppointmentRequest(patientId, null, start, 30, "CONSULTATION", null);
+
+            assertThatThrownBy(() -> service.createAppointment(TENANT, req))
+                    .isInstanceOf(za.co.handyflow.platform.shared.ConflictException.class)
+                    .hasMessageContaining("The clinic is closed")
+                    .hasMessageContaining("Public holiday");
             verify(appointmentRepo, never()).save(any(ClinicAppointment.class));
         }
 
