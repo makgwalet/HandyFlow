@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import ConsultationSession from "./ConsultationSession"
 import { LabsTabEnhanced } from "./LabsTab"
 import ConsentTab from "./ConsentTab"
+import TimelineTab from "./TimelineTab"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import RxFillControl from "./RxFillControl"
@@ -189,7 +190,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
     {id:"rx",           label:"Prescriptions",icon:Pill},
     {id:"labs",         label:"Lab results",  icon:FlaskConical},
     {id:"documents",    label:"Documents",    icon:FileText},
-    {id:"history",      label:"History",      icon:Clock},
+    {id:"history",      label:"Timeline",      icon:Clock},
     {id:"consent",      label:"Consent",      icon:ShieldCheck},
   ]
 
@@ -382,7 +383,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
       {activeTab==="rx"           && <PrescriptionsTab patient={patient} consultations={consultations as Consultation[]}/>}
       {activeTab==="labs"         && <LabsTabEnhanced patient={patient}/>}
       {activeTab==="documents"    && <DocumentsTab patient={patient} consultations={consultations as Consultation[]}/>}
-      {activeTab==="history"      && <HistoryTab appointments={appointments as Appointment[]} consultations={consultations as Consultation[]}/>}
+      {activeTab==="history"      && <TimelineTab patientId={patient.id}/>}
       {activeTab==="consent"      && <ConsentTab patient={patient}/>}
     </div>
   )
