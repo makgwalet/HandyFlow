@@ -160,13 +160,14 @@ Load the demo, sign in as a user with `SECURITY_READ` and `SECURITY_MANAGE` (adm
 - [ ] Checkpoints shows 25 with scan counts; inactive checkpoints are marked. QR print works. NFC and BLE checkpoints show their tag id.
 
 ### Gate
-- [ ] Gate Dashboard shows 6 entries on site and 1 overstayed (the overstayed one is also still on site, so check whether your dashboard counts it in the on-site total).
+- [ ] Gate Dashboard shows 7 on site now for all sites (6 on site plus 1 overstayed; the overstayed person counts), 1 overstayed, and per-site cards. Today's entered and left counts depend on the time you load the data.
 - [ ] Gate Access shows 6 access points and 16 entries, 9 departed.
 - [ ] Recording a departure for an on-site visitor moves them to departed and drops the on-site count.
 
 ### Guards and Guard 360
 - [ ] Guards lists 14. Filter by grade and by status; the terminated guard is hidden or flagged as your filter dictates.
 - [ ] Open a guard: the profile shows screening, competencies, documents, ratings and complaints.
+- [ ] On a guard's Documents tab the "Guard file checklist" can say police clearance or POPIA consent is missing while Deployment Readiness is 100%. They are different lists (see backlog, pending C1).
 - [ ] PSiRA badges: some valid, two expiring within 30 days (about 15 and 25 days), one expired about 10 days ago.
 - [ ] Screening panel states: Cleared, Pending, Flagged, Unscreened across different guards.
 - [ ] A guard with a firearm competency shows it on the profile and in Armoury.
