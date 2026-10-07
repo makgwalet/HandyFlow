@@ -407,6 +407,82 @@ public class ClinicService {
         return page.map(c -> toConsultationResponse(c, patientNames, practNames));
     }
 
+    // ── Drafts (autosave target) ───────────────────────────────────────────────
+
+    /**
+     * Starts a persisted DRAFT consultation. Unlike {@link #createConsultation} this
+     * deliberately does NOT complete the appointment, touch lastVisitAt or email the
+     * visit summary: those happen on {@link #signConsultation}.
+     */
+    @Transactional
+    public ConsultationResponse createDraftConsultation(TenantId tenantId, UUID patientId,
+                                                        CreateConsultationRequest req) {
+        ClinicPatient patient = patientRepo.findActiveById(tenantId, patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", patientId.toString()));
+
+        ClinicConsultation c = ClinicConsultation.createDraft(
+                tenantId, patientId, req.appointmentId(), req.practitionerId(), req.chiefComplaint());
+        c.recordVitals(req.weightKg(), req.heightCm(), req.bloodPressure(),
+                req.pulseBpm(), req.temperatureC(), req.oxygenSatPct());
+        c.recordClinical(req.history(), req.examination(), req.diagnosis(),
+                req.icd10Codes(), req.treatmentPlan(), req.followUpDays());
+        consultationRepo.save(c);
+        log.info("Created DRAFT consultation={} patient={}", c.getId(), patientId);
+
+        Map<UUID, String> patientNames = Map.of(patientId,
+                patient.getFirstName() + " " + patient.getLastName());
+        Map<UUID, String> practNames = c.getPractitionerId() != null
+                ? loadPractitionerNamesById(tenantId, List.of(c.getPractitionerId()))
+                : Map.of();
+        return toConsultationResponse(c, patientNames, practNames);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ConsultationResponse> getDraftConsultations(TenantId tenantId) {
+        return mapConsultationsList(consultationRepo.findDrafts(tenantId), tenantId);
+    }
+
+    /** DRAFT -> SIGNED. Completes the appointment, stamps lastVisitAt, emails the summary. */
+    @Transactional
+    public ConsultationResponse signConsultation(TenantId tenantId, UUID id) {
+        ClinicConsultation c = consultationRepo.findActiveById(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Consultation", id.toString()));
+        if (!c.isDraft()) {
+            throw new IllegalStateException("Only a DRAFT consultation can be signed (is " + c.getStatus() + ").");
+        }
+        c.sign();
+        consultationRepo.save(c);
+
+        if (c.getAppointmentId() != null) {
+            appointmentRepo.findActiveById(tenantId, c.getAppointmentId())
+                    .ifPresent(a -> { if (a.isActive()) { a.complete(); appointmentRepo.save(a); } });
+        }
+        ClinicPatient patient = patientRepo.findActiveById(tenantId, c.getPatientId())
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", c.getPatientId().toString()));
+        patient.setLastVisitAt(Instant.now());
+        patientRepo.save(patient);
+        sendVisitSummaryEmail(tenantId, c, patient);
+        log.info("Signed consultation={}", id);
+
+        Map<UUID, String> practNames = c.getPractitionerId() != null
+                ? loadPractitionerNamesById(tenantId, List.of(c.getPractitionerId()))
+                : Map.of();
+        return toConsultationResponse(c, Map.of(c.getPatientId(),
+                patient.getFirstName() + " " + patient.getLastName()), practNames);
+    }
+
+    /** DRAFT -> ABANDONED (kept for audit, hidden from the drafts tray and billing). */
+    @Transactional
+    public void abandonConsultation(TenantId tenantId, UUID id) {
+        ClinicConsultation c = consultationRepo.findActiveById(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Consultation", id.toString()));
+        if (!c.isDraft()) {
+            throw new IllegalStateException("Only a DRAFT consultation can be abandoned (is " + c.getStatus() + ").");
+        }
+        c.abandon();
+        consultationRepo.save(c);
+    }
+
     // ── Edit a saved consultation ──────────────────────────────────────────────
 
     @Transactional
@@ -414,6 +490,10 @@ public class ClinicService {
                                                    CreateConsultationRequest req) {
         ClinicConsultation c = consultationRepo.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Consultation", id.toString()));
+        if (c.isLocked()) {
+            throw new IllegalStateException("Consultation is " + c.getStatus()
+                    + " and can no longer be edited; add an addendum instead.");
+        }
 
         boolean hasVitals = req.weightKg() != null || req.heightCm() != null
                 || req.bloodPressure() != null || req.pulseBpm() != null
@@ -606,7 +686,7 @@ public class ClinicService {
                 c.getTemperatureC(), c.getOxygenSatPct(), c.getChiefComplaint(),
                 c.getHistory(), c.getExamination(), c.getDiagnosis(), c.getIcd10Codes(),
                 c.getTreatmentPlan(), c.getFollowUpDays(), c.isBilled(), c.getBillingAmount(),
-                c.getCreatedAt());
+                c.getCreatedAt(), c.getStatus());
     }
 
     private PrescriptionResponse toPrescriptionResponse(ClinicPrescription p) {

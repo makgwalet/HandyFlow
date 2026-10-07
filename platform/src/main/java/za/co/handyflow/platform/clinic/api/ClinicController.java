@@ -212,6 +212,50 @@ public class ClinicController {
                 clinicService.createConsultation(TenantContext.getTenantIdAsObject(), patientId, req)));
     }
 
+    @PatchMapping("/consultations/{id}")
+    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @Operation(summary = "Partial update of a consultation (autosave target); null fields are left unchanged")
+    public ResponseEntity<ApiResponse<ConsultationResponse>> patchConsultation(
+            @PathVariable UUID id,
+            @RequestBody CreateConsultationRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Consultation updated",
+                clinicService.updateConsultation(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @PostMapping("/patients/{patientId}/consultations/draft")
+    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @Operation(summary = "Start a persisted DRAFT consultation (no appointment completion, no email)")
+    public ResponseEntity<ApiResponse<ConsultationResponse>> createDraftConsultation(
+            @PathVariable UUID patientId,
+            @RequestBody CreateConsultationRequest req) {
+        return ResponseEntity.status(201).body(ApiResponse.success("Draft started",
+                clinicService.createDraftConsultation(TenantContext.getTenantIdAsObject(), patientId, req)));
+    }
+
+    @GetMapping("/consultations/drafts")
+    @PreAuthorize("hasAuthority('CLINIC_READ')")
+    @Operation(summary = "Open DRAFT consultations for the tenant (drafts tray)")
+    public ResponseEntity<ApiResponse<List<ConsultationResponse>>> getDraftConsultations() {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                clinicService.getDraftConsultations(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/consultations/{id}/sign")
+    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @Operation(summary = "Sign a DRAFT consultation: completes the appointment and emails the visit summary")
+    public ResponseEntity<ApiResponse<ConsultationResponse>> signConsultation(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Consultation signed",
+                clinicService.signConsultation(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/consultations/{id}/abandon")
+    @PreAuthorize("hasAuthority('CLINIC_WRITE')")
+    @Operation(summary = "Abandon a DRAFT consultation")
+    public ResponseEntity<ApiResponse<Void>> abandonConsultation(@PathVariable UUID id) {
+        clinicService.abandonConsultation(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok(ApiResponse.success("Draft abandoned", null));
+    }
+
     // ── Prescriptions ─────────────────────────────────────────────────────────
 
     @GetMapping("/consultations/{consultationId}/prescriptions")

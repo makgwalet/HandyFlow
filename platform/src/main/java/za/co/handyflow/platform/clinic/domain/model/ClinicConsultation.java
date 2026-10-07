@@ -46,6 +46,10 @@ public class ClinicConsultation {
     @Column(name = "treatment_plan") String  treatmentPlan;
     @Column(name = "follow_up_days") Integer followUpDays;
 
+    // Lifecycle: DRAFT -> SIGNED -> LOCKED, or DRAFT -> ABANDONED
+    String status = "SIGNED";
+    @Column(name = "signed_at") Instant signedAt;
+
     // Billing
     boolean billed = false;
     @Column(name = "billing_code")   String     billingCode;
@@ -74,6 +78,28 @@ public class ClinicConsultation {
         c.createdAt      = Instant.now();
         c.updatedAt      = Instant.now();
         return c;
+    }
+
+    public static ClinicConsultation createDraft(TenantId tenantId,
+                                                 UUID patientId, UUID appointmentId,
+                                                 UUID practitionerId, String chiefComplaint) {
+        ClinicConsultation c = create(tenantId, patientId, appointmentId, practitionerId, chiefComplaint);
+        c.status = "DRAFT";
+        return c;
+    }
+
+    public boolean isDraft()  { return "DRAFT".equals(status); }
+    public boolean isLocked() { return "LOCKED".equals(status) || "ABANDONED".equals(status); }
+
+    public void sign() {
+        this.status    = "SIGNED";
+        this.signedAt  = Instant.now();
+        this.updatedAt = this.signedAt;
+    }
+
+    public void abandon() {
+        this.status    = "ABANDONED";
+        this.updatedAt = Instant.now();
     }
 
     // ── Mutators ──────────────────────────────────────────────────────────────

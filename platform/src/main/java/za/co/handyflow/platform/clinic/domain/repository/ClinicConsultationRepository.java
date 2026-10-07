@@ -16,6 +16,9 @@ public interface ClinicConsultationRepository extends JpaRepository<ClinicConsul
     @Query("SELECT c FROM ClinicConsultation c WHERE c.tenantId = :#{#tenantId.value} AND c.patientId = :patientId AND c.deletedAt IS NULL ORDER BY c.consultedAt DESC")
     List<ClinicConsultation> findByPatient(TenantId tenantId, UUID patientId);
 
+    @Query("SELECT c FROM ClinicConsultation c WHERE c.tenantId = :#{#tenantId.value} AND c.status = 'DRAFT' AND c.deletedAt IS NULL ORDER BY c.updatedAt DESC")
+    List<ClinicConsultation> findDrafts(TenantId tenantId);
+
     @Query("SELECT c FROM ClinicConsultation c WHERE c.tenantId = :#{#tenantId.value} AND c.id = :id AND c.deletedAt IS NULL")
     Optional<ClinicConsultation> findActiveById(TenantId tenantId, UUID id);
 
@@ -23,7 +26,7 @@ public interface ClinicConsultationRepository extends JpaRepository<ClinicConsul
     Page<ClinicConsultation> findAllActive(TenantId tenantId, Pageable pageable);
 
     // FIX #8 — for the /billing/consultations?unbilled=true endpoint
-    @Query("SELECT c FROM ClinicConsultation c WHERE c.tenantId = :#{#tenantId.value} AND c.deletedAt IS NULL AND c.billed = false ORDER BY c.consultedAt DESC")
+    @Query("SELECT c FROM ClinicConsultation c WHERE c.tenantId = :#{#tenantId.value} AND c.deletedAt IS NULL AND c.status <> 'DRAFT' AND c.status <> 'ABANDONED' AND c.billed = false ORDER BY c.consultedAt DESC")
     Page<ClinicConsultation> findAllUnbilled(TenantId tenantId, Pageable pageable);
 
     /**
