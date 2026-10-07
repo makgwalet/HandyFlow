@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest"
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
-const post = vi.fn()
-vi.mock("../../api/client", () => ({ apiClient: { post: (...a: any[]) => post(...a) } }))
-import PrescriptionForm, { EMPTY_RX, rxProblems, rxRequest } from "./PrescriptionForm"
+const post = vi.fn(), get = vi.fn()
+vi.mock("../../api/client", () => ({ apiClient: { post: (...a: any[]) => post(...a), get: (...a: any[]) => get(...a) } }))
+import PrescriptionForm, { EMPTY_RX, medicineLabel, rxProblems, rxRequest } from "./PrescriptionForm"
 
-beforeEach(() => { post.mockReset(); post.mockResolvedValue({ data: { data: { alerts: [], note: "" } } }) })
+beforeEach(() => { post.mockReset(); post.mockResolvedValue({ data: { data: { alerts: [], note: "" } } }); get.mockReset(); get.mockResolvedValue({ data: { data: [] } }) })
 afterEach(cleanup)
 
 describe("rxProblems / rxRequest", () => {
@@ -63,5 +63,31 @@ describe("PrescriptionForm", () => {
     fireEvent.click(screen.getByText("Add prescription", { selector: "button" }))
     await waitFor(() => expect(onSubmit).toHaveBeenCalled())
     expect(onSubmit.mock.calls[0][0].allergyOverrideReason).toBe("Tolerated before, specialist advice")
+  })
+})
+
+describe("medicine suggestions", () => {
+  it("writes a catalogue medicine as generic name and strength", () => {
+    expect(medicineLabel({ genericName: "Amoxicillin", strength: "500mg" })).toBe("Amoxicillin 500mg")
+    expect(medicineLabel({ genericName: "Paracetamol", strength: null })).toBe("Paracetamol")
+  })
+  it("offers catalogue matches while typing and fills the field when one is chosen", async () => {
+    get.mockResolvedValue({ data: { data: [{ genericName: "Amoxicillin", strength: "500mg", dosageForm: "Capsule" }] } })
+    render(<PrescriptionForm consultationId="c1" onSubmit={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText("Medication *"), { target: { value: "amox" } })
+    fireEvent.click(await screen.findByRole("option", {}, { timeout: 3000 }))
+    expect((screen.getByLabelText("Medication *") as HTMLInputElement).value).toBe("Amoxicillin 500mg")
+    expect(screen.queryByRole("listbox")).toBeNull()
+    expect(get).toHaveBeenCalledWith("/api/v1/clinic/medications?search=amox")
+  })
+  it("still lets the prescriber type a medicine when the catalogue search fails", async () => {
+    get.mockImplementation(() => Promise.reject(new Error("x")))
+    const onSubmit = vi.fn().mockResolvedValue(undefined)
+    render(<PrescriptionForm consultationId="c1" onSubmit={onSubmit} />)
+    fireEvent.change(screen.getByLabelText("Medication *"), { target: { value: "Something unlisted" } })
+    await waitFor(() => expect(get).toHaveBeenCalled(), { timeout: 3000 })
+    expect(screen.queryByRole("listbox")).toBeNull()
+    fireEvent.click(screen.getByText("Add prescription", { selector: "button" }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
   })
 })
