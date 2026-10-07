@@ -7,6 +7,7 @@ import ConsentTab from "./ConsentTab"
 import TimelineTab from "./TimelineTab"
 import PatientNotesPanel, { PatientAlertBanner } from "./PatientNotes"
 import ObservationMatrix from "./ObservationMatrix"
+import PatientSummaryPrint from "./PatientSummaryPrint"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import RxFillControl from "./RxFillControl"
@@ -461,6 +462,7 @@ function OverviewTab({ patient, idInfo, familyMembers, onOpenPatient, qc }: {
         <ClinicalSummaryPanel patientId={patient.id} fallbackAllergies={patient.allergies} fallbackConditions={patient.chronicConditions} />
         <PatientNotesPanel patientId={patient.id} />
         <ObservationMatrix patientId={patient.id} />
+        <div style={{ marginTop: 16 }}><PatientSummaryPrint patient={patient as any} /></div>
 
         {patient.notes && (
           <div style={{ padding:"12px 14px", background:LIGHT, borderRadius:10, border:`1px solid ${BORDER}` }}>
