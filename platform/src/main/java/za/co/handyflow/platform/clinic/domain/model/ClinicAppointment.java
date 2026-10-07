@@ -39,6 +39,7 @@ public class ClinicAppointment {
     // S1-8: front-desk / nurse progress through the clinic, for waiting-time reporting.
     @Column(name = "checked_in_at") Instant checkedInAt;
     @Column(name = "triaged_at")    Instant triagedAt;
+    @Column(name = "room_id") UUID roomId;
     @Version long version;
 
     // ── Factory ───────────────────────────────────────────────────────────────
@@ -47,7 +48,15 @@ public class ClinicAppointment {
                                            UUID patientId, UUID practitionerId,
                                            Instant scheduledAt, int durationMinutes,
                                            String appointmentType, String reason) {
+        return create(tenantId, patientId, practitionerId, scheduledAt, durationMinutes, appointmentType, reason, null);
+    }
+
+    public static ClinicAppointment create(TenantId tenantId,
+                                           UUID patientId, UUID practitionerId,
+                                           Instant scheduledAt, int durationMinutes,
+                                           String appointmentType, String reason, UUID roomId) {
         ClinicAppointment a = new ClinicAppointment();
+        a.roomId          = roomId;
         a.id              = UUID.randomUUID();
         a.tenantId        = tenantId.getValue();
         a.patientId       = patientId;
@@ -132,11 +141,17 @@ public class ClinicAppointment {
      * and becomes eligible for a fresh automatic reminder.
      */
     public void reschedule(Instant newTime, int minutes, UUID newPractitionerId) {
+        reschedule(newTime, minutes, newPractitionerId, null);
+    }
+
+    /** A null practitioner or room leaves it as it is. */
+    public void reschedule(Instant newTime, int minutes, UUID newPractitionerId, UUID newRoomId) {
         if (!"SCHEDULED".equals(this.status) && !"CONFIRMED".equals(this.status))
             throw new IllegalStateException("Only a SCHEDULED or CONFIRMED appointment can be moved (is " + this.status + ")");
         this.scheduledAt = newTime;
         this.durationMinutes = minutes;
         if (newPractitionerId != null) this.practitionerId = newPractitionerId;
+        if (newRoomId != null) this.roomId = newRoomId;
         this.status = "SCHEDULED";
         this.reminderSentAt = null;
         this.updatedAt = Instant.now();

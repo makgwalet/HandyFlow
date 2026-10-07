@@ -46,6 +46,7 @@ class ClinicServiceTest {
     @Mock ClinicWorkingHoursService workingHoursService;
     @Mock ClinicClosureService closureService;
     @Mock za.co.handyflow.platform.shared.EmailService emailService;
+    @Mock ClinicRoomService roomService;
 
     @InjectMocks ClinicService service;
 
@@ -454,6 +455,56 @@ class ClinicServiceTest {
         }
 
         @Test
+        @DisplayName("refuses a booking into a room that is already in use")
+        void refusesBusyRoom() {
+            var patientId = UUID.randomUUID();
+            var roomId = UUID.randomUUID();
+            when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patientWithId("Jane","Dlamini")));
+            var start = Instant.now().plusSeconds(3600);
+            when(roomService.find(TENANT, roomId)).thenReturn(Optional.of(new za.co.handyflow.platform.clinic.dto.RoomDtos.RoomResponse(roomId, "Room 2", true)));
+            when(schedulingService.findRoomClashes(TENANT, roomId, start, 30, null))
+                    .thenReturn(List.of(new AppointmentRules.Clash("Sam Nkosi", start, 30)));
+
+            var req = new CreateAppointmentRequest(patientId, null, start, 30, "CONSULTATION", null, roomId);
+
+            assertThatThrownBy(() -> service.createAppointment(TENANT, req))
+                    .isInstanceOf(za.co.handyflow.platform.shared.ConflictException.class)
+                    .hasMessageContaining("Room 2 is already booked")
+                    .hasMessageContaining("Sam Nkosi");
+            verify(appointmentRepo, never()).save(any(ClinicAppointment.class));
+        }
+
+        @Test
+        @DisplayName("refuses a room that is switched off, even when overlap is allowed")
+        void refusesSwitchedOffRoom() {
+            var patientId = UUID.randomUUID();
+            var roomId = UUID.randomUUID();
+            when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patientWithId("Jane","Dlamini")));
+            when(roomService.find(TENANT, roomId)).thenReturn(Optional.of(new za.co.handyflow.platform.clinic.dto.RoomDtos.RoomResponse(roomId, "Old room", false)));
+
+            var req = new CreateAppointmentRequest(patientId, null, Instant.now().plusSeconds(3600), 30, "CONSULTATION", null, roomId);
+
+            assertThatThrownBy(() -> service.createAppointment(TENANT, req, true))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("switched off");
+            verify(appointmentRepo, never()).save(any(ClinicAppointment.class));
+        }
+
+        @Test
+        @DisplayName("refuses a room that does not exist")
+        void refusesUnknownRoom() {
+            var patientId = UUID.randomUUID();
+            var roomId = UUID.randomUUID();
+            when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patientWithId("Jane","Dlamini")));
+            when(roomService.find(TENANT, roomId)).thenReturn(Optional.empty());
+
+            var req = new CreateAppointmentRequest(patientId, null, Instant.now().plusSeconds(3600), 30, "CONSULTATION", null, roomId);
+
+            assertThatThrownBy(() -> service.createAppointment(TENANT, req))
+                    .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
         @DisplayName("refuses a booking outside the practitioner's working hours")
         void refusesOutsideWorkingHours() {
             var patientId = UUID.randomUUID();
@@ -606,6 +657,23 @@ class ClinicServiceTest {
             service.rescheduleAppointment(TENANT, appt.getId(), new RescheduleRequest(Instant.now().plusSeconds(86400), null, null), false);
 
             verifyNoInteractions(emailService);
+        }
+
+        @Test
+        @DisplayName("refuses a move into a room that is already in use")
+        void refusesBusyRoom() {
+            var appt = existing(null);
+            var roomId = UUID.randomUUID();
+            when(appointmentRepo.findActiveById(TENANT, appt.getId())).thenReturn(Optional.of(appt));
+            when(roomService.find(TENANT, roomId)).thenReturn(Optional.of(new za.co.handyflow.platform.clinic.dto.RoomDtos.RoomResponse(roomId, "Room 2", true)));
+            var newTime = Instant.now().plusSeconds(86400);
+            when(schedulingService.findRoomClashes(TENANT, roomId, newTime, 30, appt.getId()))
+                    .thenReturn(List.of(new AppointmentRules.Clash("Sam Nkosi", newTime, 30)));
+
+            assertThatThrownBy(() -> service.rescheduleAppointment(TENANT, appt.getId(), new RescheduleRequest(newTime, null, null, roomId), false))
+                    .isInstanceOf(za.co.handyflow.platform.shared.ConflictException.class)
+                    .hasMessageContaining("Room 2 is already booked");
+            verify(appointmentRepo, never()).save(any(ClinicAppointment.class));
         }
 
         @Test

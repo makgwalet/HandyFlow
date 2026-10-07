@@ -54,4 +54,20 @@ public class ClinicSchedulingService {
                         rs.getInt("duration_minutes")),
                 t.getValue(), patientId, to, from, ignoreAppointmentId, ignoreAppointmentId);
     }
+
+    /** Live bookings already in the room overlapping [start, start + minutes). The clash name is the patient. */
+    @Transactional(readOnly = true)
+    List<Clash> findRoomClashes(TenantId t, UUID roomId, Instant start, int minutes, UUID ignoreAppointmentId) {
+        Timestamp from = Timestamp.from(start);
+        Timestamp to = Timestamp.from(start.plus(Duration.ofMinutes(minutes)));
+        return jdbc.query("SELECT p.full_name AS patient_name, a.scheduled_at, a.duration_minutes "
+                        + "FROM clinic_appointments a JOIN clinic_patients p ON p.id = a.patient_id "
+                        + "WHERE a.tenant_id = ? AND a.room_id = ? AND a.deleted_at IS NULL "
+                        + "AND a.status NOT IN ('CANCELLED','NO_SHOW') "
+                        + "AND a.scheduled_at < ? AND a.scheduled_at + a.duration_minutes * INTERVAL '1 minute' > ? "
+                        + "AND (?::uuid IS NULL OR a.id <> ?::uuid) ORDER BY a.scheduled_at",
+                (rs, i) -> new Clash(rs.getString("patient_name"), rs.getTimestamp("scheduled_at").toInstant(),
+                        rs.getInt("duration_minutes")),
+                t.getValue(), roomId, to, from, ignoreAppointmentId, ignoreAppointmentId);
+    }
 }

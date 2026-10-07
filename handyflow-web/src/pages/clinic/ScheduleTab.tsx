@@ -18,6 +18,7 @@ interface Appointment {
   scheduledAt: string; durationMinutes: number
   appointmentType: string; status: string; reason: string
   videoRoomUrl?: string
+  roomId?: string|null; roomName?: string|null
 }
 interface Practitioner { id: string; fullName: string; specialty: string }
 interface Patient { id: string; fullName: string }
@@ -103,7 +104,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
   // Book form
   const [bookForm, setBookForm] = useState({
     patientId:"", practitionerId:"", scheduledAt:"",
-    durationMinutes:"30", appointmentType:"CONSULTATION", reason:""
+    durationMinutes:"30", appointmentType:"CONSULTATION", reason:"", roomId:""
   })
 
   const weekStart = view==="week" ? startOfWeek(anchor) : anchor
@@ -124,6 +125,10 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
     refetchInterval: 60_000,
   })
 
+  const { data: rooms=[] } = useQuery<{id:string; name:string}[]>({
+    queryKey:["clinic-rooms"],
+    queryFn: async()=>{ const r = await apiClient.get("/api/v1/clinic/rooms"); return r.data?.data ?? r.data ?? [] },
+  })
   const { data: practitioners=[] } = useQuery<Practitioner[]>({
     queryKey: ["clinic-practitioners-list"],
     queryFn: async () => unwrap(await apiClient.get("/api/v1/clinic/practitioners/list")),
@@ -177,7 +182,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
       qc.invalidateQueries({queryKey:["schedule-appts"]})
       qc.invalidateQueries({queryKey:["clinic-appts-dashboard"]})
       setShowBook(false)
-      setBookForm({patientId:"",practitionerId:"",scheduledAt:"",durationMinutes:"30",appointmentType:"CONSULTATION",reason:""})
+      setBookForm({patientId:"",practitionerId:"",scheduledAt:"",durationMinutes:"30",appointmentType:"CONSULTATION",reason:"",roomId:""})
       setApiError("")
     },
     onError: (e:any, vars) => {
@@ -365,6 +370,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
                 ["Time", new Date(selected.scheduledAt).toLocaleTimeString("en-ZA",{hour:"2-digit",minute:"2-digit"})],
                 ["Duration", `${selected.durationMinutes} minutes`],
                 ["Practitioner", selected.practitionerName ? `Dr. ${selected.practitionerName}` : "—"],
+                ["Room", selected.roomName || "—"],
                 ["Reason", selected.reason || "—"],
               ].map(([label,value])=>(
                 <div key={label as string} style={{padding:"9px 12px",background:LIGHT,borderRadius:8}}>
@@ -431,6 +437,15 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
                 {(practitioners as Practitioner[]).map(p=><option key={p.id} value={p.id}>Dr. {p.fullName} — {p.specialty}</option>)}
               </select>
             </div>
+            {rooms.length>0 && (
+              <div>
+                <label style={lbl}>Room</label>
+                <select aria-label="Room" value={bookForm.roomId} onChange={e=>setBookForm(f=>({...f,roomId:e.target.value}))} style={sinp}>
+                  <option value="">No room</option>
+                  {rooms.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              </div>
+            )}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
               <div>
                 <label style={lbl}>Date & time *</label>
@@ -486,6 +501,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
                 durationMinutes: parseInt(bookForm.durationMinutes) || 30,
                 appointmentType: bookForm.appointmentType,
                 reason: bookForm.reason || null,
+                roomId: bookForm.roomId || null,
               }})
             }}
             confirmLabel="Book appointment"

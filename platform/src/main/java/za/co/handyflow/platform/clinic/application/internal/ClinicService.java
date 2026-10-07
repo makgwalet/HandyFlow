@@ -47,6 +47,7 @@ public class ClinicService {
     private final ClinicTimeOffService         timeOffService;
     private final ClinicWorkingHoursService    workingHoursService;
     private final ClinicClosureService         closureService;
+    private final ClinicRoomService            roomService;
 
     // ── Patients ──────────────────────────────────────────────────────────────
 
@@ -329,13 +330,15 @@ public class ClinicService {
         if (!allowOverlap && req.practitionerId() != null) {
             requirePractitionerFree(tenantId, req.practitionerId(), req.scheduledAt(), minutes, null);
         }
+        String roomName = req.roomId() != null ? requireUsableRoom(tenantId, req.roomId()) : null;
         if (!allowOverlap) {
+            if (req.roomId() != null) requireRoomFree(tenantId, req.roomId(), roomName, req.scheduledAt(), minutes, null);
             requirePatientFree(tenantId, req.patientId(), patient.getFullName(), req.scheduledAt(), minutes, null);
         }
         ClinicAppointment appt = ClinicAppointment.create(
                 tenantId, req.patientId(), req.practitionerId(),
                 req.scheduledAt(), minutes,
-                req.appointmentType(), req.reason()
+                req.appointmentType(), req.reason(), req.roomId()
         );
         appointmentRepo.save(appt);
         log.info("Created appointment={} patient={}", appt.getId(), req.patientId());
@@ -350,7 +353,8 @@ public class ClinicService {
 
         return toAppointmentResponse(appt,
                 loadPatientNames(tenantId, List.of(appt)),
-                loadPractitionerNames(tenantId, List.of(appt)));
+                loadPractitionerNames(tenantId, List.of(appt)),
+                loadRoomNames(tenantId, List.of(appt)));
     }
 
     private void sendBookingConfirmation(TenantId tenantId, ClinicAppointment appt, ClinicPatient patient) {
@@ -466,7 +470,8 @@ public class ClinicService {
         appointmentRepo.save(appt);
         return toAppointmentResponse(appt,
                 loadPatientNames(tenantId, List.of(appt)),
-                loadPractitionerNames(tenantId, List.of(appt)));
+                loadPractitionerNames(tenantId, List.of(appt)),
+                loadRoomNames(tenantId, List.of(appt)));
     }
 
     /** Throws a 409 when the practitioner is already booked, or away, at that time. */
@@ -480,6 +485,20 @@ public class ClinicService {
         if (!away.isEmpty()) throw new ConflictException(TimeOffRules.message(name, away, AppointmentRules.CLINIC_ZONE));
         if (outside) throw new ConflictException(WorkingHoursRules.outsideHours(name, hours, start, minutes, AppointmentRules.CLINIC_ZONE));
         throw new ConflictException(AppointmentRules.conflictMessage(name, clashes, AppointmentRules.CLINIC_ZONE));
+    }
+
+    /** The room must exist in this tenant and be switched on (not overridable). Returns its name. */
+    private String requireUsableRoom(TenantId tenantId, UUID roomId) {
+        var room = roomService.find(tenantId, roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Room", roomId.toString()));
+        if (!room.active()) throw new IllegalArgumentException("The room \"" + room.name() + "\" is switched off");
+        return room.name();
+    }
+
+    /** Throws a 409 when the room already has a live booking at that time. */
+    private void requireRoomFree(TenantId tenantId, UUID roomId, String roomName, Instant start, int minutes, UUID ignoreAppointmentId) {
+        var clashes = schedulingService.findRoomClashes(tenantId, roomId, start, minutes, ignoreAppointmentId);
+        if (!clashes.isEmpty()) throw new ConflictException(AppointmentRules.roomConflictMessage(roomName, clashes, AppointmentRules.CLINIC_ZONE));
     }
 
     /** Throws a 409 when the clinic is closed on any day the booking touches. */
@@ -510,13 +529,19 @@ public class ClinicService {
         if (!allowOverlap && practitionerId != null) {
             requirePractitionerFree(tenantId, practitionerId, req.scheduledAt(), minutes, appt.getId());
         }
+        UUID roomId = req.roomId() != null ? req.roomId() : appt.getRoomId();
+        if (req.roomId() != null) requireUsableRoom(tenantId, req.roomId());
+        if (!allowOverlap && roomId != null) {
+            String roomName = roomService.find(tenantId, roomId).map(r -> r.name()).orElse(null);
+            requireRoomFree(tenantId, roomId, roomName, req.scheduledAt(), minutes, appt.getId());
+        }
         if (!allowOverlap) {
             String patientName = patientRepo.findActiveById(tenantId, appt.getPatientId()).map(ClinicPatient::getFullName).orElse(null);
             requirePatientFree(tenantId, appt.getPatientId(), patientName, req.scheduledAt(), minutes, appt.getId());
         }
         Instant oldTime = appt.getScheduledAt();
         UUID oldPractitioner = appt.getPractitionerId();
-        appt.reschedule(req.scheduledAt(), minutes, req.practitionerId());
+        appt.reschedule(req.scheduledAt(), minutes, req.practitionerId(), req.roomId());
         appointmentRepo.save(appt);
         log.info("Rescheduled appointment={} to {}", appt.getId(), req.scheduledAt());
         if (RescheduleEmail.worthSending(oldTime, oldPractitioner, appt.getScheduledAt(), appt.getPractitionerId())) {
@@ -524,7 +549,8 @@ public class ClinicService {
         }
         return toAppointmentResponse(appt,
                 loadPatientNames(tenantId, List.of(appt)),
-                loadPractitionerNames(tenantId, List.of(appt)));
+                loadPractitionerNames(tenantId, List.of(appt)),
+                loadRoomNames(tenantId, List.of(appt)));
     }
 
     // ── Consultations ─────────────────────────────────────────────────────────
@@ -858,13 +884,15 @@ public class ClinicService {
     private Page<AppointmentResponse> mapAppointmentsPage(Page<ClinicAppointment> page, TenantId tenantId) {
         Map<UUID, String> patientNames = loadPatientNames(tenantId, page.getContent());
         Map<UUID, String> practNames   = loadPractitionerNames(tenantId, page.getContent());
-        return page.map(a -> toAppointmentResponse(a, patientNames, practNames));
+        Map<UUID, String> roomNames    = loadRoomNames(tenantId, page.getContent());
+        return page.map(a -> toAppointmentResponse(a, patientNames, practNames, roomNames));
     }
 
     private List<AppointmentResponse> mapAppointmentsList(List<ClinicAppointment> list, TenantId tenantId) {
         Map<UUID, String> patientNames = loadPatientNames(tenantId, list);
         Map<UUID, String> practNames   = loadPractitionerNames(tenantId, list);
-        return list.stream().map(a -> toAppointmentResponse(a, patientNames, practNames)).toList();
+        Map<UUID, String> roomNames    = loadRoomNames(tenantId, list);
+        return list.stream().map(a -> toAppointmentResponse(a, patientNames, practNames, roomNames)).toList();
     }
 
     /** Maps consultations to responses (patient and practitioner names resolved in bulk). */
@@ -899,6 +927,11 @@ public class ClinicService {
                 .collect(Collectors.toMap(
                         p -> p.getId(),
                         p -> p.getFirstName() + " " + p.getLastName()));
+    }
+
+    private Map<UUID, String> loadRoomNames(TenantId tenantId, List<ClinicAppointment> appts) {
+        Set<UUID> ids = appts.stream().map(ClinicAppointment::getRoomId).filter(Objects::nonNull).collect(Collectors.toSet());
+        return ids.isEmpty() ? Map.of() : roomService.namesByIds(tenantId, ids);
     }
 
     private Map<UUID, String> loadPractitionerNames(TenantId tenantId, List<ClinicAppointment> appts) {
@@ -963,7 +996,8 @@ public class ClinicService {
 
     private AppointmentResponse toAppointmentResponse(ClinicAppointment a,
                                                       Map<UUID, String> patientNames,
-                                                      Map<UUID, String> practNames) {
+                                                      Map<UUID, String> practNames,
+                                                      Map<UUID, String> roomNames) {
         return new AppointmentResponse(
                 a.getId(), a.getPatientId(),
                 patientNames.getOrDefault(a.getPatientId(), "Unknown"),
@@ -971,7 +1005,8 @@ public class ClinicService {
                 a.getPractitionerId() != null ? practNames.get(a.getPractitionerId()) : null,
                 a.getScheduledAt(), a.getDurationMinutes(),
                 a.getAppointmentType(), a.getStatus(), a.getReason(), a.getNotes(),
-                a.getCreatedAt());
+                a.getCreatedAt(),
+                a.getRoomId(), a.getRoomId() != null ? roomNames.get(a.getRoomId()) : null);
     }
 
     private ConsultationResponse toConsultationResponse(ClinicConsultation c,

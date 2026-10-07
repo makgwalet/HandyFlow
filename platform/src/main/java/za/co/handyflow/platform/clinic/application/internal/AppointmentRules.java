@@ -60,4 +60,13 @@ final class AppointmentRules {
         String more = clashes.size() > 1 ? " (and " + (clashes.size() - 1) + " more)" : "";
         return who + " already has an appointment " + when + with + more + ".";
     }
+
+    /** The room is already in use at that time. */
+    static String roomConflictMessage(String roomName, List<Clash> clashes, ZoneId zone) {
+        Clash c = clashes.get(0);
+        String when = HM.format(c.start().atZone(zone)) + "–" + HM.format(c.start().plus(Duration.ofMinutes(c.minutes())).atZone(zone));
+        String room = roomName == null || roomName.isBlank() ? "This room" : roomName;
+        String more = clashes.size() > 1 ? " (and " + (clashes.size() - 1) + " more)" : "";
+        return room + " is already booked " + when + " for " + c.patientName() + more + ".";
+    }
 }
