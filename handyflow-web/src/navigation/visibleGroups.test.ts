@@ -17,3 +17,25 @@ describe("visibleGroups: clinic admin sections", () => {
     expect(ids(["CLINIC_CONTENT_APPROVE"])).toContain("question-library")
   })
 })
+
+describe("clinic navigation structure", () => {
+  const all = CLINIC_SECTIONS.groups.flatMap(g => g.sections.map(s => s.id))
+  it("lists every section exactly once", () => {
+    expect(new Set(all).size).toBe(all.length)
+  })
+  it("keeps every section id the page can render, so deep links still work", () => {
+    for (const id of ["dashboard","patients","schedule","consultations","practitioners","claims","billing","recalls",
+      "waitlist","handoff","drafts","access-log","waiting-room","time-off","working-hours","closures","rooms",
+      "lab-inbox","question-library"]) expect(all).toContain(id)
+  })
+  it("puts front-desk work ahead of setup", () => {
+    const labels = CLINIC_SECTIONS.groups.map(g => g.label)
+    expect(labels.indexOf("Front desk")).toBeLessThan(labels.indexOf("Practice setup"))
+  })
+  it("gives every section its own icon within its group", () => {
+    for (const g of CLINIC_SECTIONS.groups) {
+      const icons = g.sections.map(s => s.icon)
+      expect(new Set(icons).size).toBe(icons.length)
+    }
+  })
+})

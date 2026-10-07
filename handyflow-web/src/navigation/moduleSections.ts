@@ -554,24 +554,44 @@ export const CLINIC_SECTIONS: ModuleSections = {
   groups: [
     { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
     {
-      label: 'Patients',
+      label: 'Front desk',
+      sections: [
+        { id: 'schedule', label: 'Schedule', icon: CalendarDays },
+        { id: 'waiting-room', label: 'Waiting room', icon: UserCheck },
+        { id: 'waitlist', label: 'Waitlist', icon: ListPlus },
+        { id: 'recalls', label: 'Recalls', icon: CalendarClock },
+      ],
+    },
+    {
+      label: 'Patient care',
       sections: [
         { id: 'patients', label: 'Patients', icon: Users },
         { id: 'consultations', label: 'Consultations', icon: FileText },
         { id: 'drafts', label: 'Drafts', icon: FileClock, permission: 'CLINIC_CLINICAL_WRITE' },
         { id: 'handoff', label: 'Handoff queue', icon: ArrowRightLeft, permission: 'CLINIC_CLINICAL_WRITE' },
-        { id: 'recalls', label: 'Recalls', icon: CalendarClock },
-        { id: 'waitlist', label: 'Waitlist', icon: ListPlus },
         { id: 'lab-inbox', label: 'Lab inbox', icon: FlaskConical },
       ],
     },
-    { label: 'Scheduling', sections: [{ id: 'schedule', label: 'Schedule', icon: Calendar }, { id: 'waiting-room', label: 'Waiting room', icon: Users }, { id: 'time-off', label: 'Time off', icon: Calendar }, { id: 'working-hours', label: 'Working hours', icon: Calendar }, { id: 'closures', label: 'Closures', icon: Calendar }, { id: 'rooms', label: 'Rooms', icon: Calendar }] },
     {
-      label: 'Practice & finance',
+      label: 'Money',
       sections: [
-        { id: 'practitioners', label: 'Practitioners', icon: Stethoscope },
         { id: 'claims', label: 'Claims', icon: CreditCard },
         { id: 'billing', label: 'Billing', icon: BarChart2 },
+      ],
+    },
+    {
+      label: 'Practice setup',
+      sections: [
+        { id: 'practitioners', label: 'Practitioners', icon: Stethoscope },
+        { id: 'rooms', label: 'Rooms', icon: DoorOpen },
+        { id: 'working-hours', label: 'Working hours', icon: Clock },
+        { id: 'time-off', label: 'Time off', icon: CalendarRange },
+        { id: 'closures', label: 'Closures', icon: Lock },
+      ],
+    },
+    {
+      label: 'Governance',
+      sections: [
         { id: 'access-log', label: 'Access log', icon: ShieldCheck, permission: 'CLINIC_ADMIN' },
         { id: 'question-library', label: 'Question library', icon: ListChecks, anyPermission: ['CLINIC_CONTENT_ADMIN', 'CLINIC_CONTENT_APPROVE'] },
       ],
