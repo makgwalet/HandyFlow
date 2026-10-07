@@ -96,8 +96,8 @@ export default function RecurringDetailPage() {
                     {s.lineItems.length === 0 ? <tr><td colSpan={5} style={{ ...td, textAlign: "center", color: "var(--hf-text-faint)", padding: 24 }}>No line items yet. Invoices will be empty until some are added.</td></tr> :
                       s.lineItems.map((li, i) => (
                         <tr key={li.id ?? i} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
-                          <td style={td}>{li.description}</td><td style={{ ...td, textAlign: "right" }}>{li.quantity}</td><td style={{ ...td, textAlign: "right" }}>{fmtR(li.unitPrice)}</td>
-                          <td style={{ ...td, textAlign: "right" }}>{li.vatRate ?? 15}%</td><td style={{ ...td, textAlign: "right", fontWeight: 700, color: "var(--hf-text-primary)" }}>{fmtR(li.lineTotal)}</td>
+                          <td style={td}>{li.description}</td><td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>{li.quantity}</td><td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>{fmtR(li.unitPrice)}</td>
+                          <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>{li.vatRate ?? 15}%</td><td style={{ ...td, textAlign: "right", whiteSpace: "nowrap", fontWeight: 700, color: "var(--hf-text-primary)" }}>{fmtR(li.lineTotal)}</td>
                         </tr>))}
                   </tbody>
                 </table>
@@ -121,8 +121,8 @@ export default function RecurringDetailPage() {
                       <tr key={i.id} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
                         <td style={td}><Link to={`/invoices/${i.id}`} style={{ fontWeight: 700 }}>{i.invoiceNumber}</Link></td>
                         <td style={td}>{fmtDate(i.issuedAt ?? i.createdAt)}</td>
-                        <td style={{ ...td, textAlign: "right" }}>{fmtR(i.total)}</td>
-                        <td style={{ ...td, textAlign: "right" }}>{i.status === "DRAFT" || i.status === "CANCELLED" ? "—" : fmtR(balanceOf(i))}</td>
+                        <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>{fmtR(i.total)}</td>
+                        <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>{i.status === "DRAFT" || i.status === "CANCELLED" ? "—" : fmtR(balanceOf(i))}</td>
                         <td style={td}><Chip tone={INVOICE_TONE[i.status] ?? "neutral"}>{label(INVOICE_LABEL, i.status)}</Chip></td>
                       </tr>))}
                   </tbody>

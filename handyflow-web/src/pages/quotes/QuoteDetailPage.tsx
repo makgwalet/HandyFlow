@@ -113,8 +113,8 @@ export function QuoteDetailPage() {
                     lines.map((li, i) => (
                       <tr key={li.id ?? i} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
                         <td style={td}>{li.description}{li.unit && <span style={{ color: "var(--hf-text-faint)" }}> · per {li.unit}</span>}</td>
-                        <td style={{ ...td, textAlign: "right" }}>{li.quantity}</td><td style={{ ...td, textAlign: "right" }}>{fmtR(li.unitPrice)}</td>
-                        <td style={{ ...td, textAlign: "right" }}>{li.vatRate ?? 15}%</td><td style={{ ...td, textAlign: "right", fontWeight: 700, color: "var(--hf-text-primary)" }}>{fmtR(li.lineTotal)}</td>
+                        <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>{li.quantity}</td><td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>{fmtR(li.unitPrice)}</td>
+                        <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>{li.vatRate ?? 15}%</td><td style={{ ...td, textAlign: "right", whiteSpace: "nowrap", fontWeight: 700, color: "var(--hf-text-primary)" }}>{fmtR(li.lineTotal)}</td>
                       </tr>))}
                 </tbody>
               </table>

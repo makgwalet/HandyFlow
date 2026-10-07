@@ -123,8 +123,8 @@ export default function InvoiceDetailPage() {
                   {inv.lineItems.length === 0 ? <tr><td colSpan={5} style={{ ...td, textAlign: "center", color: "var(--hf-text-faint)", padding: 24 }}>No line items.</td></tr> :
                     inv.lineItems.map((li, i) => (
                       <tr key={li.id ?? i} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
-                        <td style={td}>{li.description}</td><td style={{ ...td, textAlign: "right" }}>{li.quantity}</td><td style={{ ...td, textAlign: "right" }}>{fmtR(li.unitPrice)}</td>
-                        <td style={{ ...td, textAlign: "right" }}>{li.vatRate ?? 15}%</td><td style={{ ...td, textAlign: "right", fontWeight: 700, color: "var(--hf-text-primary)" }}>{fmtR(li.lineTotal)}</td>
+                        <td style={td}>{li.description}</td><td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>{li.quantity}</td><td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>{fmtR(li.unitPrice)}</td>
+                        <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>{li.vatRate ?? 15}%</td><td style={{ ...td, textAlign: "right", whiteSpace: "nowrap", fontWeight: 700, color: "var(--hf-text-primary)" }}>{fmtR(li.lineTotal)}</td>
                       </tr>))}
                 </tbody>
               </table>
