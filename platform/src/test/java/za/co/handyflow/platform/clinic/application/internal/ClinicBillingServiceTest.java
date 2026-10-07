@@ -146,8 +146,13 @@ class ClinicBillingServiceTest {
     class ClaimLifecycle {
 
         ClinicClaim draftClaim() {
-            return ClinicClaim.create(TENANT, UUID.randomUUID(),
+            var claim = ClinicClaim.create(TENANT, UUID.randomUUID(),
                     UUID.randomUUID(), null, "Discovery", "DH123", "00");
+            // a claim can only be submitted with at least one line that carries an ICD-10 code
+            claim.addLine(ClinicClaimLine.of(claim.getId(), "CONSULTATION", "0191", null,
+                    "I10", "Consultation", BigDecimal.ONE, new BigDecimal("520.00"), null, 0));
+            claim.recalculate();
+            return claim;
         }
 
         @Test
@@ -156,8 +161,6 @@ class ClinicBillingServiceTest {
             var id    = UUID.randomUUID();
             var claim = draftClaim();
             when(claimRepo.findActiveById(TENANT, id)).thenReturn(Optional.of(claim));
-            when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
-            when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
 
             var result = service.submitClaim(TENANT, id, "DH-2026-001");
 
@@ -172,8 +175,6 @@ class ClinicBillingServiceTest {
             var claim = draftClaim();
             claim.submit("REF-001");
             when(claimRepo.findActiveById(TENANT, id)).thenReturn(Optional.of(claim));
-            when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
-            when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
 
             var result = service.updateClaimStatus(TENANT, id, "accept", null);
 
@@ -187,8 +188,6 @@ class ClinicBillingServiceTest {
             var claim = draftClaim();
             claim.submit("REF-001");
             when(claimRepo.findActiveById(TENANT, id)).thenReturn(Optional.of(claim));
-            when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
-            when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
 
             var result = service.updateClaimStatus(TENANT, id, "reject",
                     "Invalid member number");
@@ -205,8 +204,6 @@ class ClinicBillingServiceTest {
             claim.submit("REF-001");
             claim.markAccepted();
             when(claimRepo.findActiveById(TENANT, id)).thenReturn(Optional.of(claim));
-            when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
-            when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
 
             var result = service.updateClaimStatus(TENANT, id, "paid", null);
 

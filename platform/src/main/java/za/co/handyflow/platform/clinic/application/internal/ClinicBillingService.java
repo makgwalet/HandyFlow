@@ -653,9 +653,9 @@ public class ClinicBillingService {
                 .toList();
         return new ClinicClaimResponse(
                 c.getId(), c.getConsultationId(), c.getPatientId(),
-                patientNames.getOrDefault(c.getPatientId(), null),
+                c.getPatientId() == null ? null : patientNames.get(c.getPatientId()),
                 c.getPractitionerId(),
-                practNames.getOrDefault(c.getPractitionerId(), null),
+                c.getPractitionerId() == null ? null : practNames.get(c.getPractitionerId()),
                 c.getStatus(), c.getSchemeName(), c.getMemberNumber(), c.getDependentCode(),
                 c.getGrossAmount(), c.getSchemePortion(), c.getPatientPortion(),
                 c.getSubmittedAt(), c.getReferenceNumber(), c.getRejectionReason(),

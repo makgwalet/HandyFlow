@@ -330,8 +330,10 @@ class ClinicServiceTest {
             // We need to simulate PRINCIPAL — use spy or a test helper
             // Simpler: test via the patchPatient route making accountType PRINCIPAL
             // For unit test, verify the repo delegation is correct
-            when(patientRepo.findDependantsByPrincipalId(eq(TENANT), eq(principalId)))
-                    .thenReturn(List.of(patientWithId("Alex","Dlamini")));
+            // never reached for an INDIVIDUAL patient, so lenient
+            var alex = patientWithId("Alex","Dlamini");
+            lenient().when(patientRepo.findDependantsByPrincipalId(eq(TENANT), eq(principalId)))
+                    .thenReturn(List.of(alex));
 
             // principal.getAccountType() is "INDIVIDUAL" by default from create()
             // so getFamilyMembers returns empty for INDIVIDUAL — test the INDIVIDUAL case
