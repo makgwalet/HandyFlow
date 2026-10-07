@@ -529,7 +529,10 @@ public class ClinicService {
         if (!allowOverlap && practitionerId != null) {
             requirePractitionerFree(tenantId, practitionerId, req.scheduledAt(), minutes, appt.getId());
         }
-        UUID roomId = req.roomId() != null ? req.roomId() : appt.getRoomId();
+        if (req.wantsRoomCleared() && req.roomId() != null) {
+            throw new IllegalArgumentException("Choose a room or clear it, not both");
+        }
+        UUID roomId = req.wantsRoomCleared() ? null : (req.roomId() != null ? req.roomId() : appt.getRoomId());
         if (req.roomId() != null) requireUsableRoom(tenantId, req.roomId());
         if (!allowOverlap && roomId != null) {
             String roomName = roomService.find(tenantId, roomId).map(r -> r.name()).orElse(null);
@@ -542,6 +545,7 @@ public class ClinicService {
         Instant oldTime = appt.getScheduledAt();
         UUID oldPractitioner = appt.getPractitionerId();
         appt.reschedule(req.scheduledAt(), minutes, req.practitionerId(), req.roomId());
+        if (req.wantsRoomCleared()) appt.clearRoom();
         appointmentRepo.save(appt);
         log.info("Rescheduled appointment={} to {}", appt.getId(), req.scheduledAt());
         if (RescheduleEmail.worthSending(oldTime, oldPractitioner, appt.getScheduledAt(), appt.getPractitionerId())) {

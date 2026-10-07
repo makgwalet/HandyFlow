@@ -747,6 +747,35 @@ class ClinicServiceTest {
         }
 
         @Test
+        @DisplayName("clearRoom takes the appointment out of its room")
+        void clearsTheRoom() {
+            var roomId = UUID.randomUUID();
+            var appt = ClinicAppointment.create(TENANT, UUID.randomUUID(), null,
+                    Instant.now().plusSeconds(7200), 30, "CONSULTATION", null, roomId);
+            when(appointmentRepo.findActiveById(TENANT, appt.getId())).thenReturn(Optional.of(appt));
+            when(patientRepo.findActiveById(TENANT, appt.getPatientId())).thenReturn(Optional.of(patientWithId("Jane", "Dlamini")));
+            when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+
+            service.rescheduleAppointment(TENANT, appt.getId(),
+                    new RescheduleRequest(Instant.now().plusSeconds(86400), null, null, null, true), false);
+
+            assertThat(appt.getRoomId()).isNull();
+            verify(appointmentRepo).save(appt);
+        }
+
+        @Test
+        @DisplayName("choosing a room and clearing it in one request is refused")
+        void refusesRoomAndClear() {
+            var appt = existing(null);
+            when(appointmentRepo.findActiveById(TENANT, appt.getId())).thenReturn(Optional.of(appt));
+
+            assertThatThrownBy(() -> service.rescheduleAppointment(TENANT, appt.getId(),
+                    new RescheduleRequest(Instant.now().plusSeconds(86400), null, null, UUID.randomUUID(), true), false))
+                    .isInstanceOf(IllegalArgumentException.class);
+            verify(appointmentRepo, never()).save(any(ClinicAppointment.class));
+        }
+
+        @Test
         @DisplayName("unknown appointment is not found")
         void notFound() {
             var id = UUID.randomUUID();

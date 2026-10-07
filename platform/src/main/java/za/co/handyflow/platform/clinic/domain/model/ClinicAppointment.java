@@ -157,6 +157,12 @@ public class ClinicAppointment {
         this.updatedAt = Instant.now();
     }
 
+    /** Takes the appointment out of its room. */
+    public void clearRoom() {
+        this.roomId = null;
+        this.updatedAt = Instant.now();
+    }
+
     public boolean isActive() {
         return !"CANCELLED".equals(this.status) && !"COMPLETED".equals(this.status)
                 && !"NO_SHOW".equals(this.status) && this.deletedAt == null;

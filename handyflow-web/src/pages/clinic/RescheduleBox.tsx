@@ -7,9 +7,11 @@ export interface Movable { id: string; scheduledAt: string; durationMinutes: num
 export interface RoomOption { id: string; name: string }
 
 /** The body of the reschedule call: the room is only sent when the user picked a different one. */
+export const NO_ROOM = "__none__"
 export function moveBody(when: string, roomId: string, currentRoomId?: string | null) {
-  const body: { scheduledAt: string; roomId?: string } = { scheduledAt: new Date(when).toISOString() }
-  if (roomId && roomId !== (currentRoomId ?? "")) body.roomId = roomId
+  const body: { scheduledAt: string; roomId?: string; clearRoom?: boolean } = { scheduledAt: new Date(when).toISOString() }
+  if (roomId === NO_ROOM) { if (currentRoomId) body.clearRoom = true }
+  else if (roomId && roomId !== (currentRoomId ?? "")) body.roomId = roomId
   return body
 }
 
@@ -70,6 +72,7 @@ export default function RescheduleBox({ appointment, onMoved, rooms = [] }: { ap
           <select aria-label="Room" value={roomId} onChange={e => { setRoomId(e.target.value); setClash(""); setError("") }}
             style={{ display: "block", marginTop: 4, padding: "7px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, width: "100%" }}>
             <option value="">{appointment.roomId ? "(keep current)" : "No room"}</option>
+            {appointment.roomId && <option value={NO_ROOM}>Take out of its room</option>}
             {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
         </label>
