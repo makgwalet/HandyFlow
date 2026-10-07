@@ -41,8 +41,7 @@ class ClinicAllergySnapshotServiceTest {
 
     @BeforeEach
     void setUp() {
-        tenant = Mockito.mock(TenantId.class, withSettings().lenient());
-        lenient().when(tenant.getValue()).thenReturn(UUID.randomUUID());
+        tenant = TenantId.of(UUID.randomUUID());
         service = new ClinicAllergySnapshotService(allergyRepo, consultationRepo, jdbc, new ObjectMapper());
     }
 

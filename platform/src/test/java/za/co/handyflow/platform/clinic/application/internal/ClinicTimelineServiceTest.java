@@ -40,8 +40,7 @@ class ClinicTimelineServiceTest {
 
     @BeforeEach
     void setUp() {
-        tenant = Mockito.mock(TenantId.class, withSettings().lenient());
-        lenient().when(tenant.getValue()).thenReturn(UUID.randomUUID());
+        tenant = TenantId.of(UUID.randomUUID());
     }
 
     private void patientExists() {

@@ -46,13 +46,11 @@ class ClinicServiceTest {
 
     @InjectMocks ClinicService service;
 
-    // TenantId has a private constructor — create via Mockito mock
-    // and stub getValue() which is what SpEL :#{#tenantId.value} and service internals call.
+    // A real TenantId (TenantId.of): a Mockito mock here breaks stubbing whenever an entity is built inside when(...).thenReturn(...)
     static final UUID TENANT_UUID = UUID.fromString("9ecb3dc7-75d4-4e56-b0a2-c95d3c7c584f");
     static final TenantId TENANT;
     static {
-        TENANT = Mockito.mock(TenantId.class);
-        Mockito.when(TENANT.getValue()).thenReturn(TENANT_UUID);
+        TENANT = TenantId.of(TENANT_UUID);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -83,7 +81,7 @@ class ClinicServiceTest {
 
             when(patientRepo.findActiveByTenantId(eq(TENANT), any(Pageable.class)))
                     .thenReturn(page);
-            when(patientRepo.findAllByIds(eq(TENANT), anySet()))
+            lenient().when(patientRepo.findAllByIds(eq(TENANT), anySet()))
                     .thenReturn(List.of());
 
             var result = service.getPatients(TENANT, null, null, false,
@@ -98,7 +96,7 @@ class ClinicServiceTest {
         void delegatesToSearchWhenQueryProvided() {
             when(patientRepo.search(eq(TENANT), eq("nkosi"), any(Pageable.class)))
                     .thenReturn(Page.empty());
-            when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+            lenient().when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
 
             service.getPatients(TENANT, "nkosi", null, false, PageRequest.of(0, 20));
 
@@ -134,6 +132,9 @@ class ClinicServiceTest {
         void batchLoadsPrincipalNames() {
             var principalId = UUID.randomUUID();
             var principal   = patientWithId("Jane", "Dlamini");
+            // full_name is a generated DB column, so it is null in a unit test
+            org.springframework.test.util.ReflectionTestUtils.setField(principal, "fullName", "Jane Dlamini");
+            org.springframework.test.util.ReflectionTestUtils.setField(principal, "id", principalId);
             var dependant   = ClinicPatient.create(TENANT,
                     "Alex", "Dlamini", null, null, null, null, null, null, null);
             // Simulate dependant having principalId set
@@ -360,7 +361,7 @@ class ClinicServiceTest {
             var patient = patientWithId("Jane","Dlamini");
             when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patient));
             when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of(patient));
-            when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+            lenient().when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
 
             var req = new CreateAppointmentRequest(
                     patientId, null, Instant.now().plusSeconds(3600),
@@ -380,7 +381,7 @@ class ClinicServiceTest {
             when(patientRepo.findActiveById(TENANT, patientId))
                     .thenReturn(Optional.of(patientWithId("Jane","Dlamini")));
             when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
-            when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+            lenient().when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
 
             var req = new CreateAppointmentRequest(
                     patientId, null, Instant.now().plusSeconds(3600),
@@ -438,7 +439,7 @@ class ClinicServiceTest {
             var patient = patientWithId("Jane","Dlamini");
             when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patient));
             when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of(patient));
-            when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+            lenient().when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
 
             var req = new CreateAppointmentRequest(patientId, practitionerId, Instant.now().plusSeconds(3600), 30, "CONSULTATION", null);
 
@@ -455,7 +456,7 @@ class ClinicServiceTest {
             var patient = patientWithId("Jane","Dlamini");
             when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patient));
             when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of(patient));
-            when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+            lenient().when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
 
             service.createAppointment(TENANT, new CreateAppointmentRequest(
                     patientId, null, Instant.now().minusSeconds(120), 30, "CONSULTATION", null));
@@ -577,7 +578,7 @@ class ClinicServiceTest {
                     Instant.now(), 30, "CONSULTATION", null);
             when(appointmentRepo.findActiveById(TENANT, id)).thenReturn(Optional.of(appt));
             when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
-            when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+            lenient().when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
 
             var result = service.updateAppointmentStatus(TENANT, id, "confirm");
 
@@ -593,7 +594,7 @@ class ClinicServiceTest {
             appt.confirm(); appt.start();
             when(appointmentRepo.findActiveById(TENANT, id)).thenReturn(Optional.of(appt));
             when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
-            when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+            lenient().when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
 
             var result = service.updateAppointmentStatus(TENANT, id, "complete");
 
@@ -628,7 +629,7 @@ class ClinicServiceTest {
             var patientId = UUID.randomUUID();
             var patient = patientWithId("Jane","Dlamini");
             when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patient));
-            when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+            lenient().when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
 
             var req = new CreateConsultationRequest(null, null,
                     "Hypertension check",
@@ -650,7 +651,7 @@ class ClinicServiceTest {
             var patientId = UUID.randomUUID();
             var patient = patientWithId("Jane","Dlamini");
             when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patient));
-            when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+            lenient().when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
 
             var req = new CreateConsultationRequest(null, null, "Annual check",
                     null, null, null, null, null, null,
@@ -675,7 +676,7 @@ class ClinicServiceTest {
 
             when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patient));
             when(appointmentRepo.findActiveById(TENANT, apptId)).thenReturn(Optional.of(appt));
-            when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+            lenient().when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
 
             var req = new CreateConsultationRequest(apptId, null, "Follow-up",
                     null, null, null, null, null, null,

@@ -35,8 +35,7 @@ class ClinicDispensingServiceTest {
 
     @BeforeEach
     void setUp() {
-        tenant = Mockito.mock(TenantId.class, withSettings().lenient());
-        lenient().when(tenant.getValue()).thenReturn(UUID.randomUUID());
+        tenant = TenantId.of(UUID.randomUUID());
     }
 
     private ClinicPrescription rx(int repeats, int quantity) {

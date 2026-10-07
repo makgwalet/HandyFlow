@@ -58,7 +58,8 @@ class ClinicAppointmentReminderSchedulerTest {
     @Test
     void sendsOnlyWhatItManagedToClaim() {
         UUID a = UUID.randomUUID(), b = UUID.randomUUID();
-        when(appointmentRepo.findDueForReminder(any(), any())).thenReturn(List.of(appt(a), appt(b)));
+        List<ClinicAppointment> due = List.of(appt(a), appt(b));
+        when(appointmentRepo.findDueForReminder(any(), any())).thenReturn(due);
         when(reminderService.claimReminder(a)).thenReturn(true);
         when(reminderService.claimReminder(b)).thenReturn(false); // another instance got there first
         assertEquals(1, scheduler.run(DAYTIME));
@@ -69,7 +70,8 @@ class ClinicAppointmentReminderSchedulerTest {
     @Test
     void oneFailureDoesNotStopTheRest() {
         UUID a = UUID.randomUUID(), b = UUID.randomUUID();
-        when(appointmentRepo.findDueForReminder(any(), any())).thenReturn(List.of(appt(a), appt(b)));
+        List<ClinicAppointment> due = List.of(appt(a), appt(b));
+        when(appointmentRepo.findDueForReminder(any(), any())).thenReturn(due);
         when(reminderService.claimReminder(any())).thenReturn(true);
         doThrow(new IllegalStateException("mail down")).when(reminderService).sendReminder(a);
         assertEquals(1, scheduler.run(DAYTIME));

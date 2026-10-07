@@ -35,8 +35,7 @@ class ClinicHandoffServiceTest {
     static final UUID TENANT_UUID = UUID.fromString("9ecb3dc7-75d4-4e56-b0a2-c95d3c7c584f");
     static final TenantId TENANT;
     static {
-        TENANT = Mockito.mock(TenantId.class);
-        Mockito.when(TENANT.getValue()).thenReturn(TENANT_UUID);
+        TENANT = TenantId.of(TENANT_UUID);
     }
 
     /** A draft with the nurse's portion filled in, registered with the repository mock. */
