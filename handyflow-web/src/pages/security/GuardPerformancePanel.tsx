@@ -10,7 +10,7 @@ import { apiClient } from "../../api/client"
 import Chip from "../../components/ui/Chip"
 import { toneColor } from "../../components/ui/Chip"
 import { todayIso } from "./guard360.logic"
-import { BAND_LABEL, BAND_TONE, DIMENSIONS, LEVEL_TONE, RATING_SOURCES, percentTone, ratingFormError, sourceLabel, type Performance } from "./performance.logic"
+import { BAND_LABEL, BAND_TONE, DIMENSIONS, chartGeometry, trendSummary, trendText, type HistoryPoint, LEVEL_TONE, RATING_SOURCES, percentTone, ratingFormError, sourceLabel, type Performance } from "./performance.logic"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16 }
 const input: React.CSSProperties = { padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text-primary)", width: "100%", boxSizing: "border-box" }
@@ -80,6 +80,40 @@ function RatingForm({ guardId, onClose }: { guardId: string; onClose: () => void
   )
 }
 
+function ScoreTrend({ guardId }: { guardId: string }) {
+  const [days, setDays] = useState(30)
+  const { data } = useQuery<HistoryPoint[]>({
+    queryKey: ["guard-performance-history", guardId, days],
+    queryFn: async () => { const r = await apiClient.get(`/api/v1/security/guards/${guardId}/performance/history`, { params: { days } }); const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : [] },
+  })
+  const points = data ?? []
+  const W = 560, H = 140
+  const g = chartGeometry(points, W, H)
+  const summary = trendSummary(points)
+  const color = summary?.direction === "down" ? "var(--hf-danger-text)" : "var(--hf-accent)"
+  return (
+    <div style={card}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <div style={h}>Score trend</div>
+        <div role="group" aria-label="Trend period" style={{ display: "flex", gap: 6 }}>
+          {[30, 90].map(n => <button key={n} onClick={() => setDays(n)} aria-pressed={days === n} style={{ ...btn, padding: "4px 10px", ...(days === n ? { background: "var(--hf-surface-sunken)", color: "var(--hf-text-primary)" } : {}) }}>{n} days</button>)}
+        </div>
+      </div>
+      {g.dots.length === 0
+        ? <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>No history yet. A score is saved for each guard every night, so the trend builds up from tomorrow.</div>
+        : <>
+            <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`Operational score over the last ${days} days. ${trendText(summary, fmt)}`} style={{ maxHeight: 180 }}>
+              {[0, 50, 70, 85, 100].map(v => { const y = 8 + (1 - v / 100) * (H - 16); return <g key={v}><line x1="0" x2={W} y1={y} y2={y} stroke="var(--hf-border)" strokeDasharray={v === 0 || v === 100 ? undefined : "3 4"} strokeWidth="1" /><text x="2" y={y - 2} fontSize="9" fill="var(--hf-text-muted)">{v}</text></g> })}
+              <path d={g.line} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" />
+              {g.dots.map(d => <circle key={d.date} cx={d.x} cy={d.y} r="2.5" fill={color}><title>{`${fmt(d.date)}: ${d.score}`}</title></circle>)}
+            </svg>
+            <div style={{ fontSize: 13, marginTop: 6 }}>{trendText(summary, fmt)}</div>
+            <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Guide lines mark the band edges: 50, 70 and 85. Days without enough data are left out.</div>
+          </>}
+    </div>
+  )
+}
+
 export default function GuardPerformancePanel({ guardId, canManage }: { guardId: string; canManage: boolean }) {
   const [adding, setAdding] = useState(false)
   const { data, isLoading, error } = useQuery<Performance>({
@@ -108,6 +142,8 @@ export default function GuardPerformancePanel({ guardId, canManage }: { guardId:
           <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 6 }}>The score describes records. It does not decide anything about employment.</div>
         </div>
       </div>
+
+      <ScoreTrend guardId={guardId} />
 
       <div style={card}>
         <div style={h}>Recommendations for review</div>

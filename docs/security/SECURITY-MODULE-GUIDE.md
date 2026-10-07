@@ -188,6 +188,10 @@ Load the demo, sign in as a user with `SECURITY_READ` and `SECURITY_MANAGE` (adm
 - [ ] 06:45 every day: one digest of skills and certificates that expire within 30 days (the notification links to Guards).
 - [ ] 02:15 every day: each active guard's score and risk recommendations are saved (table `security_guard_score_history`). A recommendation that was not on the guard's previous snapshot is announced once to administrators; one that keeps standing is not repeated. A guard's first snapshot is a baseline and announces nothing.
 
+### Performance trend
+- [ ] Guard 360, Performance tab: a **Score trend** chart (30 or 90 days) with a one-line summary ("Up 12 points since 20 Sep"). With the demo data it shows 30 illustrative days; they are seeded, not calculated, and the nightly job adds real ones from the day it first runs.
+- [ ] Checkpoint compliance now has data: completed demo shifts carry scans, and about 85 per cent meet their minimum (guards 3 and 5 about half).
+
 ### Risk Rules and Ratings
 - [ ] Risk Rules shows the seeded thresholds.
 - [ ] Ratings on the guard profile show an operational score; guards with poor ratings or open complaints sit in a higher risk band.
@@ -497,6 +501,8 @@ Generated from the controllers. Paths are under the host root. A blank permissio
 | POST | `/api/v1/guard/incidents` | SECURITY_GUARD |
 
 ### GuardPerformanceController
+
+`GET /api/v1/security/guards/{guardId}/performance/history?days=90` (SECURITY_READ) returns the daily snapshots, oldest first (1 to 365 days).
 
 | Method | Path | Permission |
 |---|---|---|

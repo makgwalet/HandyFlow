@@ -31,6 +31,20 @@ function renderPanel() {
 }
 
 describe('GuardPerformancePanel', () => {
+  it('draws the score trend from the history and says what changed', async () => {
+    api.get.mockImplementation(async (url: string) => url.endsWith('/history')
+      ? { data: { data: [{ date: '2026-09-20', score: 60, band: 'NEEDS_ATTENTION', coverage: 90, recommendations: 0 }, { date: '2026-10-06', score: 72, band: 'GOOD', coverage: 90, recommendations: 1 }] } }
+      : { data: { data: perf() } })
+    renderPanel()
+    expect(await screen.findByRole('img', { name: /Operational score over the last 30 days. Up 12 points since/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '90 days' }))
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith('/api/v1/security/guards/g1/performance/history', { params: { days: 90 } }))
+  })
+  it('says the trend builds up when there is no history', async () => {
+    api.get.mockImplementation(async (url: string) => url.endsWith('/history') ? { data: { data: [] } } : { data: { data: perf() } })
+    renderPanel()
+    expect(await screen.findByText(/No history yet/)).toBeTruthy()
+  })
   it('shows the score, explains each component and leaves out the ones without data', async () => {
     api.get.mockResolvedValue({ data: { data: perf() } })
     renderPanel()

@@ -394,6 +394,35 @@ SELECT pg_temp.did(9, 900000 + l.rn), pg_temp.t(), pg_temp.did(4, 1 + (l.rn % 4)
        pg_temp.utc_now() - (l.rn * 11) * interval '1 minute', NULL, NULL, 'DEMO unscheduled check', 'QR', NULL
 FROM _live l WHERE l.site_id = pg_temp.did(2, 1);
 
+-- Shift-level scans for completed shifts, so patrol compliance on the Performance tab has something to measure.
+-- Most guards meet the shift's minimum scan count on about nine shifts in ten; guards 3 and 5 on about half.
+-- (Scans are spread 25 minutes apart from the start of the shift, at the site's checkpoints in turn.)
+INSERT INTO security_checkpoint_logs (id, tenant_id, checkpoint_id, guard_id, shift_id, scanned_at, latitude, longitude, notes, scan_type, round_id)
+SELECT pg_temp.did(9, (2000000 + x.rn * 10 + k.i)::int), pg_temp.t(), y.cp, x.guard_id, x.shift_id,
+       x.start_at + (k.i - 1) * interval '25 minutes' + interval '5 minutes', NULL, NULL, NULL, 'QR', NULL
+FROM (
+  SELECT row_number() OVER (ORDER BY s.start_at, s.id)::int AS rn, s.id AS shift_id, s.guard_id, s.start_at, s.min_scan_count,
+         (SELECT array_agg(c.id ORDER BY c.sort_order) FROM security_checkpoints c WHERE c.site_id = s.site_id AND c.active AND c.id::text LIKE 'd3d3d3d3-%') AS cps,
+         CASE WHEN s.guard_id IN (pg_temp.did(3, 3), pg_temp.did(3, 5)) THEN 5 ELSE 9 END AS good_in_ten
+  FROM security_shifts s
+  WHERE s.id::text LIKE 'd3d3d3d3-%' AND s.status = 'COMPLETED' AND s.min_scan_count > 0
+    AND NOT EXISTS (SELECT 1 FROM security_checkpoint_logs l WHERE l.shift_id = s.id)
+) x
+CROSS JOIN LATERAL generate_series(1, CASE WHEN (x.rn % 10) < x.good_in_ten THEN x.min_scan_count ELSE GREATEST(0, x.min_scan_count - 1) END) AS k(i)
+CROSS JOIN LATERAL (SELECT x.cps[1 + ((k.i - 1) % GREATEST(1, COALESCE(array_length(x.cps, 1), 1)))] AS cp) y
+WHERE y.cp IS NOT NULL;
+
+-- A month of daily score snapshots for the demo guards, so the Performance tab has a trend to draw before the
+-- nightly job has run. These are illustrative: they do not come from the score calculation. The nightly job adds
+-- the real ones, and the remove script deletes these along with the guards.
+INSERT INTO security_guard_score_history (id, tenant_id, guard_id, snapshot_date, score, band, coverage, recommendations)
+SELECT gen_random_uuid(), pg_temp.t(), g.id, d.day, sc.score,
+       CASE WHEN sc.score >= 85 THEN 'EXCELLENT' WHEN sc.score >= 70 THEN 'GOOD' WHEN sc.score >= 50 THEN 'NEEDS_ATTENTION' ELSE 'AT_RISK' END,
+       90, ''
+FROM (SELECT g0.id, row_number() OVER (ORDER BY g0.id) AS gi FROM security_guards g0 WHERE g0.id::text LIKE 'd3d3d3d3-%' AND g0.active) g
+CROSS JOIN LATERAL (SELECT (current_date - o) AS day, o FROM generate_series(1, 30) AS o) d
+CROSS JOIN LATERAL (SELECT GREATEST(20, LEAST(98, 62 + (g.gi * 7) % 28 + round(7 * sin((30 - d.o) / 4.0 + g.gi))::int - CASE WHEN g.gi % 4 = 0 THEN (30 - d.o) / 3 ELSE 0 END))::int AS score) sc;
+
 -- ── Live positions ─────────────────────────────────────────────────────────────────────────────
 -- Of the guards on duty, a third have a fresh position, a third a stale one (25 minutes old) and a third none.
 INSERT INTO security_guard_location_pings (id, tenant_id, guard_id, shift_id, device_session_id, latitude, longitude, accuracy_metres, recorded_at, created_at)

@@ -50,3 +50,39 @@ export function riskSettingsError(s: { reviewAt: number; warningAt: number; inve
   if (!Number.isInteger(s.misconductWindowDays) || s.misconductWindowDays < 30 || s.misconductWindowDays > 730) return "The misconduct window must be between 30 and 730 days"
   return null
 }
+
+// ── Score trend ────────────────────────────────────────────────────────────────────────────────────────────────
+export interface HistoryPoint { date: string; score: number | null; band: string | null; coverage: number; recommendations: number }
+
+/** The snapshots that carry a score (days without enough data are left as gaps, not drawn as zero). */
+export const scoredPoints = (points: HistoryPoint[]) => points.filter(p => p.score !== null)
+
+/** Change between the first and last scored day, or null when there are fewer than two. */
+export function trendSummary(points: HistoryPoint[]): { delta: number; from: string; to: string; direction: "up" | "down" | "flat" } | null {
+  const s = scoredPoints(points)
+  if (s.length < 2) return null
+  const delta = (s[s.length - 1].score as number) - (s[0].score as number)
+  return { delta, from: s[0].date, to: s[s.length - 1].date, direction: delta > 2 ? "up" : delta < -2 ? "down" : "flat" }
+}
+
+/** Plain-words version of the summary, for the line under the chart. */
+export function trendText(t: ReturnType<typeof trendSummary>, fmtDate: (d: string) => string): string {
+  if (!t) return "The trend appears after two days with a score."
+  if (t.direction === "flat") return `Steady since ${fmtDate(t.from)} (${t.delta >= 0 ? "+" : ""}${t.delta}).`
+  const n = Math.abs(t.delta)
+  return `${t.direction === "up" ? "Up" : "Down"} ${n} point${n === 1 ? "" : "s"} since ${fmtDate(t.from)}.`
+}
+
+/** Positions for an SVG line chart over the scored days: x by date, y from 0 to 100 (higher is better). */
+export function chartGeometry(points: HistoryPoint[], width: number, height: number, pad = 8) {
+  const s = scoredPoints(points)
+  if (s.length === 0) return { line: "", dots: [] as { x: number; y: number; date: string; score: number }[] }
+  const t = (d: string) => new Date(d + "T00:00:00Z").getTime()
+  const t0 = t(s[0].date), span = Math.max(1, t(s[s.length - 1].date) - t0)
+  const dots = s.map(p => ({
+    x: s.length === 1 ? width / 2 : pad + ((t(p.date) - t0) / span) * (width - 2 * pad),
+    y: pad + (1 - (p.score as number) / 100) * (height - 2 * pad),
+    date: p.date, score: p.score as number,
+  }))
+  return { line: dots.map((d, i) => `${i === 0 ? "M" : "L"}${d.x.toFixed(1)} ${d.y.toFixed(1)}`).join(" "), dots }
+}

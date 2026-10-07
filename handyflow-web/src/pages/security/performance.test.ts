@@ -33,3 +33,29 @@ describe('performance logic', () => {
   })
   it('names rating sources', () => { expect(sourceLabel('CLIENT')).toBe('Client'); expect(sourceLabel('SUPERVISOR')).toBe('Supervisor') })
 })
+
+import { chartGeometry, trendSummary, trendText } from './performance.logic'
+const pt = (date: string, score: number | null) => ({ date, score, band: null, coverage: 90, recommendations: 0 })
+describe('score trend', () => {
+  it('summarises the change between the first and last scored day', () => {
+    expect(trendSummary([pt('2026-09-01', 60), pt('2026-09-02', null), pt('2026-09-10', 72)])).toMatchObject({ delta: 12, direction: 'up', from: '2026-09-01', to: '2026-09-10' })
+    expect(trendSummary([pt('2026-09-01', 80), pt('2026-09-10', 70)])?.direction).toBe('down')
+    expect(trendSummary([pt('2026-09-01', 70), pt('2026-09-10', 71)])?.direction).toBe('flat')
+    expect(trendSummary([pt('2026-09-01', 70)])).toBeNull()
+  })
+  it('words the summary', () => {
+    const f = (d: string) => d
+    expect(trendText(trendSummary([pt('2026-09-01', 60), pt('2026-09-10', 61 + 5)]), f)).toBe('Up 6 points since 2026-09-01.')
+    expect(trendText(trendSummary([pt('2026-09-01', 60), pt('2026-09-10', 59)]), f)).toBe('Steady since 2026-09-01 (-1).')
+    expect(trendText(null, f)).toMatch(/two days/)
+  })
+  it('places points by date and score, leaving gaps out', () => {
+    const g = chartGeometry([pt('2026-09-01', 100), pt('2026-09-02', null), pt('2026-09-03', 0)], 100, 100, 10)
+    expect(g.dots).toHaveLength(2)
+    expect(g.dots[0]).toMatchObject({ x: 10, y: 10 })
+    expect(g.dots[1]).toMatchObject({ x: 90, y: 90 })
+    expect(g.line.startsWith('M10.0 10.0 L90.0 90.0')).toBe(true)
+    expect(chartGeometry([], 100, 100).line).toBe('')
+    expect(chartGeometry([pt('2026-09-01', 50)], 100, 100).dots[0].x).toBe(50)
+  })
+})

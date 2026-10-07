@@ -14,6 +14,7 @@ import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.security.application.internal.GuardPerformanceService;
 import za.co.handyflow.platform.security.application.internal.GuardRatingService;
 import za.co.handyflow.platform.security.application.internal.GuardRiskSettingsService;
+import za.co.handyflow.platform.security.application.internal.GuardScoreTrendService;
 import za.co.handyflow.platform.security.dto.GuardPerformanceDtos.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -32,6 +33,7 @@ import java.util.UUID;
 public class GuardPerformanceController {
 
     private final GuardPerformanceService performanceService;
+    private final GuardScoreTrendService trendService;
     private final GuardRatingService ratingService;
     private final GuardRiskSettingsService settingsService;
     private final FeatureGuard featureGuard;
@@ -42,6 +44,14 @@ public class GuardPerformanceController {
     public ResponseEntity<ApiResponse<PerformanceResponse>> performance(@PathVariable UUID guardId) {
         featureGuard.requireModule("security");
         return ResponseEntity.ok(ApiResponse.success(performanceService.performance(TenantContext.getTenantIdAsObject(), guardId)));
+    }
+
+    @GetMapping("/guards/{guardId}/performance/history")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
+    @Operation(summary = "Daily operational score snapshots, oldest first (days defaults to 90, at most 365)")
+    public ResponseEntity<ApiResponse<java.util.List<HistoryPoint>>> history(@PathVariable UUID guardId, @RequestParam(required = false) Integer days) {
+        featureGuard.requireModule("security");
+        return ResponseEntity.ok(ApiResponse.success(trendService.history(TenantContext.getTenantIdAsObject(), guardId, days)));
     }
 
     @PostMapping("/guards/{guardId}/ratings")

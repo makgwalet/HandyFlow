@@ -43,4 +43,7 @@ public final class GuardPerformanceDtos {
             Integer score, String band, int coverage, List<ScoreComponent> components,
             List<RecommendationItem> recommendations, Basis basis, RiskSettingsDto settings,
             Double ratingAverage, int ratingCount, List<RatingItem> ratings) {}
+
+    /** One day on the score trend. `recommendations` is how many risk recommendations stood that day. */
+    public record HistoryPoint(LocalDate date, Integer score, String band, int coverage, int recommendations) {}
 }
