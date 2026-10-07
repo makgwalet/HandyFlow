@@ -1,5 +1,6 @@
 // src/pages/clinic/BillingTab.tsx
 // Billing & Reports — who paid, who owes, revenue by period/doctor, payment recording
+import PatientPicker, { type PickerPatient } from "./PatientPicker"
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -75,10 +76,7 @@ export default function BillingTab() {
     },
   })
 
-  const { data: patients=[] } = useQuery({
-    queryKey: ["clinic-patients-list"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/clinic/patients?size=200")),
-  })
+  const [payPatient, setPayPatient] = useState<PickerPatient | null>(null)
 
   const recordPayment = useMutation({
     mutationFn: (body:any) => apiClient.post("/api/v1/clinic/billing/payments", body),
@@ -87,6 +85,7 @@ export default function BillingTab() {
       qc.invalidateQueries({queryKey:["billing-payments"]})
       setShowPayment(false)
       setPayForm({patientId:"",method:"EFT",amount:"",reference:"",notes:""})
+      setPayPatient(null)
       setPayError("")
     },
     onError: (e:any) => setPayError(e.response?.data?.message ?? "Failed to record payment"),
@@ -202,7 +201,7 @@ export default function BillingTab() {
                       <td style={{padding:"12px 16px",fontSize:13,color:GRAY_TEXT}}>{b.claimCount}</td>
                       <td style={{padding:"12px 16px"}}>
                         <div style={{display:"flex",gap:6}}>
-                          <button onClick={()=>{setPayForm(f=>({...f,patientId:b.patientId}));setShowPayment(true)}}
+                          <button onClick={()=>{setPayForm(f=>({...f,patientId:b.patientId}));setPayPatient({id:b.patientId,fullName:b.patientName});setShowPayment(true)}}
                             style={{padding:"5px 12px",border:`1px solid ${TEAL}`,borderRadius:7,background:"var(--hf-success-soft)",color:TEAL_TEXT,fontSize:12,fontWeight:600,cursor:"pointer"}}>
                             Pay
                           </button>
@@ -395,10 +394,7 @@ export default function BillingTab() {
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <div>
                 <label style={lbl}>Patient *</label>
-                <select value={payForm.patientId} onChange={e=>setPayForm(f=>({...f,patientId:e.target.value}))} style={sinp}>
-                  <option value="">Select patient...</option>
-                  {(patients as any[]).map((p:any)=><option key={p.id} value={p.id}>{p.fullName}</option>)}
-                </select>
+                <PatientPicker value={payPatient} onChange={p=>{ setPayPatient(p); setPayForm(f=>({...f,patientId:p?.id??""})) }} />
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
                 <div>

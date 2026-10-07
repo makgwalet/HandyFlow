@@ -1,12 +1,16 @@
 // src/pages/clinic/ScheduleTab.tsx
 // Day / Week calendar view per doctor — click slot to book appointment
+import { Modal } from "./patientFile.shared"
+import PatientPicker, { type PickerPatient } from "./PatientPicker"
+import { myPractitionerId } from "./currentPractitioner"
+import { useAuthStore } from "../../store/auth.store"
 import RescheduleBox from "./RescheduleBox"
 import { bookingProblem, clashMessage, NO_ROOM_FILTER, passesFilters, WALK_IN_GRACE_MS } from "./bookingRules"
 import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import {
-  ChevronLeft, ChevronRight, Plus, X, 
+  ChevronLeft, ChevronRight, Plus, 
   CheckCircle, AlertCircle, Mail, Video,
 } from "lucide-react"
 
@@ -21,7 +25,6 @@ interface Appointment {
   roomId?: string|null; roomName?: string|null
 }
 interface Practitioner { id: string; fullName: string; specialty: string }
-interface Patient { id: string; fullName: string }
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 
@@ -97,10 +100,12 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
   const [roomFilter, setRoomFilter] = useState<string>("all")
   const [selected, setSelected]         = useState<Appointment|null>(null)
   const [showBook, setShowBook]         = useState(false)
-  const [bookSlot, setBookSlot]         = useState<{date:Date;hour:number}|null>(null)
+  const [, setBookSlot]         = useState<{date:Date;hour:number}|null>(null)
   const [apiError, setApiError]         = useState("")
   const [clash, setClash]               = useState<{message:string; body:any}|null>(null)
   const nowRef = useRef<HTMLDivElement>(null)
+  const [bookPatient, setBookPatient] = useState<PickerPatient | null>(null)
+  const userEmail = useAuthStore(st => st.user?.email)
 
   // Book form
   const [bookForm, setBookForm] = useState({
@@ -135,10 +140,6 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
     queryFn: async () => unwrap(await apiClient.get("/api/v1/clinic/practitioners/list")),
   })
 
-  const { data: patients=[] } = useQuery<Patient[]>({
-    queryKey: ["clinic-patients-list"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/clinic/patients?size=200")),
-  })
 
   const doAction = useMutation({
     mutationFn: ({id,action}:{id:string;action:string}) => apiClient.post(`/api/v1/clinic/appointments/${id}/${action}`),
@@ -184,6 +185,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
       qc.invalidateQueries({queryKey:["clinic-appts-dashboard"]})
       setShowBook(false)
       setBookForm({patientId:"",practitionerId:"",scheduledAt:"",durationMinutes:"30",appointmentType:"CONSULTATION",reason:"",roomId:""})
+      setBookPatient(null)
       setApiError("")
     },
     onError: (e:any, vars) => {
@@ -219,7 +221,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
     dt.setHours(hour, 0, 0, 0)
     const iso = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}T${String(hour).padStart(2,"0")}:00`
     setBookSlot({date:day, hour})
-    setBookForm(f => ({...f, scheduledAt:iso, practitionerId: doctorFilter==="all"?"":doctorFilter}))
+    setBookForm(f => ({...f, scheduledAt:iso, practitionerId: doctorFilter==="all"?myPractitionerId(practitioners as any[], userEmail):doctorFilter}))
     setShowBook(true)
     setApiError("")
   }
@@ -275,7 +277,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
             ))}
           </div>
 
-          <button onClick={()=>{setShowBook(true);setBookForm(f=>({...f,scheduledAt:"",practitionerId:doctorFilter==="all"?"":doctorFilter}));setApiError("")}}
+          <button onClick={()=>{setShowBook(true);setBookForm(f=>({...f,scheduledAt:"",practitionerId:doctorFilter==="all"?myPractitionerId(practitioners as any[], userEmail):doctorFilter}));setApiError("")}}
             style={{display:"flex",alignItems:"center",gap:6,background:NAVY,color:"var(--hf-text-on-solid)",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
             <Plus size={14}/> Book appointment
           </button>
@@ -435,10 +437,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
             <div>
               <label style={lbl}>Patient *</label>
-              <select value={bookForm.patientId} onChange={e=>setBookForm(f=>({...f,patientId:e.target.value}))} style={sinp}>
-                <option value="">Select patient...</option>
-                {(patients as Patient[]).map(p=><option key={p.id} value={p.id}>{p.fullName}</option>)}
-              </select>
+              <PatientPicker value={bookPatient} onChange={p=>{ setBookPatient(p); setBookForm(f=>({...f,patientId:p?.id??""})) }} />
             </div>
             <div>
               <label style={lbl}>Practitioner</label>
@@ -524,19 +523,6 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
 
 // ── Shared ────────────────────────────────────────────────────────────────────
 
-function Modal({title,onClose,children}:{title:string;onClose:()=>void;children:React.ReactNode}) {
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(3px)"}}>
-      <div style={{background:"var(--hf-surface)",borderRadius:16,padding:28,width:480,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"var(--hf-text)"}}>{title}</h3>
-          <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:GRAY,display:"flex"}}><X size={20}/></button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-}
 function ModalFooter({onCancel,onConfirm,confirmLabel,loading}:{onCancel:()=>void;onConfirm:()=>void;confirmLabel:string;loading?:boolean}) {
   return <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}><button onClick={onCancel} style={btnCancel}>Cancel</button><button onClick={onConfirm} disabled={loading} style={btnPrimary}>{loading?"Saving...":confirmLabel}</button></div>
 }

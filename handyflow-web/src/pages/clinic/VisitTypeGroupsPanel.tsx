@@ -2,6 +2,7 @@
 // Which question groups each visit type opens, in order. A practice can set its own list (which replaces the platform
 // default for that visit type) or go back to the default. Whether a listed group is actually shown still depends on
 // its review status, so listing an unapproved group opens nothing yet.
+import { useDialogs } from "./dialogs"
 import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -28,6 +29,7 @@ const msg = (e: any) => e?.response?.data?.message ?? e?.message ?? "That did no
 
 export default function VisitTypeGroupsPanel({ groupCodes }: { groupCodes: string[] }) {
   const qc = useQueryClient()
+  const { confirm, dialogs } = useDialogs()
   const canAdmin = usePermission("CLINIC_CONTENT_ADMIN")
   const [visitType, setVisitType] = useState("CONSULTATION")
   const [draft, setDraft] = useState<Entry[]>([])
@@ -48,6 +50,7 @@ export default function VisitTypeGroupsPanel({ groupCodes }: { groupCodes: strin
 
   return (
     <div style={{ marginTop: 24 }}>
+      {dialogs}
       <div style={{ fontSize: 10, fontWeight: 700, color: "var(--hf-text-faint)", letterSpacing: "0.06em", marginBottom: 6 }}>GROUPS PER VISIT TYPE</div>
       <select aria-label="Visit type" value={visitType} onChange={e => setVisitType(e.target.value)}>
         {VISIT_TYPES.map(v => <option key={v} value={v}>{v.replace(/_/g, " ")}</option>)}
@@ -79,7 +82,7 @@ export default function VisitTypeGroupsPanel({ groupCodes }: { groupCodes: strin
           <button type="button" disabled={!pick} onClick={() => { edit(addGroup(draft, pick)); setPick("") }}>Add</button>
           <button type="button" disabled={!dirty || save.isPending} onClick={() => save.mutate()}>Save list</button>
           {data?.source === "TENANT" && <button type="button" disabled={reset.isPending}
-            onClick={() => { if (window.confirm("Go back to the platform default for this visit type?")) reset.mutate() }}>Use platform default</button>}
+            onClick={async () => { if (await confirm({ title: "Use the platform default?", body: "Your custom group order for this visit type will be removed.", confirmLabel: "Use default" })) reset.mutate() }}>Use platform default</button>}
         </div>
       )}
       {error && <div role="status" style={{ fontSize: 12, color: "var(--hf-danger-text)", marginTop: 6 }}>{error}</div>}

@@ -2,6 +2,7 @@
 // Live consultation session — timer, SOAP notes, live bill, prescriptions
 // Opened when a doctor starts a consultation from an appointment
 
+import { useDialogs } from "./dialogs"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -64,6 +65,7 @@ interface Props {
 
 export default function ConsultationSession({ patient, appointment, onComplete, onMinimise, onCancel, discardToken = 0 }: Props) {
   const qc = useQueryClient()
+  const { confirm, prompt, notify, dialogs } = useDialogs()
 
   // ── Timer ──────────────────────────────────────────────────────────────────
   const startTimeRef = useRef(Date.now())
@@ -179,7 +181,8 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
     setHandoffBusy(true); setHandoffError("")
     try {
       await apiClient.patch(`/api/v1/clinic/consultations/${id}`, draftPayload())
-      const note = window.prompt("Optional note for the doctor:") ?? ""
+      const note = await prompt({ title: "Send to doctor", label: "Note for the doctor", optional: true, multiline: true, confirmLabel: "Send" })
+      if (note === null) { setHandoffBusy(false); return }
       await apiClient.post(`/api/v1/clinic/consultations/${id}/send-to-doctor`, { comment: note })
       qc.invalidateQueries({ queryKey: ["clinic-handoff-queue"] })
       onCancel()
@@ -187,8 +190,8 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
       setHandoffError(e?.response?.data?.message ?? "Could not send to doctor")
     } finally { setHandoffBusy(false) }
   }
-  const handleCancel = () => {
-    if (window.confirm("Discard this consultation draft? The notes entered so far will be abandoned.")) discardDraft()
+  const handleCancel = async () => {
+    if (await confirm({ title: "Discard this draft?", body: "The notes entered so far will be abandoned.", confirmLabel: "Discard draft", danger: true })) discardDraft()
   }
   useEffect(() => {
     if (discardToken > 0) discardDraft()
@@ -203,7 +206,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
 
   const startRec = () => {
     const SR=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition
-    if (!SR) { alert("Speech recognition requires Chrome or Edge"); return }
+    if (!SR) { void notify({ title: "Voice notes unavailable", body: "Speech recognition needs Chrome or Edge." }); return }
     const r=new SR(); r.continuous=true; r.interimResults=true; r.lang="en-ZA"
     r.onresult=(e:any)=>{
       let final=""
@@ -220,7 +223,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
     // straight from the browser to a third-party API with no auth, consent or audit.
     // It returns once a backend scribe endpoint exists (consent gate, then draft, then
     // clinician review, then sign). Nothing is sent anywhere from here.
-    window.alert("AI note extraction is switched off until the secure, consent-gated scribe is available. Your transcript was not sent anywhere.")
+    await notify({ title: "AI notes are switched off", body: "AI note extraction stays off until the secure, consent-gated scribe is available. Your transcript was not sent anywhere." })
   }
 
   // ── Bill lines ────────────────────────────────────────────────────────────
@@ -379,6 +382,7 @@ export default function ConsultationSession({ patient, appointment, onComplete, 
 
   return (
     <div style={{ fontFamily:"'Inter',system-ui,sans-serif", height:"100%", display:"flex", flexDirection:"column" }}>
+      {dialogs}
 
       {/* ── Session header ─────────────────────────────────────────────── */}
       <div style={{ background:`linear-gradient(135deg,${NAVY} 0%,var(--hf-primary-deep) 100%)`,

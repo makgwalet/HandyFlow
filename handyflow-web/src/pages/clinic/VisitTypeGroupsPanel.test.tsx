@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest"
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
 const get = vi.fn(), put = vi.fn(), del = vi.fn()
@@ -55,9 +55,10 @@ describe("VisitTypeGroupsPanel", () => {
   })
   it("offers the way back to the default only for a practice's own list, after confirming", async () => {
     get.mockResolvedValue({ data: { data: { visitType: "CONSULTATION", source: "TENANT", groups: [e("A")] } } })
-    vi.spyOn(window, "confirm").mockReturnValue(true)
     show()
     fireEvent.click(await screen.findByText("Use platform default"))
+    expect(del).not.toHaveBeenCalled()
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Use the platform default?" })).getByText("Use default"))
     await waitFor(() => expect(del).toHaveBeenCalledWith("/api/v1/clinic/visit-types/CONSULTATION/groups"))
   })
   it("is read-only without author rights", async () => {

@@ -1,5 +1,6 @@
 // src/pages/clinic/PatientConsultationTab.tsx
 // Split out of PatientFilePage.tsx (W-4); behaviour unchanged.
+import { useDialogs } from "./dialogs"
 import { useRef, useState } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -13,6 +14,7 @@ import { Activity, ChevronDown, ChevronUp, Loader, Mic, MicOff, Pill, Plus, Stet
 export default function ConsultationTab({ patient, consultations, practitioners, qc, addToBill, onSwitchTab }:
   {patient:Patient; consultations:Consultation[]; practitioners:Practitioner[]; qc:any; addToBill:(l:any)=>void; onSwitchTab:(t:any)=>void}) {
   const [expanded, setExpanded] = useState<string|null>(null)
+  const { notify, dialogs } = useDialogs()
   const [showNew, setShowNew]   = useState(false)
   const [showRx, setShowRx]     = useState<string|null>(null)
   const [editingId, setEditingId] = useState<string|null>(null)
@@ -82,7 +84,7 @@ export default function ConsultationTab({ patient, consultations, practitioners,
 
   const startRecording = () => {
     const SR=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition
-    if (!SR) { alert("Speech recognition requires Chrome or Edge."); return }
+    if (!SR) { void notify({ title: "Voice notes unavailable", body: "Speech recognition needs Chrome or Edge." }); return }
     const r=new SR(); r.continuous=true; r.interimResults=true; r.lang="en-ZA"
     r.onresult=(e:any)=>{
       let final=""
@@ -99,13 +101,14 @@ export default function ConsultationTab({ patient, consultations, practitioners,
     // straight from the browser to a third-party API with no auth, consent or audit.
     // It returns once a backend scribe endpoint exists (consent gate, then draft, then
     // clinician review, then sign). Nothing is sent anywhere from here.
-    window.alert("AI note extraction is switched off until the secure, consent-gated scribe is available. Your transcript was not sent anywhere.")
+    await notify({ title: "AI notes are switched off", body: "AI note extraction stays off until the secure, consent-gated scribe is available. Your transcript was not sent anywhere." })
   }
 
   const sorted=[...consultations].sort((a,b)=>b.consultedAt.localeCompare(a.consultedAt))
 
   return (
     <div>
+      {dialogs}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
         <div style={{ fontSize:15, fontWeight:700, color:"var(--hf-text)" }}>{consultations.length} consultation{consultations.length!==1?"s":""}</div>
         <button onClick={()=>{setShowNew(true);setForm({...EMPTY});setTranscript("");setApiError("")}} style={btnPrimary}><Plus size={14}/> Record consultation</button>

@@ -3,6 +3,7 @@
 // (DRAFT, NURSE_IN_PROGRESS, RETURNED_TO_NURSE). Resuming reopens the patient's file on the same
 // appointment, where the session finds the draft and continues it. A draft with no appointment
 // cannot be resumed from here yet; it can still be discarded.
+import { useDialogs } from "./dialogs"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -20,6 +21,7 @@ const STATUS: Record<string, string> = { DRAFT: "Draft", NURSE_IN_PROGRESS: "Nur
 
 export default function DraftsTab({ onResume }: Props) {
   const qc = useQueryClient()
+  const { confirm, dialogs } = useDialogs()
   const canWrite = usePermission("CLINIC_CLINICAL_WRITE")
   const [error, setError] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
@@ -59,6 +61,7 @@ export default function DraftsTab({ onResume }: Props) {
 
   return (
     <div>
+      {dialogs}
       <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: "0 0 12px" }}>
         Consultations that have not been handed over or signed. Nothing here is lost: drafts autosave as you work.
       </p>
@@ -93,7 +96,7 @@ export default function DraftsTab({ onResume }: Props) {
                   title={d.appointmentId ? "" : "This draft has no appointment, so it cannot be resumed from here."}
                   onClick={() => resume(d)}>Resume</button>
                 <button style={btn()} disabled={discard.isPending}
-                  onClick={() => { if (window.confirm("Discard this draft? It cannot be recovered.")) discard.mutate(d.id) }}>Discard</button>
+                  onClick={async () => { if (await confirm({ title: "Discard this draft?", body: "It cannot be recovered.", confirmLabel: "Discard", danger: true })) discard.mutate(d.id) }}>Discard</button>
               </div>
             )}
           </div>

@@ -1,5 +1,6 @@
 // src/pages/clinic/PatientFilePage.tsx
 // Full-page patient file — 8 tabs + family management + account lifecycle
+import { useDialogs } from "./dialogs"
 import { useEffect, useState } from "react"
 import ConsultationSession from "./ConsultationSession"
 import { LabsTabEnhanced } from "./LabsTab"
@@ -29,6 +30,7 @@ interface Props {
 
 export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPatient, initialSession, onSessionClear }: Props) {
   const qc = useQueryClient()
+  const { confirm, prompt, dialogs } = useDialogs()
   const [activeTab, setActiveTab] = useState<TabId>("overview")
   const [billLines, setBillLines] = useState<BillLine[]>([])
   const [showActions, setShowActions] = useState(false)
@@ -104,6 +106,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
 
   return (
     <div style={{ fontFamily:"'Inter',system-ui,sans-serif", minHeight:600 }}>
+      {dialogs}
       {/* ── Patient banner ──────────────────────────────────────────────── */}
       <div style={{ background:`linear-gradient(135deg,${NAVY} 0%,var(--hf-primary-deep) 100%)`,
         borderRadius:12, marginBottom:24, padding:"24px 28px 0", overflow:"hidden" }}>
@@ -186,8 +189,9 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
                 {/* Archive */}
                 {!isArchived && (
                   <ActionItem icon={Archive} label="Archive record"
-                    color={RED_TEXT} onClick={()=>{
-                      const reason = window.prompt("Archive reason (HPCSA records retained 6 years):")
+                    color={RED_TEXT} onClick={async ()=>{
+                      setShowActions(false)
+                      const reason = await prompt({ title: "Archive this record", body: "HPCSA records are retained for 6 years, so the record is archived, never deleted.", label: "Reason", confirmLabel: "Archive", danger: true })
                       if (reason !== null) archive.mutate(reason)
                     }}
                     hint="Soft-archive — never permanently deleted"/>
@@ -272,7 +276,7 @@ export default function PatientFilePage({ patient, onClose, onNavigate, onOpenPa
               display:"flex",alignItems:"center",gap:6}}>
             ↑ Return to session
           </button>
-          <button onClick={()=>{ if (window.confirm("Discard this consultation draft?")) setDiscardToken(t=>t+1) }}
+          <button onClick={async ()=>{ if (await confirm({ title: "Discard this session?", body: "The consultation draft will be abandoned.", confirmLabel: "Discard", danger: true })) setDiscardToken(t=>t+1) }}
             style={{background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.7)",
               border:"none",borderRadius:8,padding:"7px 12px",fontSize:12,cursor:"pointer"}}>
             Discard session

@@ -1,7 +1,8 @@
 // src/pages/clinic/patientFile.shared.tsx
 // Types, design tokens, formatters and small layout helpers shared by the patient file and its tabs.
+import ModalShell from "./ModalShell"
 import { apiClient } from "../../api/client"
-import { User, Calendar, AlertCircle, X, CheckCircle, PlayCircle, XCircle, Loader } from "lucide-react"
+import { User, Calendar, AlertCircle, CheckCircle, PlayCircle, XCircle, Loader } from "lucide-react"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -106,17 +107,7 @@ export const downloadPdf = async (url:string, filename:string) => {
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
 export function Modal({ title, onClose, children, wide }:{title:string;onClose:()=>void;children:React.ReactNode;wide?:boolean}) {
-  return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.55)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1200, backdropFilter:"blur(3px)" }}>
-      <div style={{ background:"var(--hf-surface)", borderRadius:16, padding:28, width:wide?740:500, maxHeight:"92vh", overflowY:"auto", boxShadow:"0 24px 64px rgba(0,0,0,0.22)" }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
-          <h3 style={{ margin:0, fontSize:17, fontWeight:700, color:"var(--hf-text)" }}>{title}</h3>
-          <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", color:GRAY, display:"flex" }}><X size={20}/></button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
+  return <ModalShell title={title} onClose={onClose} width={wide?740:500}>{children}</ModalShell>
 }
 export function ModalFooter({ onCancel, onConfirm, confirmLabel, loading }:{onCancel:()=>void;onConfirm:()=>void;confirmLabel:string;loading?:boolean}) {
   return <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20 }}><button onClick={onCancel} style={btnCancel}>Cancel</button><button onClick={onConfirm} disabled={loading} style={btnPrimary}>{loading?<><Loader size={13}/> {confirmLabel}</>:confirmLabel}</button></div>

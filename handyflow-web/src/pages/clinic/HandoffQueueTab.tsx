@@ -2,6 +2,7 @@
 // Nurse -> doctor handoff queue (DEC-CLINIC-004). Doctors accept a handed-over
 // consultation, finish their review, and either sign it or send it back to the
 // nurse with a reason and comment. Every move is audited server-side.
+import { useDialogs } from "./dialogs"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -44,6 +45,7 @@ const btn = (primary = false): React.CSSProperties => ({
 
 export default function HandoffQueueTab() {
   const qc = useQueryClient()
+  const { confirm, dialogs } = useDialogs()
   const canSign = usePermission("CLINIC_CLINICAL_SIGN")  // doctor actions
   const [error, setError] = useState("")
   const [returning, setReturning] = useState<QueueItem | null>(null)
@@ -83,6 +85,7 @@ export default function HandoffQueueTab() {
 
   return (
     <div>
+      {dialogs}
       <p style={{ margin: "0 0 16px", color: "var(--hf-text-muted)", fontSize: 13 }}>
         Consultations handed over by nurses, oldest first. Accepting takes the consultation; returning sends it back with a reason.
       </p>
@@ -117,7 +120,7 @@ export default function HandoffQueueTab() {
               )}
               {canSign && item.status === "DOCTOR_COMPLETED" && (
                 <button style={btn(true)} disabled={act.isPending}
-                  onClick={() => { if (window.confirm("Sign this consultation? It will complete the visit.")) act.mutate({ id: item.id, path: "sign" }) }}>
+                  onClick={async () => { if (await confirm({ title: "Sign this consultation?", body: "It will complete the visit.", confirmLabel: "Sign" })) act.mutate({ id: item.id, path: "sign" }) }}>
                   Sign</button>
               )}
               {canSign && <button style={btn()} disabled={act.isPending}

@@ -3,6 +3,7 @@
 // the user's permissions allow. Authoring is a JSON editor for now; the server validates the whole definition and its
 // messages are shown as they come. Nothing here approves content on its own: review and activation are separate
 // permissions, and activation by someone other than the reviewer is enforced by the server (DEC-CLINIC-001).
+import { useDialogs } from "./dialogs"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -44,6 +45,7 @@ const btn: React.CSSProperties = { background: "none", border: "none", cursor: "
 
 export default function QuestionLibraryAdminTab() {
   const qc = useQueryClient()
+  const { prompt, dialogs } = useDialogs()
   const canAdmin = usePermission("CLINIC_CONTENT_ADMIN")
   const canApprove = usePermission("CLINIC_CONTENT_APPROVE")
   const [error, setError] = useState("")
@@ -66,13 +68,13 @@ export default function QuestionLibraryAdminTab() {
       setError(""); setEditor({ id: g.id, code: g.code, text: JSON.stringify(v.definition, null, 2), readOnly, title: `${g.code} v${g.version} (${g.status})` })
     } catch (e) { setError(msg(e)) }
   }
-  const act = (g: GroupRow, a: ActionId) => {
+  const act = async (g: GroupRow, a: ActionId) => {
     if (a === "view") return open(g, true)
     if (a === "edit") return open(g, false)
     if (a === "submit") return run.mutate(() => apiClient.post(`${lib}/${g.id}/submit-for-review`, {}))
     if (a === "new-version") return run.mutate(() => apiClient.post(`${lib}/${g.id}/new-version`))
     const status = { approve: "APPROVED", changes: "CHANGES_REQUESTED", activate: "ACTIVE", deprecate: "DEPRECATED" }[a]
-    const note = a === "changes" ? window.prompt("What needs to change?") : null
+    const note = a === "changes" ? await prompt({ title: "Request changes", label: "What needs to change?", multiline: true, confirmLabel: "Send back" }) : null
     if (a === "changes" && !note?.trim()) return
     run.mutate(() => apiClient.post(`${lib}/${g.id}/status`, { status, note }))
   }
@@ -88,6 +90,7 @@ export default function QuestionLibraryAdminTab() {
   const rows = data ?? []
   return (
     <div>
+      {dialogs}
       <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 10 }}>
         Question groups need clinical review before use. Content marked DEMO is sample content only.
       </div>

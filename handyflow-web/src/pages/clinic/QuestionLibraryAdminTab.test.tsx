@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest"
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
 const get = vi.fn(), post = vi.fn(), put = vi.fn()
@@ -66,12 +66,15 @@ describe("QuestionLibraryAdminTab", () => {
     expect(put).not.toHaveBeenCalled()
   })
   it("asks for a reason before requesting changes, and sends nothing without one", async () => {
-    const prompt = vi.spyOn(window, "prompt").mockReturnValue("  ")
     show()
     fireEvent.click(await screen.findByText("Request changes"))
+    const ask = () => within(screen.getByRole("dialog", { name: "Request changes" }))
+    fireEvent.change(ask().getByLabelText("What needs to change?"), { target: { value: "  " } })
+    fireEvent.click(ask().getByText("Send back"))
     expect(post).not.toHaveBeenCalled()
-    prompt.mockReturnValue("Add a pregnancy question")
-    fireEvent.click(screen.getByText("Request changes"))
+    expect(ask().getByRole("alert")).toBeTruthy()
+    fireEvent.change(ask().getByLabelText("What needs to change?"), { target: { value: "Add a pregnancy question" } })
+    fireEvent.click(ask().getByText("Send back"))
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clinic/question-groups/g2/status",
       { status: "CHANGES_REQUESTED", note: "Add a pregnancy question" }))
   })

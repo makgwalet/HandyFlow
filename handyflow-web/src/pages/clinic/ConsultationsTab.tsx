@@ -1,4 +1,8 @@
 // src/pages/clinic/ConsultationsTab.tsx
+import ModalShell from "./ModalShell"
+import PatientPicker, { type PickerPatient } from "./PatientPicker"
+import { myPractitionerId } from "./currentPractitioner"
+import { useAuthStore } from "../../store/auth.store"
 import PrescriptionForm from "./PrescriptionForm"
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -6,7 +10,7 @@ import { apiClient } from "../../api/client"
 import AddendaPanel from "./AddendaPanel"
 import QuestionAnswersReadOnly from "./QuestionAnswersReadOnly"
 import AllergySnapshot from "./AllergySnapshot"
-import { Plus, X, FileText, ChevronDown, ChevronUp, Pill, AlertCircle, Activity, Download } from "lucide-react"
+import { Plus, FileText, ChevronDown, ChevronUp, Pill, AlertCircle, Activity, Download } from "lucide-react"
 
 interface Consultation {
   id: string; patientId: string; patientName: string
@@ -21,7 +25,6 @@ interface Prescription {
   id: string; medicationName: string; dosage: string; frequency: string
   duration: string; quantity: number; repeats: number; instructions: string; dispensed: boolean
 }
-interface Patient      { id: string; fullName: string }
 interface Practitioner { id: string; fullName: string; specialty: string }
 
 const unwrapList = (r: any) => { const p = r.data?.data ?? r.data; return Array.isArray(p) ? p : (p?.content ?? []) }
@@ -34,7 +37,10 @@ const EMPTY_FORM = {
 
 export default function ConsultationsTab() {
   const qc = useQueryClient()
-  const [selectedPatientId, setSelectedPatientId] = useState("")
+  const [selectedPatient, setSelectedPatient] = useState<PickerPatient | null>(null)
+  const selectedPatientId = selectedPatient?.id ?? ""
+  const [formPatient, setFormPatient] = useState<PickerPatient | null>(null)
+  const userEmail = useAuthStore(st => st.user?.email)
   const [expanded, setExpanded]     = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [showRx, setShowRx]         = useState<string | null>(null)
@@ -47,10 +53,6 @@ export default function ConsultationsTab() {
   const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({})
   const f = (k: keyof typeof EMPTY_FORM, v: string) => { setForm(p => ({ ...p, [k]: v })); setFieldErrors(e => { const n = { ...e }; delete n[k]; return n }) }
 
-  const { data: patients = [] } = useQuery<Patient[]>({
-    queryKey: ["clinic-patients-list"],
-    queryFn: async () => unwrapList(await apiClient.get("/api/v1/clinic/patients?size=200")),
-  })
   const { data: practitioners = [] } = useQuery<Practitioner[]>({
     queryKey: ["clinic-practitioners-list"],
     queryFn: async () => unwrapList(await apiClient.get("/api/v1/clinic/practitioners/list")),
@@ -126,13 +128,16 @@ export default function ConsultationsTab() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 13, color: "var(--hf-text-muted)", fontWeight: 500 }}>Patient:</span>
-          <select value={selectedPatientId} onChange={e => setSelectedPatientId(e.target.value)}
-            style={{ padding: "8px 12px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, minWidth: 220, outline: "none" }}>
-            <option value="">Select patient to view history...</option>
-            {(patients as Patient[]).map(p => <option key={p.id} value={p.id}>{p.fullName}</option>)}
-          </select>
+          <div style={{ width: 340 }}>
+            <PatientPicker value={selectedPatient} onChange={setSelectedPatient} placeholder="Find a patient to view their history…" />
+          </div>
         </div>
-        <button onClick={() => { setShowCreate(true); setForm(EMPTY_FORM); setFieldErrors({}); setApiError("") }} style={btnPrimary}>
+        <button onClick={() => {
+          setShowCreate(true); setFieldErrors({}); setApiError("")
+          // Start from the patient already on screen, and from the logged-in practitioner.
+          setFormPatient(selectedPatient)
+          setForm({ ...EMPTY_FORM, patientId: selectedPatient?.id ?? "", practitionerId: myPractitionerId(practitioners as any[], userEmail) })
+        }} style={btnPrimary}>
           <Plus size={15} /> Record Consultation
         </button>
       </div>
@@ -268,15 +273,9 @@ export default function ConsultationsTab() {
 
       {/* Prescriptions modal */}
       {showRx && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 580, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--hf-success-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}><Pill size={16} style={{ color: 'var(--hf-accent-text)' }} /></div>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Prescriptions</h3>
-              </div>
-              <button onClick={() => { setShowRx(null); setApiError("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
-            </div>
+        <ModalShell title="Prescriptions" width={580} onClose={() => { setShowRx(null); setApiError("") }}
+          icon={<div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--hf-success-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}><Pill size={16} style={{ color: 'var(--hf-accent-text)' }} /></div>}>
+          <div>
 
             {(prescriptions as Prescription[]).length === 0 ? (
               <div style={{ textAlign: "center", padding: "20px 0", color: "var(--hf-text-faint)", fontSize: 13 }}>No prescriptions issued for this consultation.</div>
@@ -308,20 +307,14 @@ export default function ConsultationsTab() {
                 onSubmit={body => { setApiError(""); return addPrescription.mutateAsync({ consultationId: showRx!, body }) }} />
             </div>
           </div>
-        </div>
+        </ModalShell>
       )}
 
       {/* Referral letter modal */}
       {showReferral && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 560, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--hf-danger-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}><FileText size={16} style={{ color: 'var(--hf-danger-text-strong)' }} /></div>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--hf-text)" }}>Referral Letter</h3>
-              </div>
-              <button onClick={() => { setShowReferral(null); setReferralError("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
-            </div>
+        <ModalShell title="Referral letter" width={560} onClose={() => { setShowReferral(null); setReferralError("") }}
+          icon={<div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--hf-danger-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}><FileText size={16} style={{ color: 'var(--hf-danger-text-strong)' }} /></div>}>
+          <div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
@@ -372,27 +365,25 @@ export default function ConsultationsTab() {
               </button>
             </div>
           </div>
-        </div>
+        </ModalShell>
       )}
 
       {/* Record consultation modal */}
       {showCreate && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
-          <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 720, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--hf-text)" }}>Record Consultation</h3>
-              <button onClick={() => setShowCreate(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-faint)", display: "flex" }}><X size={20} /></button>
-            </div>
+        <ModalShell title="Record consultation" width={720} onClose={() => setShowCreate(false)}
+          footer={<>
+            <button onClick={() => setShowCreate(false)} style={btnCancel}>Cancel</button>
+            <button onClick={handleCreate} disabled={createConsultation.isPending} style={btnPrimary}>
+              {createConsultation.isPending ? "Recording..." : "Record consultation"}
+            </button></>}>
+          <div>
 
             <FormSection title="Patient & Practitioner">
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <div>
                   <label style={lbl}>Patient *</label>
-                  <select value={form.patientId} onChange={e => f("patientId", e.target.value)} style={{ ...inp("patientId"), background: "var(--hf-surface)" }}>
-                    <option value="">Select patient...</option>
-                    {(patients as Patient[]).map(p => <option key={p.id} value={p.id}>{p.fullName}</option>)}
-                  </select>
-                  {fieldErrors.patientId && <div style={{ fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}><AlertCircle size={12} />{fieldErrors.patientId}</div>}
+                  <PatientPicker value={formPatient} error={fieldErrors.patientId}
+                    onChange={p => { setFormPatient(p); f("patientId", p?.id ?? "") }} />
                 </div>
                 <div>
                   <label style={lbl}>Practitioner</label>
@@ -436,15 +427,9 @@ export default function ConsultationsTab() {
               </div>
             </FormSection>
 
-            {apiError && <div style={{ marginBottom: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{apiError}</div>}
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button onClick={() => setShowCreate(false)} style={btnCancel}>Cancel</button>
-              <button onClick={handleCreate} disabled={createConsultation.isPending} style={btnPrimary}>
-                {createConsultation.isPending ? "Recording..." : "Record Consultation"}
-              </button>
-            </div>
+            {apiError && <div role="alert" style={{ marginBottom: 14, padding: "10px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 8, fontSize: 13, color: "var(--hf-danger-text)", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle size={14} />{apiError}</div>}
           </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   )
@@ -459,7 +444,6 @@ function FormSection({ title, children }: { title: string; children: React.React
   )
 }
 
-const inp  = (key: string): React.CSSProperties => ({ width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, outline: "none" })
 const sinp: React.CSSProperties = { width: "100%", padding: "9px 12px", boxSizing: "border-box" as const, border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, outline: "none", background: "var(--hf-surface)" }
 const lbl: React.CSSProperties  = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 5 }
 const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, padding: "9px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer" }

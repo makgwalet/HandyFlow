@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest"
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
 vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true }))
@@ -49,12 +49,13 @@ describe("DraftsTab", () => {
   })
 
   it("discards only after confirmation", async () => {
-    vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true)
     show()
     const discard = (await screen.findAllByText("Discard"))[0]
     fireEvent.click(discard)
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Discard this draft?" })).getByText("Cancel"))
     expect(post).not.toHaveBeenCalled()
     fireEvent.click(discard)
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Discard this draft?" })).getByText("Discard"))
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clinic/consultations/d1/abandon"))
   })
 

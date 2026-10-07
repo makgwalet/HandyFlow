@@ -2,6 +2,7 @@
 // Patient overview: allergies, conditions and medicines, read from the structured records (S1-2) and editable by
 // clinicians. Resolving or stopping an item keeps it on record; nothing is deleted. If the structured lists cannot
 // be loaded, the older plain-text lists on the patient are shown read-only instead, so an allergy is never hidden.
+import { useDialogs } from "./dialogs"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -55,6 +56,7 @@ function Section({ title, tone, children }: { title: string; tone: "danger" | "w
 export default function ClinicalSummaryPanel({ patientId, fallbackAllergies = [], fallbackConditions = [] }:
   { patientId: string; fallbackAllergies?: string[]; fallbackConditions?: string[] }) {
   const qc = useQueryClient()
+  const { confirm, dialogs } = useDialogs()
   const canWrite = usePermission("CLINIC_CLINICAL_WRITE")
   const [error, setError] = useState("")
   const refresh = () => { setError(""); qc.invalidateQueries({ queryKey: ["pf-clinical", patientId] }); qc.invalidateQueries({ queryKey: ["clinic-patients"] }) }
@@ -76,6 +78,7 @@ export default function ClinicalSummaryPanel({ patientId, fallbackAllergies = []
 
   return (
     <div>
+      {dialogs}
       {error && <div role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 8 }}>{error}</div>}
 
       <Section title="⚠ Allergies" tone="danger">
@@ -91,7 +94,7 @@ export default function ClinicalSummaryPanel({ patientId, fallbackAllergies = []
                 {x.reaction && <span style={{ color: "var(--hf-text-muted)" }}>{x.reaction}</span>}
                 {canWrite && <>
                   <button style={linkBtn} onClick={() => patch.mutate({ kind: "allergies", id: x.id, body: { status: "RESOLVED" } })}>Resolved</button>
-                  <button style={linkBtn} onClick={() => { if (window.confirm(`Mark "${x.allergen}" as entered in error?`)) patch.mutate({ kind: "allergies", id: x.id, body: { status: "ENTERED_IN_ERROR" } }) }}>Entered in error</button>
+                  <button style={linkBtn} onClick={async () => { if (await confirm({ title: "Mark as entered in error?", body: `"${x.allergen}" will no longer count as an allergy.`, confirmLabel: "Entered in error", danger: true })) patch.mutate({ kind: "allergies", id: x.id, body: { status: "ENTERED_IN_ERROR" } }) }}>Entered in error</button>
                 </>}
               </div>
             ))}
