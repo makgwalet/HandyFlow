@@ -1,5 +1,6 @@
 // src/pages/clinic/ScheduleTab.tsx
 // Day / Week calendar view per doctor — click slot to book appointment
+import { bookingProblem, clashMessage, WALK_IN_GRACE_MS } from "./bookingRules"
 import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -95,6 +96,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
   const [showBook, setShowBook]         = useState(false)
   const [bookSlot, setBookSlot]         = useState<{date:Date;hour:number}|null>(null)
   const [apiError, setApiError]         = useState("")
+  const [clash, setClash]               = useState<{message:string; body:any}|null>(null)
   const nowRef = useRef<HTMLDivElement>(null)
 
   // Book form
@@ -167,15 +169,22 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
   })
 
   const book = useMutation({
-    mutationFn: (body:any) => apiClient.post("/api/v1/clinic/appointments", body),
+    mutationFn: ({body, allowOverlap}:{body:any; allowOverlap?:boolean}) =>
+      apiClient.post("/api/v1/clinic/appointments", body, allowOverlap ? {params:{allowOverlap:true}} : undefined),
     onSuccess: () => {
+      setClash(null)
       qc.invalidateQueries({queryKey:["schedule-appts"]})
       qc.invalidateQueries({queryKey:["clinic-appts-dashboard"]})
       setShowBook(false)
       setBookForm({patientId:"",practitionerId:"",scheduledAt:"",durationMinutes:"30",appointmentType:"CONSULTATION",reason:""})
       setApiError("")
     },
-    onError: (e:any) => setApiError(e.response?.data?.message ?? "Booking failed"),
+    onError: (e:any, vars) => {
+      const msg = clashMessage(e)
+      if (msg) { setClash({message: msg, body: vars.body}); setApiError(""); return }
+      setClash(null)
+      setApiError(e.response?.data?.message ?? "Booking failed")
+    },
   })
 
   // Scroll to current time on mount
@@ -417,7 +426,7 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
               <div>
                 <label style={lbl}>Date & time *</label>
                 <input type="datetime-local" value={bookForm.scheduledAt}
-                  min={new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)}
+                  min={new Date(Date.now() - WALK_IN_GRACE_MS - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)}
                   onChange={e=>setBookForm(f=>({...f,scheduledAt:e.target.value}))} style={sinp}/>
               </div>
               <div>
@@ -443,30 +452,32 @@ export default function ScheduleTab({ onStartSession }: ScheduleTabProps = {}) {
                 ✓ {new Date(bookForm.scheduledAt).toLocaleString("en-ZA",{dateStyle:"medium",timeStyle:"short"})} · {bookForm.durationMinutes} min
               </div>
             )}
+            {clash && (
+              <div role="alert" style={{padding:"10px 12px",background:"var(--hf-warning-soft)",border:"1px solid var(--hf-warning-border, var(--hf-border))",borderRadius:8,fontSize:13,color:"var(--hf-warning-text)"}}>
+                <div style={{fontWeight:600,marginBottom:6}}>{clash.message}</div>
+                <button type="button" disabled={book.isPending}
+                  onClick={()=>book.mutate({body:clash.body, allowOverlap:true})}
+                  style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--hf-warning-text)",background:"transparent",color:"var(--hf-warning-text)",fontWeight:600,fontSize:12,cursor:"pointer"}}>
+                  Book anyway
+                </button>
+              </div>
+            )}
             {apiError && <ErrBox msg={apiError}/>}
           </div>
           <ModalFooter
-            onCancel={()=>setShowBook(false)}
+            onCancel={()=>{setShowBook(false); setClash(null)}}
             onConfirm={()=>{
-              if (!bookForm.patientId || !bookForm.scheduledAt) {
-                setApiError("Patient and date/time are required"); return
-              }
-              // FIX: browsers don't reliably block a past datetime-local
-              // value entered by typing/paste even with min= set — belt
-              // and braces client-side check. Real enforcement still
-              // belongs server-side (see ClinicService.createAppointment),
-              // this only improves the UX for the common case.
-              if (new Date(bookForm.scheduledAt).getTime() < Date.now()) {
-                setApiError("Cannot book an appointment in the past"); return
-              }
-              book.mutate({
+              const problem = bookingProblem(bookForm, Date.now())
+              if (problem) { setApiError(problem); return }
+              setClash(null)
+              book.mutate({body: {
                 patientId: bookForm.patientId,
                 practitionerId: bookForm.practitionerId || null,
                 scheduledAt: new Date(bookForm.scheduledAt).toISOString(),
                 durationMinutes: parseInt(bookForm.durationMinutes) || 30,
                 appointmentType: bookForm.appointmentType,
                 reason: bookForm.reason || null,
-              })
+              }})
             }}
             confirmLabel="Book appointment"
             loading={book.isPending}/>

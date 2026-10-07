@@ -41,6 +41,7 @@ class ClinicServiceTest {
     @Mock ClinicPrescriptionRepository prescriptionRepo;
     @Mock ClinicPrescribingSafetyService prescribingSafety;
     @Mock ClinicAllergySnapshotService allergySnapshot;
+    @Mock ClinicSchedulingService schedulingService;
 
     @InjectMocks ClinicService service;
 
@@ -387,6 +388,71 @@ class ClinicServiceTest {
             var result = service.createAppointment(TENANT, req);
 
             assertThat(result.durationMinutes()).isEqualTo(30);
+        }
+
+        @Test
+        @DisplayName("refuses a booking that overlaps the practitioner's other appointment")
+        void refusesOverlap() {
+            var patientId = UUID.randomUUID();
+            var practitionerId = UUID.randomUUID();
+            when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patientWithId("Jane","Dlamini")));
+            var start = Instant.now().plusSeconds(3600);
+            when(schedulingService.findClashes(TENANT, practitionerId, start, 30, null))
+                    .thenReturn(List.of(new AppointmentRules.Clash("Sam Nkosi", start, 30)));
+            when(practitionerRepo.findActiveById(TENANT, practitionerId)).thenReturn(Optional.empty());
+
+            var req = new CreateAppointmentRequest(patientId, practitionerId, start, 30, "CONSULTATION", null);
+
+            assertThatThrownBy(() -> service.createAppointment(TENANT, req))
+                    .isInstanceOf(za.co.handyflow.platform.shared.ConflictException.class)
+                    .hasMessageContaining("Sam Nkosi");
+            verify(appointmentRepo, never()).save(any(ClinicAppointment.class));
+        }
+
+        @Test
+        @DisplayName("books anyway when the user chose to allow the overlap")
+        void allowsOverlapWhenAsked() {
+            var patientId = UUID.randomUUID();
+            var practitionerId = UUID.randomUUID();
+            var patient = patientWithId("Jane","Dlamini");
+            when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patient));
+            when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of(patient));
+            when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+
+            var req = new CreateAppointmentRequest(patientId, practitionerId, Instant.now().plusSeconds(3600), 30, "CONSULTATION", null);
+
+            service.createAppointment(TENANT, req, true);
+
+            verify(appointmentRepo).save(any(ClinicAppointment.class));
+            verifyNoInteractions(schedulingService);
+        }
+
+        @Test
+        @DisplayName("accepts a walk-in booked a few minutes ago but not an hour ago")
+        void walkInGrace() {
+            var patientId = UUID.randomUUID();
+            var patient = patientWithId("Jane","Dlamini");
+            when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patient));
+            when(patientRepo.findAllByIds(any(), anySet())).thenReturn(List.of(patient));
+            when(practitionerRepo.findAllByIds(any(), anySet())).thenReturn(List.of());
+
+            service.createAppointment(TENANT, new CreateAppointmentRequest(
+                    patientId, null, Instant.now().minusSeconds(120), 30, "CONSULTATION", null));
+            verify(appointmentRepo).save(any(ClinicAppointment.class));
+
+            assertThatThrownBy(() -> service.createAppointment(TENANT, new CreateAppointmentRequest(
+                    patientId, null, Instant.now().minusSeconds(3600), 30, "CONSULTATION", null)))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("rejects an absurd appointment length")
+        void rejectsBadLength() {
+            var patientId = UUID.randomUUID();
+            when(patientRepo.findActiveById(TENANT, patientId)).thenReturn(Optional.of(patientWithId("Jane","Dlamini")));
+            assertThatThrownBy(() -> service.createAppointment(TENANT, new CreateAppointmentRequest(
+                    patientId, null, Instant.now().plusSeconds(3600), 0, "CONSULTATION", null)))
+                    .isInstanceOf(IllegalArgumentException.class);
         }
 
         @Test

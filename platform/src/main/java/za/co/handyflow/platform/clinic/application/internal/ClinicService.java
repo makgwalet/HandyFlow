@@ -43,6 +43,7 @@ public class ClinicService {
     private final EmailService                 emailService;
     private final ClinicConsultationSummaryPdfService consultationSummaryPdfService;
     private final JdbcTemplate                 jdbc;
+    private final ClinicSchedulingService      schedulingService;
 
     // ── Patients ──────────────────────────────────────────────────────────────
 
@@ -299,6 +300,14 @@ public class ClinicService {
 
     @Transactional
     public AppointmentResponse createAppointment(TenantId tenantId, CreateAppointmentRequest req) {
+        return createAppointment(tenantId, req, false);
+    }
+
+    /**
+     * @param allowOverlap true when the user has seen the clash warning and chose to double-book anyway
+     */
+    @Transactional
+    public AppointmentResponse createAppointment(TenantId tenantId, CreateAppointmentRequest req, boolean allowOverlap) {
         ClinicPatient patient = patientRepo.findActiveById(tenantId, req.patientId())
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", req.patientId().toString()));
         // FIX: no validation existed on scheduledAt at all — an appointment
@@ -308,13 +317,22 @@ public class ClinicService {
         // client) from submitting a past timestamp. This is the actual
         // enforcement; the frontend guard just avoids the round-trip for
         // the common case.
-        if (req.scheduledAt().isBefore(Instant.now())) {
+        // A few minutes of grace so a walk-in booked "now" is not refused for being a moment ago.
+        if (AppointmentRules.inThePast(req.scheduledAt(), Instant.now())) {
             throw new IllegalArgumentException("Cannot book an appointment in the past");
+        }
+        int minutes = AppointmentRules.minutes(req.durationMinutes());
+        if (!allowOverlap && req.practitionerId() != null) {
+            var clashes = schedulingService.findClashes(tenantId, req.practitionerId(), req.scheduledAt(), minutes, null);
+            if (!clashes.isEmpty()) {
+                String name = practitionerRepo.findActiveById(tenantId, req.practitionerId())
+                        .map(ClinicPractitioner::getFullName).orElse(null);
+                throw new ConflictException(AppointmentRules.conflictMessage(name, clashes, AppointmentRules.CLINIC_ZONE));
+            }
         }
         ClinicAppointment appt = ClinicAppointment.create(
                 tenantId, req.patientId(), req.practitionerId(),
-                req.scheduledAt(),
-                req.durationMinutes() != null ? req.durationMinutes() : 30,
+                req.scheduledAt(), minutes,
                 req.appointmentType(), req.reason()
         );
         appointmentRepo.save(appt);

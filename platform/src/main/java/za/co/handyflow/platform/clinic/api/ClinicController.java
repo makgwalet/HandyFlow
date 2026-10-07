@@ -180,11 +180,12 @@ public class ClinicController {
 
     @PostMapping("/appointments")
     @PreAuthorize("hasAuthority('CLINIC_WRITE')")
-    @Operation(summary = "Book an appointment for a patient")
+    @Operation(summary = "Book an appointment for a patient. Refused with 409 when the practitioner already has an overlapping booking, unless allowOverlap=true.")
     public ResponseEntity<ApiResponse<AppointmentResponse>> createAppointment(
-            @Valid @RequestBody CreateAppointmentRequest req) {
+            @Valid @RequestBody CreateAppointmentRequest req,
+            @RequestParam(defaultValue = "false") boolean allowOverlap) {
         return ResponseEntity.status(201).body(ApiResponse.success("Appointment booked",
-                clinicService.createAppointment(TenantContext.getTenantIdAsObject(), req)));
+                clinicService.createAppointment(TenantContext.getTenantIdAsObject(), req, allowOverlap)));
     }
 
     @PostMapping("/appointments/{id}/{action}")
