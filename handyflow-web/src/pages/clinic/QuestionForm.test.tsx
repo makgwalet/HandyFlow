@@ -38,6 +38,22 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
+describe("QuestionForm with fixed group codes (doctor review)", () => {
+  it("loads exactly the named groups by code, skipping the visit-type list", async () => {
+    get.mockImplementation((url: string) => {
+      if (url.endsWith("/question-groups/DEMO")) return Promise.resolve({ data: { data: group } })
+      if (url.endsWith("/question-groups/GONE")) return Promise.reject(new Error("404"))
+      return Promise.resolve({ data: { data: {} } })
+    })
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <QuestionForm consultationId="c1" patientId="p1" visitType="CONSULTATION" groupCodes={["DEMO", "GONE"]} />
+      </QueryClientProvider>)
+    expect(await screen.findByText(/DEMO: intake/)).toBeTruthy()
+    expect(get.mock.calls.some(c => String(c[0]).endsWith("/question-groups"))).toBe(false)
+  })
+})
+
 describe("QuestionForm", () => {
   it("renders nothing when no group is served for the visit", async () => {
     get.mockImplementation(() => Promise.resolve({ data: { data: [] } }))

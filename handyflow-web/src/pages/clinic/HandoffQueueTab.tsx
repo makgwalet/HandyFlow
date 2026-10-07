@@ -7,9 +7,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import QuestionAnswersReadOnly from "./QuestionAnswersReadOnly"
+import QuestionForm from "./QuestionForm"
 
 interface QueueItem {
-  id: string; patientName: string; practitionerName?: string; chiefComplaint?: string
+  id: string; patientId: string; patientName: string; practitionerName?: string; chiefComplaint?: string
   status: "READY_FOR_DOCTOR" | "DOCTOR_REVIEWING" | "DOCTOR_COMPLETED" | string
   createdAt: string
 }
@@ -54,6 +55,12 @@ export default function HandoffQueueTab() {
     queryKey: ["clinic-handoff-queue"],
     queryFn: async () => unwrap(await apiClient.get(`${base}/handoff-queue`)),
     refetchInterval: 30_000,
+  })
+  // Groups already started on the expanded consultation: the doctor edits these, nothing new is opened.
+  const { data: storedCodes = [] } = useQuery<string[]>({
+    queryKey: ["clinic-handoff-form-codes", historyFor],
+    enabled: !!historyFor,
+    queryFn: async () => Object.keys(unwrap(await apiClient.get(`/api/v1/clinic/consultations/${historyFor}/form-data`))?.groups ?? {}),
   })
   const { data: history = [] } = useQuery<Transition[]>({
     queryKey: ["clinic-handoff-history", historyFor],
@@ -120,7 +127,11 @@ export default function HandoffQueueTab() {
                 {historyFor === item.id ? "Hide details" : "Answers & history"}</button>
             </div>
             {historyFor === item.id && (
-              <div style={{ flexBasis: "100%" }}><QuestionAnswersReadOnly consultationId={item.id} /></div>
+              <div style={{ flexBasis: "100%" }}>
+                {canSign && item.status === "DOCTOR_REVIEWING" && storedCodes.length > 0
+                  ? <QuestionForm consultationId={item.id} patientId={item.patientId} visitType="CONSULTATION" groupCodes={storedCodes} />
+                  : <QuestionAnswersReadOnly consultationId={item.id} />}
+              </div>
             )}
             {historyFor === item.id && (
               <ol style={{ flexBasis: "100%", margin: "8px 0 0", paddingLeft: 18, fontSize: 12, color: "var(--hf-text-muted)" }}>

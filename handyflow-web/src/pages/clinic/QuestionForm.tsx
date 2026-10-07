@@ -34,12 +34,24 @@ interface Props {
   patientId: string
   visitType: string
   readOnly?: boolean
+  /** When set, show exactly these groups (those already started) instead of the ones served for the visit type. */
+  groupCodes?: string[]
 }
 
-export default function QuestionForm({ consultationId, patientId, visitType, readOnly }: Props) {
+export default function QuestionForm({ consultationId, patientId, visitType, readOnly, groupCodes }: Props) {
+  const fixed = groupCodes ? groupCodes.join(",") : null
   const { data: groups = [] } = useQuery<Group[]>({
-    queryKey: ["clinic-question-groups", visitType, patientId],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/clinic/question-groups", { params: { visitType, patientId } })) ?? [],
+    queryKey: ["clinic-question-groups", visitType, patientId, fixed],
+    queryFn: async () => {
+      if (groupCodes) {
+        const out: Group[] = []
+        for (const c of groupCodes) {
+          try { out.push(unwrap(await apiClient.get(`/api/v1/clinic/question-groups/${c}`))) } catch { /* no longer served: skip */ }
+        }
+        return out
+      }
+      return unwrap(await apiClient.get("/api/v1/clinic/question-groups", { params: { visitType, patientId } })) ?? []
+    },
     staleTime: 5 * 60_000,
   })
   const [extraCodes, setExtraCodes] = useState<string[]>([])
