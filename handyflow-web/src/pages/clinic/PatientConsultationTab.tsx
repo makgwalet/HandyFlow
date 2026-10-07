@@ -3,7 +3,7 @@
 import { useRef, useState } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { AllergyWarning, missingReasons, useAllergyChecks } from "./PrescriptionAllergyCheck"
+import PrescriptionForm from "./PrescriptionForm"
 import type { Consultation, Patient, Practitioner, Prescription } from "./patientFile.shared"
 import { AMBER, BORDER, Empty, ErrBox, FSect, GRAY, GREEN_TEXT, LIGHT, Modal, ModalFooter, PURPLE, PURPLE_TEXT, RED, RED_TEXT, TEAL, TEAL_TEXT, btnPrimary, downloadPdf, fmtDT, lbl, sinp, unwrap } from "./patientFile.shared"
 import { Activity, ChevronDown, ChevronUp, Loader, Mic, MicOff, Pill, Plus, Stethoscope } from "lucide-react"
@@ -53,7 +53,6 @@ export default function ConsultationTab({ patient, consultations, practitioners,
   const [form, setForm] = useState({...EMPTY})
   const f = (k:keyof typeof EMPTY, v:string) => setForm(p=>({...p,[k]:v}))
 
-  const [rxForm, setRxForm] = useState({medicationName:"",dosage:"",frequency:"",duration:"",quantity:"30",repeats:"0",instructions:""})
 
   const { data: prescriptions=[] } = useQuery({
     queryKey:["pf-rx",showRx],
@@ -71,16 +70,12 @@ export default function ConsultationTab({ patient, consultations, practitioners,
     },
     onError:(e:any)=>setApiError(e.response?.data?.message??"Failed"),
   })
-  const [rxAllergyReason, setRxAllergyReason] = useState("")
   const [rxError, setRxError] = useState("")
-  const rxAllergy = useAllergyChecks(showRx||null, [{id:"rx-form",medicationName:rxForm.medicationName}])
-  const rxNeedsReason = missingReasons([{id:"rx-form",medicationName:rxForm.medicationName,allergyReason:rxAllergyReason}], rxAllergy).length>0
   const addRx = useMutation({
     mutationFn: ({cid,body}:{cid:string;body:any})=>apiClient.post(`/api/v1/clinic/consultations/${cid}/prescriptions`,body),
     onSuccess: ()=>{
       qc.invalidateQueries({queryKey:["pf-rx",showRx]})
-      setRxForm({medicationName:"",dosage:"",frequency:"",duration:"",quantity:"30",repeats:"0",instructions:""})
-      setRxAllergyReason(""); setRxError("")
+      setRxError("")
     },
     onError:(e:any)=>setRxError(e.response?.data?.message??"Could not add the prescription"),
   })
@@ -187,20 +182,8 @@ export default function ConsultationTab({ patient, consultations, practitioners,
             </div>
           )}
           <div style={{ borderTop:`1px solid ${BORDER}`, paddingTop:16 }}>
-            <div style={{ fontSize:13, fontWeight:700, color:"var(--hf-text)", marginBottom:12 }}>Add prescription</div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-              <div style={{ gridColumn:"1/-1" }}><label style={lbl}>Medication *</label><input value={rxForm.medicationName} onChange={e=>setRxForm(f=>({...f,medicationName:e.target.value}))} placeholder="Amoxicillin 500mg" style={sinp}/></div>
-              <div><label style={lbl}>Dosage</label><input value={rxForm.dosage} onChange={e=>setRxForm(f=>({...f,dosage:e.target.value}))} placeholder="500mg" style={sinp}/></div>
-              <div><label style={lbl}>Frequency</label><input value={rxForm.frequency} onChange={e=>setRxForm(f=>({...f,frequency:e.target.value}))} placeholder="3× daily" style={sinp}/></div>
-              <div><label style={lbl}>Duration</label><input value={rxForm.duration} onChange={e=>setRxForm(f=>({...f,duration:e.target.value}))} placeholder="7 days" style={sinp}/></div>
-              <div><label style={lbl}>Qty</label><input type="number" value={rxForm.quantity} onChange={e=>setRxForm(f=>({...f,quantity:e.target.value}))} style={sinp}/></div>
-              <div style={{ gridColumn:"1/-1" }}><label style={lbl}>Instructions</label><input value={rxForm.instructions} onChange={e=>setRxForm(f=>({...f,instructions:e.target.value}))} placeholder="Take with food" style={sinp}/></div>
-            </div>
-            <AllergyWarning result={rxAllergy["rx-form"]} reason={rxAllergyReason} onReason={setRxAllergyReason} />
-            {rxError && <div role="alert" style={{ color:"var(--hf-danger-text)", fontSize:12, marginTop:8 }}>{rxError}</div>}
-            <div style={{ display:"flex", justifyContent:"flex-end", marginTop:14 }}>
-              <button onClick={()=>{ setRxError(""); addRx.mutate({cid:showRx!,body:{...rxForm,quantity:parseInt(rxForm.quantity),repeats:parseInt(rxForm.repeats),allergyOverrideReason:rxAllergyReason.trim()||null}}) }} disabled={!rxForm.medicationName||addRx.isPending||rxNeedsReason} style={btnPrimary}>{addRx.isPending?"Adding...":"Add prescription"}</button>
-            </div>
+            <PrescriptionForm consultationId={showRx} busy={addRx.isPending} error={rxError}
+              onSubmit={body=>{ setRxError(""); return addRx.mutateAsync({cid:showRx!,body}) }} />
           </div>
         </Modal>
       )}

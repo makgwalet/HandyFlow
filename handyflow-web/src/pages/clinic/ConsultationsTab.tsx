@@ -1,4 +1,5 @@
 // src/pages/clinic/ConsultationsTab.tsx
+import PrescriptionForm from "./PrescriptionForm"
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -46,8 +47,6 @@ export default function ConsultationsTab() {
   const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({})
   const f = (k: keyof typeof EMPTY_FORM, v: string) => { setForm(p => ({ ...p, [k]: v })); setFieldErrors(e => { const n = { ...e }; delete n[k]; return n }) }
 
-  const [rxForm, setRxForm] = useState({ medicationName: "", dosage: "", frequency: "", duration: "", quantity: "30", repeats: "0", instructions: "" })
-
   const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ["clinic-patients-list"],
     queryFn: async () => unwrapList(await apiClient.get("/api/v1/clinic/patients?size=200")),
@@ -80,7 +79,7 @@ export default function ConsultationsTab() {
   const addPrescription = useMutation({
     mutationFn: ({ consultationId, body }: { consultationId: string; body: any }) =>
       apiClient.post(`/api/v1/clinic/consultations/${consultationId}/prescriptions`, body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["prescriptions"] }); setRxForm({ medicationName: "", dosage: "", frequency: "", duration: "", quantity: "30", repeats: "0", instructions: "" }) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["prescriptions"] }); setApiError("") },
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to add prescription"),
   })
 
@@ -305,40 +304,8 @@ export default function ConsultationsTab() {
             )}
 
             <div style={{ borderTop: "1px solid var(--hf-border)", paddingTop: 18 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 14 }}>Add Prescription</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <label style={lbl}>Medication *</label>
-                  <input value={rxForm.medicationName} onChange={e => setRxForm(f => ({ ...f, medicationName: e.target.value }))} placeholder="Amoxicillin 500mg" style={sinp} />
-                </div>
-                <div>
-                  <label style={lbl}>Dosage</label>
-                  <input value={rxForm.dosage} onChange={e => setRxForm(f => ({ ...f, dosage: e.target.value }))} placeholder="500mg" style={sinp} />
-                </div>
-                <div>
-                  <label style={lbl}>Frequency</label>
-                  <input value={rxForm.frequency} onChange={e => setRxForm(f => ({ ...f, frequency: e.target.value }))} placeholder="3× daily" style={sinp} />
-                </div>
-                <div>
-                  <label style={lbl}>Duration</label>
-                  <input value={rxForm.duration} onChange={e => setRxForm(f => ({ ...f, duration: e.target.value }))} placeholder="7 days" style={sinp} />
-                </div>
-                <div>
-                  <label style={lbl}>Quantity</label>
-                  <input type="number" value={rxForm.quantity} onChange={e => setRxForm(f => ({ ...f, quantity: e.target.value }))} style={sinp} />
-                </div>
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <label style={lbl}>Instructions</label>
-                  <input value={rxForm.instructions} onChange={e => setRxForm(f => ({ ...f, instructions: e.target.value }))} placeholder="Take with food and water" style={sinp} />
-                </div>
-              </div>
-              {apiError && <div style={{ marginTop: 10, padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, fontSize: 13, color: "var(--hf-danger-text)" }}>{apiError}</div>}
-              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
-                <button onClick={() => addPrescription.mutate({ consultationId: showRx!, body: { ...rxForm, quantity: parseInt(rxForm.quantity), repeats: parseInt(rxForm.repeats) } })}
-                  disabled={!rxForm.medicationName || addPrescription.isPending} style={btnPrimary}>
-                  {addPrescription.isPending ? "Adding..." : "Add Prescription"}
-                </button>
-              </div>
+              <PrescriptionForm consultationId={showRx} busy={addPrescription.isPending} error={apiError}
+                onSubmit={body => { setApiError(""); return addPrescription.mutateAsync({ consultationId: showRx!, body }) }} />
             </div>
           </div>
         </div>
