@@ -49,6 +49,12 @@ public final class ComplaintWorkflow {
 
     public static boolean isOpen(Status s) { return s != Status.CLOSED && s != Status.WITHDRAWN; }
 
+    /** A substantiated complaint that has reached its finding (or later, including closed) can be referred to HR once. */
+    public static boolean canReferToHr(Status status, Finding finding, boolean alreadyReferred) {
+        return !alreadyReferred && finding == Finding.SUBSTANTIATED
+                && (status == Status.FINDING_MADE || status == Status.ACTION_TAKEN || status == Status.CLOSED);
+    }
+
     /** Details may be edited until a finding is made. */
     public static boolean isEditable(Status s) { return s == Status.RECEIVED || s == Status.UNDER_INVESTIGATION; }
 

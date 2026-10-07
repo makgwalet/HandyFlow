@@ -185,6 +185,10 @@ Load the demo, sign in as a user with `SECURITY_READ` and `SECURITY_MANAGE` (adm
 - [ ] Open the closed one (CMP-DEMO-05) and choose **Reopen**, giving a reason. It returns to Under investigation, the finding and action are cleared, and the timeline records what they were. A withdrawn complaint cannot be reopened.
 - [ ] Logging a complaint that is critical, or about excessive force, a firearm, theft or harassment, sends an in-app and email alert to the tenant's administrators (link opens the complaint).
 
+### HR link
+- [ ] Guard 360, Overview: an **HR employee record** card. Search HR employees (two characters or more), link one, or unlink. An employee can be linked to one guard only; a second attempt names the guard already linked.
+- [ ] On a complaint with a **substantiated** finding, once the guard is linked: **Refer to HR** (needs Security manage and HR manage) opens a disciplinary case in HR for that employee with the complaint number, category and finding. It can be done once; the page then shows HR's outcome, read live from HR. Nothing is decided or changed in HR beyond opening the case. Without a link the page says to link the guard first. The demo data has no HR employees, so link a guard to one of your own to try this.
+
 ### Automatic alerts and snapshots
 - [ ] 06:45 every day: one digest of skills and certificates that expire within 30 days (the notification links to Guards).
 - [ ] 02:15 every day: each active guard's score and risk recommendations are saved (table `security_guard_score_history`). A recommendation that was not on the guard's previous snapshot is announced once to administrators; one that keeps standing is not repeated. A guard's first snapshot is a baseline and announces nothing.
@@ -446,6 +450,7 @@ Generated from the controllers. Paths are under the host root. A blank permissio
 | POST | `/api/v1/security/complaints/{id}/close` | SECURITY_MANAGE |
 | POST | `/api/v1/security/complaints/{id}/withdraw` | SECURITY_MANAGE |
 | POST | `/api/v1/security/complaints/{id}/reopen` | SECURITY_MANAGE |
+| POST | `/api/v1/security/complaints/{id}/refer-hr` | SECURITY_MANAGE and HR_MANAGE (or USER_UPDATE) |
 | POST | `/api/v1/security/complaints/{id}/evidence` | SECURITY_MANAGE |
 | GET | `/api/v1/security/complaints/{id}/evidence/{evidenceId}/download` | SECURITY_READ |
 | DELETE | `/api/v1/security/complaints/{id}/evidence/{evidenceId}` | SECURITY_MANAGE |
@@ -500,6 +505,15 @@ Generated from the controllers. Paths are under the host root. A blank permissio
 | Method | Path | Permission |
 |---|---|---|
 | POST | `/api/v1/guard/incidents` | SECURITY_GUARD |
+
+### GuardHrLinkController
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/api/v1/security/guards/{guardId}/hr-link` | SECURITY_READ |
+| GET | `/api/v1/security/guards/hr-employees?q=` | SECURITY_MANAGE |
+| PUT | `/api/v1/security/guards/{guardId}/hr-link` | SECURITY_MANAGE |
+| DELETE | `/api/v1/security/guards/{guardId}/hr-link` | SECURITY_MANAGE |
 
 ### GuardPerformanceController
 

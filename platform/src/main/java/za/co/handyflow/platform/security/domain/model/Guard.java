@@ -176,6 +176,10 @@ public class Guard {
     @Column(name = "employee_code", unique = true, length = 20)
     private String employeeCode;
 
+    // ── V333: HR link ────────────────────────────────────────────────────────
+    @Column(name = "employee_id")
+    private UUID employeeId;
+
     // ── V220: Emergency contact ──────────────────────────────────────────────
     // At least one of guard.phone / emergencyContactPhone is required at
     // creation (enforced in GuardService, not here) -- see V220 migration.
@@ -404,6 +408,12 @@ public class Guard {
      * index doesn't exclude soft-deleted guards (a retired code must never
      * be reissued).
      */
+    /** Links (or, with null, unlinks) the HR employee record this guard is the same person as. */
+    public void linkEmployee(UUID employeeId) {
+        this.employeeId = employeeId;
+        this.updatedAt = Instant.now();
+    }
+
     public void assignEmployeeCode(String employeeCode) {
         this.employeeCode = employeeCode;
         this.updatedAt     = Instant.now();

@@ -18,6 +18,7 @@ export interface ComplaintDetail {
   resolutionNote: string | null; closedByName: string | null; closedAt: string | null; withdrawnReason: string | null
   createdByName: string | null; editable: boolean; allowedSteps: string[]; events: ComplaintEvent[]
   evidence: { id: string; fileName: string; label: string | null; sizeBytes: number; uploadedByName: string | null; createdAt: string }[]
+  hr?: import("./hrLink.logic").HrReferral | null; canReferToHr?: boolean
 }
 export interface ComplaintCounts { open: number; last90Days: number; substantiatedLast90Days: number }
 
@@ -104,5 +105,5 @@ export function actionsFor(finding: string | null) {
 
 export const EVENT_LABELS: Record<string, string> = {
   LOGGED: "Complaint logged", EDITED: "Details updated", INVESTIGATION_STARTED: "Investigation started", FINDING_RECORDED: "Finding recorded",
-  ACTION_RECORDED: "Action recorded", CLOSED: "Complaint closed", WITHDRAWN: "Complaint withdrawn", REOPENED: "Complaint reopened", EVIDENCE_ADDED: "Evidence added", EVIDENCE_REMOVED: "Evidence removed",
+  ACTION_RECORDED: "Action recorded", CLOSED: "Complaint closed", WITHDRAWN: "Complaint withdrawn", REOPENED: "Complaint reopened", REFERRED_TO_HR: "Referred to HR", EVIDENCE_ADDED: "Evidence added", EVIDENCE_REMOVED: "Evidence removed",
 }

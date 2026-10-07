@@ -33,6 +33,16 @@ class ComplaintWorkflowTest {
         assertThat(ComplaintWorkflow.isOpen(Status.FINDING_MADE)).isTrue();
     }
 
+    @Test @DisplayName("Only a substantiated complaint past its finding can be referred to HR, once")
+    void referToHr() {
+        assertThat(ComplaintWorkflow.canReferToHr(Status.FINDING_MADE, Finding.SUBSTANTIATED, false)).isTrue();
+        assertThat(ComplaintWorkflow.canReferToHr(Status.CLOSED, Finding.SUBSTANTIATED, false)).isTrue();
+        assertThat(ComplaintWorkflow.canReferToHr(Status.CLOSED, Finding.SUBSTANTIATED, true)).isFalse();
+        assertThat(ComplaintWorkflow.canReferToHr(Status.FINDING_MADE, Finding.INCONCLUSIVE, false)).isFalse();
+        assertThat(ComplaintWorkflow.canReferToHr(Status.UNDER_INVESTIGATION, null, false)).isFalse();
+        assertThat(ComplaintWorkflow.canReferToHr(Status.WITHDRAWN, Finding.SUBSTANTIATED, false)).isFalse();
+    }
+
     @Test @DisplayName("A closed complaint can only be reopened")
     void reopenOnlyFromClosed() {
         assertThat(ComplaintWorkflow.allowedSteps(Status.CLOSED, Finding.SUBSTANTIATED)).containsExactly(Step.REOPEN);

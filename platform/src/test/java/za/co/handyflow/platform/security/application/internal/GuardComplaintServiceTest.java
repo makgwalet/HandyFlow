@@ -48,6 +48,7 @@ class GuardComplaintServiceTest {
     @Mock private EvidenceFacade evidenceFacade;
     @Mock private TenantNumberingFacade numberingFacade;
     @Mock private GuardComplaintAlerts alerts;
+    @Mock private za.co.handyflow.platform.hr.application.HrFacade hrFacade;
 
     private static final TenantId TENANT = TenantId.generate();
     private static final UUID USER = UUID.randomUUID();
@@ -55,7 +56,7 @@ class GuardComplaintServiceTest {
     private final UUID guardId = UUID.randomUUID();
 
     private GuardComplaintService service() {
-        return new GuardComplaintService(repository, eventRepository, guardRepository, siteRepository, guardService, evidenceFacade, numberingFacade, alerts);
+        return new GuardComplaintService(repository, eventRepository, guardRepository, siteRepository, guardService, evidenceFacade, numberingFacade, alerts, hrFacade);
     }
 
     @BeforeEach
@@ -175,6 +176,47 @@ class GuardComplaintServiceTest {
         var last = captor.getAllValues().get(captor.getAllValues().size() - 1);
         assertThat(last.getEventType()).isEqualTo("REOPENED");
         assertThat(last.getNote()).contains("new evidence").contains("substantiated").contains("verbal warning");
+    }
+
+    private za.co.handyflow.platform.security.domain.model.Guard linkedGuard(UUID employeeId) {
+        var g = za.co.handyflow.platform.security.domain.model.Guard.create(TENANT, "Gerhard", "Botha", "P1", "id", "082", "C", null, null, null);
+        g.linkEmployee(employeeId);
+        lenient().when(guardRepository.findActiveById(TENANT, guardId)).thenReturn(Optional.of(g));
+        return g;
+    }
+
+    @Test @DisplayName("A substantiated complaint is referred to HR once, opening a disciplinary case for the linked employee")
+    void referToHr() {
+        var employee = UUID.randomUUID();
+        linkedGuard(employee);
+        var c = complaint(Status.UNDER_INVESTIGATION);
+        assertThatThrownBy(() -> service().referToHr(TENANT, c.getId(), USER, "Sam")).isInstanceOf(HandyFlowException.class).hasMessageContaining("substantiated");
+        service().finding(TENANT, c.getId(), new FindingRequest("SUBSTANTIATED", "Confirmed"), USER, "Sam");
+        var caseId = UUID.randomUUID();
+        when(hrFacade.addDisciplinary(eq(TENANT), eq(employee), any(za.co.handyflow.platform.hr.dto.AddDisciplinaryRequest.class), eq(USER)))
+                .thenReturn(new za.co.handyflow.platform.hr.dto.DisciplinaryResponse(caseId, employee, "Gerhard Botha", TODAY, "Lateness", "d", null, null, false, Instant.now()));
+        when(hrFacade.findDisciplinary(TENANT, employee, caseId)).thenReturn(Optional.of(
+                new za.co.handyflow.platform.hr.dto.DisciplinaryResponse(caseId, employee, "Gerhard Botha", TODAY, "Lateness", "d", "VERBAL_WARNING", null, false, Instant.now())));
+        var out = service().referToHr(TENANT, c.getId(), USER, "Sam");
+        assertThat(out.hr().disciplinaryId()).isEqualTo(caseId);
+        assertThat(out.hr().outcome()).isEqualTo("VERBAL_WARNING");
+        assertThat(out.canReferToHr()).isFalse();
+        assertThatThrownBy(() -> service().referToHr(TENANT, c.getId(), USER, "Sam")).isInstanceOf(HandyFlowException.class).hasMessageContaining("already");
+        var captor = org.mockito.ArgumentCaptor.forClass(za.co.handyflow.platform.hr.dto.AddDisciplinaryRequest.class);
+        verify(hrFacade).addDisciplinary(eq(TENANT), eq(employee), captor.capture(), eq(USER));
+        assertThat(captor.getValue().description()).contains("CMP-0001").contains("Confirmed");
+        assertThat(captor.getValue().incidentType()).isEqualTo("Lateness");
+    }
+
+    @Test @DisplayName("Referral needs the guard linked to an HR record, and offers the button only then")
+    void referNeedsLink() {
+        var c = complaint(Status.UNDER_INVESTIGATION);
+        service().finding(TENANT, c.getId(), new FindingRequest("SUBSTANTIATED", "Confirmed"), USER, "Sam");
+        assertThat(service().get(TENANT, c.getId()).canReferToHr()).isFalse();
+        assertThatThrownBy(() -> service().referToHr(TENANT, c.getId(), USER, "Sam")).isInstanceOf(HandyFlowException.class).hasMessageContaining("Link the guard");
+        linkedGuard(UUID.randomUUID());
+        assertThat(service().get(TENANT, c.getId()).canReferToHr()).isTrue();
+        verify(hrFacade, never()).addDisciplinary(any(), any(), any(), any());
     }
 
     @Test @DisplayName("A withdrawn complaint cannot be reopened")

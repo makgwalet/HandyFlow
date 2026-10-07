@@ -13,6 +13,7 @@ import Chip from "../../components/ui/Chip"
 import { PageHeader } from "../../components/ui/PageHeader"
 import EvidenceFiles from "./EvidenceFiles"
 import ComplaintForm from "./ComplaintForm"
+import { hrOutcomeLabel, referHint } from "./hrLink.logic"
 import {
   COMPLAINT_SEVERITY_TONE, EVENT_LABELS, FINDINGS, PATH_LABELS, actionLabel, actionsFor, availableSteps, categoryLabel,
   complainantLabel, findingLabel, pathPosition, severityLabel, statusLabel, statusTone, stepFormError, type ComplaintDetail,
@@ -84,12 +85,18 @@ export default function ComplaintDetailPage() {
   const [step, setStep] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [fileErr, setFileErr] = useState("")
+  const [hrErr, setHrErr] = useState("")
+  const canHr = usePermission("HR_MANAGE") || usePermission("USER_UPDATE")
   const { data, isLoading, error } = useQuery<ComplaintDetail>({
     queryKey: ["complaint", id],
     queryFn: async () => { const r = await apiClient.get(`/api/v1/security/complaints/${id}`); return r.data?.data ?? r.data },
     enabled: !!id,
   })
   const refresh = () => { qc.invalidateQueries({ queryKey: ["complaint", id] }); qc.invalidateQueries({ queryKey: ["complaints"] }); qc.invalidateQueries({ queryKey: ["guard-overview"] }) }
+  const refer = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/security/complaints/${id}/refer-hr`),
+    onSuccess: () => { setHrErr(""); refresh() }, onError: e => setHrErr(errText(e)),
+  })
   const header = (title: string) => <PageHeader title={title} icon={AlertOctagon} breadcrumbs={[{ label: "Security", to: "/security/dashboard" }, { label: "Complaints", to: "/security/complaints" }, { label: title }]} />
 
   if (isLoading) return <div>{header("Complaint")}<div style={{ color: "var(--hf-text-muted)" }}>Loading complaint...</div></div>
@@ -153,6 +160,27 @@ export default function ComplaintDetailPage() {
           </div>
         </div>
       </div>
+
+      {(data.hr || data.canReferToHr || referHint(s, !!data.canReferToHr, !!data.hr)) && (
+        <div style={{ ...card, marginTop: 16 }}>
+          <div style={h}>HR disciplinary case</div>
+          {data.hr ? (
+            <div style={{ fontSize: 14 }}>
+              Referred to HR on {fmt(data.hr.referredAt.slice(0, 10))}{data.hr.referredBy ? ` by ${data.hr.referredBy}` : ""}.
+              <div style={{ marginTop: 4 }}><b>HR outcome:</b> {hrOutcomeLabel(data.hr.outcome)}{data.hr.hearingDate ? ` (hearing ${fmt(data.hr.hearingDate)})` : ""}</div>
+              <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 4 }}>The outcome is HR's and is read from there. Nothing is changed in HR from this page.</div>
+            </div>
+          ) : data.canReferToHr ? (
+            <div>
+              <div style={{ fontSize: 13, marginBottom: 8 }}>This complaint was substantiated. You can open a disciplinary case in HR for the guard. HR decides what follows; nothing is decided here.</div>
+              {canManage && canHr
+                ? <button style={primary} onClick={() => refer.mutate()} disabled={refer.isPending}>Refer to HR</button>
+                : <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Referring needs both Security manage and HR manage rights.</div>}
+              {hrErr && <div role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 13, marginTop: 6 }}>{hrErr}</div>}
+            </div>
+          ) : <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>{referHint(s, false, false)}</div>}
+        </div>
+      )}
 
       <div style={{ ...card, marginTop: 16 }}>
         <div style={h}>Evidence</div>

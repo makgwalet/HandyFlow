@@ -3,11 +3,15 @@ package za.co.handyflow.platform.hr.application;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import za.co.handyflow.platform.hr.application.internal.HrService;
+import org.springframework.data.domain.PageRequest;
+import za.co.handyflow.platform.hr.dto.AddDisciplinaryRequest;
 import za.co.handyflow.platform.hr.dto.CreateEmployeeRequest;
+import za.co.handyflow.platform.hr.dto.DisciplinaryResponse;
 import za.co.handyflow.platform.hr.dto.EmployeeResponse;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -90,5 +94,24 @@ public class HrFacade {
      */
     public boolean employeeExists(TenantId tenantId, UUID employeeId) {
         return findEmployeeById(tenantId, employeeId).isPresent();
+    }
+
+    /** Employees matching a name, number or ID search, for pickers in other modules (at most `limit`, newest first as HR orders them). */
+    public List<EmployeeResponse> searchEmployees(TenantId tenantId, String search, int limit) {
+        return hrService.getEmployees(tenantId, null, search, PageRequest.of(0, Math.max(1, Math.min(limit, 50)))).getContent();
+    }
+
+    /** Opens a disciplinary case for an employee, exactly as HR's own endpoint does. */
+    public DisciplinaryResponse addDisciplinary(TenantId tenantId, UUID employeeId, AddDisciplinaryRequest req, UUID issuedBy) {
+        return hrService.addDisciplinary(tenantId, employeeId, req, issuedBy);
+    }
+
+    /** One disciplinary case of an employee, if it still exists. */
+    public Optional<DisciplinaryResponse> findDisciplinary(TenantId tenantId, UUID employeeId, UUID disciplinaryId) {
+        try {
+            return hrService.getDisciplinary(tenantId, employeeId).stream().filter(d -> d.id().equals(disciplinaryId)).findFirst();
+        } catch (ResourceNotFoundException e) {
+            return Optional.empty();
+        }
     }
 }

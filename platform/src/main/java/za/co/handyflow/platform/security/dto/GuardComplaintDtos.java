@@ -46,7 +46,12 @@ public final class GuardComplaintDtos {
             String actionNote, String actionByName, Instant actionAt,
             String resolutionNote, String closedByName, Instant closedAt, String withdrawnReason,
             String createdByName, boolean editable, List<String> allowedSteps,
-            List<EventItem> events, List<GuardOverviewResponse.EvidenceItem> evidence) {}
+            List<EventItem> events, List<GuardOverviewResponse.EvidenceItem> evidence,
+            HrReferral hr, boolean canReferToHr) {}
+
+    /** The HR disciplinary case a complaint was referred to. `outcome` and `hearingDate` are HR's, read live. */
+    public record HrReferral(UUID disciplinaryId, UUID employeeId, String employeeName, Instant referredAt, String referredBy,
+                             String outcome, LocalDate hearingDate) {}
 
     public record ComplaintCounts(int open, int last90Days, int substantiatedLast90Days) {}
 }

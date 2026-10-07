@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import za.co.handyflow.platform.evidence.application.EvidenceFacade;
+import za.co.handyflow.platform.hr.application.HrFacade;
+import za.co.handyflow.platform.hr.dto.AddDisciplinaryRequest;
 import za.co.handyflow.platform.evidence.dto.EvidenceResponse;
 import za.co.handyflow.platform.identity.TenantNumberingFacade;
 import za.co.handyflow.platform.security.domain.model.ComplaintWorkflow;
@@ -58,6 +60,7 @@ public class GuardComplaintService {
     private final EvidenceFacade evidenceFacade;
     private final TenantNumberingFacade numberingFacade;
     private final GuardComplaintAlerts alerts;
+    private final HrFacade hrFacade;
 
     // ── Logging and editing ───────────────────────────────────────────────────
 
@@ -176,6 +179,31 @@ public class GuardComplaintService {
         c.reopen();
         repository.save(c);
         event(c, "REOPENED", Status.UNDER_INVESTIGATION, req.reason().trim() + before, by, byName);
+        return detail(c);
+    }
+
+    /**
+     * Opens a disciplinary case in HR for a substantiated complaint, once. The guard must be linked to an HR employee
+     * record. This hands the matter to HR; it records no outcome and changes neither the complaint's status nor the
+     * guard's. HR decides what follows.
+     */
+    @Transactional
+    public ComplaintDetail referToHr(TenantId tenantId, UUID id, UUID by, String byName) {
+        GuardComplaint c = find(tenantId, id);
+        if (c.getHrDisciplinaryId() != null) throw conflict("This complaint has already been referred to HR");
+        if (!ComplaintWorkflow.canReferToHr(c.getStatus(), c.getFinding(), false))
+            throw conflict("Only a complaint with a substantiated finding can be referred to HR");
+        UUID employeeId = guardRepository.findActiveById(tenantId, c.getGuardId()).map(g -> g.getEmployeeId()).orElse(null);
+        if (employeeId == null) throw bad("Link the guard to an HR employee record first", "NO_HR_LINK");
+        String category = c.getCategory().name().toLowerCase().replace('_', ' ');
+        String text = "Security complaint " + c.getComplaintNumber() + " (" + category + ", " + c.getSeverity().name().toLowerCase()
+                + ") was substantiated. " + c.getDescription()
+                + (c.getFindingNote() == null ? "" : " Finding: " + c.getFindingNote());
+        var created = hrFacade.addDisciplinary(tenantId, employeeId, new AddDisciplinaryRequest(c.getOccurredOn(),
+                Character.toUpperCase(category.charAt(0)) + category.substring(1), text, null), by);
+        c.referToHr(created.id(), byName);
+        repository.save(c);
+        event(c, "REFERRED_TO_HR", null, "Disciplinary case opened in HR", by, byName);
         return detail(c);
     }
 
@@ -312,10 +340,19 @@ public class GuardComplaintService {
                 .map(e -> new EventItem(e.getId(), e.getEventType(), e.getToStatus(), e.getNote(), e.getByName(), e.getAt())).toList();
         List<EvidenceItem> files = evidenceFacade.listFor(c.getTenantId(), SOURCE_MODULE, ENTITY_TYPE, c.getId()).stream()
                 .map(e -> new EvidenceItem(e.id(), e.fileName(), e.evidenceType(), e.fileSizeBytes(), e.uploadedByName(), e.createdAt())).toList();
+        HrReferral hr = null;
+        UUID employeeId = guardRepository.findActiveById(c.getTenantId(), c.getGuardId()).map(g -> g.getEmployeeId()).orElse(null);
+        if (c.getHrDisciplinaryId() != null) {
+            var d = employeeId == null ? java.util.Optional.<za.co.handyflow.platform.hr.dto.DisciplinaryResponse>empty()
+                    : hrFacade.findDisciplinary(c.getTenantId(), employeeId, c.getHrDisciplinaryId());
+            hr = new HrReferral(c.getHrDisciplinaryId(), employeeId, d.map(x -> x.employeeName()).orElse(null), c.getHrReferredAt(),
+                    c.getHrReferredBy(), d.map(x -> x.outcome()).orElse(null), d.map(x -> x.hearingDate()).orElse(null));
+        }
+        boolean canRefer = ComplaintWorkflow.canReferToHr(c.getStatus(), c.getFinding(), c.getHrDisciplinaryId() != null) && employeeId != null;
         return new ComplaintDetail(s, c.getDescription(), c.getComplainantType().name(), c.getComplainantName(), c.getComplainantContact(),
                 c.getWitnesses(), c.getInvestigatorName(), c.getFindingNote(), c.getFindingByName(), c.getFindingAt(),
                 c.getActionNote(), c.getActionByName(), c.getActionAt(), c.getResolutionNote(), c.getClosedByName(), c.getClosedAt(),
                 c.getWithdrawnReason(), c.getCreatedByName(), ComplaintWorkflow.isEditable(c.getStatus()),
-                ComplaintWorkflow.allowedSteps(c.getStatus(), c.getFinding()).stream().map(Enum::name).toList(), events, files);
+                ComplaintWorkflow.allowedSteps(c.getStatus(), c.getFinding()).stream().map(Enum::name).toList(), events, files, hr, canRefer);
     }
 }

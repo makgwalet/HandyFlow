@@ -109,6 +109,15 @@ public class GuardComplaint {
     @Column(name = "withdrawn_reason", columnDefinition = "text")
     private String withdrawnReason;
 
+    @Column(name = "hr_disciplinary_id")
+    private UUID hrDisciplinaryId;
+
+    @Column(name = "hr_referred_at")
+    private Instant hrReferredAt;
+
+    @Column(name = "hr_referred_by", length = 200)
+    private String hrReferredBy;
+
     @Column(name = "created_by")
     private UUID createdBy;
 
@@ -187,6 +196,14 @@ public class GuardComplaint {
         this.withdrawnReason = blank(reason);
         this.closedByName = byName;
         this.closedAt = Instant.now();
+        this.updatedAt = Instant.now();
+    }
+
+    /** Remembers the HR disciplinary case this complaint was referred to. Once only. */
+    public void referToHr(UUID disciplinaryId, String byName) {
+        this.hrDisciplinaryId = disciplinaryId;
+        this.hrReferredAt = Instant.now();
+        this.hrReferredBy = byName;
         this.updatedAt = Instant.now();
     }
 

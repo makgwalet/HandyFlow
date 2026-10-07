@@ -16,6 +16,7 @@ import GuardScreeningPanel, { RequestScreening } from "./GuardScreeningPanel"
 import SkillsTab from "./GuardCompetencyPanel"
 import ComplaintsTab from "./ComplaintsTab"
 import GuardPerformancePanel from "./GuardPerformancePanel"
+import GuardHrLinkCard from "./GuardHrLinkCard"
 import type { ComplaintCounts, ComplaintSummary } from "./complaints.logic"
 import {
   DOCUMENT_CATEGORIES, SEVERITY_TONE, SHIFT_TONE, categoryLabel, completionRate, expiryState,
@@ -139,6 +140,7 @@ export default function GuardProfilePage() {
             <StatTile label="Complaints, last 90 days" value={data.complaintCounts?.last90Days ?? 0} hint={`${data.complaintCounts?.open ?? 0} open`} tone={(data.complaintCounts?.open ?? 0) > 0 ? "warn" : "neutral"} icon={<AlertOctagon size={18} />} />
             <StatTile label="Documents on file" value={data.documents.length} icon={<FileText size={18} />} />
           </div>
+          <GuardHrLinkCard guardId={guard.id} canManage={canManage} />
           <div style={{ ...card, display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
             <ReadinessRing readiness={readiness} />
             <div style={{ flex: "1 1 260px", minWidth: 0 }}>

@@ -62,6 +62,10 @@ public interface GuardRepository extends JpaRepository<Guard, UUID> {
         """)
     Page<Guard> findSchedulable(TenantId tenantId, Pageable pageable);
 
+    /** The guard linked to an HR employee, if any. */
+    @Query("SELECT g FROM Guard g WHERE g.tenantId = :tenantId AND g.employeeId = :employeeId AND g.deletedAt IS NULL")
+    Optional<Guard> findByEmployee(TenantId tenantId, UUID employeeId);
+
     /** Every guard on the tenant's books that is not deleted, for the nightly jobs. */
     @Query("SELECT g FROM Guard g WHERE g.tenantId = :tenantId AND g.deletedAt IS NULL ORDER BY g.lastName, g.firstName")
     List<Guard> findAllActiveList(TenantId tenantId);

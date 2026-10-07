@@ -28,6 +28,24 @@ function renderDetail() {
 }
 
 describe('ComplaintDetailPage', () => {
+  it('offers Refer to HR on a substantiated complaint to someone with both rights, and sends it', async () => {
+    perms.add('SECURITY_MANAGE'); perms.add('HR_MANAGE')
+    api.get.mockResolvedValue({ data: { data: detail({ allowedSteps: ['ACTION'], canReferToHr: true }, { status: 'FINDING_MADE', finding: 'SUBSTANTIATED' }) } })
+    api.post.mockResolvedValue({ data: {} })
+    renderDetail()
+    fireEvent.click(await screen.findByRole('button', { name: 'Refer to HR' }))
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/v1/security/complaints/c1/refer-hr'))
+  })
+  it('explains what is missing when the guard has no HR link, and shows HR\'s outcome once referred', async () => {
+    perms.add('SECURITY_MANAGE')
+    api.get.mockResolvedValue({ data: { data: detail({ allowedSteps: ['ACTION'], canReferToHr: false }, { status: 'FINDING_MADE', finding: 'SUBSTANTIATED' }) } })
+    const first = renderDetail()
+    expect(await screen.findByText(/link the guard to their HR employee record/i)).toBeTruthy()
+    first.unmount()
+    api.get.mockResolvedValue({ data: { data: detail({ allowedSteps: [], hr: { disciplinaryId: 'd1', employeeId: 'e1', employeeName: 'Thabo', referredAt: '2026-10-05T08:00:00Z', referredBy: 'Sam', outcome: 'WRITTEN_WARNING', hearingDate: null } }, { status: 'CLOSED', finding: 'SUBSTANTIATED', open: false }) } })
+    renderDetail()
+    expect(await screen.findByText(/Written warning/)).toBeTruthy()
+  })
   it('shows the complaint, its timeline and only the steps the server allows', async () => {
     perms.add('SECURITY_MANAGE')
     api.get.mockResolvedValue({ data: { data: detail() } })

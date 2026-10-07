@@ -127,6 +127,15 @@ public class GuardComplaintController {
                 TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
     }
 
+    @PostMapping("/{id}/refer-hr")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE') and hasAnyAuthority('HR_MANAGE','USER_UPDATE')")
+    @Operation(summary = "Open an HR disciplinary case for a substantiated complaint (needs HR rights too)")
+    public ResponseEntity<ApiResponse<ComplaintDetail>> referToHr(@PathVariable UUID id) {
+        featureGuard.requireModule("security");
+        return ResponseEntity.ok(ApiResponse.success("Referred to HR", service.referToHr(TenantContext.getTenantIdAsObject(), id,
+                TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
+    }
+
     @PostMapping(value = "/{id}/evidence", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Attach an evidence file")
