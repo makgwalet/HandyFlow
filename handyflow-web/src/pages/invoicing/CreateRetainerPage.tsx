@@ -99,7 +99,7 @@ export function CreateRetainerPage() {
       const res = await apiClient.post('/api/v1/invoicing/invoices/retainer', body)
       return res.data?.data?.id ?? res.data?.id
     },
-    onSuccess: () => navigate('/invoices'),
+    onSuccess: () => navigate('/retainers'),
     onError: (e: any) => setSubmitError(e.response?.data?.message ?? 'Failed to create retainer invoice.'),
   })
 
@@ -113,7 +113,7 @@ export function CreateRetainerPage() {
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
-        <button onClick={() => navigate('/invoices')}
+        <button onClick={() => navigate('/retainers')}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 9, padding: '7px 12px', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
           <ArrowLeft size={15} /> Back
         </button>

@@ -106,6 +106,15 @@ public class QuoteController {
         return ResponseEntity.ok(ApiResponse.success("Quote accepted", quote));
     }
 
+    @PostMapping("/{id}/reject")
+    @PreAuthorize("hasAuthority('INVOICE_CREATE')")
+    @Operation(summary = "Reject a sent quote")
+    public ResponseEntity<ApiResponse<QuoteResponse>> rejectQuote(@PathVariable UUID id) {
+        featureGuard.requireModule("invoicing");
+        var tenantId = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success("Quote rejected", quoteService.rejectQuote(tenantId, id)));
+    }
+
     @PostMapping("/{id}/convert-to-invoice")
     @PreAuthorize("hasAuthority('INVOICE_CREATE')")
     @Operation(summary = "Convert accepted quote to invoice")

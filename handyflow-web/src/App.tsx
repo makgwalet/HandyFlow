@@ -5,7 +5,13 @@ import { LoginPage }                    from "./pages/auth/LoginPage"
 import { RegisterPage }                 from "./pages/auth/RegisterPage"
 import { DashboardPage }                from "./pages/dashboard/DashboardPage"
 import { CustomersPage }                from "./pages/customers/CustomersPage"
-import { InvoicingPage }                from "./pages/invoicing/InvoicingPage"
+import QuotesListPage                  from "./pages/invoicing/QuotesListPage"
+import InvoicesListPage                from "./pages/invoicing/InvoicesListPage"
+import InvoiceDetailPage               from "./pages/invoicing/InvoiceDetailPage"
+import RecurringListPage               from "./pages/invoicing/RecurringListPage"
+import RecurringDetailPage             from "./pages/invoicing/RecurringDetailPage"
+import RetainersListPage               from "./pages/invoicing/RetainersListPage"
+import CreditNotesListPage             from "./pages/invoicing/CreditNotesListPage"
 import { CreateQuotePage }              from "./pages/invoicing/CreateQuotePage"
 import { QuoteDetailPage }              from "./pages/quotes/QuoteDetailPage"
 import { CataloguePage }                from "./pages/catalogue/CataloguePage"
@@ -279,8 +285,11 @@ export default function App() {
           {/* All module pages — inside AppShell (sidebar + top bar) */}
           <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
             <Route path="/customers"   element={<CustomersPage />} />
-            <Route path="/quotes"      element={<InvoicingPage />} />
-            <Route path="/invoices"    element={<InvoicingPage />} />
+            <Route path="/quotes"      element={<QuotesListPage />} />
+            <Route path="/invoices"    element={<InvoicesListPage />} />
+            <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
+            <Route path="/retainers"   element={<RetainersListPage />} />
+            <Route path="/credit-notes" element={<CreditNotesListPage />} />
             <Route path="/quotes/new"  element={<CreateQuotePage />} />
             <Route path="/quotes/:id"  element={<QuoteDetailPage />} />
             <Route path="/catalogue/:section?" element={<CataloguePage />} />
@@ -319,7 +328,8 @@ export default function App() {
             <Route path="/invoices/retainer/new"  element={<CreateRetainerPage />} />
             <Route path="/recurring/variable-hours/new" element={<CreateVariableHoursContractPage />} />
             <Route path="/recurring/new"          element={<CreateRecurringSchedulePage />} />
-            <Route path="/recurring"              element={<InvoicingPage />} />
+            <Route path="/recurring"              element={<RecurringListPage />} />
+            <Route path="/recurring/:id"          element={<RecurringDetailPage />} />
             <Route path="/supply-chain/:section?" element={<SupplyChainPage />} />
             <Route path="/legalcompliance/:section?" element={<LegalCompliancePage />} />
             <Route path="/compliancetender/:section?" element={<CompliancePage />} />

@@ -1,450 +1,156 @@
-// src/pages/quotes/QuoteDetailPage.tsx
-import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import {
-  ArrowLeft, Send, CheckCircle, XCircle, FileCheck, Clock,
-  AlertCircle, Download, ExternalLink, AlertTriangle,
-} from 'lucide-react'
-import { apiClient } from '../../api/client'
-import type { Quote } from '../../types/invoicing.types'
-import type { Customer } from '../../types/crm.types'
+// src/pages/quotes/QuoteDetailPage.tsx  (route: /quotes/:id)
+//
+// One quote: who it is for, what it prices, where it is in its life (sent, viewed, accepted, invoiced) and the actions
+// that apply to its status. Sending needs INVOICE_SEND; accepting, rejecting and converting need INVOICE_CREATE.
+import { useState } from "react"
+import { Link, useNavigate, useParams } from "react-router-dom"
+import { CheckCircle, Download, Eye, FileCheck, FileText, Send, XCircle } from "lucide-react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { apiClient } from "../../api/client"
+import { PageHeader } from "../../components/ui/PageHeader"
+import Chip from "../../components/ui/Chip"
+import { usePermission } from "../../hooks/usePermission"
+import { QUOTE_LABEL, QUOTE_TONE, fmtDate, fmtR, label, quoteExpiryLabel, type Quote } from "../invoicing/billing.logic"
+import { apiMessage, downloadPdf, useInvoices } from "../invoicing/queries"
+import { Btn, Dialog, Facts, Loading, Notice, StateBox, Totals, panel, sectionTitle, td } from "../invoicing/ui"
 
-type QuoteStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED' | 'INVOICED'
-
-const STATUS_CONFIG: Record<QuoteStatus, { label: string; bg: string; color: string; icon: React.ElementType }> = {
-  DRAFT:    { label: 'Draft',    bg: 'var(--hf-surface-sunken)', color: 'var(--hf-text-tertiary)', icon: AlertCircle },
-  SENT:     { label: 'Sent',     bg: 'var(--hf-info-soft)', color: 'var(--hf-info-text)', icon: Send },
-  ACCEPTED: { label: 'Accepted', bg: 'var(--hf-success-soft)', color: 'var(--hf-success-text-strong)', icon: CheckCircle },
-  REJECTED: { label: 'Rejected', bg: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', icon: XCircle },
-  EXPIRED:  { label: 'Expired',  bg: 'var(--hf-warning-soft-strong)', color: 'var(--hf-warning-text-deep)', icon: Clock },
-  INVOICED: { label: 'Invoiced', bg: 'var(--hf-violet-soft-strong)', color: 'var(--hf-violet-text)', icon: FileCheck },
-}
-
-function Btn({ label, icon: Icon, onClick, disabled, variant = 'secondary' }: {
-  label: string; icon: React.ElementType; onClick: () => void
-  disabled?: boolean; variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'outline'
-}) {
-  const styles = {
-    primary:   { bg: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)',  border: 'none' },
-    secondary: { bg: 'var(--hf-surface)',   color: 'var(--hf-text-secondary)', border: '1px solid var(--hf-border)' },
-    success:   { bg: 'var(--hf-success)', color: 'var(--hf-text-on-solid)',   border: 'none' },
-    danger:    { bg: 'var(--hf-danger)', color: 'var(--hf-text-on-solid)',   border: 'none' },
-    outline:   { bg: 'var(--hf-surface)',   color: 'var(--hf-primary-text)', border: '1px solid var(--hf-primary)' },
-  }
-  const s = styles[variant]
-  return (
-    <button onClick={onClick} disabled={disabled} style={{
-      display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px',
-      background: disabled ? 'var(--hf-surface-sunken)' : s.bg,
-      border: disabled ? '1px solid var(--hf-border)' : s.border,
-      borderRadius: 9, fontSize: 13, fontWeight: 600,
-      color: disabled ? 'var(--hf-text-faint)' : s.color,
-      cursor: disabled ? 'not-allowed' : 'pointer',
-    }}>
-      <Icon size={15} />{label}
-    </button>
-  )
-}
-
-// ── Reject confirmation modal ─────────────────────────────────────────────────
-function RejectModal({
-  quoteNumber, isPending, error, onConfirm, onCancel,
-}: {
-  quoteNumber: string; isPending: boolean; error: string
-  onConfirm: () => void; onCancel: () => void
-}) {
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(2px)' }}>
-      <div style={{ background: 'var(--hf-surface)', borderRadius: 18, padding: 32, width: 420, boxShadow: '0 24px 64px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-
-        <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--hf-orange-soft)', border: '2px solid var(--hf-orange-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-          <AlertTriangle size={24} style={{ color: 'var(--hf-orange-text)' }} strokeWidth={2} />
-        </div>
-
-        <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: 'var(--hf-text)' }}>Reject Quote?</h3>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 40, padding: '7px 16px', margin: '10px 0' }}>
-          <XCircle size={14} style={{ color: 'var(--hf-danger-text)' }} />
-          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--hf-text)' }}>{quoteNumber}</span>
-        </div>
-
-        <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--hf-text-muted)', lineHeight: 1.6 }}>
-          This will mark the quote as <strong>Rejected</strong>.<br />
-          The client will need a new quote to proceed.
-        </p>
-
-        {error && (
-          <div style={{ width: '100%', marginBottom: 16, padding: '10px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <AlertCircle size={15} style={{ color: 'var(--hf-danger-text)', flexShrink: 0 }} />{error}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', gap: 10, width: '100%' }}>
-          <button onClick={onCancel} disabled={isPending}
-            style={{ flex: 1, padding: '11px', border: '1.5px solid var(--hf-border)', borderRadius: 10, background: 'var(--hf-surface)', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
-            Cancel
-          </button>
-          <button onClick={onConfirm} disabled={isPending}
-            style={{ flex: 1, padding: '11px', border: 'none', borderRadius: 10, background: isPending ? 'color-mix(in srgb, var(--hf-danger) 45%, var(--hf-surface))' : 'var(--hf-danger)', color: 'var(--hf-text-on-solid)', fontSize: 14, fontWeight: 700, cursor: isPending ? 'not-allowed' : 'pointer' }}>
-            {isPending ? 'Rejecting...' : 'Yes, Reject'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
+interface CustomerLite { name: string; email?: string; phone?: string; taxNumber?: string; address?: Record<string, string | undefined> }
 
 export function QuoteDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const canCreate = usePermission("INVOICE_CREATE")
+  const canSend = usePermission("INVOICE_SEND")
+  const [rejecting, setRejecting] = useState(false)
+  const [msg, setMsg] = useState("")
 
-  const [showRejectModal, setShowRejectModal] = useState(false)
-  const [rejectError, setRejectError]         = useState('')
+  const { data: quote, isLoading, isError } = useQuery<Quote>({
+    queryKey: ["quote", id], enabled: !!id,
+    queryFn: async () => { const r = await apiClient.get(`/api/v1/invoicing/quotes/${id}`); return r.data?.data ?? r.data },
+  })
+  const { data: customer } = useQuery<CustomerLite>({
+    queryKey: ["customer", quote?.customerId], enabled: !!quote?.customerId,
+    queryFn: async () => { const r = await apiClient.get(`/api/v1/crm/customers/${quote!.customerId}`); return r.data?.data ?? r.data },
+  })
+  // The invoice a quote became is the one that points back at it.
+  const { data: invoices } = useInvoices()
+  const invoice = quote?.status === "INVOICED" ? invoices?.rows.find(i => i.quoteId === quote.id) : undefined
 
-  const { data: quote, isLoading } = useQuery<Quote>({
-    queryKey: ['quote', id],
-    queryFn: async () => {
-      const res = await apiClient.get(`/api/v1/invoicing/quotes/${id}`)
-      return (res.data?.data ?? res.data) as Quote
-    },
-    enabled: !!id,
+  const after = () => { setMsg(""); qc.invalidateQueries({ queryKey: ["quote", id] }); qc.invalidateQueries({ queryKey: ["quotes"] }) }
+  const post = (action: string, fallback: string, onOk?: (res: any) => void) => useMutation({ // eslint-disable-line react-hooks/rules-of-hooks
+    mutationFn: () => apiClient.post(`/api/v1/invoicing/quotes/${id}/${action}`),
+    onSuccess: res => { after(); onOk?.(res) },
+    onError: (e: any) => setMsg(apiMessage(e, fallback)),
+  })
+  const send = post("send", "The quote could not be sent.")
+  const accept = post("accept", "The quote could not be accepted.")
+  const reject = post("reject", "The quote could not be rejected.", () => setRejecting(false))
+  const convert = post("convert-to-invoice", "The quote could not be converted.", res => {
+    qc.invalidateQueries({ queryKey: ["invoices"] })
+    const newId = res.data?.data ?? res.data
+    if (typeof newId === "string") navigate(`/invoices/${newId}`)
   })
 
-  const { data: customer } = useQuery<Customer>({
-    queryKey: ['customer', quote?.customerId],
-    queryFn: async () => {
-      const res = await apiClient.get(`/api/v1/crm/customers/${quote!.customerId}`)
-      return (res.data?.data ?? res.data) as Customer
-    },
-    enabled: !!quote?.customerId,   // ← only fetch if not a walk-in
-  })
+  if (isLoading) return <Loading text="Loading quote..." />
+  if (isError || !quote) return <StateBox icon={FileText} tone="bad" title="Quote not found" text="It may have been removed, or you may not have access." action={<Btn onClick={() => navigate("/quotes")}>Back to quotes</Btn>} />
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['quote', id] })
-
-  const sendQuote = useMutation({
-    mutationFn: () => apiClient.post(`/api/v1/invoicing/quotes/${id}/send`),
-    onSuccess: invalidate,
-  })
-
-  const acceptQuote = useMutation({
-    mutationFn: () => apiClient.post(`/api/v1/invoicing/quotes/${id}/accept`),
-    onSuccess: invalidate,
-  })
-
-  const rejectQuote = useMutation({
-    mutationFn: () => apiClient.post(`/api/v1/invoicing/quotes/${id}/reject`),
-    onSuccess: () => { invalidate(); setShowRejectModal(false); setRejectError('') },
-    onError: (e: any) => {
-      setRejectError(e.response?.data?.message ?? 'Failed to reject quote. Please try again.')
-    },
-  })
-
-  const convertQuote = useMutation({
-    mutationFn: () => apiClient.post(`/api/v1/invoicing/quotes/${id}/convert-to-invoice`),
-    onSuccess: () => { invalidate(); qc.invalidateQueries({ queryKey: ['quotes'] }) },
-  })
-
-  const downloadPdf = () => {
-    apiClient.get(`/api/v1/invoicing/quotes/${id}/pdf`, { responseType: 'blob' } as any)
-      .then((res: any) => {
-        const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-        const a = document.createElement('a')
-        a.href = url; a.download = `${quote?.quoteNumber ?? 'quote'}.pdf`; a.click()
-        URL.revokeObjectURL(url)
-      })
-      .catch(() => alert('Failed to download PDF'))
-  }
-
-  if (isLoading) return <div style={{ padding: 80, textAlign: 'center', color: 'var(--hf-text-faint)' }}>Loading quote...</div>
-  if (!quote)   return <div style={{ padding: 80, textAlign: 'center', color: 'var(--hf-text-faint)' }}>Quote not found</div>
-
-  const status = quote.status as QuoteStatus
-  const sc = STATUS_CONFIG[status] ?? STATUS_CONFIG.DRAFT
-  const StatusIcon = sc.icon
-
-  // Support both saved customers and walk-in clients
-  const isWalkin       = !quote.customerId
-  const walkinName     = (quote as any).walkinClientName
-  const walkinEmail    = (quote as any).walkinClientEmail
-  const walkinPhone    = (quote as any).walkinClientPhone
-  const displayName    = isWalkin ? walkinName : customer?.name
-  const displayEmail   = isWalkin ? walkinEmail : customer?.email
-  const displayPhone   = isWalkin ? walkinPhone : customer?.phone
-  const displayVat     = isWalkin ? null : customer?.taxNumber
-
-  const addr = customer?.address
-  const addressLine = addr
-    ? [addr.street, addr.suburb, addr.city, addr.province, addr.postalCode].filter(Boolean).join(', ')
-    : null
+  const isWalkin = !quote.customerId
+  const name = isWalkin ? quote.walkinClientName : customer?.name
+  const email = isWalkin ? quote.walkinClientEmail : customer?.email
+  const phone = isWalkin ? quote.walkinClientPhone : customer?.phone
+  const addr = customer?.address ? [customer.address.street, customer.address.suburb, customer.address.city, customer.address.province, customer.address.postalCode].filter(Boolean).join(", ") : ""
+  const lines = quote.lineItems ?? []
+  const expiry = quoteExpiryLabel(quote)
+  const steps = [
+    { label: "Created", at: quote.createdAt, done: true },
+    { label: "Sent to client", at: quote.sentAt, done: !!quote.sentAt },
+    { label: quote.firstViewedAt ? `Viewed${(quote.viewCount ?? 0) > 1 ? ` (${quote.viewCount} times)` : ""}` : "Viewed by client", at: quote.firstViewedAt, done: !!quote.firstViewedAt },
+    { label: "Accepted", at: quote.acceptedAt, done: !!quote.acceptedAt || quote.status === "INVOICED" },
+    { label: "Invoiced", at: invoice?.createdAt, done: quote.status === "INVOICED" },
+  ]
 
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", maxWidth: 860, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1000 }}>
+      <PageHeader breadcrumbs={[{ label: "Quotes", to: "/quotes" }, { label: quote.quoteNumber }]} icon={FileText} title={quote.quoteNumber}
+        subtitle={<span style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <Chip tone={QUOTE_TONE[quote.status] ?? "neutral"}>{label(QUOTE_LABEL, quote.status)}</Chip>{isWalkin && <Chip tone="warn">Walk-in</Chip>}<span>{quote.title}</span></span>}
+        action={<>
+          <Btn icon={Download} onClick={async () => setMsg((await downloadPdf(`/api/v1/invoicing/quotes/${quote.id}/pdf`, `${quote.quoteNumber}.pdf`)) ?? "")}>Download PDF</Btn>
+          {quote.status === "DRAFT" && canSend && <Btn variant="primary" icon={Send} onClick={() => send.mutate()} disabled={send.isPending || lines.length === 0}>{send.isPending ? "Sending..." : "Send quote"}</Btn>}
+          {quote.status === "SENT" && canCreate && <>
+            <Btn variant="success" icon={CheckCircle} onClick={() => accept.mutate()} disabled={accept.isPending}>Mark accepted</Btn>
+            <Btn icon={XCircle} onClick={() => setRejecting(true)}>Mark rejected</Btn>
+          </>}
+          {quote.status === "ACCEPTED" && canCreate && <Btn variant="primary" icon={FileCheck} onClick={() => convert.mutate()} disabled={convert.isPending}>{convert.isPending ? "Converting..." : "Convert to invoice"}</Btn>}
+          {quote.status === "INVOICED" && <Btn icon={FileCheck} onClick={() => navigate(invoice ? `/invoices/${invoice.id}` : "/invoices")}>View invoice</Btn>}
+        </>} />
+      {msg && <div style={{ marginBottom: 14 }}><Notice tone="bad">{msg}</Notice></div>}
+      {quote.status === "DRAFT" && lines.length === 0 && <div style={{ marginBottom: 14 }}><Notice tone="info">Add at least one line item before this quote can be sent.</Notice></div>}
+      {expiry && <div style={{ marginBottom: 14 }}><Notice tone={expiry.startsWith("Lapsed") ? "bad" : "warn"}>{expiry}{quote.expiresAt ? `. Valid until ${fmtDate(quote.expiresAt)}.` : ""}</Notice></div>}
+      {quote.status === "ACCEPTED" && <div style={{ marginBottom: 14 }}><Notice tone="ok"><CheckCircle size={14} aria-hidden="true" /> Accepted. Convert it to an invoice when you are ready to bill.</Notice></div>}
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => navigate('/quotes')}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 9, padding: '7px 12px', fontSize: 13, fontWeight: 600, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
-            <ArrowLeft size={15} /> Back
-          </button>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--hf-text)', margin: 0 }}>{quote.quoteNumber}</h1>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 5, background: sc.bg, color: sc.color, fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 20 }}>
-                <StatusIcon size={12} />{sc.label}
-              </span>
-              {isWalkin && (
-                <span style={{ fontSize: 11, fontWeight: 600, background: 'var(--hf-warning-soft-strong)', color: 'var(--hf-warning-text-deep)', padding: '3px 8px', borderRadius: 20 }}>
-                  Walk-in
-                </span>
-              )}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
+        <div style={{ display: "grid", gap: 16, flex: "2 1 480px", minWidth: 0 }}>
+          <section style={{ ...panel, padding: 18 }} aria-label="Bill to">
+            <p style={sectionTitle}>Bill to</p>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "var(--hf-text-primary)" }}>{name ?? (isWalkin ? "Walk-in client" : "Loading customer...")}</div>
+            {email && <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginTop: 4 }}>{email}</div>}
+            {phone && <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>{phone}</div>}
+            {addr && <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 4 }}>{addr}</div>}
+            {customer?.taxNumber && <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 4 }}>VAT {customer.taxNumber}</div>}
+          </section>
+
+          <section style={{ ...panel, overflow: "hidden" }} aria-label="Line items">
+            <p style={{ ...sectionTitle, padding: "16px 18px 0", margin: "0 0 10px" }}>Line items</p>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr style={{ background: "var(--hf-surface-muted)" }}>
+                  {["Description", "Qty", "Unit price", "VAT", "Total"].map((h, i) => <th key={h} style={{ textAlign: i === 0 ? "left" : "right", padding: "9px 14px", fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase" }}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {lines.length === 0 ? <tr><td colSpan={5} style={{ ...td, textAlign: "center", color: "var(--hf-text-faint)", padding: 24 }}>No line items on this quote yet.</td></tr> :
+                    lines.map((li, i) => (
+                      <tr key={li.id ?? i} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
+                        <td style={td}>{li.description}{li.unit && <span style={{ color: "var(--hf-text-faint)" }}> · per {li.unit}</span>}</td>
+                        <td style={{ ...td, textAlign: "right" }}>{li.quantity}</td><td style={{ ...td, textAlign: "right" }}>{fmtR(li.unitPrice)}</td>
+                        <td style={{ ...td, textAlign: "right" }}>{li.vatRate ?? 15}%</td><td style={{ ...td, textAlign: "right", fontWeight: 700, color: "var(--hf-text-primary)" }}>{fmtR(li.lineTotal)}</td>
+                      </tr>))}
+                </tbody>
+              </table>
             </div>
-            <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: '4px 0 0' }}>{quote.title}</p>
-          </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", padding: "14px 18px 18px" }}>
+              <Totals rows={[["Subtotal", fmtR(quote.subtotal)], ["VAT", fmtR(quote.vatTotal)]]} total={fmtR(quote.total)} />
+            </div>
+            {quote.notes && <div style={{ padding: "14px 18px", borderTop: "1px solid var(--hf-border-subtle)", background: "var(--hf-surface-muted)" }}><p style={sectionTitle}>Notes</p><div style={{ fontSize: 13, color: "var(--hf-text-tertiary)", lineHeight: 1.6 }}>{quote.notes}</div></div>}
+          </section>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <Btn label="Download PDF" icon={Download} variant="outline" onClick={downloadPdf} />
-          {status === 'DRAFT' && (
-            <Btn label={sendQuote.isPending ? 'Sending...' : 'Send quote'} icon={Send} variant="primary"
-              onClick={() => sendQuote.mutate()}
-              disabled={sendQuote.isPending || quote.lineItems.length === 0} />
-          )}
-          {status === 'SENT' && (<>
-            <Btn label="Accept" icon={CheckCircle} variant="success"
-              onClick={() => acceptQuote.mutate()} disabled={acceptQuote.isPending} />
-            <Btn label="Reject" icon={XCircle} variant="danger"
-              onClick={() => { setShowRejectModal(true); setRejectError('') }}
-              disabled={rejectQuote.isPending} />
-          </>)}
-          {status === 'ACCEPTED' && (
-            <Btn label={convertQuote.isPending ? 'Converting...' : 'Convert to invoice'} icon={FileCheck} variant="primary"
-              onClick={() => convertQuote.mutate()} disabled={convertQuote.isPending} />
-          )}
-          {status === 'INVOICED' && (
-            <Btn label="View invoice" icon={ExternalLink} variant="outline"
-              onClick={() => navigate('/invoices')} />
-          )}
-        </div>
+        <aside style={{ display: "grid", gap: 16, flex: "1 1 260px", minWidth: 0 }}>
+          <section style={{ ...panel, padding: 18 }} aria-label="Quote details">
+            <p style={sectionTitle}>Details</p>
+            <Facts rows={[["Created", fmtDate(quote.createdAt)], ["Sent", fmtDate(quote.sentAt)], ["Expires", fmtDate(quote.expiresAt)], ["Total", fmtR(quote.total)]]} />
+          </section>
+          <section style={{ ...panel, padding: 18 }} aria-label="Timeline">
+            <p style={sectionTitle}>Timeline</p>
+            <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
+              {steps.map(s => (
+                <li key={s.label} style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <span aria-hidden="true" style={{ width: 18, height: 18, borderRadius: "50%", flexShrink: 0, background: s.done ? "var(--hf-success)" : "var(--hf-surface-sunken)", border: `2px solid ${s.done ? "var(--hf-success)" : "var(--hf-border)"}` }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: s.done ? "var(--hf-text-primary)" : "var(--hf-text-faint)" }}>{s.label}{s.at ? ` · ${fmtDate(s.at)}` : ""}</span>
+                </li>))}
+            </ol>
+            {quote.status === "SENT" && !quote.firstViewedAt && <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 10, display: "flex", gap: 5, alignItems: "center" }}><Eye size={12} aria-hidden="true" /> The client has not opened it yet.</div>}
+          </section>
+          {!isWalkin && <section style={{ ...panel, padding: 18 }} aria-label="Customer"><p style={sectionTitle}>Customer</p><div style={{ fontSize: 14, fontWeight: 700 }}>{customer?.name ?? "…"}</div><div style={{ marginTop: 6, fontSize: 13 }}><Link to="/customers">View in CRM</Link></div></section>}
+        </aside>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16 }}>
-
-        {/* Main card */}
-        <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-
-          {/* Bill To + Quote meta */}
-          <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--hf-border-subtle)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-            <div>
-              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>Bill To</p>
-              {displayName ? (
-                <>
-                  <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--hf-text)', margin: '0 0 4px' }}>{displayName}</p>
-                  {isWalkin && (
-                    <span style={{ fontSize: 11, background: 'var(--hf-warning-soft-strong)', color: 'var(--hf-warning-text-deep)', padding: '2px 7px', borderRadius: 10, fontWeight: 600 }}>Walk-in client</span>
-                  )}
-                  {displayEmail && <p style={{ fontSize: 13, color: 'var(--hf-text-muted)', margin: '4px 0 2px' }}>{displayEmail}</p>}
-                  {displayPhone && <p style={{ fontSize: 13, color: 'var(--hf-text-muted)', margin: '0 0 2px' }}>{displayPhone}</p>}
-                  {addressLine  && <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: '4px 0 0', lineHeight: 1.5 }}>{addressLine}</p>}
-                  {displayVat   && <p style={{ fontSize: 12, color: 'var(--hf-text-faint)', margin: '4px 0 0' }}>VAT: {displayVat}</p>}
-                </>
-              ) : (
-                <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', margin: 0 }}>
-                  {isWalkin ? 'No client details provided' : 'Loading customer details...'}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>Quote Details</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {[
-                  ['Quote #',  quote.quoteNumber],
-                  ['Created',  new Date(quote.createdAt).toLocaleDateString('en-ZA')],
-                  ['Sent',     quote.sentAt    ? new Date(quote.sentAt).toLocaleDateString('en-ZA')    : '—'],
-                  ['Expires',  quote.expiresAt ? new Date(quote.expiresAt).toLocaleDateString('en-ZA') : '—'],
-                ].map(([label, value]) => (
-                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                    <span style={{ color: 'var(--hf-text-muted)' }}>{label}</span>
-                    <span style={{ fontWeight: 600, color: 'var(--hf-text)' }}>{value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Line items */}
-          <div>
-            <div style={{ display: 'grid', gridTemplateColumns: '3fr 80px 120px 80px 120px', padding: '12px 24px', background: 'var(--hf-surface-muted)', borderBottom: '1px solid var(--hf-border-subtle)' }}>
-              {['Description', 'Unit', 'Unit price', 'Qty', 'Line total'].map(h => (
-                <p key={h} style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</p>
-              ))}
-            </div>
-
-            {quote.lineItems.length === 0 ? (
-              <div style={{ padding: '40px 24px', textAlign: 'center' }}>
-                <p style={{ color: 'var(--hf-text-faint)', fontSize: 13, margin: 0 }}>No line items on this quote yet</p>
-              </div>
-            ) : quote.lineItems.map((li, i) => (
-              <div key={li.id} style={{ display: 'grid', gridTemplateColumns: '3fr 80px 120px 80px 120px', padding: '14px 24px', borderTop: i === 0 ? 'none' : '1px solid var(--hf-border-subtle)', alignItems: 'center' }}>
-                <div>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--hf-text)', margin: 0 }}>{li.description}</p>
-                  <p style={{ fontSize: 11, color: 'var(--hf-text-faint)', margin: '2px 0 0' }}>VAT {li.vatRate}%</p>
-                </div>
-                <p style={{ fontSize: 13, color: 'var(--hf-text-muted)', margin: 0 }}>{li.unit}</p>
-                <p style={{ fontSize: 13, color: 'var(--hf-text)', margin: 0 }}>R {Number(li.unitPrice).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
-                <p style={{ fontSize: 13, color: 'var(--hf-text)', margin: 0 }}>{li.quantity}</p>
-                <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--hf-primary-text)', margin: 0 }}>
-                  R {Number(li.lineTotal).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          {/* Totals */}
-          <div style={{ padding: '20px 24px', borderTop: '1px solid var(--hf-border-subtle)', display: 'flex', justifyContent: 'flex-end' }}>
-            <div style={{ width: 260 }}>
-              {[['Subtotal', quote.subtotal], ['VAT', quote.vatTotal]].map(([label, value]) => (
-                <div key={label as string} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ fontSize: 13, color: 'var(--hf-text-muted)' }}>{label as string}</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-text)' }}>R {Number(value).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</span>
-                </div>
-              ))}
-              <div style={{ height: 1, background: 'var(--hf-surface-strong)', margin: '10px 0' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--hf-text)' }}>Total</span>
-                <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--hf-primary-text)' }}>
-                  R {Number(quote.total).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {quote.notes && (
-            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--hf-border-subtle)', background: 'var(--hf-surface-muted)' }}>
-              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>Notes</p>
-              <p style={{ fontSize: 13, color: 'var(--hf-text-tertiary)', margin: 0, lineHeight: 1.6 }}>{quote.notes}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-          {/* Timeline */}
-          <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 14px' }}>Timeline</p>
-            {[
-              { label: 'Created',        done: true,                  date: quote.createdAt },
-              { label: 'Sent to client', done: !!quote.sentAt,        date: quote.sentAt },
-              { label: 'Accepted',       done: !!quote.acceptedAt,    date: quote.acceptedAt },
-              { label: 'Invoiced',       done: status === 'INVOICED', date: null },
-            ].map((step, i) => (
-              <div key={step.label} style={{ display: 'flex', gap: 10, marginBottom: i < 3 ? 12 : 0 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: step.done ? 'var(--hf-success)' : 'var(--hf-surface-sunken)', border: `2px solid ${step.done ? 'var(--hf-success)' : 'var(--hf-border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    {step.done && <CheckCircle size={12} style={{ color: "var(--hf-text-on-solid)" }} strokeWidth={3} />}
-                  </div>
-                  {i < 3 && <div style={{ width: 2, flex: 1, background: step.done ? 'var(--hf-success-soft-strong)' : 'var(--hf-surface-sunken)', minHeight: 16, marginTop: 3 }} />}
-                </div>
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: step.done ? 'var(--hf-text)' : 'var(--hf-text-faint)', margin: 0 }}>{step.label}</p>
-                  {step.date && <p style={{ fontSize: 11, color: 'var(--hf-text-faint)', margin: '1px 0 0' }}>{new Date(step.date).toLocaleDateString('en-ZA')}</p>}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Customer or walk-in card */}
-          <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-primary-border)', borderRadius: 14, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px' }}>
-              {isWalkin ? 'Walk-in Client' : 'Customer'}
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: isWalkin ? 'var(--hf-warning-soft-strong)' : 'var(--hf-info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: isWalkin ? 'var(--hf-warning-text-deep)' : 'var(--hf-info-text)', flexShrink: 0 }}>
-                {(displayName ?? '?').charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--hf-text)', margin: 0 }}>{displayName ?? 'Unknown'}</p>
-                {displayEmail && <p style={{ fontSize: 12, color: 'var(--hf-text-muted)', margin: '1px 0 0' }}>{displayEmail}</p>}
-              </div>
-            </div>
-            {!isWalkin && (
-              <button onClick={() => navigate('/customers')}
-                style={{ width: '100%', padding: '7px 12px', background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, color: 'var(--hf-text-tertiary)', cursor: 'pointer', fontWeight: 500 }}>
-                View in CRM →
-              </button>
-            )}
-          </div>
-
-          {/* Status-specific cards */}
-          {status === 'SENT' && quote.expiresAt && (
-            <div style={{ background: 'var(--hf-warning-soft)', border: '1px solid var(--hf-warning-border-strong)', borderRadius: 12, padding: '14px 16px' }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <Clock size={15} style={{ color: 'var(--hf-warning-text)', marginTop: 1 }} />
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-warning-text-deep)', margin: 0 }}>Expires soon</p>
-                  <p style={{ fontSize: 12, color: 'var(--hf-warning-text-strong)', margin: '2px 0 0' }}>
-                    {new Date(quote.expiresAt).toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long' })}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {status === 'ACCEPTED' && (
-            <div style={{ background: 'var(--hf-success-soft)', border: '1px solid var(--hf-success-border-subtle)', borderRadius: 12, padding: '14px 16px' }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <CheckCircle size={15} style={{ color: 'var(--hf-success-text)' }} />
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-success-text-strong)', margin: 0 }}>Quote accepted</p>
-                  <p style={{ fontSize: 12, color: 'var(--hf-success-text-strong)', margin: '2px 0 0' }}>Ready to convert to an invoice</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {status === 'REJECTED' && (
-            <div style={{ background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 12, padding: '14px 16px' }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <XCircle size={15} style={{ color: 'var(--hf-danger-text)' }} />
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-danger-text)', margin: 0 }}>Quote rejected</p>
-                  <p style={{ fontSize: 12, color: 'var(--hf-danger-text-strong)', margin: '2px 0 0' }}>Create a new quote to proceed</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {status === 'INVOICED' && (
-            <div style={{ background: 'var(--hf-violet-soft)', border: '1px solid var(--hf-violet-border)', borderRadius: 12, padding: '14px 16px' }}>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                <FileCheck size={15} style={{ color: 'var(--hf-violet-text)' }} />
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--hf-violet-text)', margin: 0 }}>Invoice created</p>
-                  <p style={{ fontSize: 12, color: 'var(--hf-violet-text)', margin: '2px 0 0' }}>This quote has been invoiced</p>
-                </div>
-              </div>
-              <button onClick={() => navigate('/invoices')}
-                style={{ width: '100%', padding: '7px 12px', background: 'var(--hf-surface)', border: '1px solid var(--hf-violet-border)', borderRadius: 8, fontSize: 12, color: 'var(--hf-violet-text)', cursor: 'pointer', fontWeight: 600 }}>
-                View invoices →
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Reject modal */}
-      {showRejectModal && (
-        <RejectModal
-          quoteNumber={quote.quoteNumber}
-          isPending={rejectQuote.isPending}
-          error={rejectError}
-          onConfirm={() => rejectQuote.mutate()}
-          onCancel={() => { setShowRejectModal(false); setRejectError('') }}
-        />
+      {rejecting && (
+        <Dialog title="Mark this quote as rejected?" subtitle={quote.quoteNumber} onClose={() => setRejecting(false)}
+          footer={<><Btn onClick={() => setRejecting(false)}>Keep it</Btn><Btn variant="danger" onClick={() => reject.mutate()} disabled={reject.isPending}>{reject.isPending ? "Rejecting..." : "Mark rejected"}</Btn></>}>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--hf-text-muted)", lineHeight: 1.6 }}>The quote will be marked <strong>Rejected</strong> and cannot be accepted afterwards. The client would need a new quote to go ahead.</p>
+        </Dialog>
       )}
     </div>
   )
