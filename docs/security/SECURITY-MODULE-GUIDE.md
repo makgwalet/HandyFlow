@@ -170,7 +170,7 @@ Load the demo, sign in as a user with `SECURITY_READ` and `SECURITY_MANAGE` (adm
 - [ ] Flags column: Busisiwe Cele and the expired-PSiRA guard show "PSiRA expired"; two guards show "PSiRA 15d left" and "PSiRA 25d left"; screening flags follow the guard's screening status. The PSiRA banner says 1 expired and 2 expiring, and Show them filters to those three.
 - [ ] Select two guards: the bar offers Set status and Export CSV. A guard the server refuses is named in the result and the others still change.
 - [ ] Open a guard: the profile shows screening, competencies, documents, ratings and complaints.
-- [ ] On a guard's Documents tab the "Guard file checklist" can say police clearance or POPIA consent is missing while Deployment Readiness is 100%. They are different lists, and the panel now says so.
+- [ ] On a guard's Documents tab the "Guard file checklist" can say police clearance or POPIA consent is missing while Deployment Readiness is 100%. They are different lists, and the panel now says so. A tenant can make police clearance, POPIA consent or any other file document count towards readiness (see Readiness requirements below).
 - [ ] PSiRA badges: some valid, two expiring within 30 days (about 15 and 25 days), one expired about 10 days ago.
 - [ ] Screening panel states: Cleared, Pending, Flagged, Unscreened across different guards.
 - [ ] A guard with a firearm competency shows it on the profile and in Armoury.
@@ -793,3 +793,22 @@ Generated from the controllers. Paths are under the host root. A blank permissio
 8. **Switching off a checkpoint on an active route** (fixed in 0044). Open rounds that use it stop waiting for it, and rounds generated later leave it out; switching it back on restores both. Rounds that already finished are not changed.
 9. **Screening gate** (fixed in 0044). The pre-shift gate and the guard's screening status now look at the newest record of each screening type, the same rule as Deployment Readiness, so a passed renewal clears an older failure.
 10. **NFC tags and Bluetooth beacons** (fixed in 0044) only have to be unique within a tenant, not across all tenants.
+
+
+## Readiness requirements per tenant (patch 0052, apply after 0051)
+
+What counts towards a guard's Deployment Readiness is now a company setting. **Workforce > Risk rules** has a second card, "Deployment readiness requirements", with two groups of tick boxes: the screenings (criminal record check, reference check, drug test, credit check, polygraph, psychometric, ID and qualification verification) and the documents in the guard file (ID copy, police clearance, POPIA consent, proof of address, firearm licence and so on).
+
+- Until someone saves, the standard defaults apply: criminal record check, reference check, drug test and an ID copy.
+- A valid PSiRA registration is always required. It is a legal requirement, so it is not a tick box.
+- A required document is met when a document of that category is on the guard's file. A required screening is met by the newest record of that type passing, in date and with an evidence file (the same rule as before).
+- A screening that is not ticked is still shown in the matrix, and a failed or expired one still blocks readiness; it just does not count towards the percentage.
+- Anyone with security access can read the settings; changing them needs SECURITY_ADMIN (`GET/PUT /api/v1/security/readiness-settings`). Changes apply immediately to every guard, since readiness is calculated when the page is opened.
+- Saving with nothing ticked is refused on screen, so a guard cannot become "ready" on PSiRA alone by accident.
+
+**Check it:**
+- [ ] Workforce > Risk rules shows the new card with the defaults ticked and "These are the standard defaults."
+- [ ] Tick POPIA consent and save. Open a guard with 100% readiness: it drops, and the matrix lists "POPIA consent on file" as missing.
+- [ ] Upload a POPIA consent document on that guard's Documents tab: that line turns met.
+- [ ] Untick Drug test and save: Drug test stays in the matrix but no longer counts towards the percentage.
+- [ ] As a user without SECURITY_ADMIN the boxes are greyed out and there is no Save button.

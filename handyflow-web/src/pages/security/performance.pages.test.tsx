@@ -95,6 +95,11 @@ describe('GuardPerformancePanel', () => {
   })
 })
 
+const readiness = (o: any = {}) => ({
+  requiredScreening: ['CRIMINAL_RECORD_CHECK', 'DRUG_TEST'], requiredDocuments: ['ID_COPY'], customised: false,
+  screeningOptions: [{ value: 'CRIMINAL_RECORD_CHECK', label: 'Criminal record check' }, { value: 'DRUG_TEST', label: 'Drug test' }],
+  documentOptions: [{ value: 'ID_COPY', label: 'ID copy' }, { value: 'POPIA_CONSENT', label: 'POPIA consent' }], ...o })
+
 describe('RiskRulesTab', () => {
   function renderRules() {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -122,5 +127,36 @@ describe('RiskRulesTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save risk rules' }))
     await waitFor(() => expect(api.put).toHaveBeenCalled())
     expect(api.put.mock.calls[0][1]).toMatchObject({ reviewAt: 1, warningAt: 4, investigationAt: 5 })
+  })
+  it('shows the readiness requirements read-only without admin permission', async () => {
+    api.get.mockImplementation((url: string) => Promise.resolve({ data: { data: url.includes('readiness-settings') ? readiness() : settings() } }))
+    renderRules()
+    const box = await screen.findByLabelText('Drug test') as HTMLInputElement
+    expect(box.checked).toBe(true)
+    expect(box.disabled).toBe(true)
+    expect((screen.getByLabelText('POPIA consent') as HTMLInputElement).checked).toBe(false)
+    expect(screen.queryByRole('button', { name: 'Save readiness requirements' })).toBeNull()
+  })
+  it('saves the chosen screenings and documents', async () => {
+    perms.add('SECURITY_ADMIN')
+    api.get.mockImplementation((url: string) => Promise.resolve({ data: { data: url.includes('readiness-settings') ? readiness() : settings() } }))
+    api.put.mockResolvedValue({ data: {} })
+    renderRules()
+    fireEvent.click(await screen.findByLabelText('POPIA consent'))
+    fireEvent.click(screen.getByLabelText('Drug test'))
+    fireEvent.click(screen.getByRole('button', { name: 'Save readiness requirements' }))
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/api/v1/security/readiness-settings',
+      { requiredScreening: ['CRIMINAL_RECORD_CHECK'], requiredDocuments: ['ID_COPY', 'POPIA_CONSENT'] }))
+  })
+  it('blocks saving when nothing is chosen', async () => {
+    perms.add('SECURITY_ADMIN')
+    api.get.mockImplementation((url: string) => Promise.resolve({ data: { data: url.includes('readiness-settings') ? readiness() : settings() } }))
+    renderRules()
+    fireEvent.click(await screen.findByLabelText('Criminal record check'))
+    fireEvent.click(screen.getByLabelText('Drug test'))
+    fireEvent.click(screen.getByLabelText('ID copy'))
+    fireEvent.click(screen.getByRole('button', { name: 'Save readiness requirements' }))
+    expect((await screen.findByRole('alert')).textContent).toMatch(/at least one/i)
+    expect(api.put).not.toHaveBeenCalled()
   })
 })

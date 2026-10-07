@@ -16,6 +16,8 @@ import za.co.handyflow.platform.security.application.internal.GuardRatingService
 import za.co.handyflow.platform.security.application.internal.GuardRiskSettingsService;
 import za.co.handyflow.platform.security.application.internal.GuardReviewService;
 import za.co.handyflow.platform.security.application.internal.GuardScoreTrendService;
+import za.co.handyflow.platform.security.application.internal.ReadinessSettingsService;
+import za.co.handyflow.platform.security.dto.ReadinessSettingsDtos.*;
 import za.co.handyflow.platform.security.dto.GuardReviewDtos;
 import za.co.handyflow.platform.security.dto.GuardPerformanceDtos.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -39,6 +41,7 @@ public class GuardPerformanceController {
     private final GuardReviewService reviewService;
     private final GuardRatingService ratingService;
     private final GuardRiskSettingsService settingsService;
+    private final ReadinessSettingsService readinessSettingsService;
     private final FeatureGuard featureGuard;
 
     @GetMapping("/guards/{guardId}/performance")
@@ -98,5 +101,22 @@ public class GuardPerformanceController {
         featureGuard.requireModule("security");
         return ResponseEntity.ok(ApiResponse.success("Risk rules saved",
                 settingsService.save(TenantContext.getTenantIdAsObject(), req, TenantContext.getCurrentUserName())));
+    }
+
+    @GetMapping("/readiness-settings")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
+    @Operation(summary = "The screenings and documents required for deployment readiness (defaults until saved)")
+    public ResponseEntity<ApiResponse<ReadinessSettingsDto>> readinessSettings() {
+        featureGuard.requireModule("security");
+        return ResponseEntity.ok(ApiResponse.success(readinessSettingsService.get(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PutMapping("/readiness-settings")
+    @PreAuthorize("hasAuthority('SECURITY_ADMIN')")
+    @Operation(summary = "Change the screenings and documents required for deployment readiness")
+    public ResponseEntity<ApiResponse<ReadinessSettingsDto>> saveReadinessSettings(@Valid @RequestBody SaveReadinessSettingsRequest req) {
+        featureGuard.requireModule("security");
+        return ResponseEntity.ok(ApiResponse.success("Readiness requirements saved",
+                readinessSettingsService.save(TenantContext.getTenantIdAsObject(), req, TenantContext.getCurrentUserName())));
     }
 }

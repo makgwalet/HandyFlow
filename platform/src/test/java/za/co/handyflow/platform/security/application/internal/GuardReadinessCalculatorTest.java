@@ -174,4 +174,36 @@ class GuardReadinessCalculatorTest {
         assertThat(item.label()).isEqualTo("Armed response");
         assertThat(item.key()).isEqualTo("COMPETENCY:x");
     }
+
+    @Test @DisplayName("An extra required document must be on file, and counts towards the percentage")
+    void extraDocumentRequired() {
+        var req = new GuardReadinessCalculator.Requirements(Set.of("CRIMINAL_RECORD_CHECK", "REFERENCE_CHECK", "DRUG_TEST"), Set.of("ID_COPY", "POPIA_CONSENT"));
+        Result without = GuardReadinessCalculator.calculate(new Input(TODAY, "123", FAR, allThree(), Set.of("ID_COPY"), List.of(), req));
+        assertThat(item(without, "DOCUMENT:POPIA_CONSENT").met()).isFalse();
+        assertThat(item(without, "DOCUMENT:POPIA_CONSENT").label()).isEqualTo("POPIA consent on file");
+        assertThat(without.ready()).isFalse();
+        Result with = GuardReadinessCalculator.calculate(new Input(TODAY, "123", FAR, allThree(), Set.of("ID_COPY", "POPIA_CONSENT"), List.of(), req));
+        assertThat(item(with, "DOCUMENT:POPIA_CONSENT").met()).isTrue();
+        assertThat(with.percent()).isEqualTo(100);
+    }
+
+    @Test @DisplayName("A screening the tenant does not require no longer counts, and a new one can be required")
+    void screeningChoice() {
+        var req = new GuardReadinessCalculator.Requirements(Set.of("CRIMINAL_RECORD_CHECK", "CREDIT_CHECK"), Set.of("ID_COPY"));
+        var facts = List.of(pass("CRIMINAL_RECORD_CHECK", FAR, 1));
+        Result r = GuardReadinessCalculator.calculate(new Input(TODAY, "123", FAR, facts, Set.of("ID_COPY"), List.of(), req));
+        assertThat(item(r, "DRUG_TEST").required()).isFalse();
+        assertThat(item(r, "CREDIT_CHECK").required()).isTrue();
+        assertThat(item(r, "CREDIT_CHECK").met()).isFalse();
+        assertThat(r.ready()).isFalse();
+    }
+
+    @Test @DisplayName("Dropping the ID copy requirement removes it from the matrix; PSiRA stays")
+    void noDocuments() {
+        var req = new GuardReadinessCalculator.Requirements(Set.of(), Set.of());
+        Result r = GuardReadinessCalculator.calculate(new Input(TODAY, null, null, List.of(), Set.of(), List.of(), req));
+        assertThat(r.items().stream().anyMatch(i -> i.key().equals("ID_COPY"))).isFalse();
+        assertThat(r.items().get(0).required()).isTrue();
+        assertThat(r.ready()).isFalse();
+    }
 }

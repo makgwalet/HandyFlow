@@ -86,3 +86,23 @@ export function chartGeometry(points: HistoryPoint[], width: number, height: num
   }))
   return { line: dots.map((d, i) => `${i === 0 ? "M" : "L"}${d.x.toFixed(1)} ${d.y.toFixed(1)}`).join(" "), dots }
 }
+
+/** The tenant's deployment-readiness requirements, as the server returns them. */
+export interface ReadinessOption { value: string; label: string }
+export interface ReadinessSettings {
+  requiredScreening: string[]; requiredDocuments: string[]
+  screeningOptions: ReadinessOption[]; documentOptions: ReadinessOption[]
+  customised: boolean; updatedByName?: string | null; updatedAt?: string | null
+}
+
+/** Adds the value if it is missing, removes it if present. Never mutates the list. */
+export function toggleValue(list: string[], value: string): string[] {
+  return list.includes(value) ? list.filter(v => v !== value) : [...list, value]
+}
+
+/** Stops an accidental save that would leave readiness resting on the PSiRA registration alone. */
+export function readinessSettingsError(screening: string[], documents: string[]): string | null {
+  if (screening.length === 0 && documents.length === 0)
+    return "Choose at least one screening or document. A guard would otherwise be ready on a PSiRA registration alone."
+  return null
+}

@@ -53,6 +53,7 @@ public class GuardOverviewService {
     private final ShiftRepository shiftRepository;
     private final IncidentRepository incidentRepository;
     private final SiteRepository siteRepository;
+    private final ReadinessSettingsService readinessSettings;
 
     @Transactional(readOnly = true)
     public GuardOverviewResponse overview(TenantId tenantId, UUID guardId) {
@@ -77,7 +78,7 @@ public class GuardOverviewService {
                 .toList();
         java.time.LocalDate today = now.atZone(java.time.ZoneId.of("Africa/Johannesburg")).toLocalDate();
         var competencies = competencyService.listForGuard(tenantId, guardId, today);
-        Readiness readiness = readiness(guard.psiraNumber(), guard.psiraExpiryDate(), records, evidence, documents, competencies, now);
+        Readiness readiness = readiness(guard.psiraNumber(), guard.psiraExpiryDate(), records, evidence, documents, competencies, readinessSettings.effective(tenantId), now);
 
         var complaints = complaintService.forGuard(tenantId, guardId);
 
@@ -131,7 +132,8 @@ public class GuardOverviewService {
     /** Readiness is judged in South African time, like every other date rule in the product. */
     static Readiness readiness(String psiraNumber, java.time.LocalDate psiraExpiry, List<GuardScreeningRecord> records,
                                Map<UUID, List<EvidenceItem>> evidence, List<GuardDocumentResponse> documents,
-                               List<za.co.handyflow.platform.security.dto.GuardCompetencyResponse> competencies, Instant now) {
+                               List<za.co.handyflow.platform.security.dto.GuardCompetencyResponse> competencies,
+                               GuardReadinessCalculator.Requirements requirements, Instant now) {
         java.time.LocalDate today = now.atZone(java.time.ZoneId.of("Africa/Johannesburg")).toLocalDate();
         List<ScreeningFacts> facts = records.stream()
                 .map(r -> new ScreeningFacts(r.getScreeningType().name(), r.getResult().name(), r.getConductedAt(),
@@ -143,7 +145,7 @@ public class GuardOverviewService {
                         c.expiryDate(), c.evidence().size(), c.verifiedAt() != null))
                 .toList();
         var result = GuardReadinessCalculator.calculate(
-                new GuardReadinessCalculator.Input(today, psiraNumber, psiraExpiry, facts, categories, comps));
+                new GuardReadinessCalculator.Input(today, psiraNumber, psiraExpiry, facts, categories, comps, requirements));
 
         // Link each screening row to its newest record so the page can open it.
         Map<String, UUID> newestId = new HashMap<>();

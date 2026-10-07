@@ -40,6 +40,7 @@ class GuardOverviewServiceTest {
     @Mock private ShiftRepository shiftRepository;
     @Mock private IncidentRepository incidentRepository;
     @Mock private SiteRepository siteRepository;
+    @Mock private ReadinessSettingsService readinessSettings;
 
     private static final TenantId TENANT = TenantId.generate();
     private static final Instant NOW = Instant.parse("2026-10-07T08:00:00Z");
@@ -48,7 +49,12 @@ class GuardOverviewServiceTest {
 
     private GuardOverviewService service() {
         return new GuardOverviewService(guardService, screeningService, evidenceService, competencyService, complaintService, screeningRepository,
-                shiftRepository, incidentRepository, siteRepository);
+                shiftRepository, incidentRepository, siteRepository, readinessSettings);
+    }
+
+    @org.junit.jupiter.api.BeforeEach
+    void defaultRequirements() {
+        org.mockito.Mockito.lenient().when(readinessSettings.effective(TENANT)).thenReturn(GuardReadinessCalculator.Requirements.defaults());
     }
 
     private void guardExists() {

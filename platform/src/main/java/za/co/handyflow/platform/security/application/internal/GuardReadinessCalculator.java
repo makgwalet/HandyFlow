@@ -18,7 +18,8 @@ import java.util.stream.Collectors;
  * criminal record check, reference check and drug test that each passed, have an evidence file attached and
  * are in date. Other screening types are shown, and only a failed or expired one blocks readiness.
  * Percent is the share of required checks met. A reviewer's sign-off is shown but does not decide
- * readiness unless it is NOT_CLEARED. The required set is a default; making it per-tenant is later work.
+ * readiness unless it is NOT_CLEARED. The required screening types and documents come from the tenant's
+ * Requirements (the defaults above until the tenant changes them); the PSiRA registration is always required.
  */
 public final class GuardReadinessCalculator {
 
@@ -26,6 +27,8 @@ public final class GuardReadinessCalculator {
 
     /** Screening types that count towards the percentage. */
     public static final List<String> REQUIRED_SCREENING = List.of("CRIMINAL_RECORD_CHECK", "REFERENCE_CHECK", "DRUG_TEST");
+    /** Guard-file documents required by default. */
+    public static final List<String> DEFAULT_DOCUMENTS = List.of("ID_COPY");
     /** Screening types always shown in the matrix, required or not. */
     public static final List<String> SHOWN_SCREENING = List.of(
             "ID_VERIFICATION", "CRIMINAL_RECORD_CHECK", "REFERENCE_CHECK", "DRUG_TEST", "POLYGRAPH", "PSYCHOMETRIC");
@@ -39,12 +42,24 @@ public final class GuardReadinessCalculator {
     public record CompetencyFacts(String id, String type, String title, boolean required, LocalDate expiry,
                                   int evidenceCount, boolean verified) {}
 
+    /** What a tenant requires for readiness. Screening types and guard-file document categories, by enum name. */
+    public record Requirements(Set<String> screening, Set<String> documents) {
+        public static Requirements defaults() {
+            return new Requirements(new java.util.LinkedHashSet<>(REQUIRED_SCREENING), new java.util.LinkedHashSet<>(DEFAULT_DOCUMENTS));
+        }
+    }
+
     public record Input(LocalDate today, String psiraNumber, LocalDate psiraExpiry,
                         List<ScreeningFacts> screenings, Set<String> documentCategories,
-                        List<CompetencyFacts> competencies) {
+                        List<CompetencyFacts> competencies, Requirements requirements) {
+        public Input(LocalDate today, String psiraNumber, LocalDate psiraExpiry,
+                     List<ScreeningFacts> screenings, Set<String> documentCategories,
+                     List<CompetencyFacts> competencies) {
+            this(today, psiraNumber, psiraExpiry, screenings, documentCategories, competencies, Requirements.defaults());
+        }
         public Input(LocalDate today, String psiraNumber, LocalDate psiraExpiry,
                      List<ScreeningFacts> screenings, Set<String> documentCategories) {
-            this(today, psiraNumber, psiraExpiry, screenings, documentCategories, List.of());
+            this(today, psiraNumber, psiraExpiry, screenings, documentCategories, List.of(), Requirements.defaults());
         }
     }
 
@@ -58,15 +73,21 @@ public final class GuardReadinessCalculator {
     public static Result calculate(Input in) {
         List<Item> items = new ArrayList<>();
         items.add(psira(in));
-        items.add(idCopy(in));
+        Requirements req = in.requirements() == null ? Requirements.defaults() : in.requirements();
+        // ID copy first (as it always was), then any other required document, in a fixed order.
+        List<String> docs = new ArrayList<>();
+        if (req.documents().contains("ID_COPY")) docs.add("ID_COPY");
+        req.documents().stream().filter(d -> !d.equals("ID_COPY")).sorted().forEach(docs::add);
+        for (String d : docs) items.add(document(d, in.documentCategories().contains(d)));
 
         Map<String, ScreeningFacts> latest = in.screenings().stream().collect(Collectors.toMap(
                 ScreeningFacts::type, f -> f,
                 (a, b) -> a.createdAt().isAfter(b.createdAt()) ? a : b));
         List<String> types = new ArrayList<>(SHOWN_SCREENING);
+        for (String t : req.screening()) if (!types.contains(t)) types.add(t);
         for (String t : latest.keySet()) if (!types.contains(t)) types.add(t);
         for (String t : types) {
-            items.add(screening(t, latest.get(t), REQUIRED_SCREENING.contains(t), in.today()));
+            items.add(screening(t, latest.get(t), req.screening().contains(t), in.today()));
         }
 
         for (CompetencyFacts c : in.competencies()) items.add(competency(c, in.today()));
@@ -145,10 +166,24 @@ public final class GuardReadinessCalculator {
         return new Item("PSIRA", label, true, State.MET, "valid", in.psiraExpiry(), 0, true);
     }
 
-    private static Item idCopy(Input in) {
-        boolean has = in.documentCategories().contains("ID_COPY");
-        return new Item("ID_COPY", "ID copy on file", true, has ? State.MET : State.MISSING,
+    /** A required guard-file document. The ID copy keeps its original key so existing links and tests are unchanged. */
+    private static Item document(String category, boolean has) {
+        String key = category.equals("ID_COPY") ? "ID_COPY" : DOCUMENT_PREFIX + category;
+        return new Item(key, labelOfDocument(category) + " on file", true, has ? State.MET : State.MISSING,
                 has ? "on file" : "not in the guard file", null, 0, has);
+    }
+
+    public static final String DOCUMENT_PREFIX = "DOCUMENT:";
+
+    public static String labelOfDocument(String category) {
+        return switch (category) {
+            case "ID_COPY" -> "ID copy";
+            case "PSIRA_CERTIFICATE" -> "PSiRA certificate";
+            case "POPIA_CONSENT" -> "POPIA consent";
+            case "FIREARM_LICENSE" -> "Firearm licence";
+            case "DRIVERS_LICENSE" -> "Driver's licence";
+            default -> { String t = category.toLowerCase().replace('_', ' '); yield Character.toUpperCase(t.charAt(0)) + t.substring(1); }
+        };
     }
 
     private static Item screening(String type, ScreeningFacts f, boolean required, LocalDate today) {

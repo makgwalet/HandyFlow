@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
+import ReadinessRequirementsCard from "./ReadinessRequirementsCard"
 import { riskSettingsError, type RiskSettings } from "./performance.logic"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16, maxWidth: 720 }
@@ -40,6 +41,7 @@ export default function RiskRulesTab() {
   const submit = () => { const m = riskSettingsError(f); if (m) setMsg({ ok: false, text: m }); else { setMsg(null); save.mutate() } }
 
   return (
+    <>
     <div style={card}>
       <div style={{ fontWeight: 800, marginBottom: 4 }}>Risk rules</div>
       <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginBottom: 14 }}>
@@ -63,5 +65,7 @@ export default function RiskRulesTab() {
       {canEdit && <div style={{ marginTop: 14 }}><button onClick={submit} disabled={save.isPending} style={primary}>Save risk rules</button></div>}
       {data?.updatedByName && <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 8 }}>Last changed by {data.updatedByName}.</div>}
     </div>
+    <ReadinessRequirementsCard />
+    </>
   )
 }

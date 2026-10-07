@@ -59,3 +59,18 @@ describe('score trend', () => {
     expect(chartGeometry([pt('2026-09-01', 50)], 100, 100).dots[0].x).toBe(50)
   })
 })
+
+describe('readiness requirement helpers', () => {
+  it('toggles a value without changing the original list', async () => {
+    const { toggleValue } = await import('./performance.logic')
+    const a = ['ID_COPY']
+    expect(toggleValue(a, 'POPIA_CONSENT')).toEqual(['ID_COPY', 'POPIA_CONSENT'])
+    expect(toggleValue(a, 'ID_COPY')).toEqual([])
+    expect(a).toEqual(['ID_COPY'])
+  })
+  it('refuses a save with nothing chosen', async () => {
+    const { readinessSettingsError } = await import('./performance.logic')
+    expect(readinessSettingsError([], [])).toMatch(/at least one/i)
+    expect(readinessSettingsError(['DRUG_TEST'], [])).toBeNull()
+  })
+})
